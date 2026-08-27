@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>0.0.2-SNAPSHOT</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-agent-tools-web-browser</artifactId>
+    <packaging>jar</packaging>
+    <description>
+        Browser-driven web tools — uses headless Chromium via Playwright to
+        fetch single-page-app sites that the plain-HTTP mc-agent-tools-web
+        can't see (JavaScript-rendered content, cookie/consent banners that
+        block static fetches, etc.).
+
+        Kept as a separate module from mc-agent-tools-web because it pulls
+        in a ~150MB Chromium download on first use — apps that don't want
+        that footprint can leave this off their classpath.
+    </description>
+
+    <properties>
+        <playwright.version>1.49.0</playwright.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-tool-spi</artifactId>
+        </dependency>
+        <!--
+            Reused for HtmlToMarkdown + HtmlLinkExtractor so the browser
+            tool emits the same Markdown shape as the HTTP web_read tool
+            (inline [text](url) links in the body, plus the link block at
+            the end). Pulls Jsoup transitively; Tika is not loaded at
+            runtime because we only call the HTML helpers.
+        -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-tools-document</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.playwright</groupId>
+            <artifactId>playwright</artifactId>
+            <version>${playwright.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

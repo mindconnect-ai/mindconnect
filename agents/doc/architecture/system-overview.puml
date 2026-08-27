@@ -1,0 +1,90 @@
+@startuml system-overview
+
+skinparam linetype ortho
+skinparam defaultFontName Arial
+skinparam backgroundColor White
+
+skinparam rectangle {
+  BorderColor #555
+  FontName Arial
+}
+skinparam node {
+  BackgroundColor #FAFAFA
+  BorderColor #555
+  FontName Arial
+}
+skinparam arrow {
+  Color #555
+}
+
+title MindConnect — System Overview
+
+' ─────────────────────────────────────────────
+' ROW 1
+' ─────────────────────────────────────────────
+
+node "[[system-architecture.puml#Data_Providers Data Providers]]" as DP #EEF2FF
+node "[[system-architecture.puml#Data_Pools_Ingestion Data Pools & Ingestion]]" as ING #FFF3E0
+
+' ─────────────────────────────────────────────
+' ROW 2 — CORE SERVICES
+' ─────────────────────────────────────────────
+
+node "[[system-architecture.puml#Agent_Server Agent Server]]" as AS #F0FFF0
+node "[[system-architecture.puml#LLM_Server LLM Server]]" as LLMS #E8F4FD
+node "[[system-architecture.puml#MCP_Gateway MCP Gateway]]" as MCPG #FDE8F5
+node "[[system-architecture.puml#Workflow_Engine Workflow Engine]]" as WF #FFFDE7
+
+' ─────────────────────────────────────────────
+' ROW 3 — SUPPORT SERVICES
+' ─────────────────────────────────────────────
+
+node "[[system-architecture.puml#Memory_Service Memory Service]]" as LMS #FCE4EC
+node "[[system-architecture.puml#Event_Bus Event Bus]]" as EB #F3E5F5
+node "[[system-architecture.puml#Prompt_Repository Prompt Repository\n& Skill Registry]]" as PR #FFF9E6
+node "[[system-architecture.puml#Testbench Testbench]]" as TB #F1F8E9
+node "[[system-architecture.puml#Job_Scheduler Job Scheduler]]" as JS #FBE9E7
+node "[[system-architecture.puml#Message_Repository Message Repository]]" as MR #E8F5E9
+node "[[system-architecture.puml#Script_Execution_Server Script Execution Server]]" as SES #EDE7F6
+
+' ─────────────────────────────────────────────
+' ROW 4 — CLIENTS
+' ─────────────────────────────────────────────
+
+node "[[system-architecture.puml#Clients Clients]]" as CL #FCE4EC
+
+' ─────────────────────────────────────────────
+' CONNECTIONS
+' ─────────────────────────────────────────────
+
+DP  --> ING  : raw documents
+ING --> AS   : retrieval (vector,\nkeyword, chunks)
+ING --> EB   : ingestion events
+
+AS  <-> LMS  : read & write user memories
+AS  <-> MR   : persist & retrieve conversations
+AS  --> LLMS : LLMChatHandler
+AS  --> MCPG : tool calls
+AS  --> WF   : trigger workflow
+AS  --> SES  : execute script as tool
+WF  --> SES  : delegate script steps
+AS  --> PR   : fetch prompts
+AS  <-> EB   : agent events
+
+MCPG --> WF  : invoke workflow\n(backendType=WORKFLOW)
+
+WF  --> EB   : workflow events
+
+TB  --> AS   : inject test conversations
+TB  --> LLMS : LLM-as-judge scoring
+TB  --> MR   : import conversations\nas test cases
+
+JS  --> AS   : trigger agent session
+JS  --> WF   : trigger workflow
+JS  --> ING  : trigger ingestion
+JS  --> EB   : job events
+
+CL  <-> AS   : conversations
+CL  <-> EB   : subscribe / publish events
+
+@enduml

@@ -1,0 +1,16 @@
+{
+  "id": "11111111-1111-1111-1111-111111111111",
+  "name": "demo-llm",
+  "provider": "LM_STUDIO",
+  "model": "openai/gpt-oss-120b",
+  "baseUrl": "http://localhost:1234",
+  "apiKey": "lm-studio",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 2048,
+  "additionalParams": {},
+  "contextWindowTokens": 8192,
+  "isAlias": false,
+  "delegatesTo": null,
+  "retry": null,
+  "rateLimit": null
+}

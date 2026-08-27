@@ -1,0 +1,12 @@
+# Postgres for the cluster demo (same coordinates the tests use):
+#   podman compose up -d     (or docker compose up -d)
+services:
+  postgres:
+    image: postgres:17
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_PASSWORD: test
+      # The demo's own database — integration tests use the default
+      # `postgres` db and DROP their tables; they must never share.
+      POSTGRES_DB: taskqueue

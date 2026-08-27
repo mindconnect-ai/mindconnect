@@ -1,0 +1,5 @@
+@startuml wf_expr
+:assign copy
+  out = "${in}"
+;
+@enduml

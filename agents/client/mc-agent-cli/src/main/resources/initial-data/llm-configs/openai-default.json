@@ -1,0 +1,12 @@
+{
+  "id": "00000001-0000-0000-0000-000000000003",
+  "name": "openai-default",
+  "provider": "OPENAI",
+  "model": "${OPENAI_MODEL:gpt-5.4-mini}",
+  "baseUrl": "https://api.openai.com",
+  "apiKey": "${OPENAI_API_KEY}",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 4096,
+  "additionalParams": {},
+  "contextWindowTokens": 128000
+}

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="600" fill="#FFFFFF"/>
+
+  <text x="600" y="55" text-anchor="middle" font-size="28" font-weight="700" fill="#1F2D5C">
+    SPA interaction
+  </text>
+  <text x="600" y="88" text-anchor="middle" font-size="16" fill="#5C6B82">
+    EventBus handles the click. Server returns JSON. Renderer morphs the DOM.
+  </text>
+
+  <!-- Box 1: User clicks -->
+  <g transform="translate(60, 200)">
+    <rect width="230" height="160" rx="14" fill="#FFFFFF" stroke="#3A7BD5" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="115" y="78" text-anchor="middle" font-size="56">👆</text>
+    <text x="115" y="118" text-anchor="middle" font-size="18" font-weight="700" fill="#1F2D5C">User clicks</text>
+    <text x="115" y="143" text-anchor="middle" font-size="14" fill="#5C6B82">"Delete product"</text>
+  </g>
+
+  <g transform="translate(300, 270)">
+    <line x1="0" y1="10" x2="55" y2="10" stroke="#1F2D5C" stroke-width="3"/>
+    <polygon points="55,3 70,10 55,17" fill="#1F2D5C"/>
+  </g>
+
+  <!-- Box 2: EventBus -->
+  <g transform="translate(380, 200)">
+    <rect width="230" height="160" rx="14" fill="#F0F9F0" stroke="#3A7BD5" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="115" y="78" text-anchor="middle" font-size="48">⚡</text>
+    <text x="115" y="118" text-anchor="middle" font-size="18" font-weight="700" fill="#1F2D5C">EventBus</text>
+    <text x="115" y="143" text-anchor="middle" font-size="14" fill="#5C6B82">intercepts → fetch</text>
+  </g>
+
+  <g transform="translate(620, 270)">
+    <line x1="0" y1="10" x2="55" y2="10" stroke="#1F2D5C" stroke-width="3"/>
+    <polygon points="55,3 70,10 55,17" fill="#1F2D5C"/>
+  </g>
+
+  <!-- Box 3: Controller -->
+  <g transform="translate(700, 200)">
+    <rect width="230" height="160" rx="14" fill="#FFFFFF" stroke="#1F2D5C" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="115" y="78" text-anchor="middle" font-size="48">⚙️</text>
+    <text x="115" y="118" text-anchor="middle" font-size="18" font-weight="700" fill="#1F2D5C">Controller</text>
+    <text x="115" y="143" text-anchor="middle" font-size="14" font-weight="700" fill="#1F2D5C">returns JSON</text>
+  </g>
+
+  <g transform="translate(940, 270)">
+    <line x1="0" y1="10" x2="55" y2="10" stroke="#1F2D5C" stroke-width="3"/>
+    <polygon points="55,3 70,10 55,17" fill="#1F2D5C"/>
+  </g>
+
+  <!-- Box 4: Renderer morphs -->
+  <g transform="translate(1020, 200)">
+    <rect width="140" height="160" rx="14" fill="#E8F4FD" stroke="#1F2D5C" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="70" y="78" text-anchor="middle" font-size="48">🔁</text>
+    <text x="70" y="118" text-anchor="middle" font-size="15" font-weight="700" fill="#1F2D5C">Renderer</text>
+    <text x="70" y="143" text-anchor="middle" font-size="13" fill="#5C6B82">morphs DOM</text>
+  </g>
+
+  <!-- Bottom note -->
+  <g transform="translate(0, 470)">
+    <rect x="60" y="0" width="1080" height="90" rx="10" fill="#FFFBEA" stroke="#B89500" stroke-width="2"/>
+    <text x="600" y="38" text-anchor="middle" font-size="18" font-weight="700" fill="#7A5C00">Same controller, same UiNode tree.</text>
+    <text x="600" y="66" text-anchor="middle" font-size="14" fill="#7A5C00">Only the serialisation differs: HTML for SSR, JSON for SPA.</text>
+  </g>
+</svg>

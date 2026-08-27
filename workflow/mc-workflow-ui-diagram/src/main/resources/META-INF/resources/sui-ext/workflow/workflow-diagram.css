@@ -1,0 +1,91 @@
+/*
+ * Workflow-domain styling for UiDiagram nodes. Ships with mc-workflow-ui-diagram
+ * and is served at /sui-ext/workflow/workflow-diagram.css by any Spring Boot app
+ * that has this module on the classpath (via Spring Boot's automatic
+ * META-INF/resources/ static-asset handling — same pattern as
+ * /sui-ext/diagram/extension.js).
+ *
+ * Pair this file with the diagram extension's own base stylesheet (or your
+ * app's default fills) — the rules here only set domain-specific overrides
+ * (fill colours, dashes, the merge diamond's reduced opacity, etc.) and rely
+ * on the diagram extension to draw the actual primitive geometry.
+ *
+ * The class names match the constants in {@code WorkflowShapes.java} — keep
+ * those two files in sync.
+ */
+
+.wf-event-start .sui-diagram-shape {
+    fill: #4caf50;
+    stroke: #2e7d32;
+}
+
+.wf-event-end .sui-diagram-shape {
+    fill: #ffffff;
+    stroke: #b3261e;
+}
+
+.wf-action .sui-diagram-shape {
+    fill: #f0f4ff;
+    stroke: #3b6fd9;
+}
+
+.wf-decision .sui-diagram-shape {
+    fill: #fff5d6;
+    stroke: #c89c00;
+}
+
+/* Synthetic re-join after a decision — dashed border + slightly transparent
+ * to signal "scaffolding, not a real step". */
+.wf-merge .sui-diagram-shape {
+    fill: #fff5d6;
+    stroke: #c89c00;
+    stroke-dasharray: 3 3;
+}
+
+.wf-fork .sui-diagram-shape,
+.wf-join .sui-diagram-shape {
+    fill: #1d2129;
+    stroke: #1d2129;
+}
+
+.wf-call .sui-diagram-shape {
+    fill: #efe7ff;
+    stroke: #6c3fc5;
+}
+
+.wf-subprocess .sui-diagram-shape {
+    fill: #e7f5ee;
+    stroke: #2f7f53;
+}
+
+/* The "+" badge that subprocess nodes carry — same green as the subprocess
+ * outline so it reads as part of the same shape, not a generic icon. */
+.wf-subprocess .sui-diagram-marker {
+    fill: #2f7f53;
+}
+
+/* ── Containers ───────────────────────────────────────────────────────────
+ * Containers wrap one or more child nodes. They share a translucent fill +
+ * dashed border so the children inside read as the dominant content, with
+ * the container as a soft frame around them. Per-role variants tint the
+ * frame to match the surrounding workflow vocabulary (yellow for decision
+ * branches, green for loop bodies, neutral grey for plain blocks). */
+
+.wf-branch-container .sui-diagram-shape {
+    fill: rgba(255, 245, 214, 0.45);
+    stroke: #c89c00;
+    stroke-dasharray: 4 4;
+}
+
+.wf-loop-container .sui-diagram-shape {
+    fill: rgba(231, 245, 238, 0.45);
+    stroke: #2f7f53;
+    stroke-dasharray: 4 4;
+}
+
+.wf-block-container .sui-diagram-shape {
+    fill: rgba(240, 244, 255, 0.45);
+    stroke: #5b6470;
+    stroke-dasharray: 4 4;
+}
+

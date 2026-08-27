@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>UiDiagram editor harness</title>
+    <!-- Base <sui-diagram> styling (edges, markers, buttons); ships with the
+         diagram extension. -->
+    <link rel="stylesheet" href="/sui-ext/diagram/diagram.css">
+    <!-- Workflow-domain colour scheme (ships with mc-workflow-ui-diagram). -->
+    <link rel="stylesheet" href="/sui-ext/workflow/workflow-diagram.css">
+    <!-- App-local layout, header, side-panel, dialog. -->
+    <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+    <header>
+        <h1>UiDiagram editor</h1>
+        <label>
+            Workflow:
+            <select id="sample-picker"></select>
+        </label>
+        <button id="reload-btn" type="button">Reload</button>
+        <button id="save-btn" type="button">Save</button>
+        <div class="mode-toggle" role="group" aria-label="Canvas mode">
+            <button id="mode-select-btn" type="button" class="mode-btn mode-btn--active">Select</button>
+            <button id="mode-pan-btn"    type="button" class="mode-btn">Pan</button>
+        </div>
+        <span id="status" class="status"></span>
+    </header>
+
+    <div class="layout">
+        <main id="diagram-host">
+            <p class="placeholder">Pick a workflow above.</p>
+        </main>
+        <aside id="side-panel">
+            <h2>Selected step</h2>
+            <p class="placeholder" id="side-placeholder">Click a node to inspect.</p>
+            <div id="side-content" hidden>
+                <dl>
+                    <dt>Step</dt>
+                    <dd id="side-stepref"></dd>
+                    <dt>Type</dt>
+                    <dd id="side-steptype"></dd>
+                </dl>
+                <form id="step-form">
+                    <label>Name
+                        <input type="text" name="name" id="rename-input">
+                    </label>
+                    <!-- Step-type-specific fields are appended here at runtime -->
+                    <div id="step-fields"></div>
+                    <button id="save-step-btn" type="button">Save changes</button>
+                </form>
+                <button id="delete-btn" type="button" class="danger">Delete</button>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Step-type picker shown when the user clicks a + on an edge -->
+    <dialog id="insert-dialog">
+        <form method="dialog">
+            <h2>Insert step</h2>
+            <p id="insert-after-label"></p>
+            <ul id="insert-options"></ul>
+            <menu>
+                <button value="cancel">Cancel</button>
+            </menu>
+        </form>
+    </dialog>
+
+    <script type="module">
+        import { SuiRenderer } from "/sui/renderer.js";
+        import { install as installDiagram } from "/sui-ext/diagram/extension.js";
+
+        const renderer = new SuiRenderer();
+        installDiagram(renderer);
+
+        const picker     = document.getElementById("sample-picker");
+        const host       = document.getElementById("diagram-host");
+        const reload     = document.getElementById("reload-btn");
+        const saveBtn    = document.getElementById("save-btn");
+        const statusEl   = document.getElementById("status");
+        const sideContent = document.getElementById("side-content");
+        const sidePlaceholder = document.getElementById("side-placeholder");
+        const sideStepRef  = document.getElementById("side-stepref");
+        const sideStepType = document.getElementById("side-steptype");
+        const renameInput  = document.getElementById("rename-input");
+        const stepFields   = document.getElementById("step-fields");
+        const saveStepBtn  = document.getElementById("save-step-btn");
+        const deleteBtn    = document.getElementById("delete-btn");
+        const insertDialog = document.getElementById("insert-dialog");
+        const insertOptions = document.getElementById("insert-options");
+        const insertAfterLabel = document.getElementById("insert-after-label");
+        const modeSelectBtn = document.getElementById("mode-select-btn");
+        const modePanBtn    = document.getElementById("mode-pan-btn");
+
+        /**
+         * Toggles the canvas between Select and Pan mode. Calls the
+         * component's setMode() so the diagram knows which mousedowns to
+         * own. Survives diagram re-renders because we apply it after each
+         * mutation via syncCanvasMode().
+         */
+        let canvasMode = "select";
+        function setCanvasMode(m) {
+            canvasMode = m;
+            modeSelectBtn.classList.toggle("mode-btn--active", m === "select");
+            modePanBtn.classList.toggle("mode-btn--active",   m === "pan");
+            syncCanvasMode();
+        }
+        function syncCanvasMode() {
+            const el = host.querySelector("sui-diagram");
+            if (el && typeof el.setMode === "function") el.setMode(canvasMode);
+        }
+        modeSelectBtn.addEventListener("click", () => setCanvasMode("select"));
+        modePanBtn.addEventListener("click",    () => setCanvasMode("pan"));
+
+        // Selection state — kept here (not in the component) because the side
+        // panel is part of the host page, not the canvas.
+        let currentWorkflow = null;
+        let selectedStepRef = null;
+        let selectedStepData = null;   // the full StepData JSON for the selected step
+        let pendingAfterRef = null;
+        // Pending container insertion — either pendingAfterRef OR these are set
+        // when the insert dialog is open. Set from sui-diagram-insert-into.
+        let pendingContainer = null;   // { containerPath, position }
+        let stepTypeOptions = [];
+
+        function setStatus(msg, isError = false) {
+            statusEl.textContent = msg;
+            statusEl.classList.toggle("status--error", isError);
+        }
+
+        async function loadList() {
+            const [names, types] = await Promise.all([
+                fetch("/api/workflows").then(r => r.json()),
+                fetch("/api/workflows/step-types").then(r => r.json()),
+            ]);
+            stepTypeOptions = types;
+
+            picker.innerHTML = "";
+            for (const n of names) {
+                const o = document.createElement("option");
+                o.value = n;
+                o.textContent = n;
+                picker.appendChild(o);
+            }
+        }
+
+        async function loadDiagram(name) {
+            currentWorkflow = name;
+            selectedStepRef = null;
+            sideContent.hidden = true;
+            sidePlaceholder.hidden = false;
+
+            host.innerHTML = `<p class="placeholder">Loading ${name}…</p>`;
+            try {
+                const res = await fetch(`/api/workflows/${name}/diagram`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const node = await res.json();
+                host.innerHTML = renderer.render(node);
+                syncCanvasMode();
+                setStatus("");
+            } catch (err) {
+                host.innerHTML = `<pre class="error">Failed to load: ${err}</pre>`;
+                setStatus(`Load failed: ${err.message}`, true);
+            }
+        }
+
+        function replaceDiagramFromResponse(node) {
+            // Reuse the existing <sui-diagram> element when possible — just
+            // swap its data-graph attribute. Tearing down and re-creating the
+            // element on every save/insert/delete would also reset the
+            // component's view state (camera pan/zoom, selection), which
+            // makes the editor feel jumpy. Falls back to full innerHTML
+            // replacement if no element exists yet.
+            const existing = host.querySelector("sui-diagram");
+            const html = renderer.render(node);
+            if (!existing) {
+                host.innerHTML = html;
+                return;
+            }
+            const tpl = document.createElement("template");
+            tpl.innerHTML = html;
+            const fresh = tpl.content.querySelector("sui-diagram");
+            const payload = fresh?.getAttribute("data-graph");
+            if (payload != null) existing.setAttribute("data-graph", payload);
+            else host.innerHTML = html;   // unexpected shape — full rebuild
+        }
+
+        // ── Custom event handlers (from <sui-diagram>) ──────────────────────
+
+        host.addEventListener("sui-diagram-node-selected", async (ev) => {
+            const { stepRef } = ev.detail;
+            selectedStepRef = stepRef;
+            selectedStepData = null;
+            stepFields.innerHTML = "";
+            if (!stepRef) {
+                sideContent.hidden = true;
+                sidePlaceholder.hidden = false;
+                sidePlaceholder.textContent = "Synthetic node — no editable step.";
+                return;
+            }
+            // Skip the property-fetch for reserved-prefix refs (__start__,
+            // __end__, __merge__:<if>, __branch__:<path>). They're draggable
+            // scaffolding — no StepData lives behind them.
+            if (stepRef.startsWith("__")) {
+                sideContent.hidden = false;
+                sidePlaceholder.hidden = true;
+                sideStepRef.textContent = stepRef;
+                sideStepType.textContent = stepRef.startsWith("__merge__:") ? "join"
+                    : stepRef.startsWith("__branch__:") ? "branch"
+                    : "event";
+                renameInput.value = stepRef;
+                renameInput.disabled = true;
+                saveStepBtn.disabled = true;
+                deleteBtn.disabled = true;
+                return;
+            }
+            renameInput.disabled = false;
+            saveStepBtn.disabled = false;
+            deleteBtn.disabled = false;
+
+            try {
+                const res = await fetch(`/api/workflows/${currentWorkflow}/steps/${encodeURIComponent(stepRef)}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                selectedStepData = await res.json();
+            } catch (err) {
+                setStatus(`Could not load step: ${err.message}`, true);
+                return;
+            }
+            sideContent.hidden = false;
+            sidePlaceholder.hidden = true;
+            sideStepRef.textContent = stepRef;
+            sideStepType.textContent = selectedStepData.type ?? "(unknown)";
+            renameInput.value = stepRef;
+            renderStepFields(selectedStepData);
+        });
+
+        /**
+         * Renders the type-specific fields into #step-fields. Reads
+         * step.type (set by the server's polymorphic Jackson config) and
+         * dispatches to a per-type renderer. Unknown types fall back to a
+         * read-only JSON dump so the user still sees the data.
+         */
+        function renderStepFields(step) {
+            stepFields.innerHTML = "";
+            switch (step.type) {
+                case "code":            return renderCodeFields(step);
+                case "httpcall":        return renderHttpFields(step);
+                case "assignvariables": return renderAssignFields(step);
+                case "callworkflow":    return renderCallFields(step);
+                case "if":              return renderIfFields(step);
+                case "foreach":         return renderForEachFields(step);
+                case "jumpto":          return renderJumpToFields(step);
+                case "block":           return; // name is the only editable thing
+                default: {
+                    const pre = document.createElement("pre");
+                    pre.textContent = JSON.stringify(step, null, 2);
+                    pre.style.fontSize = "0.75rem";
+                    stepFields.appendChild(pre);
+                }
+            }
+        }
+
+        function addField(label, input) {
+            const wrap = document.createElement("label");
+            wrap.textContent = label;
+            wrap.appendChild(input);
+            stepFields.appendChild(wrap);
+        }
+        function makeInput(name, value, placeholder) {
+            const i = document.createElement("input");
+            i.type = "text"; i.name = name; i.value = value ?? "";
+            if (placeholder) i.placeholder = placeholder;
+            return i;
+        }
+        function makeTextarea(name, value, rows) {
+            const t = document.createElement("textarea");
+            t.name = name; t.value = value ?? ""; t.rows = rows ?? 4;
+            t.style.width = "100%";
+            return t;
+        }
+        function makeSelect(name, value, options) {
+            const s = document.createElement("select");
+            s.name = name;
+            for (const opt of options) {
+                const o = document.createElement("option");
+                o.value = opt; o.textContent = opt;
+                if (opt === value) o.selected = true;
+                s.appendChild(o);
+            }
+            return s;
+        }
+        function makeCheckbox(name, checked) {
+            const c = document.createElement("input");
+            c.type = "checkbox"; c.name = name; c.checked = !!checked;
+            return c;
+        }
+
+        function renderCodeFields(s) {
+            addField("Language", makeSelect("language", s.language ?? "javascript",
+                ["mini", "javascript", "groovy", "python", "beanshell"]));
+            addField("Code", makeTextarea("code", s.code, 8));
+        }
+        function renderHttpFields(s) {
+            addField("Method", makeSelect("method", s.method ?? "GET",
+                ["GET", "POST", "PUT", "PATCH", "DELETE"]));
+            addField("URL", makeInput("url", s.url, "https://…/${var}"));
+            addField("Body", makeTextarea("body", s.body, 4));
+            addField("Content-Type", makeInput("contentType", s.contentType, "application/json"));
+        }
+        function renderAssignFields(s) {
+            const list = document.createElement("div");
+            list.className = "var-list";
+            const assigns = Array.isArray(s.variableAssignments) ? s.variableAssignments : [];
+            function rebuild() {
+                list.innerHTML = "";
+                assigns.forEach((va, idx) => {
+                    const row = document.createElement("div");
+                    row.style.display = "flex"; row.style.gap = "0.25rem"; row.style.marginBottom = "0.25rem";
+                    const k = makeInput(`var_${idx}_name`, va.varName, "varName");
+                    const v = makeInput(`var_${idx}_expr`, va.expressionOrVarName, "expression");
+                    k.addEventListener("input", () => assigns[idx].varName = k.value);
+                    v.addEventListener("input", () => assigns[idx].expressionOrVarName = v.value);
+                    const del = document.createElement("button");
+                    del.type = "button"; del.textContent = "✕";
+                    del.addEventListener("click", () => { assigns.splice(idx, 1); rebuild(); });
+                    row.append(k, v, del);
+                    list.appendChild(row);
+                });
+            }
+            rebuild();
+            const addBtn = document.createElement("button");
+            addBtn.type = "button"; addBtn.textContent = "+ Add assignment";
+            addBtn.addEventListener("click", () => {
+                assigns.push({ varName: "", expressionOrVarName: "" });
+                rebuild();
+            });
+            // Stash the array under a known key so collectFormPatch() can pick it up.
+            list.dataset.stash = "variableAssignments";
+            stepFields.append(list, addBtn);
+            // Expose for collectFormPatch():
+            stepFields._assigns = assigns;
+        }
+        function renderCallFields(s) {
+            addField("Workflow", makeInput("workflow", s.workflow, "workflow-id"));
+            // assignParams is a Map<String,String>; for simplicity we render
+            // it as JSON in a textarea. Parse on save.
+            const j = JSON.stringify(s.assignParams ?? {}, null, 2);
+            const ta = makeTextarea("assignParamsJson", j, 4);
+            addField("Param mapping (JSON)", ta);
+        }
+        function renderIfFields(s) {
+            // The builder currently only exposes the first condition's text
+            // in the diagram label; mirror that in the side panel for now.
+            const c0 = (s.conditions ?? [])[0];
+            addField("Condition", makeInput("conditionExpression", c0?.condition, "spel: x > 0"));
+        }
+        function renderForEachFields(s) {
+            addField("Loop over", makeInput("loopOver", s.loopOver, "varName or expression"));
+            addField("Item var", makeInput("runVar", s.runVar, "item"));
+            addField("Index var (optional)", makeInput("indexVar", s.indexVar, "idx"));
+            const cb = makeCheckbox("parallel", s.parallel);
+            addField("Parallel", cb);
+        }
+        function renderJumpToFields(s) {
+            // Build the target picker from every step-ref currently in the
+            // diagram, minus reserved-prefix scaffolding and the jump itself
+            // (no point jumping to your own line).
+            const refs = collectStepRefs().filter(r => r !== selectedStepRef);
+            const sel = document.createElement("select");
+            sel.name = "jumpTo";
+            const blank = document.createElement("option");
+            blank.value = ""; blank.textContent = "— pick a target step —";
+            if (!s.jumpTo) blank.selected = true;
+            sel.appendChild(blank);
+            for (const r of refs) {
+                const o = document.createElement("option");
+                o.value = r; o.textContent = r;
+                if (r === s.jumpTo) o.selected = true;
+                sel.appendChild(o);
+            }
+            addField("Jump to", sel);
+        }
+
+        /**
+         * All step-refs currently shown on the canvas, in render order, minus
+         * synthetic scaffolding (start/end/merge/branch markers). Read off the
+         * DOM so we don't need a separate workflow→steps fetch — the diagram
+         * already carries every step we care about.
+         */
+        function collectStepRefs() {
+            const out = [];
+            host.querySelectorAll("[data-step-ref]").forEach(el => {
+                const r = el.dataset.stepRef;
+                if (!r || r.startsWith("__")) return;
+                if (!out.includes(r)) out.push(r);
+            });
+            return out;
+        }
+
+        /**
+         * Collects the form values back into a patch object that mirrors the
+         * field names on the server-side StepData class. Per-type because
+         * the field set differs, but most are straight {name → input.value}.
+         */
+        function collectFormPatch(step) {
+            const patch = { name: renameInput.value.trim() };
+            const getVal = (n) => stepFields.querySelector(`[name="${n}"]`);
+            const getStr = (n) => getVal(n)?.value ?? "";
+            const getBool = (n) => !!(getVal(n)?.checked);
+            switch (step.type) {
+                case "code":
+                    patch.language = getStr("language");
+                    patch.code     = getStr("code");
+                    break;
+                case "httpcall":
+                    patch.method      = getStr("method");
+                    patch.url         = getStr("url");
+                    patch.body        = getStr("body");
+                    patch.contentType = getStr("contentType");
+                    break;
+                case "assignvariables":
+                    patch.variableAssignments = stepFields._assigns ?? [];
+                    break;
+                case "callworkflow":
+                    patch.workflow = getStr("workflow");
+                    try {
+                        patch.assignParams = JSON.parse(getStr("assignParamsJson") || "{}");
+                    } catch {
+                        throw new Error("Param mapping is not valid JSON");
+                    }
+                    break;
+                case "if": {
+                    const expr = getStr("conditionExpression");
+                    const oldConditions = step.conditions ?? [];
+                    if (oldConditions.length > 0) {
+                        oldConditions[0].condition = expr;
+                    } else {
+                        oldConditions.push({ condition: expr });
+                    }
+                    patch.conditions = oldConditions;
+                    break;
+                }
+                case "foreach":
+                    patch.loopOver  = getStr("loopOver");
+                    patch.runVar    = getStr("runVar");
+                    patch.indexVar  = getStr("indexVar");
+                    patch.parallel  = getBool("parallel");
+                    break;
+                case "jumpto":
+                    patch.jumpTo    = getStr("jumpTo");
+                    break;
+            }
+            return patch;
+        }
+
+        host.addEventListener("sui-diagram-node-moved", async (ev) => {
+            if (!currentWorkflow) return;
+            const { stepRef, x, y } = ev.detail;
+            try {
+                const res = await fetch(`/api/workflows/${currentWorkflow}/move-node`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ stepRef, x, y }),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                setStatus(`Moved ${stepRef}`);
+            } catch (err) {
+                setStatus(`Move failed: ${err.message}`, true);
+            }
+        });
+
+        host.addEventListener("sui-diagram-edge-waypoints-changed", async (ev) => {
+            if (!currentWorkflow) return;
+            const { sourceStepRef, targetStepRef, waypoints } = ev.detail;
+            try {
+                const res = await fetch(`/api/workflows/${currentWorkflow}/edge-waypoints`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        source: sourceStepRef,
+                        target: targetStepRef,
+                        waypoints,
+                    }),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                setStatus(`Edge ${sourceStepRef}→${targetStepRef}: ${waypoints.length} waypoint(s)`);
+            } catch (err) {
+                setStatus(`Edge update failed: ${err.message}`, true);
+            }
+        });
+
+        host.addEventListener("sui-diagram-insert-after", (ev) => {
+            const { afterStepRef } = ev.detail;
+            // A click on the If's join-node carries afterStepRef =
+            // "__merge__:<ifName>". Semantically that means "insert after
+            // the whole If" — the underlying server endpoint just wants the
+            // If's own name as the anchor.
+            const resolved = afterStepRef && afterStepRef.startsWith("__merge__:")
+                ? afterStepRef.substring("__merge__:".length)
+                : afterStepRef;
+            pendingAfterRef = resolved;
+            pendingContainer = null;
+            insertAfterLabel.textContent = resolved
+                ? `After step "${resolved}"`
+                : `At the beginning`;
+            openInsertDialog();
+        });
+
+        host.addEventListener("sui-diagram-insert-into", (ev) => {
+            const { containerPath, position } = ev.detail;
+            pendingAfterRef = null;
+            pendingContainer = { containerPath, position };
+            const where = position === "first" ? "at the start of" : "at the end of";
+            insertAfterLabel.textContent = `Insert ${where} ${describeContainer(containerPath)}`;
+            openInsertDialog();
+        });
+
+        function describeContainer(containerPath) {
+            // containerPath shapes: block:<name>, foreach:<name>,
+            // if:<name>:then:<idx>, if:<name>:else
+            const parts = containerPath.split(":");
+            if (parts[0] === "block") return `block "${parts[1]}"`;
+            if (parts[0] === "foreach") return `foreach "${parts[1]}"`;
+            if (parts[0] === "if" && parts[2] === "else") return `the else branch of "${parts[1]}"`;
+            if (parts[0] === "if" && parts[2] === "then") return `then branch ${parts[3]} of "${parts[1]}"`;
+            return containerPath;
+        }
+
+        function openInsertDialog() {
+            // Build the picker list fresh each time — keeps the dialog in sync
+            // with whatever step-types the server reports.
+            insertOptions.innerHTML = "";
+            for (const opt of stepTypeOptions) {
+                const li = document.createElement("li");
+                const b  = document.createElement("button");
+                b.type = "button";
+                b.textContent = opt.label;
+                b.addEventListener("click", () => {
+                    insertDialog.close();
+                    insertStep(opt.stepType);
+                });
+                li.appendChild(b);
+                insertOptions.appendChild(li);
+            }
+            insertDialog.showModal();
+        }
+
+        host.addEventListener("sui-diagram-delete", async (ev) => {
+            const { stepRef } = ev.detail;
+            if (!currentWorkflow) return;
+            if (!confirm(deletePromptFor(stepRef))) return;
+            await mutate(`steps/${encodeURIComponent(stepRef)}`, "DELETE");
+        });
+
+        // ── Side-panel actions ─────────────────────────────────────────────
+
+        saveStepBtn.addEventListener("click", async () => {
+            if (!selectedStepRef || !currentWorkflow || !selectedStepData) return;
+            let patch;
+            try {
+                patch = collectFormPatch(selectedStepData);
+            } catch (err) {
+                setStatus(`Save failed: ${err.message}`, true);
+                return;
+            }
+            try {
+                const res = await fetch(
+                    `/api/workflows/${currentWorkflow}/steps/${encodeURIComponent(selectedStepRef)}`,
+                    { method: "PUT", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(patch) });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const node = await res.json();
+                replaceDiagramFromResponse(node);
+                // The step may have been renamed; update the selection ref so
+                // subsequent saves hit the right path.
+                if (patch.name && patch.name !== selectedStepRef) {
+                    selectedStepRef = patch.name;
+                    sideStepRef.textContent = selectedStepRef;
+                }
+                setStatus("Saved");
+            } catch (err) {
+                setStatus(`Save failed: ${err.message}`, true);
+            }
+        });
+
+        deleteBtn.addEventListener("click", async () => {
+            if (!selectedStepRef || !currentWorkflow) return;
+            if (!confirm(deletePromptFor(selectedStepRef))) return;
+            await mutate(`steps/${encodeURIComponent(selectedStepRef)}`, "DELETE");
+        });
+
+        // Container steps (block, if, foreach) take their whole subtree with
+        // them when deleted; warn the user when that's about to happen so a
+        // misclick doesn't silently nuke half the workflow.
+        function deletePromptFor(stepRef) {
+            const g = host.querySelector(`[data-node-id][data-step-ref="${stepRef}"]`);
+            const isContainer = !!g && g.querySelector(":scope > g[data-node-id]") !== null;
+            return isContainer
+                ? `Delete "${stepRef}" and everything inside it?`
+                : `Delete step "${stepRef}"?`;
+        }
+
+        // ── Helpers ────────────────────────────────────────────────────────
+
+        async function insertStep(stepType) {
+            if (!currentWorkflow) return;
+            const body = pendingContainer
+                ? { stepType, intoContainer: pendingContainer.containerPath,
+                    position: pendingContainer.position }
+                : { stepType, afterStepRef: pendingAfterRef };
+            try {
+                const res = await fetch(`/api/workflows/${currentWorkflow}/insert-step`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const node = await res.json();
+                replaceDiagramFromResponse(node);
+                setStatus(`Inserted ${stepType}`);
+            } catch (err) {
+                setStatus(`Insert failed: ${err.message}`, true);
+            }
+        }
+
+        async function mutate(pathSuffix, method) {
+            try {
+                const res = await fetch(`/api/workflows/${currentWorkflow}/${pathSuffix}`,
+                    { method });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const node = await res.json();
+                replaceDiagramFromResponse(node);
+                // Clear selection — the underlying step may have been renamed
+                // (stepRef changed) or removed entirely.
+                selectedStepRef = null;
+                sideContent.hidden = true;
+                sidePlaceholder.hidden = false;
+                sidePlaceholder.textContent = "Click a node to inspect.";
+                setStatus("OK");
+            } catch (err) {
+                setStatus(`Mutation failed: ${err.message}`, true);
+            }
+        }
+
+        picker.addEventListener("change", () => loadDiagram(picker.value));
+        reload.addEventListener("click", () => loadDiagram(picker.value));
+        saveBtn.addEventListener("click", async () => {
+            if (!currentWorkflow) return;
+            try {
+                const res = await fetch(`/api/workflows/${currentWorkflow}/save`, { method: "POST" });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const body = await res.json();
+                setStatus(`Saved → ${body.savedTo}`);
+            } catch (err) {
+                setStatus(`Save failed: ${err.message}`, true);
+            }
+        });
+
+        await loadList();
+        if (picker.options.length > 0) {
+            picker.value = picker.options[0].value;
+            await loadDiagram(picker.value);
+        }
+    </script>
+</body>
+</html>

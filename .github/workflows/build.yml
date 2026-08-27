@@ -1,0 +1,142 @@
+name: build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# dorny/paths-filter lists a PR's changed files through the GitHub API, which
+# needs pull-requests: read. Repos whose default GITHUB_TOKEN permissions are
+# restricted don't grant that unless the workflow asks — without it the changes
+# job fails with "Resource not accessible by integration".
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 1) Detect which areas changed, then decide what must be built.
+  #    Dependency rules:
+  #      mc-java-parent/** -> everything inherits the base parent -> build all
+  #      (the area parents live INSIDE their areas — agents/mc-agents-parent,
+  #       workflow/mc-workflow-parent — so the area filters below cover them)
+  #      common/**      -> agents and workflow consume common      -> build those
+  #      agents/**      -> isolated (pulls common in as a module)  -> build agents
+  #      workflow/**    -> agents consume workflow artifacts       -> build workflow + agents
+  #    (semantic-ui moved to its own repo — mindconnect-ai/mc-semantic-ui —
+  #     and is consumed as published Maven artifacts.)
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.decide.outputs.matrix }}
+      any: ${{ steps.decide.outputs.any }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            parents:
+              - 'mc-java-parent/**'
+            common:
+              - 'common/**'
+            agents:
+              - 'agents/**'
+            workflow:
+              - 'workflow/**'
+            ci:
+              - '.github/workflows/build.yml'
+
+      - name: Decide build matrix
+        id: decide
+        env:
+          PARENTS: ${{ steps.filter.outputs.parents }}
+          COMMON: ${{ steps.filter.outputs.common }}
+          AGENTS: ${{ steps.filter.outputs.agents }}
+          WORKFLOW: ${{ steps.filter.outputs.workflow }}
+          CI: ${{ steps.filter.outputs.ci }}
+        run: |
+          set -euo pipefail
+          areas=""
+          add() { case " $areas " in *" $1 "*) ;; *) areas="$areas $1";; esac; }
+
+          # parents or the CI file itself -> build everything
+          if [ "$PARENTS" = "true" ] || [ "$CI" = "true" ]; then
+            add agents; add workflow
+          else
+            [ "$AGENTS" = "true" ]      && add agents      || true
+            # agents consume workflow artifacts (workflow tools + embedded
+            # workflow admin), so a workflow change must rebuild agents too.
+            if [ "$WORKFLOW" = "true" ]; then add workflow; add agents; fi
+            # Fan-out: both agents and workflow embed common modules.
+            if [ "$COMMON" = "true" ]; then add agents; add workflow; fi
+          fi
+
+          # Build a JSON array for the matrix
+          json="["
+          first=true
+          for a in $areas; do
+            $first && first=false || json="$json,"
+            json="$json\"$a\""
+          done
+          json="$json]"
+
+          echo "matrix=$json" >> "$GITHUB_OUTPUT"
+          if [ "$areas" = "" ]; then echo "any=false" >> "$GITHUB_OUTPUT"; else echo "any=true" >> "$GITHUB_OUTPUT"; fi
+          echo "Will build:$areas"
+
+  # 2) Build only the affected areas, in parallel.
+  build:
+    needs: changes
+    if: needs.changes.outputs.any == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        area: ${{ fromJSON(needs.changes.outputs.matrix) }}
+    name: build (${{ matrix.area }})
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # The agents reactor consumes workflow artifacts (mc-agent-tools-workflow
+      # depends on mc-workflow/*, mc-agent-admin-ui-app embeds the workflow
+      # admin) that it does not build itself — install them first, without
+      # tests: the workflow area runs its own test job. The parent POMs must
+      # land in the local repo too: inside a reactor they resolve via
+      # relativePath, but consumed-from-repo artifact descriptors need the
+      # parents as installed artifacts.
+      - name: Install workflow artifacts (agents consume them)
+        if: matrix.area == 'agents'
+        run: |
+          mvn -B -ntp -N -f mc-java-parent/pom.xml install
+          mvn -B -ntp -f workflow/pom.xml clean install -DskipTests
+
+      - name: Build & test ${{ matrix.area }}
+        run: mvn -B -ntp -f ${{ matrix.area }}/pom.xml clean install
+
+  # 3) A stable status check that is always green when nothing needed building,
+  #    so branch protection can require "build-result" regardless of paths.
+  build-result:
+    needs: [changes, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify build outcome
+        run: |
+          if [ "${{ needs.build.result }}" = "failure" ] || [ "${{ needs.build.result }}" = "cancelled" ]; then
+            echo "A build job failed."; exit 1
+          fi
+          echo "OK (built: ${{ needs.changes.outputs.matrix }})"

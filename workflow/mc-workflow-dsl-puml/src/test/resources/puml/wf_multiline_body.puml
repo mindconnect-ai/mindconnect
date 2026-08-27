@@ -1,0 +1,17 @@
+@startuml wf_multiline_body
+:input -> userId, amount;
+start
+:httpcall postOrder
+url = https://example.com/api/orders
+method = POST
+assign-result -> orderId;
+note right
+  body:
+  {
+    "userId": "${userId}",
+    "amount": "${amount}"
+  }
+end note
+stop
+:output <- orderId;
+@enduml

@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 700" font-family="'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.20"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#1F2D5C"/>
+    </marker>
+    <marker id="arrowhead-loop" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto">
+      <polygon points="0,0 10,5 0,10" fill="#E91E63"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="700" fill="#FFFFFF"/>
+
+  <text x="600" y="46" text-anchor="middle" font-size="28" font-weight="700" fill="#1F2D5C">
+    How it works
+  </text>
+  <text x="600" y="74" text-anchor="middle" font-size="16" fill="#5C6B82">
+    One model. One controller. Many renderers.
+  </text>
+
+  <!-- ── Box 1: Backend ────────────────────────────────────────── -->
+  <g transform="translate(40, 215)">
+    <rect width="190" height="130" rx="14" fill="#FFFFFF" stroke="#1F2D5C" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="95" y="60" text-anchor="middle" font-size="42">⚙️</text>
+    <text x="95" y="92" text-anchor="middle" font-size="18" font-weight="700" fill="#1F2D5C">Backend</text>
+    <text x="95" y="115" text-anchor="middle" font-size="13" fill="#5C6B82">creates / replaces</text>
+  </g>
+
+  <!-- Arrow from Backend to BOTH UiPage and UiPatch (forking) -->
+  <g>
+    <!-- Top fork: UiPage (full tree) -->
+    <path d="M 240 260 L 305 215" stroke="#1F2D5C" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+    <!-- Bottom fork: UiPatch (diff) -->
+    <path d="M 240 300 L 305 345" stroke="#1F2D5C" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  </g>
+
+  <!-- ── Box 2a: UiPage (full tree) ───────────────────────────── -->
+  <g transform="translate(315, 175)">
+    <rect width="200" height="90" rx="14" fill="#E8F4FD" stroke="#1F2D5C" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="100" y="36" text-anchor="middle" font-size="28">🌳</text>
+    <text x="100" y="62" text-anchor="middle" font-size="16" font-weight="700" fill="#1F2D5C">UiPage</text>
+    <text x="100" y="80" text-anchor="middle" font-size="12" fill="#5C6B82">full UiNode tree</text>
+  </g>
+
+  <!-- ── Box 2b: UiPatch (diff) ───────────────────────────────── -->
+  <g transform="translate(315, 295)">
+    <rect width="200" height="90" rx="14" fill="#E8F5E9" stroke="#4CAF50" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="100" y="36" text-anchor="middle" font-size="28">✨</text>
+    <text x="100" y="62" text-anchor="middle" font-size="16" font-weight="700" fill="#2E7D32">UiPatch</text>
+    <text x="100" y="80" text-anchor="middle" font-size="12" fill="#2E7D32">tiny diff — APPEND / REPLACE / …</text>
+  </g>
+
+  <!-- Both UiPage and UiPatch merge into Renderer -->
+  <g>
+    <path d="M 525 218 L 590 260" stroke="#1F2D5C" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+    <path d="M 525 340 L 590 298" stroke="#1F2D5C" stroke-width="3" fill="none" marker-end="url(#arrowhead)"/>
+  </g>
+
+  <!-- ── Box 3: Renderer ──────────────────────────────────────── -->
+  <g transform="translate(600, 215)">
+    <rect width="190" height="130" rx="14" fill="#FFFFFF" stroke="#1F2D5C" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="95" y="60" text-anchor="middle" font-size="42">🎨</text>
+    <text x="95" y="92" text-anchor="middle" font-size="18" font-weight="700" fill="#1F2D5C">Renderer</text>
+    <text x="95" y="115" text-anchor="middle" font-size="13" fill="#5C6B82">paints / morphs</text>
+  </g>
+
+  <!-- ── Four render targets fanning out ──────────────────────── -->
+  <g>
+    <line x1="800" y1="245" x2="855" y2="190" stroke="#1F2D5C" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <line x1="800" y1="262" x2="855" y2="248" stroke="#1F2D5C" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <line x1="800" y1="278" x2="855" y2="308" stroke="#1F2D5C" stroke-width="2" marker-end="url(#arrowhead)"/>
+    <line x1="800" y1="295" x2="855" y2="368" stroke="#1F2D5C" stroke-width="2" marker-end="url(#arrowhead)"/>
+  </g>
+
+  <g transform="translate(870, 170)">
+    <rect width="140" height="50" rx="10" fill="#E8F5E9" stroke="#4CAF50" stroke-width="2"/>
+    <text x="70" y="32" text-anchor="middle" font-size="15" font-weight="700" fill="#2E7D32">📄 SSR (HTML)</text>
+  </g>
+  <g transform="translate(870, 230)">
+    <rect width="140" height="50" rx="10" fill="#E8F4FD" stroke="#3A7BD5" stroke-width="2"/>
+    <text x="70" y="32" text-anchor="middle" font-size="15" font-weight="700" fill="#1F4E8C">🌐 SPA (TS)</text>
+  </g>
+  <g transform="translate(870, 290)">
+    <rect width="140" height="50" rx="10" fill="#FFF4E6" stroke="#FF9800" stroke-width="2"/>
+    <text x="70" y="32" text-anchor="middle" font-size="15" font-weight="700" fill="#B25C00">🖥 Swing</text>
+  </g>
+  <g transform="translate(870, 350)">
+    <rect width="140" height="50" rx="10" fill="#F4F4F4" stroke="#5C6B82" stroke-width="2"/>
+    <text x="70" y="32" text-anchor="middle" font-size="15" font-weight="700" fill="#1F2D5C">⌨ Terminal</text>
+  </g>
+
+  <text x="940" y="425" text-anchor="middle" font-size="20" fill="#5C6B82">⋮</text>
+  <text x="940" y="446" text-anchor="middle" font-size="13" fill="#5C6B82" font-style="italic">your own renderer</text>
+
+  <!-- ── User box ────────────────────────────────────────────── -->
+  <g transform="translate(870, 500)">
+    <rect width="200" height="90" rx="14" fill="#FFFFFF" stroke="#E91E63" stroke-width="3" filter="url(#softShadow)"/>
+    <text x="100" y="40" text-anchor="middle" font-size="32">👤</text>
+    <text x="100" y="66" text-anchor="middle" font-size="17" font-weight="700" fill="#AD1457">User</text>
+    <text x="100" y="83" text-anchor="middle" font-size="12" fill="#AD1457">clicks / submits</text>
+  </g>
+
+  <!-- Targets → User -->
+  <g>
+    <line x1="940" y1="470" x2="940" y2="490" stroke="#E91E63" stroke-width="2.5" stroke-dasharray="5 3" marker-end="url(#arrowhead-loop)"/>
+    <text x="958" y="484" font-size="12" fill="#AD1457" font-style="italic" text-anchor="start">sees UI</text>
+  </g>
+
+  <!-- Loop back: User → Backend -->
+  <g>
+    <path d="M 870 545 Q 500 615 135 545 L 135 345" stroke="#E91E63" stroke-width="3" fill="none" marker-end="url(#arrowhead-loop)"/>
+    <text x="500" y="613" text-anchor="middle" font-size="14" font-weight="700" fill="#AD1457">action → request → new UiPage or UiPatch</text>
+  </g>
+
+  <!-- Bottom note -->
+  <g transform="translate(0, 645)">
+    <rect x="60" y="0" width="1080" height="40" rx="10" fill="#FFFBEA" stroke="#B89500" stroke-width="2"/>
+    <text x="600" y="26" text-anchor="middle" font-size="14" font-weight="700" fill="#7A5C00">
+      Swap the renderer, you change the medium. Send a UiPatch, you skip the round-trip cost — not your code.
+    </text>
+  </g>
+</svg>

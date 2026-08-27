@@ -1,0 +1,85 @@
+{
+  "realm": "mindconnect",
+  "enabled": true,
+  "displayName": "MindConnect",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 86400,
+  "clients": [
+    {
+      "clientId": "mc-admin-ui",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:9090/*",
+        "https://*.mindconnect.ai/*"
+      ],
+      "webOrigins": ["+"],
+      "protocol": "openid-connect",
+      "defaultClientScopes": [
+        "openid",
+        "profile",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ]
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "admin",     "description": "Full administrative access" },
+      { "name": "poweruser", "description": "Extended user with elevated rights" },
+      { "name": "user",      "description": "Standard user" },
+      { "name": "hr",        "description": "Human Resources access" },
+      { "name": "dev",       "description": "Developer access" }
+    ]
+  },
+  "users": [
+    {
+      "username": "mc_user",
+      "email": "mc_user@mindconnect.ai",
+      "firstName": "MC",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["user"]
+    },
+    {
+      "username": "mc_admin",
+      "email": "mc_admin@mindconnect.ai",
+      "firstName": "MC",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "mc_hr",
+      "email": "mc_hr@mindconnect.ai",
+      "firstName": "MC",
+      "lastName": "HR",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["hr"]
+    },
+    {
+      "username": "mc_dev",
+      "email": "mc_dev@mindconnect.ai",
+      "firstName": "MC",
+      "lastName": "Dev",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["dev"]
+    }
+  ]
+}

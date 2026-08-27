@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 470" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    Episodic Memory — long-term memory from experienced conversations.
+    Top (Write): completed conversation → condense → episode in long-term store.
+    Bottom (Read): new question → retrieve semantically similar episodes → into Working Memory.
+  -->
+
+  <defs>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="aw" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b35b00"/>
+    </marker>
+    <marker id="ar" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2c5d8a"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 30px; font-weight: 700; fill: #1a3a5c; }
+    .head  { font-size: 18px; font-weight: 700; fill: #1a3a5c; }
+    .sub   { font-size: 13.5px; fill: #666; }
+    .lane  { font-size: 13px; font-weight: 700; letter-spacing: 1px; }
+    .epi   { font-size: 13px; fill: #444; }
+    .badge { font-size: 13px; font-weight: 700; }
+    .ewrite { stroke: #b35b00; stroke-width: 2.5; fill: none; }
+    .eread  { stroke: #2c5d8a; stroke-width: 2.5; fill: none; stroke-dasharray: 6 4; }
+  </style>
+
+  <text x="40" y="50" class="title">Episodic Memory — long-term memory from conversations</text>
+
+  <!-- ════ WRITE LANE (top) ════ -->
+  <text x="40" y="104" class="lane" fill="#b35b00">WRITE — after the conversation</text>
+
+  <!-- finished conversation -->
+  <g filter="url(#s)">
+    <rect x="40" y="120" width="270" height="120" rx="14" fill="#E8F4FD" stroke="#9cc4e0" stroke-width="2"/>
+  </g>
+  <text x="64" y="150" class="head">💬 Conversation</text>
+  <text x="64" y="176" class="sub">completed session</text>
+  <text x="64" y="198" class="sub">(many messages,</text>
+  <text x="64" y="216" class="sub">raw history)</text>
+
+  <path d="M310,180 L376,180" class="ewrite" marker-end="url(#aw)"/>
+  <text x="343" y="170" class="badge" fill="#b35b00" text-anchor="middle">condense</text>
+
+  <!-- condense -->
+  <g filter="url(#s)">
+    <rect x="376" y="132" width="230" height="96" rx="14" fill="#FFF8E6" stroke="#e0c878" stroke-width="2"/>
+  </g>
+  <text x="400" y="162" class="head" font-size="16">🤖 Summarise</text>
+  <text x="400" y="186" class="sub">Key points + metadata:</text>
+  <text x="400" y="206" class="sub">Topic · time · user/agent</text>
+
+  <path d="M606,180 L672,180" class="ewrite" marker-end="url(#aw)"/>
+  <text x="639" y="170" class="badge" fill="#b35b00" text-anchor="middle">store</text>
+
+  <!-- ════ STORE (center-right) ════ -->
+  <g filter="url(#s)">
+    <rect x="690" y="96" width="560" height="288" rx="18" fill="#EDE7F6" stroke="#b3a4d6" stroke-width="2.5"/>
+  </g>
+  <text x="714" y="130" class="head" font-size="20">🧠 Long-term store (episodes)</text>
+  <text x="714" y="154" class="sub">searchable via embedding / similarity</text>
+
+  <rect x="714" y="170" width="512" height="44" rx="9" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="730" y="197" class="epi">📌 “Vector DB comparison → recommended Qdrant”  ·  <tspan fill="#888">May</tspan></text>
+  <rect x="714" y="222" width="512" height="44" rx="9" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="730" y="249" class="epi">📌 “Keycloak OIDC setup, callback loop solved”  ·  <tspan fill="#888">April</tspan></text>
+  <rect x="714" y="274" width="512" height="44" rx="9" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="730" y="301" class="epi">📌 “Excel report monthly, customer's format”  ·  <tspan fill="#888">March</tspan></text>
+  <text x="714" y="350" class="sub">each episode = a condensed memory of an earlier conversation</text>
+
+  <!-- ════ READ LANE (bottom-left) ════ -->
+  <text x="40" y="300" class="lane" fill="#2c5d8a">READ — on a new question</text>
+
+  <g filter="url(#s)">
+    <rect x="40" y="316" width="270" height="120" rx="14" fill="#E8F5E9" stroke="#86c193" stroke-width="2"/>
+  </g>
+  <text x="64" y="346" class="head">❓ New question</text>
+  <text x="64" y="372" class="sub">“Which vector DB</text>
+  <text x="64" y="390" class="sub">did we recommend?”</text>
+  <text x="64" y="418" class="sub" font-weight="700" fill="#2c5d8a">→ retrieve similar episode</text>
+
+  <!-- read arrow: store → working memory of new turn -->
+  <path d="M690,330 C480,330 470,376 312,376" class="eread" marker-end="url(#ar)"/>
+  <text x="500" y="320" class="badge" fill="#2c5d8a" text-anchor="middle">relevant episode</text>
+  <text x="500" y="404" class="sub" text-anchor="middle">shown in Working Memory → agent “remembers”</text>
+
+</svg>

@@ -1,0 +1,12 @@
+@startuml wf_http_rt
+start
+:httpcall fetch
+url = "https://example.com/api/${id}"
+method = POST
+body = "{\"key\":\"${value}\"}"
+failOnError = false
+statusCodeVar = status
+header.Authorization = "Bearer ${token}"
+assign-result -> fetch;
+stop
+@enduml

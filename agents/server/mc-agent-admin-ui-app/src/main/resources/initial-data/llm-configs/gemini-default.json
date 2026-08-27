@@ -1,0 +1,12 @@
+{
+  "id": "00000001-0000-0000-0000-000000000005",
+  "name": "gemini-default",
+  "provider": "GOOGLE_GEMINI",
+  "model": "${GEMINI_MODEL:gemini-2.0-flash}",
+  "baseUrl": "https://generativelanguage.googleapis.com",
+  "apiKey": "${GEMINI_API_KEY}",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 8192,
+  "additionalParams": {},
+  "contextWindowTokens": 1000000
+}

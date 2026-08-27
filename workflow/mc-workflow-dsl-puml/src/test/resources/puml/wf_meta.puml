@@ -1,0 +1,6 @@
+@startuml wf_meta
+:input -> userId, amount;
+start
+stop
+:output <- total;
+@enduml

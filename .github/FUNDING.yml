@@ -1,0 +1,10 @@
+# GitHub renders a "Sponsor" button from this file.
+
+# Ko-fi page slug — the part after ko-fi.com/
+ko_fi: beisdog
+
+# Other channels GitHub supports if you want them later:
+# github: [your_github_sponsors_username]
+# patreon: your_patreon_username
+# buy_me_a_coffee: your_bmac_username
+# custom: ["https://your-site.example/donate"]

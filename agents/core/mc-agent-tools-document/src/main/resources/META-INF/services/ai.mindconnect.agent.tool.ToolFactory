@@ -1,0 +1,7 @@
+ai.mindconnect.agent.tools.document.DocumentFileReadToolFactory
+ai.mindconnect.agent.tools.document.DocumentOutlineToolFactory
+ai.mindconnect.agent.tools.document.ReadDocumentToolFactory
+ai.mindconnect.agent.tools.document.DocumentSectionsToolFactory
+ai.mindconnect.agent.tools.document.ReadDocumentSectionToolFactory
+ai.mindconnect.agent.tools.document.GrepDocumentToolFactory
+ai.mindconnect.agent.tools.document.DocumentWriteToolFactory

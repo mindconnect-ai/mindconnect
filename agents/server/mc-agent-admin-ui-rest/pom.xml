@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>0.0.2-SNAPSHOT</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-agent-admin-ui-rest</artifactId>
+    <packaging>jar</packaging>
+    <description>
+        The admin UI itself — the controllers serving UiNode JSON under
+        /admin/api/**, the pages and components they render, and the SPA
+        assets. A library, like mc-agent-api-rest: no Spring Boot main class,
+        so a host app decides how it is wired and secured.
+    </description>
+
+    <dependencies>
+        <!-- Agent platform — REST controllers + WebSocket + core server -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-api-rest</artifactId>
+        </dependency>
+        <!-- Tool providers (discovered via ServiceLoader SPI) -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-vector-store-tools</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-store</artifactId>
+        </dependency>
+        <!-- Semantic UI (from the standalone mc-semantic-ui repo): core
+             (model + default TS renderer) + the JSON-viewer and markdown
+             extensions (the former mc-semantic-ui-extensions bundle). -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-semantic-ui-core</artifactId>
+            <version>${semantic-ui.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-semantic-ui-ext-json</artifactId>
+            <version>${semantic-ui.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-semantic-ui-ext-markdown</artifactId>
+            <version>${semantic-ui.version}</version>
+        </dependency>
+        <!-- Embedded workflow admin (list / edit / run workflows under /workflow-admin) -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-admin-rest</artifactId>
+            <version>0.0.2-SNAPSHOT</version>
+        </dependency>
+        <!-- Code steps in workflows need a script engine (same choice as the standalone admin app) -->
+        <!-- Seeds the bundled example workflows into the store on startup -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-initial-data</artifactId>
+            <version>0.0.2-SNAPSHOT</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+        </dependency>
+    
+        <!-- The UI controllers read the signed-in user via @AuthenticationPrincipal
+             OidcUser; the OAuth flow itself is the host app's business. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-client</artifactId>
+        </dependency>
+    </dependencies>
+
+</project>

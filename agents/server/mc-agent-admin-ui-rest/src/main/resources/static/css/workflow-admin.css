@@ -1,0 +1,209 @@
+/* Workflow admin — step cards. Layered on top of /sui/sui.css. */
+
+.wf-step {
+  border: 1px solid #c9d4df;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+  margin: 4px 0;
+}
+
+.wf-step-type {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5a7fa3;
+}
+
+.wf-step-name {
+  font-weight: 600;
+  color: #1a3a5c;
+}
+
+/* "if <condition>" / "else" — labels the branch box that follows them. */
+.wf-branch-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #5a7fa3;
+}
+
+/* Nested container (block body, for-each body, if branches) */
+.wf-nested {
+  border: 1px dashed #c9d4df;
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin: 4px 0 4px 20px;
+  background: #f7fafc;
+}
+
+/* --- Run view ---------------------------------------------------------- */
+
+.wf-run-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1a3a5c;
+}
+
+/* One executed step. Same card treatment as the editor's steps, so the run
+   reads as the same workflow, just annotated with what happened. */
+.wf-run-step {
+  border: 1px solid #c9d4df;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #ffffff;
+  margin: 4px 0;
+}
+
+/* State pill — colour carries the meaning, the label spells it out. */
+.wf-run-state {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #eef2f6;
+  color: #5a7fa3;
+}
+
+.wf-run-state--finished { background: #e7f6ec; color: #14653b; }
+.wf-run-state--halted   { background: #fff4de; color: #7a5200; }
+.wf-run-state--error    { background: #fdecec; color: #9b1c1c; }
+
+/* Start → end → duration. Quiet on purpose: it is context, not the result. */
+.wf-run-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #8aa0b5;
+}
+
+/* "variable =" in front of a step box: the step (with its sub-steps) is the
+   value that landed in this variable. */
+.wf-run-assign-var {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #14653b;
+  padding-left: 2px;
+}
+
+/* "Input" / "Output" label in front of a value line. */
+.wf-run-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #8aa0b5;
+  min-width: 54px;
+}
+
+.wf-run-result {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: #37516b;
+  word-break: break-word;
+}
+
+.wf-run-error-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: #9b1c1c;
+  word-break: break-word;
+}
+
+/* The closing banner. Deliberately louder than a step card: it is the answer
+   to "what happened", and it is the last thing on the page. */
+.wf-run-outcome {
+  border: 1px solid;
+  border-left-width: 6px;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+
+.wf-run-outcome-headline {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.wf-run-outcome-detail {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.wf-run-outcome--success {
+  background: #e7f6ec;
+  border-color: #3f9b6d;
+  color: #14653b;
+}
+
+.wf-run-outcome--halted {
+  background: #fff4de;
+  border-color: #d19a1e;
+  color: #7a5200;
+}
+
+.wf-run-outcome--error {
+  background: #fdecec;
+  border-color: #d16a6a;
+  color: #9b1c1c;
+}
+
+/* --- Run inspection dialogs (log / StepInstance JSON) ------------------- */
+
+.wf-run-log-line {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #37516b;
+  white-space: pre-wrap;
+  padding: 2px 0;
+  border-bottom: 1px solid #eef2f6;
+}
+
+/* The raw instance JSON: preserve the pretty-printer's newlines and indents,
+   which a normal text node would collapse into one run-on line. */
+.wf-run-json {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #37516b;
+  white-space: pre;
+  overflow-x: auto;
+  background: #f7fafc;
+  border: 1px solid #c9d4df;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+/* --- Migrations: Before/After diff table -------------------------------- */
+
+/* Values are JSON (pretty-printed for objects/arrays): keep the printer's
+   newlines, break long tokens instead of widening the page, monospace. */
+.migration-diff td {
+  vertical-align: top;
+}
+
+.migration-diff td:nth-child(2),
+.migration-diff td:nth-child(3) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13.5px;
+  color: #1f2933;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 40vw;
+}
+
+/* Every row in the migration list is a collapsible; its summary is the row.
+   The framework's muted 12px summary style is fine for secondary detail
+   toggles, but here it IS the content — make it read like a list entry. */
+#migration-list .sui-activity-summary,
+.tool-catalog .sui-activity-summary {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2933;
+}

@@ -1,0 +1,4 @@
+@startuml myWorkflow
+start
+stop
+@enduml

@@ -1,0 +1,495 @@
+/*
+ * Admin-UI-specific styles. Everything generic to semantic-ui is in
+ * /sui/sui.css (mc-semantic-ui-core). This file owns:
+ *
+ *   - Page chrome (header, top nav, user info, loading bar/spinner)
+ *   - Layout containers (#main)
+ *   - App-specific overlays on top of sui-* classes
+ *     (.memory-page, .chat-container, .chat-form, .user-message, …)
+ */
+
+/* ── Page chrome ────────────────────────────────────────────────────────── */
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+/* ── App shell (see AdminLayout: UiAppShell = header + menu + content) ─── */
+
+/* The loading overlay is drawn by SuiRenderer on top of <main>; the
+   styles live in /sui/sui.css. No app-side spinner needed. */
+
+/* Layout, burger and collapse behaviour all come from the framework's
+   .sui-shell* rules. Our only jobs: let the shell span the viewport, and
+   centre page content at a comfortable reading width inside the (framework-
+   scrolled) content pane. */
+#main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+#main > .sui-shell { flex: 1 1 auto; }
+
+/* Content is anchored to the sidebar, not centred in the leftover space —
+   a centred card reads as a floating island on a wide monitor, while the
+   right-hand whitespace reads as intentional breathing room. Two caps:
+   tables and lists may run wide, forms and detail cards stay at a
+   readable line length. */
+.sui-shell-content > * {
+    max-width: 1400px;
+    margin-left: 0;
+    margin-right: auto;
+}
+.sui-shell-content .sui-form:not(.chat-form),
+.sui-shell-content .sui-detail {
+    max-width: 900px;
+}
+
+
+/* ── Chat input: send button floats into the textarea's corner ─────────── */
+
+.chat-form { position: relative; padding: 12px; }
+.chat-form .sui-field { margin-bottom: 0; }
+.chat-form .sui-field label { display: none; }
+.chat-form .sui-field textarea {
+    min-height: 56px;
+    max-height: 200px;
+    padding-right: 52px;
+}
+.chat-form .sui-form-footer {
+    position: absolute;
+    right: 18px;
+    bottom: 18px;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+    gap: 6px;
+    z-index: 1;
+}
+.chat-form .sui-form-footer .sui-btn {
+    width: 32px; height: 32px;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.15);
+}
+
+/* Streaming state: the composer becomes a status row — thinking indicator
+   left, a real Stop button right — with the same card footprint as the
+   idle form, so the swap doesn't jump. */
+.chat-form--streaming {
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 56px;
+    padding: 12px 16px;
+    background: var(--sui-color-surface);
+    border-radius: var(--sui-radius-lg);
+    box-shadow: var(--sui-shadow-card);
+}
+.chat-thinking {
+    color: #64748b;
+    font-style: italic;
+    font-size: 14px;
+}
+.chat-thinking::after {
+    content: "";
+    display: inline-block;
+    width: 1.5em;
+    text-align: left;
+    margin-left: 2px;
+    animation: sui-thinking-dots 1.4s infinite steps(4, end);
+}
+
+/* ── Working-memory + traces: master-detail grid ───────────────────────── */
+
+/*
+ * The two-column layout is applied to the inner <div class="sui-panels"> the
+ * section template emits — that's the element that actually holds the two
+ * <div class="sui-panel"> children. Putting the grid on .memory-page would
+ * lay out the (optional) <h2> + panels-wrapper as a grid, which silently
+ * collapsed the layout to a single column after the stack-mode refactor
+ * inserted the panels-wrapper as a direct child.
+ */
+.memory-page > .sui-panels {
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) 2fr;
+    gap: 16px;
+    align-items: start;
+}
+.memory-page > .sui-panels > .sui-panel {
+    min-width: 0; /* prevent grid blow-up from long preformatted lines */
+}
+.memory-page .sui-list-item-description {
+    color: #64748b;
+    font-size: 12px;
+    font-family: var(--sui-font-mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.memory-master {
+    display: flex;
+    flex-direction: column;
+    max-height: 75vh;
+}
+.memory-master > .sui-list-header { flex: 0 0 auto; }
+.memory-master > ul {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+.memory-master .sui-list-item {
+    border-bottom: 1px solid #e2e8f0;
+    padding: 0;
+}
+.memory-master .sui-list-item:hover { background: #f1f5f9; }
+.memory-master .sui-list-item-main { padding: 8px 10px; }
+.memory-master .sui-list-item-label {
+    display: block;
+    color: #2563eb;
+    text-decoration: underline;
+    text-decoration-color: #cbd5e1;
+    text-underline-offset: 2px;
+    font-weight: 500;
+    font-size: 13px;
+    cursor: pointer;
+}
+.memory-master .sui-list-item-label:hover {
+    color: #1d4ed8;
+    text-decoration-color: currentColor;
+}
+.memory-master .sui-list-item-desc {
+    display: block;
+    margin-top: 2px;
+    cursor: pointer;
+    white-space: pre-line;
+    font-family: inherit;
+    font-size: 12px;
+    color: #475569;
+}
+.memory-page pre {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.memory-page pre code { background: transparent; color: inherit; }
+.memory-page > .sui-panel:nth-child(2) {
+    max-height: 75vh;
+    overflow-y: auto;
+}
+
+/* Indentation per nesting level for sub-agent roundtrip cards. */
+.trace-depth-1 { margin-left: 24px;  border-left: 3px solid #cbd5e1; padding-left: 10px; }
+.trace-depth-2 { margin-left: 48px;  border-left: 3px solid #94a3b8; padding-left: 10px; }
+.trace-depth-3 { margin-left: 72px;  border-left: 3px solid #64748b; padding-left: 10px; }
+.trace-depth-4 { margin-left: 96px;  border-left: 3px solid #475569; padding-left: 10px; }
+.trace-depth-5 { margin-left: 120px; border-left: 3px solid #334155; padding-left: 10px; }
+
+/* ── Embedded API explorer (Swagger UI in a UiIFrame) ──────────────────── */
+
+/* Same viewport-capping trick as the chat page: the shell stops growing and
+   the frame takes everything between header and pane edges. */
+.sui-shell:has(.app-fill-frame) { height: 100dvh; }
+.sui-shell-content:has(.app-fill-frame) { display: flex; flex-direction: column; }
+.sui-shell-content > .app-fill-frame { max-width: none; }
+
+/* ── Chat thread ────────────────────────────────────────────────────────── */
+
+/* Classic chat layout: the page fills the content pane, the conversation
+   takes all space between the page header and the composer, and scrolls
+   inside itself. The chain of section/panel wrappers between the pane and
+   the .chat-container must each become growing flex columns — :has() walks
+   exactly that chain and nothing else (the Info tab and every other page
+   keep the default flow). */
+/* Cap the shell to the viewport on the chat page — its min-height would
+   otherwise let the whole shell grow with the history and push the composer
+   below the fold; with the cap, the conversation list is the scrollpane. */
+.sui-shell:has(.chat-container) { height: 100dvh; }
+.sui-shell-content:has(.chat-container) {
+    display: flex;
+    flex-direction: column;
+}
+.sui-shell-content:has(.chat-container) > .sui-section,
+.sui-shell-content .sui-section:has(.chat-container) > .sui-panels,
+.sui-panels > .sui-panel:has(.chat-container),
+.sui-panel > .sui-section:has(.chat-container),
+.sui-panel > .sui-section:has(.chat-container) > .sui-panels {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+.sui-shell-content:has(.chat-container) > .sui-section { width: 100%; }
+.sui-panel > .sui-section:has(.chat-container) > .sui-panels { gap: 10px; }
+/* Only the messages panel grows; chips row + composer hug their content.
+   Inside it, the UiScrollPane (stick-to-latest) is the scrolling viewport —
+   the list flows naturally within, its header stays sticky (framework). */
+.sui-panels > .sui-panel:has(.chat-container) {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-container > ul { scroll-behavior: smooth; }
+
+/* Token usage in the chat header: compact bar + muted readout. */
+.chat-token-usage { align-items: center; white-space: nowrap; }
+.chat-token-usage .sui-progress--bar { width: 140px; }
+.chat-token-text { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+
+.user-message, .bot-message {
+    padding: 10px 14px;
+    border-radius: 16px;
+    margin: 4px 0;
+}
+.user-message {
+    background: #dcfce7;
+    color: #14532d;
+    margin-left: auto;
+    max-width: 80%;
+    border-bottom-right-radius: 4px;
+}
+.user-message p { margin: 0; }
+.bot-message {
+    background: #f1f5f9;
+    color: #1a1a1a;
+    width: 100%;
+    border-bottom-left-radius: 4px;
+}
+
+/* Pending bot reply while waiting for the first LLM token. The text reads
+   "AI is thinking" and a row of three dots fades in/out next to it. The
+   thinking class is set by the server on the pending bot-message; it's
+   replaced (without the class) as soon as a token arrives, so the
+   animation disappears once the real reply starts streaming. */
+.bot-message--thinking {
+    color: #64748b;
+    font-style: italic;
+}
+.bot-message--thinking p::after {
+    content: "";
+    display: inline-block;
+    width: 1.5em;
+    text-align: left;
+    margin-left: 2px;
+    animation: sui-thinking-dots 1.4s infinite steps(4, end);
+}
+@keyframes sui-thinking-dots {
+    0%   { content: ""; }
+    25%  { content: "."; }
+    50%  { content: ".."; }
+    75%  { content: "..."; }
+    100% { content: ""; }
+}
+.chat-container .sui-list-item {
+    border-bottom: none;
+    padding: 4px 20px;
+    align-items: flex-end;
+    flex-direction: column;
+}
+.chat-container .sui-list-item-main { width: 100%; }
+.chat-container .sui-list-item-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: #94a3b8;
+    margin-bottom: 2px;
+    display: block;
+}
+.chat-container .sui-list-item:has(.user-message) .sui-list-item-main {
+    align-items: flex-end;
+}
+/* Compact, low-contrast delete button per chat message — only visible on
+   row hover so it doesn't clutter the conversation. */
+.chat-container .sui-list-item-actions { opacity: 0; transition: opacity .12s; }
+.chat-container .sui-list-item:hover .sui-list-item-actions { opacity: 1; }
+.chat-container .sui-list-item-actions .sui-btn {
+    padding: 2px 6px;
+    font-size: 11px;
+    background: transparent;
+    color: #9ca3af;
+}
+.chat-container .sui-list-item-actions .sui-btn:hover:not(:disabled) {
+    background: #fee2e2;
+    color: #dc2626;
+}
+
+/* ── Legacy activity-log block (still used by some tool messages) ──────── */
+
+.activity-log { font-size: 12px; color: #64748b; line-height: 1.5; }
+.activity-log p, .activity-log li { margin: 0 0 .15em; }
+.activity-log ul { margin: 0; padding-left: 1.2em; list-style: none; }
+.activity-log li::before { content: ""; }
+
+/* ── Task cards (tool calls + sub-agent calls) ─────────────────────────── */
+
+.task-card-body {
+    font-size: 13px;
+    color: #111827;
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-top: 6px;
+    line-height: 1.5;
+}
+.task-card-body pre {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin: 4px 0 10px;
+    overflow-x: auto;
+    font-size: 12px;
+    font-family: var(--sui-font-mono);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+.task-card-body code {
+    font-size: 12px;
+    color: #0f172a;
+    font-family: var(--sui-font-mono);
+}
+.task-card-body strong {
+    color: #1e293b;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+/* ── Sub-agent tree ─────────────────────────────────────────────────────
+ * A sub-agent card's body holds a nested list of its own task cards (the
+ * tool calls it made), then a status line and its final answer. The nesting
+ * is structural (a real <ul> inside the card), so indentation comes from a
+ * left rule on the nested list rather than per-level margin hacks.
+ */
+.sub-agent-children {
+    margin: 6px 0 0;
+    border-left: 2px solid #cbd5e1;
+    padding-left: 12px;
+}
+.sub-agent-children > .sui-list-header { display: none; }
+.sub-agent-children > ul { list-style: none; padding: 0; margin: 0; }
+
+.sub-agent-status {
+    font-size: 12px;
+    color: #64748b;
+    margin: 4px 0;
+}
+.sub-agent-status--error { color: #b91c1c; }
+
+.sub-agent-answer {
+    margin-top: 8px;
+    background: #eef2ff;
+}
+
+/* "Open sub-agent session ↗" link at the top of a sub-agent card body. */
+.sub-agent-children + .sui-link,
+.sui-stack > .sui-link {
+    display: inline-block;
+    margin: 2px 0 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ── Agent list: name + LLM-config badge in the row header ────────────── */
+
+.agent-name {
+    font-weight: 600;
+}
+/* The row header (name + badge) spans the full row width so the badge can be
+   pushed to the far right edge for a tidy, aligned column of badges.
+   The chain of containers between the <li> and the badge must each stretch:
+   - the main column (.sui-list-item-main) doesn't flex:1 by default, so the
+     label zone only spans the text width — give it flex:1 for badge rows;
+   - the label wrapper (<a>/<span>) is inline → make it block, full width;
+   - the header stack itself spans 100%, then the badge is pushed right. */
+.sui-list-item:has(.agent-head) .sui-list-item-main { flex: 1; min-width: 0; }
+.sui-list-item-label:has(.agent-head) { display: block; width: 100%; }
+.agent-head { width: 100%; align-items: baseline; }
+/* Push the badge to the right edge of the row, with a clear gap before the
+   action buttons so it reads as metadata, not a third button. */
+.agent-head .agent-llm-badge { margin-left: auto; margin-right: 16px; }
+
+/* LLM-config tag at the right of the name row. Soft green pill — sits apart
+   from the blue name links and the blue "New Agent" button, and reads as a
+   metadata label rather than a third action button. */
+.agent-llm-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #15803d;
+    border: 1px solid #86efac;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.6;
+    white-space: nowrap;
+}
+
+/* ── LLM-config test dialog: response box ─────────────────────────────── */
+
+/*
+ * Rendered underneath the form when a test has just returned. The meta
+ * line ("✓ OK · 920 ms · 14 in / 38 out tokens") is small and muted;
+ * the body wraps long answers (or error messages) in a soft-padded box
+ * so it stays readable inside the modal.
+ */
+.llm-test-result {
+    margin-top: 16px;
+    border-radius: 6px;
+    padding: 12px 14px;
+    border: 1px solid;
+}
+.llm-test-result--ok  { background: #f0fdf4; border-color: #bbf7d0; }
+.llm-test-result--err { background: #fef2f2; border-color: #fecaca; }
+.llm-test-meta {
+    font-size: 12px;
+    color: #475569;
+    margin-bottom: 6px;
+    font-family: var(--sui-font-mono);
+}
+.llm-test-body {
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: var(--sui-font-mono);
+    font-size: 13px;
+    line-height: 1.5;
+    color: #0f172a;
+}
+.llm-test-result--err .llm-test-body { color: #991b1b; }
+
+/* ── Tool catalog ──────────────────────────────────────────────────────────
+   The collapsed summary line is the primary reading surface here — the
+   framework default (12px, subtle gray, meant for background activity) is
+   too quiet for it. */
+.tool-catalog .sui-activity-summary {
+    font-size: 14px;
+    color: var(--sui-color-text);
+    padding: 6px 0;
+}
+/* Group headers read as section titles above their tools. */
+.tool-catalog > ul > li > .sui-list-item-main > details > .sui-activity-summary {
+    font-size: 15px;
+    font-weight: 600;
+}
+/* The nested per-group list needs no header block of its own. */
+.tool-catalog .sui-activity-body .sui-list-header { display: none; }

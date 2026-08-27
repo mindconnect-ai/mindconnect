@@ -1,0 +1,57 @@
+name: docs
+
+# Builds the Docusaurus site from website/ and publishes it via GitHub Pages
+# FROM THIS REPO (no external docs repo, no deploy key).
+#
+# One-time setup in the repo: Settings → Pages → Source: "GitHub Actions".
+# The site then serves at https://<owner>.github.io/<repo>/ — the Docusaurus
+# config derives owner and repo from GITHUB_REPOSITORY automatically.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'website/**'
+      - '.github/workflows/docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Build site
+        working-directory: website
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: website/build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

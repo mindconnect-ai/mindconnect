@@ -1,0 +1,31 @@
+spring:
+  main:
+    web-application-type: none
+    banner-mode: off
+
+mindconnect:
+  user:
+    id: mcuser
+  agent:
+    storage-dir: data/agents
+    tool-result:
+      summarizer: llm
+  message:
+    storage-dir: data/messages
+  memory:
+    storage-dir: data/memory
+  workspace:
+    base-dir: data/workspaces
+  tools:
+    tavily-api-key: ${TAVILY_API_KEY:}
+    # Working directory for bash, file_list, file_read, file_write (defaults to user home)
+    base-dir: ${user.home}
+  # Uncomment to use remote agent server
+  # remote:
+  #   url: http://localhost:8080
+
+  logging:
+    level:
+      ai.mindconnect: INFO
+      ai.mindconnect.message.adapter: WARN
+      ai.mindconnect.agent.service.token: INFO

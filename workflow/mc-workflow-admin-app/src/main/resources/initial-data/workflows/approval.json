@@ -1,0 +1,57 @@
+{
+  "@class" : "ai.mindconnect.workflow.domain.WorkflowData",
+  "name" : "approval",
+  "assignResultToVar" : null,
+  "resultFrom" : "decision",
+  "steps" : [ {
+    "@class" : "ai.mindconnect.workflow.domain.AssignVariablesData",
+    "name" : "request",
+    "assignResultToVar" : null,
+    "variableAssignments" : [ {
+      "varName" : "amount",
+      "expressionOrVarName" : "4200"
+    } ],
+    "type" : "assignvariables"
+  }, {
+    "@class" : "ai.mindconnect.workflow.domain.BlockData",
+    "name" : "await-approval",
+    "assignResultToVar" : null,
+    "resultFrom" : null,
+    "steps" : [ {
+      "@class" : "ai.mindconnect.workflow.domain.HaltData",
+      "name" : "wait-for-human",
+      "assignResultToVar" : null,
+      "condition" : null,
+      "returnResult" : false,
+      "returnResultExpression" : null,
+      "next" : null,
+      "resumeParams" : {
+        "type" : "object",
+        "properties" : {
+          "approver" : { "type" : "string", "description" : "Who is signing off" },
+          "verdict" : { "type" : "string", "enum" : [ "approve", "reject" ] },
+          "comment" : { "type" : "string", "description" : "Optional note" }
+        },
+        "required" : [ "approver", "verdict" ]
+      },
+      "type" : "halt"
+    } ],
+    "type" : "block"
+  }, {
+    "@class" : "ai.mindconnect.workflow.domain.CodeData",
+    "name" : "record-decision",
+    "assignResultToVar" : "decision",
+    "language" : "mini",
+    "code" : "verdict + \" by \" + approver + \" (\" + str(amount) + \")\"",
+    "wrapInFunction" : false,
+    "injectVariables" : true,
+    "exportVariables" : true,
+    "type" : "code"
+  } ],
+  "uid" : null,
+  "params" : { "type" : "object", "properties" : { } },
+  "paramDefaults" : { },
+  "subWorkflows" : [ ],
+  "workflowType" : null,
+  "type" : "workflow"
+}

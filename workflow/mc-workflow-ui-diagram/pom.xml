@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+<parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-workflow-parent</artifactId>
+        <version>0.0.2-SNAPSHOT</version>
+        <relativePath>../mc-workflow-parent/pom.xml</relativePath>
+    </parent>
+
+    <groupId>ai.mindconnect</groupId>
+    <artifactId>mc-workflow-ui-diagram</artifactId>
+    <version>0.0.2-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <description>
+        Adapter that converts a WorkflowData tree into a UiDiagram (the SVG
+        renderer node from mc-semantic-ui-ext-diagram). Sits beside
+        mc-workflow-dsl-puml as a second "WorkflowData → external presentation"
+        adapter; both depend on mc-workflow's domain model and on nothing
+        else in the workflow tree.
+    </description>
+
+    <properties>
+        <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <lombok.version>1.18.40</lombok.version>
+    </properties>
+
+    <dependencies>
+        <!-- The workflow domain we're rendering. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow</artifactId>
+            <version>0.0.2-SNAPSHOT</version>
+        </dependency>
+        <!-- The UiDiagram node type we're producing. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-semantic-ui-ext-diagram</artifactId>
+            <version>${semantic-ui.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- TEST -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.10.3</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>3.26.3</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <configuration>
+                    <release>${java.version}</release>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

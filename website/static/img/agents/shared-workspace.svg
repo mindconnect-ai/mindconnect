@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 700" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    Shared session workspace as an exchange channel between agents (target picture).
+    Multiple agents read/write files into a shared session filesystem
+    via workspace_write / workspace_read / workspace_list.
+  -->
+
+  <defs>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="aw" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b35b00"/>
+    </marker>
+    <marker id="ar" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2c5d8a"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 30px; font-weight: 700; fill: #1a3a5c; }
+    .head  { font-size: 18px; font-weight: 700; fill: #1a3a5c; }
+    .sub   { font-size: 13.5px; fill: #666; }
+    .file  { font-size: 14px; fill: #444; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .mono  { font-size: 13px; fill: #b35b00; font-weight: 700; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .read  { font-size: 13px; fill: #2c5d8a; font-weight: 700; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .badge { font-size: 12px; font-weight: 700; }
+    .ewrite { stroke: #b35b00; stroke-width: 2.5; fill: none; }
+    .eread  { stroke: #2c5d8a; stroke-width: 2.5; fill: none; stroke-dasharray: 6 4; }
+  </style>
+
+  <text x="40" y="52" class="title">Shared workspace — exchange via files</text>
+
+  <!-- ── Agents (top row) ───────────────────────────── -->
+  <!-- research-lead -->
+  <g filter="url(#s)">
+    <rect x="60" y="100" width="300" height="96" rx="14" fill="#FFF8E6" stroke="#e0c878" stroke-width="2"/>
+  </g>
+  <text x="84" y="132" font-size="22">🤖</text>
+  <text x="118" y="132" class="head">research-lead</text>
+  <text x="84" y="160" class="sub">writes plan &amp; final report</text>
+  <text x="84" y="182" class="mono">workspace_write</text>
+
+  <!-- web-researcher -->
+  <g filter="url(#s)">
+    <rect x="490" y="100" width="300" height="96" rx="14" fill="#E8F5E9" stroke="#86c193" stroke-width="2"/>
+  </g>
+  <text x="514" y="132" font-size="22">🤖</text>
+  <text x="548" y="132" class="head">web-researcher</text>
+  <text x="514" y="160" class="sub">stores findings per DB</text>
+  <text x="514" y="182" class="mono">workspace_write</text>
+
+  <!-- verifier -->
+  <g filter="url(#s)">
+    <rect x="920" y="100" width="300" height="96" rx="14" fill="#FCE4F1" stroke="#d79bc4" stroke-width="2"/>
+  </g>
+  <text x="944" y="132" font-size="22">🕵️</text>
+  <text x="978" y="132" class="head">verifier</text>
+  <text x="944" y="160" class="sub">reads findings, checks sources</text>
+  <text x="944" y="182" class="read">workspace_read · _list</text>
+
+  <!-- ── Shared filesystem (center) ─────────────────── -->
+  <g filter="url(#s)">
+    <rect x="220" y="330" width="840" height="220" rx="18" fill="#EEF4FB" stroke="#9cc4e0" stroke-width="2.5"/>
+  </g>
+  <text x="250" y="368" class="head" font-size="20">📁 Session filesystem</text>
+  <text x="250" y="392" class="sub">a shared location for all agents in one conversation</text>
+
+  <!-- files inside -->
+  <rect x="250" y="410" width="240" height="44" rx="9" fill="#fff" stroke="#9cc4e0" stroke-width="1.5"/>
+  <text x="266" y="437" class="file">📄 plan.md</text>
+  <rect x="510" y="410" width="240" height="44" rx="9" fill="#fff" stroke="#9cc4e0" stroke-width="1.5"/>
+  <text x="526" y="437" class="file">📄 findings-qdrant.md</text>
+  <rect x="770" y="410" width="260" height="44" rx="9" fill="#fff" stroke="#9cc4e0" stroke-width="1.5"/>
+  <text x="786" y="437" class="file">📄 findings-weaviate.md</text>
+
+  <rect x="250" y="468" width="240" height="44" rx="9" fill="#fff" stroke="#9cc4e0" stroke-width="1.5"/>
+  <text x="266" y="495" class="file">📄 findings-milvus.md</text>
+  <rect x="510" y="468" width="240" height="44" rx="9" fill="#fff" stroke="#9cc4e0" stroke-width="1.5"/>
+  <text x="526" y="495" class="file">📄 verdicts.md</text>
+  <rect x="770" y="468" width="260" height="44" rx="9" fill="#FFF8E6" stroke="#e0c878" stroke-width="1.8"/>
+  <text x="786" y="495" class="file">📄 report.md</text>
+
+  <!-- ── arrows: write (down) / read (up) ───────────── -->
+  <!-- research-lead writes -->
+  <path d="M150,196 C150,260 220,270 280,328" class="ewrite" marker-end="url(#aw)"/>
+  <!-- web-researcher writes -->
+  <path d="M600,196 L600,326" class="ewrite" marker-end="url(#aw)"/>
+  <!-- verifier reads -->
+  <path d="M1010,328 C1010,260 1080,250 1080,198" class="eread" marker-end="url(#ar)"/>
+
+  <text x="120" y="262" class="badge" fill="#b35b00">write</text>
+  <text x="610" y="262" class="badge" fill="#b35b00">write</text>
+  <text x="1030" y="262" class="badge" fill="#2c5d8a">read</text>
+
+  <!-- ── note ───────────────────────────────────────── -->
+  <g filter="url(#s)">
+    <rect x="40" y="586" width="1200" height="92" rx="14" fill="#FFFBEA" stroke="#e0c878" stroke-width="2"/>
+  </g>
+  <text x="64" y="616" class="head">Idea: exchange without loading everything into the context</text>
+  <text x="64" y="642" class="sub">Instead of passing large intermediate results through the prompt, agents store them as a <tspan class="file" font-size="13">File</tspan> —</text>
+  <text x="64" y="662" class="sub">the next agent reads exactly what it needs. Tools: <tspan class="mono">workspace_write</tspan> · <tspan class="read">workspace_read</tspan> · <tspan class="read">workspace_list</tspan>.</text>
+
+</svg>

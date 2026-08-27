@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    Agent runtime — internal building blocks of a turn:
+    Runtime (Tool-Loop) ⇄ LLM, Working Memory (System-Prompt + Window),
+    Session (history), tool_calls (MCP / Function-Tools).
+  -->
+
+  <defs>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title  { font-size: 30px; font-weight: 700; fill: #1a3a5c; }
+    .head   { font-size: 20px; font-weight: 700; fill: #1a3a5c; }
+    .sub    { font-size: 14px; fill: #666; }
+    .lbl    { font-size: 14px; fill: #555; }
+    .mono   { font-size: 14px; fill: #b35b00; font-weight: 700; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .edge   { stroke: #555; stroke-width: 2.5; fill: none; }
+    .edgeL  { stroke: #888; stroke-width: 2; fill: none; stroke-dasharray: 5 4; }
+  </style>
+
+  <text x="40" y="52" class="title">Agent runtime — one turn</text>
+
+  <!-- ── Working Memory (left) ─────────────────────── -->
+  <g filter="url(#s)">
+    <rect x="40" y="110" width="300" height="300" rx="16" fill="#FFF8E6" stroke="#e0c878" stroke-width="2"/>
+  </g>
+  <text x="64" y="146" class="head">Working Memory</text>
+  <text x="64" y="170" class="sub">Context for the next LLM call</text>
+  <rect x="64" y="190" width="252" height="46" rx="10" fill="#fff" stroke="#e0c878" stroke-width="1.5"/>
+  <text x="80" y="212" class="lbl" font-weight="700">System-Prompt</text>
+  <text x="80" y="230" class="sub">Role · Tools · Skills</text>
+  <rect x="64" y="248" width="252" height="142" rx="10" fill="#fff" stroke="#e0c878" stroke-width="1.5"/>
+  <text x="80" y="270" class="lbl" font-weight="700">Message-Window</text>
+  <text x="80" y="290" class="sub">prepares the history so</text>
+  <text x="80" y="308" class="sub">that it fits the context:</text>
+  <text x="80" y="332" class="sub">• MemoryStrategy selects</text>
+  <text x="80" y="352" class="sub">• trim older turns /</text>
+  <text x="80" y="370" class="sub">&#160;&#160;summarise</text>
+
+  <!-- ── Runtime / Tool-Loop (center) ──────────────── -->
+  <g filter="url(#s)">
+    <rect x="430" y="90" width="360" height="340" rx="16" fill="#F0FFF4" stroke="#86c193" stroke-width="2.5"/>
+  </g>
+  <text x="610" y="128" class="head" text-anchor="middle">Agent-Runtime</text>
+  <text x="610" y="150" class="sub" text-anchor="middle">ToolLoopRunner — the loop</text>
+
+  <!-- loop steps -->
+  <rect x="470" y="172" width="280" height="44" rx="10" fill="#fff" stroke="#86c193" stroke-width="1.5"/>
+  <text x="610" y="199" class="lbl" text-anchor="middle"><tspan font-weight="700">1.</tspan> Ask LLM (Streaming)</text>
+
+  <rect x="470" y="236" width="280" height="60" rx="10" fill="#fff" stroke="#86c193" stroke-width="1.5"/>
+  <text x="610" y="262" class="lbl" text-anchor="middle"><tspan font-weight="700">2.</tspan> Response: Text  or  <tspan class="mono">tool_calls</tspan></text>
+  <text x="610" y="282" class="sub" text-anchor="middle">Text → done · Tool → execute</text>
+
+  <rect x="470" y="316" width="280" height="44" rx="10" fill="#fff" stroke="#86c193" stroke-width="1.5"/>
+  <text x="610" y="343" class="lbl" text-anchor="middle"><tspan font-weight="700">3.</tspan> Append result → repeat</text>
+
+  <text x="610" y="402" class="sub" text-anchor="middle">repeats until text (max. MAX_TOOL_ROUNDS)</text>
+
+  <!-- loop-back arrow inside runtime -->
+  <path d="M758,338 C800,338 800,194 752,194" class="edge" marker-end="url(#a)"/>
+
+  <!-- ── LLM (top right) ──────────────────────────── -->
+  <g filter="url(#s)">
+    <rect x="880" y="100" width="300" height="100" rx="16" fill="#E8F4FD" stroke="#9cc4e0" stroke-width="2"/>
+  </g>
+  <text x="1030" y="142" class="head" text-anchor="middle">LLM-Gateway</text>
+  <text x="1030" y="168" class="sub" text-anchor="middle">Anthropic · OpenAI — interchangeable</text>
+
+  <!-- ── tool_calls (bottom right) ────────────────── -->
+  <g filter="url(#s)">
+    <rect x="880" y="240" width="300" height="120" rx="16" fill="#FDE8F5" stroke="#d79bc4" stroke-width="2"/>
+  </g>
+  <text x="1030" y="280" class="mono" text-anchor="middle" font-size="16">tool_calls</text>
+  <text x="1030" y="306" class="sub" text-anchor="middle">MCP-Tools · Function-Tools</text>
+  <text x="1030" y="328" class="sub" text-anchor="middle">web_search · workspace_write …</text>
+  <text x="1030" y="350" class="sub" text-anchor="middle">run_agent → Sub-Agent</text>
+
+  <!-- ── Session (bottom, full width) ─────────────── -->
+  <g filter="url(#s)">
+    <rect x="40" y="470" width="1140" height="120" rx="16" fill="#EDE7F6" stroke="#b3a4d6" stroke-width="2"/>
+  </g>
+  <text x="64" y="506" class="head">Session</text>
+  <text x="64" y="530" class="sub">persistent conversation history · tokens · status · parentSessionId / parentTurnId</text>
+  <rect x="64" y="544" width="150" height="32" rx="8" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="139" y="565" class="lbl" text-anchor="middle">Turn 1</text>
+  <rect x="226" y="544" width="150" height="32" rx="8" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="301" y="565" class="lbl" text-anchor="middle">Turn 2</text>
+  <rect x="388" y="544" width="150" height="32" rx="8" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="463" y="565" class="lbl" text-anchor="middle">Turn 3 …</text>
+
+  <!-- ── Messages of one turn (below session) ─────── -->
+  <g filter="url(#s)">
+    <rect x="40" y="630" width="1140" height="130" rx="16" fill="#FAFAFA" stroke="#ccc" stroke-width="2"/>
+  </g>
+  <text x="64" y="664" class="head">Messages of a turn</text>
+  <text x="290" y="664" class="sub">— each turn references its messages</text>
+
+  <rect x="64" y="684" width="180" height="56" rx="9" fill="#E8F4FD" stroke="#9cc4e0" stroke-width="1.5"/>
+  <text x="154" y="708" class="mono" text-anchor="middle" font-size="13">user</text>
+  <text x="154" y="728" class="sub" text-anchor="middle">the question</text>
+
+  <rect x="262" y="684" width="200" height="56" rx="9" fill="#F0FFF4" stroke="#86c193" stroke-width="1.5"/>
+  <text x="362" y="708" class="mono" text-anchor="middle" font-size="13">assistant</text>
+  <text x="362" y="728" class="sub" text-anchor="middle">Text + tool_calls</text>
+
+  <rect x="480" y="684" width="200" height="56" rx="9" fill="#FDE8F5" stroke="#d79bc4" stroke-width="1.5"/>
+  <text x="580" y="708" class="mono" text-anchor="middle" font-size="13">tool_result</text>
+  <text x="580" y="728" class="sub" text-anchor="middle">Tool output</text>
+
+  <rect x="698" y="684" width="200" height="56" rx="9" fill="#F0FFF4" stroke="#86c193" stroke-width="1.5"/>
+  <text x="798" y="708" class="mono" text-anchor="middle" font-size="13">assistant</text>
+  <text x="798" y="728" class="sub" text-anchor="middle">final answer</text>
+
+  <text x="930" y="704" class="sub">→ chronological order</text>
+  <text x="930" y="724" class="sub">&#160;&#160;&#160;per turn</text>
+
+  <!-- turn → its messages -->
+  <path d="M139,576 C139,600 154,604 154,628" class="edgeL" marker-end="url(#a)"/>
+
+  <!-- ── edges ────────────────────────────────────── -->
+  <!-- working memory → runtime -->
+  <path d="M340,250 L430,250" class="edge" marker-end="url(#a)"/>
+  <text x="385" y="240" class="sub" text-anchor="middle">feeds</text>
+
+  <!-- runtime ⇄ LLM -->
+  <path d="M790,180 L876,150" class="edge" marker-end="url(#a)"/>
+  <path d="M876,168 L790,200" class="edge" marker-end="url(#a)"/>
+
+  <!-- runtime ⇄ tool_calls -->
+  <path d="M790,300 L876,300" class="edge" marker-end="url(#a)"/>
+  <path d="M876,320 L790,340" class="edge" marker-end="url(#a)"/>
+
+  <!-- session/history → working memory (build window from history) -->
+  <path d="M150,470 L160,410" class="edgeL" marker-end="url(#a)"/>
+  <text x="172" y="450" class="sub">History → prepare window</text>
+  <!-- runtime → session (persist turn) -->
+  <path d="M610,430 L610,470" class="edgeL" marker-end="url(#a)"/>
+  <text x="620" y="456" class="sub">Save turn</text>
+
+</svg>

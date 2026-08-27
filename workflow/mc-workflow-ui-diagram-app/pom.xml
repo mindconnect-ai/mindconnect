@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-workflow-parent</artifactId>
+        <version>0.0.2-SNAPSHOT</version>
+        <relativePath>../mc-workflow-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-workflow-ui-diagram-app</artifactId>
+    <packaging>jar</packaging>
+
+    <description>
+        Spring Boot test harness for the UiDiagram editor pipeline. Bundles
+        mc-workflow-ui-diagram (the builder), mc-semantic-ui-ext-diagram (the
+        renderer node + Web-Component) and mc-semantic-ui-core (the dispatcher),
+        exposes a tiny REST API that returns pre-baked sample workflows as
+        UiDiagram JSON, and ships a static index.html that wires the renderer
+        up in the browser. The point: run `mvn spring-boot:run` here and see
+        the diagram in a browser without standing up the rest of the monorepo.
+    </description>
+
+    <dependencies>
+        <!-- Web stack — single starter, no JPA / security / etc. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- The pipeline under test. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-ui-diagram</artifactId>
+            <version>0.0.2-SNAPSHOT</version>
+        </dependency>
+        <!--
+            mc-semantic-ui-ext-diagram and mc-semantic-ui-core are transitive
+            via mc-workflow-ui-diagram, but we declare core explicitly so the
+            /sui/renderer.js asset is unambiguously on the classpath even if
+            someone later trims the transitive graph.
+        -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-semantic-ui-core</artifactId>
+            <version>${semantic-ui.version}</version>
+        </dependency>
+        <!--
+            Jackson-based WorkflowData round-trip — used by the editor's Save
+            endpoint to write modified workflows back to disk as JSON.
+        -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-jackson</artifactId>
+            <version>0.0.2-SNAPSHOT</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>${project.artifactId}</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

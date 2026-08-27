@@ -1,0 +1,7 @@
+@startuml wf_multi_assign
+:assign setVars
+  firstName = John
+  lastName = Doe
+  age = 30
+;
+@enduml

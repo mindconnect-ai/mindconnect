@@ -1,0 +1,9 @@
+@startuml wf_parent
+:call invokeChild
+workflow = childWf;
+partition childWf {
+  :assign hello
+  msg = hello from child;
+}
+stop
+@enduml

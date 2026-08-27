@@ -1,0 +1,8 @@
+@startuml wf_py_rt
+start
+:code py
+language = python
+code = x * 2
+assign-result -> result;
+stop
+@enduml

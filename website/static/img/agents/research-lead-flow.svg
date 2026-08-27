@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 350" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    Research lead Agent — vector database comparison (left → right)
+    Stages: Question → todo_write → run_agents (3× web-researcher) → verifier → workspace_write
+  -->
+
+  <defs>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+    <marker id="ap" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2c7a3f"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 30px; font-weight: 700; fill: #1a3a5c; }
+    .step  { font-size: 13px; font-weight: 700; fill: #999; letter-spacing: 1px; }
+    .head  { font-size: 19px; font-weight: 700; fill: #1a3a5c; }
+    .agent { font-size: 16px; font-weight: 700; fill: #1a3a5c; }
+    .tool  { font-size: 15px; font-weight: 700; fill: #b35b00; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .tag   { font-size: 14px; fill: #2c7a3f; font-weight: 700; }
+    .edge  { stroke: #555; stroke-width: 2.5; fill: none; }
+    .edgeP { stroke: #2c7a3f; stroke-width: 2.5; fill: none; }
+  </style>
+
+  <text x="40" y="50" class="title">Research lead — vector database comparison</text>
+
+  <!-- ── 1. Question ───────────────────────────── -->
+  <text x="40" y="120" class="step">1 · QUESTION</text>
+  <g filter="url(#s)">
+    <rect x="40" y="132" width="220" height="150" rx="14" fill="#E8F4FD" stroke="#9cc4e0" stroke-width="2"/>
+  </g>
+  <text x="135" y="185" font-size="34" text-anchor="middle">👤</text>
+  <text x="150" y="222" class="head" text-anchor="middle">Question</text>
+  <text x="150" y="248" font-size="14" fill="#555" text-anchor="middle">Qdrant · Weaviate</text>
+  <text x="150" y="268" font-size="14" fill="#555" text-anchor="middle">· compare Milvus</text>
+
+  <path d="M260,207 L300,207" class="edge" marker-end="url(#a)"/>
+
+  <!-- ── 2. Plan / todo_write ───────────────── -->
+  <text x="308" y="120" class="step">2 · PLAN</text>
+  <g filter="url(#s)">
+    <rect x="308" y="132" width="220" height="150" rx="14" fill="#FFF8E6" stroke="#e0c878" stroke-width="2"/>
+  </g>
+  <text x="402" y="180" font-size="30" text-anchor="middle">🤖</text>
+  <text x="418" y="216" class="agent" text-anchor="middle">research-lead</text>
+  <rect x="350" y="234" width="135" height="30" rx="15" fill="#fff" stroke="#b35b00" stroke-width="1.5"/>
+  <text x="417" y="254" class="tool" text-anchor="middle">todo_write</text>
+
+  <path d="M528,207 L568,207" class="edge" marker-end="url(#a)"/>
+
+  <!-- ── 3. Parallel: run_agents → 3 researcher ─ -->
+  <text x="576" y="120" class="step">3 · RESEARCH IN PARALLEL</text>
+  <rect x="576" y="170" width="140" height="74" rx="14" fill="#FFF8E6" stroke="#e0c878" stroke-width="2"/>
+  <text x="646" y="200" class="tool" text-anchor="middle" font-size="14">run_agents</text>
+  <text x="646" y="224" class="tag" text-anchor="middle" font-size="13">3× parallel</text>
+
+  <!-- fan-out -->
+  <path d="M716,180 C760,180 760,150 800,150" class="edgeP" marker-end="url(#ap)"/>
+  <path d="M716,207 L800,207" class="edgeP" marker-end="url(#ap)"/>
+  <path d="M716,234 C760,234 760,264 800,264" class="edgeP" marker-end="url(#ap)"/>
+
+  <g filter="url(#s)">
+    <rect x="800" y="118" width="270" height="64" rx="12" fill="#E8F5E9" stroke="#86c193" stroke-width="2"/>
+    <rect x="800" y="186" width="270" height="64" rx="12" fill="#E8F5E9" stroke="#86c193" stroke-width="2"/>
+    <rect x="800" y="254" width="270" height="64" rx="12" fill="#E8F5E9" stroke="#86c193" stroke-width="2"/>
+  </g>
+  <text x="822" y="146" font-size="20">🤖</text>
+  <text x="852" y="146" class="agent" font-size="15">web-researcher</text>
+  <text x="852" y="168" class="tag">Qdrant</text>
+  <text x="822" y="214" font-size="20">🤖</text>
+  <text x="852" y="214" class="agent" font-size="15">web-researcher</text>
+  <text x="852" y="236" class="tag">Weaviate</text>
+  <text x="822" y="282" font-size="20">🤖</text>
+  <text x="852" y="282" class="agent" font-size="15">web-researcher</text>
+  <text x="852" y="304" class="tag">Milvus</text>
+
+  <!-- collect -->
+  <path d="M1070,150 C1110,150 1110,207 1150,207" class="edgeP"/>
+  <path d="M1070,218 L1150,210" class="edgeP"/>
+  <path d="M1070,286 C1110,286 1110,207 1150,207" class="edgeP" marker-end="url(#ap)"/>
+
+  <!-- ── 4. verifier ───────────────────────── -->
+  <text x="1158" y="120" class="step">4 · VERIFY</text>
+  <g filter="url(#s)">
+    <rect x="1158" y="132" width="220" height="150" rx="14" fill="#FCE4F1" stroke="#d79bc4" stroke-width="2"/>
+  </g>
+  <text x="1252" y="180" font-size="30" text-anchor="middle">🕵️</text>
+  <text x="1268" y="216" class="agent" text-anchor="middle">verifier</text>
+  <text x="1268" y="244" font-size="14" fill="#2c7a3f" font-weight="700" text-anchor="middle">confirmed /</text>
+  <text x="1268" y="264" font-size="14" fill="#b00020" font-weight="700" text-anchor="middle">refuted</text>
+
+  <path d="M1378,207 L1418,207" class="edge" marker-end="url(#a)"/>
+
+  <!-- ── 5. workspace_write ────────────────── -->
+  <text x="1426" y="120" class="step">5 · REPORT</text>
+  <g filter="url(#s)">
+    <rect x="1426" y="132" width="214" height="150" rx="14" fill="#EDE7F6" stroke="#b3a4d6" stroke-width="2"/>
+  </g>
+  <text x="1533" y="182" font-size="30" text-anchor="middle">📋</text>
+  <rect x="1452" y="206" width="162" height="30" rx="15" fill="#fff" stroke="#b35b00" stroke-width="1.5"/>
+  <text x="1533" y="226" class="tool" text-anchor="middle" font-size="14">workspace_write</text>
+  <text x="1533" y="262" font-size="15" fill="#1a3a5c" font-weight="700" text-anchor="middle">report.md</text>
+
+</svg>

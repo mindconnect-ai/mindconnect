@@ -1,0 +1,139 @@
+{
+  "@class": "ai.mindconnect.workflow.domain.WorkflowData",
+  "name": "word-to-markdown",
+  "assignResultToVar": null,
+  "resultFrom": "resultMessage",
+  "steps": [
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "get-sections",
+      "assignResultToVar": "sectionsJson",
+      "tool": "document_sections",
+      "arguments": "{\"path\": \"${wordFile}\"}",
+      "type": "toolcall"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "parse-sections",
+      "assignResultToVar": null,
+      "language": "javascript",
+      "code": "sections = (function () {\n  var parsed = JSON.parse(String(sectionsJson));\n  var out = [];\n  for (var i = 0; i < parsed.sections.length; i++) {\n    var s = parsed.sections[i];\n    if (!String(s.content || '').trim()) { continue; }\n    var title = String(s.title || ('section-' + s.index));\n    out.push({\n      title: title,\n      content: String(s.content),\n      slug: ('0' + (out.length + 1)).slice(-2) + '-' + title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')\n    });\n  }\n  if (out.length === 0) { throw 'No sections with content found in the document'; }\n  return out;\n})();\nsectionCount = sections.length;\n",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.ForEachData",
+      "name": "each-section",
+      "assignResultToVar": "joinedSummaries",
+      "resultFrom": "sectionSummaryBlock",
+      "loopOver": "sections",
+      "runVar": "section",
+      "indexVar": "idx",
+      "parallel": false,
+      "joinResults": true,
+      "joinDelimiter": "\n\n",
+      "steps": [
+        {
+          "@class": "ai.mindconnect.workflow.domain.CodeData",
+          "name": "prep-section",
+          "assignResultToVar": null,
+          "language": "javascript",
+          "code": "contentArgs = {\n  path: targetDir + '/' + section.slug + '.md',\n  content: '# ' + section.title + '\\n\\n' + section.content + '\\n'\n};\nsectionPrompt = 'Summarize the following section of a document. Reply with a concise Markdown summary. No preamble.\\n\\nSection title: ' + section.title + '\\n\\n' + section.content;\n",
+          "wrapInFunction": false,
+          "injectVariables": true,
+          "exportVariables": true,
+          "type": "code"
+        },
+        {
+          "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+          "name": "write-section",
+          "assignResultToVar": null,
+          "tool": "file_write",
+          "arguments": "${contentArgs}",
+          "type": "toolcall"
+        },
+        {
+          "@class": "ai.mindconnect.agent.tools.workflow.step.AgentCallData",
+          "name": "summarize-section",
+          "assignResultToVar": "sectionSummary",
+          "agent": "Summarizer",
+          "message": "${sectionPrompt}",
+          "type": "agentcall"
+        },
+        {
+          "@class": "ai.mindconnect.workflow.domain.CodeData",
+          "name": "prep-section-summary",
+          "assignResultToVar": null,
+          "language": "javascript",
+          "code": "summaryArgs = {\n  path: targetDir + '/' + section.slug + '-summary.md',\n  content: '# Summary: ' + section.title + '\\n\\n' + String(sectionSummary) + '\\n'\n};\nsectionSummaryBlock = '## ' + section.title + '\\n\\n' + String(sectionSummary);\n",
+          "wrapInFunction": false,
+          "injectVariables": true,
+          "exportVariables": true,
+          "type": "code"
+        },
+        {
+          "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+          "name": "write-section-summary",
+          "assignResultToVar": null,
+          "tool": "file_write",
+          "arguments": "${summaryArgs}",
+          "type": "toolcall"
+        }
+      ],
+      "type": "foreach"
+    },
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.AgentCallData",
+      "name": "summarize-document",
+      "assignResultToVar": "overallSummary",
+      "agent": "Summarizer",
+      "message": "Below are per-section summaries of one document. Write an overall summary of the whole document in Markdown. Start with one paragraph, then a short bullet list of the key points. No preamble.\n\n${joinedSummaries}",
+      "type": "agentcall"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "prep-overall-file",
+      "assignResultToVar": null,
+      "language": "javascript",
+      "code": "overallArgs = {\n  path: targetDir + '/document-summary.md',\n  content: '# Document summary\\n\\n' + String(overallSummary) + '\\n'\n};\nresultMessage = 'Wrote ' + sectionCount + ' section files, ' + sectionCount + ' section summaries and document-summary.md to ' + targetDir;\n",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "write-document-summary",
+      "assignResultToVar": null,
+      "tool": "file_write",
+      "arguments": "${overallArgs}",
+      "type": "toolcall"
+    }
+  ],
+  "uid": null,
+  "params": {
+    "type": "object",
+    "properties": {
+      "wordFile": {
+        "type": "string",
+        "format": "path",
+        "description": "Path to the Word document, relative to the tools base directory (mindconnect.tools.base-dir, default: your home) — e.g. Documents/spec.docx"
+      },
+      "targetDir": {
+        "type": "string",
+        "format": "path",
+        "description": "Folder the markdown files are written to, relative to the same base directory — e.g. Documents/spec-md"
+      }
+    },
+    "required": [
+      "wordFile",
+      "targetDir"
+    ]
+  },
+  "paramDefaults": {},
+  "subWorkflows": [],
+  "workflowType": null,
+  "type": "workflow"
+}

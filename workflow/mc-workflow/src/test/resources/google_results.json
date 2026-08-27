@@ -1,0 +1,530 @@
+{
+  "search_metadata": {
+    "id": "6720ebde21e77b326216875d",
+    "status": "Success",
+    "json_endpoint": "https://serpapi.com/searches/32a7a3a9b4528bb3/6720ebde21e77b326216875d.json",
+    "created_at": "2024-10-29 14:06:22 UTC",
+    "processed_at": "2024-10-29 14:06:22 UTC",
+    "google_url": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&sourceid=chrome&ie=UTF-8",
+    "raw_html_file": "https://serpapi.com/searches/32a7a3a9b4528bb3/6720ebde21e77b326216875d.html",
+    "total_time_taken": 1.94
+  },
+  "search_parameters": {
+    "engine": "google",
+    "q": "Warum ist Justin Bieber so beliebt?=10",
+    "google_domain": "google.com",
+    "device": "desktop"
+  },
+  "search_information": {
+    "query_displayed": "Warum ist Justin Bieber so beliebt?=10",
+    "total_results": 8,
+    "time_taken_displayed": 0.79,
+    "organic_results_state": "Results for exact spelling"
+  },
+  "inline_images": [
+    {
+      "source": "https://m.youtube.com/watch?v=KRA2UIWY960",
+      "thumbnail": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/0c2a9a0d5c9c624b5cd07ae1738204d419dc5e497937de520048f1a61c4832df.jpeg",
+      "original": "https://i.ytimg.com/vi/KRA2UIWY960/maxresdefault.jpg",
+      "title": "Selena Gomez Reveals The True Reason She And Justin Broke Up",
+      "source_name": "YouTube"
+    },
+    {
+      "source": "https://www.watchmojo.com/articles/top-10-reasons-why-justin-bieber-is-hated",
+      "thumbnail": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/0c2a9a0d5c9c624b46da000b81621d6ba22c915c3fe2df69c63c5765b44e4280.jpeg",
+      "original": "https://www.watchmojo.com/uploads/blipthumbs/M-P-Top10-Reasons-Why-Justin-Bieber-Is-Hated-480p30_480.jpg",
+      "title": "Top 10 Reasons Why Justin Bieber Is Hated | Articles on ...",
+      "source_name": "WatchMojo"
+    },
+    {
+      "source": "https://m.youtube.com/watch?v=qwlqnpL9Ndg",
+      "thumbnail": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/0c2a9a0d5c9c624bc21b9d27ec2cd478931d80bfca4437f66cf5013232ed10fe.jpeg",
+      "original": "https://i.ytimg.com/vi/qwlqnpL9Ndg/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLBgBgRRqLp9r5lobrCHv7aDPaqOLg",
+      "title": "Justin Bieber SPEAKS UP About Diddy Clip & GETS EMOTIONAL!!",
+      "source_name": "YouTube"
+    },
+    {
+      "source": "https://www.facebook.com/alainahersheyy/videos/the-shocking-meaning-of-justin-biebers-yummy/164678571516471/",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQIkIjPp0VKxkj7Vm4zRx_tqZP4Uvl9vLCjA05zHA6XOQU7v2dsGLZ_ODI&s",
+      "original": "https://lookaside.fbsbx.com/lookaside/crawler/media/?media_id=164678571516471&get_thumbnail=1",
+      "title": "The Shocking Meaning of Justin Bieber's 'Yummy' | Facebook",
+      "source_name": "Facebook"
+    },
+    {
+      "source": "https://www.youtube.com/watch?v=9p7MwQ0wcmc",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT3yMxZ1l3yVXMdDgzQW5dG92N4Ift0yKU77u1kun9ryyCka7uVbHwpAr0&s",
+      "original": "https://i.ytimg.com/vi/9p7MwQ0wcmc/sddefault.jpg",
+      "title": "Top 10 Reasons Why Justin Bieber Is Hated (Quickie)",
+      "source_name": "YouTube"
+    },
+    {
+      "source": "https://www.youtube.com/watch?v=7W9nOdqxsOw",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSWGHAZTFPd5TBSu1o5-wOilw6r86_ctTvl0RbsYHgy9WzADQPtljdrvFQ&s",
+      "original": "https://i.ytimg.com/vi/7W9nOdqxsOw/maxresdefault.jpg",
+      "title": "Justin Bieber: ‘Changes' and Being Protective of Billie Eilish | Apple Music",
+      "source_name": "YouTube"
+    },
+    {
+      "source": "https://m.youtube.com/watch?v=LAPGMM6dWUs",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQfo53G3lUvsy_xxCX4J-USXCscLytwHBXI63n-OionIwiYmwRATrv-0PI&s",
+      "original": "https://i.ytimg.com/vi/LAPGMM6dWUs/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLAfHVekZSMM0rl0m35kv3xCKt1bLw",
+      "title": "Why Justin Bieber Is Still So Popular",
+      "source_name": "YouTube"
+    },
+    {
+      "source": "https://en.wikipedia.org/wiki/Justin_Bieber",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSky52e35K6f7nUXbYySl1KLNcVQHyJuAKkJSjsB2RhwFn6FkL9-RmfKeo&s",
+      "original": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/Justin_Bieber_in_2015.jpg/640px-Justin_Bieber_in_2015.jpg",
+      "title": "Justin Bieber - Wikipedia",
+      "source_name": "Wikipedia"
+    },
+    {
+      "source": "https://www.youtube.com/watch?v=2iy0cBhB2V0",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTmo0C1VpZVJnDJ7rz1cJl2ywhLdeVai7nML4AwBGvwnq64mNZtMIpVy5Q&s",
+      "original": "https://i.ytimg.com/vi/2iy0cBhB2V0/hqdefault.jpg",
+      "title": "Justin Bieber's Face Paralysis - Why Would God Allow This?",
+      "source_name": "YouTube"
+    }
+  ],
+  "related_questions": [
+    {
+      "question": "How is Justin Bieber inspiring?",
+      "snippet": "Beyond his musical evolution, Bieber has also been open about his struggles with mental health and the importance of seeking help. His willingness to speak candidly about his experiences has resonated with fans worldwide, further humanizing the superstar persona and inspiring others to prioritize their well-being.",
+      "title": "Justin Bieber Turns 30: Reflecting on a Decade of Musical Evolution",
+      "date": "Mar 1, 2024",
+      "link": "https://www.kissottawa.com/2024/03/01/justin-bieber-turns-30-reflecting-on-a-decade-of-musical-evolution/#:~:text=Beyond%20his%20musical%20evolution%2C%20Bieber,to%20prioritize%20their%20well%2Dbeing.",
+      "displayed_link": "https://www.kissottawa.com › 2024/03/01 › justin-bieber-...",
+      "source_logo": null,
+      "next_page_token": "eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IkhvdyBpcyBKdXN0aW4gQmllYmVyIGluc3BpcmluZz8iLCJsayI6IkdoNW9iM2NnYVhNZ2FuVnpkR2x1SUdKcFpXSmxjaUJwYm5Od2FYSnBibWMiLCJicyI6ImMtTnk0NUwzeUM5WHlDeFc4Q290THNuTVUzREtURTFLTFZMSXpDc3V5Q3pLekV1M2w3akRaYVFnSlpjQlVaVUZVWldFcG9vcmlFczFQS05Tb1R3UjNhQzB4Tno4MG1LZ1NnVWpBME1EZTRuTk5VWnFVaXJsVUxXb3hxR3E1ZkxqVWc3UFNDeFJ5RTFNU1VVenRUaGZvU0Nfb0RRbnNjaGU0bzJja1lxVVVqbGNKYXFaQ0pWY1FMOTZvanN2RWFndUp5Y3pQeTh4c3lqVlh1SmdQTWl2R1A1RVVTWEFDQUEiLCJpZCI6ImZjXzN1c2daNVRTTDctWnB0UVB4WTZxa1FZXzIifQ==",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google_related_questions&google_domain=google.com&next_page_token=eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IkhvdyBpcyBKdXN0aW4gQmllYmVyIGluc3BpcmluZz8iLCJsayI6IkdoNW9iM2NnYVhNZ2FuVnpkR2x1SUdKcFpXSmxjaUJwYm5Od2FYSnBibWMiLCJicyI6ImMtTnk0NUwzeUM5WHlDeFc4Q290THNuTVUzREtURTFLTFZMSXpDc3V5Q3pLekV1M2w3akRaYVFnSlpjQlVaVUZVWldFcG9vcmlFczFQS05Tb1R3UjNhQzB4Tno4MG1LZ1NnVWpBME1EZTRuTk5VWnFVaXJsVUxXb3hxR3E1ZkxqVWc3UFNDeFJ5RTFNU1VVenRUaGZvU0Nfb0RRbnNjaGU0bzJja1lxVVVqbGNKYXFaQ0pWY1FMOTZvanN2RWFndUp5Y3pQeTh4c3lqVlh1SmdQTWl2R1A1RVVTWEFDQUEiLCJpZCI6ImZjXzN1c2daNVRTTDctWnB0UVB4WTZxa1FZXzIifQ%3D%3D"
+    },
+    {
+      "question": "Why was Justin Bieber famous in 2010?",
+      "snippet": "Part two of his debut album, My World 2.0, reached double platinum status in just over six months, garnering two nominations for the approaching Grammy Awards, while a new book — Justin Bieber: First Step 2 Forever: My Story — became a New York Times Bestsellers list fixture, currently enjoying its eighth week on the ...",
+      "title": "Justin Bieber - Person of the Year 2010 - TIME",
+      "link": "https://content.time.com/time/specials/packages/article/0,28804,2036683_2036767_2037175,00.html#:~:text=Part%20two%20of%20his%20debut,its%20eighth%20week%20on%20the",
+      "displayed_link": "https://content.time.com › specials › packages › article",
+      "source_logo": null,
+      "next_page_token": "eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IldoeSB3YXMgSnVzdGluIEJpZWJlciBmYW1vdXMgaW4gMjAxMD8iLCJsayI6IkdpUjNhSGtnZDJGeklHcDFjM1JwYmlCaWFXVmlaWElnWm1GdGIzVnpJR2x1SURJd01UQSIsImJzIjoiYy1OeTQ1TDN5QzlYeUN4VzhDb3RMc25NVTNES1RFMUtMVkxJekNzdXlDekt6RXUzbDdqRFphUWdKWmNCVVpVRlVaV0Vwb29yaUVzMVBLTlNvVHdSM2FDMHhOejgwbUtnU2dVakEwTURlNG5OTlVacVVpcmxVTFdveHFHcTVmTGpVZzdQU0N4UnlFMU1TVVV6dFRoZm9TQ19vRFFuc2NoZTRvMmNrWXFVVWpsY0phcVpDSlZjUUw5Nm9qc3ZFYWd1SnljelB5OHhzeWpWWHVKZ1BNaXZHUDVFVVNYQUNBQSIsImlkIjoiZmNfM3VzZ1o1VFNMNy1acHRRUHhZNnFrUVlfMiJ9",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google_related_questions&google_domain=google.com&next_page_token=eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IldoeSB3YXMgSnVzdGluIEJpZWJlciBmYW1vdXMgaW4gMjAxMD8iLCJsayI6IkdpUjNhSGtnZDJGeklHcDFjM1JwYmlCaWFXVmlaWElnWm1GdGIzVnpJR2x1SURJd01UQSIsImJzIjoiYy1OeTQ1TDN5QzlYeUN4VzhDb3RMc25NVTNES1RFMUtMVkxJekNzdXlDekt6RXUzbDdqRFphUWdKWmNCVVpVRlVaV0Vwb29yaUVzMVBLTlNvVHdSM2FDMHhOejgwbUtnU2dVakEwTURlNG5OTlVacVVpcmxVTFdveHFHcTVmTGpVZzdQU0N4UnlFMU1TVVV6dFRoZm9TQ19vRFFuc2NoZTRvMmNrWXFVVWpsY0phcVpDSlZjUUw5Nm9qc3ZFYWd1SnljelB5OHhzeWpWWHVKZ1BNaXZHUDVFVVNYQUNBQSIsImlkIjoiZmNfM3VzZ1o1VFNMNy1acHRRUHhZNnFrUVlfMiJ9"
+    },
+    {
+      "question": "What made Justin Bieber so popular?",
+      "snippet": "Bieber was ushered into mainstream stardom with his teen pop-driven debut studio album, My World 2.0 (2010), which debuted atop the US Billboard 200 and made him the youngest solo male act to do so in 47 years.",
+      "title": "Justin Bieber - Wikipedia",
+      "link": "https://en.wikipedia.org/wiki/Justin_Bieber#:~:text=Bieber%20was%20ushered%20into%20mainstream,do%20so%20in%2047%20years.",
+      "displayed_link": "https://en.wikipedia.org › wiki › Justin_Bieber",
+      "thumbnail": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTw54k-XwIEKT3WdTjDswraBD6m_1gmGcpqdjqLOyDw&s",
+      "next_page_token": "eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IldoYXQgbWFkZSBKdXN0aW4gQmllYmVyIHNvIHBvcHVsYXI/IiwibGsiOiJHaUozYUdGMElHMWhaR1VnYW5WemRHbHVJR0pwWldKbGNpQnpieUJ3YjNCMWJHRnkiLCJicyI6ImMtTnk0NUwzeUM5WHlDeFc4Q290THNuTVUzREtURTFLTFZMSXpDc3V5Q3pLekV1M2w3akRaYVFnSlpjQlVaVUZVWldFcG9vcmlFczFQS05Tb1R3UjNhQzB4Tno4MG1LZ1NnVWpBME1EZTRuTk5VWnFVaXJsVUxXb3hxR3E1ZkxqVWc3UFNDeFJ5RTFNU1VVenRUaGZvU0Nfb0RRbnNjaGU0bzJja1lxVVVqbGNKYXFaQ0pWY1FMOTZvanN2RWFndUp5Y3pQeTh4c3lqVlh1SmdQTWl2R1A1RVVTWEFDQUEiLCJpZCI6ImZjXzN1c2daNVRTTDctWnB0UVB4WTZxa1FZXzIifQ==",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google_related_questions&google_domain=google.com&next_page_token=eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IldoYXQgbWFkZSBKdXN0aW4gQmllYmVyIHNvIHBvcHVsYXI%2FIiwibGsiOiJHaUozYUdGMElHMWhaR1VnYW5WemRHbHVJR0pwWldKbGNpQnpieUJ3YjNCMWJHRnkiLCJicyI6ImMtTnk0NUwzeUM5WHlDeFc4Q290THNuTVUzREtURTFLTFZMSXpDc3V5Q3pLekV1M2w3akRaYVFnSlpjQlVaVUZVWldFcG9vcmlFczFQS05Tb1R3UjNhQzB4Tno4MG1LZ1NnVWpBME1EZTRuTk5VWnFVaXJsVUxXb3hxR3E1ZkxqVWc3UFNDeFJ5RTFNU1VVenRUaGZvU0Nfb0RRbnNjaGU0bzJja1lxVVVqbGNKYXFaQ0pWY1FMOTZvanN2RWFndUp5Y3pQeTh4c3lqVlh1SmdQTWl2R1A1RVVTWEFDQUEiLCJpZCI6ImZjXzN1c2daNVRTTDctWnB0UVB4WTZxa1FZXzIifQ%3D%3D"
+    },
+    {
+      "question": "Is Justin Bieber a billionaire?",
+      "snippet": "If you're wondering about Justin Bieber'sfinancial status in 2024, let's just say he's doing more than fine. With an estimated net worth sitting at around $300 million, the pop sensation has come a long way from his humble beginnings.",
+      "title": "Justin Bieber Net Worth 2024: How much money he has now and what ...",
+      "date": "Aug 25, 2024",
+      "link": "https://www.marca.com/en/lifestyle/celebrity-net-worth/2024/08/25/66cba3d146163fc7678b4596.html#:~:text=If%20you're%20wondering,way%20from%20his%20humble%20beginnings.",
+      "displayed_link": "https://www.marca.com › celebrity-net-worth › 2024/08/25",
+      "source_logo": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/659ea7e569ecf2f57a870e960e64d2ad1cf39ba4bb36fe5b052bb8842cd8a16c.png",
+      "next_page_token": "eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IklzIEp1c3RpbiBCaWViZXIgYSBiaWxsaW9uYWlyZT8iLCJsayI6IkdoNXBjeUJxZFhOMGFXNGdZbWxsWW1WeUlHRWdZbWxzYkdsdmJtRnBjbVUiLCJicyI6ImMtTnk0NUwzeUM5WHlDeFc4Q290THNuTVUzREtURTFLTFZMSXpDc3V5Q3pLekV1M2w3akRaYVFnSlpjQlVaVUZVWldFcG9vcmlFczFQS05Tb1R3UjNhQzB4Tno4MG1LZ1NnVWpBME1EZTRuTk5VWnFVaXJsVUxXb3hxR3E1ZkxqVWc3UFNDeFJ5RTFNU1VVenRUaGZvU0Nfb0RRbnNjaGU0bzJja1lxVVVqbGNKYXFaQ0pWY1FMOTZvanN2RWFndUp5Y3pQeTh4c3lqVlh1SmdQTWl2R1A1RVVTWEFDQUEiLCJpZCI6ImZjXzN1c2daNVRTTDctWnB0UVB4WTZxa1FZXzIifQ==",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google_related_questions&google_domain=google.com&next_page_token=eyJvbnMiOiIxMDA0MSIsImZjIjoiRW9zQkNreEJTa2M1U210UFV6TnpUWGhqVVVFMk5GSndZbGxKVDNSWVNFWlJaalJCYm1nMU1rZEtZbFp0WVdwTU4zbEhTWGRIZW1WNVZtMUpNRVZhUVZaSVlVRnZiakZUTTAxUE5HdENiMGRURWhjemRYTm5XalZVVTB3M0xWcHdkRkZRZUZrMmNXdFJXUm9pUVVaWWNrVmpjRU5EV2tWNlFtWTNhMGhOZUhkUE5YVjJTVFoyYTBwWFFuaEhRUSIsImZjdiI6IjMiLCJlaSI6IjN1c2daNVRTTDctWnB0UVB4WTZxa1FZIiwicWMiOiJDaWgzWVhKMWJTQnBjM1FnYW5WemRHbHVJR0pwWldKbGNpQnpieUJpWld4cFpXSjBJRDg5SURFd0VBQXhBQUFBd0cxUjBEOTk1OUFFUHciLCJxdWVzdGlvbiI6IklzIEp1c3RpbiBCaWViZXIgYSBiaWxsaW9uYWlyZT8iLCJsayI6IkdoNXBjeUJxZFhOMGFXNGdZbWxsWW1WeUlHRWdZbWxzYkdsdmJtRnBjbVUiLCJicyI6ImMtTnk0NUwzeUM5WHlDeFc4Q290THNuTVUzREtURTFLTFZMSXpDc3V5Q3pLekV1M2w3akRaYVFnSlpjQlVaVUZVWldFcG9vcmlFczFQS05Tb1R3UjNhQzB4Tno4MG1LZ1NnVWpBME1EZTRuTk5VWnFVaXJsVUxXb3hxR3E1ZkxqVWc3UFNDeFJ5RTFNU1VVenRUaGZvU0Nfb0RRbnNjaGU0bzJja1lxVVVqbGNKYXFaQ0pWY1FMOTZvanN2RWFndUp5Y3pQeTh4c3lqVlh1SmdQTWl2R1A1RVVTWEFDQUEiLCJpZCI6ImZjXzN1c2daNVRTTDctWnB0UVB4WTZxa1FZXzIifQ%3D%3D"
+    }
+  ],
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "What made Justin Bieber so popular through the 2010s?",
+      "link": "https://www.quora.com/What-made-Justin-Bieber-so-popular-through-the-2010s",
+      "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.quora.com/What-made-Justin-Bieber-so-popular-through-the-2010s&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQFnoECBcQAQ",
+      "displayed_link": "https://www.quora.com › What-made-Justin-Bieber-so-p...",
+      "favicon": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee1c38457cf528fa12dd9613b8fb52bd746.webp",
+      "snippet": "He's far from unique but he's more than just a singer. He was basically what the guys behind him were looking for: a kid who could sing and who had the right ...",
+      "snippet_highlighted_words": [
+        "He's far from unique"
+      ],
+      "sitelinks": {
+        "list": [
+          {
+            "title": "Why is Justin Bieber so popular?",
+            "link": "https://www.quora.com/Why-is-Justin-Bieber-so-popular-1",
+            "answer_count": 82,
+            "date": "Oct 14, 2010"
+          },
+          {
+            "title": "Why did Justin Bieber become so unpopular?",
+            "link": "https://www.quora.com/Why-did-Justin-Bieber-become-so-unpopular",
+            "answer_count": 35,
+            "date": "Sep 10, 2014"
+          },
+          {
+            "title": "Who are the fans of Justin Bieber or is a Belieber? Why?",
+            "link": "https://www.quora.com/Who-are-the-fans-of-Justin-Bieber-or-is-a-Belieber-Why",
+            "answer_count": 2,
+            "date": "Jun 5, 2018"
+          },
+          {
+            "title": "Why is the world so crazy about Justin Bieber?",
+            "link": "https://www.quora.com/Why-is-the-world-so-crazy-about-Justin-Bieber",
+            "answer_count": 6,
+            "date": "Oct 7, 2016"
+          }
+        ]
+      },
+      "missing": [
+        "beliebt"
+      ],
+      "must_include": {
+        "word": "beliebt",
+        "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Warum+ist+Justin+Bieber+so+%22beliebt%22+?%3D10&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ5t4CegQIGBAB"
+      },
+      "source": "Quora"
+    },
+    {
+      "position": 2,
+      "title": "do you think Justin bieber is still as popular and influential ...",
+      "link": "https://www.reddit.com/r/popheads/comments/107d1dk/do_you_think_justin_bieber_is_still_as_popular/",
+      "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.reddit.com/r/popheads/comments/107d1dk/do_you_think_justin_bieber_is_still_as_popular/&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQFnoECB0QAQ",
+      "displayed_link": "180+ comments · 1 year ago",
+      "favicon": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee1570ab8ce1a8dc8f64267fbaec59ee3a7.webp",
+      "snippet": "I remember how famous he was in 2010 and afterwards. people just listened to his music, criticised him, loved him, copied his haircut... how is the situation ...",
+      "sitelinks": {
+        "list": [
+          {
+            "title": "Justin Bieber's rise to fame is actually one of the most ... - Reddit",
+            "link": "https://www.reddit.com/r/popheads/comments/g0m3y0/justin_biebers_rise_to_fame_is_actually_one_of/",
+            "date": "Apr 13, 2020"
+          },
+          {
+            "title": "Can someone depict how big Justin Bieber was ... - Reddit",
+            "link": "https://www.reddit.com/r/popheads/comments/o9stym/can_someone_depict_how_big_justin_bieber_was/",
+            "date": "Jun 28, 2021"
+          },
+          {
+            "title": "Why is justin bieber hated so much? : r/Music - Reddit",
+            "link": "https://www.reddit.com/r/Music/comments/txdvpk/why_is_justin_bieber_hated_so_much/",
+            "date": "Apr 6, 2022"
+          },
+          {
+            "title": "How has Justin Bieber managed to stay relevant for so long ...",
+            "link": "https://www.reddit.com/r/popheads/comments/qim5rf/how_has_justin_bieber_managed_to_stay_relevant/",
+            "date": "Oct 29, 2021"
+          }
+        ]
+      },
+      "missing": [
+        "beliebt"
+      ],
+      "must_include": {
+        "word": "beliebt",
+        "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Warum+ist+Justin+Bieber+so+%22beliebt%22+?%3D10&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ5t4CegQIHhAB"
+      },
+      "source": "Reddit · r/popheads"
+    },
+    {
+      "position": 3,
+      "title": "Top 10 Reasons That Justin Bieber is Actually Pretty ...",
+      "link": "https://www.toptenz.net/top-10-reasons-that-justin-bieber-is-actually-pretty-awesome.php",
+      "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.toptenz.net/top-10-reasons-that-justin-bieber-is-actually-pretty-awesome.php&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQFnoECBMQAQ",
+      "displayed_link": "https://www.toptenz.net › top-10-reasons-that-justin-biebe...",
+      "date": "Jul 1, 2013",
+      "snippet": "Bieber doesn't just have talent, he has talent for days. The young star can not only play the guitar, drums, keyboard and trumpet, he can also play a guitar ...",
+      "snippet_highlighted_words": [
+        "Bieber doesn't just have talent, he has talent for days"
+      ],
+      "missing": [
+        "beliebt"
+      ],
+      "must_include": {
+        "word": "beliebt",
+        "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Warum+ist+Justin+Bieber+so+%22beliebt%22+?%3D10&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ5t4CegQIFBAB"
+      },
+      "source": "TopTenz"
+    },
+    {
+      "position": 4,
+      "title": "Why Justin Bieber Is Still So Popular",
+      "link": "https://m.youtube.com/watch?v=LAPGMM6dWUs",
+      "displayed_link": "640+ views · 3 years ago",
+      "thumbnail": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee1236dc672dbc69dbbb085c4fe6a79759b.jpeg",
+      "favicon": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee1498aaf6498b7f3977cb8e0700bbf076d.png",
+      "snippet": "Justin Bieber was a teen idol all the way back in 2009, and yet he's currently the artist on Spotify with the most monthly streams.",
+      "duration": "19:21",
+      "missing": [
+        "beliebt"
+      ],
+      "must_include": {
+        "word": "beliebt",
+        "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Warum+ist+Justin+Bieber+so+%22beliebt%22+?%3D10&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ5t4CegQIBBAT"
+      },
+      "video_link": "https://encrypted-vtbn0.gstatic.com/video?q=tbn:ANd9GcSmLTSVf8xfF27k9ew9QFzqaVlhiVUFu5H1MA",
+      "source": "YouTube · Terrifying Music Lessons"
+    },
+    {
+      "position": 5,
+      "title": "Justin Bieber",
+      "link": "https://en.wikipedia.org/wiki/Justin_Bieber",
+      "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://en.wikipedia.org/wiki/Justin_Bieber&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQFnoECBIQAQ",
+      "displayed_link": "https://en.wikipedia.org › wiki › Justin_Bieber",
+      "favicon": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee1a3050e249647c81298419ce16b2a64f2.webp",
+      "snippet": "Justin Drew Bieber is a Canadian singer. Regarded as a pop icon, he is recognized for his multi-genre musical performances. He was discovered by American ...",
+      "snippet_highlighted_words": [
+        "Justin",
+        "Bieber"
+      ],
+      "missing": [
+        "Warum",
+        "ist",
+        "beliebt"
+      ],
+      "source": "Wikipedia"
+    },
+    {
+      "position": 6,
+      "title": "Top 10 Reasons Why Justin Bieber Is Hated | Geeks",
+      "link": "https://vocal.media/geeks/top-10-reasons-why-justin-bieber-is-hated",
+      "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://vocal.media/geeks/top-10-reasons-why-justin-bieber-is-hated&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQFnoECDwQAQ",
+      "displayed_link": "https://vocal.media › geeks › top-10-reasons-why-justin-...",
+      "favicon": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee1a6d7c47016dd99569a68fa4def1e5b96.webp",
+      "snippet": "We're counting down our picks for the top 10 reasons why Justin Bieber is hated. For this list, we're looking at some of the douchiest, dumbest, or most ...",
+      "snippet_highlighted_words": [
+        "Justin Bieber is hated"
+      ],
+      "missing": [
+        "beliebt"
+      ],
+      "must_include": {
+        "word": "beliebt",
+        "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Warum+ist+Justin+Bieber+so+%22beliebt%22+?%3D10&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ5t4CegQIQBAB"
+      },
+      "source": "Vocal"
+    },
+    {
+      "position": 7,
+      "title": "Why Is Justin Bieber This Popular?",
+      "link": "https://www.vulture.com/2011/02/why_is_justin_bieber_this_popu.html",
+      "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.vulture.com/2011/02/why_is_justin_bieber_this_popu.html&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQFnoECD4QAQ",
+      "displayed_link": "https://www.vulture.com › 2011/02 › why_is_justin_bie...",
+      "favicon": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee14241f7e68069d75f4aca5c3e28be90a1.webp",
+      "date": "Feb 18, 2011",
+      "snippet": "Bieber is more successful than the Jonas Brothers because teen girls find Bieber's particular sexless good looks to be superior to those of either Nick, Joe, ...",
+      "snippet_highlighted_words": [
+        "Bieber is more successful than the Jonas Brothers"
+      ],
+      "source": "Vulture"
+    },
+    {
+      "position": 8,
+      "title": "Why is Justin Bieber so popular?",
+      "link": "https://www.quora.com/What-do-people-like-about-Justin-Bieber?top_ans=66254622",
+      "redirect_link": "https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://www.quora.com/What-do-people-like-about-Justin-Bieber%3Ftop_ans%3D66254622&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQFnoECD8QAQ",
+      "displayed_link": "https://www.quora.com › What-do-people-like-about-Ju...",
+      "favicon": "https://serpapi.com/searches/6720ebde21e77b326216875d/images/84ef2ff005e64a4d8f983e55241bbee117012f3e365ffa8b2b85674e78a834fd.webp",
+      "snippet": "He's appealing to a larger demographic with his new album, which is more hip-hop and EDM focused. And his recent interest in wearing Metallic, ...",
+      "snippet_highlighted_words": [
+        "He's appealing to a larger demographic with his new album"
+      ],
+      "missing": [
+        "beliebt"
+      ],
+      "must_include": {
+        "word": "beliebt",
+        "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Warum+ist+Justin+Bieber+so+%22beliebt%22+?%3D10&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ5t4CegQIRRAB"
+      },
+      "source": "Quora"
+    }
+  ],
+  "top_stories_link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Warum+ist+Justin+Bieber+so+beliebt?%3D10&udm=2&source=univ&fir=QpBAqxjEuA6j8M%252Cvqg6-RmvmCgE1M%252C_%253Bq9FfRuEX6T79vM%252CeFCpxUKT2f5L-M%252C_%253BEGqBNoJmtgukMM%252CV0pmIK7ux_xZeM%252C_%253B0XMgj9lMyifjlM%252CpQZXxZSayP-vpM%252C_%253BpVmQYSs2SzpUNM%252C7D2ebR6fY4QOSM%252C_%253BPNJbawri2Y211M%252C5WUybCRWzTs_ZM%252C_%253BPkwr7eLynINq0M%252CJzdONEQMSENkTM%252C_%253B-nct6pSzGj5YEM%252CdSOZcBEVngpiTM%252C_%253Bc8Qkem9naGBRuM%252CGJYKZx3NvvCwzM%252C_&usg=AI4_-kQjOOQLoSCaLnEwJSLS-Ar6G_jAbg&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ7Al6BAhIEAY",
+  "top_stories_serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10",
+  "related_searches": [
+    {
+      "block_position": 1,
+      "query": "Why is Justin Bieber so popular",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Why+is+Justin+Bieber+so+popular&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhLEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Why+is+Justin+Bieber+so+popular"
+    },
+    {
+      "block_position": 1,
+      "query": "How old was Justin Bieber in 2010",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=How+old+was+Justin+Bieber+in+2010&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhKEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=How+old+was+Justin+Bieber+in+2010"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber popularity chart",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Justin+Bieber+popularity+chart&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhQEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+popularity+chart"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber age",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Justin+Bieber+age&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhREAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+age"
+    },
+    {
+      "block_position": 1,
+      "query": "Why is Justin Bieber important",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Why+is+Justin+Bieber+important&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhPEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Why+is+Justin+Bieber+important"
+    },
+    {
+      "block_position": 1,
+      "query": "Is Justin Bieber still popular in 2023",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Is+Justin+Bieber+still+popular+in+2023&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhOEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Is+Justin+Bieber+still+popular+in+2023"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber daughter",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Justin+Bieber+daughter&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhNEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+daughter"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber 2024",
+      "link": "https://www.google.com/search?sca_esv=492959cb0fa9f70d&q=Justin+Bieber+2024&sa=X&ved=2ahUKEwiUueC44bOJAxW_jIkEHUWHKmIQ1QJ6BAhJEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+2024"
+    }
+  ],
+  "dmca_messages": {
+    "title": "Notices about Filtered Results",
+    "messages": [
+      {
+        "content": "In order to show you the most relevant results, we have omitted some entries very similar to the 8 already displayed.If you like, you can repeat the search with the omitted results included.",
+        "highlighted_words": [
+          {
+            "link": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&sca_esv=492959cb0fa9f70d&filter=0",
+            "text": "repeat the search with the omitted results included"
+          }
+        ]
+      }
+    ]
+  },
+  "pagination": {
+    "current": 1,
+    "next": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10&sourceid=chrome&ie=UTF-8",
+    "other_pages": {
+      "2": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10&sourceid=chrome&ie=UTF-8",
+      "3": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=20&sourceid=chrome&ie=UTF-8",
+      "4": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=30&sourceid=chrome&ie=UTF-8",
+      "5": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=40&sourceid=chrome&ie=UTF-8"
+    }
+  },
+  "serpapi_pagination": {
+    "current": 1,
+    "next_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10",
+    "next": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10",
+    "other_pages": {
+      "2": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10",
+      "3": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=20",
+      "4": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=30",
+      "5": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=40"
+    }
+  }
+}3D10&start=20",
+      "4": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=30",
+      "5": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=40"
+    }
+  }
+}hlighted_words": [
+        "Justin Bieber is hated"
+      ],
+      "missing": [
+        "Warum",
+        "ist",
+        "beliebt"
+      ],
+      "source": "Vocal"
+    }
+  ],
+  "related_searches": [
+    {
+      "block_position": 1,
+      "query": "Why is Justin Bieber so popular",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=Why+is+Justin+Bieber+so+popular&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhCEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Why+is+Justin+Bieber+so+popular"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber age",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=Justin+Bieber+age&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhEEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+age"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber popularity chart",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=Justin+Bieber+popularity+chart&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhGEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+popularity+chart"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber daughter",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=Justin+Bieber+daughter&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhFEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+daughter"
+    },
+    {
+      "block_position": 1,
+      "query": "How old was Justin Bieber in 2010",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=How+old+was+Justin+Bieber+in+2010&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhIEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=How+old+was+Justin+Bieber+in+2010"
+    },
+    {
+      "block_position": 1,
+      "query": "Justin Bieber 2024",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=Justin+Bieber+2024&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhDEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Justin+Bieber+2024"
+    },
+    {
+      "block_position": 1,
+      "query": "Where is Justin Bieber right now",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=Where+is+Justin+Bieber+right+now&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhJEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Where+is+Justin+Bieber+right+now"
+    },
+    {
+      "block_position": 1,
+      "query": "Why is Justin Bieber important",
+      "link": "https://www.google.com/search?sca_esv=fb627f01e4917464&q=Why+is+Justin+Bieber+important&sa=X&ved=2ahUKEwiAj9ud-biIAxX4rJUCHYgkMW8Q1QJ6BAhHEAE",
+      "serpapi_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Why+is+Justin+Bieber+important"
+    }
+  ],
+  "dmca_messages": {
+    "title": "Notices about Filtered Results",
+    "messages": [
+      {
+        "content": "In order to show you the most relevant results, we have omitted some entries very similar to the 8 already displayed.If you like, you can repeat the search with the omitted results included.",
+        "highlighted_words": [
+          {
+            "link": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&sca_esv=fb627f01e4917464&filter=0",
+            "text": "repeat the search with the omitted results included"
+          }
+        ]
+      }
+    ]
+  },
+  "pagination": {
+    "current": 1,
+    "next": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10&sourceid=chrome&ie=UTF-8",
+    "other_pages": {
+      "2": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10&sourceid=chrome&ie=UTF-8",
+      "3": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=20&sourceid=chrome&ie=UTF-8",
+      "4": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=30&sourceid=chrome&ie=UTF-8",
+      "5": "https://www.google.com/search?q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&oq=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=40&sourceid=chrome&ie=UTF-8"
+    }
+  },
+  "serpapi_pagination": {
+    "current": 1,
+    "next_link": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10",
+    "next": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10",
+    "other_pages": {
+      "2": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=10",
+      "3": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=20",
+      "4": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=30",
+      "5": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=40"
+    }
+  }
+}stin+Bieber+so+beliebt%3F%3D10&start=10",
+      "3": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=20",
+      "4": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=30",
+      "5": "https://serpapi.com/search.json?device=desktop&engine=google&google_domain=google.com&q=Warum+ist+Justin+Bieber+so+beliebt%3F%3D10&start=40"
+    }
+  }
+}

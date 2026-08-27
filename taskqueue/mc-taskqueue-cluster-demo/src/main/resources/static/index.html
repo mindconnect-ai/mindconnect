@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Task Queue Cluster</title>
+  <link rel="stylesheet" href="/sui/sui.css">
+  <link rel="stylesheet" href="/cluster-demo.css">
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: var(--sui-color-bg, #f5f5f5); }
+    #app { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    // Defensive on purpose: a failed import or boot must say so on the page,
+    // not leave it silently blank.
+    (async () => {
+      const host = document.getElementById("app");
+      try {
+        const { SuiRenderer, installDefaultHandlers } = await import("/sui/renderer.js");
+        const { SuiEventBus } = await import("/sui/eventbus.js");
+        const { install: installJsonViewer } = await import("/sui-ext/jsonviewer/extension.js");
+
+        const renderer = installDefaultHandlers(new SuiRenderer().attach(host));
+        await installJsonViewer(renderer);
+
+        const bus = new SuiEventBus(renderer, host);
+        const path = window.location.pathname + window.location.search;
+        await bus.start(path === "/" ? "/tasks/dashboard" : path);
+      } catch (e) {
+        console.error("SPA boot failed", e);
+        host.textContent = "SPA boot failed: " + (e && e.message ? e.message : e);
+      }
+    })();
+  </script>
+</body>
+</html>

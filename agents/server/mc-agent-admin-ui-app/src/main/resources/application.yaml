@@ -1,0 +1,90 @@
+server:
+  port: 9090
+
+logging:
+  pattern:
+    console: "%d{HH:mm:ss} %-5level [%X{agentName:-}/%X{subAgent:-}] [%logger{36}] %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [s=%X{sessionId:-} a=%X{agentName:-} sub=%X{subAgent:-} tool=%X{tool:-}] %logger{50} - %msg%n"
+  file:
+    name: logs/agent-admin-ui.log
+  logback:
+    rollingpolicy:
+      file-name-pattern: logs/agent-admin-ui.%d{yyyy-MM-dd}.%i.log
+      max-history: 7
+      total-size-cap: 200MB
+  level:
+    root: WARN
+    ai.mindconnect: INFO
+    ai.mindconnect.llm.wire: INFO
+    ai.mindconnect.agent.tool: DEBUG
+    org.springframework: INFO
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2.client: TRACE
+    org.springframework.security.web.authentication: TRACE
+
+mindconnect:
+  data:
+    base-dir: ./data
+  # Authentication is OFF by default so the app runs without Keycloak. In that
+  # mode SecurityConfig wires an "everything permitAll" chain and injects a
+  # fixed dev user (see dev-user) as the OidcUser principal.
+  # To require Keycloak login, activate the "keycloak" profile
+  # (--spring.profiles.active=keycloak): it provides the OAuth2 client
+  # registration AND flips auth.enabled on together.
+  auth:
+    enabled: ${MC_AUTH_ENABLED:false}
+    # Username used as the OidcUser when auth is disabled.
+    dev-user: ${MC_DEV_USER:mc_user}
+  tools:
+    tavily-api-key: ${TAVILY_API_KEY:}
+  encryption:
+    # Required — encrypts stored LLM credentials. No default on purpose.
+    # Set MINDCONNECT_ENCRYPTION_SECRET_KEY to a strong, private 32-char value.
+    secret-key: ${MINDCONNECT_ENCRYPTION_SECRET_KEY:}
+
+spring:
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+springdoc:
+  # The admin shell's API section embeds this Swagger UI. Scope it to the
+  # runtime's REST API — the admin-ui page controllers return recursive
+  # UiNode trees whose schemas freeze Swagger UI's example renderer.
+  paths-to-match: /api/**
+  swagger-ui:
+    # Operations start collapsed; the standalone Schemas section is hidden
+    # (belt and braces against expensive model rendering).
+    docExpansion: none
+    defaultModelsExpandDepth: -1
+
+---
+# ── Keycloak / OIDC login ────────────────────────────────────────────────────
+# Only active with the "keycloak" profile (--spring.profiles.active=keycloak).
+# Without it there is no OAuth2 client registration, so Spring's OAuth2 client
+# auto-config backs off and the app starts fully without Keycloak (open chain).
+spring:
+  config:
+    activate:
+      on-profile: keycloak
+  # OAuth2 client (BFF). The "keycloak" registration is referenced by
+  # SecurityConfig and Spring Security's /oauth2/authorization/{registrationId}.
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: ${KC_ISSUER_URI:http://localhost:8180/realms/mindconnect}
+        registration:
+          keycloak:
+            client-id: ${KC_CLIENT_ID:mc-admin-ui}
+            client-secret: ${KC_CLIENT_SECRET:}
+            authorization-grant-type: authorization_code
+            scope: openid, profile, email
+            # Must match the Valid redirect URI registered in Keycloak.
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+mindconnect:
+  # Turn auth on together with the registration above, so securedFilterChain
+  # always has its ClientRegistrationRepository.
+  auth:
+    enabled: true

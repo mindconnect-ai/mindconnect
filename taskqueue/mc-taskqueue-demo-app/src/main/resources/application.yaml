@@ -1,0 +1,21 @@
+# Task queue demo — SPA mode, no SSR, no auth.
+server:
+  port: 9094
+
+spring:
+  application:
+    name: mc-taskqueue-demo-app
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+mindconnect:
+  taskqueue-demo:
+    # Relative output directories from the submit form resolve against this root.
+    output-root: data/output
+    # How many links EACH page follows — the crawl grows by this factor per level.
+    max-links-per-page-default: 5
+  taskqueue:
+    retention: PT1H   # finished task trees leave the in-memory store after this (PT0S = keep forever)

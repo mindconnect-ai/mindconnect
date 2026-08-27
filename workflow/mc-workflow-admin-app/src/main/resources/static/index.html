@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow Admin</title>
+  <link rel="stylesheet" href="/sui/sui.css">
+  <!-- Base <sui-diagram> styling (edges, markers, buttons); ships with the
+       diagram extension. Domain colours layer on top. -->
+  <link rel="stylesheet" href="/sui-ext/diagram/diagram.css">
+  <link rel="stylesheet" href="/sui-ext/workflow/workflow-diagram.css">
+  <link rel="stylesheet" href="/workflow-admin.css">
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: var(--sui-color-bg, #f5f5f5); }
+    #app { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    import { SuiRenderer, installDefaultHandlers } from "/sui/renderer.js";
+    import { SuiEventBus } from "/sui/eventbus.js";
+    import { install as installDiagram } from "/sui-ext/diagram/extension.js";
+
+    const host = document.getElementById("app");
+    const renderer = installDefaultHandlers(new SuiRenderer().attach(host));
+    // Teach the renderer to draw UiDiagram nodes (the "Diagram" tab). The
+    // <sui-diagram> element it produces handles pan/zoom/drag itself and emits
+    // events; for now we wire only the one we need — click-to-open.
+    installDiagram(renderer);
+
+    const bus = new SuiEventBus(renderer, host);
+
+    // Clicking a node opens that step's definition — the same dialog the
+    // editor's "Details" button opens. The node carries stepRef (the step's
+    // name, which is the admin's address); synthetic nodes (start/end/branch)
+    // carry none, so they do nothing.
+    host.addEventListener("sui-diagram-node-selected", async (event) => {
+      const stepRef = event.detail && event.detail.stepRef;
+      if (!stepRef) return;
+      const wf = workflowFromUrl();
+      if (!wf) return;
+      const res = await fetch(`/workflow-admin/${wf}/step/${encodeURIComponent(stepRef)}`,
+                              { headers: { Accept: "application/json" } });
+      if (res.ok) bus.applyPatch(await res.json());
+    });
+
+    /** The workflow name is the second path segment: /workflow-admin/{wf}[/...]. */
+    function workflowFromUrl() {
+      const segments = window.location.pathname.split("/").filter(Boolean);
+      return segments[0] === "workflow-admin" ? segments[1] : null;
+    }
+
+    // Boot from the URL in the address bar, so deep links like
+    // /workflow-admin/hello are bookmarkable and survive a reload. start()
+    // also wires the popstate listener for browser back/forward. A bare "/"
+    // lands on the workflow list.
+    const path = window.location.pathname + window.location.search;
+    bus.start(path === "/" ? "/workflow-admin" : path);
+  </script>
+</body>
+</html>

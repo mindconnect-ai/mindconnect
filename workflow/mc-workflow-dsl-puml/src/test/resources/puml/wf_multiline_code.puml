@@ -1,0 +1,15 @@
+@startuml wf_multiline_code
+:input -> x;
+start
+:code compute
+language = javascript
+assign-result -> sum;
+note right
+  code:
+  var doubled = x * 2;
+  var tripled = x * 3;
+  doubled + tripled;
+end note
+stop
+:output <- sum;
+@enduml

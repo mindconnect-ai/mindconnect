@@ -1,0 +1,18 @@
+{
+  "id": "00000001-0000-0000-0000-000000000007",
+  "name": "claude-haiku-default",
+  "provider": "ANTHROPIC",
+  "model": "${CLAUDE_HAIKU_MODEL:claude-haiku-4-5}",
+  "baseUrl": "https://api.anthropic.com",
+  "apiKey": "${ANTHROPIC_API_KEY}",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 8192,
+  "additionalParams": {},
+  "contextWindowTokens": 200000,
+  "retry": {
+    "enabled": true,
+    "maxAttempts": 5,
+    "baseBackoffMillis": 2000,
+    "maxBackoffMillis": 30000
+  }
+}

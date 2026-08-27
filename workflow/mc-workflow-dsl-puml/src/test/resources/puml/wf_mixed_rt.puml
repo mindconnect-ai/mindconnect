@@ -1,0 +1,22 @@
+@startuml wf_mixed_rt
+:input -> x;
+start
+:httpcall http
+url = https://www.google.com/search?q=plantuml
+method = GET
+assign-result -> httpResponse;
+:code js
+language = javascript
+code = x + 1
+assign-result -> y;
+:code bsh
+language = beanshell
+code = "return y + 1;"
+assign-result -> z;
+:code py
+language = python
+code = z + 1
+assign-result -> final;
+stop
+:output <- final;
+@enduml

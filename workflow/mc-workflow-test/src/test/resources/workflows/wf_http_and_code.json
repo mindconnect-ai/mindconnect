@@ -1,0 +1,23 @@
+{
+  "@class" : "ai.mindconnect.workflow.domain.WorkflowData",
+  "name" : "wf_http_and_code",
+  "resultFrom" : "summary",
+  "steps" : [
+    {
+      "@class" : "ai.mindconnect.workflow.domain.HttpCallData",
+      "name" : "fetchGreeting",
+      "url" : "${apiBase}/hello",
+      "method" : "GET",
+      "failOnError" : true,
+      "assignResultToVar" : "rawResponse"
+    },
+    {
+      "@class" : "ai.mindconnect.workflow.domain.CodeData",
+      "name" : "buildSummary",
+      "language" : "javascript",
+      "wrapInFunction" : false,
+      "code" : "\"Fetched: \" + rawResponse",
+      "assignResultToVar" : "summary"
+    }
+  ]
+}

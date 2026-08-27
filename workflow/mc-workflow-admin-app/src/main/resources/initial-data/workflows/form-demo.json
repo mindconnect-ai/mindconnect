@@ -1,0 +1,86 @@
+{
+  "@class" : "ai.mindconnect.workflow.domain.WorkflowData",
+  "name" : "form-demo",
+  "assignResultToVar" : null,
+  "resultFrom" : "summary",
+  "steps" : [ {
+    "@class" : "ai.mindconnect.workflow.step.form.FormStepData",
+    "name" : "collect",
+    "assignResultToVar" : null,
+    "condition" : null,
+    "returnResult" : true,
+    "returnResultExpression" : null,
+    "next" : null,
+    "resumeParams" : {
+      "type" : "object",
+      "properties" : { }
+    },
+    "form" : {
+      "type" : "form",
+      "id" : "decision-form",
+      "title" : "Please decide",
+      "fields" : [ {
+        "type" : "field",
+        "id" : "approver",
+        "label" : "Your name",
+        "fieldType" : "TEXT",
+        "editable" : true,
+        "required" : true,
+        "submitOnEnter" : false,
+        "submitOnChange" : false,
+        "multiple" : false
+      }, {
+        "type" : "field",
+        "id" : "verdict",
+        "label" : "Verdict",
+        "fieldType" : "SELECT",
+        "value" : "approve",
+        "editable" : true,
+        "required" : false,
+        "options" : [ {
+          "value" : "approve",
+          "label" : "approve"
+        }, {
+          "value" : "reject",
+          "label" : "reject"
+        } ],
+        "submitOnEnter" : false,
+        "submitOnChange" : false,
+        "multiple" : false
+      }, {
+        "type" : "field",
+        "id" : "comment",
+        "label" : "Comment",
+        "fieldType" : "TEXTAREA",
+        "editable" : true,
+        "required" : false,
+        "submitOnEnter" : false,
+        "submitOnChange" : false,
+        "multiple" : false
+      } ],
+      "actions" : [ ],
+      "links" : [ ],
+      "reloadOnSubmit" : false
+    },
+    "type" : "formstep"
+  }, {
+    "@class" : "ai.mindconnect.workflow.domain.CodeData",
+    "name" : "record",
+    "assignResultToVar" : "summary",
+    "language" : "mini",
+    "code" : "verdict + \" by \" + approver",
+    "wrapInFunction" : false,
+    "injectVariables" : true,
+    "exportVariables" : true,
+    "type" : "code"
+  } ],
+  "uid" : null,
+  "params" : {
+    "type" : "object",
+    "properties" : { }
+  },
+  "paramDefaults" : { },
+  "subWorkflows" : [ ],
+  "workflowType" : null,
+  "type" : "workflow"
+}

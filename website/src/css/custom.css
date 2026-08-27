@@ -1,0 +1,30 @@
+/* Theme accent tuned to the project's diagrams (#1a3a5c deep blue). */
+:root {
+  --ifm-color-primary: #1a3a5c;
+  --ifm-color-primary-dark: #173352;
+  --ifm-color-primary-darker: #16304d;
+  --ifm-color-primary-darkest: #12283f;
+  --ifm-color-primary-light: #1d4166;
+  --ifm-color-primary-lighter: #1e446b;
+  --ifm-color-primary-lightest: #224d79;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #7fb0d9;
+  --ifm-color-primary-dark: #6aa3d2;
+  --ifm-color-primary-darker: #5f9bce;
+  --ifm-color-primary-darkest: #3f82bb;
+  --ifm-color-primary-light: #94bde0;
+  --ifm-color-primary-lighter: #9fc4e3;
+  --ifm-color-primary-lightest: #c2dbef;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
+
+/* Give embedded SVG diagrams a little breathing room and a max width. */
+.markdown img[src*='/img/'] {
+  display: block;
+  margin: 1.5rem auto;
+  max-width: 100%;
+}

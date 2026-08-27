@@ -1,0 +1,7 @@
+@startuml wf_if_no_else
+if (${enabled}) then (yes)
+  :assign
+    done = true
+  ;
+endif
+@enduml

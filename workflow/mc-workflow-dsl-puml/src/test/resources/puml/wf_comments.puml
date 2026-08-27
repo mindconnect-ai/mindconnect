@@ -1,0 +1,7 @@
+@startuml wf_comments
+' This is a comment
+:assign step1
+  val = test
+;
+' Another comment
+@enduml

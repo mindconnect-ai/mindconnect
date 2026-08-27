@@ -1,0 +1,6 @@
+@startuml wf_call
+:call invokeSubWf
+workflow = subWorkflow
+userId = "${currentUser}"
+assign-result -> subResult;
+@enduml

@@ -1,0 +1,3 @@
+ai.mindconnect.agent.builder.lmstudio.TestTools$EchoFactory
+ai.mindconnect.agent.builder.lmstudio.TestTools$SlowEchoFactory
+ai.mindconnect.agent.builder.lmstudio.TestTools$BigFactory

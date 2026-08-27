@@ -1,0 +1,55 @@
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    restart: unless-stopped
+    env_file: .env.docker
+    environment:
+      KC_DB:             postgres
+      KC_HOSTNAME_STRICT: false
+      KC_HTTP_ENABLED:   true
+      KC_PROXY:          edge
+    command: start-dev --import-realm
+    volumes:
+      - ./keycloak/mindconnect-realm.json:/opt/keycloak/data/import/mindconnect-realm.json:ro
+    ports:
+      - "8180:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /realms/master HTTP/1.0\r\n\r\n' >&3 && grep -q 'realm' <&3"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  keycloak-seed:
+    image: curlimages/curl:latest
+    env_file: .env.docker
+    volumes:
+      - ./keycloak/seed-passwords.sh:/seed-passwords.sh:ro
+    entrypoint: ["/bin/sh", "/seed-passwords.sh"]
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: on-failure
+
+volumes:
+  postgres_data:

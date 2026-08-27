@@ -1,0 +1,11 @@
+@startuml wf_if
+if (${flag}) then (yes)
+  :assign thenStep
+    result_var = then_value
+  ;
+else (no)
+  :assign elseStep
+    result_var = else_value
+  ;
+endif
+@enduml

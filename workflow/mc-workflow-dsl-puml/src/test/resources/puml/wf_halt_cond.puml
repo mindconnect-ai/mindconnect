@@ -1,0 +1,5 @@
+@startuml wf_halt_cond
+:halt conditionalHalt
+condition = "${needsApproval}"
+next = afterApproval;
+@enduml

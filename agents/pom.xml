@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-java-parent</artifactId>
+        <version>0.0.2-SNAPSHOT</version>
+        <relativePath>../mc-java-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-agents-aggregator</artifactId>
+    <packaging>pom</packaging>
+    <description>Build reactor for the agent platform (per-area CI); not published</description>
+
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <modules>
+        <!-- the area parent itself, so this area builds standalone -->
+        <module>mc-agents-parent</module>
+        <!-- shared modules pulled in so this area builds standalone -->
+        <module>../common/mc-common</module>
+        <module>vectorstore/mc-vector-store</module>
+        <module>vectorstore/mc-vector-store-pgvector</module>
+        <module>vectorstore/mc-vector-store-tools</module>
+        <module>vectorstore/mc-file-store</module>
+        <module>builder/mc-agent-runtime-builder</module>
+        <module>demo/mc-agent-simple-demo</module>
+
+        <module>core/mc-agent-protocol</module>
+        <module>core/mc-agent-protocol-openai</module>
+        <module>core/mc-agent-protocol-mc-runtime</module>
+        <module>core/mc-llm-gateway-core</module>
+        <module>core/mc-llm-gateway</module>
+        <module>core/mc-credentials</module>
+        <module>core/mc-message-repository-core</module>
+        <module>core/mc-message-repository</module>
+        <module>core/mc-agent-tool-spi</module>
+        <module>core/mc-agent-runtime-core</module>
+        <module>core/mc-agent-memory-strategies</module>
+        <module>core/mc-agent-runtime</module>
+        <module>core/mc-agent-tools</module>
+        <module>core/mc-agent-tools-code</module>
+        <module>core/mc-agent-tools-document</module>
+        <module>core/mc-agent-tools-web</module>
+        <module>core/mc-agent-tools-web-browser</module>
+        <module>core/mc-agent-tools-workflow</module>
+        <module>core/mc-mcp-proxy</module>
+        <module>core/mc-agent-tools-gmail</module>
+        <module>server/mc-agent-api-rest</module>
+        <module>server/mc-agent-api-app</module>
+        <module>server/mc-agent-admin-ui-rest</module>
+        <module>server/mc-agent-admin-ui-app</module>
+        <module>client/mc-agent-cli</module>
+    </modules>
+
+</project>

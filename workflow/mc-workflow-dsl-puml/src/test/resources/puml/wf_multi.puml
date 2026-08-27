@@ -1,0 +1,11 @@
+@startuml wf_multi
+:assign step1
+  a = 1
+;
+:assign step2
+  b = 2
+;
+:assign step3
+  c = 3
+;
+@enduml

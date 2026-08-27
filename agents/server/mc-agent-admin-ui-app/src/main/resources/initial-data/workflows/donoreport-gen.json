@@ -1,0 +1,244 @@
+{
+  "@class": "ai.mindconnect.workflow.domain.WorkflowData",
+  "name": "donoreport-gen",
+  "params": {
+    "type": "object",
+    "properties": {
+      "templateFile": {
+        "type": "string",
+        "format": "path",
+        "description": "Word template whose sections describe the report to generate (path relative to the tools base directory)."
+      },
+      "docsDir": {
+        "type": "string",
+        "format": "path",
+        "description": "Folder with the source documents (subfolders included) — ingested into the run's knowledge store."
+      },
+      "workDir": {
+        "type": "string",
+        "format": "path",
+        "description": "Working folder for this run's outputs: the section-selection template_<timestamp>.json and the final generated Word document."
+      }
+    },
+    "required": [
+      "templateFile",
+      "docsDir",
+      "workDir"
+    ]
+  },
+  "steps": [
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "get-outline",
+      "assignResultToVar": "sectionsJson",
+      "tool": "document_sections",
+      "arguments": "{\"path\": \"${templateFile}\"}",
+      "type": "toolcall"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "build-pick-form",
+      "language": "javascript",
+      "code": "var parsed = JSON.parse(String(sectionsJson));\nallSections = JSON.stringify(parsed.sections || []);\npickForm = JSON.stringify({ type: 'form', id: 'pick-form', title: 'Select the sections to generate', fields: (parsed.sections || []).map(function (s, i) { var hint = String(s.content || '').substring(0, 160); return { type: 'field', id: 'keep-' + i, label: (s.title || ('Section ' + (i + 1))), fieldType: 'BOOLEAN', value: true, editable: true, hint: hint }; }) });",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.step.form.FormStepData",
+      "name": "pick-sections",
+      "formFrom": "pickForm",
+      "type": "formstep"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "select-sections",
+      "language": "javascript",
+      "code": "var all = JSON.parse(String(allSections));\nvar sel = [];\nfor (var i = 0; i < all.length; i++) { if (String(this['keep-' + i]) === 'true') { sel.push({ idx: sel.length, title: all[i].title || ('Section ' + (i + 1)), level: all[i].level || 1, content: String(all[i].content || '') }); } }\nselectedJson = JSON.stringify(sel);\nts = String(new Date().getTime());\nstore = 'donoreport-' + ts;\ntemplateFileName = String(workDir) + '/template_' + ts + '.json';",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "save-template",
+      "assignResultToVar": "templateSaved",
+      "tool": "file_write",
+      "arguments": "{\"path\": \"${templateFileName}\", \"content\": ${selectedJson}}",
+      "type": "toolcall"
+    },
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "list-files",
+      "assignResultToVar": "globResult",
+      "tool": "glob",
+      "arguments": "{\"path\": \"${docsDir}\", \"pattern\": \"**\"}",
+      "type": "toolcall"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "parse-files",
+      "language": "javascript",
+      "code": "files = String(globResult).split('\\n').map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0 && l.indexOf(' ') !== 0 && !/^(No |Error|\\.\\.\\.)/.test(l) && /\\.[A-Za-z0-9]+$/.test(l); });",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.ForEachData",
+      "name": "ingest-files",
+      "loopOver": "files",
+      "runVar": "file",
+      "indexVar": "fileIdx",
+      "parallel": false,
+      "joinResults": true,
+      "joinDelimiter": "\n",
+      "resultFrom": "ingested",
+      "assignResultToVar": "ingestLog",
+      "type": "foreach",
+      "steps": [
+        {
+          "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+          "name": "ingest-one",
+          "assignResultToVar": "ingested",
+          "tool": "vector_ingest_file",
+          "arguments": "{\"path\": \"${file}\", \"store\": \"${store}\"}",
+          "type": "toolcall"
+        }
+      ]
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "init-loop",
+      "language": "javascript",
+      "code": "pendingJson = selectedJson;\ncontentsJson = JSON.stringify({});",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "generate",
+      "language": "javascript",
+      "code": "pending = JSON.parse(String(pendingJson));",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.ForEachData",
+      "name": "write-sections",
+      "loopOver": "pending",
+      "runVar": "sec",
+      "indexVar": "secIdx",
+      "parallel": false,
+      "joinResults": true,
+      "resultFrom": "draft",
+      "assignResultToVar": "draftsJoined",
+      "type": "foreach",
+      "steps": [
+        {
+          "@class": "ai.mindconnect.agent.tools.workflow.step.AgentCallData",
+          "name": "write-one-section",
+          "assignResultToVar": "draft",
+          "agentSpec": {
+            "name": "section-writer",
+            "description": "Writes report sections from the project knowledge store.",
+            "llmConfigName": "agent-default",
+            "systemPrompt": "You write sections for a donor report. Use the search_project_docs tool (multiple queries if needed) to find facts in the project documents, then write the section. Write ONLY the section body text — no headings, no meta commentary. Be factual; if the documents lack the information, say so briefly.",
+            "tools": [
+              {
+                "name": "search_project_docs",
+                "tool": "vector_search",
+                "description": "Semantic search over the ingested project documents.",
+                "overrides": {
+                  "params": {
+                    "store": "${store}"
+                  }
+                }
+              }
+            ]
+          },
+          "message": "Write the report section \"${sec.title}\". The template describes this section as follows — treat it as the specification of what belongs here:\n\n${sec.content}\n\nSearch the project documents for the relevant facts and write the section body.",
+          "type": "agentcall"
+        }
+      ],
+      "joinDelimiter": "\n<<<SECTION-BREAK>>>\n"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "merge-drafts",
+      "language": "javascript",
+      "code": "var contents = JSON.parse(String(contentsJson));\nvar pend = JSON.parse(String(pendingJson));\nvar parts = String(draftsJoined).split('\\n<<<SECTION-BREAK>>>\\n');\nfor (var i = 0; i < pend.length; i++) { contents[String(pend[i].idx)] = String(parts[i] || ''); }\ncontentsJson = JSON.stringify(contents);",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "build-review-form",
+      "language": "javascript",
+      "code": "var sel = JSON.parse(String(selectedJson));\nvar contents = JSON.parse(String(contentsJson));\nreviewForm = JSON.stringify({ type: 'form', id: 'review-form', title: 'Review the generated sections — edit freely; tick Regenerate to redo one', fields: sel.reduce(function (acc, s) { acc.push({ type: 'field', id: 'content-' + s.idx, label: s.title, fieldType: 'TEXTAREA', value: String(contents[String(s.idx)] || ''), editable: true }); acc.push({ type: 'field', id: 'regen-' + s.idx, label: 'Regenerate \"' + s.title + '\"', fieldType: 'BOOLEAN', value: false, editable: true }); return acc; }, []) });",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.step.form.FormStepData",
+      "name": "review",
+      "formFrom": "reviewForm",
+      "type": "formstep"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "apply-review",
+      "language": "javascript",
+      "code": "var sel = JSON.parse(String(selectedJson));\nvar contents = JSON.parse(String(contentsJson));\nvar regen = [];\nfor (var i = 0; i < sel.length; i++) { var idx = sel[i].idx; var edited = this['content-' + idx]; if (edited !== undefined && edited !== null) { contents[String(idx)] = String(edited); } if (String(this['regen-' + idx]) === 'true') { regen.push(sel[i]); } }\ncontentsJson = JSON.stringify(contents);\npendingJson = JSON.stringify(regen);\nregenCount = regen.length;",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "decide-next",
+      "language": "javascript",
+      "code": "nextStep = (Number(regenCount) > 0) ? 'generate' : 'build-doc-args';",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.JumpToData",
+      "name": "loop-or-continue",
+      "jumpTo": "${nextStep}",
+      "type": "jumpto"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "build-doc-args",
+      "language": "javascript",
+      "code": "var sel = JSON.parse(String(selectedJson));\nvar contents = JSON.parse(String(contentsJson));\nwriteArgs = { path: String(workDir) + '/donoreport_' + ts + '.docx', template: String(templateFile), sections: sel.map(function (s) { return { title: s.title, level: s.level, content: String(contents[String(s.idx)] || '') }; }) };",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "write-document",
+      "assignResultToVar": "result",
+      "tool": "document_write",
+      "arguments": "${writeArgs}",
+      "type": "toolcall"
+    }
+  ]
+}

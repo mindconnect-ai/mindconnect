@@ -1,0 +1,259 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 600" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    How agents work together — comic strip
+    4 panels, one character per panel.
+    Characters: User (human), travel agent (robot), flight agent (robot), travel agent again + user.
+  -->
+
+  <defs>
+    <!-- Drop shadows -->
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="offsetblur"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.25"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Speech-bubble tail (small) -->
+    <symbol id="bubbleTailLeft" viewBox="0 0 30 30">
+      <path d="M 30 0 L 0 25 L 25 18 Z" fill="white" stroke="#333" stroke-width="2"/>
+    </symbol>
+    <symbol id="bubbleTailRight" viewBox="0 0 30 30">
+      <path d="M 0 0 L 30 25 L 5 18 Z" fill="white" stroke="#333" stroke-width="2"/>
+    </symbol>
+
+    <!-- User character (head + body), male-ish neutral -->
+    <symbol id="userChar" viewBox="0 0 100 140">
+      <!-- Hair -->
+      <ellipse cx="50" cy="32" rx="22" ry="20" fill="#5C4033"/>
+      <!-- Head -->
+      <circle cx="50" cy="40" r="20" fill="#F5C99B"/>
+      <!-- Eyes -->
+      <circle cx="43" cy="40" r="2" fill="#222"/>
+      <circle cx="57" cy="40" r="2" fill="#222"/>
+      <!-- Smile -->
+      <path d="M 43 48 Q 50 53 57 48" stroke="#222" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      <!-- Neck -->
+      <rect x="46" y="58" width="8" height="6" fill="#F5C99B"/>
+      <!-- Shirt -->
+      <path d="M 25 64 Q 50 60 75 64 L 80 130 L 20 130 Z" fill="#3A7BD5"/>
+      <!-- Collar v -->
+      <path d="M 42 64 L 50 76 L 58 64" stroke="#2A5BA5" stroke-width="2" fill="none"/>
+    </symbol>
+
+    <!-- Robot (generic). Color via use[fill] override won't work for nested fills, so we
+         provide two variants with different palette. -->
+    <symbol id="robotBlue" viewBox="0 0 100 140">
+      <!-- Antenna -->
+      <line x1="50" y1="8" x2="50" y2="18" stroke="#222" stroke-width="2"/>
+      <circle cx="50" cy="6" r="4" fill="#FFC107"/>
+      <!-- Head -->
+      <rect x="26" y="18" width="48" height="40" rx="8" fill="#5B8DEF" stroke="#222" stroke-width="2"/>
+      <!-- Eyes -->
+      <circle cx="40" cy="36" r="5" fill="white" stroke="#222" stroke-width="1.5"/>
+      <circle cx="60" cy="36" r="5" fill="white" stroke="#222" stroke-width="1.5"/>
+      <circle cx="40" cy="36" r="2.4" fill="#222"/>
+      <circle cx="60" cy="36" r="2.4" fill="#222"/>
+      <!-- Mouth -->
+      <rect x="38" y="46" width="24" height="5" rx="2" fill="#222"/>
+      <line x1="44" y1="46" x2="44" y2="51" stroke="#5B8DEF" stroke-width="1.5"/>
+      <line x1="50" y1="46" x2="50" y2="51" stroke="#5B8DEF" stroke-width="1.5"/>
+      <line x1="56" y1="46" x2="56" y2="51" stroke="#5B8DEF" stroke-width="1.5"/>
+      <!-- Neck -->
+      <rect x="46" y="58" width="8" height="6" fill="#777"/>
+      <!-- Body -->
+      <rect x="22" y="64" width="56" height="55" rx="6" fill="#5B8DEF" stroke="#222" stroke-width="2"/>
+      <!-- Chest panel -->
+      <rect x="36" y="76" width="28" height="20" rx="3" fill="#1F2D5C"/>
+      <circle cx="44" cy="86" r="2" fill="#7CFFB2"/>
+      <circle cx="52" cy="86" r="2" fill="#FFC107"/>
+      <circle cx="60" cy="86" r="2" fill="#FF6B6B"/>
+      <!-- Arms -->
+      <rect x="10" y="68" width="12" height="40" rx="4" fill="#5B8DEF" stroke="#222" stroke-width="2"/>
+      <rect x="78" y="68" width="12" height="40" rx="4" fill="#5B8DEF" stroke="#222" stroke-width="2"/>
+      <circle cx="16" cy="112" r="6" fill="#888" stroke="#222" stroke-width="1.5"/>
+      <circle cx="84" cy="112" r="6" fill="#888" stroke="#222" stroke-width="1.5"/>
+      <!-- Legs -->
+      <rect x="32" y="119" width="14" height="18" fill="#5B8DEF" stroke="#222" stroke-width="2"/>
+      <rect x="54" y="119" width="14" height="18" fill="#5B8DEF" stroke="#222" stroke-width="2"/>
+    </symbol>
+
+    <symbol id="robotGreen" viewBox="0 0 100 140">
+      <line x1="50" y1="8" x2="50" y2="18" stroke="#222" stroke-width="2"/>
+      <circle cx="50" cy="6" r="4" fill="#FF6B6B"/>
+      <rect x="26" y="18" width="48" height="40" rx="8" fill="#4CAF50" stroke="#222" stroke-width="2"/>
+      <circle cx="40" cy="36" r="5" fill="white" stroke="#222" stroke-width="1.5"/>
+      <circle cx="60" cy="36" r="5" fill="white" stroke="#222" stroke-width="1.5"/>
+      <circle cx="40" cy="36" r="2.4" fill="#222"/>
+      <circle cx="60" cy="36" r="2.4" fill="#222"/>
+      <rect x="38" y="46" width="24" height="5" rx="2" fill="#222"/>
+      <line x1="44" y1="46" x2="44" y2="51" stroke="#4CAF50" stroke-width="1.5"/>
+      <line x1="50" y1="46" x2="50" y2="51" stroke="#4CAF50" stroke-width="1.5"/>
+      <line x1="56" y1="46" x2="56" y2="51" stroke="#4CAF50" stroke-width="1.5"/>
+      <rect x="46" y="58" width="8" height="6" fill="#777"/>
+      <rect x="22" y="64" width="56" height="55" rx="6" fill="#4CAF50" stroke="#222" stroke-width="2"/>
+      <rect x="36" y="76" width="28" height="20" rx="3" fill="#1B4D1F"/>
+      <circle cx="44" cy="86" r="2" fill="#7CFFB2"/>
+      <circle cx="52" cy="86" r="2" fill="#FFC107"/>
+      <circle cx="60" cy="86" r="2" fill="#FF6B6B"/>
+      <rect x="10" y="68" width="12" height="40" rx="4" fill="#4CAF50" stroke="#222" stroke-width="2"/>
+      <rect x="78" y="68" width="12" height="40" rx="4" fill="#4CAF50" stroke="#222" stroke-width="2"/>
+      <circle cx="16" cy="112" r="6" fill="#888" stroke="#222" stroke-width="1.5"/>
+      <circle cx="84" cy="112" r="6" fill="#888" stroke="#222" stroke-width="1.5"/>
+      <rect x="32" y="119" width="14" height="18" fill="#4CAF50" stroke="#222" stroke-width="2"/>
+      <rect x="54" y="119" width="14" height="18" fill="#4CAF50" stroke="#222" stroke-width="2"/>
+    </symbol>
+
+    <!-- Globe icon for "Tokyo trip" -->
+    <symbol id="globe" viewBox="0 0 40 40">
+      <circle cx="20" cy="20" r="18" fill="#9CD3FF" stroke="#222" stroke-width="2"/>
+      <path d="M 2 20 H 38 M 20 2 V 38 M 6 10 Q 20 14 34 10 M 6 30 Q 20 26 34 30" stroke="#1F6FB5" stroke-width="1.5" fill="none"/>
+    </symbol>
+
+    <!-- Plane icon -->
+    <symbol id="plane" viewBox="0 0 40 40">
+      <path d="M 4 24 L 30 18 L 32 8 L 36 8 L 34 18 L 38 18 L 36 22 L 18 26 L 12 32 L 8 32 L 12 24 L 6 24 Z" fill="#333"/>
+    </symbol>
+
+    <!-- Clipboard icon -->
+    <symbol id="clipboard" viewBox="0 0 40 40">
+      <rect x="6" y="8" width="28" height="30" rx="2" fill="#F5DC91" stroke="#222" stroke-width="2"/>
+      <rect x="14" y="4" width="12" height="8" rx="2" fill="#BD8F2E" stroke="#222" stroke-width="2"/>
+      <line x1="12" y1="20" x2="28" y2="20" stroke="#555" stroke-width="1.5"/>
+      <line x1="12" y1="26" x2="28" y2="26" stroke="#555" stroke-width="1.5"/>
+      <line x1="12" y1="32" x2="22" y2="32" stroke="#555" stroke-width="1.5"/>
+    </symbol>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="600" fill="#FAFAFA"/>
+
+  <!-- Title -->
+  <text x="800" y="42" text-anchor="middle" font-size="26" font-weight="700" fill="#1F2D5C">
+    How agents work together
+  </text>
+  <line x1="700" y1="55" x2="900" y2="55" stroke="#1F2D5C" stroke-width="2"/>
+
+  <!-- ═══════ PANEL 1 ═══════ -->
+  <g transform="translate(20, 80)">
+    <rect x="0" y="0" width="380" height="490" rx="14" fill="#E8F4FD" stroke="#3A7BD5" stroke-width="2.5" filter="url(#softShadow)"/>
+    <text x="190" y="36" text-anchor="middle" font-size="18" font-weight="700" fill="#1F4E8C">1. The request</text>
+
+    <!-- Character: User -->
+    <use href="#userChar" x="140" y="250" width="100" height="140"/>
+
+    <!-- Speech bubble -->
+    <g transform="translate(40, 80)">
+      <rect x="0" y="0" width="300" height="140" rx="20" fill="white" stroke="#333" stroke-width="2.5"/>
+      <text x="20" y="40" font-size="16" fill="#222">Plan me a</text>
+      <text x="20" y="64" font-size="16" fill="#222">trip to</text>
+      <text x="20" y="88" font-size="20" font-weight="700" fill="#3A7BD5">Tokyo 🇯🇵</text>
+      <use href="#globe" x="220" y="55" width="60" height="60"/>
+      <!-- Tail pointing to user mouth -->
+      <path d="M 140 130 L 175 175 L 165 138 Z" fill="white" stroke="#333" stroke-width="2.5"/>
+    </g>
+
+    <text x="190" y="445" text-anchor="middle" font-size="15" fill="#1F4E8C">Request goes to the</text>
+    <text x="190" y="467" text-anchor="middle" font-size="16" font-weight="700" fill="#1F4E8C">travel agent</text>
+  </g>
+
+  <!-- Arrow 1 → 2 -->
+  <g transform="translate(400, 320)">
+    <path d="M 5 0 L 35 0 L 35 -10 L 55 5 L 35 20 L 35 10 L 5 10 Z" fill="#333"/>
+  </g>
+
+  <!-- ═══════ PANEL 2 ═══════ -->
+  <g transform="translate(460, 80)">
+    <rect x="0" y="0" width="380" height="490" rx="14" fill="#FFF4E6" stroke="#FF9800" stroke-width="2.5" filter="url(#softShadow)"/>
+    <text x="190" y="36" text-anchor="middle" font-size="18" font-weight="700" fill="#B25C00">2. Travel agent delegates</text>
+
+    <!-- Character: Blue robot (Travel Agent) -->
+    <use href="#robotBlue" x="50" y="240" width="100" height="140"/>
+
+    <!-- Tiny green robot in thought, indicating delegation -->
+    <use href="#robotGreen" x="240" y="270" width="60" height="84"/>
+    <text x="270" y="365" text-anchor="middle" font-size="11" font-weight="700" fill="#2E7D32">Flight agent</text>
+
+    <!-- Speech bubble from Travel Agent -->
+    <g transform="translate(30, 80)">
+      <rect x="0" y="0" width="320" height="140" rx="20" fill="white" stroke="#333" stroke-width="2.5"/>
+      <text x="20" y="36" font-size="15" fill="#222">For flights I ask</text>
+      <text x="20" y="60" font-size="15" fill="#222">the</text>
+      <text x="60" y="60" font-size="17" font-weight="700" fill="#4CAF50">flight agent</text>
+      <text x="20" y="100" font-size="13" fill="#555" font-style="italic">→ issues task</text>
+      <text x="20" y="120" font-size="13" fill="#555" font-style="italic">     “Flights Berlin → Tokyo”</text>
+      <!-- Tail pointing to travel agent -->
+      <path d="M 90 130 L 105 170 L 130 138 Z" fill="white" stroke="#333" stroke-width="2.5"/>
+    </g>
+
+    <text x="190" y="445" text-anchor="middle" font-size="15" fill="#B25C00">Hands subtask to</text>
+    <text x="190" y="467" text-anchor="middle" font-size="16" font-weight="700" fill="#B25C00">specialised sub-agent</text>
+  </g>
+
+  <!-- Arrow 2 → 3 -->
+  <g transform="translate(840, 320)">
+    <path d="M 5 0 L 35 0 L 35 -10 L 55 5 L 35 20 L 35 10 L 5 10 Z" fill="#333"/>
+  </g>
+
+  <!-- ═══════ PANEL 3 ═══════ -->
+  <g transform="translate(900, 80)">
+    <rect x="0" y="0" width="380" height="490" rx="14" fill="#E8F5E9" stroke="#4CAF50" stroke-width="2.5" filter="url(#softShadow)"/>
+    <text x="190" y="36" text-anchor="middle" font-size="18" font-weight="700" fill="#2E7D32">3. Flight agent works</text>
+
+    <!-- Character: Green robot (Flight Agent), bigger -->
+    <use href="#robotGreen" x="140" y="240" width="100" height="140"/>
+
+    <!-- Tool icons floating around: plane + small "magnifier" -->
+    <use href="#plane" x="60" y="260" width="60" height="60"/>
+    <g transform="translate(255, 260)">
+      <circle cx="20" cy="20" r="14" fill="white" stroke="#222" stroke-width="2.5"/>
+      <line x1="30" y1="30" x2="42" y2="42" stroke="#222" stroke-width="3" stroke-linecap="round"/>
+    </g>
+
+    <!-- Speech bubble -->
+    <g transform="translate(30, 80)">
+      <rect x="0" y="0" width="320" height="140" rx="20" fill="white" stroke="#333" stroke-width="2.5"/>
+      <text x="20" y="36" font-size="14" fill="#222">I find 3 cheap</text>
+      <text x="20" y="58" font-size="14" fill="#222">connections:</text>
+      <text x="30" y="86" font-size="15" font-weight="700" fill="#2E7D32">✈ LH716  Berlin → Tokyo</text>
+      <text x="30" y="108" font-size="15" font-weight="700" fill="#2E7D32">✈ EK932  via Dubai</text>
+      <text x="30" y="130" font-size="13" fill="#555" font-style="italic">… and one more</text>
+      <!-- Tail -->
+      <path d="M 160 132 L 190 175 L 180 140 Z" fill="white" stroke="#333" stroke-width="2.5"/>
+    </g>
+
+    <text x="190" y="445" text-anchor="middle" font-size="15" fill="#2E7D32">Own tools,</text>
+    <text x="190" y="467" text-anchor="middle" font-size="16" font-weight="700" fill="#2E7D32">own API calls</text>
+  </g>
+
+  <!-- Arrow 3 → 4 -->
+  <g transform="translate(1280, 320)">
+    <path d="M 5 0 L 35 0 L 35 -10 L 55 5 L 35 20 L 35 10 L 5 10 Z" fill="#333"/>
+  </g>
+
+  <!-- ═══════ PANEL 4 ═══════ -->
+  <g transform="translate(1340, 80)">
+    <rect x="0" y="0" width="240" height="490" rx="14" fill="#FCE4EC" stroke="#E91E63" stroke-width="2.5" filter="url(#softShadow)"/>
+    <text x="120" y="36" text-anchor="middle" font-size="18" font-weight="700" fill="#AD1457">4. Answer to you</text>
+
+    <!-- User receiving -->
+    <use href="#userChar" x="70" y="240" width="100" height="140"/>
+
+    <!-- Clipboard / travel-plan above -->
+    <use href="#clipboard" x="80" y="80" width="80" height="80"/>
+
+    <!-- Speech-bubble-like card with the plan -->
+    <g transform="translate(20, 165)">
+      <rect x="0" y="0" width="200" height="80" rx="14" fill="white" stroke="#333" stroke-width="2"/>
+      <text x="100" y="22" text-anchor="middle" font-size="13" font-weight="700" fill="#AD1457">Your itinerary</text>
+      <text x="14" y="42" font-size="12" fill="#222">• Flight LH716 · 15 May</text>
+      <text x="14" y="58" font-size="12" fill="#222">• Hotel Park Hyatt</text>
+      <text x="14" y="74" font-size="12" fill="#222">• Weather 22 °C ☀</text>
+    </g>
+
+    <text x="120" y="445" text-anchor="middle" font-size="14" fill="#AD1457">All in one</text>
+    <text x="120" y="467" text-anchor="middle" font-size="16" font-weight="700" fill="#AD1457">finished answer</text>
+  </g>
+
+</svg>

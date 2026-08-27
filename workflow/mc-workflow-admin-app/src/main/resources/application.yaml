@@ -1,0 +1,21 @@
+# Standalone workflow admin — SPA mode, no SSR, no auth.
+#
+# Runs on 9093 (editor-app holds 9092, shop-demo 9091, agent admin 9090).
+# Workflows are stored as JSON files under the directory below.
+
+server:
+  port: 9093
+
+spring:
+  application:
+    name: mc-workflow-admin-app
+  # Dev: auto-restart on recompiled classes, LiveReload for static assets.
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+mindconnect:
+  workflow-admin:
+    dir: data/workflows

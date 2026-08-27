@@ -1,0 +1,51 @@
+{
+  "id": "00000002-0000-0000-0000-000000000021",
+  "namespace": {
+    "value": "local"
+  },
+  "name": "explorer",
+  "description": "Read-only exploration sub-agent. Sweeps the filesystem/codebase to locate files, directories and naming conventions and reports the conclusion (paths + brief why), not full file dumps. Call via run_agent for broad 'where is / which files' searches.",
+  "systemPrompt": "You are a read-only exploration sub-agent. The parent agent gives you ONE locate/search task. Your job is to find WHERE things are — files, directories, definitions, naming conventions — and report the conclusion, not to read or review everything you find in full.\n\nToday's date: {{ current_date }}\n\n## Tools & discipline\n- Use `glob` for filename patterns (e.g. '**/*.java', '**/*Controller*'), `file_list` to walk directories, `bash` (grep/find/rg) for content searches, and `file_read` ONLY to read short excerpts that confirm a match. Never dump whole large files — read just enough to verify.\n- Cast a wide net first (multiple patterns / spellings), then narrow. Consider alternative naming conventions before concluding something doesn't exist.\n- Stop once you can answer confidently. Do not chain endless reads.\n- You are READ-ONLY: never write, move or modify files, never run mutating commands.\n\n## Output format (CRITICAL)\nReturn a single JSON object — no preamble, no markdown fences. Schema:\n```\n{\n  \"matches\": [\n    { \"path\": \"<verbatim path>\", \"kind\": \"file|dir\", \"why\": \"<1 sentence: why this is relevant>\", \"confidence\": \"high|medium|low\" }\n  ],\n  \"conventions_observed\": \"<naming/layout patterns you noticed, or null>\",\n  \"summary\": \"<1-2 sentence answer to the task>\",\n  \"no_results_explanation\": \"<string ONLY if matches is empty, else null>\"\n}\n```\nQuote every `path` verbatim from a tool result. Never invent paths. If you found nothing, return matches=[] with a clear no_results_explanation.",
+  "welcomeMessage": null,
+  "maxIterations": 8,
+  "memoryConfig": {
+    "kind": "none"
+  },
+  "status": "ACTIVE",
+  "tools": [
+    {
+      "id": "00000003-0000-0000-0000-000000000210",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000021",
+      "name": "glob",
+      "description": "Finds files by glob pattern (e.g. '**/*.java'), newest first.",
+      "enabled": true,
+      "overrides": { "baseDir": "" }
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000211",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000021",
+      "name": "file_list",
+      "description": "Lists files in a directory.",
+      "enabled": true,
+      "overrides": { "baseDir": "" }
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000212",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000021",
+      "name": "file_read",
+      "description": "Reads the content of a file. Use only for short confirming excerpts.",
+      "enabled": true,
+      "overrides": { "baseDir": "" }
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000213",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000021",
+      "name": "bash",
+      "description": "Executes a read-only bash command (grep, rg, find) and returns the output.",
+      "enabled": true
+    }
+  ],
+  "createdAt": "2025-01-01T00:00:00Z",
+  "updatedAt": "2025-01-01T00:00:00Z",
+  "llmConfigName": "agent-default"
+}

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign in — MindConnect Admin</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #f5f6f8;
+            color: #1a1a1a;
+        }
+        .card {
+            background: #fff;
+            padding: 40px 48px;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            max-width: 380px;
+            width: 90%;
+            text-align: center;
+        }
+        h1 {
+            margin: 0 0 8px;
+            font-size: 22px;
+            font-weight: 600;
+        }
+        p {
+            margin: 0 0 24px;
+            color: #6b7280;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 28px;
+            background: #2563eb;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 15px;
+            transition: background 0.15s ease;
+        }
+        .btn:hover { background: #1d4ed8; }
+        .error {
+            margin: 0 0 20px;
+            padding: 12px 14px;
+            background: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.5;
+            text-align: left;
+        }
+        @media (prefers-color-scheme: dark) {
+            body { background: #111827; color: #f3f4f6; }
+            .card { background: #1f2937; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4); }
+            p { color: #9ca3af; }
+            .error { background: #3f1d1d; color: #fecaca; border-color: #7f1d1d; }
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>MindConnect Admin</h1>
+        <p>Sign in with your Keycloak account to continue.</p>
+        <!--
+          Filled in by the inline script below from the ?error= query
+          parameter. Spring's failureUrl points at /login?error=…, so
+          this is how the user finds out what went wrong without
+          server-side templating.
+        -->
+        <div id="error" class="error" hidden></div>
+        <a class="btn" href="/oauth2/authorization/keycloak">Sign in with Keycloak</a>
+    </div>
+    <script>
+        // Display a human-readable reason when Spring's OAuth failure
+        // handler bounces the user back here with ?error=…
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const code = params.get("error");
+            if (!code) return;
+            const el = document.getElementById("error");
+            const messages = {
+                oidc: "Your previous sign-in attempt failed. This usually means a stale session or an expired token — please try again."
+            };
+            el.textContent = "Login failed: " + (messages[code] || code);
+            el.hidden = false;
+        })();
+    </script>
+</body>
+</html>

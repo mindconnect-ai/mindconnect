@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 760" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    Sub-agent — the idea:
+    A turn calls run_agent → opens a SUB-SESSION (parentSessionId/parentTurnId)
+    → the sub-agent is the SAME runtime with its OWN Working Memory (own Tokens)
+    → only the condensed result flows back as tool_result into the Parent-Turn.
+    Key point: sub-session Tokens do NOT burden the main context.
+  -->
+
+  <defs>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="ag" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2c7a3f"/>
+    </marker>
+    <marker id="ab" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7a5fbf"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 30px; font-weight: 700; fill: #1a3a5c; }
+    .head  { font-size: 20px; font-weight: 700; fill: #1a3a5c; }
+    .sub   { font-size: 13.5px; fill: #666; }
+    .lbl   { font-size: 14px; fill: #444; }
+    .mono  { font-size: 14px; fill: #b35b00; font-weight: 700; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .badge { font-size: 13px; font-weight: 700; }
+    .tok   { font-size: 13px; font-weight: 700; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .green { stroke: #2c7a3f; stroke-width: 2.5; fill: none; }
+    .purp  { stroke: #7a5fbf; stroke-width: 2.5; fill: none; }
+  </style>
+
+  <text x="40" y="52" class="title">Sub-agent — sub-session, own Working Memory &amp; recursion</text>
+
+  <!-- ════ PARENT SESSION ════ -->
+  <g filter="url(#s)">
+    <rect x="40" y="98" width="560" height="350" rx="18" fill="#F0FFF4" stroke="#86c193" stroke-width="2.5"/>
+  </g>
+  <text x="68" y="136" class="head">Main agent · session</text>
+  <rect x="475" y="116" width="100" height="26" rx="13" fill="#E8F5E9" stroke="#86c193"/>
+  <text x="525" y="134" class="badge" fill="#2c7a3f" text-anchor="middle">depth = 0</text>
+
+  <!-- parent working memory -->
+  <rect x="68" y="156" width="504" height="86" rx="11" fill="#FFF8E6" stroke="#e0c878" stroke-width="1.5"/>
+  <text x="86" y="180" class="lbl" font-weight="700">Working Memory (main)</text>
+  <text x="86" y="202" class="sub">System prompt + own Message-Window</text>
+  <rect x="390" y="166" width="164" height="26" rx="13" fill="#fff" stroke="#86c193" stroke-width="1.5"/>
+  <text x="472" y="184" class="tok" fill="#2c7a3f" text-anchor="middle">~12k Tokens</text>
+  <text x="86" y="226" class="sub">contains <tspan font-weight="700">only</tspan> the <tspan class="mono" font-size="13">tool_result</tspan> — not the sub-history</text>
+
+  <!-- parent runtime -->
+  <rect x="68" y="256" width="504" height="172" rx="11" fill="#fff" stroke="#86c193" stroke-width="1.5"/>
+  <text x="86" y="282" class="lbl" font-weight="700">Agent runtime (tool loop)</text>
+  <text x="86" y="306" class="sub">LLM decides: delegate task</text>
+  <rect x="86" y="320" width="170" height="32" rx="9" fill="#FFF8E6" stroke="#e0c878" stroke-width="1.5"/>
+  <text x="171" y="341" class="mono" text-anchor="middle">run_agent(…)</text>
+  <text x="268" y="341" class="sub">is just a tool call</text>
+  <text x="86" y="382" class="sub">waits for result …</text>
+  <rect x="86" y="394" width="330" height="22" rx="6" fill="#F0FFF4"/>
+  <text x="96" y="410" class="sub">← <tspan class="mono" font-size="13">tool_result</tspan> comes back, loop continues</text>
+
+  <!-- ════ SUB SESSION ════ -->
+  <g filter="url(#s)">
+    <rect x="720" y="150" width="560" height="350" rx="18" fill="#F3EEFB" stroke="#b3a4d6" stroke-width="2.5"/>
+  </g>
+  <text x="748" y="188" class="head">Sub-agent · sub-session</text>
+  <rect x="1155" y="168" width="100" height="26" rx="13" fill="#EDE7F6" stroke="#b3a4d6"/>
+  <text x="1205" y="186" class="badge" fill="#7a5fbf" text-anchor="middle">depth = 1</text>
+
+  <!-- sub working memory — OWN tokens -->
+  <rect x="748" y="208" width="504" height="86" rx="11" fill="#FFF8E6" stroke="#e0c878" stroke-width="1.5"/>
+  <text x="766" y="232" class="lbl" font-weight="700">Own Working Memory (sub)</text>
+  <text x="766" y="254" class="sub">own system prompt + own Message-Window</text>
+  <rect x="1070" y="218" width="164" height="26" rx="13" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="1152" y="236" class="tok" fill="#7a5fbf" text-anchor="middle">~40k Tokens</text>
+  <text x="766" y="278" class="sub">searches, pages, intermediate steps — <tspan font-weight="700">isolated</tspan> from the main context</text>
+
+  <!-- sub runtime — SAME runtime -->
+  <rect x="748" y="308" width="504" height="172" rx="11" fill="#fff" stroke="#b3a4d6" stroke-width="1.5"/>
+  <text x="766" y="334" class="lbl" font-weight="700">same agent runtime — new context</text>
+  <text x="766" y="358" class="sub">own tools · own model · own tool loop</text>
+  <rect x="766" y="372" width="300" height="32" rx="9" fill="#FFF8E6" stroke="#e0c878" stroke-width="1.5"/>
+  <text x="781" y="393" class="sub">can itself call <tspan class="mono" font-size="13">run_agent(…)</tspan> again</text>
+  <text x="766" y="436" class="sub">→ recursion, limited by <tspan font-weight="700" fill="#444">MAX_DEPTH</tspan></text>
+  <!-- recursion self-loop -->
+  <path d="M1066,388 C1150,388 1150,356 1068,356" class="purp" marker-end="url(#ab)"/>
+  <text x="1162" y="378" class="badge" fill="#7a5fbf">↻</text>
+
+  <!-- open sub-session arrow -->
+  <path d="M572,300 C650,300 650,250 720,250" class="purp" marker-end="url(#ab)"/>
+  <text x="646" y="240" class="badge" fill="#7a5fbf" text-anchor="middle">openChat(...)</text>
+  <text x="646" y="262" class="sub" text-anchor="middle">open own session</text>
+
+  <!-- return result arrow: ONLY the condensed result -->
+  <path d="M748,420 C660,420 660,405 580,405" class="green" marker-end="url(#ag)"/>
+  <text x="664" y="442" class="badge" fill="#2c7a3f" text-anchor="middle">result only</text>
+  <text x="664" y="460" class="tok" fill="#2c7a3f" text-anchor="middle">~0,5k Tokens</text>
+
+  <!-- ════ key takeaway: token isolation ════ -->
+  <g filter="url(#s)">
+    <rect x="40" y="560" width="1240" height="150" rx="16" fill="#EAF7EE" stroke="#86c193" stroke-width="2"/>
+  </g>
+  <text x="64" y="598" class="head">Token isolation — the core idea</text>
+  <text x="64" y="628" class="lbl">Each sub-session has its <tspan font-weight="700">own Working Memory</tspan>. The many Tokens of the research (searches, read pages,</text>
+  <text x="64" y="652" class="lbl">intermediate steps) stay <tspan font-weight="700">in the sub-session</tspan> — they do <tspan font-weight="700">not</tspan> burden the context of the main session.</text>
+  <text x="64" y="676" class="lbl">Only the <tspan font-weight="700">condensed result</tspan> flows back as <tspan class="mono">tool_result</tspan>. Linked via <tspan class="mono">parentSessionId</tspan> / <tspan class="mono">parentTurnId</tspan>.</text>
+
+</svg>

@@ -1,0 +1,51 @@
+{
+  "@class": "ai.mindconnect.workflow.domain.WorkflowData",
+  "name": "file-ingestion",
+  "params": {
+    "type": "object",
+    "properties": {
+      "file": {
+        "type": "string",
+        "format": "path",
+        "description": "Path to the document (Word, PDF, text/markdown), relative to the tools base directory."
+      },
+      "store": {
+        "type": "string",
+        "description": "Name of the vector store to ingest into — e.g. 'knowledge' or a project name."
+      }
+    },
+    "required": [
+      "file",
+      "store"
+    ]
+  },
+  "steps": [
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "get-sections",
+      "assignResultToVar": "sectionsJson",
+      "tool": "document_sections",
+      "arguments": "{\"path\": \"${file}\"}",
+      "type": "toolcall"
+    },
+    {
+      "@class": "ai.mindconnect.workflow.domain.CodeData",
+      "name": "build-chunks",
+      "assignResultToVar": null,
+      "language": "javascript",
+      "code": "upsertArgs = (function () {\n  var MAX = 2000;\n  var parsed = JSON.parse(String(sectionsJson));\n  var chunks = [];\n  var sections = parsed.sections || [];\n  for (var i = 0; i < sections.length; i++) {\n    var title = sections[i].title || '';\n    var text = (sections[i].content || '').trim();\n    if (text.length === 0) continue;\n    if (text.length <= MAX) {\n      chunks.push({ text: (title ? title + '\\n' : '') + text, title: title });\n    } else {\n      var part = 1;\n      for (var pos = 0; pos < text.length; pos += MAX) {\n        var piece = text.substring(pos, Math.min(pos + MAX, text.length));\n        chunks.push({ text: (title ? title + ' (' + part + ')\\n' : '') + piece, title: title });\n        part++;\n      }\n    }\n  }\n  return { store: store, file_id: file, chunks: chunks };\n})();",
+      "wrapInFunction": false,
+      "injectVariables": true,
+      "exportVariables": true,
+      "type": "code"
+    },
+    {
+      "@class": "ai.mindconnect.agent.tools.workflow.step.ToolCallData",
+      "name": "upsert-chunks",
+      "assignResultToVar": "result",
+      "tool": "vector_upsert",
+      "arguments": "${upsertArgs}",
+      "type": "toolcall"
+    }
+  ]
+}

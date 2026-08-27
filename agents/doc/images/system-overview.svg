@@ -1,0 +1,515 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css"
+     data-diagram-type="DESCRIPTION" height="661px" preserveAspectRatio="none"
+     style="width:1205px;height:661px;background:#FFFFFF;" version="1.1" viewBox="0 0 1205 661" width="1205px"
+     zoomAndPan="magnify"><?plantuml 1.2026.6?>
+    <defs/>
+    <g>
+        <g class="title" data-source-line="19">
+            <text fill="#000000" font-family="Arial" font-size="14" font-weight="700" lengthAdjust="spacing"
+                  textLength="226.3926" x="485.9979" y="23.1318">MindConnect &#8212; System Overview
+            </text>
+        </g><!--entity DP-->
+        <g class="entity" data-qualified-name="DP" data-source-line="25" id="ent0001">
+            <polygon fill="#EEF2FF"
+                     points="40.91,53.6635,50.91,43.6635,173.5028,43.6635,173.5028,79.7621,163.5028,89.7621,40.91,89.7621,40.91,53.6635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="163.5028" x2="173.5028" y1="53.6635" y2="43.6635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="40.91" x2="163.5028" y1="53.6635" y2="53.6635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="163.5028" x2="163.5028" y1="53.6635" y2="89.7621"/>
+            <a href="system-architecture.puml#Data_Providers" target="_top"
+               title="system-architecture.puml#Data_Providers" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Data_Providers" xlink:show="new"
+               xlink:title="system-architecture.puml#Data_Providers" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="92.5928" x="55.91" y="76.7954">Data Providers
+                </text>
+            </a>
+        </g><!--entity ING-->
+        <g class="entity" data-qualified-name="ING" data-source-line="26" id="ent0002">
+            <polygon fill="#FFF3E0"
+                     points="16,159.7635,26,149.7635,198.4199,149.7635,198.4199,185.8621,188.4199,195.8621,16,195.8621,16,159.7635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="188.4199" x2="198.4199" y1="159.7635" y2="149.7635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="16" x2="188.4199" y1="159.7635" y2="159.7635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="188.4199" x2="188.4199" y1="159.7635" y2="195.8621"/>
+            <a href="system-architecture.puml#Data_Pools_Ingestion" target="_top"
+               title="system-architecture.puml#Data_Pools_Ingestion" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Data_Pools_Ingestion" xlink:show="new"
+               xlink:title="system-architecture.puml#Data_Pools_Ingestion" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="142.4199" x="31" y="182.8954">Data Pools &amp; Ingestion
+                </text>
+            </a>
+        </g><!--entity AS-->
+        <g class="entity" data-qualified-name="AS" data-source-line="32" id="ent0003">
+            <polygon fill="#F0FFF0"
+                     points="549.35,265.8635,559.35,255.8635,671.06,255.8635,671.06,291.9621,661.06,301.9621,549.35,301.9621,549.35,265.8635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="661.06" x2="671.06" y1="265.8635" y2="255.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="549.35" x2="661.06" y1="265.8635" y2="265.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="661.06" x2="661.06" y1="265.8635" y2="301.9621"/>
+            <a href="system-architecture.puml#Agent_Server" target="_top" title="system-architecture.puml#Agent_Server"
+               xlink:actuate="onRequest" xlink:href="system-architecture.puml#Agent_Server" xlink:show="new"
+               xlink:title="system-architecture.puml#Agent_Server" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="81.71" x="564.35" y="288.9954">Agent Runtime
+                </text>
+            </a>
+        </g><!--entity LLMS-->
+        <g class="entity" data-qualified-name="LLMS" data-source-line="33" id="ent0004">
+            <polygon fill="#E8F4FD"
+                     points="1068.03,380.0035,1078.03,370.0035,1180.3884,370.0035,1180.3884,406.1021,1170.3884,416.1021,1068.03,416.1021,1068.03,380.0035"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1170.3884" x2="1180.3884" y1="380.0035" y2="370.0035"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1068.03" x2="1170.3884" y1="380.0035" y2="380.0035"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1170.3884" x2="1170.3884" y1="380.0035" y2="416.1021"/>
+            <a href="system-architecture.puml#LLM_Server" target="_top" title="system-architecture.puml#LLM_Server"
+               xlink:actuate="onRequest" xlink:href="system-architecture.puml#LLM_Server" xlink:show="new"
+               xlink:title="system-architecture.puml#LLM_Server" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="72.3584" x="1083.03" y="403.1354">LLM Gateway
+                </text>
+            </a>
+        </g><!--entity MCPG-->
+        <g class="entity" data-qualified-name="MCPG" data-source-line="34" id="ent0005">
+            <polygon fill="#FDE8F5"
+                     points="427.09,380.0035,437.09,370.0035,557.338,370.0035,557.338,406.1021,547.338,416.1021,427.09,416.1021,427.09,380.0035"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="547.338" x2="557.338" y1="380.0035" y2="370.0035"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="427.09" x2="547.338" y1="380.0035" y2="380.0035"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="547.338" x2="547.338" y1="380.0035" y2="416.1021"/>
+            <a href="system-architecture.puml#MCP_Gateway" target="_top" title="system-architecture.puml#MCP_Gateway"
+               xlink:actuate="onRequest" xlink:href="system-architecture.puml#MCP_Gateway" xlink:show="new"
+               xlink:title="system-architecture.puml#MCP_Gateway" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="90.248" x="442.09" y="403.1354">MCP Gateway
+                </text>
+            </a>
+        </g><!--entity WF-->
+        <g class="entity" data-qualified-name="WF" data-source-line="35" id="ent0006">
+            <polygon fill="#FFFDE7"
+                     points="537.69,494.1535,547.69,484.1535,682.731,484.1535,682.731,520.2521,672.731,530.2521,537.69,530.2521,537.69,494.1535"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="672.731" x2="682.731" y1="494.1535" y2="484.1535"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="537.69" x2="672.731" y1="494.1535" y2="494.1535"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="672.731" x2="672.731" y1="494.1535" y2="530.2521"/>
+            <a href="system-architecture.puml#Workflow_Engine" target="_top"
+               title="system-architecture.puml#Workflow_Engine" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Workflow_Engine" xlink:show="new"
+               xlink:title="system-architecture.puml#Workflow_Engine" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="105.041" x="552.69" y="517.2854">Workflow Engine
+                </text>
+            </a>
+        </g><!--entity LMS-->
+        <g class="entity" data-qualified-name="LMS" data-source-line="41" id="ent0007">
+            <polygon fill="#FCE4EC"
+                     points="705.64,265.8635,715.64,255.8635,846.7709,255.8635,846.7709,291.9621,836.7709,301.9621,705.64,301.9621,705.64,265.8635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="836.7709" x2="846.7709" y1="265.8635" y2="255.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="705.64" x2="836.7709" y1="265.8635" y2="265.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="836.7709" x2="836.7709" y1="265.8635" y2="301.9621"/>
+            <a href="system-architecture.puml#Memory_Service" target="_top"
+               title="system-architecture.puml#Memory_Service" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Memory_Service" xlink:show="new"
+               xlink:title="system-architecture.puml#Memory_Service" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="101.1309" x="720.64" y="288.9954">Memory Service
+                </text>
+            </a>
+        </g><!--entity EB-->
+        <g class="entity" data-qualified-name="EB" data-source-line="42" id="ent0008">
+            <polygon fill="#F3E5F5"
+                     points="251.3,600.2535,261.3,590.2535,355.1135,590.2535,355.1135,626.3521,345.1135,636.3521,251.3,636.3521,251.3,600.2535"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="345.1135" x2="355.1135" y1="600.2535" y2="590.2535"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="251.3" x2="345.1135" y1="600.2535" y2="600.2535"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="345.1135" x2="345.1135" y1="600.2535" y2="636.3521"/>
+            <a href="system-architecture.puml#Event_Bus" target="_top" title="system-architecture.puml#Event_Bus"
+               xlink:actuate="onRequest" xlink:href="system-architecture.puml#Event_Bus" xlink:show="new"
+               xlink:title="system-architecture.puml#Event_Bus" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="63.8135" x="266.3" y="623.3854">Event Bus
+                </text>
+            </a>
+        </g><!--entity PR-->
+        <g class="entity" data-qualified-name="PR" data-source-line="43" id="ent0009">
+            <polygon fill="#FFF9E6"
+                     points="663.24,371.9635,673.24,361.9635,819.1707,361.9635,819.1707,414.1608,809.1707,424.1608,663.24,424.1608,663.24,371.9635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="809.1707" x2="819.1707" y1="371.9635" y2="361.9635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="663.24" x2="809.1707" y1="371.9635" y2="371.9635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="809.1707" x2="809.1707" y1="371.9635" y2="424.1608"/>
+            <a href="system-architecture.puml#Prompt_Repository" target="_top"
+               title="system-architecture.puml#Prompt_Repository" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Prompt_Repository" xlink:show="new"
+               xlink:title="system-architecture.puml#Prompt_Repository" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="115.9307" x="678.24" y="395.0954">Prompt Repository
+                </text>
+            </a>
+            <a href="system-architecture.puml#Prompt_Repository" target="_top"
+               title="system-architecture.puml#Prompt_Repository" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Prompt_Repository" xlink:show="new"
+               xlink:title="system-architecture.puml#Prompt_Repository" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="94.1309" x="678.24" y="411.194">&amp; Skill Registry
+                </text>
+            </a>
+        </g><!--entity TB-->
+        <g class="entity" data-qualified-name="TB" data-source-line="44" id="ent0010">
+            <polygon fill="#F1F8E9"
+                     points="1005.52,159.7635,1015.52,149.7635,1110.8921,149.7635,1110.8921,185.8621,1100.8921,195.8621,1005.52,195.8621,1005.52,159.7635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1100.8921" x2="1110.8921" y1="159.7635" y2="149.7635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1005.52" x2="1100.8921" y1="159.7635" y2="159.7635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1100.8921" x2="1100.8921" y1="159.7635" y2="195.8621"/>
+            <a href="system-architecture.puml#Testbench" target="_top" title="system-architecture.puml#Testbench"
+               xlink:actuate="onRequest" xlink:href="system-architecture.puml#Testbench" xlink:show="new"
+               xlink:title="system-architecture.puml#Testbench" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="65.3721" x="1020.52" y="182.8954">Testbench
+                </text>
+            </a>
+        </g><!--entity JS-->
+        <g class="entity" data-qualified-name="JS" data-source-line="45" id="ent0011">
+            <polygon fill="#FBE9E7"
+                     points="367.46,53.6635,377.46,43.6635,496.9629,43.6635,496.9629,79.7621,486.9629,89.7621,367.46,89.7621,367.46,53.6635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="486.9629" x2="496.9629" y1="53.6635" y2="43.6635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="367.46" x2="486.9629" y1="53.6635" y2="53.6635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="486.9629" x2="486.9629" y1="53.6635" y2="89.7621"/>
+            <a href="system-architecture.puml#Job_Scheduler" target="_top"
+               title="system-architecture.puml#Job_Scheduler" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Job_Scheduler" xlink:show="new"
+               xlink:title="system-architecture.puml#Job_Scheduler" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="89.5029" x="382.46" y="76.7954">Job Scheduler
+                </text>
+            </a>
+        </g><!--entity MR-->
+        <g class="entity" data-qualified-name="MR" data-source-line="46" id="ent0012">
+            <polygon fill="#E8F5E9"
+                     points="974.4,265.8635,984.4,255.8635,1142.0133,255.8635,1142.0133,291.9621,1132.0133,301.9621,974.4,301.9621,974.4,265.8635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1132.0133" x2="1142.0133" y1="265.8635" y2="255.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="974.4" x2="1132.0133" y1="265.8635" y2="265.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="1132.0133" x2="1132.0133" y1="265.8635" y2="301.9621"/>
+            <a href="system-architecture.puml#Message_Repository" target="_top"
+               title="system-architecture.puml#Message_Repository" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Message_Repository" xlink:show="new"
+               xlink:title="system-architecture.puml#Message_Repository" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="127.6133" x="989.4" y="288.9954">Message Repository
+                </text>
+            </a>
+        </g><!--entity SES-->
+        <g class="entity" data-qualified-name="SES" data-source-line="47" id="ent0013">
+            <polygon fill="#EDE7F6"
+                     points="648.07,600.2535,658.07,590.2535,834.3522,590.2535,834.3522,626.3521,824.3522,636.3521,648.07,636.3521,648.07,600.2535"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="824.3522" x2="834.3522" y1="600.2535" y2="590.2535"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="648.07" x2="824.3522" y1="600.2535" y2="600.2535"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="824.3522" x2="824.3522" y1="600.2535" y2="636.3521"/>
+            <a href="system-architecture.puml#Script_Execution_Server" target="_top"
+               title="system-architecture.puml#Script_Execution_Server" xlink:actuate="onRequest"
+               xlink:href="system-architecture.puml#Script_Execution_Server" xlink:show="new"
+               xlink:title="system-architecture.puml#Script_Execution_Server" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="146.2822" x="663.07" y="623.3854">Script Execution Server
+                </text>
+            </a>
+        </g><!--entity CL-->
+        <g class="entity" data-qualified-name="CL" data-source-line="53" id="ent0014">
+            <polygon fill="#FCE4EC"
+                     points="358.81,265.8635,368.81,255.8635,441.603,255.8635,441.603,291.9621,431.603,301.9621,358.81,301.9621,358.81,265.8635"
+                     style="stroke:#555555;stroke-width:0.5;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="431.603" x2="441.603" y1="265.8635" y2="255.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="358.81" x2="431.603" y1="265.8635" y2="265.8635"/>
+            <line style="stroke:#555555;stroke-width:0.5;" x1="431.603" x2="431.603" y1="265.8635" y2="301.9621"/>
+            <a href="system-architecture.puml#Clients" target="_top" title="system-architecture.puml#Clients"
+               xlink:actuate="onRequest" xlink:href="system-architecture.puml#Clients" xlink:show="new"
+               xlink:title="system-architecture.puml#Clients" xlink:type="simple">
+                <text fill="#0000FF" font-family="Arial" font-size="14" lengthAdjust="spacing"
+                      text-decoration="underline" textLength="42.793" x="373.81" y="288.9954">Clients
+                </text>
+            </a>
+        </g><!--link DP to ING-->
+        <g class="link" data-entity-1="ent0001" data-entity-2="ent0002" data-link-type="dependency"
+           data-source-line="59" id="lnk15">
+            <path d="M107.21,90.2635 C107.21,107.8435 107.21,126.7635 107.21,144.3335" fill="none" id="DP-to-ING"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="107.21,149.3335,111.21,140.3335,107.21,144.3335,103.21,140.3335,107.21,149.3335"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="88.1499"
+                  x="18.21" y="116.9874">raw documents
+            </text>
+        </g><!--link ING to AS-->
+        <g class="link" data-entity-1="ent0002" data-entity-2="ent0003" data-link-type="dependency"
+           data-source-line="60" id="lnk16">
+            <path d="M198.86,161.3535 C338.86,161.3535 589.92,161.3535 589.92,161.3535 C589.92,161.3535 589.92,216.0935 589.92,250.4035"
+                  fill="none" id="ING-to-AS" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="589.92,255.4035,593.92,246.4035,589.92,250.4035,585.92,246.4035,589.92,255.4035"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="93.1899"
+                  x="343.4" y="143.5474">retrieval (vector,
+            </text>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="101.1499"
+                  x="339.42" y="158.4961">keyword, chunks)
+            </text>
+        </g><!--link ING to EB-->
+        <g class="link" data-entity-1="ent0002" data-entity-2="ent0008" data-link-type="dependency"
+           data-source-line="61" id="lnk17">
+            <path d="M198.8,172.3535 C236.74,172.3535 272.07,172.3535 272.07,172.3535 C272.07,172.3535 272.07,493.7435 272.07,584.9035"
+                  fill="none" id="ING-to-EB" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="272.07,589.9035,276.07,580.9035,272.07,584.9035,268.07,580.9035,272.07,589.9035"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="93.9517"
+                  x="178.07" y="341.6874">ingestion events
+            </text>
+        </g><!--link AS to LMS-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0007" data-link-type="dependency"
+           data-source-line="63" id="lnk18">
+            <path d="M676.55,279.3535 C687.54,279.3535 689.08,279.3535 700.31,279.3535" fill="none" id="AS-LMS"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="671.55,279.3535,680.55,283.3535,676.55,279.3535,680.55,275.3535,671.55,279.3535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <polygon fill="#555555"
+                     points="705.31,279.3535,696.31,275.3535,700.31,279.3535,696.31,283.3535,705.31,279.3535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="158.939"
+                  x="529.43" y="276.5474">read &amp; write user memories
+            </text>
+        </g><!--link AS to MR-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0012" data-link-type="dependency"
+           data-source-line="64" id="lnk19">
+            <path d="M669.11,307.4035 C669.11,324.0235 669.11,338.3535 669.11,338.3535 C669.11,338.3535 1021.22,338.3535 1021.22,338.3535 C1021.22,338.3535 1021.22,324.0235 1021.22,307.4035"
+                  fill="none" id="AS-MR" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="669.11,302.4035,665.11,311.4035,669.11,307.4035,673.11,311.4035,669.11,302.4035"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <polygon fill="#555555"
+                     points="1021.22,302.4035,1017.22,311.4035,1021.22,307.4035,1025.22,311.4035,1021.22,302.4035"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="181.3525"
+                  x="663.16" y="351.5474">persist &amp; retrieve conversations
+            </text>
+        </g><!--link AS to LLMS-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0004" data-link-type="dependency"
+           data-source-line="65" id="lnk20">
+            <path d="M667.15,302.3035 C667.15,323.1435 667.15,350.3535 667.15,350.3535 C667.15,350.3535 1105.02,350.3535 1105.02,350.3535 C1105.02,350.3535 1105.02,354.7335 1105.02,364.7035"
+                  fill="none" id="AS-to-LLMS" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="1105.02,369.7035,1109.02,360.7035,1105.02,364.7035,1101.02,360.7035,1105.02,369.7035"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="98.2744"
+                  x="872.74" y="347.5474">LLMChatHandler
+            </text>
+        </g><!--link AS to MCPG-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0005" data-link-type="dependency"
+           data-source-line="66" id="lnk21">
+            <path d="M554.67,302.2835 C554.67,321.9835 554.67,345.0235 554.67,364.7135" fill="none" id="AS-to-MCPG"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="554.67,369.7135,558.67,360.7135,554.67,364.7135,550.67,360.7135,554.67,369.7135"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="50.5781"
+                  x="503.67" y="333.1974">tool calls
+            </text>
+        </g><!--link AS to WF-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0006" data-link-type="dependency"
+           data-source-line="67" id="lnk22">
+            <path d="M610.29,302.0535 C610.29,345.7035 610.29,434.7035 610.29,478.6535" fill="none" id="AS-to-WF"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="610.29,483.6535,614.29,474.6535,610.29,478.6535,606.29,474.6535,610.29,483.6535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="91.0254"
+                  x="564.79" y="406.0474">trigger workflow
+            </text>
+        </g><!--link AS to SES-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0013" data-link-type="dependency"
+           data-source-line="68" id="lnk23">
+            <path d="M636.77,302.2035 C636.77,349.9335 636.77,454.3535 636.77,454.3535 C636.77,454.3535 750.95,454.3535 750.95,454.3535 C750.95,454.3535 750.95,540.6335 750.95,584.8535"
+                  fill="none" id="AS-to-SES" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="750.95,589.8535,754.95,580.8535,750.95,584.8535,746.95,580.8535,750.95,589.8535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="122.1162"
+                  x="562.54" y="451.5474">execute script as tool
+            </text>
+        </g><!--link WF to SES-->
+        <g class="link" data-entity-1="ent0006" data-entity-2="ent0013" data-link-type="dependency"
+           data-source-line="69" id="lnk24">
+            <path d="M665.4,530.7535 C665.4,548.3335 665.4,567.2535 665.4,584.8235" fill="none" id="WF-to-SES"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555" points="665.4,589.8235,669.4,580.8235,665.4,584.8235,661.4,580.8235,665.4,589.8235"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="119.2344"
+                  x="545.4" y="557.4774">delegate script steps
+            </text>
+        </g><!--link AS to PR-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0009" data-link-type="dependency"
+           data-source-line="70" id="lnk25">
+            <path d="M665.2,302.2835 C665.2,319.3735 665.2,337.7435 665.2,356.4935" fill="none" id="AS-to-PR"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555" points="665.2,361.4935,669.2,352.4935,665.2,356.4935,661.2,352.4935,665.2,361.4935"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="78.7554"
+                  x="586.2" y="329.0774">fetch prompts
+            </text>
+        </g><!--link AS to EB-->
+        <g class="link" data-entity-1="ent0003" data-entity-2="ent0008" data-link-type="dependency"
+           data-source-line="71" id="lnk26">
+            <path d="M552.01,307.3535 C552.01,319.3035 552.01,326.3535 552.01,326.3535 C552.01,326.3535 313.59,326.3535 313.59,326.3535 C313.59,326.3535 313.59,516.2935 313.59,584.8235"
+                  fill="none" id="AS-EB" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="552.01,302.3535,548.01,311.3535,552.01,307.3535,556.01,311.3535,552.01,302.3535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <polygon fill="#555555"
+                     points="313.59,589.8235,317.59,580.8235,313.59,584.8235,309.59,580.8235,313.59,589.8235"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="74.4453"
+                  x="238.59" y="324.0674">agent events
+            </text>
+        </g><!--link MCPG to WF-->
+        <g class="link" data-entity-1="ent0005" data-entity-2="ent0006" data-link-type="dependency"
+           data-source-line="73" id="lnk27">
+            <path d="M547.51,416.4335 C547.51,436.1335 547.51,459.1735 547.51,478.8635" fill="none" id="MCPG-to-WF"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="547.51,483.8635,551.51,474.8635,547.51,478.8635,543.51,474.8635,547.51,483.8635"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="91.7554"
+                  x="414.7795" y="432.3374">invoke workflow
+            </text>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="172.2944"
+                  x="374.51" y="447.2861">(backendType=WORKFLOW)
+            </text>
+        </g><!--link WF to EB-->
+        <g class="link" data-entity-1="ent0006" data-entity-2="ent0008" data-link-type="dependency"
+           data-source-line="75" id="lnk28">
+            <path d="M537.37,507.3535 C455.64,507.3535 334.35,507.3535 334.35,507.3535 C334.35,507.3535 334.35,553.5735 334.35,584.7935"
+                  fill="none" id="WF-to-EB" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="334.35,589.7935,338.35,580.7935,334.35,584.7935,330.35,580.7935,334.35,589.7935"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="92.479"
+                  x="301.64" y="504.5474">workflow events
+            </text>
+        </g><!--link TB to AS-->
+        <g class="link" data-entity-1="ent0010" data-entity-2="ent0003" data-link-type="dependency"
+           data-source-line="77" id="lnk29">
+            <path d="M1005.33,184.3535 C890.9,184.3535 630.49,184.3535 630.49,184.3535 C630.49,184.3535 630.49,222.5335 630.49,250.5335"
+                  fill="none" id="TB-to-AS" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="630.49,255.5335,634.49,246.5335,630.49,250.5335,626.49,246.5335,630.49,255.5335"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="138.7344"
+                  x="643.32" y="181.5474">inject test conversations
+            </text>
+        </g><!--link TB to LLMS-->
+        <g class="link" data-entity-1="ent0010" data-entity-2="ent0004" data-link-type="dependency"
+           data-source-line="78" id="lnk30">
+            <path d="M1111.21,172.3535 C1136.45,172.3535 1161.2,172.3535 1161.2,172.3535 C1161.2,172.3535 1161.2,308.1935 1161.2,364.8535"
+                  fill="none" id="TB-to-LLMS" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="1161.2,369.8535,1165.2,360.8535,1161.2,364.8535,1157.2,360.8535,1161.2,369.8535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="125.0044"
+                  x="1035.2" y="243.3074">LLM-as-judge scoring
+            </text>
+        </g><!--link TB to MR-->
+        <g class="link" data-entity-1="ent0010" data-entity-2="ent0012" data-link-type="dependency"
+           data-source-line="79" id="lnk31">
+            <path d="M1058.21,196.3535 C1058.21,213.9435 1058.21,232.8635 1058.21,250.4335" fill="none" id="TB-to-MR"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="1058.21,255.4335,1062.21,246.4335,1058.21,250.4335,1054.21,246.4335,1058.21,255.4335"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="119.939"
+                  x="938.21" y="208.0874">import conversations
+            </text>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="75.8672"
+                  x="960.2459" y="223.0361">as test cases
+            </text>
+        </g><!--link JS to AS-->
+        <g class="link" data-entity-1="ent0011" data-entity-2="ent0003" data-link-type="dependency"
+           data-source-line="81" id="lnk32">
+            <path d="M478.51,90.1835 C478.51,143.9435 478.51,271.3535 478.51,271.3535 C478.51,271.3535 509.59,271.3535 543.99,271.3535"
+                  fill="none" id="JS-to-AS" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="548.99,271.3535,539.99,267.3535,543.99,271.3535,539.99,275.3535,548.99,271.3535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="120.6816"
+                  x="357.51" y="213.2074">trigger agent session
+            </text>
+        </g><!--link JS to WF-->
+        <g class="link" data-entity-1="ent0011" data-entity-2="ent0006" data-link-type="dependency"
+           data-source-line="82" id="lnk33">
+            <path d="M460.06,90.0135 C460.06,151.6535 460.06,314.3535 460.06,314.3535 C460.06,314.3535 583.81,314.3535 583.81,314.3535 C583.81,314.3535 583.81,427.6535 583.81,478.9435"
+                  fill="none" id="JS-to-WF" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="583.81,483.9435,587.81,474.9435,583.81,478.9435,579.81,474.9435,583.81,483.9435"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="91.0254"
+                  x="402.56" y="327.5474">trigger workflow
+            </text>
+        </g><!--link JS to ING-->
+        <g class="link" data-entity-1="ent0011" data-entity-2="ent0002" data-link-type="dependency"
+           data-source-line="83" id="lnk34">
+            <path d="M367.19,59.3535 C294.23,59.3535 185.96,59.3535 185.96,59.3535 C185.96,59.3535 185.96,111.0735 185.96,144.3035"
+                  fill="none" id="JS-to-ING" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="185.96,149.3035,189.96,140.3035,185.96,144.3035,181.96,140.3035,185.96,149.3035"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="92.498" x="232.6"
+                  y="56.5474">trigger ingestion
+            </text>
+        </g><!--link JS to EB-->
+        <g class="link" data-entity-1="ent0011" data-entity-2="ent0008" data-link-type="dependency"
+           data-source-line="84" id="lnk35">
+            <path d="M367.01,74.3535 C330.73,74.3535 292.83,74.3535 292.83,74.3535 C292.83,74.3535 292.83,481.0635 292.83,584.8035"
+                  fill="none" id="JS-to-EB" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="292.83,589.8035,296.83,580.8035,292.83,584.8035,288.83,580.8035,292.83,589.8035"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="59.2617"
+                  x="232.83" y="292.1774">job events
+            </text>
+        </g><!--link CL to AS-->
+        <g class="link" data-entity-1="ent0014" data-entity-2="ent0003" data-link-type="dependency"
+           data-source-line="86" id="lnk36">
+            <path d="M446.95,286.3535 C477.57,286.3535 509.64,286.3535 544.05,286.3535" fill="none" id="CL-AS"
+                  style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="441.95,286.3535,450.95,290.3535,446.95,286.3535,450.95,282.3535,441.95,286.3535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <polygon fill="#555555"
+                     points="549.05,286.3535,540.05,282.3535,544.05,286.3535,540.05,290.3535,549.05,286.3535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="80.209" x="455.5"
+                  y="299.5474">conversations
+            </text>
+        </g><!--link CL to EB-->
+        <g class="link" data-entity-1="ent0014" data-entity-2="ent0008" data-link-type="dependency"
+           data-source-line="87" id="lnk37">
+            <path d="M392.95,307.4235 C392.95,383.5535 392.95,613.3535 392.95,613.3535 C392.95,613.3535 380.15,613.3535 360.41,613.3535"
+                  fill="none" id="CL-EB" style="stroke:#555555;stroke-width:1;"/>
+            <polygon fill="#555555"
+                     points="392.95,302.4235,388.95,311.4235,392.95,307.4235,396.95,311.4235,392.95,302.4235"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <polygon fill="#555555"
+                     points="355.41,613.3535,364.41,617.3535,360.41,613.3535,364.41,609.3535,355.41,613.3535"
+                     style="stroke:#555555;stroke-width:1;stroke-linejoin:miter;stroke-miterlimit:10;"/>
+            <text fill="#000000" font-family="Arial" font-size="13" lengthAdjust="spacing" textLength="149.5825"
+                  x="242.95" y="473.8574">subscribe / publish events
+            </text>
+        </g>
+        <?plantuml-src rLVhRjis5FwlfpXeW5w0UakRk6k2hK2YK9qpnpOiT_xH50OjCJ9ZcHH8ofun5EX3z0dx93kaADaEK3Zxvo01p7FxU7XkfFISYu8gke2S2sRM1GEfp4m6kX6ax8wMkOcaC3swO72XECstv5EQp3CbIv66CfSAnZDkMB2be5XYgCXo1ly609TIfKnLgaVjTXjP3w2_RjaAcNgp1xiSHHVsxty3KgNaoY5kMNmD0iCDEdZ3BRuGw37y-FOTuhKsR07z9LDBpbP1y09-VFzs2F_eoR0_XZS7v57WalNiysVjejQYAh6ba9XIiL-ASf4VNL539mCbbnmpfi6Iq91VlZm3Yim1714IlOsYn-99cUj9HsHC6ow5HxLCU0uDswDtUX-nTABeX1mVNZBVkfeB-qC2CHd-tGb9_AJIUv4nOIOnzWfJu0Ye21_yYnXZVupHFzwFrUtUr4YutCL11YAHzz5fTBKVwIOSJ3vImrPq3RW6l_POoB4LSOLexVrOOwdcTxbSJOZ8S5v2JKD5Uynnv6hiYlnsU3LsKisrJuD1VpXwccLsmnPIhLrry0HdjYF1atM9s0g9Gd9Amls0P6dhzhBKu5Q0Amz3BX7bXBGVKniuo1Q5cGnP8JKtrgMA0nlEhNWEyPpdEV8ohesggt0mT1LpHjxjtsU40stAH3A3PkLHHjRRDz5xShOVvLfE9t4oOscPOuiX1GtbqQvj12_96LRn8rAYDStOzk4zQ-lqTSSDNU-s7-Dbd2YECIN_iAIqKxmU2HKV6lxkV8Y97G_OVj6xmsl0qsh8TpkaDtfQVHVc7Bj3W__rmGwxJQCTLAp3Vgz7mb6dtpkeAEFp1bgj3-uX0kUWw0fIcPGB6z70CgqGBqedP4PnjgGvl5nY8gHwVIlcRBt21-zhI6QbcEjNZGsEAcl3ctSGMphCm8BzZWfs93fGckB3QAKmkL1gRAQ57Q2SwKOJEzHg5lWemo65ojuH1eaKs6QQsWqgVRkrku_FxKyue-PFAbAS8etKtR3dOF151WdDyuqTtfDs7yJEClHZvI_JHcxx6ENCTJa3NJKzrfp52gprbbRASfRHZHeMSR7PQb0TwOuPd9k5cykRy_hGKVTYgSFctAwzj75ToZbhVBmLB-rt3nFf2B-P_XZtXtz5tVxuLT2uvK5hWmONX_HsZhcujnyR1fFs8BgruYQwBQfRzsMQsJDYnaJMwFYCyKM1Ns-xEBV21ip1Kur93gxZ7GVgw5UdHmsDLetIpr9KotqPr_Ac-Xe57uPxl63g2E34S67t3koUkXPwErrERJwd37w5efpcNCzgdFy0?>
+    </g>
+</svg>

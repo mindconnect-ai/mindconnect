@@ -1,0 +1,6 @@
+@startuml wf_assign
+:assign greet
+  message = Hello World
+  assign-result -> message
+;
+@enduml

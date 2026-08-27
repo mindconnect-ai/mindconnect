@@ -1,0 +1,48 @@
+name: Bug report
+description: Report something that isn't working as expected
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill in the details below.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - agent runtime
+        - workflow engine
+        - semantic-ui
+        - common
+        - build / CI
+        - other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps, code, or a failing test if possible.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Module/version or commit, Java version, OS.
+      placeholder: "commit abc123 · Java 21 · macOS 14"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack trace
+      render: shell

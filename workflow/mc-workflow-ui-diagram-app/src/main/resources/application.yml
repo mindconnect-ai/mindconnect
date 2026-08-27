@@ -1,0 +1,13 @@
+server:
+  # 8080 is typically taken by the AdminUi app — pick something free so the
+  # editor harness can run alongside without conflict.
+  port: 8090
+
+spring:
+  application:
+    name: mc-workflow-ui-diagram-app
+
+logging:
+  level:
+    root: INFO
+    ai.mindconnect: DEBUG

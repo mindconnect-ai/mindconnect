@@ -1,0 +1,20 @@
+{
+  "@class" : "ai.mindconnect.workflow.domain.WorkflowData",
+  "name" : "wf_hello",
+  "assignResultToVar" : null,
+  "resultFrom" : "greeting",
+  "steps" : [ {
+    "@class" : "ai.mindconnect.workflow.domain.AssignVariablesData",
+    "name" : "assign",
+    "assignResultToVar" : "greeting",
+    "variableAssignments" : [ {
+      "varName" : "greeting",
+      "expressionOrVarName" : "Hello ${name}!"
+    } ]
+  } ],
+  "uid" : null,
+  "params" : [ "name" ],
+  "subWorkflows" : [ ],
+  "workflowType" : null,
+  "type" : "workflow"
+}

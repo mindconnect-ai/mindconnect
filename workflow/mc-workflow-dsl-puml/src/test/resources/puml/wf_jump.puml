@@ -1,0 +1,5 @@
+@startuml wf_jump
+:jump skipToEnd
+  to = endStep
+;
+@enduml

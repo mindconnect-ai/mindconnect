@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest an idea or improvement
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - agent runtime
+        - workflow engine
+        - semantic-ui
+        - common
+        - build / CI
+        - other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: The use case or pain point behind the request.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you'd like to see. Alternatives you considered are welcome too.
+  - type: markdown
+    attributes:
+      value: >
+        For large or architectural changes, consider opening a
+        [Discussion](https://github.com/mindconnect-ai/mindconnect/discussions)
+        first to align on the approach.

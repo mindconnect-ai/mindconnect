@@ -1,0 +1,11 @@
+@startuml wf_spel_if
+if (spel: score >= 90) then (yes)
+  :assign highTier
+  tier = gold;
+else (no)
+  :assign lowTier
+  tier = silver;
+endif
+stop
+:output <- tier;
+@enduml

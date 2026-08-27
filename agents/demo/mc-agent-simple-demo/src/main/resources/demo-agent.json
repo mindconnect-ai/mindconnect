@@ -1,0 +1,16 @@
+{
+  "id": "22222222-2222-2222-2222-222222222222",
+  "namespace": { "value": "local" },
+  "name": "demo-agent",
+  "description": "A minimal demo agent embedded via AgentRuntimeBuilder",
+  "systemPrompt": "You are a concise, helpful assistant. Answer clearly and briefly.",
+  "welcomeMessage": null,
+  "llmConfigName": "demo-llm",
+  "maxIterations": 5,
+  "memoryConfig": { "kind": "none" },
+  "status": "ACTIVE",
+  "tools": [],
+  "responseReviewers": null,
+  "createdAt": "2025-01-01T00:00:00Z",
+  "updatedAt": "2025-01-01T00:00:00Z"
+}

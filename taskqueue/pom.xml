@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-java-parent</artifactId>
+        <version>0.0.2-SNAPSHOT</version>
+        <relativePath>../mc-java-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-task-queue-aggregator</artifactId>
+    <version>0.0.2-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <description>
+        Multi-module build for the task queue: the ports and their local
+        implementation today, a remote queue and a dispatcher UI to come.
+        Agent-agnostic on purpose — agent turns are one caller, workflow runs
+        and ingestion jobs are others.
+    </description>
+
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <modules>
+        <module>mc-task-queue</module>
+        <module>mc-task-queue-schedule</module>
+        <module>mc-task-queue-jdbc</module>
+        <module>mc-taskqueue-demo-app</module>
+        <module>mc-taskqueue-cluster-demo</module>
+    </modules>
+
+</project>

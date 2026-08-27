@@ -1,0 +1,126 @@
+name: release
+
+# Manual, deliberate releases only — never on every merge. You pick the moment;
+# this cuts the -SNAPSHOT to a real version, publishes every module to
+# MAVEN CENTRAL (Central Publisher Portal), tags it, then opens the next
+# -SNAPSHOT on main.
+#
+# Required repo secrets:
+#   CENTRAL_USERNAME / CENTRAL_PASSWORD — a user token from
+#     https://central.sonatype.com (Account → Generate User Token); the
+#     namespace ai.mindconnect must be verified there once.
+#   MAVEN_GPG_PRIVATE_KEY  — ASCII-armored private key for artifact signing
+#     (gpg --armor --export-secret-keys <id>).
+#   MAVEN_GPG_PASSPHRASE   — its passphrase.
+#
+# With autoPublish=false (mc-java-parent), the upload waits in the Portal
+# for a manual "Publish" — nothing goes live by accident.
+on:
+  workflow_dispatch:
+    inputs:
+      releaseVersion:
+        description: 'Release version (blank = drop -SNAPSHOT from the current one)'
+        required: false
+        default: ''
+      nextVersion:
+        description: 'Next dev version incl. -SNAPSHOT (blank = bump patch)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # push the version-bump commits and the tag
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          # Writes ~/.m2/settings.xml with a server id matching the
+          # publishingServerId in mc-java-parent, and imports the GPG key.
+          server-id: central
+          server-username: CENTRAL_USERNAME
+          server-password: CENTRAL_PASSWORD
+          gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Configure git identity
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Compute versions
+        id: v
+        run: |
+          set -euo pipefail
+          CURRENT=$(mvn -q -DforceStdout help:evaluate -Dexpression=project.version)
+          RELEASE="${{ inputs.releaseVersion }}"
+          [ -z "$RELEASE" ] && RELEASE="${CURRENT%-SNAPSHOT}"
+          NEXT="${{ inputs.nextVersion }}"
+          if [ -z "$NEXT" ]; then
+            IFS='.' read -r MA MI PA <<< "$RELEASE"
+            NEXT="${MA}.${MI}.$((PA + 1))-SNAPSHOT"
+          fi
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
+          echo "next=$NEXT"       >> "$GITHUB_OUTPUT"
+          echo "Releasing $CURRENT -> $RELEASE, then opening $NEXT"
+
+      # Flat version scheme — every module shares the exact same version string,
+      # in both <version> and <parent>. versions:set misses the area-aggregator
+      # poms (their parent isn't in that reactor), so replace the literal string
+      # across every pom instead; it's complete and can't leave a mixed state.
+      - name: Set release version
+        run: find . -name pom.xml -exec sed -i "s|<version>${{ steps.v.outputs.current }}</version>|<version>${{ steps.v.outputs.release }}</version>|g" {} +
+
+      # Keep the copy-paste dependency snippets in the docs on the version people
+      # can actually pull. Targets only a <version> that follows an mc-* artifactId,
+      # so third-party versions (spring-boot, …) are untouched. Committed with the
+      # release below. Docusaurus can't interpolate variables inside code fences,
+      # so this source rewrite is the way. Shown without -SNAPSHOT; it stays until
+      # the next release moves it.
+      - name: Update dependency snippets in the docs
+        env:
+          RELEASE: ${{ steps.v.outputs.release }}
+        run: >
+          find website/docs \( -name '*.md' -o -name '*.mdx' \) -print0
+          | xargs -0 perl -0777 -pi -e
+          's|(<artifactId>mc-[^<]+</artifactId>\s*<version>)[^<]+(</version>)|${1}$ENV{RELEASE}${2}|g'
+
+      # The `release` profile (mc-java-parent) attaches sources + javadoc,
+      # signs with GPG and hands the deploy to the central-publishing plugin.
+      - name: Build & publish to Maven Central
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
+        run: mvn -B -ntp -DskipTests -Prelease deploy
+
+      - name: Commit release version and tag
+        run: |
+          git commit -am "release: v${{ steps.v.outputs.release }}"
+          git tag -a "v${{ steps.v.outputs.release }}" -m "Release v${{ steps.v.outputs.release }}"
+
+      - name: Open next development version
+        run: find . -name pom.xml -exec sed -i "s|<version>${{ steps.v.outputs.release }}</version>|<version>${{ steps.v.outputs.next }}</version>|g" {} +
+
+      - name: Commit next version and push
+        run: |
+          git commit -am "chore: start ${{ steps.v.outputs.next }} [skip ci]"
+          git push origin HEAD:${{ github.ref_name }} --follow-tags
+
+      # Turn the pushed tag into a proper Release entry with auto-generated notes,
+      # so it shows under Releases (not just Tags).
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          gh release create "v${{ steps.v.outputs.release }}"
+          --title "v${{ steps.v.outputs.release }}"
+          --generate-notes

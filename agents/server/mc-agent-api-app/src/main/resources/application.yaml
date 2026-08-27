@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: mc-agent-api-app
+
+server:
+  port: 8080
+
+mindconnect:
+  agent:
+    storage-dir: data/agents
+  workspace:
+    base-dir: data/workspaces
+  tools:
+    # Tavily API key for web_search tool (leave empty to disable)
+    tavily-api-key: ${TAVILY_API_KEY:}
+    # Working directory for bash, file_list, file_read, file_write (defaults to user home)
+    base-dir: ${user.home}
+  eventbus:
+    # Set to remote event bus URL to use SSE mode, leave empty for in-memory
+    url: http://localhost:8081
+  message:
+    storage-dir: data/messages
+  memory:
+    storage-dir: data/memory
+
+logging:
+  level:
+    ai.mindconnect: INFO
+    root: WARN
+  pattern:
+    console: "%d{HH:mm:ss} %-5level [%logger{36}] %msg%n"

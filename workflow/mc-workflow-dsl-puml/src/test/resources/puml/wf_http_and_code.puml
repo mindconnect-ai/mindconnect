@@ -1,0 +1,14 @@
+@startuml wf_http_and_code
+:input -> apiBase;
+start
+:httpcall fetchGreeting
+url = "${apiBase}/hello"
+method = GET
+assign-result -> rawResponse;
+:code buildSummary
+language = javascript
+code = "Fetched: " + rawResponse
+assign-result -> summary;
+stop
+:output <- summary;
+@enduml

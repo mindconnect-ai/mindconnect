@@ -1,0 +1,17 @@
+@startuml wf_foreach
+:for -> items as item index i parallel;
+fork
+  :assign processItem
+    processed = "${item}"
+    assign-result -> processed;
+  :code
+    language = beanshell
+  ;
+  note right
+          code:
+          return processed + ' processed';
+      end note
+end fork
+stop
+:output <- results;
+@enduml

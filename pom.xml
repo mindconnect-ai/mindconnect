@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ai.mindconnect</groupId>
+    <artifactId>mindconnect</artifactId>
+    <version>0.0.2-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <description>Release reactor — every publishable module exactly once (whole-repo build &amp; deploy)</description>
+
+    <properties>
+        <!-- The root aggregator itself is never published. -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <!--
+      This is the RELEASE reactor: it lists every leaf module exactly once so that
+      `versions:set` and `deploy` cover the whole repo without duplicate-in-reactor
+      errors and without publishing any shared module twice.
+
+      The per-area aggregators (agents/pom.xml, semantic-ui/pom.xml, workflow/pom.xml)
+      are intentionally NOT listed here — they exist only for the per-area CI builds
+      and pull shared modules via ../ relative paths, which would duplicate them here.
+    -->
+    <modules>
+        <!-- Parent POMs (built/installed first). mc-java-parent is the one
+             repo-wide base at the root; each area's own parent lives INSIDE
+             that area so an area can move to its own repo wholesale. -->
+        <module>mc-java-parent</module>
+        <module>agents/mc-agents-parent</module>
+        <module>workflow/mc-workflow-parent</module>
+
+        <!-- common -->
+        <module>common/mc-schema</module>
+        <module>agents/vectorstore/mc-vector-store</module>
+        <module>agents/vectorstore/mc-vector-store-pgvector</module>
+        <module>agents/vectorstore/mc-vector-store-tools</module>
+        <module>agents/vectorstore/mc-file-store</module>
+        <module>agents/builder/mc-agent-runtime-builder</module>
+        <module>agents/demo/mc-agent-simple-demo</module>
+        <module>common/mc-pathaccessor</module>
+        <module>common/mc-script-mini</module>
+        <module>common/mc-file-manager</module>
+        <module>common/mc-webscraper</module>
+        <module>common/mc-initial-data</module>
+        <module>common/mc-common</module>
+
+        <!-- Task queue — its own tree; more modules follow (remote queue, dispatcher UI) -->
+        <module>taskqueue/mc-task-queue</module>
+        <module>taskqueue/mc-task-queue-schedule</module>
+        <module>taskqueue/mc-task-queue-jdbc</module>
+        <module>taskqueue/mc-taskqueue-demo-app</module>
+        <module>taskqueue/mc-taskqueue-cluster-demo</module>
+
+        <!-- semantic-ui lives in its own repo now (mindconnect-ai/mc-semantic-ui);
+             the modules here consume its published artifacts — the version is
+             the semantic-ui.version property in mc-java-parent. -->
+
+        <!-- workflow -->
+        <module>workflow/mc-workflow</module>
+        <module>workflow/mc-workflow-code-javascript</module>
+        <module>workflow/mc-workflow-code-groovy</module>
+        <module>workflow/mc-workflow-code-beanshell</module>
+        <module>workflow/mc-workflow-code-jython</module>
+        <module>workflow/mc-workflow-jackson</module>
+        <module>workflow/mc-workflow-persistence</module>
+        <module>workflow/mc-workflow-step-form</module>
+        <module>workflow/mc-workflow-dsl-puml</module>
+        <module>workflow/mc-workflow-ui-diagram</module>
+        <module>workflow/mc-workflow-ui-diagram-app</module>
+        <module>workflow/mc-workflow-spi-lookup</module>
+        <module>workflow/mc-workflow-test</module>
+        <module>workflow/mc-workflow-swing-ui</module>
+        <module>workflow/mc-workflow-admin-rest</module>
+        <module>workflow/mc-workflow-admin-app</module>
+
+        <!-- agents -->
+        <module>agents/core/mc-llm-gateway-core</module>
+        <module>agents/core/mc-llm-gateway</module>
+        <module>agents/core/mc-credentials</module>
+        <module>agents/core/mc-message-repository-core</module>
+        <module>agents/core/mc-message-repository</module>
+        <module>agents/core/mc-agent-protocol</module>
+        <module>agents/core/mc-agent-protocol-openai</module>
+        <module>agents/core/mc-agent-protocol-mc-runtime</module>
+        <module>agents/core/mc-agent-tool-spi</module>
+        <module>agents/core/mc-agent-runtime-core</module>
+        <module>agents/core/mc-agent-memory-strategies</module>
+        <module>agents/core/mc-agent-runtime</module>
+        <module>agents/core/mc-agent-tools</module>
+        <module>agents/core/mc-agent-tools-code</module>
+        <module>agents/core/mc-agent-tools-document</module>
+        <module>agents/core/mc-agent-tools-web</module>
+        <module>agents/core/mc-agent-tools-web-browser</module>
+        <module>agents/core/mc-agent-tools-workflow</module>
+        <module>agents/core/mc-mcp-proxy</module>
+        <module>agents/core/mc-agent-tools-gmail</module>
+        <module>agents/server/mc-agent-api-rest</module>
+        <module>agents/server/mc-agent-api-app</module>
+        <module>agents/server/mc-agent-admin-ui-rest</module>
+        <module>agents/server/mc-agent-admin-ui-app</module>
+        <module>agents/client/mc-agent-cli</module>
+    </modules>
+
+</project>

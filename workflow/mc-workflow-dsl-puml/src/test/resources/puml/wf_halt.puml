@@ -1,0 +1,5 @@
+@startuml wf_halt
+:halt waitStep
+  next = continueStep
+;
+@enduml

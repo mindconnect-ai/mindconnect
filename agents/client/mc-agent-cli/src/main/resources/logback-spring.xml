@@ -1,0 +1,97 @@
+<configuration>
+
+    <!--
+        MDC fields populated by ai.mindconnect.common.LoggingContext:
+        - sessionId       : current AgentSession UUID
+        - conversationId  : current Conversation UUID
+        - agentName       : the (top-level) agent's display name
+        - subAgent        : name of an active stateless sub-agent (reviewers, web-researcher, …)
+        - task            : task name passed to RunTaskUseCase
+        - tool            : tool currently being executed by the agent loop
+
+        Pattern uses Logback's MDC default-value syntax %X{key:-fallback}.
+        Empty fallbacks render as empty strings, so unset MDC slots disappear.
+    -->
+
+    <!-- Console: terse, only the essentials -->
+    <property name="CONSOLE_PATTERN"
+              value="%d{HH:mm:ss} %-5level [%X{agentName:-}/%X{subAgent:-}] [%logger{36}] %msg%n"/>
+
+    <!-- File: full diagnostics including session id and current tool -->
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] [s=%X{sessionId:-} a=%X{agentName:-} sub=%X{subAgent:-} tool=%X{tool:-}] %logger{50} - %msg%n"/>
+
+    <!-- Console: only WARN and above to keep terminal clean -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>WARN</level>
+        </filter>
+        <encoder>
+            <pattern>${CONSOLE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File: rolling daily, keep 7 days, max 200MB total -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/agent-cli.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/agent-cli.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE_LLM_TRACE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/agent-cli-llm-trace.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>logs/agent-cli-llm-trace.%d{yyyy-MM-dd}.log</fileNamePattern>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- MindConnect: DEBUG to file -->
+    <logger name="ai.mindconnect" level="INFO" additivity="false">
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+
+    <!--
+        LLM wire logger — dumps every LLM request and response as pretty-printed JSON.
+        Default in this CLI build: DEBUG (active, written to file only).
+        Disable by setting logging.level.ai.mindconnect.llm.wire=WARN in application.yaml,
+        or change the level here.
+    -->
+    <logger name="ai.mindconnect.llm.wire" level="DEBUG" additivity="false">
+        <appender-ref ref="FILE_LLM_TRACE"/>
+    </logger>
+
+    <!--
+        Tool wire logger — dumps full tool-call args and results.
+        Default in this CLI build: DEBUG (active, written to file only).
+        Without this logger at DEBUG, AgentService still emits short summary lines at INFO.
+    -->
+    <logger name="ai.mindconnect.agent.tool" level="DEBUG" additivity="false">
+        <appender-ref ref="FILE_LLM_TRACE"/>
+    </logger>
+
+    <!-- Spring/OkHttp: INFO to file only -->
+    <logger name="org.springframework" level="INFO" additivity="false">
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="okhttp3" level="INFO" additivity="false">
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <root level="WARN">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>

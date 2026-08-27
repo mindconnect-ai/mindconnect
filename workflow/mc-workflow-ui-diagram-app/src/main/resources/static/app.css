@@ -1,0 +1,225 @@
+/*
+ * Editor harness styling. Goal: enough polish that the editor is usable for
+ * manual testing — selection visible, plus-buttons look clickable, side
+ * panel doesn't fight the canvas. Final design polish (typography, theme
+ * tokens, focus rings) is a separate concern.
+ */
+
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: #f6f7f9;
+    color: #1d2129;
+    /* Whole page never scrolls; horizontal scrolling belongs to the
+       canvas pane, vertical to the body if the layout ever exceeds the
+       viewport. */
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem 1.5rem;
+    background: #ffffff;
+    border-bottom: 1px solid #d8dde3;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+header h1 {
+    font-size: 1.1rem;
+    margin: 0;
+    margin-right: auto;
+    color: #1d2129;
+}
+
+select, button, input[type="text"] {
+    font: inherit;
+    padding: 0.35rem 0.75rem;
+    border: 1px solid #c0c6cd;
+    border-radius: 4px;
+    background: #fff;
+}
+
+button {
+    cursor: pointer;
+}
+
+button.danger {
+    border-color: #b3261e;
+    color: #b3261e;
+}
+
+.mode-toggle {
+    display: inline-flex;
+    border: 1px solid #c0c6cd;
+    border-radius: 4px;
+    overflow: hidden;
+}
+.mode-btn {
+    border: none;
+    border-radius: 0;
+    padding: 0.35rem 0.75rem;
+    background: #fff;
+    cursor: pointer;
+    font: inherit;
+}
+.mode-btn + .mode-btn {
+    border-left: 1px solid #c0c6cd;
+}
+.mode-btn--active {
+    background: #3b6fd9;
+    color: #ffffff;
+}
+
+.status {
+    margin-left: auto;
+    font-size: 0.85rem;
+    color: #2f7f53;
+}
+
+.status--error {
+    color: #b3261e;
+}
+
+/* ── Layout: canvas + side panel ───────────────────────────────────────── */
+
+.layout {
+    /* Header is sticky on top (separate); .layout fills the rest of the
+       viewport. Flexbox gives us a fixed-width side panel + a flexing
+       canvas with its own overflow without the grid-track quirks where
+       intrinsic content size would push the page sideways. */
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+main#diagram-host {
+    flex: 1 1 auto;
+    min-width: 0;       /* lets the flex item shrink below its content's intrinsic width */
+    /* No scroll: the canvas itself is "infinite" via SVG viewBox pan/zoom,
+       so the host pane just provides a fixed window into it. */
+    overflow: hidden;
+    padding: 0;
+    box-sizing: border-box;
+    display: flex;      /* lets <sui-diagram> stretch to fill */
+}
+
+aside#side-panel {
+    flex: 0 0 280px;    /* fixed 280px wide, never shrinks */
+    background: #ffffff;
+    border-left: 1px solid #d8dde3;
+    padding: 1.25rem;
+    font-size: 0.9rem;
+    overflow: auto;     /* in case the panel content itself grows tall */
+}
+
+aside#side-panel h2 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    color: #5b6470;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+aside#side-panel dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.25rem 0.75rem;
+    margin: 0 0 1rem 0;
+}
+
+aside#side-panel dt {
+    color: #5b6470;
+    font-weight: 500;
+}
+
+aside#side-panel dd {
+    margin: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.85rem;
+}
+
+aside#side-panel label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #5b6470;
+    font-size: 0.85rem;
+}
+
+aside#side-panel input[type="text"] {
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 0.25rem;
+}
+
+aside#side-panel button {
+    margin-right: 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.placeholder {
+    color: #8a8f96;
+    font-style: italic;
+}
+
+.error {
+    color: #b3261e;
+    background: #fde8e8;
+    padding: 1rem;
+    border-radius: 4px;
+}
+
+/* ── Insert dialog ─────────────────────────────────────────────────────── */
+
+dialog {
+    border: 1px solid #d8dde3;
+    border-radius: 6px;
+    padding: 1.5rem;
+    min-width: 280px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+dialog::backdrop {
+    background: rgba(29, 33, 41, 0.4);
+}
+
+dialog h2 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.05rem;
+}
+
+dialog p {
+    margin: 0 0 1rem 0;
+    color: #5b6470;
+    font-size: 0.9rem;
+}
+
+dialog ul {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem 0;
+}
+
+dialog li {
+    margin-bottom: 0.4rem;
+}
+
+dialog li button {
+    width: 100%;
+    text-align: left;
+}
+
+dialog menu {
+    margin: 0;
+    padding: 0;
+    text-align: right;
+}

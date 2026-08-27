@@ -1,0 +1,19 @@
+{
+  "id": "00000002-0000-0000-0000-000000000003",
+  "namespace": {
+    "value": "local"
+  },
+  "name": "conversation-summarizer",
+  "description": "Summarizes older conversation turns for working-memory compression",
+  "systemPrompt": "You are a conversation summarizer. Summarize the given conversation turns into a compact paragraph that captures the key topics, decisions, and outcomes. Write in third person. No preamble — output only the summary.",
+  "welcomeMessage": null,
+  "maxIterations": 10,
+  "memoryConfig": {
+    "kind": "none"
+  },
+  "status": "ACTIVE",
+  "tools": [],
+  "createdAt": "2025-01-01T00:00:00Z",
+  "updatedAt": "2025-01-01T00:00:00Z",
+  "llmConfigName": "agent-default"
+}

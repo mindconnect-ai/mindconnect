@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    Workflow engine — high level:
+    Definition (PlantUML / JSON) -> Engine (WorkflowContext + step loop) ->
+    typed steps -> pluggable script runtimes.  Persistence saves/resumes the run.
+  -->
+
+  <defs>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1a3a5c"/>
+    </marker>
+    <marker id="arrp" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c2185b"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 28px; font-weight: 700; fill: #1a3a5c; }
+    .subtitle { font-size: 16px; fill: #666; }
+    .head { font-size: 19px; font-weight: 700; fill: #1a3a5c; }
+    .sub { font-size: 13px; fill: #555; }
+    .mono { font-family: 'SF Mono', Menlo, monospace; font-size: 13px; fill: #2c5d8a; }
+    .edge { stroke: #1a3a5c; stroke-width: 2.5; fill: none; }
+    .edgep { stroke: #c2185b; stroke-width: 2.5; fill: none; stroke-dasharray: 6 5; }
+    .elbl { font-size: 13px; fill: #1a3a5c; font-weight: 600; }
+    .note { font-size: 15px; fill: #7a5b00; font-weight: 600; }
+  </style>
+
+  <!-- Title -->
+  <text x="600" y="44" text-anchor="middle" class="title">Workflow engine — how it works</text>
+  <text x="600" y="70" text-anchor="middle" class="subtitle">A small, embeddable step runner. Define a flow, run it in your JVM.</text>
+
+  <!-- 1 · Definition -->
+  <g filter="url(#s)">
+    <rect x="40" y="150" width="220" height="180" rx="16" fill="#E8F4FD" stroke="#9cc4e0" stroke-width="2"/>
+  </g>
+  <text x="150" y="186" text-anchor="middle" class="head">Definition</text>
+  <text x="150" y="214" text-anchor="middle" class="sub">a flow as a tree of steps</text>
+  <text x="150" y="252" text-anchor="middle" class="mono">PlantUML DSL</text>
+  <text x="150" y="276" text-anchor="middle" class="sub">— or —</text>
+  <text x="150" y="300" text-anchor="middle" class="mono">JSON (Jackson)</text>
+
+  <!-- 2 · Engine -->
+  <g filter="url(#s)">
+    <rect x="340" y="130" width="250" height="220" rx="16" fill="#E8F5E9" stroke="#86c193" stroke-width="2"/>
+  </g>
+  <text x="465" y="166" text-anchor="middle" class="head">Engine</text>
+  <text x="465" y="192" text-anchor="middle" class="sub">WorkflowContext + step loop</text>
+  <text x="465" y="232" text-anchor="middle" class="sub">• scoped variables</text>
+  <text x="465" y="258" text-anchor="middle" class="sub">• SpEL expression resolution</text>
+  <text x="465" y="284" text-anchor="middle" class="sub">• <tspan class="mono">${...}</tspan> string substitution</text>
+  <text x="465" y="318" text-anchor="middle" class="sub">runs each step, follows the flow</text>
+
+  <!-- 3 · Steps -->
+  <g filter="url(#s)">
+    <rect x="670" y="130" width="230" height="220" rx="16" fill="#FFF8E6" stroke="#e0c878" stroke-width="2"/>
+  </g>
+  <text x="785" y="166" text-anchor="middle" class="head">Typed steps</text>
+  <text x="785" y="200" text-anchor="middle" class="mono">If · ForEach · Block</text>
+  <text x="785" y="226" text-anchor="middle" class="mono">CallWorkflow · JumpTo</text>
+  <text x="785" y="252" text-anchor="middle" class="mono">AssignVariables · Halt</text>
+  <text x="785" y="278" text-anchor="middle" class="mono">HttpCall</text>
+  <text x="785" y="312" text-anchor="middle" class="mono" fill="#b06a00">CodeStep →</text>
+
+  <!-- 4 · Script runtimes -->
+  <g filter="url(#s)">
+    <rect x="980" y="150" width="180" height="180" rx="16" fill="#F3E9FB" stroke="#b794d0" stroke-width="2"/>
+  </g>
+  <text x="1070" y="186" text-anchor="middle" class="head">Scripting</text>
+  <text x="1070" y="212" text-anchor="middle" class="sub">pluggable runtimes</text>
+  <text x="1070" y="244" text-anchor="middle" class="mono">BeanShell</text>
+  <text x="1070" y="268" text-anchor="middle" class="mono">JavaScript</text>
+  <text x="1070" y="292" text-anchor="middle" class="mono">Groovy · Jython</text>
+
+  <!-- Edges across the top row -->
+  <path class="edge" d="M262 240 H338" marker-end="url(#arr)"/>
+  <path class="edge" d="M592 240 H668" marker-end="url(#arr)"/>
+  <text x="300" y="230" text-anchor="middle" class="elbl">parse</text>
+  <text x="630" y="230" text-anchor="middle" class="elbl">execute</text>
+  <path class="edge" d="M870 312 C 930 312, 940 240, 978 240" marker-end="url(#arr)"/>
+
+  <!-- 5 · Persistence (below the engine) -->
+  <g filter="url(#s)">
+    <rect x="340" y="430" width="250" height="120" rx="16" fill="#FCE8F0" stroke="#e6a3c0" stroke-width="2"/>
+  </g>
+  <text x="465" y="466" text-anchor="middle" class="head" fill="#a01050">Persistence</text>
+  <text x="465" y="494" text-anchor="middle" class="sub">save state · pause · resume</text>
+  <text x="465" y="520" text-anchor="middle" class="sub">long-running workflows survive restarts</text>
+
+  <path class="edgep" d="M465 352 V428" marker-end="url(#arrp)"/>
+  <path class="edgep" d="M500 428 V354" marker-end="url(#arrp)"/>
+  <text x="408" y="395" text-anchor="middle" class="elbl" fill="#c2185b">save</text>
+  <text x="558" y="395" text-anchor="middle" class="elbl" fill="#c2185b">resume</text>
+
+  <!-- Takeaway note -->
+  <g filter="url(#s)">
+    <rect x="640" y="430" width="520" height="120" rx="14" fill="#FFFCEC" stroke="#e6d27a" stroke-width="2"/>
+  </g>
+  <text x="900" y="470" text-anchor="middle" class="note">No framework lock-in.</text>
+  <text x="900" y="498" text-anchor="middle" class="sub">Add the core as a plain library and drive it from your own Java code —</text>
+  <text x="900" y="520" text-anchor="middle" class="sub">a diagram view and a Swing editor ship alongside, but are optional.</text>
+</svg>

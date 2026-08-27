@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1680 470" font-family="'Helvetica Neue', Arial, sans-serif">
+  <!--
+    web-researcher delegates the reading of INDIVIDUAL pages to url-reader sub-agents.
+    Idea: each large page stays in the url-reader; only the relevant excerpts flow back.
+    Sub-agent (web-researcher) itself calls sub-agents (url-reader) → recursion in action.
+  -->
+
+  <defs>
+    <filter id="s" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="3" result="o"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#555"/>
+    </marker>
+    <marker id="ap" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7a5fbf"/>
+    </marker>
+    <marker id="ag" markerWidth="11" markerHeight="11" refX="8" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2c7a3f"/>
+    </marker>
+  </defs>
+
+  <style>
+    .title { font-size: 30px; font-weight: 700; fill: #1a3a5c; }
+    .step  { font-size: 13px; font-weight: 700; fill: #999; letter-spacing: 1px; }
+    .head  { font-size: 19px; font-weight: 700; fill: #1a3a5c; }
+    .agent { font-size: 15px; font-weight: 700; fill: #1a3a5c; }
+    .tool  { font-size: 14px; font-weight: 700; fill: #b35b00; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .sub   { font-size: 13px; fill: #666; }
+    .url   { font-size: 13px; fill: #2c5d8a; font-family: 'SFMono-Regular', Menlo, monospace; }
+    .edge  { stroke: #555; stroke-width: 2.5; fill: none; }
+    .purp  { stroke: #7a5fbf; stroke-width: 2.5; fill: none; }
+    .green { stroke: #2c7a3f; stroke-width: 2.5; fill: none; }
+  </style>
+
+  <text x="40" y="50" class="title">web-researcher delegates pages to url-reader</text>
+
+  <!-- ── 1. web-researcher ─────────────────────── -->
+  <text x="40" y="116" class="step">SUB-AGENT (research)</text>
+  <g filter="url(#s)">
+    <rect x="40" y="128" width="300" height="220" rx="14" fill="#E8F5E9" stroke="#86c193" stroke-width="2.5"/>
+  </g>
+  <text x="64" y="162" font-size="22">🤖</text>
+  <text x="98" y="162" class="head">web-researcher</text>
+  <text x="64" y="190" class="sub">Topic: e.g. Qdrant</text>
+  <rect x="64" y="204" width="120" height="28" rx="14" fill="#fff" stroke="#b35b00" stroke-width="1.5"/>
+  <text x="124" y="223" class="tool" text-anchor="middle">web_search</text>
+  <text x="64" y="256" class="sub">gets a list of hits:</text>
+  <text x="64" y="280" class="url">• qdrant.tech/pricing</text>
+  <text x="64" y="300" class="url">• github.com/qdrant…</text>
+  <text x="64" y="320" class="url">• news.ycombinator…</text>
+
+  <!-- fan-out to url-readers -->
+  <text x="430" y="116" class="step">ONE SUB-AGENT PER URL</text>
+  <rect x="380" y="200" width="120" height="74" rx="12" fill="#FFF8E6" stroke="#e0c878" stroke-width="2"/>
+  <text x="440" y="230" class="tool" text-anchor="middle" font-size="13">run_agent</text>
+  <text x="440" y="252" class="sub" text-anchor="middle" font-size="12">per URL</text>
+
+  <path d="M340,237 L376,237" class="edge" marker-end="url(#a)"/>
+
+  <path d="M500,214 C540,214 540,168 580,168" class="purp" marker-end="url(#ap)"/>
+  <path d="M500,237 L580,237" class="purp" marker-end="url(#ap)"/>
+  <path d="M500,260 C540,260 540,306 580,306" class="purp" marker-end="url(#ap)"/>
+
+  <!-- ── url-reader sub-agents ─────────────────── -->
+  <g filter="url(#s)">
+    <rect x="580" y="136" width="330" height="64" rx="12" fill="#EDE7F6" stroke="#b3a4d6" stroke-width="2"/>
+    <rect x="580" y="205" width="330" height="64" rx="12" fill="#EDE7F6" stroke="#b3a4d6" stroke-width="2"/>
+    <rect x="580" y="274" width="330" height="64" rx="12" fill="#EDE7F6" stroke="#b3a4d6" stroke-width="2"/>
+  </g>
+  <text x="600" y="164" font-size="18">📄</text>
+  <text x="628" y="164" class="agent">url-reader</text>
+  <text x="628" y="186" class="url" font-size="12">qdrant.tech/pricing</text>
+  <text x="600" y="233" font-size="18">📄</text>
+  <text x="628" y="233" class="agent">url-reader</text>
+  <text x="628" y="255" class="url" font-size="12">github.com/qdrant…</text>
+  <text x="600" y="302" font-size="18">📄</text>
+  <text x="628" y="302" class="agent">url-reader</text>
+  <text x="628" y="324" class="url" font-size="12">news.ycombinator…</text>
+
+  <!-- tools of url-reader -->
+  <text x="950" y="116" class="step">READS WHOLE PAGE</text>
+  <g filter="url(#s)">
+    <rect x="950" y="160" width="250" height="150" rx="14" fill="#E8F4FD" stroke="#9cc4e0" stroke-width="2"/>
+  </g>
+  <text x="1075" y="192" class="head" text-anchor="middle" font-size="17">one web page</text>
+  <rect x="972" y="210" width="120" height="26" rx="13" fill="#fff" stroke="#b35b00" stroke-width="1.5"/>
+  <text x="1032" y="228" class="tool" text-anchor="middle" font-size="13">web_read</text>
+  <rect x="972" y="244" width="206" height="26" rx="13" fill="#fff" stroke="#b35b00" stroke-width="1.5"/>
+  <text x="1075" y="262" class="tool" text-anchor="middle" font-size="13">web_read_browser</text>
+  <text x="1075" y="294" class="sub" text-anchor="middle">Playwright — also JS pages</text>
+
+  <path d="M910,168 C930,168 930,210 948,222" class="purp" marker-end="url(#ap)"/>
+  <path d="M910,306 C930,306 930,250 948,238" class="purp" marker-end="url(#ap)"/>
+
+  <!-- return: only excerpts -->
+  <path d="M580,300 C420,300 420,330 342,330" class="green" marker-end="url(#ag)"/>
+  <text x="404" y="364" class="sub" fill="#2c7a3f" font-weight="700" text-anchor="middle">returns only the relevant excerpts</text>
+
+  <!-- ── takeaway ──────────────────────────────── -->
+  <g filter="url(#s)">
+    <rect x="40" y="384" width="1600" height="66" rx="14" fill="#F3EEFB" stroke="#b3a4d6" stroke-width="2"/>
+  </g>
+  <text x="64" y="412" class="head" font-size="17">Token isolation, one level deeper</text>
+  <text x="64" y="436" class="sub">The large, raw page contents stay in the respective <tspan font-weight="700">url-reader</tspan>. The <tspan font-weight="700">web-researcher</tspan> sees only the condensed excerpts — its context stays small.</text>
+
+</svg>

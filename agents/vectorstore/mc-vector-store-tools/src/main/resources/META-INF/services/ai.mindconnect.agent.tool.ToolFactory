@@ -1,0 +1,4 @@
+ai.mindconnect.vectorstore.tools.VectorTools$UpsertFactory
+ai.mindconnect.vectorstore.tools.VectorTools$SearchFactory
+ai.mindconnect.vectorstore.tools.VectorTools$DeleteFileFactory
+ai.mindconnect.vectorstore.tools.VectorIngestFileTool$Factory

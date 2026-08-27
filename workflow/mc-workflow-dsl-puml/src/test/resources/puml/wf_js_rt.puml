@@ -1,0 +1,8 @@
+@startuml wf_js_rt
+start
+:code js
+language = javascript
+code = x + y
+assign-result -> sum;
+stop
+@enduml

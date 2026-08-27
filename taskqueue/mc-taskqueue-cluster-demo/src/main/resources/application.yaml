@@ -1,0 +1,29 @@
+# Cluster demo — one jar, two roles. This file is the MASTER's default;
+# workers are started by the master with role/port/master-url overridden on
+# the command line.
+server:
+  port: 9100
+
+spring:
+  application:
+    name: mc-taskqueue-cluster-demo
+
+mindconnect:
+  cluster:
+    role: master
+    workers: 2                # started (and watched) by the master
+    worker-base-port: 9101
+    lease: PT30S              # kill a worker, wait this long, watch the retry
+    retention:
+      tasks: PT1H             # finished task trees are forgotten after this (PT0S = keep forever)
+      channel-age: PT1H       # channel events leave after this age (PT0S = no age limit)
+      channel-events: 5000    # count cap on top — newest kept per channel (0 = no count cap)
+    worker-concurrency: 2     # tasks at a time per worker — makes sleep visible as a queue
+    master-url: http://localhost:9100
+    db:
+      url: jdbc:postgresql://localhost:5433/taskqueue
+      user: postgres
+      password: test
+    # crawl defaults
+    output-root: data/output
+    max-links-per-page-default: 5

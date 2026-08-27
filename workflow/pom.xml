@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-java-parent</artifactId>
+        <version>0.0.2-SNAPSHOT</version>
+        <relativePath>../mc-java-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-workflow-aggregator</artifactId>
+    <version>0.0.2-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <description>Multi-module build for all mc-workflow modules</description>
+
+    <properties>
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
+    <modules>
+        <!-- the area parent itself, so this area builds standalone -->
+        <module>mc-workflow-parent</module>
+        <!-- common libs consumed by mc-workflow -->
+        <module>../common/mc-pathaccessor</module>
+        <module>../common/mc-script-mini</module>
+        <module>../common/mc-initial-data</module>
+        <module>../common/mc-schema</module>
+        <!-- Core API — no internal dependencies -->
+        <module>mc-workflow</module>
+        <!-- Language engine registrations — each depends on mc-workflow-code -->
+        <module>mc-workflow-code-javascript</module>
+        <module>mc-workflow-code-groovy</module>
+        <module>mc-workflow-code-beanshell</module>
+        <module>mc-workflow-code-jython</module>
+
+        <!-- Other step/resolver modules — depend on api only -->
+        <module>mc-workflow-jackson</module>
+
+        <!-- File-based persistence repositories — depends on api + jackson -->
+        <module>mc-workflow-persistence</module>
+        <module>mc-workflow-step-form</module>
+
+        <!-- PlantUML activity diagram DSL parser/serializer — depends on api, code, http (optional) -->
+        <module>mc-workflow-dsl-puml</module>
+
+        <!-- UiDiagram adapter — depends on api + mc-semantic-ui-ext-diagram -->
+        <module>mc-workflow-ui-diagram</module>
+
+        <!-- Spring Boot test harness for the UiDiagram editor pipeline -->
+        <module>mc-workflow-ui-diagram-app</module>
+
+        <!-- SPI auto-configuration — depends on api; language/http/spel modules are test-scoped -->
+        <module>mc-workflow-spi-lookup</module>
+
+        <!-- Integration test suite — depends on all modules above -->
+        <module>mc-workflow-test</module>
+
+        <!-- swing ui -->
+        <module>mc-workflow-swing-ui</module>
+
+        <!-- Embeddable semantic-ui workflow admin + its standalone app -->
+        <module>mc-workflow-admin-rest</module>
+        <module>mc-workflow-admin-app</module>
+    </modules>
+
+</project>

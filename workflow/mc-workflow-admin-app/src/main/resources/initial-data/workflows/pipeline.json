@@ -1,0 +1,52 @@
+{
+  "@class" : "ai.mindconnect.workflow.domain.WorkflowData",
+  "name" : "pipeline",
+  "assignResultToVar" : null,
+  "resultFrom" : "out",
+  "steps" : [ {
+    "@class" : "ai.mindconnect.workflow.domain.AssignVariablesData",
+    "name" : "init",
+    "assignResultToVar" : "out",
+    "variableAssignments" : [ {
+      "varName" : "out",
+      "expressionOrVarName" : "start"
+    } ],
+    "type" : "assignvariables"
+  }, {
+    "@class" : "ai.mindconnect.workflow.domain.ForEachData",
+    "name" : "loop",
+    "assignResultToVar" : "out",
+    "resultFrom" : "out",
+    "steps" : [ {
+      "@class" : "ai.mindconnect.workflow.domain.AssignVariablesData",
+      "name" : "process",
+      "assignResultToVar" : null,
+      "variableAssignments" : [ {
+        "varName" : "out",
+        "expressionOrVarName" : "seen:${item}"
+      } ],
+      "type" : "assignvariables"
+    } ],
+    "loopOver" : "items",
+    "runVar" : "item",
+    "indexVar" : null,
+    "parallel" : false,
+    "joinResults" : true,
+    "joinDelimiter" : ", ",
+    "type" : "foreach"
+  } ],
+  "uid" : null,
+  "params" : {
+    "type" : "object",
+    "properties" : {
+      "items" : {
+        "type" : "array",
+        "items" : { "type" : "string" },
+        "description" : "The list the loop iterates over"
+      }
+    }
+  },
+  "subWorkflows" : [ ],
+  "workflowType" : null,
+  "type" : "workflow"
+}

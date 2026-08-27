@@ -1,0 +1,8 @@
+@startuml wf_bsh_rt
+start
+:code bsh
+language = beanshell
+code = "return x * 2;"
+assign-result -> result;
+stop
+@enduml

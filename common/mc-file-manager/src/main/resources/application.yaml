@@ -1,0 +1,9 @@
+server:
+  port: ${PORT:8086}
+  forward-headers-strategy: framework
+spring:
+
+mindconnect:
+  file-manager:
+    base-directory: ${FILE_MANAGER_BASE_DIR:/Users/dbe/Insync/deep_tc/gdrive/Business/Coderepo/mindconnect/mc-java/rest/mc-file-manager-rest/src/main/resources/data}
+

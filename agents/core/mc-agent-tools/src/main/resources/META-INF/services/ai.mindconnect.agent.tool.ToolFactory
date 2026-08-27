@@ -1,0 +1,11 @@
+ai.mindconnect.agent.tools.builtin.CurrentDateTimeToolFactory
+ai.mindconnect.agent.tools.builtin.BashToolFactory
+ai.mindconnect.agent.tools.builtin.FileListToolFactory
+ai.mindconnect.agent.tools.builtin.FileReadToolFactory
+ai.mindconnect.agent.tools.builtin.FileWriteToolFactory
+ai.mindconnect.agent.tools.builtin.GlobToolFactory
+ai.mindconnect.agent.tools.builtin.ListAgentsToolFactory
+ai.mindconnect.agent.tools.builtin.WorkspaceReadToolFactory
+ai.mindconnect.agent.tools.builtin.WorkspaceWriteToolFactory
+ai.mindconnect.agent.tools.builtin.WorkspaceListToolFactory
+ai.mindconnect.agent.tools.builtin.FetchToolResultToolFactory

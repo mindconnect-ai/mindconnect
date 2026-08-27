@@ -1,0 +1,19 @@
+{
+  "id": "00000002-0000-0000-0000-000000000002",
+  "namespace": {
+    "value": "local"
+  },
+  "name": "title-generator",
+  "description": "Generates a short title for a conversation from the first user message",
+  "systemPrompt": "You generate short conversation titles. Given a conversation exchange, respond with a concise title of 4-6 words that captures the topic. No punctuation at the end, no quotes — just the title.",
+  "welcomeMessage": null,
+  "maxIterations": 10,
+  "memoryConfig": {
+    "kind": "none"
+  },
+  "status": "ACTIVE",
+  "tools": [],
+  "createdAt": "2025-01-01T00:00:00Z",
+  "updatedAt": "2025-01-01T00:00:00Z",
+  "llmConfigName": "agent-default"
+}

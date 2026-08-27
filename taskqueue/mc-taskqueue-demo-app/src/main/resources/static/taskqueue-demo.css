@@ -1,0 +1,22 @@
+/* Board layout: tree and detail panel top-aligned with stable widths, so
+   live label updates don't make the page jump. */
+#board-main {
+  align-items: flex-start;
+}
+#board-main > #task-tree {
+  flex: 0 0 45%;
+  min-width: 0;
+}
+#board-main > #task-detail-panel {
+  flex: 1 1 55%;
+  min-width: 0;
+}
+
+/* Monospace for the raw streams — feed lines and channel messages. */
+#event-feed [id^="feed-"],
+#channel-inspector [id^="channel-msg-"] {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

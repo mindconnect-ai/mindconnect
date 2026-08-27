@@ -1,0 +1,12 @@
+{
+  "id": "00000001-0000-0000-0000-000000000004",
+  "name": "azure-openai-default",
+  "provider": "AZURE_OPENAI",
+  "model": "${AZURE_OPENAI_DEPLOYMENT:gpt-4o}",
+  "baseUrl": "${AZURE_OPENAI_ENDPOINT}",
+  "apiKey": "${AZURE_OPENAI_API_KEY}",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 4096,
+  "additionalParams": {},
+  "contextWindowTokens": 128000
+}
