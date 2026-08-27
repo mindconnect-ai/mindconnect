@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 /**
  * Per-config retry policy for transient provider errors (HTTP 429 rate-limit /
  * 529 overloaded). Consumed by
- * {@link ai.mindconnect.llm.service.RetryingLlmGateway}. Attached to an
+ * {@code ai.mindconnect.llm.service.RetryingLlmGateway}. Attached to an
  * {@link LlmConfig} so different models/providers can be tuned independently;
  * when a config carries no policy, {@link #defaults()} applies.
  *

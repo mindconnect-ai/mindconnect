@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * The full todo list owned by one {@link AgentSession}.
+ * The full todo list owned by one {@link ai.mindconnect.agent.domain.AgentSession}.
  *
  * <p>Replace-semantics: each save overwrites the previous list completely.
  * The LLM is expected to submit the new full state on every update; the

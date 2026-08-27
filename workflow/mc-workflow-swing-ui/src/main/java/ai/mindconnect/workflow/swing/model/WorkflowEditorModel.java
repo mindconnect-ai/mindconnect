@@ -16,7 +16,7 @@ import java.util.Map;
  * {@link DefaultListModel} so Swing components stay in sync automatically.
  *
  * <p>All mutating methods fire change events on the list model; callers
- * can also attach a {@link ChangeListener} to be notified of workflow-level
+ * can also attach a change listener via {@link #addChangeListener} to be notified of workflow-level
  * changes (name, params, dirty flag).
  */
 public class WorkflowEditorModel {

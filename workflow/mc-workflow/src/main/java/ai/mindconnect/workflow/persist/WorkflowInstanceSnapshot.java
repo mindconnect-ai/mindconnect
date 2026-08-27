@@ -10,7 +10,7 @@ import lombok.Data;
  *
  * @see FrameSnapshot for why the frames are the resume chain rather than the
  *      whole execution; the readable step-by-step history lives in
- *      {@link #runTraceJson} instead
+ *      {@code runTraceJson} instead
  */
 @Data
 public class WorkflowInstanceSnapshot {

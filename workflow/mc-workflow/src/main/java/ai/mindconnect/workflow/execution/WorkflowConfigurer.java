@@ -18,7 +18,7 @@ package ai.mindconnect.workflow.execution;
  * </pre>
  *
  * <p>Expression-resolver modules install their resolver via
- * {@link WorkflowContextFactory#setExpressionResolver} or, when multiple
+ * {@code WorkflowContextFactory#setExpressionResolver} or, when multiple
  * resolvers may be present, by appending to a
  * {@link CompositeExpressionResolver}:
  * <pre>

@@ -151,7 +151,7 @@ public final class WorkflowInstanceSnapshots {
      * The halt step this instance is waiting at.
      *
      * <p>Lets a caller ask a suspended instance what it is waiting <em>for</em>
-     * — {@link ai.mindconnect.workflow.domain.HaltData#getResumeParams()} — and
+     * — {@code HaltData#getResumeParams()} — and
      * collect it, without having to rebuild the instance first. That is the whole
      * difference between "this run is paused" and "this run is paused, waiting
      * for a user message".

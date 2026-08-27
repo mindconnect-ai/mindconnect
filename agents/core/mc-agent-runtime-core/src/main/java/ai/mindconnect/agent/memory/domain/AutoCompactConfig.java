@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * <p>
  * Live messages are kept verbatim. After each turn, if the live window's tokens
  * exceed {@link #compactAtRatio} of the LLM context window, the entire conversation
- * is summarised into a single {@link ai.mindconnect.agent.domain.ConversationSummary}
+ * is summarised into a single {@link ConversationSummary}
  * and the live window restarts empty (apart from the injected summary).
  * <p>
  * Optionally, {@link #toolResultEviction} replaces older TOOL_RESULT messages with

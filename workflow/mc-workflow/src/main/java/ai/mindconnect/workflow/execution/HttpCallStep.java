@@ -22,8 +22,8 @@ import java.util.Map;
  *
  * <p>The step result is the response body as a {@code String}.
  * Optionally the status code and headers can be stored in named variables
- * via {@link HttpCallData#getStatusCodeVar()} and
- * {@link HttpCallData#getResponseHeadersVar()}.
+ * via {@code HttpCallData#getStatusCodeVar()} and
+ * {@code HttpCallData#getResponseHeadersVar()}.
  */
 public class HttpCallStep extends BaseStepInstance<HttpCallData> {
 

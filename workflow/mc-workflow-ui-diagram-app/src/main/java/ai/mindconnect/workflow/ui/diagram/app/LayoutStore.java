@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>Thread-safety: the editor mutates from request threads concurrently
  * (typical Spring controller), so the outer map is concurrent and inner
- * maps use {@link ConcurrentHashMap} via {@link #computeIfAbsent}.
+ * maps use {@link ConcurrentHashMap} via {@code computeIfAbsent}.
  */
 @Component
 public class LayoutStore {

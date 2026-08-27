@@ -8,8 +8,8 @@ import org.codehaus.groovy.jsr223.GroovyScriptEngineFactory;
 /**
  * Registers the Groovy engine with the shared {@link ScriptExecutor}.
  *
- * <p>After this configurer runs, {@link ai.mindconnect.workflow.code.CodeStep}
- * and {@link ai.mindconnect.workflow.code.ScriptExpressionResolver} resolve
+ * <p>After this configurer runs, {@link ai.mindconnect.workflow.execution.CodeStep}
+ * and {@link ai.mindconnect.workflow.scripting.ScriptExpressionResolver} resolve
  * Groovy code using the alias {@code "groovy"}.
  *
  * <p>Example step data:

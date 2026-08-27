@@ -3,13 +3,13 @@ package ai.mindconnect.pathaccessor;
 /**
  * Strategy for reading a dot-separated path from a root object.
  *
- * <p>Implementations are tried in registration order by {@link StringVariableReplacer}.
+ * <p>Implementations are tried in registration order by {@code StringVariableReplacer}.
  * The first accessor whose {@link #supports} method returns {@code true} for the
  * root object is used to resolve the path.
  *
  * <p>Built-in implementations: {@link MapPathAccessor}, {@link BeanPathAccessor},
  * {@link RecordPathAccessor}.  Additional implementations can be added from other
- * modules and registered on the {@link StringVariableReplacer} instance.
+ * modules and registered on the {@code StringVariableReplacer} instance.
  */
 public interface PathAccessor {
 

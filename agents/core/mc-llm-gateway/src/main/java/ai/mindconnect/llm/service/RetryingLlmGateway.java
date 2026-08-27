@@ -27,8 +27,8 @@ import java.util.function.Consumer;
  * one-way "committed" latch: once the first chunk passes through, a later
  * {@link LlmTransientException} is rethrown instead of retried.
  *
- * <p>Backoff is exponential from {@link #BASE_BACKOFF_MILLIS}, capped by
- * {@link #MAX_ATTEMPTS}; a positive {@code Retry-After} from the server takes
+ * <p>Backoff is exponential from {@link RetryConfig#baseBackoffMillis()}, attempts
+ * are capped by {@link RetryConfig#maxAttempts()}; a positive {@code Retry-After} from the server takes
  * precedence over the computed delay.
  */
 public class RetryingLlmGateway implements LlmGateway {

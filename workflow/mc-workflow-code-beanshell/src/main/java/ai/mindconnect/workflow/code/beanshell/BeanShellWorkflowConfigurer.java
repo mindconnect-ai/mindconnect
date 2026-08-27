@@ -8,8 +8,8 @@ import bsh.engine.BshScriptEngineFactory;
 /**
  * Registers the BeanShell engine with the shared {@link ScriptExecutor}.
  *
- * <p>After this configurer runs, {@link ai.mindconnect.workflow.code.CodeStep}
- * and {@link ai.mindconnect.workflow.code.ScriptExpressionResolver} resolve
+ * <p>After this configurer runs, {@link ai.mindconnect.workflow.execution.CodeStep}
+ * and {@link ai.mindconnect.workflow.scripting.ScriptExpressionResolver} resolve
  * BeanShell code using the aliases {@code "beanshell"} and {@code "bsh"}.
  *
  * <p>Example step data:

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Per-config concurrency limit for LLM requests, consumed by
- * {@link ai.mindconnect.llm.service.ThrottlingLlmGateway}. Attached to an
+ * {@code ai.mindconnect.llm.service.ThrottlingLlmGateway}. Attached to an
  * {@link LlmConfig} so different models/providers can be throttled
  * independently.
  *

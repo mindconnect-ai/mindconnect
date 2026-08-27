@@ -16,7 +16,7 @@ public interface AgentTaskRunner {
 
     /**
      * Runs the task with the given user message.
-     * The system prompt is rendered through the {@link PromptRenderer} pipeline,
+     * The system prompt is rendered through the {@link ai.mindconnect.agent.port.out.PromptRenderer} pipeline,
      * giving access to all standard variables ({@code current_date}, etc.).
      *
      * @param task        logical task name — matches an AgentDefinition by name if one exists
@@ -27,7 +27,7 @@ public interface AgentTaskRunner {
 
     /**
      * Runs the task with extra prompt-template variables that are added on top of
-     * the standard {@link PromptContextProvider} context.
+     * the standard {@link ai.mindconnect.agent.port.out.PromptContextProvider} context.
      * Useful for hook-style sub-agents (response reviewers, classifiers) that need
      * to receive caller-provided values like the user's question or the agent's
      * draft answer in their system prompt.

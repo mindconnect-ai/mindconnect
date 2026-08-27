@@ -64,7 +64,7 @@ import java.util.stream.*;
  *   // result of a for loop is a List of the last expression of each iteration
  *   doubled = for (n in nums) { n * 2 }
  *
- * Operators: ==  !=  <  >  <=  >=  &&  ||  !  +  -  *  /
+ * Operators: {@code ==  !=  <  >  <=  >=  &&  ||  !  +  -  *  /}
  * Built-ins: print(...)  println(...)  str(x)  num(x)  bool(x)  len(x)
  */
 public class    MiniScriptEngine extends AbstractScriptEngine {

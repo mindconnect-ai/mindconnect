@@ -8,7 +8,7 @@ import java.util.concurrent.CompletableFuture;
 /**
  * Handle to one in-flight or finished chat turn.
  *
- * <p>Returned by {@link AgentChatClient#send(String)}. The turn runs
+ * <p>Returned by {@link AgentChatClient#send}. The turn runs
  * asynchronously on the runtime's executor; the caller controls observation
  * and lifecycle through this handle.
  *

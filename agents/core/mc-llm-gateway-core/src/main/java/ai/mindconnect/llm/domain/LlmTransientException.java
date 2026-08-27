@@ -11,9 +11,9 @@ package ai.mindconnect.llm.domain;
  * applies backoff; non-transient failures should remain plain
  * {@link RuntimeException}s so they propagate immediately.
  *
- * @param status          the provider HTTP status (e.g. 429, 529); 0 if unknown
- * @param retryAfterMillis server-suggested wait from a {@code Retry-After}
- *                         header, in millis, or 0 when the server gave no hint
+ * <p>{@code status} carries the provider HTTP status (e.g. 429, 529; 0 if
+ * unknown); {@code retryAfterMillis} the server-suggested wait from a
+ * {@code Retry-After} header, in millis, or 0 when the server gave no hint.
  */
 public class LlmTransientException extends RuntimeException {
 

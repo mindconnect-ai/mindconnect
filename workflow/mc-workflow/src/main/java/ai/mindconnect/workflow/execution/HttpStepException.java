@@ -4,7 +4,7 @@ import ai.mindconnect.workflow.domain.HttpCallData;
 
 /**
  * Thrown by {@link HttpCallStep} when the server returns a non-2xx status
- * and {@link HttpCallData#isFailOnError()} is {@code true}.
+ * and {@code HttpCallData#isFailOnError()} is {@code true}.
  */
 public class HttpStepException extends RuntimeException {
 

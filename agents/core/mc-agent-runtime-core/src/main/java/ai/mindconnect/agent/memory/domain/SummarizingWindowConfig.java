@@ -7,7 +7,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
  * <p>
  * Live recent messages are kept until they exceed {@code maxConversationRatio} of the LLM
  * context window. Older messages are summarized via the {@code conversation-summarizer}
- * stateless agent and persisted as {@link ai.mindconnect.agent.domain.ConversationSummary}.
+ * stateless agent and persisted as {@link ConversationSummary}.
  * Large tool results are eagerly compressed once the window pressure crosses
  * {@code compressWhenWindowAboveRatio} — gated by {@link #compressToolResults}.
  * <p>

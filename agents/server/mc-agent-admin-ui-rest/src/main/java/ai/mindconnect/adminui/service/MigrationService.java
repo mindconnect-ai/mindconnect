@@ -26,7 +26,7 @@ import java.util.Set;
  * Computes and applies "migrations" — pending imports of bundled initial data
  * (classpath {@code initial-data/**}) against what is currently stored.
  *
- * <p>Where {@link ai.mindconnect.adminui.InitialDataLoader} silently imports new
+ * <p>Where {@code ai.mindconnect.adminui.InitialDataLoader} silently imports new
  * records at startup and skips differing ones, this service surfaces every
  * pending change (new <em>and</em> changed) so an admin can review the diff in
  * the Migrations tab and apply or ignore each one individually.

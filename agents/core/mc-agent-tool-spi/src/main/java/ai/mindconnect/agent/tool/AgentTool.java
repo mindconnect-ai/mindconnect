@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Reference from an {@link AgentDefinition} to a tool the agent is allowed to use.
+ * Reference from an {@code AgentDefinition} to a tool the agent is allowed to use.
  *
  * <p>An {@code AgentTool} is intentionally a thin pointer: it carries only the
  * tool's global name plus optional agent-specific overrides. It does <strong>not</strong>

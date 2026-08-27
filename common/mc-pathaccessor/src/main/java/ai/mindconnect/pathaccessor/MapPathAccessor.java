@@ -5,7 +5,7 @@ import java.util.Map;
 /**
  * A {@link PathAccessor} that traverses nested {@link Map} structures.
  *
- * <p>This is the default accessor registered in every {@link StringVariableReplacer}
+ * <p>This is the default accessor registered in every {@code StringVariableReplacer}
  * instance.  It handles the common case where workflow variables are plain
  * {@code Map<String, Object>} trees (e.g. parsed JSON objects).
  *

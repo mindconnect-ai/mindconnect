@@ -8,8 +8,8 @@ import org.python.jsr223.PyScriptEngineFactory;
 /**
  * Registers the Jython (Python 2.7) engine with the shared {@link ScriptExecutor}.
  *
- * <p>After this configurer runs, {@link ai.mindconnect.workflow.code.CodeStep}
- * and {@link ai.mindconnect.workflow.code.ScriptExpressionResolver} resolve
+ * <p>After this configurer runs, {@link ai.mindconnect.workflow.execution.CodeStep}
+ * and {@link ai.mindconnect.workflow.scripting.ScriptExpressionResolver} resolve
  * Python/Jython code using the aliases {@code "python"} and {@code "jython"}.
  *
  * <p>Example step data:

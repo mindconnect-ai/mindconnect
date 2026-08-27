@@ -8,8 +8,8 @@ import com.oracle.truffle.js.scriptengine.GraalJSEngineFactory;
 /**
  * Registers the GraalJS (JavaScript) engine with the shared {@link ScriptExecutor}.
  *
- * <p>After this configurer runs, {@link ai.mindconnect.workflow.code.CodeStep}
- * and {@link ai.mindconnect.workflow.code.ScriptExpressionResolver} resolve
+ * <p>After this configurer runs, {@link ai.mindconnect.workflow.execution.CodeStep}
+ * and {@link ai.mindconnect.workflow.scripting.ScriptExpressionResolver} resolve
  * JavaScript code using any of the aliases: {@code "javascript"}, {@code "js"},
  * {@code "graal.js"}.
  *
