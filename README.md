@@ -8,13 +8,15 @@
 <h1 align="center">MindConnect</h1>
 
 [![Build](https://github.com/mindconnect-ai/mindconnect/actions/workflows/build.yml/badge.svg)](https://github.com/mindconnect-ai/mindconnect/actions/workflows/build.yml)
+[![Docs](https://img.shields.io/badge/Docs-mindconnect--ai.github.io-blue.svg)](https://mindconnect-ai.github.io/mindconnect/)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Java 21](https://img.shields.io/badge/Java-21-orange.svg)](https://adoptium.net/)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 A multi-module Maven monorepo for building LLM-powered agents and the
-server-driven UIs to operate them. Four areas — **each is fully
-self-contained and usable on its own**:
+server-driven UIs to operate them. Full documentation:
+**[mindconnect-ai.github.io/mindconnect](https://mindconnect-ai.github.io/mindconnect/)**.
+Four areas — **each is fully self-contained and usable on its own**:
 
 | Area | What it is | README |
 |------|------------|--------|
