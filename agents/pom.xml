@@ -24,6 +24,7 @@
         <module>mc-agents-parent</module>
         <!-- shared modules pulled in so this area builds standalone -->
         <module>../common/mc-common</module>
+        <module>../taskqueue/mc-task-queue</module>
         <module>vectorstore/mc-vector-store</module>
         <module>vectorstore/mc-vector-store-pgvector</module>
         <module>vectorstore/mc-vector-store-tools</module>

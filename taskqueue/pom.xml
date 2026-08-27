@@ -26,6 +26,8 @@
     </properties>
 
     <modules>
+        <!-- shared module pulled in so this area builds standalone (demo apps scrape) -->
+        <module>../common/mc-webscraper</module>
         <module>mc-task-queue</module>
         <module>mc-task-queue-schedule</module>
         <module>mc-task-queue-jdbc</module>

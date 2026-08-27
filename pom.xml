@@ -8,6 +8,7 @@
     <artifactId>mindconnect</artifactId>
     <version>0.0.2-SNAPSHOT</version>
     <packaging>pom</packaging>
+    <name>mindconnect</name>
     <description>Release reactor — every publishable module exactly once (whole-repo build &amp; deploy)</description>
 
     <properties>

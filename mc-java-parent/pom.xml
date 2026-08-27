@@ -8,6 +8,7 @@
     <artifactId>mc-java-parent</artifactId>
     <version>0.0.2-SNAPSHOT</version>
     <packaging>pom</packaging>
+    <name>mc-java-parent</name>
     <description>Lightweight parent for pure Java modules — no Spring, no framework</description>
 
     <!-- Project metadata required by Maven Central, inherited by every module. -->

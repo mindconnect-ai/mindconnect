@@ -25,7 +25,8 @@ jobs:
   #      (the area parents live INSIDE their areas — agents/mc-agents-parent,
   #       workflow/mc-workflow-parent — so the area filters below cover them)
   #      common/**      -> agents and workflow consume common      -> build those
-  #      agents/**      -> isolated (pulls common in as a module)  -> build agents
+  #      taskqueue/**   -> agents consume mc-task-queue            -> build taskqueue + agents
+  #      agents/**      -> isolated (pulls common + taskqueue in)  -> build agents
   #      workflow/**    -> agents consume workflow artifacts       -> build workflow + agents
   #    (semantic-ui moved to its own repo — mindconnect-ai/mc-semantic-ui —
   #     and is consumed as published Maven artifacts.)
@@ -45,6 +46,8 @@ jobs:
               - 'mc-java-parent/**'
             common:
               - 'common/**'
+            taskqueue:
+              - 'taskqueue/**'
             agents:
               - 'agents/**'
             workflow:
@@ -57,6 +60,7 @@ jobs:
         env:
           PARENTS: ${{ steps.filter.outputs.parents }}
           COMMON: ${{ steps.filter.outputs.common }}
+          TASKQUEUE: ${{ steps.filter.outputs.taskqueue }}
           AGENTS: ${{ steps.filter.outputs.agents }}
           WORKFLOW: ${{ steps.filter.outputs.workflow }}
           CI: ${{ steps.filter.outputs.ci }}
@@ -67,12 +71,15 @@ jobs:
 
           # parents or the CI file itself -> build everything
           if [ "$PARENTS" = "true" ] || [ "$CI" = "true" ]; then
-            add agents; add workflow
+            add agents; add workflow; add taskqueue
           else
             [ "$AGENTS" = "true" ]      && add agents      || true
             # agents consume workflow artifacts (workflow tools + embedded
             # workflow admin), so a workflow change must rebuild agents too.
             if [ "$WORKFLOW" = "true" ]; then add workflow; add agents; fi
+            # agents consume mc-task-queue (pulled into the agents reactor),
+            # so a taskqueue change must rebuild agents too.
+            if [ "$TASKQUEUE" = "true" ]; then add taskqueue; add agents; fi
             # Fan-out: both agents and workflow embed common modules.
             if [ "$COMMON" = "true" ]; then add agents; add workflow; fi
           fi
