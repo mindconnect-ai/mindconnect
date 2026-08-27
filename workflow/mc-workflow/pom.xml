@@ -6,7 +6,7 @@
 <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.0.2-SNAPSHOT</version>
+        <version>0.0.2</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
@@ -14,7 +14,7 @@
     <artifactId>mc-workflow</artifactId>
     <name>mc-workflow</name>
     <description>Core workflow engine: steps, execution, variable scopes, expression resolution</description>
-    <version>0.0.2-SNAPSHOT</version>
+    <version>0.0.2</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -41,12 +41,12 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-pathaccessor</artifactId>
-            <version>0.0.2-SNAPSHOT</version>
+            <version>0.0.2</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-script-mini</artifactId>
-            <version>0.0.2-SNAPSHOT</version>
+            <version>0.0.2</version>
         </dependency>
 
         <!-- TEST -->

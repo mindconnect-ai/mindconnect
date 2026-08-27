@@ -14,7 +14,7 @@ their own store, where every firing becomes an ordinary `TaskSubmission`.
 <dependency>
   <groupId>ai.mindconnect</groupId>
   <artifactId>mc-task-queue-schedule</artifactId>
-  <version>0.0.2-SNAPSHOT</version>
+  <version>0.0.2</version>
 </dependency>
 ```
 
