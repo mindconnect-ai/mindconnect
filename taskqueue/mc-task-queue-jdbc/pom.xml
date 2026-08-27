@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-task-queue-jdbc</artifactId>
+    <name>mc-task-queue-jdbc</name>
     <packaging>jar</packaging>
 
     <description>

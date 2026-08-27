@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-taskqueue-demo-app</artifactId>
+    <name>mc-taskqueue-demo-app</name>
     <packaging>jar</packaging>
 
     <description>

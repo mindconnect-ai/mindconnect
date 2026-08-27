@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-vector-store-tools</artifactId>
+    <name>mc-vector-store-tools</name>
     <packaging>jar</packaging>
     <description>Agent tools around the vector-store SPI — vector_upsert / vector_search /
         vector_delete_file (group "knowledge"), embedding inside the tool so workflows and

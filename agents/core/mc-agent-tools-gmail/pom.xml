@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tools-gmail</artifactId>
+    <name>mc-agent-tools-gmail</name>
     <packaging>jar</packaging>
     <description>
         Gmail MCP pass-through: registers a gmail_search_messages tool that

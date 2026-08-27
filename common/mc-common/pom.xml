@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-common</artifactId>
+    <name>mc-common</name>
     <packaging>jar</packaging>
     <description>Shared value objects and base types — pure Java, no framework</description>
 

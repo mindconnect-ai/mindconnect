@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-initial-data</artifactId>
+    <name>mc-initial-data</name>
     <packaging>jar</packaging>
     <description>
         Seeds an application from bundled classpath resources on first run.

@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-mcp-proxy</artifactId>
+    <name>mc-mcp-proxy</name>
     <packaging>jar</packaging>
     <description>
         MCP wrapper on top of the official Java SDK

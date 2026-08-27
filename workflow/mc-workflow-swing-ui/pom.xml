@@ -12,6 +12,7 @@
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-swing-ui</artifactId>
+    <name>mc-workflow-swing-ui</name>
     <version>0.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 

@@ -12,6 +12,8 @@
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-jackson</artifactId>
+    <name>mc-workflow-jackson</name>
+    <description>JSON (de)serialization of workflow definitions</description>
     <version>0.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 

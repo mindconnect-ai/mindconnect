@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-protocol-mc-runtime</artifactId>
+    <name>mc-agent-protocol-mc-runtime</name>
     <packaging>jar</packaging>
     <description>
         Backend adapter: the mc-agent-protocol surface (Sessions, AgentResponses,

@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-runtime</artifactId>
+    <name>mc-agent-runtime</name>
     <packaging>jar</packaging>
     <description>
         Agent runtime adapters — file and in-memory repositories, the local

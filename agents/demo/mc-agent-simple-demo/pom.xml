@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-simple-demo</artifactId>
+    <name>mc-agent-simple-demo</name>
     <packaging>jar</packaging>
     <description>Embedding demos: the agent runtime in a plain Java main via AgentRuntimeBuilder —
         a minimal chat, and a chat with an attached file searched through the session's vector

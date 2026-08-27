@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tools-web</artifactId>
+    <name>mc-agent-tools-web</name>
     <packaging>jar</packaging>
     <description>Web built-in agent tools — HTTP fetch, search, HTML-to-Markdown (future Playwright home)</description>
 

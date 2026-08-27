@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-schema</artifactId>
+    <name>mc-schema</name>
     <packaging>jar</packaging>
     <description>A small, dependency-free typed model of the JSON-Schema subset used for
         declaring inputs — workflow parameters, halt-resume inputs, LLM tool signatures — built

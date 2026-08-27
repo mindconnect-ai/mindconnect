@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-workflow-admin-app</artifactId>
+    <name>mc-workflow-admin-app</name>
     <packaging>jar</packaging>
 
     <description>

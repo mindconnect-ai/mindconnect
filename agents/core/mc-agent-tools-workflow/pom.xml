@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tools-workflow</artifactId>
+    <name>mc-agent-tools-workflow</name>
     <packaging>jar</packaging>
     <description>Exposes persisted workflows as agent tools — one tool per workflow, parameters from the workflow's input schema</description>
 

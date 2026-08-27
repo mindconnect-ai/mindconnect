@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-task-queue-schedule</artifactId>
+    <name>mc-task-queue-schedule</name>
     <packaging>jar</packaging>
     <description>
         Cron for the task queue, as an addon rather than a queue feature: a

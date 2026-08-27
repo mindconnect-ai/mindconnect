@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-task-queue</artifactId>
+    <name>mc-task-queue</name>
     <packaging>jar</packaging>
     <description>
         Task queue ports (TaskQueue, TaskStore, TaskWorker) with a local

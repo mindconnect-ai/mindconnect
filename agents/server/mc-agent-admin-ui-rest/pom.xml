@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-admin-ui-rest</artifactId>
+    <name>mc-agent-admin-ui-rest</name>
     <packaging>jar</packaging>
     <description>
         The admin UI itself — the controllers serving UiNode JSON under

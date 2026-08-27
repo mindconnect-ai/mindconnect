@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-memory-strategies</artifactId>
+    <name>mc-agent-memory-strategies</name>
     <packaging>jar</packaging>
     <description>
         Working-memory strategies — what actually happens to a conversation as

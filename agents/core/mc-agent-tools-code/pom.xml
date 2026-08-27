@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tools-code</artifactId>
+    <name>mc-agent-tools-code</name>
     <packaging>jar</packaging>
     <description>Code execution agent tool — runs snippets in disposable containers via docker or podman</description>
 

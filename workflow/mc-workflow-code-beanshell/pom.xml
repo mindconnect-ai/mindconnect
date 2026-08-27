@@ -12,6 +12,8 @@
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-code-beanshell</artifactId>
+    <name>mc-workflow-code-beanshell</name>
+    <description>BeanShell script step support for the workflow engine</description>
     <version>0.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 

@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tools</artifactId>
+    <name>mc-agent-tools</name>
     <packaging>jar</packaging>
     <description>Lightweight built-in agent tools — filesystem, workspace, bash (no network, no heavy parsers)</description>
 

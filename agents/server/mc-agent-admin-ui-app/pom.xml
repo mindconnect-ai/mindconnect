@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-admin-ui-app</artifactId>
+    <name>mc-agent-admin-ui-app</name>
     <packaging>jar</packaging>
     <description>Admin UI backend — serves UiNode JSON for agent and LLM config management</description>
 

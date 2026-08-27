@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-message-repository-core</artifactId>
+    <name>mc-message-repository-core</name>
     <packaging>jar</packaging>
     <description>
         The message repository's core: conversations, participants and messages

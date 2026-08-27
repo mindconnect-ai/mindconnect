@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tools-web-browser</artifactId>
+    <name>mc-agent-tools-web-browser</name>
     <packaging>jar</packaging>
     <description>
         Browser-driven web tools — uses headless Chromium via Playwright to

@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tools-document</artifactId>
+    <name>mc-agent-tools-document</name>
     <packaging>jar</packaging>
     <description>Document-aware built-in agent tools — PDF/Word/text parsing via Tika+PDFBox+POI</description>
 

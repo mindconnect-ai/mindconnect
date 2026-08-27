@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-api-rest</artifactId>
+    <name>mc-agent-api-rest</name>
     <packaging>jar</packaging>
     <description>Agent REST controllers and DTOs — library, no Spring Boot main class</description>
 

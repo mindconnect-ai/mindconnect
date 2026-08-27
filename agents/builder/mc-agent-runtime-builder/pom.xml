@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-runtime-builder</artifactId>
+    <name>mc-agent-runtime-builder</name>
     <packaging>jar</packaging>
     <description>Spring-free builder facade for embedding the agent runtime in any Java program.
         Compiles against every capability module (tools, vector stores, file store, workflows) but

@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-protocol-openai</artifactId>
+    <name>mc-agent-protocol-openai</name>
     <packaging>jar</packaging>
     <description>
         Backend adapter: implements the mc-agent-protocol surface (Sessions,

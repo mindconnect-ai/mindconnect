@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-script-mini</artifactId>
+    <name>mc-script-mini</name>
     <packaging>jar</packaging>
     <description>Mini scripting language</description>
 

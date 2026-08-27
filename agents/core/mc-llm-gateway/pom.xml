@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-llm-gateway</artifactId>
+    <name>mc-llm-gateway</name>
     <packaging>jar</packaging>
     <description>LLM server — domain, ports, service, LM Studio (OpenAI-compatible) adapter</description>
 

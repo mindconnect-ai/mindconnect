@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-llm-gateway-core</artifactId>
+    <name>mc-llm-gateway-core</name>
     <packaging>jar</packaging>
     <description>
         The LLM gateway's core: chat/streaming types and the ports

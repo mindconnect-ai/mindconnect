@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-protocol</artifactId>
+    <name>mc-agent-protocol</name>
     <packaging>jar</packaging>
     <description>
         Agent protocol vocabulary: Response, Item, Conversation, events and commands.

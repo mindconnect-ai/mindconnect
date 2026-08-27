@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-workflow-ui-diagram-app</artifactId>
+    <name>mc-workflow-ui-diagram-app</name>
     <packaging>jar</packaging>
 
     <description>

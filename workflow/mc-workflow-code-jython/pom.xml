@@ -12,6 +12,8 @@
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-code-jython</artifactId>
+    <name>mc-workflow-code-jython</name>
+    <description>Python (Jython) script step support for the workflow engine</description>
     <version>0.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 

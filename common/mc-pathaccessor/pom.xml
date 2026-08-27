@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-pathaccessor</artifactId>
+    <name>mc-pathaccessor</name>
     <packaging>jar</packaging>
     <description>PathAccessor strategy interface and built-in implementations (Map, Bean, Record) together with PathSegment</description>
 

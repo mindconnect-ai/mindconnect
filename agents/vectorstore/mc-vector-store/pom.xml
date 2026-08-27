@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-vector-store</artifactId>
+    <name>mc-vector-store</name>
     <packaging>jar</packaging>
     <description>Vector store SPI (chunks, similarity search, backends via ServiceLoader) plus the
         built-in file-persisted in-memory backend with lazy per-store loading and idle eviction.

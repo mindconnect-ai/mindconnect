@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-runtime-core</artifactId>
+    <name>mc-agent-runtime-core</name>
     <packaging>jar</packaging>
     <description>
         The agent runtime's core: agent and session domain, the ports around

@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-cli</artifactId>
+    <name>mc-agent-cli</name>
     <packaging>jar</packaging>
     <description>Terminal REPL client — wires all agent platform modules in a single JVM</description>
 

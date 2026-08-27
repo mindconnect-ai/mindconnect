@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-message-repository</artifactId>
+    <name>mc-message-repository</name>
     <packaging>jar</packaging>
     <description>
         Message repository adapters — file-backed and in-memory implementations

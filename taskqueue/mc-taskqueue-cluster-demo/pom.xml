@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-taskqueue-cluster-demo</artifactId>
+    <name>mc-taskqueue-cluster-demo</name>
     <packaging>jar</packaging>
 
     <description>

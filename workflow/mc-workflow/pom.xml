@@ -12,6 +12,8 @@
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow</artifactId>
+    <name>mc-workflow</name>
+    <description>Core workflow engine: steps, execution, variable scopes, expression resolution</description>
     <version>0.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 

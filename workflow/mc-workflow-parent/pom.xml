@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-workflow-parent</artifactId>
+    <name>mc-workflow-parent</name>
     <packaging>pom</packaging>
     <description>Parent POM for the mc-workflow engine modules (Spring-independent)</description>
 

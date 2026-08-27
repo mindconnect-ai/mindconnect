@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-api-app</artifactId>
+    <name>mc-agent-api-app</name>
     <packaging>jar</packaging>
     <description>Agent server Spring Boot application — embeds mc-agent-api-rest</description>
 

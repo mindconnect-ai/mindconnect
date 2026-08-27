@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-workflow-step-form</artifactId>
+    <name>mc-workflow-step-form</name>
     <packaging>jar</packaging>
     <description>A form step: like halt, it suspends the workflow — but it carries a semantic-ui
         form that the run view renders, and the fields the user fills become the resume params.

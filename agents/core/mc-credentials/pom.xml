@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-credentials</artifactId>
+    <name>mc-credentials</name>
     <packaging>jar</packaging>
     <description>
         User credentials store: OAuth2 tokens + API keys, encrypted at rest,

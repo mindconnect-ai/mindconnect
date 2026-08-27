@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-vector-store-pgvector</artifactId>
+    <name>mc-vector-store-pgvector</name>
     <packaging>jar</packaging>
     <description>pgvector backend for the vector-store SPI — one table per store with an HNSW
         index, plain JDBC, scales past what the in-memory backend should hold.</description>

@@ -13,6 +13,7 @@
     <!-- Project from https://start.vaadin.com/project/32c6f638-5d55-4d08-8d48-be0b3962af8c -->
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-webscraper</artifactId>
+    <description>Web scraping and content extraction (jsoup + Playwright backends)</description>
     <name>mc-webscraper</name>
     <packaging>jar</packaging>
 

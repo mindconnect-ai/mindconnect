@@ -12,6 +12,7 @@
     </parent>
 
     <artifactId>mc-agent-tool-spi</artifactId>
+    <name>mc-agent-tool-spi</name>
     <packaging>jar</packaging>
     <description>
         What a tool IS and how it gets bound: Tool, ToolFactory, ToolRegistry,
