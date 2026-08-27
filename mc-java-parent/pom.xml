@@ -128,8 +128,8 @@
         Prerequisites (one-time):
           1. Central Portal account with the namespace `ai.mindconnect` verified.
           2. A Portal user token, wired as a <server> with id "central" in
-             settings.xml (CI: the release workflow does this from secrets
-             CENTRAL_USERNAME / CENTRAL_PASSWORD).
+             settings.xml (CI: the release workflow does this from the org
+             secrets CENTRAL_TOKEN_USERNAME / CENTRAL_TOKEN_PASSWORD).
           3. A GPG key pair for signing (CI: secrets MAVEN_GPG_PRIVATE_KEY /
              MAVEN_GPG_PASSPHRASE, imported by actions/setup-java).
 
