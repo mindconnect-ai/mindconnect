@@ -5,8 +5,8 @@ name: release
 # MAVEN CENTRAL (Central Publisher Portal), tags it, then opens the next
 # -SNAPSHOT on main.
 #
-# Required repo secrets:
-#   CENTRAL_USERNAME / CENTRAL_PASSWORD — a user token from
+# Required secrets (org-level on mindconnect-ai, shared with mc-semantic-ui):
+#   CENTRAL_TOKEN_USERNAME / CENTRAL_TOKEN_PASSWORD — a user token from
 #     https://central.sonatype.com (Account → Generate User Token); the
 #     namespace ai.mindconnect must be verified there once.
 #   MAVEN_GPG_PRIVATE_KEY  — ASCII-armored private key for artifact signing
@@ -45,8 +45,8 @@ jobs:
           # Writes ~/.m2/settings.xml with a server id matching the
           # publishingServerId in mc-java-parent, and imports the GPG key.
           server-id: central
-          server-username: CENTRAL_USERNAME
-          server-password: CENTRAL_PASSWORD
+          server-username: CENTRAL_TOKEN_USERNAME
+          server-password: CENTRAL_TOKEN_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
           gpg-passphrase: MAVEN_GPG_PASSPHRASE
 
@@ -97,8 +97,8 @@ jobs:
       # signs with GPG and hands the deploy to the central-publishing plugin.
       - name: Build & publish to Maven Central
         env:
-          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
-          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
+          CENTRAL_TOKEN_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.MAVEN_GPG_PASSPHRASE }}
         run: mvn -B -ntp -DskipTests -Prelease deploy
 
