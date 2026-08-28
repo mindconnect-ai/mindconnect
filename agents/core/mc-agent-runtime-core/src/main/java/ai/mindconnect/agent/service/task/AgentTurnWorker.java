@@ -19,7 +19,7 @@ import ai.mindconnect.agent.service.round.AgentRound;
 import ai.mindconnect.agent.service.round.LlmAnswer;
 import ai.mindconnect.agent.service.round.TurnMessage;
 import ai.mindconnect.agent.service.round.TurnOutcome;
-import ai.mindconnect.agent.service.stream.TurnChannels;
+import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.agent.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
@@ -89,7 +89,7 @@ public final class AgentTurnWorker implements TaskWorker {
     private final LlmChat llmChat;
     /** Nullable — no repository, no tracing. */
     private final LlmCallTraceRepository traceRepository;
-    private final TurnChannels turnChannels;
+    private final SessionChannels sessionChannels;
     private final AgentTaskRunner agentTaskRunner;
     private final WorkingMemoryRepository workingMemoryRepository;
 
@@ -102,7 +102,7 @@ public final class AgentTurnWorker implements TaskWorker {
                            DynamicToolActivations dynamicToolActivations,
                            LlmChat llmChat,
                            LlmCallTraceRepository traceRepository,
-                           TurnChannels turnChannels,
+                           SessionChannels sessionChannels,
                            AgentTaskRunner agentTaskRunner,
                            WorkingMemoryRepository workingMemoryRepository) {
         this.conversationManager = conversationManager;
@@ -114,7 +114,7 @@ public final class AgentTurnWorker implements TaskWorker {
         this.dynamicToolActivations = dynamicToolActivations;
         this.llmChat = llmChat;
         this.traceRepository = traceRepository;
-        this.turnChannels = turnChannels;
+        this.sessionChannels = sessionChannels;
         this.agentTaskRunner = agentTaskRunner;
         this.workingMemoryRepository = workingMemoryRepository;
     }
@@ -191,7 +191,7 @@ public final class AgentTurnWorker implements TaskWorker {
 
         // Resolved per execution BY ID — this is what survives a suspension
         // and lets a resumed turn stream seamlessly on (concept 12/16).
-        Consumer<StreamEvent> stream = turnChannels.publisherFor(turnId);
+        Consumer<StreamEvent> stream = sessionChannels.publisherFor(session.id(), turnId, run);
 
         MemoryStrategy memoryStrategy = memoryStrategyFactory.create(def);
         TokenCounter tokenCounter = memoryStrategy.resolveTokenCounter(def);

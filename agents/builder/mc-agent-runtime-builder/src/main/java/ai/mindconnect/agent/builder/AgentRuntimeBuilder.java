@@ -366,15 +366,15 @@ public final class AgentRuntimeBuilder {
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore);
-        var turnChannels = new ai.mindconnect.agent.service.stream.TurnChannels();
+        var sessionChannels = new ai.mindconnect.agent.service.stream.SessionChannels();
         var turnWorker = new ai.mindconnect.agent.service.task.AgentTurnWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, activations,
-                llmChat, traceRepository, turnChannels,
+                llmChat, traceRepository, sessionChannels,
                 statelessRunner, workingMemoryRepository);
         var toolWorker = new ai.mindconnect.agent.service.task.ToolCallWorker(
                 conversationManager, definitionRepository, sessionService,
-                memoryStrategyFactory, toolRegistry, activations, toolExecutor, turnChannels,
+                memoryStrategyFactory, toolRegistry, activations, toolExecutor, sessionChannels,
                 approvalStore);
         var taskQueue = new ai.mindconnect.taskqueue.local.LocalTaskQueue(
                 new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
@@ -383,7 +383,7 @@ public final class AgentRuntimeBuilder {
         taskQueue.register(ai.mindconnect.agent.service.task.ToolCallWorker.TYPE, toolWorker);
         AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
                 conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                statelessRunner, turnChannels, taskQueue, approvalStore, turnExecutor);
+                statelessRunner, sessionChannels, taskQueue, approvalStore, turnExecutor);
 
         // 7. Seed configs, agents, workflows.
         for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);
