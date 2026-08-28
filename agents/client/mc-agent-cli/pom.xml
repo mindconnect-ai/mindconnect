@@ -56,6 +56,18 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals><goal>repackage</goal></goals>
+                        <configuration>
+                            <!-- The plain jar stays the main artifact (that is
+                                 what goes to Central); the runnable one rides
+                                 along as -exec.jar, for `java -jar` without a
+                                 Maven around it. -->
+                            <classifier>exec</classifier>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>
