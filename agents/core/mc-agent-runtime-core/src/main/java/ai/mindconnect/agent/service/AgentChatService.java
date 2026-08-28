@@ -164,6 +164,16 @@ public class AgentChatService {
     }
 
     /**
+     * The conversation's OPEN approval questions, oldest first. The stream
+     * announces a request in the moment it is raised; a client that connects
+     * later — or reattaches after a restart — reads the still-unanswered ones
+     * here and shows their cards.
+     */
+    public List<ToolApproval> openApprovals(UUID rootSessionId) {
+        return approvalStore.openForRoot(rootSessionId);
+    }
+
+    /**
      * The human's answer to an approval card — Deny, Allow once, or Allow for
      * this session. The card's identity is the {@code callId}; everything
      * else comes from the {@link ToolApprovalStore} entry, the ONE truth for

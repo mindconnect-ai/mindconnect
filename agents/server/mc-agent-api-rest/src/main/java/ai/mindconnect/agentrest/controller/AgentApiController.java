@@ -10,6 +10,8 @@ import ai.mindconnect.agent.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.service.AgentChatService;
 import ai.mindconnect.agent.service.AgentRegistryService;
 import ai.mindconnect.agent.service.AgentSessionService;
+import ai.mindconnect.agent.service.approval.ApprovalScope;
+import ai.mindconnect.agent.service.approval.ToolApproval;
 import ai.mindconnect.agentrest.dto.CreateAgentRequest;
 import ai.mindconnect.agentrest.dto.StartSessionRequest;
 import ai.mindconnect.agentrest.dto.AttachedFrame;
@@ -339,5 +341,38 @@ public class AgentApiController {
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "compressedMessages", compressed));
+    }
+
+    // ── Approvals ───────────────────────────────────────────────────────────
+
+    @Operation(tags = "Sessions", summary = "List the open approval requests",
+            description = "The still-unanswered questions of this conversation, oldest first — "
+                    + "root tool calls and the ones bubbled up from sub-agents alike. The "
+                    + "stream announces a request only in the moment it is raised, so a client "
+                    + "that connects later (or reattaches after a restart) rebuilds its cards "
+                    + "from here. Each entry's content is the call JSON the card shows.")
+    @GetMapping("/sessions/{sessionId}/approvals")
+    public List<ToolApproval> openApprovals(@PathVariable UUID sessionId) {
+        List<ToolApproval> open = chatService.openApprovals(sessionId);
+        log.info("GET /api/sessions/{}/approvals → {} open", sessionId, open.size());
+        return open;
+    }
+
+    @Operation(tags = "Sessions", summary = "Answer an approval request",
+            description = "Deny, allow once, or allow the tool for the rest of the session "
+                    + "(scope=once|session). The callId is the whole identity. No new stream: "
+                    + "the turn never ended — it is suspended on the parked tool task and "
+                    + "continues on its original stream the moment the decision arrives. "
+                    + "204 when it was delivered, 404 for a stale card whose task is gone.")
+    @PostMapping("/sessions/{sessionId}/approvals/{callId}")
+    public ResponseEntity<Void> answerApproval(@PathVariable UUID sessionId,
+                                               @PathVariable String callId,
+                                               @RequestParam boolean approved,
+                                               @RequestParam(defaultValue = "once") String scope) {
+        boolean delivered = chatService.answerApproval(
+                sessionId, callId, approved, ApprovalScope.fromParam(scope));
+        log.info("POST /api/sessions/{}/approvals/{} approved={} scope={} → delivered={}",
+                sessionId, callId, approved, scope, delivered);
+        return delivered ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 }
