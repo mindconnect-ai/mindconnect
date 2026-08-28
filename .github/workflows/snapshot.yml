@@ -1,0 +1,107 @@
+name: snapshot
+
+# Snapshot builds for the desktop clients — manual only. You pick the moment;
+# this builds the runnable jars from the branch you trigger on and puts them
+# behind a rolling `snapshot` pre-release, so the download URLs never change:
+#
+#   .../releases/download/snapshot/mc-agent-admin-ui-app-exec.jar
+#   .../releases/download/snapshot/mc-agent-cli-exec.jar
+#   .../releases/download/snapshot/snapshot.txt   (version, commit, build time)
+#
+# Nothing here touches Maven Central or the version in the POMs — that stays
+# the job of release.yml.
+on:
+  workflow_dispatch:
+    inputs:
+      modules:
+        description: 'What to publish'
+        type: choice
+        options: [both, admin-ui-app, cli]
+        default: both
+
+permissions:
+  contents: write   # move the `snapshot` tag and write its release
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # The agents reactor consumes workflow artifacts it does not build
+      # itself, and needs the base parent as an installed artifact — the same
+      # prerequisites build.yml sets up for the agents area.
+      - name: Install parent + workflow artifacts
+        run: |
+          mvn -B -ntp -N -f mc-java-parent/pom.xml install
+          mvn -B -ntp -f workflow/pom.xml clean install -DskipTests
+
+      - name: Build the executable jars
+        run: |
+          set -euo pipefail
+          case "${{ inputs.modules }}" in
+            admin-ui-app) pl="server/mc-agent-admin-ui-app" ;;
+            cli)          pl="client/mc-agent-cli" ;;
+            *)            pl="server/mc-agent-admin-ui-app,client/mc-agent-cli" ;;
+          esac
+          mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am
+
+      # Stable asset names: no version in them, so a client can hard-code the
+      # URL. What you actually got is in snapshot.txt next to them.
+      - name: Collect the assets
+        run: |
+          set -euo pipefail
+          mkdir -p snapshot-assets
+          ver=$(mvn -B -q -ntp -DforceStdout help:evaluate -Dexpression=project.version)
+          for m in server/mc-agent-admin-ui-app:mc-agent-admin-ui-app \
+                   client/mc-agent-cli:mc-agent-cli; do
+            jar="agents/${m%%:*}/target/${m##*:}-${ver}-exec.jar"
+            if [ -f "$jar" ]; then
+              cp "$jar" "snapshot-assets/${m##*:}-exec.jar"
+              echo "collected $jar"
+            fi
+          done
+          printf '%s\n' \
+            "version: $ver" \
+            "commit:  ${GITHUB_SHA::7}" \
+            "branch:  $GITHUB_REF_NAME" \
+            "built:   $(date -u +%Y-%m-%dT%H:%MZ)" \
+            > snapshot-assets/snapshot.txt
+          cat snapshot-assets/snapshot.txt
+          ls -lh snapshot-assets
+
+      # `gh release create` will not move an existing tag, so the rolling
+      # release is replaced rather than edited. The assets are gone for the few
+      # seconds in between — a snapshot channel can afford that, a stable
+      # download URL is what it cannot do without.
+      - name: Replace the rolling snapshot release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release delete snapshot --yes --cleanup-tag || true
+          gh release create snapshot snapshot-assets/* \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Snapshot $(date -u +%Y-%m-%d)" \
+            --notes "Built from \`$GITHUB_REF_NAME\` at ${GITHUB_SHA::7}.
+
+          Not a release: these assets are replaced in place, under the same URLs. For something stable, take a version from [Maven Central](https://central.sonatype.com/namespace/ai.mindconnect) or a tagged release.
+
+          Run either jar with a JDK 21:
+
+          \`\`\`bash
+          java -jar mc-agent-admin-ui-app-exec.jar
+          \`\`\`"
