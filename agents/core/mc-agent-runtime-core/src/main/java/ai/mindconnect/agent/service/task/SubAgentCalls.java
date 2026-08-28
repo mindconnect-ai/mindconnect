@@ -8,7 +8,7 @@ import ai.mindconnect.agent.memory.port.in.MemoryStrategyFactory;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.service.AgentSessionService;
 import ai.mindconnect.agent.service.InlineAgentTools;
-import ai.mindconnect.agent.service.stream.TurnChannels;
+import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.channel.Subscription;
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.common.PageRequest;
@@ -51,7 +51,7 @@ final class SubAgentCalls {
     private final AgentDefinitionRepository definitionRepository;
     private final AgentSessionService sessionService;
     private final MemoryStrategyFactory memoryStrategyFactory;
-    private final TurnChannels turnChannels;
+    private final SessionChannels sessionChannels;
 
     /** Set once the queue exists — needed to await sub-agent turns. */
     private volatile TaskQueue queue;
@@ -60,12 +60,12 @@ final class SubAgentCalls {
                   AgentDefinitionRepository definitionRepository,
                   AgentSessionService sessionService,
                   MemoryStrategyFactory memoryStrategyFactory,
-                  TurnChannels turnChannels) {
+                  SessionChannels sessionChannels) {
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
         this.sessionService = sessionService;
         this.memoryStrategyFactory = memoryStrategyFactory;
-        this.turnChannels = turnChannels;
+        this.sessionChannels = sessionChannels;
     }
 
     void attach(TaskQueue queue) {
@@ -164,7 +164,7 @@ final class SubAgentCalls {
             return "Error: sub-session has no turn to run";
         }
         int currentRun = subHistory.currentRun();
-        Subscription mirror = turnChannels.subscribe(currentTurn,
+        Subscription mirror = sessionChannels.subscribeTurn(subSession.id(), currentTurn,
                 event -> parentStream.accept(new StreamEvent.SubAgentEvent(cardId, event)));
         try {
             String childTaskId = ctx.submitChild(AgentTurnWorker.submission(
@@ -185,7 +185,6 @@ final class SubAgentCalls {
             return "Error: " + e.getMessage();
         } finally {
             mirror.close();
-            turnChannels.drop(currentTurn);
         }
     }
 
