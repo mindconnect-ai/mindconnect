@@ -11,7 +11,7 @@ import ai.mindconnect.agent.service.AgentSessionService;
 import ai.mindconnect.agent.service.InlineAgentTools;
 import ai.mindconnect.agent.service.round.ToolCalls;
 import ai.mindconnect.agent.service.round.TurnMessage;
-import ai.mindconnect.agent.service.stream.TurnChannels;
+import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.agent.service.turn.ToolExecutor;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
@@ -79,7 +79,7 @@ public final class ToolCallWorker implements TaskWorker {
     private final ToolRegistry toolRegistry;
     private final DynamicToolActivations dynamicToolActivations;
     private final ToolExecutor toolExecutor;
-    private final TurnChannels turnChannels;
+    private final SessionChannels sessionChannels;
     private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
     private final SubAgentCalls subAgents;
 
@@ -90,7 +90,7 @@ public final class ToolCallWorker implements TaskWorker {
                           ToolRegistry toolRegistry,
                           DynamicToolActivations dynamicToolActivations,
                           ToolExecutor toolExecutor,
-                          TurnChannels turnChannels,
+                          SessionChannels sessionChannels,
                           ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
@@ -99,10 +99,10 @@ public final class ToolCallWorker implements TaskWorker {
         this.toolRegistry = toolRegistry;
         this.dynamicToolActivations = dynamicToolActivations;
         this.toolExecutor = toolExecutor;
-        this.turnChannels = turnChannels;
+        this.sessionChannels = sessionChannels;
         this.approvalStore = approvalStore;
         this.subAgents = new SubAgentCalls(conversationManager, definitionRepository,
-                sessionService, memoryStrategyFactory, turnChannels);
+                sessionService, memoryStrategyFactory, sessionChannels);
     }
 
     /** Wires the queue in after construction; must happen before the first task runs. */
@@ -162,7 +162,7 @@ public final class ToolCallWorker implements TaskWorker {
 
             MemoryStrategy memoryStrategy = memoryStrategyFactory.create(def);
             TokenCounter tokenCounter = memoryStrategy.resolveTokenCounter(def);
-            Consumer<StreamEvent> stream = turnChannels.publisherFor(turnId);
+            Consumer<StreamEvent> stream = sessionChannels.publisherFor(session.id(), turnId, run);
             ConversationMessageLog messageLog = new ConversationMessageLog(
                     conversationManager, UUID.randomUUID() /* user sender — see follow-up task */,
                     def.id(), turnId, run, tokenCounter);
@@ -301,10 +301,11 @@ public final class ToolCallWorker implements TaskWorker {
                                      ai.mindconnect.agent.service.approval.ToolApproval entry,
                                      Map<String, Object> arguments) {
         try {
-            UUID rootTurnId = conversationManager.loadCompleteHistory(root.conversationId())
-                    .currentTurnId().orElse(null);
+            var rootHistory = conversationManager.loadCompleteHistory(root.conversationId());
+            UUID rootTurnId = rootHistory.currentTurnId().orElse(null);
             if (rootTurnId == null) return;
-            turnChannels.publisherFor(rootTurnId).accept(new StreamEvent.ApprovalRequested(
+            sessionChannels.publisherFor(root.id(), rootTurnId, rootHistory.currentRun())
+                    .accept(new StreamEvent.ApprovalRequested(
                     entry.requestId(), entry.callId(), entry.toolName(),
                     arguments == null ? Map.of() : arguments,
                     entry.originSessionId(), entry.toolTaskId()));

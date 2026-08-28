@@ -14,7 +14,10 @@ import ai.mindconnect.agent.port.out.PromptRenderer;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.service.approval.ToolApproval;
 import ai.mindconnect.agent.service.approval.ToolApprovalStore;
-import ai.mindconnect.agent.service.stream.TurnChannels;
+import ai.mindconnect.agent.service.stream.SessionChannels;
+import ai.mindconnect.agent.service.stream.SessionEvent;
+import ai.mindconnect.channel.Channel;
+import ai.mindconnect.channel.Subscription;
 import ai.mindconnect.agent.service.round.TurnMessage;
 import ai.mindconnect.agent.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.service.turn.LocalChatTurnHandle;
@@ -67,7 +70,7 @@ public class AgentChatService {
     private final WorkingMemoryRepository workingMemoryRepository;
     private final PromptRenderer promptRenderer;
     private final AgentTaskRunner agentTaskRunner;
-    private final TurnChannels turnChannels;
+    private final SessionChannels sessionChannels;
     private final TaskQueue queue;
     private final ToolApprovalStore approvalStore;
     private final ExecutorService turnExecutor;
@@ -79,7 +82,7 @@ public class AgentChatService {
                             WorkingMemoryRepository workingMemoryRepository,
                             PromptRenderer promptRenderer,
                             AgentTaskRunner agentTaskRunner,
-                            TurnChannels turnChannels,
+                            SessionChannels sessionChannels,
                             TaskQueue queue,
                             ToolApprovalStore approvalStore,
                             ExecutorService turnExecutor) {
@@ -90,7 +93,7 @@ public class AgentChatService {
         this.workingMemoryRepository = workingMemoryRepository;
         this.promptRenderer = promptRenderer;
         this.agentTaskRunner = agentTaskRunner;
-        this.turnChannels = turnChannels;
+        this.sessionChannels = sessionChannels;
         this.queue = queue;
         this.approvalStore = approvalStore;
         this.turnExecutor = turnExecutor;
@@ -151,14 +154,11 @@ public class AgentChatService {
     private ChatTurnHandle startTurn(UUID sessionId, UUID turnId, int run,
                                      Consumer<StreamEvent> eventHandler,
                                      java.util.function.UnaryOperator<String> afterCompletion) {
-        var subscription = turnChannels.subscribe(turnId, eventHandler);
+        var subscription = sessionChannels.subscribeTurn(sessionId, turnId, eventHandler);
         String taskId = queue.submit(AgentTurnWorker.submission(turnId, run, sessionId, 0, null));
         CompletableFuture<String> future = CompletableFuture
                 .supplyAsync(() -> awaitResult(taskId), turnExecutor)
-                .whenComplete((response, error) -> {
-                    subscription.close();
-                    turnChannels.drop(turnId);
-                })
+                .whenComplete((response, error) -> subscription.close())
                 .thenApply(afterCompletion);
         return new LocalChatTurnHandle(turnId, sessionId, future, () -> cancelChat(sessionId));
     }
@@ -224,6 +224,42 @@ public class AgentChatService {
      * No scan, no map. The cancel cascades over the task tree, so sub-agent
      * turns die with their parent.
      */
+    /**
+     * What {@link #attach} hands back: the live subscription plus everything
+     * a reconnecting client needs to orient itself — whether a turn is
+     * running right now, and which part of the stream the buffer still
+     * covers. {@code firstBufferedSeq > afterSeq + 1} means the replay has a
+     * gap; the client refreshes from the persisted history instead of
+     * trusting the tail.
+     */
+    public record Attachment(Subscription subscription, UUID liveTurnId, Integer liveRun,
+                             long firstBufferedSeq, long latestSeq) {
+    }
+
+    /**
+     * Attach to the session's stream: replay after {@code afterSeq}, then
+     * live. This is the reconnect story — a client whose stream died (or
+     * that just opened the session) resumes with its last seq and receives
+     * everything it missed that the ring buffer still holds, the running
+     * turn's partial included.
+     */
+    public Attachment attach(UUID sessionId, long afterSeq,
+                             Consumer<Channel.Event<SessionEvent>> consumer) {
+        AgentSession session = sessionService.findSession(sessionId);
+        var history = conversationManager.loadCompleteHistory(session.conversationId());
+        UUID liveTurnId = history.currentTurnId()
+                .filter(turnId -> queue
+                        .get(AgentTurnWorker.taskIdFor(turnId, history.currentRun()))
+                        .filter(task -> !task.status().terminal())
+                        .isPresent())
+                .orElse(null);
+        long firstBuffered = sessionChannels.earliestBufferedSeq(sessionId);
+        long latest = sessionChannels.lastSeq(sessionId);
+        Subscription subscription = sessionChannels.subscribe(sessionId, afterSeq, consumer);
+        return new Attachment(subscription, liveTurnId,
+                liveTurnId == null ? null : history.currentRun(), firstBuffered, latest);
+    }
+
     public boolean cancelChat(UUID sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
         var history = conversationManager.loadCompleteHistory(session.conversationId());

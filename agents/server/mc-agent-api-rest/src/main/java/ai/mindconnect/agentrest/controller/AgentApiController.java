@@ -12,6 +12,8 @@ import ai.mindconnect.agent.service.AgentRegistryService;
 import ai.mindconnect.agent.service.AgentSessionService;
 import ai.mindconnect.agentrest.dto.CreateAgentRequest;
 import ai.mindconnect.agentrest.dto.StartSessionRequest;
+import ai.mindconnect.agentrest.dto.AttachedFrame;
+import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.StreamEventFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
 import ai.mindconnect.common.Namespace;
@@ -231,6 +233,58 @@ public class AgentApiController {
         boolean cancelled = chatService.cancelChat(sessionId);
         log.info("DELETE /api/sessions/{}/chat → cancelled={}", sessionId, cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    }
+
+    @Operation(tags = "Sessions", summary = "Attach to the session's event stream",
+            description = "The reconnect story: replays every buffered event after afterSeq, "
+                    + "then continues live — a running turn's partial answer included. The "
+                    + "first frame is {type:'attached'} with the buffer bounds and the live "
+                    + "turn (null when idle); a firstBufferedSeq beyond afterSeq+1 means the "
+                    + "replay has a gap and the client should refresh from the history. Every "
+                    + "following frame carries seq (the cursor for the next reconnect), "
+                    + "turnId and run around the usual event payload. The stream stays open "
+                    + "across turns until the client disconnects or the emitter times out — "
+                    + "reattaching with the last seen seq is the intended loop.")
+    @GetMapping(value = "/sessions/{sessionId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter sessionStream(@PathVariable UUID sessionId,
+                                    @RequestParam(defaultValue = "0") long afterSeq) {
+        log.info("GET /api/sessions/{}/stream afterSeq={}", sessionId, afterSeq);
+        SseEmitter emitter = new SseEmitter(120_000L);
+
+        // The replay runs on the channel's drain thread and could outrun the
+        // attached frame below — the latch holds event frames until it is out.
+        var attachedSent = new java.util.concurrent.CountDownLatch(1);
+        AgentChatService.Attachment attachment = chatService.attach(sessionId, afterSeq, event -> {
+            try {
+                attachedSent.await();
+                emitter.send(SseEmitter.event().data(
+                        compactMapper.writeValueAsString(new SessionStreamFrame(
+                                event.seq(),
+                                event.value().turnId().toString(),
+                                event.value().run(),
+                                StreamEventFrame.from(event.value().event()))),
+                        MediaType.APPLICATION_JSON));
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        });
+        try {
+            emitter.send(SseEmitter.event().data(
+                    compactMapper.writeValueAsString(AttachedFrame.of(
+                            attachment.firstBufferedSeq(), attachment.latestSeq(),
+                            attachment.liveTurnId(), attachment.liveRun())),
+                    MediaType.APPLICATION_JSON));
+        } catch (Exception e) {
+            attachment.subscription().close();
+            emitter.completeWithError(e);
+            return emitter;
+        } finally {
+            attachedSent.countDown();
+        }
+        emitter.onCompletion(attachment.subscription()::close);
+        emitter.onTimeout(attachment.subscription()::close);
+        emitter.onError(error -> attachment.subscription().close());
+        return emitter;
     }
 
     // ── History & memory ────────────────────────────────────────────────────

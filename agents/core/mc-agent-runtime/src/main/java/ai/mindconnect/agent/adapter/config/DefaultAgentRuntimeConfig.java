@@ -22,7 +22,7 @@ import ai.mindconnect.agent.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.stream.TurnChannels;
+import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.agent.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.service.task.ToolCallWorker;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
@@ -366,12 +366,12 @@ public class DefaultAgentRuntimeConfig {
                                     DynamicToolActivations dynamicToolActivations,
                                     LlmChat llmChat,
                                     LlmCallTraceRepository llmCallTraceRepository,
-                                    TurnChannels turnChannels,
+                                    SessionChannels sessionChannels,
                                     AgentTaskRunner agentTaskRunner,
                                     WorkingMemoryRepository workingMemoryRepository) {
         return new AgentTurnWorker(conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, dynamicToolActivations,
-                llmChat, llmCallTraceRepository, turnChannels,
+                llmChat, llmCallTraceRepository, sessionChannels,
                 agentTaskRunner, workingMemoryRepository);
     }
 
@@ -383,11 +383,11 @@ public class DefaultAgentRuntimeConfig {
                                   ToolRegistry toolRegistry,
                                   DynamicToolActivations dynamicToolActivations,
                                   ToolExecutor toolExecutor,
-                                  TurnChannels turnChannels,
+                                  SessionChannels sessionChannels,
                                   ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
         return new ToolCallWorker(conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, toolRegistry, dynamicToolActivations, toolExecutor,
-                turnChannels, approvalStore);
+                sessionChannels, approvalStore);
     }
 
     @Bean
@@ -398,13 +398,13 @@ public class DefaultAgentRuntimeConfig {
                                        WorkingMemoryRepository workingMemoryRepository,
                                        PromptRenderer promptRenderer,
                                        AgentTaskRunner agentTaskRunner,
-                                       TurnChannels turnChannels,
+                                       SessionChannels sessionChannels,
                                        LocalTaskQueue taskQueue,
                                        ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
                                        ExecutorService turnExecutor) {
         return new AgentChatService(sessionService, definitionRepository, conversationManager,
                 memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                agentTaskRunner, turnChannels, taskQueue, approvalStore, turnExecutor);
+                agentTaskRunner, sessionChannels, taskQueue, approvalStore, turnExecutor);
     }
 
     /**
@@ -413,7 +413,7 @@ public class DefaultAgentRuntimeConfig {
      * reference into a running turn (concept 16, decision 3).
      */
     @Bean
-    public TurnChannels turnChannels() {
-        return new TurnChannels();
+    public SessionChannels sessionChannels() {
+        return new SessionChannels();
     }
 }
