@@ -58,18 +58,22 @@ jobs:
           esac
           mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am
 
-      # Stable asset names: no version in them, so a client can hard-code the
-      # URL. What you actually got is in snapshot.txt next to them.
+      # The assets keep the version in their name — a jar sitting in a Downloads
+      # folder has to be able to say what it is. That name is stable for as long
+      # as the development version is: it only moves when a release opens the
+      # next -SNAPSHOT. A client that wants to be sure asks the API for the
+      # release's asset list rather than assembling the URL by hand.
       - name: Collect the assets
         run: |
           set -euo pipefail
           mkdir -p snapshot-assets
           ver=$(mvn -B -q -ntp -DforceStdout help:evaluate -Dexpression=project.version)
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
           for m in server/mc-agent-admin-ui-app:mc-agent-admin-ui-app \
                    client/mc-agent-cli:mc-agent-cli; do
             jar="agents/${m%%:*}/target/${m##*:}-${ver}-exec.jar"
             if [ -f "$jar" ]; then
-              cp "$jar" "snapshot-assets/${m##*:}-exec.jar"
+              cp "$jar" "snapshot-assets/"
               echo "collected $jar"
             fi
           done
@@ -84,24 +88,25 @@ jobs:
 
       # `gh release create` will not move an existing tag, so the rolling
       # release is replaced rather than edited. The assets are gone for the few
-      # seconds in between — a snapshot channel can afford that, a stable
-      # download URL is what it cannot do without.
+      # seconds in between — a snapshot channel can afford that.
       - name: Replace the rolling snapshot release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/snapshot"
           gh release delete snapshot --yes --cleanup-tag || true
           gh release create snapshot snapshot-assets/* \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Snapshot $(date -u +%Y-%m-%d)" \
-            --notes "Built from \`$GITHUB_REF_NAME\` at ${GITHUB_SHA::7}.
+            --title "Snapshot $VERSION ($(date -u +%Y-%m-%d))" \
+            --notes "Version \`$VERSION\`, built from \`$GITHUB_REF_NAME\` at ${GITHUB_SHA::7}.
 
-          Not a release: these assets are replaced in place, under the same URLs. For something stable, take a version from [Maven Central](https://central.sonatype.com/namespace/ai.mindconnect) or a tagged release.
-
-          Run either jar with a JDK 21:
+          Not a release: these assets are replaced in place whenever the snapshot workflow runs. For something that stays put, take a version from [Maven Central](https://central.sonatype.com/namespace/ai.mindconnect) or a tagged release.
 
           \`\`\`bash
-          java -jar mc-agent-admin-ui-app-exec.jar
-          \`\`\`"
+          curl -LO $base/mc-agent-admin-ui-app-$VERSION-exec.jar
+          java -jar mc-agent-admin-ui-app-$VERSION-exec.jar
+          \`\`\`
+
+          The CLI is \`mc-agent-cli-$VERSION-exec.jar\`, next to it. Both need a JDK 21. The file names carry the development version, so they change when a release opens the next one — \`snapshot.txt\` names the current one, and the [release API](https://docs.github.com/en/rest/releases/releases#get-a-release-by-tag-name) lists the assets."
