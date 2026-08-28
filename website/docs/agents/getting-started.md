@@ -13,6 +13,31 @@ sidebar_position: 1
 That's it for local use — **no Docker, no Keycloak, no database** are needed to
 run the Admin UI in its default mode.
 
+## Run it without building
+
+If you only want to *use* the Admin UI, take a runnable jar instead of a
+checkout. The `snapshot` pre-release carries the current development build of
+main as a single self-contained file:
+
+```bash
+curl -LO https://github.com/mindconnect-ai/mindconnect/releases/download/snapshot/mc-agent-admin-ui-app-0.0.3-SNAPSHOT-exec.jar
+export MINDCONNECT_ENCRYPTION_SECRET_KEY="change-me-to-a-32-char-secret!!!"
+java -jar mc-agent-admin-ui-app-0.0.3-SNAPSHOT-exec.jar
+```
+
+The file name carries the version, so it changes when a release opens the next
+one. `snapshot.txt` next to it names the current build (version, commit, build
+time) — that is the file to read before assembling a URL.
+
+These are development builds, replaced in place whenever the snapshot workflow
+runs. Released versions live on [Maven
+Central](https://central.sonatype.com/namespace/ai.mindconnect).
+
+Prefer not to touch a terminal at all? The [desktop
+launcher](https://github.com/mindconnect-ai/mc-clients/releases/latest)
+downloads either channel, edits the environment and starts and stops the
+server for you.
+
 ## Build
 
 ```bash

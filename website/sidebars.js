@@ -24,6 +24,7 @@ const sidebars = {
           ],
         },
         'agents/cli',
+        'agents/rest-api',
         'agents/llm-gateway',
         {
           type: 'category',
