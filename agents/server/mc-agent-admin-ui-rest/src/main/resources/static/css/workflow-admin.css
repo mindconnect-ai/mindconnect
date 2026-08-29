@@ -36,9 +36,11 @@
 
 /* The type as written, not shouted: small caps and the faintest ink made
    the one thing that says what a step DOES the hardest thing to read. */
+/* No column: the name follows its type at the row gap, the way a label
+   follows a keyword. The 8.5rem column aligned names vertically but pushed
+   every name a hand's width away from what it belongs to. */
 .wf-step-type {
   display: inline-block;
-  min-width: 8.5rem;
   font-size: var(--sui-text-sm);
   font-weight: 500;
   /* Full body ink. Muted was still a grey next to the name — the type is
@@ -69,10 +71,22 @@
 }
 
 /* The add-step row keeps a little air so it reads as an affordance, not a
-   row of the list. */
+   row of the list — and it only appears when the mouse is over its
+   container (or a keyboard reaches it): a list of steps should read as
+   the workflow, not as the workflow plus one button per nesting level.
+   Opacity, not display, so nothing jumps when it fades in. */
 .wf-body > .sui-btn,
 .wf-nested > .sui-btn {
-  margin: var(--sui-space-sm) var(--sui-space-md);
+  margin: var(--sui-space-xs) var(--sui-space-md);
+  opacity: 0;
+  transition: opacity var(--sui-duration-fast, 120ms);
+}
+
+.wf-body:hover > .sui-btn,
+.wf-nested:hover > .sui-btn,
+.wf-body:focus-within > .sui-btn,
+.wf-nested:focus-within > .sui-btn {
+  opacity: 1;
 }
 
 /* --- Run view ---------------------------------------------------------- */
