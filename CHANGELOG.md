@@ -36,6 +36,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **The Stores tab can create stores again.** Moving the Vector Stores actions
+  into the page header had tied the button to the tab the page was opened on;
+  switching tabs now swaps the header action with it, so Stores gets New Store
+  and Templates gets New Template.
+- **The chat history drawer stays opaque under the mouse.** A leftover rule
+  from when the history was a side column turned the drawer transparent on
+  hover. The drawer also opens below the page header now (with its open/close
+  controls drawn as panel icons rather than arrows), the host's "…" menu
+  (workspace, traces, memory, todos) is back in the chat header, and the
+  token-usage gauge is no longer faded.
+
 - **The session tools in the admin UI work for a chat without an agent.**
   Working memory, traces, todos and the workspace dialog resolved the agent
   straight from the registry, so all four answered 404 for a chat whose agent

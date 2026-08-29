@@ -435,18 +435,13 @@
     background: var(--sui-color-surface);
 }
 
-.chat-conversation .chat-token-usage {
-    opacity: .55;
-    transition: opacity .15s ease;
-}
-
-.chat-conversation .chat-token-usage:hover {
-    opacity: 1;
-}
-
+/* Legible, not decorative: the readout takes the body ink — muted grey at
+   12px was below comfortable contrast — and the bar itself stays fully
+   opaque (an earlier 55% fade made the whole gauge disappear into the
+   header). */
 .chat-conversation .chat-token-text {
-    color: var(--sui-color-text-muted);
-    font-size: 11.5px;
+    color: var(--sui-color-text-body);
+    font-size: var(--sui-text-xs, 12px);
 }
 
 .chat-conversation .chat-token-usage .sui-progress--bar {
@@ -712,16 +707,11 @@
 
 
 /* ── The history ──────────────────────────────────────────────────────────
-   A sidebar of chats is a place you look, not a panel you work in: it loses
-   its card and sits directly on the page, and the current chat is marked by
-   a soft tint rather than by a blue label. */
-#chat-menu.sui-menu,
-#chat-menu.sui-menu:hover {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-}
-
+   The current chat is marked by a soft tint rather than by a blue label.
+   (The rule that once stripped the menu's card — from when the history stood
+   beside the conversation — is gone: its :hover variant outranked the
+   drawer's opaque surface below, which made the drawer turn transparent the
+   moment the mouse entered it.) */
 #chat-menu .sui-menu-item .sui-menu-link {
     border-radius: 10px;
     color: var(--sui-color-text-body);
@@ -809,6 +799,16 @@
 #chat-menu.sui-menu--overlay {
     background: var(--sui-color-surface);
     border-inline-end: 1px solid var(--sui-color-border);
+    /* It comes out from under the header, not over it: the open button
+       floats just below the header, and a drawer should emerge where its
+       button is. The header stays visible and undimmed above both drawer
+       and scrim. */
+    inset-block-start: var(--sui-list-header-h, 63px);
+    height: calc(100% - var(--sui-list-header-h, 63px));
+}
+
+#chat-app-shell .sui-menu-backdrop {
+    inset-block-start: var(--sui-list-header-h, 63px);
 }
 
 /* Shadow only while open. Hidden, the drawer is merely translated off to the
@@ -823,4 +823,20 @@
    control you want is at its edge, next to what you just opened. */
 #chat-menu .chat-drawer-close {
     margin-inline-start: auto;
+}
+
+/* ── The header's right-hand tools ────────────────────────────────────────
+   Token bar and the host's "…" overflow share the headerExtra slot. A
+   horizontal stack with the header's own rhythm — the framework's default
+   16px stack gap is a layout gap, not a toolbar gap. */
+.chat-container .chat-header-tools {
+    gap: var(--sui-space-md, 12px);
+}
+
+/* The "…" trigger is a 36px square by default — 6px taller than the 30px
+   controls the header's height is calibrated to, which pushed this one
+   header to 69px while every other page sat at 63. */
+.chat-container .chat-header-tools .sui-menu-button-trigger {
+    width: 30px;
+    height: 30px;
 }

@@ -37,11 +37,11 @@ body {
    a centred card reads as a floating island on a wide monitor, while the
    right-hand whitespace reads as intentional breathing room. Two caps:
    tables and lists may run wide, forms and detail cards stay at a
-   readable line length. */
+   readable line length. (No auto margin here: the content area is a flex
+   column now, and an auto cross-axis margin eats the stretch — every card
+   collapsed to the width of its own content.) */
 .sui-shell-content > * {
     max-width: 1400px;
-    margin-left: 0;
-    margin-right: auto;
 }
 .sui-shell-content .sui-form:not(.chat-form),
 .sui-shell-content .sui-detail {

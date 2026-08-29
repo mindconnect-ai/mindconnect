@@ -84,6 +84,10 @@ public final class MessageListComponent implements UiComponent {
     private UUID parentSessionId;
     /** Bubbled sub-agent approval cards (from the ToolApprovalStore), rendered after the history. */
     private List<UiList.Item> bubbledApprovalCards = List.of();
+    /** The host's overflow menu (parent session, back to agent, memory/trace
+     *  dialogs), shown as a "…" button in the header. Built by ChatPage from
+     *  the host links; null when the host contributes nothing. */
+    private ai.mindconnect.ui.model.UiMenuButton overflow;
 
 
 
@@ -123,6 +127,17 @@ public final class MessageListComponent implements UiComponent {
         return this;
     }
 
+    /**
+     * The "…" menu on the right of the header. It lives on this component —
+     * not on the page around it — because the header is re-rendered by every
+     * {@code replaceAll()} during a turn, and a menu attached anywhere else
+     * would vanish the first time the agent answered.
+     */
+    public MessageListComponent withOverflow(ai.mindconnect.ui.model.UiMenuButton menu) {
+        this.overflow = menu;
+        return this;
+    }
+
     @Override
     public String id() {
         return "msg-list-" + sessionId;
@@ -145,9 +160,22 @@ public final class MessageListComponent implements UiComponent {
         // about whether a sidebar happens to be open.
         // No cssClass: an icon action does not carry one through to the
         // button. The id is what the stylesheet and chat-ui.js hold on to.
+        // Lucide's panel-left pair: a sidebar with an arrow opening out of
+        // it — the injected close button shows its mirror-image twin. Plain
+        // arrows read as forward/back navigation, which this is not.
         list.action(ai.mindconnect.ui.model.UiAction.icon("chat-history", "Chats")
-                .icon("menu"));
-        list.headerExtra(new TokenUsageComponent(id(), memory).render());
+                .icon("panel-left-open"));
+        var tokenBar = new TokenUsageComponent(id(), memory).render();
+        if (overflow == null) {
+            list.headerExtra(tokenBar);
+        } else {
+            // Token bar and overflow share the headerExtra slot, side by side.
+            list.headerExtra(ai.mindconnect.ui.model.UiStack.of(id() + "-tools")
+                    .direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL)
+                    .child(tokenBar)
+                    .child(overflow)
+                    .withCssClass("chat-header-tools"));
+        }
 
         // Sort by sequenceNum to be safe — persisted ordering should already
         // be correct but the component does not trust upstream.

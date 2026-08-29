@@ -91,7 +91,54 @@ public final class ChatPage {
 
     /** Hands the host's links to the components that render them. */
     public ChatPage withHostLinks(ai.mindconnect.chatui.ui.ChatHostLinks links) {
+        var overflow = overflowMenu(links == null
+                ? ai.mindconnect.chatui.ui.ChatHostLinks.NONE : links);
+        if (overflow != null) {
+            this.messages.withOverflow(overflow);
+        }
         return this;
+    }
+
+    /**
+     * The exits, collected behind one "…" button: up to the parent session
+     * for a sub-agent chat, back to the agent, and whatever dialogs the host
+     * offers (working memory, traces, todos, workspace). Null when there is
+     * nothing to show — a standalone chat publishes no host links and has no
+     * parent, so it gets no button at all.
+     */
+    private ai.mindconnect.ui.model.UiMenuButton overflowMenu(
+            ai.mindconnect.chatui.ui.ChatHostLinks links) {
+        var items = new java.util.ArrayList<ai.mindconnect.ui.model.UiMenuItem>();
+
+        if (session.parentSessionId() != null) {
+            items.add(ai.mindconnect.ui.model.UiMenuItem.link("parent", "Parent session",
+                    "/chat/sessions/" + session.parentSessionId()).icon("arrow-up"));
+        }
+        // Only a chat that references a registry agent has an agent to go
+        // back to. An inline session agent's id resolves to nothing, so the
+        // link would land on an agent page for an agent that does not exist.
+        boolean registryAgent = session.mainAgent()
+                .map(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
+                .orElse(true);
+        if (registryAgent) {
+            String back = links.backHref(session.agentDefinitionId(), session.id());
+            if (back != null) {
+                items.add(ai.mindconnect.ui.model.UiMenuItem.link("back", "Back to agent", back)
+                        .icon("back"));
+            }
+        }
+        for (var tool : links.sessionTools(session.id())) {
+            items.add(ai.mindconnect.ui.model.UiMenuItem.of(tool.id(), tool.label())
+                    .icon(tool.icon())
+                    .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", tool.url())));
+        }
+        if (items.isEmpty()) {
+            return null;
+        }
+        var button = ai.mindconnect.ui.model.UiMenuButton.of("chat-overflow");
+        button.icon("more");
+        items.forEach(button::item);
+        return button;
     }
 
     // ── Full render ────────────────────────────────────────────────────────

@@ -294,8 +294,7 @@ public class ChatUiController {
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
-                sessions, session, agent.name(), chat.renderContent())
-                .withHostLinks(hostLinks).render();
+                sessions, session, agent.name(), chat.renderContent()).render();
         var page = UiPage.of("/chat/sessions/" + session.id(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.
         if (!chat.activeStreams().isEmpty()) {

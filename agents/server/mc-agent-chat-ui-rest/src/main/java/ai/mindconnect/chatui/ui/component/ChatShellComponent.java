@@ -2,14 +2,10 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.chatui.ui.ChatHostLinks;
 import ai.mindconnect.ui.model.UiAppShell;
-import ai.mindconnect.ui.model.UiMenuButton;
-import ai.mindconnect.ui.model.UiHeader;
 import ai.mindconnect.ui.model.UiMenu;
 import ai.mindconnect.ui.model.UiMenuItem;
 import ai.mindconnect.ui.model.UiNode;
-import ai.mindconnect.ui.model.UiText;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -37,7 +33,6 @@ public final class ChatShellComponent implements UiComponent {
     private final AgentSession active;
     private final String agentName;
     private final UiNode content;
-    private ChatHostLinks hostLinks = ChatHostLinks.NONE;
 
     public ChatShellComponent(List<AgentSession> sessions, AgentSession active,
                               String agentName, UiNode content) {
@@ -45,16 +40,6 @@ public final class ChatShellComponent implements UiComponent {
         this.active = active;
         this.agentName = agentName;
         this.content = content;
-    }
-
-    /**
-     * What the embedding app adds to the chat. The links land in an overflow
-     * menu rather than the header itself: they are a way out of the
-     * conversation, and a conversation should not be framed by five exits.
-     */
-    public ChatShellComponent withHostLinks(ChatHostLinks links) {
-        this.hostLinks = links == null ? ChatHostLinks.NONE : links;
-        return this;
     }
 
     @Override
@@ -77,66 +62,6 @@ public final class ChatShellComponent implements UiComponent {
         return UiAppShell.of(ID)
                 .menu(menu())
                 .content(content);
-    }
-
-    /**
-     * The agent leads, the session title follows it, and the burger folds the
-     * history away — a long conversation deserves the width. Everything that
-     * leaves the chat (back to the agent, the host's inspection dialogs) hides
-     * behind one overflow button on the right.
-     */
-    private UiHeader header() {
-        var header = UiHeader.of(agentName == null ? "Chat" : agentName)
-                .brandHref("/chat")
-                .menuToggle(MENU_ID);
-        if (active == null) {
-            return header;
-        }
-        String title = active.title() != null && !active.title().isBlank()
-                ? active.title()
-                : "New chat";
-        header.extra(UiText.of("chat-title", title));
-
-        var overflow = overflowMenu();
-        if (overflow != null) {
-            header.extra(overflow);
-        }
-        return header;
-    }
-
-    /**
-     * The exits, collected: up to the parent session for a sub-agent chat,
-     * back to the agent, and whatever dialogs the host offers. Null when there
-     * is nothing to show — a standalone chat publishes no host links and has
-     * no parent, so it gets no button at all.
-     */
-    private UiMenuButton overflowMenu() {
-        var items = new java.util.ArrayList<UiMenuItem>();
-
-        if (active.parentSessionId() != null) {
-            items.add(UiMenuItem.link("parent", "Parent session",
-                    "/chat/sessions/" + active.parentSessionId()).icon("arrow-up"));
-        }
-        // Only a chat that references a registry agent has an agent to go back
-        // to. An inline session agent's id resolves to nothing, so the link
-        // would land on an agent page for an agent that does not exist.
-        if (boundToRegistryAgent()) {
-            String back = hostLinks.backHref(active.agentDefinitionId(), active.id());
-            if (back != null) {
-                items.add(UiMenuItem.link("back", "Back to agent", back).icon("back"));
-            }
-        }
-        for (var tool : hostLinks.sessionTools(active.id())) {
-            items.add(UiMenuItem.of(tool.id(), tool.label()).icon(tool.icon())
-                    .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", tool.url())));
-        }
-        if (items.isEmpty()) {
-            return null;
-        }
-        var button = UiMenuButton.of("chat-overflow");
-        button.icon("more");
-        items.forEach(button::item);
-        return button;
     }
 
     /** New chat on top, then the conversations, newest first. */
@@ -165,17 +90,6 @@ public final class ChatShellComponent implements UiComponent {
                     .selected(s.id().equals(activeId)));
         }
         return menu;
-    }
-
-    /**
-     * Whether this chat runs an agent from the registry — either a
-     * {@code ref} session agent, or a session from before session agents
-     * existed, whose {@code agentDefinitionId} was always a real one.
-     */
-    private boolean boundToRegistryAgent() {
-        return active.mainAgent()
-                .map(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
-                .orElse(true);
     }
 
     private static String ago(Instant when) {

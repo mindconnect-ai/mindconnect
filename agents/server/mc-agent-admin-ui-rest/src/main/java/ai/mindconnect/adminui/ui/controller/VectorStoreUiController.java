@@ -173,12 +173,38 @@ public class VectorStoreUiController {
         // this is one node instead of two and the empty <ul> goes away. Until
         // then, borrowing the right-looking header beats hand-building a
         // lookalike that drifts from it.
-        UiList header = UiList.of("vs-header", "Vector Stores").icon("database");
+        UiList header = headerFor(tab);
 
-        // The action belongs to the tab you are on, and the controller knows
-        // which that is — so it sits in the page header and changes with the
-        // tab, rather than each table keeping a header bar of its own that
-        // holds nothing but a button.
+        // One tab per concern, each carrying its icon. The tables carry no
+        // titles: the tab label names them and the header above names the
+        // screen. Switching a tab is a client-side panel swap, but the
+        // header's action belongs to the tab you are on — so each click also
+        // asks the server for the matching header (a REPLACE patch on
+        // vs-header). Without this, the button rendered for the initial tab
+        // simply stayed, and the Stores tab had no way to create a store.
+        UiSection tabs = UiSection.of("vs-page", null);
+        tabs.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database")
+                .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=templates")));
+        tabs.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server")
+                .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=stores")));
+        tabs.getSections().add(UiSectionEntry.of("files", "Files", filesTab).icon("file")
+                .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=files")));
+        tabs.initialSection(tab);
+
+        UiStack page = UiStack.of("vs-shell").child(header).child(tabs);
+        return UiPage.of(BASE, page);
+    }
+
+    /**
+     * The page's header, and it is a UiList with no items on purpose.
+     * This screen needs what every other one has — an icon, a title and
+     * the primary action in one bar — above a set of tabs, and a
+     * header-only list renders the identical bar to the one on Agents.
+     * The action follows the active tab; Files has none (its uploads
+     * happen inside the tab).
+     */
+    private UiList headerFor(String tab) {
+        UiList header = UiList.of("vs-header", "Vector Stores").icon("database");
         String active = tab == null ? "templates" : tab;
         if ("stores".equals(active)) {
             header.action(UiAction.primary("new-store", "New Store").icon("add")
@@ -187,18 +213,15 @@ public class VectorStoreUiController {
             header.action(UiAction.primary("new-template", "New Template").icon("add")
                     .dispatch("GET", "/admin/vector-stores/templates/new"));
         }
+        return header;
+    }
 
-        // One tab per concern, each carrying its icon. The tables carry no
-        // titles: the tab label names them and the header above names the
-        // screen.
-        UiSection tabs = UiSection.of("vs-page", null);
-        tabs.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database"));
-        tabs.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server"));
-        tabs.getSections().add(UiSectionEntry.of("files", "Files", filesTab).icon("file"));
-        tabs.initialSection(tab);
-
-        UiStack page = UiStack.of("vs-shell").child(header).child(tabs);
-        return UiPage.of(BASE, page);
+    /** The header that matches a tab — fired by the tab's onClick, REPLACEs vs-header. */
+    @GetMapping("/header")
+    public ai.mindconnect.ui.model.UiPatch headerPatch(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String tab) {
+        return ai.mindconnect.ui.model.UiPatch.of()
+                .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-header", headerFor(tab)));
     }
 
     private static String readableSize(long bytes) {
