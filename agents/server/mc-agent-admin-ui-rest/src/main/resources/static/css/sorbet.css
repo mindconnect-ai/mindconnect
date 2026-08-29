@@ -130,11 +130,6 @@
     line-height: 1.6;
 }
 
-:root.sui-theme-sorbet :is(h1, h2, h3, h4) {
-    letter-spacing: -.011em;
-    color: var(--sui-color-text-strong);
-}
-
 :root.sui-theme-sorbet .sui-shell,
 :root.sui-theme-sorbet .sui-shell-body,
 :root.sui-theme-sorbet .sui-shell-content {
@@ -152,10 +147,6 @@
    composer are excluded — a theme selector carries the :root class and
    outranks the module's own rules. */
 
-:root.sui-theme-sorbet :is(.sui-list, .sui-table, .sui-tree):hover {
-    box-shadow: var(--sui-shadow-card);
-}
-
 :root.sui-theme-sorbet :is(.sui-table, .sui-tree, .sui-detail, .sui-menu),
 :root.sui-theme-sorbet .sui-form:not(.chat-form),
 :root.sui-theme-sorbet .sui-list:not(.chat-container) {
@@ -163,6 +154,8 @@
     box-shadow: var(--sui-shadow-card);
 }
 
+/* Inside a tabbed panel the panel is the card — the lifted-card treatment
+   above must not stack a second shadow onto its children. */
 :root.sui-theme-sorbet .sui-tabs + .sui-panels > .sui-panel > :is(.sui-list, .sui-table, .sui-detail, .sui-form),
 :root.sui-theme-sorbet .sui-tabs + .sui-panels > .sui-panel > .sui-stack > :is(.sui-list, .sui-table) {
     box-shadow: none;
@@ -191,7 +184,7 @@
 :root.sui-theme-sorbet .sui-menu {
     background: transparent;
     border: none;
-    box-shadow: none;
+    box-shadow: none;   /* the card rule above names .sui-menu too */
 }
 
 :root.sui-theme-sorbet .sui-menu-link {
@@ -267,7 +260,6 @@
 }
 
 :root.sui-theme-sorbet .sui-btn--secondary {
-    box-shadow: none;
     border: 1px solid var(--sui-color-border-strong);
     background: var(--sui-color-surface);
 }
@@ -327,41 +319,14 @@
 :root.sui-theme-sorbet .sui-toast--warn    { --sui-toast-bg: var(--sui-color-warning-bg);   --sui-toast-ring: var(--sui-color-warning-border); --sui-toast-fg: var(--sui-color-warning); }
 :root.sui-theme-sorbet .sui-toast--error   { --sui-toast-bg: var(--sui-color-danger-bg);    --sui-toast-ring: var(--sui-color-danger-border); --sui-toast-fg: var(--sui-color-danger); }
 
-:root.sui-theme-sorbet .sui-scroll-latest {
-    background: var(--sui-color-surface);
-    border: none;
-    box-shadow: var(--sui-shadow-pop);
-    color: var(--sui-color-text-body);
-}
-
 
 /* ══ Progress & badges ═══════════════════════════════════════════════════ */
-
-:root.sui-theme-sorbet .sui-progress-track {
-    background: var(--sui-color-surface-alt);
-}
-
-:root.sui-theme-sorbet .sui-progress-fill {
-    background: var(--sui-color-primary);
-}
-
-:root.sui-theme-sorbet .sui-menu-button-item-badge,
-:root.sui-theme-sorbet .sui-menu-badge {
-    background: var(--sui-color-surface-alt);
-    color: var(--sui-color-text-muted);
-    font-weight: 400;
-}
 
 
 /* ══ Prose & code ════════════════════════════════════════════════════════
    The same framework bug the other themes patch: `.sui-list ul { list-style:
    none }` is meant for the list's own rows, and markdown nests inside a list
    too. One line in sui.css would retire all four copies by now. */
-
-:root.sui-theme-sorbet .sui-markdown ul { list-style: disc;    padding-inline-start: 1.35em; }
-:root.sui-theme-sorbet .sui-markdown ol { list-style: decimal; padding-inline-start: 1.35em; }
-:root.sui-theme-sorbet .sui-markdown li { margin-block: .25em; }
-:root.sui-theme-sorbet .sui-markdown li::marker { color: var(--sui-color-text-subtle); }
 
 :root.sui-theme-sorbet .sui-markdown :not(pre) > code {
     background: var(--sui-color-primary-soft);
@@ -370,13 +335,6 @@
     border-radius: 6px;
     padding: .1em .35em;
     font-size: .9em;
-}
-
-:root.sui-theme-sorbet .sui-markdown pre {
-    border-radius: var(--sui-radius-md);
-    padding: 1rem 1.1rem;
-    font-size: .875em;
-    line-height: 1.6;
 }
 
 

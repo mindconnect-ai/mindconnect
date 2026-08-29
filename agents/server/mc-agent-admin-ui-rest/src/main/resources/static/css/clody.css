@@ -98,8 +98,6 @@
     --sui-font-size:   15px;
 
     /* No card depth. What is left is for things that actually float. */
-    --sui-shadow-sm:      none;
-    --sui-shadow-card:    none;
     --sui-shadow-pop:     0 2px 8px rgba(28, 27, 24, .06), 0 12px 32px rgba(28, 27, 24, .10);
     --sui-shadow-popover: 0 2px 8px rgba(28, 27, 24, .08), 0 16px 40px rgba(28, 27, 24, .14);
     --sui-focus-ring:     0 0 0 3px rgba(176, 85, 46, .16);
@@ -131,11 +129,6 @@
     line-height: 1.6;
 }
 
-:root.sui-theme-clody :is(h1, h2, h3, h4) {
-    letter-spacing: -.011em;
-    color: var(--sui-color-text-strong);
-}
-
 /* The page itself carries the colour; nothing inset into it needs its own. */
 :root.sui-theme-clody .sui-shell,
 :root.sui-theme-clody .sui-shell-body,
@@ -145,18 +138,12 @@
 
 
 /* ══ Depth ═══════════════════════════════════════════════════════════════
-   The default sheet gives every container a card shadow and lifts it further
-   on hover. Both are turned off here in one place — the shadow through the
-   token, the hover lift through the two rules that hard-code it. What is
-   left is a hairline, and containers that do not move when the mouse crosses
-   them. */
+   The framework itself keeps the flow flat now (no card shadows, no hover
+   lift); what Clody adds is its own separator — a hairline around each
+   container, because bone-on-white is too faint a surface step to carry
+   the job alone. */
 
-:root.sui-theme-clody :is(.sui-list, .sui-table, .sui-tree):hover {
-    box-shadow: none;
-}
-
-/* Same for the header rule below and the item rules further down: the
-   conversation's own header is styled by the chat module. */
+/* The conversation's own header is styled by the chat module. */
 :root.sui-theme-clody .sui-list.chat-container > .sui-list-header {
     border-bottom: none;
 }
@@ -170,7 +157,6 @@
 :root.sui-theme-clody :is(.sui-table, .sui-tree, .sui-form, .sui-detail, .sui-menu),
 :root.sui-theme-clody .sui-list:not(.chat-container) {
     border: 1px solid var(--sui-color-border);
-    box-shadow: none;
 }
 
 /* Panels inside tabs are already frameless in the default sheet; keep them
@@ -322,12 +308,7 @@
 }
 
 :root.sui-theme-clody .sui-btn--secondary {
-    box-shadow: none;
     border: 1px solid var(--sui-color-border-strong);
-}
-
-:root.sui-theme-clody .sui-btn--primary {
-    box-shadow: none;
 }
 
 :root.sui-theme-clody .sui-icon-btn {
@@ -375,11 +356,6 @@
    the page and have to say so. They keep a shadow — a warm one, and softer
    than the default's cool drop. */
 
-:root.sui-theme-clody :is(.sui-dialog, .sui-menu-button-popover, .sui-tab-more-menu, .sui-toast) {
-    border: 1px solid var(--sui-color-border);
-    box-shadow: var(--sui-shadow-pop);
-}
-
 :root.sui-theme-clody .sui-dialog {
     border-radius: 18px;
 }
@@ -407,30 +383,9 @@
 /* The scroll-to-latest button floats over the conversation, so it is the one
    round thing on the page that keeps a shadow — otherwise it disappears into
    whatever it happens to be sitting on. */
-:root.sui-theme-clody .sui-scroll-latest {
-    background: var(--sui-color-surface);
-    border: 1px solid var(--sui-color-border);
-    box-shadow: var(--sui-shadow-pop);
-    color: var(--sui-color-text-body);
-}
 
 
 /* ══ Progress & badges ═══════════════════════════════════════════════════ */
-
-:root.sui-theme-clody .sui-progress-track {
-    background: var(--sui-color-border-soft);
-}
-
-:root.sui-theme-clody .sui-progress-fill {
-    background: var(--sui-color-primary);
-}
-
-:root.sui-theme-clody .sui-menu-button-item-badge,
-:root.sui-theme-clody .sui-menu-badge {
-    background: var(--sui-color-surface-alt);
-    color: var(--sui-color-text-muted);
-    font-weight: 400;
-}
 
 
 /* ══ Prose & code ════════════════════════════════════════════════════════
@@ -439,30 +394,6 @@
    any markdown rendered into a list. The framework fix is to scope that rule
    to the list's own `> ul`; until then the markers are put back here, for
    every markdown block rather than only the chat's. */
-
-:root.sui-theme-clody .sui-markdown ul { list-style: disc;    padding-inline-start: 1.35em; }
-:root.sui-theme-clody .sui-markdown ol { list-style: decimal; padding-inline-start: 1.35em; }
-:root.sui-theme-clody .sui-markdown li { margin-block: .25em; }
-:root.sui-theme-clody .sui-markdown li::marker { color: var(--sui-color-text-subtle); }
-
-:root.sui-theme-clody .sui-markdown :not(pre) > code {
-    background: var(--sui-color-surface-alt);
-    border: none;
-    border-radius: 5px;
-    padding: .1em .35em;
-    font-size: .9em;
-}
-
-:root.sui-theme-clody .sui-markdown pre {
-    border-radius: var(--sui-radius-md);
-    padding: 1rem 1.1rem;
-    font-size: .875em;
-    line-height: 1.6;
-}
-
-:root.sui-theme-clody .sui-markdown blockquote {
-    color: var(--sui-color-text-muted);
-}
 
 
 /* The chat's own tint. It defaults to surface-alt, which on this palette is

@@ -85,8 +85,6 @@
 
     /* A shadow on a dark ground does almost nothing, so the containers below
        take a border instead and the depth is kept for what floats. */
-    --sui-shadow-sm:      none;
-    --sui-shadow-card:    none;
     --sui-shadow-pop:     0 2px 8px rgba(0, 0, 0, .5), 0 16px 40px rgba(0, 0, 0, .55);
     --sui-shadow-popover: 0 2px 8px rgba(0, 0, 0, .55), 0 20px 48px rgba(0, 0, 0, .6);
     --sui-focus-ring:     0 0 0 3px rgba(179, 157, 255, .28);
@@ -141,11 +139,6 @@
     line-height: 1.6;
 }
 
-:root.sui-theme-amethyst :is(h1, h2, h3, h4) {
-    letter-spacing: -.011em;
-    color: var(--sui-color-text-strong);
-}
-
 :root.sui-theme-amethyst .sui-shell,
 :root.sui-theme-amethyst .sui-shell-body,
 :root.sui-theme-amethyst .sui-shell-content {
@@ -159,15 +152,10 @@
    does the work. The chat's list and composer are excluded — a theme
    selector carries the :root class and outranks the module's own rules. */
 
-:root.sui-theme-amethyst :is(.sui-list, .sui-table, .sui-tree):hover {
-    box-shadow: none;
-}
-
 :root.sui-theme-amethyst :is(.sui-table, .sui-tree, .sui-detail, .sui-menu),
 :root.sui-theme-amethyst .sui-form:not(.chat-form),
 :root.sui-theme-amethyst .sui-list:not(.chat-container) {
     border: 1px solid var(--sui-color-border);
-    box-shadow: none;
 }
 
 :root.sui-theme-amethyst .sui-tabs + .sui-panels > .sui-panel > :is(.sui-list, .sui-table, .sui-detail, .sui-form),
@@ -274,17 +262,12 @@
 }
 
 :root.sui-theme-amethyst .sui-btn--secondary {
-    box-shadow: none;
     border: 1px solid var(--sui-color-border-strong);
     background: var(--sui-color-surface);
 }
 
 :root.sui-theme-amethyst .sui-btn--secondary:hover:not(:disabled) {
     background: var(--sui-color-surface-alt);
-}
-
-:root.sui-theme-amethyst .sui-btn--primary {
-    box-shadow: none;
 }
 
 :root.sui-theme-amethyst .sui-icon-btn {
@@ -320,62 +303,14 @@
     border-bottom-color: var(--sui-color-primary);
 }
 
-:root.sui-theme-amethyst :is(.sui-dialog, .sui-menu-button-popover, .sui-tab-more-menu, .sui-toast) {
-    background: var(--sui-color-surface);
-    border: 1px solid var(--sui-color-border);
-    box-shadow: var(--sui-shadow-pop);
-}
-
-:root.sui-theme-amethyst .sui-scroll-latest {
-    background: var(--sui-color-surface);
-    border: 1px solid var(--sui-color-border-strong);
-    box-shadow: var(--sui-shadow-pop);
-    color: var(--sui-color-text-body);
-}
-
 
 /* ══ Progress & badges ═══════════════════════════════════════════════════ */
-
-:root.sui-theme-amethyst .sui-progress-track {
-    background: var(--sui-color-surface-alt);
-}
-
-:root.sui-theme-amethyst .sui-progress-fill {
-    background: var(--sui-color-primary);
-}
-
-:root.sui-theme-amethyst .sui-menu-button-item-badge,
-:root.sui-theme-amethyst .sui-menu-badge {
-    background: var(--sui-color-surface-alt);
-    color: var(--sui-color-text-muted);
-    font-weight: 400;
-}
 
 
 /* ══ Prose & code ════════════════════════════════════════════════════════
    The same framework bug the other themes patch: `.sui-list ul { list-style:
    none }` is meant for the list's own rows, and markdown nests inside a list
    too. One line in sui.css would retire all three copies. */
-
-:root.sui-theme-amethyst .sui-markdown ul { list-style: disc;    padding-inline-start: 1.35em; }
-:root.sui-theme-amethyst .sui-markdown ol { list-style: decimal; padding-inline-start: 1.35em; }
-:root.sui-theme-amethyst .sui-markdown li { margin-block: .25em; }
-:root.sui-theme-amethyst .sui-markdown li::marker { color: var(--sui-color-text-subtle); }
-
-:root.sui-theme-amethyst .sui-markdown :not(pre) > code {
-    background: var(--sui-color-surface-alt);
-    border: none;
-    border-radius: 5px;
-    padding: .1em .35em;
-    font-size: .9em;
-}
-
-:root.sui-theme-amethyst .sui-markdown pre {
-    border-radius: var(--sui-radius-md);
-    padding: 1rem 1.1rem;
-    font-size: .875em;
-    line-height: 1.6;
-}
 
 
 /* ══ The chat ════════════════════════════════════════════════════════════

@@ -100,8 +100,6 @@
 
     /* Flat, like Clody, but for a different reason: here the planes do the
        separating, so a shadow would be a third mechanism doing the same job. */
-    --sui-shadow-sm:      none;
-    --sui-shadow-card:    none;
     --sui-shadow-pop:     0 2px 6px rgba(0, 0, 0, .04), 0 10px 30px rgba(0, 0, 0, .10);
     --sui-shadow-popover: 0 2px 6px rgba(0, 0, 0, .06), 0 14px 36px rgba(0, 0, 0, .14);
     --sui-focus-ring:     0 0 0 3px rgba(13, 13, 13, .12);
@@ -153,17 +151,6 @@
    The chat's two are excluded for the reason spelled out below: a theme
    selector carries the :root class and outranks the module's own rules, and
    the composer's border is not decoration — it is the field. */
-:root.sui-theme-gipiti :is(.sui-table, .sui-tree, .sui-detail),
-:root.sui-theme-gipiti .sui-form:not(.chat-form),
-:root.sui-theme-gipiti .sui-list:not(.chat-container) {
-    background: var(--sui-color-surface);
-    border: none;
-    box-shadow: none;
-}
-
-:root.sui-theme-gipiti :is(.sui-list, .sui-table, .sui-tree):hover {
-    box-shadow: none;
-}
 
 /* Panels inside tabs already sit frameless; leave them alone. */
 :root.sui-theme-gipiti .sui-tabs + .sui-panels > .sui-panel > :is(.sui-list, .sui-table, .sui-detail, .sui-form),
@@ -301,12 +288,7 @@
     font-weight: 500;
 }
 
-:root.sui-theme-gipiti .sui-btn--primary {
-    box-shadow: none;
-}
-
 :root.sui-theme-gipiti .sui-btn--secondary {
-    box-shadow: none;
     border: 1px solid var(--sui-color-border-strong);
     background: var(--sui-color-surface);
 }
@@ -348,11 +330,6 @@
 
 /* ══ Things that float ═══════════════════════════════════════════════════ */
 
-:root.sui-theme-gipiti :is(.sui-dialog, .sui-menu-button-popover, .sui-tab-more-menu, .sui-toast) {
-    border: 1px solid var(--sui-color-border);
-    box-shadow: var(--sui-shadow-pop);
-}
-
 :root.sui-theme-gipiti .sui-dialog {
     border-radius: var(--sui-radius-lg);
 }
@@ -372,56 +349,14 @@
 :root.sui-theme-gipiti .sui-toast--warn    { --sui-toast-bg: var(--sui-color-warning-bg);   --sui-toast-ring: #edd6b3; --sui-toast-fg: var(--sui-color-warning); }
 :root.sui-theme-gipiti .sui-toast--error   { --sui-toast-bg: var(--sui-color-danger-bg);    --sui-toast-ring: var(--sui-color-danger-border); --sui-toast-fg: var(--sui-color-danger); }
 
-:root.sui-theme-gipiti .sui-scroll-latest {
-    background: var(--sui-color-surface);
-    border: 1px solid var(--sui-color-border);
-    box-shadow: var(--sui-shadow-pop);
-    color: var(--sui-color-text-body);
-}
-
 
 /* ══ Progress & badges ═══════════════════════════════════════════════════ */
-
-:root.sui-theme-gipiti .sui-progress-track {
-    background: var(--sui-color-surface-alt);
-}
-
-:root.sui-theme-gipiti .sui-progress-fill {
-    background: var(--sui-color-text-body);
-}
-
-:root.sui-theme-gipiti .sui-menu-button-item-badge,
-:root.sui-theme-gipiti .sui-menu-badge {
-    background: var(--sui-color-surface-alt);
-    color: var(--sui-color-text-muted);
-    font-weight: 400;
-}
 
 
 /* ══ Prose & code ════════════════════════════════════════════════════════
    The same framework bug Clody patches: `.sui-list ul { list-style: none }`
    is meant for the list's own rows, but markdown nests inside a list too.
    One line in sui.css would retire both copies. */
-
-:root.sui-theme-gipiti .sui-markdown ul { list-style: disc;    padding-inline-start: 1.35em; }
-:root.sui-theme-gipiti .sui-markdown ol { list-style: decimal; padding-inline-start: 1.35em; }
-:root.sui-theme-gipiti .sui-markdown li { margin-block: .25em; }
-:root.sui-theme-gipiti .sui-markdown li::marker { color: var(--sui-color-text-subtle); }
-
-:root.sui-theme-gipiti .sui-markdown :not(pre) > code {
-    background: var(--sui-color-surface-alt);
-    border: none;
-    border-radius: 5px;
-    padding: .1em .35em;
-    font-size: .9em;
-}
-
-:root.sui-theme-gipiti .sui-markdown pre {
-    border-radius: var(--sui-radius-sm);
-    padding: 1rem 1.1rem;
-    font-size: .85em;
-    line-height: 1.6;
-}
 
 
 /* ══ The chat ════════════════════════════════════════════════════════════
