@@ -25,6 +25,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **The admin UIs draw on semantic-ui 0.2.0.** The released sheet brings the
+  spacing and type scale, list/table row alignment, one header height, calmer
+  separators and view transitions that this cycle's UI work was built against
+  (previously 0.1.3).
 - **Workflow run pages carry the same header bar as every other screen.** The
   live progress view, the finished trace and the halted Resume/Log view all
   open with the workflow's icon, its name and the page actions (Back, Variable
