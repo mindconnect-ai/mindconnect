@@ -2,6 +2,7 @@ package ai.mindconnect.agentapp;
 
 import ai.mindconnect.agent.adapter.config.DefaultAgentRuntimeConfig;
 import ai.mindconnect.agent.adapter.config.TodoToolsConfig;
+import ai.mindconnect.common.Namespace;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
@@ -44,6 +45,15 @@ public class AgentApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(AgentApplication.class, args);
+    }
+
+    /**
+     * The namespace every request runs in. The server serves one installation,
+     * so it is fixed; the workflow tools need it to resolve agents by name.
+     */
+    @Bean
+    Namespace namespace() {
+        return new Namespace("local");
     }
 
     @Bean
