@@ -43,6 +43,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **The chat is one surface, not a frame inside a frame.** The chat renders
+  its own app shell — it also runs standalone — and nested in the admin shell
+  that showed as a panel with its own edges floating in the page. It fills
+  the shell exactly now, and the conversation and the history sit on two
+  different planes (plain surface and tinted) so the sidebar is actually
+  separated from what you are reading.
+
+- **The workflow admin and the agent badge are on the type scale.** The
+  workflow screens wrote seven sizes of their own, from 11px to 18px
+  including a 13.5px, which is why they measured differently from every other
+  page.
+
 - **The LLM-config badge on an agent row is a column.** Its width followed
   its own text, so the left edge landed on a different pixel in almost every
   row and the eye had no line to follow. Fixed width, one edge.

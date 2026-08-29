@@ -48,12 +48,20 @@
     padding-block: 0;
 }
 
-/* The history scrolls on its own, full height, no viewport arithmetic. */
+/* The history scrolls on its own, full height, no viewport arithmetic.
+
+   It also gets its own plane. Sitting on the same colour as the conversation
+   it read as one undivided field with some text on the left; the point of a
+   history is that it is a different kind of thing from what you are reading,
+   and a surface change says that with no border at all. Both tokens exist in
+   every theme, so this works on all of them without naming a colour. */
 #chat-menu {
     align-self: stretch;
     min-height: 0;
     max-height: none;
     overflow-y: auto;
+    background: var(--sui-color-surface-alt);
+    border-inline-end: 1px solid var(--sui-color-border);
 }
 
 /* Inside the conversation column: the message list takes whatever is left,
@@ -90,7 +98,7 @@
    turns into a quiet surface with ordinary text on it — which is also what
    makes the session title readable again (muted grey on dark navy was not). */
 #chat-app-shell .sui-header {
-    --sui-header-bg: var(--sui-color-bg, #f4f5f7);
+    --sui-header-bg: var(--sui-color-surface, #fff);
     --sui-header-fg: var(--sui-color-text-body, #374151);
     --sui-header-brand-fg: var(--sui-color-text-strong, #111827);
     --sui-header-nav-fg: var(--sui-color-text-body, #374151);
@@ -322,12 +330,38 @@
 /* The chat area is a page, not a panel inset into one: it takes the page
    background so the conversation has nothing behind it, which is what makes
    the single tinted bubble read as a bubble. */
+/* The chat is a shell inside the host's shell — it has its own header, menu
+   and content, because it is also a standalone app. Nested, that showed as a
+   second frame: a panel with its own edges floating inside the page.
+
+   It cannot stop being a shell without giving up running on its own, so
+   instead it stops looking like one. No surface of its own, no border, no
+   inset: the inner shell fills the outer exactly, and what is left of its
+   header is a toolbar carrying the agent and the session title rather than a
+   second app bar. */
 #chat-app-shell,
-#chat-app-shell > .sui-shell-body,
-#chat-app-shell > .sui-shell-body > .sui-shell-content {
+#chat-app-shell > .sui-shell-body {
     background: var(--sui-color-bg);
     border: none;
     box-shadow: none;
+    border-radius: 0;
+}
+
+/* Two planes, and this is what tells them apart. The history sits on the
+   tinted surface (above), the conversation on the plain one — white against
+   a wash, on every theme, because both tokens exist everywhere. Tinting only
+   the sidebar was not enough: on the default palette `surface-alt` and `bg`
+   are three values apart and the seam simply did not read. */
+#chat-app-shell > .sui-shell-body > .sui-shell-content {
+    background: var(--sui-color-surface);
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
+}
+
+#chat-app-shell > .sui-shell-body > .sui-shell-content {
+    padding: 0;
 }
 
 /* ── The conversation is prose, not a list ────────────────────────────────

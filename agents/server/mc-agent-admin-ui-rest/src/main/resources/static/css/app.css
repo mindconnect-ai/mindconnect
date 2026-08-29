@@ -443,6 +443,15 @@ body {
     text-align: center;
 }
 
+/* On the scale like everything else. 11px at weight 600 was the last size on
+   the agents screen that belonged to no scale at all, and it was the reason
+   that page still measured differently from the others after the framework
+   was tidied. */
+.agent-llm-badge {
+    font-size: var(--sui-text-xs, 12px);
+    font-weight: 500;
+}
+
 /* LLM-config tag at the right of the name row. Soft green pill — sits apart
    from the blue name links and the blue "New Agent" button, and reads as a
    metadata label rather than a third action button. */
