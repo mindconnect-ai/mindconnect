@@ -25,6 +25,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **The workspace files an agent wrote are readable over the API.**
+  `GET /api/workspaces/session/{id}/files`, `/api/workspaces/agent/{agentId}/user/{userId}/files`
+  and `/api/workspaces/user/{userId}/files` list them, and appending
+  `/{name}` returns the content. The scope is in the path because it decides
+  which identifiers the request needs at all: a session workspace is addressed
+  by its session, an agent workspace by agent and user, the user workspace by
+  the user alone. Until now only the admin UI could see these files, by
+  reaching into the store directly.
 - **A chat client can reattach to a running turn.** The event stream now
   belongs to the session rather than to a single turn:
   `GET /api/sessions/{id}/stream?afterSeq=N` replays what the buffer still
