@@ -41,7 +41,9 @@
   min-width: 8.5rem;
   font-size: var(--sui-text-sm);
   font-weight: 500;
-  color: var(--sui-color-text-muted);
+  /* Full body ink. Muted was still a grey next to the name — the type is
+     half of what a row says, not a footnote to it. */
+  color: var(--sui-color-text-body);
 }
 
 .wf-step-name {
