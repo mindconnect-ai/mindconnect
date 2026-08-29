@@ -1,16 +1,49 @@
 <!DOCTYPE html>
-<html lang="en" class="sui-theme-clody">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Admin</title>
     <link rel="stylesheet" href="/sui/sui.css">
     <link rel="stylesheet" href="/css/app.css">
-    <!-- Clody: the warm theme. An overlay on sui.css + app.css, switched on
-         by the sui-theme-clody class on <html> above — drop the class (or this
-         link) and the app is back to the framework default. Must stay ahead of
-         chat-ui.css, whose chat rules are meant to win over the generic ones. -->
+    <!-- Themes. Each is an overlay scoped to its own class on <html>, so an
+         inactive one costs bytes and nothing else. The script below picks
+         which class is set; with none, the app renders as the framework
+         default. Both must stay ahead of chat-ui.css, whose chat rules are
+         meant to win over the generic ones. -->
     <link rel="stylesheet" href="/css/clody.css">
+    <link rel="stylesheet" href="/css/gipiti.css">
+    <script>
+        /*
+         * Theme selection, before first paint.
+         *
+         * Inline and in <head> on purpose: as a separate file it would load
+         * after the first paint and the page would flash the default theme
+         * first. Four lines are worth not having that flash.
+         *
+         *   ?theme=gipiti   switch and remember
+         *   ?theme=default  back to the framework's own look
+         *
+         * The choice is per browser, not per user — it is a preference about
+         * this screen, not something the server needs to know.
+         */
+        (function () {
+            var THEMES = ["clody", "gipiti"];
+            var url = new URL(window.location.href);
+            var wanted = url.searchParams.get("theme");
+            if (wanted) {
+                try { localStorage.setItem("sui-theme", wanted); } catch (e) { /* private mode */ }
+            }
+            var active = wanted;
+            if (!active) {
+                try { active = localStorage.getItem("sui-theme"); } catch (e) { active = null; }
+            }
+            if (active === null) active = "clody";   // the default look
+            if (THEMES.indexOf(active) >= 0) {
+                document.documentElement.classList.add("sui-theme-" + active);
+            }
+        })();
+    </script>
     <!-- Chat shell (sidebar + conversation) — ships with mc-agent-chat-ui-rest. -->
     <link rel="stylesheet" href="/css/chat-ui.css">
     <!-- Embedded workflow admin (/workflow-admin): step cards, base <sui-diagram>

@@ -1,0 +1,454 @@
+/*
+ * Gipiti — a neutral, app-shaped theme for semantic-ui.
+ *
+ * The second theme, and deliberately not Clody with other hex values. Clody
+ * is a document: one warm plane, everything sitting on the same paper, a
+ * clay accent doing the pointing. Gipiti is an application: two planes — a
+ * grey frame around a white working surface — near-black actions instead of
+ * a coloured accent, and pill geometry throughout.
+ *
+ * Same mechanism as Clody: an overlay on sui.css, scoped to
+ * :root.sui-theme-gipiti, setting framework variables and turning off
+ * specific pieces of the default sheet. It names no admin-app class, because
+ * app.css speaks in tokens.
+ *
+ * The three ideas, and each is the opposite of Clody's:
+ *
+ *   1. Achromatic. The neutrals carry no hue at all, so nothing on screen
+ *      has a temperature. Colour appears only where it means something —
+ *      danger, success — and never as decoration.
+ *
+ *   2. Two planes. Navigation and chrome sit on a grey field; the thing you
+ *      are working on is white and raised out of it by contrast rather than
+ *      by a border. Clody separates with a hairline on one plane; this
+ *      separates with the plane itself.
+ *
+ *   3. Near-black actions. There is no accent colour in the chrome. The
+ *      primary button is almost black, the active nav row is a grey fill,
+ *      and the only saturated thing on a normal screen is an error.
+ *
+ * Belongs in mc-semantic-ui next to sui-sbb.css and clody.css once both
+ * settle; it lives here for now for the same reason Clody does.
+ */
+
+
+/* ══ Tokens ══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-gipiti {
+    /* Achromatic neutrals — no hue anywhere on the scale. The two that
+       matter most are `bg` and `surface`: the grey frame and the white
+       surface inside it. */
+    --sui-color-bg:            #f4f4f4;
+    --sui-color-surface:       #ffffff;
+    --sui-color-surface-alt:   #ececec;
+    --sui-color-text:          #0d0d0d;
+    --sui-color-text-strong:   #000000;
+    --sui-color-text-body:     #2f2f2f;
+    --sui-color-text-muted:    #6e6e6e;
+    --sui-color-text-subtle:   #9b9b9b;
+    --sui-color-border:        #e5e5e5;
+    --sui-color-border-soft:   #f0f0f0;
+    --sui-color-border-strong: #d4d4d4;
+
+    /* There is no accent. `primary` exists because the framework asks for
+       it, so it is the same near-black as the solid actions — which is what
+       makes the one green and the one red on screen actually mean something.
+       An app that wants a brand colour puts it here and nowhere else. */
+    --sui-color-primary:       #0d0d0d;
+    --sui-color-primary-hover: #000000;
+    --sui-color-primary-soft:  #ececec;
+    --sui-color-on-primary:    #ffffff;
+
+    --sui-color-action:        #0d0d0d;
+    --sui-color-action-hover:  #2f2f2f;
+    --sui-color-on-action:     #ffffff;
+
+    /* Colour, only where it carries meaning. */
+    --sui-color-danger:          #b42318;
+    --sui-color-danger-bg:       #fdecea;
+    --sui-color-danger-bg-hover: #fbdbd7;
+    --sui-color-danger-border:   #f5c6c0;
+    --sui-color-success:         #0f7a4d;
+    --sui-color-success-bg:      #e7f4ee;
+    --sui-color-success-border:  #bfe2d1;
+    --sui-color-warning:         #a55b00;
+    --sui-color-warning-bg:      #fdf1e3;
+
+    --sui-color-required:      #b42318;
+    --sui-color-empty:         #9b9b9b;
+
+    --sui-color-code-bg:       #0d0d0d;
+    --sui-color-code-fg:       #ececec;
+    --sui-color-blockquote-border: #d4d4d4;
+
+    /* Pill geometry. The radius scale goes further than Clody's, and the
+       buttons below opt out of it entirely for a full pill — the single
+       loudest thing about how this reads. */
+    --sui-radius-sm:   10px;
+    --sui-radius-md:   14px;
+    --sui-radius-lg:   20px;
+    --sui-radius-pill: 999px;
+
+    /* An interface size, not a reading size. Clody goes to 16px because it
+       wants to be a document; this stays at 15 and tightens the leading,
+       because more of the screen is controls than prose. */
+    --sui-font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont,
+                       "Segoe UI", Helvetica, Arial, sans-serif;
+    --sui-font-mono:   ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sui-font-size:   15px;
+
+    /* Flat, like Clody, but for a different reason: here the planes do the
+       separating, so a shadow would be a third mechanism doing the same job. */
+    --sui-shadow-sm:      none;
+    --sui-shadow-card:    none;
+    --sui-shadow-pop:     0 2px 6px rgba(0, 0, 0, .04), 0 10px 30px rgba(0, 0, 0, .10);
+    --sui-shadow-popover: 0 2px 6px rgba(0, 0, 0, .06), 0 14px 36px rgba(0, 0, 0, .14);
+    --sui-focus-ring:     0 0 0 3px rgba(13, 13, 13, .12);
+
+    /* The header belongs to the frame, so it takes the frame's grey. */
+    --sui-header-bg:           #f4f4f4;
+    --sui-header-fg:           #2f2f2f;
+    --sui-header-brand-fg:     #000000;
+    --sui-header-nav-fg:       #6e6e6e;
+    --sui-header-nav-fg-hover: #000000;
+    --sui-header-nav-bg-hover: #ececec;
+    --sui-header-radius:       0;
+    --sui-header-shadow:       none;
+    --sui-header-logo-filter:  none;
+
+    color-scheme: light;
+}
+
+
+/* ══ Base ════════════════════════════════════════════════════════════════ */
+
+/* Tighter than Clody's 1.6 — this is a theme for reading controls, not
+   paragraphs. The chat's own prose sets its own leading regardless. */
+:root.sui-theme-gipiti body {
+    line-height: 1.55;
+}
+
+:root.sui-theme-gipiti :is(h1, h2, h3, h4) {
+    letter-spacing: -.015em;
+    color: var(--sui-color-text-strong);
+}
+
+
+/* ══ The two planes ══════════════════════════════════════════════════════
+   The frame is grey and the working surface is white, and that contrast is
+   the whole layout language. Nothing here needs a border to be legible,
+   which is why the containers below give theirs up. */
+
+:root.sui-theme-gipiti .sui-shell,
+:root.sui-theme-gipiti .sui-shell-body {
+    background: var(--sui-color-bg);
+}
+
+:root.sui-theme-gipiti .sui-shell-content {
+    background: var(--sui-color-bg);
+}
+
+/* Containers are white shapes on the grey, not outlined boxes on a page.
+   The chat's two are excluded for the reason spelled out below: a theme
+   selector carries the :root class and outranks the module's own rules, and
+   the composer's border is not decoration — it is the field. */
+:root.sui-theme-gipiti :is(.sui-table, .sui-tree, .sui-detail),
+:root.sui-theme-gipiti .sui-form:not(.chat-form),
+:root.sui-theme-gipiti .sui-list:not(.chat-container) {
+    background: var(--sui-color-surface);
+    border: none;
+    box-shadow: none;
+}
+
+:root.sui-theme-gipiti :is(.sui-list, .sui-table, .sui-tree):hover {
+    box-shadow: none;
+}
+
+/* Panels inside tabs already sit frameless; leave them alone. */
+:root.sui-theme-gipiti .sui-tabs + .sui-panels > .sui-panel > :is(.sui-list, .sui-table, .sui-detail, .sui-form),
+:root.sui-theme-gipiti .sui-tabs + .sui-panels > .sui-panel > .sui-stack > :is(.sui-list, .sui-table) {
+    background: transparent;
+}
+
+/* The conversation is the chat module's business — the same exclusion Clody
+   makes, and for the same reason: a theme selector carries the :root class
+   and would outrank the module's own rules. */
+:root.sui-theme-gipiti .sui-list.chat-container > .sui-list-header {
+    border-bottom: none;
+}
+
+
+/* ══ Header ══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-gipiti .sui-header {
+    border-bottom: 1px solid var(--sui-color-border);
+}
+
+:root.sui-theme-gipiti .sui-header-brand {
+    font-weight: 600;
+    letter-spacing: -.015em;
+}
+
+:root.sui-theme-gipiti .sui-header-user .sui-avatar,
+:root.sui-theme-gipiti .sui-header-avatar {
+    background: var(--sui-color-action);
+    color: var(--sui-color-on-action);
+}
+
+
+/* ══ Navigation ══════════════════════════════════════════════════════════
+   Rounded rows on the grey field, and the current one marked by a plain
+   darker fill. With no accent in the palette there is nothing to tint it
+   with, which turns out to be the point: "you are here" is a position, not
+   a category. */
+
+:root.sui-theme-gipiti .sui-menu {
+    background: transparent;
+    border: none;
+}
+
+:root.sui-theme-gipiti .sui-menu-link {
+    border-radius: var(--sui-radius-sm);
+    font-size: 14px;
+}
+
+:root.sui-theme-gipiti .sui-menu-link:hover {
+    background: var(--sui-color-surface-alt);
+}
+
+:root.sui-theme-gipiti .sui-menu-item.is-active > .sui-menu-link,
+:root.sui-theme-gipiti .sui-menu-item.is-active > .sui-menu-group > .sui-menu-link {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+}
+
+:root.sui-theme-gipiti .sui-menu-item.is-active > .sui-menu-link .sui-icon {
+    color: var(--sui-color-text-strong);
+}
+
+
+/* ══ Lists & tables ══════════════════════════════════════════════════════ */
+
+:root.sui-theme-gipiti :is(.sui-list-header, .sui-table-header) {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-gipiti :is(.sui-list-header, .sui-table-header) h2 {
+    font-size: 15px;
+    letter-spacing: -.01em;
+}
+
+/* A row's name is the row, not a link elsewhere — and with a monochrome
+   palette there is no blue to make it one anyway. */
+:root.sui-theme-gipiti .sui-list:not(.chat-container) .sui-list-item-label,
+:root.sui-theme-gipiti .sui-table td .sui-link {
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+:root.sui-theme-gipiti .sui-list:not(.chat-container) .sui-list-item-label:hover,
+:root.sui-theme-gipiti .sui-table td .sui-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+:root.sui-theme-gipiti .sui-list:not(.chat-container) .sui-list-item {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-gipiti .sui-list:not(.chat-container) .sui-list-item:hover,
+:root.sui-theme-gipiti .sui-table tbody tr:hover {
+    background: var(--sui-color-border-soft);
+}
+
+:root.sui-theme-gipiti .sui-table .column-header-background,
+:root.sui-theme-gipiti .sui-table th {
+    background: var(--sui-color-surface);
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+
+/* ══ Forms ═══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-gipiti .sui-field label {
+    color: var(--sui-color-text-body);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+:root.sui-theme-gipiti :is(.sui-field input, .sui-field textarea, .sui-field select) {
+    border-color: var(--sui-color-border-strong);
+    border-radius: var(--sui-radius-sm);
+    background: var(--sui-color-surface);
+}
+
+:root.sui-theme-gipiti :is(.sui-field input, .sui-field textarea, .sui-field select):focus {
+    border-color: var(--sui-color-text-body);
+}
+
+
+/* ══ Buttons ═════════════════════════════════════════════════════════════
+   Full pills. This is the single most visible decision in the theme, and it
+   is why the radius scale above stops short of it — a pill is not a step on
+   a scale, it is a shape, and it belongs to the controls alone. */
+
+:root.sui-theme-gipiti :is(.sui-btn, .sui-icon-btn) {
+    border-radius: var(--sui-radius-pill);
+    font-weight: 500;
+}
+
+:root.sui-theme-gipiti .sui-btn--primary {
+    box-shadow: none;
+}
+
+:root.sui-theme-gipiti .sui-btn--secondary {
+    box-shadow: none;
+    border: 1px solid var(--sui-color-border-strong);
+    background: var(--sui-color-surface);
+}
+
+:root.sui-theme-gipiti .sui-btn--secondary:hover:not(:disabled) {
+    background: var(--sui-color-surface-alt);
+}
+
+/* Links keep an underline rather than a colour — there is no colour to
+   spare, and an underline says "link" on any palette. */
+:root.sui-theme-gipiti .sui-link {
+    color: var(--sui-color-text);
+    text-decoration: underline;
+    text-decoration-color: var(--sui-color-border-strong);
+    text-underline-offset: 2px;
+}
+
+:root.sui-theme-gipiti .sui-link:hover {
+    text-decoration-color: currentColor;
+}
+
+
+/* ══ Tabs ════════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-gipiti .sui-tabs {
+    border-bottom-color: var(--sui-color-border);
+}
+
+:root.sui-theme-gipiti .sui-tab {
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+:root.sui-theme-gipiti .sui-tab.active {
+    color: var(--sui-color-text-strong);
+    border-bottom-color: var(--sui-color-text-strong);
+}
+
+
+/* ══ Things that float ═══════════════════════════════════════════════════ */
+
+:root.sui-theme-gipiti :is(.sui-dialog, .sui-menu-button-popover, .sui-tab-more-menu, .sui-toast) {
+    border: 1px solid var(--sui-color-border);
+    box-shadow: var(--sui-shadow-pop);
+}
+
+:root.sui-theme-gipiti .sui-dialog {
+    border-radius: var(--sui-radius-lg);
+}
+
+:root.sui-theme-gipiti .sui-dialog-backdrop {
+    background: rgba(0, 0, 0, .32);
+}
+
+:root.sui-theme-gipiti .sui-dialog-header {
+    border-bottom-color: var(--sui-color-border-soft);
+}
+
+/* Toasts on the same restraint: neutral card, the level in the text and the
+   rail, not in a wash of colour. */
+:root.sui-theme-gipiti .sui-toast--info    { --sui-toast-bg: var(--sui-color-surface);      --sui-toast-ring: var(--sui-color-border-strong); --sui-toast-fg: var(--sui-color-text-body); }
+:root.sui-theme-gipiti .sui-toast--success { --sui-toast-bg: var(--sui-color-success-bg);   --sui-toast-ring: var(--sui-color-success-border); --sui-toast-fg: var(--sui-color-success); }
+:root.sui-theme-gipiti .sui-toast--warn    { --sui-toast-bg: var(--sui-color-warning-bg);   --sui-toast-ring: #edd6b3; --sui-toast-fg: var(--sui-color-warning); }
+:root.sui-theme-gipiti .sui-toast--error   { --sui-toast-bg: var(--sui-color-danger-bg);    --sui-toast-ring: var(--sui-color-danger-border); --sui-toast-fg: var(--sui-color-danger); }
+
+:root.sui-theme-gipiti .sui-scroll-latest {
+    background: var(--sui-color-surface);
+    border: 1px solid var(--sui-color-border);
+    box-shadow: var(--sui-shadow-pop);
+    color: var(--sui-color-text-body);
+}
+
+
+/* ══ Progress & badges ═══════════════════════════════════════════════════ */
+
+:root.sui-theme-gipiti .sui-progress-track {
+    background: var(--sui-color-surface-alt);
+}
+
+:root.sui-theme-gipiti .sui-progress-fill {
+    background: var(--sui-color-text-body);
+}
+
+:root.sui-theme-gipiti .sui-menu-button-item-badge,
+:root.sui-theme-gipiti .sui-menu-badge {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-muted);
+    font-weight: 400;
+}
+
+
+/* ══ Prose & code ════════════════════════════════════════════════════════
+   The same framework bug Clody patches: `.sui-list ul { list-style: none }`
+   is meant for the list's own rows, but markdown nests inside a list too.
+   One line in sui.css would retire both copies. */
+
+:root.sui-theme-gipiti .sui-markdown ul { list-style: disc;    padding-inline-start: 1.35em; }
+:root.sui-theme-gipiti .sui-markdown ol { list-style: decimal; padding-inline-start: 1.35em; }
+:root.sui-theme-gipiti .sui-markdown li { margin-block: .25em; }
+:root.sui-theme-gipiti .sui-markdown li::marker { color: var(--sui-color-text-subtle); }
+
+:root.sui-theme-gipiti .sui-markdown :not(pre) > code {
+    background: var(--sui-color-surface-alt);
+    border: none;
+    border-radius: 5px;
+    padding: .1em .35em;
+    font-size: .9em;
+}
+
+:root.sui-theme-gipiti .sui-markdown pre {
+    border-radius: var(--sui-radius-sm);
+    padding: 1rem 1.1rem;
+    font-size: .85em;
+    line-height: 1.6;
+}
+
+
+/* ══ The chat ════════════════════════════════════════════════════════════
+   The one variable the chat module asks a theme for. On two planes the
+   conversation sits on white, so the bubble is the grey — the exact inverse
+   of Clody, where the page is the tint and the bubble goes darker still. */
+
+:root.sui-theme-gipiti #chat-app-shell {
+    --chat-user-bubble: var(--sui-color-bg);
+}
+
+/* The chat is the working surface, so it gets the white plane. */
+:root.sui-theme-gipiti #chat-app-shell,
+:root.sui-theme-gipiti #chat-app-shell > .sui-shell-body,
+:root.sui-theme-gipiti #chat-app-shell > .sui-shell-body > .sui-shell-content {
+    background: var(--sui-color-surface);
+}
+
+:root.sui-theme-gipiti #chat-app-shell .sui-header {
+    --sui-header-bg: var(--sui-color-surface);
+}
+
+:root.sui-theme-gipiti .chat-conversation .sui-scrollpane > .sui-list > .sui-list-header {
+    background: var(--sui-color-surface);
+}
+
+/* The composer is a pill, which is the shape the rest of the theme has been
+   promising. */
+:root.sui-theme-gipiti .chat-form.sui-form {
+    border-radius: 26px;
+}

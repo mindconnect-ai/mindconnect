@@ -43,6 +43,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **A second theme, Gipiti, and a way to switch.** Where Clody is a document
+  — one warm plane, a clay accent — Gipiti is an application: achromatic
+  neutrals with no temperature at all, a grey frame around a white working
+  surface, near-black actions instead of an accent colour, and pill-shaped
+  controls. Colour appears only where it means something.
+
+  Pick one with `?theme=clody`, `?theme=gipiti` or `?theme=default` on any
+  admin URL; the choice is remembered per browser. Both stylesheets are
+  always linked and each is scoped to its own class on `<html>`, so the
+  inactive one costs bytes and nothing else.
+
 - **Clody, a warm theme for the admin UI and the chat.** The admin app now
   ships a second look: bone-and-clay neutrals instead of the cool slate scale,
   a light header band, flat surfaces (no card shadows, no hover elevation),
