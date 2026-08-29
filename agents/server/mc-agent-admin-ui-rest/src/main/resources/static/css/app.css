@@ -90,8 +90,8 @@ body {
     min-height: 56px;
     padding: 12px 16px;
     background: var(--sui-color-surface);
+    border: 1px solid var(--sui-color-border);
     border-radius: var(--sui-radius-lg);
-    box-shadow: var(--sui-shadow-card);
 }
 .chat-thinking {
     color: var(--sui-color-text-muted);
