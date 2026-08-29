@@ -1,0 +1,63 @@
+name: changelog
+
+# A changelog rots when people forget it, and nobody notices until a release
+# is being cut and the section is empty. This asks at the only moment the
+# author still has the change in their head.
+#
+# It is a prompt, not a gate: a PR that genuinely needs no entry gets the
+# `no-changelog` label and moves on. The point is that skipping it is a
+# decision someone made, rather than something that happened.
+
+on:
+  pull_request:
+    branches: [main]
+    # labeled/unlabeled too, so adding the label re-runs and clears the check
+    # instead of leaving a red mark that has to be ignored.
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-changelog') }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Does this change need a changelog entry?
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+
+          # Shipped code only, in the four areas that publish artifacts. Tests,
+          # docs, the website and build plumbing change constantly and mean
+          # nothing to someone deciding whether to upgrade — asking for an
+          # entry there would train people to ignore this check, which is the
+          # one failure mode that matters.
+          USER_FACING=$(echo "$CHANGED" \
+            | grep -E '^(agents|workflow|taskqueue|common)/.*/src/main/.*\.java$' || true)
+
+          if [ -z "$USER_FACING" ]; then
+            echo "No shipped code changed — no entry needed."
+            exit 0
+          fi
+          if echo "$CHANGED" | grep -qx 'CHANGELOG.md'; then
+            echo "CHANGELOG.md was updated."
+            exit 0
+          fi
+
+          echo "::error::This PR changes shipped code but not CHANGELOG.md."
+          echo "Add a line under '## [Unreleased]' saying what is different for"
+          echo "someone using the libraries or running the apps — or label the PR"
+          echo "'no-changelog' if there is genuinely nothing to tell them."
+          echo
+          echo "Changed:"
+          echo "$USER_FACING" | sed 's/^/  /'
+          exit 1

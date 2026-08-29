@@ -26,6 +26,11 @@ on:
         description: 'Next dev version incl. -SNAPSHOT (blank = bump patch)'
         required: false
         default: ''
+      allowEmptyChangelog:
+        description: 'Release even though CHANGELOG.md has nothing under [Unreleased]'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write   # push the version-bump commits and the tag
@@ -93,6 +98,28 @@ jobs:
           | xargs -0 perl -0777 -pi -e
           's|(<artifactId>mc-[^<]+</artifactId>\s*<version>)[^<]+(</version>)|${1}$ENV{RELEASE}${2}|g'
 
+      # Before the upload, deliberately: an empty [Unreleased] means someone
+      # forgot, and finding that out after a push to Central is too late —
+      # a released version can never be taken back.
+      - name: Freeze the changelog into this version
+        env:
+          RELEASE: ${{ steps.v.outputs.release }}
+          ALLOW_EMPTY: ${{ inputs.allowEmptyChangelog }}
+        run: |
+          set -euo pipefail
+          if ! grep -q '^## \[Unreleased\]' CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [Unreleased]' heading to release."
+            exit 1
+          fi
+          # Everything between [Unreleased] and the next version heading.
+          BODY=$(awk '/^## \[Unreleased\]/{f=1;next} /^## \[/{f=0} f' CHANGELOG.md)
+          if [ -z "$(echo "$BODY" | tr -d '[:space:]')" ] && [ "$ALLOW_EMPTY" != "true" ]; then
+            echo "::error::[Unreleased] is empty. Write what changed, or re-run with allowEmptyChangelog."
+            exit 1
+          fi
+          printf '%s\n' "$BODY" > /tmp/release-notes.md
+          sed -i "s|^## \[Unreleased\]$|## [$RELEASE] - $(date -u +%Y-%m-%d)|" CHANGELOG.md
+
       # The `release` profile (mc-java-parent) attaches sources + javadoc,
       # signs with GPG and hands the deploy to the central-publishing plugin.
       - name: Build & publish to Maven Central
@@ -110,17 +137,36 @@ jobs:
       - name: Open next development version
         run: find . -name pom.xml -exec sed -i "s|<version>${{ steps.v.outputs.release }}</version>|<version>${{ steps.v.outputs.next }}</version>|g" {} +
 
+      # In the same commit as the version bump, so main always has somewhere to
+      # write the next entry — the moment it does not, people stop writing them.
+      - name: Open a fresh Unreleased section
+        env:
+          RELEASE: ${{ steps.v.outputs.release }}
+        run: |
+          set -euo pipefail
+          # index(), not a regex match: the heading contains [0.0.3], which as a
+          # pattern is a character class and would never match the line it came
+          # from — silently leaving main with nowhere to write the next entry.
+          awk -v rel="## [$RELEASE]" '
+            index($0, rel) == 1 && !done { print "## [Unreleased]"; print ""; done = 1 }
+            { print }
+          ' CHANGELOG.md > /tmp/changelog.md && mv /tmp/changelog.md CHANGELOG.md
+          grep -q '^## \[Unreleased\]' CHANGELOG.md \
+            || { echo "::error::failed to reopen [Unreleased]"; exit 1; }
+
       - name: Commit next version and push
         run: |
           git commit -am "chore: start ${{ steps.v.outputs.next }} [skip ci]"
           git push origin HEAD:${{ github.ref_name }} --follow-tags
 
-      # Turn the pushed tag into a proper Release entry with auto-generated notes,
-      # so it shows under Releases (not just Tags).
+      # The changelog entry is the release note. Two sources would drift, and
+      # the hand-written one is the one aimed at a reader deciding whether to
+      # upgrade; --generate-notes is appended under it for the commit detail.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >
           gh release create "v${{ steps.v.outputs.release }}"
           --title "v${{ steps.v.outputs.release }}"
+          --notes-file /tmp/release-notes.md
           --generate-notes

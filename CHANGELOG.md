@@ -1,0 +1,64 @@
+# Changelog
+
+What changed, in the words of someone who has to decide whether to upgrade.
+
+This is not the commit log — [the releases page][releases] has that, generated.
+An entry here earns its place by telling a reader who *uses* this repo what is
+different for them: a new endpoint, a behaviour that changed, a bug whose
+symptom they may have been living with. The four areas — agents, workflow,
+taskqueue, common — release together under one version, so say which one an
+entry belongs to when it is not obvious.
+
+The format is [Keep a Changelog][keepachangelog]; this project follows
+[semantic versioning][semver], with the caveat that it is pre-1.0 and breaking
+changes may land in a minor.
+
+**Adding an entry:** put it under `## [Unreleased]`, in the section that fits.
+The release workflow renames that heading to the version being cut and opens a
+fresh empty one, so nothing has to be moved by hand at release time.
+
+[releases]: https://github.com/mindconnect-ai/mindconnect/releases
+[keepachangelog]: https://keepachangelog.com/en/1.1.0/
+[semver]: https://semver.org/spec/v2.0.0.html
+
+## [Unreleased]
+
+### Added
+
+- **A chat client can reattach to a running turn.** The event stream now
+  belongs to the session rather than to a single turn:
+  `GET /api/sessions/{id}/stream?afterSeq=N` replays what the buffer still
+  holds and then continues live. The first frame says whether a turn is
+  running and where the buffer starts, so a client that lost its connection
+  can tell the difference between "carry on" and "reload the history".
+- **Approvals can be answered through the REST API.**
+  `POST /api/sessions/{id}/approvals/{callId}?approved=&scope=once|session`
+  delivers the decision to the parked tool task;
+  `GET /api/sessions/{id}/approvals` lists the still-open questions, which is
+  what a client needs after connecting late — the request event exists only in
+  the moment it is raised. Before this, a client outside the admin UI could
+  show an approval card but never answer it.
+- **Runnable jars.** `mc-agent-admin-ui-app` and `mc-agent-cli` now also build
+  a Spring Boot executable jar (classifier `exec`). The plain jar stays the
+  main artifact, so nothing about the Maven Central publication changes.
+- **A snapshot channel.** A manually triggered workflow publishes those jars
+  to a rolling `snapshot` pre-release, which is the quickest way to run the
+  admin UI without a checkout — see
+  [Getting started](https://mindconnect-ai.github.io/mindconnect/agents/getting-started).
+
+### Changed
+
+- `TurnChannels` is now `SessionChannels`, keyed by session, and events travel
+  as `SessionEvent(turnId, run, event)`. Code that subscribed to a turn keeps
+  working through `subscribeTurn(...)`; the turn is a coordinate in the
+  envelope now, not a channel of its own.
+
+### Documentation
+
+- The REST API has a page of its own, including the stream and the approvals:
+  <https://mindconnect-ai.github.io/mindconnect/agents/rest-api>.
+
+## [0.0.2] - 2026-08-27
+
+First release on Maven Central. Everything before this line lives in the
+[commit history][releases].
