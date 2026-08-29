@@ -62,3 +62,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 First release on Maven Central. Everything before this line lives in the
 [commit history][releases].
+
+### Added
+
+- Admin UI to execute Chat, configure Agents, LLM Configs, Vector Stores, Migrations
+- CLI interface to execute agents
+- Rest Layer to manage the agent runtime including the chat session
+- Tool approvals in the Admin UI
+- OpenAI Responses API compatible library to use the agent runtime or switch to OpenAI directly
+- Agent execution and tool execution is run on the TaskQueue and Channels to easily let tasks run distributed and persistent
