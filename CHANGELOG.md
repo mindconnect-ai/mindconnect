@@ -43,6 +43,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **Every theme sets the same type size.** Clody, Gipiti, Sorbet and Amethyst
+  were at 16px and the framework's own look at 15; they are all 15 now, so
+  switching a theme changes how the app looks and not how big its text is.
+
+- **The Vector Stores screen is built like the others.** Its tables had no
+  titles, so each tab's header bar held one lone button in an otherwise empty
+  band, while the page carried a heading no other screen has. The tables have
+  their titles back — name left, action right, as on Agents and Tools — and
+  the page keeps its own above the tabs.
+
+- **The chat's header is the app shell's header.** It had been dressed down
+  into something in between, with its own height, padding and type size, so
+  it agreed neither with the bar above it nor with the Agents screen. Same
+  metrics now; the burger sits where a list header's icon sits and is sized
+  like one.
+
 - **The chat is one surface, not a frame inside a frame.** The chat renders
   its own app shell — it also runs standalone — and nested in the admin shell
   that showed as a panel with its own edges floating in the page. It fills

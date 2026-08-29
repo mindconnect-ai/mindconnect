@@ -15,8 +15,8 @@
  * things restated below that any dark theme has to say — CSS cannot extend
  * a stylesheet, and four rules is a cheaper answer than a composition rule.
  *
- * The type scale is the one Clody and Gipiti use. A theme decides how the
- * app looks, not how big its text is.
+ * The type size is the framework's own, like every theme here. A theme
+ * decides how the app looks, not how big its text is.
  */
 
 
@@ -81,7 +81,7 @@
     --sui-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
                        system-ui, Roboto, sans-serif;
     --sui-font-mono:   ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
-    --sui-font-size:   16px;
+    --sui-font-size:   15px;
 
     /* A shadow on a dark ground does almost nothing, so the containers below
        take a border instead and the depth is kept for what floats. */

@@ -97,8 +97,37 @@
    own header tokens rather than fighting the rules that use them, so the bar
    turns into a quiet surface with ordinary text on it — which is also what
    makes the session title readable again (muted grey on dark navy was not). */
+/* The same bar as the app shell's own header, because it is one: 56px tall,
+   24px of side padding, the brand at the brand's size. It had been dressed
+   down into something in between — its own height, its own padding, its own
+   type size — so the two bars sat on the chat screen without ever agreeing
+   with each other, and neither matched the Agents screen.
+   
+   Only two things differ, and both because this one is light on light where
+   the outer one is light on dark: it takes the plain surface, and it needs a
+   hairline underneath where the dark band needs none. */
 #chat-app-shell .sui-header {
+    border-bottom: 1px solid var(--sui-color-border, #e5e7eb);
+    /* The burger stands where a list header's icon stands, and the agent's
+       name follows it as closely as "Agents" follows its own icon. The app
+       header's 32px gap is for a brand and a nav that want air between them;
+       here it just pushed the title a third of the way across the bar. Same
+       inline padding as a list header, too, so the two line up down the
+       page. */
+    gap: var(--sui-space-sm, 8px);
+    padding-inline: var(--sui-space-xl, 20px);
     --sui-header-bg: var(--sui-color-surface, #fff);
+}
+
+/* The burger takes the slot a list header gives its icon, so it has to be
+   the size of one. At the app header's 32px it was half again as wide as the
+   icon it stands in for, and the title behind it started a third of an inch
+   further right than "Agents" does — which is the difference you see when
+   the two screens are put side by side. */
+#chat-app-shell .sui-header-burger {
+    width: 24px;
+    height: 24px;
+    padding: 0;
     --sui-header-fg: var(--sui-color-text-body, #374151);
     --sui-header-brand-fg: var(--sui-color-text-strong, #111827);
     --sui-header-nav-fg: var(--sui-color-text-body, #374151);

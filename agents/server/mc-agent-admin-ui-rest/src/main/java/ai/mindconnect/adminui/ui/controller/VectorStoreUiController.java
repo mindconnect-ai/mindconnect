@@ -68,7 +68,7 @@ public class VectorStoreUiController {
 
     /** The overview as tabs; {@code tab} picks which one opens (after an action, the one it happened in). */
     private UiPage list(String tab) {
-        UiTable templates = UiTable.of("vs-templates", null)
+        UiTable templates = UiTable.of("vs-templates", "Templates")
                 .action(UiAction.primary("new-template", "New Template").icon("add")
                         .dispatch("GET", "/admin/vector-stores/templates/new"))
                 .column(UiTable.Column.text("name", "Name"))
@@ -91,7 +91,7 @@ public class VectorStoreUiController {
                     "description", t.metadata().getOrDefault("description", "")));
         }
 
-        UiTable instances = UiTable.of("vs-instances", null)
+        UiTable instances = UiTable.of("vs-instances", "Stores")
                 .action(UiAction.primary("new-store", "New Store").icon("add")
                         .dispatch("GET", "/admin/vector-stores/stores/new"))
                 .column(UiTable.Column.text("name", "Name"))
@@ -132,7 +132,7 @@ public class VectorStoreUiController {
 
         // The file store (Files API): raw uploads addressed by id, independent
         // of any store — attach them to a chat via POST /api/sessions/{id}/files.
-        UiTable files = UiTable.of("vs-files-all", null)
+        UiTable files = UiTable.of("vs-files-all", "Files")
                 .column(UiTable.Column.text("fid", "Id"))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("type", "Type"))
@@ -163,8 +163,20 @@ public class VectorStoreUiController {
         UiStack filesTab = UiStack.of("vs-files-tab").gap(20)
                 .child(files).child(upload);
 
-        // One tab per concern, each carrying its icon; the table titles are
-        // gone (the tab label is the heading), their header actions stay.
+        // One tab per concern, each carrying its icon.
+        //
+        // Two levels of heading, and both earn their place. The page keeps
+        // its own title above the tabs — it is the only screen with tabs, and
+        // without it the page began abruptly on a tab strip. Each table then
+        // carries its own, so its header bar reads like the one on Agents or
+        // Tools: name on the left, action on the right. Before, the title was
+        // only on the page and every tab's bar held one lone button in an
+        // otherwise empty band, which is what made this screen look like it
+        // came from somewhere else.
+        //
+        // Yes, the tab label and the table title say the same word. That is
+        // the cheaper of the two redundancies: the alternative is a bar that
+        // looks empty on every tab.
         UiSection page = UiSection.of("vs-page", "Vector Stores");
         page.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database"));
         page.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server"));
