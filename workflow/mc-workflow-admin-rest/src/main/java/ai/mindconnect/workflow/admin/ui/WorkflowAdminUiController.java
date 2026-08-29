@@ -228,15 +228,17 @@ public class WorkflowAdminUiController {
     @GetMapping("/{wf}")
     public UiPage view(@PathVariable String wf) {
         WorkflowData data = require(wf);
-        UiStack bar = UiStack.of("wf-view:" + wf + ":bar")
-                .direction(UiStack.Direction.HORIZONTAL).gap(12)
-                .child(UiText.of("wf-view:" + wf + ":title", "Workflow: " + wf))
-                .child(UiAction.primary("run", "Run").icon("flash")
-                        .onClick(UiTrigger.go(BASE + "/" + wf + "/run")))
-                .child(UiAction.secondary("back", "All workflows").icon("back")
-                        .onClick(UiTrigger.go(BASE)));
+        // The same header bar every other screen carries: icon, the thing's
+        // own name as the title (the icon says it is a workflow — a
+        // "Workflow:" prefix would say it twice), actions on the right. A
+        // header-only UiList renders the identical bar to the one on Agents.
+        UiList header = UiList.of("wf-view:" + wf + ":header", wf).icon("workflow");
+        header.action(UiAction.secondary("back", "All workflows").icon("back")
+                .onClick(UiTrigger.go(BASE)));
+        header.action(UiAction.primary("run", "Run").icon("flash")
+                .onClick(UiTrigger.go(BASE + "/" + wf + "/run")));
 
-        UiStack page = UiStack.of("wf-view:" + wf).gap(12).child(bar).child(tabsFor(wf, data, "editor"));
+        UiStack page = UiStack.of("wf-view:" + wf).child(header).child(tabsFor(wf, data, "editor"));
         return UiPage.of(BASE + "/" + wf, page);
     }
 

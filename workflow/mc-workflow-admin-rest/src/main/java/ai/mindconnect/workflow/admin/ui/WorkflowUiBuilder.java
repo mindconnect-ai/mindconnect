@@ -156,7 +156,9 @@ public class WorkflowUiBuilder {
 
     /** {@code containerPath} is {@link #ROOT} or the mutator's container DSL. */
     private UiNode addStepControl(String containerPath) {
-        return UiAction.primary("add:" + wfId + ":" + containerPath, "+ Add step")
+        // Secondary, not primary: this affordance repeats once per container,
+        // and a page of dark full-strength bars is a page shouting at itself.
+        return UiAction.secondary("add:" + wfId + ":" + containerPath, "+ Add step")
                 .onClick(UiTrigger.api("GET", url("/" + wfId + "/add/" + enc(containerPath))));
     }
 
