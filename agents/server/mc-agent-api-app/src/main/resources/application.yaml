@@ -23,6 +23,13 @@ mindconnect:
   memory:
     storage-dir: data/memory
 
+springdoc:
+  # Scope the OpenAPI document to the REST API. The workflow admin's page
+  # controller comes in with mc-workflow-admin-rest and maps 40 /workflow-admin
+  # routes that return recursive UiNode trees — server-rendered UI, not API,
+  # and schemas that freeze Swagger UI's example renderer.
+  paths-to-match: /api/**
+
 logging:
   level:
     ai.mindconnect: INFO
