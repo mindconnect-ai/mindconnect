@@ -34,6 +34,15 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
         log.info("AgentSessionRepository base: " + this.baseDir);
     }
 
+    /**
+     * Newest first, and tolerant of a session without a start time: one
+     * unreadable timestamp should misplace a single row, not throw and take
+     * the user's whole session list with it.
+     */
+    private static final java.util.Comparator<AgentSession> NEWEST_FIRST =
+            java.util.Comparator.comparing(AgentSession::startedAt,
+                    java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()));
+
     @Override
     public AgentSession save(AgentSession session) {
         Path file = fileFor(session);
@@ -101,7 +110,7 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
                     .filter(s -> s.agentDefinitionId().equals(agentDefinitionId)
                             && s.namespace().equals(namespace)
                             && s.userId().equals(userId))
-                    .sorted((a, b) -> b.startedAt().compareTo(a.startedAt()))
+                    .sorted(NEWEST_FIRST)
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -127,7 +136,7 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
                     .filter(s -> s.namespace().equals(namespace)
                             && s.userId().equals(userId)
                             && s.parentSessionId() == null)
-                    .sorted((a, b) -> b.startedAt().compareTo(a.startedAt()))
+                    .sorted(NEWEST_FIRST)
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);

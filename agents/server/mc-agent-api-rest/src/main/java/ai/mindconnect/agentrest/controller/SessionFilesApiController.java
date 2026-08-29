@@ -10,6 +10,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import java.util.List;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -76,6 +79,37 @@ public class SessionFilesApiController {
                     "Unknown fileId '" + fileId + "' — upload via POST /api/files first."));
         }
         return ResponseEntity.ok(toResponse(sessionFiles.attach(sessionId, stored)));
+    }
+
+    /** The files attached to this chat, with the number of searchable chunks each produced. */
+    @Operation(tags = "Sessions", summary = "List the files attached to a chat",
+            description = "File id \u2192 chunk count. Empty when nothing is attached or when "
+                    + "no vector store is configured.")
+    @GetMapping
+    public ResponseEntity<List<Map<String, Object>>> listAttachments(@PathVariable UUID sessionId) {
+        var files = sessionFiles.listAttachments(sessionId).entrySet().stream()
+                .map(e -> Map.<String, Object>of(
+                        "fileId", e.getKey(),
+                        "name", java.nio.file.Path.of(e.getKey()).getFileName().toString(),
+                        "chunks", e.getValue()))
+                .toList();
+        return ResponseEntity.ok(files);
+    }
+
+    /**
+     * Detaches a file from the chat: its chunks leave the session's vector
+     * store, so the agent can no longer search it, and the spooled copy goes
+     * with them. The original in the file store is untouched \u2014 it may be
+     * attached to other sessions.
+     */
+    @Operation(tags = "Sessions", summary = "Detach a file from the chat",
+            description = "Removes the file's chunks from the session's vector store and the "
+                    + "spooled copy. The file itself stays in the file store.")
+    @DeleteMapping
+    public ResponseEntity<Void> detach(@PathVariable UUID sessionId,
+                                       @RequestParam("file") String fileId) {
+        sessionFiles.deleteAttachment(sessionId, fileId);
+        return ResponseEntity.noContent().build();
     }
 
     private static Map<String, Object> toResponse(

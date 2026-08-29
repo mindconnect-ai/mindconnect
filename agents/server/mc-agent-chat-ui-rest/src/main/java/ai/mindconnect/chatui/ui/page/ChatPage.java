@@ -114,18 +114,8 @@ public final class ChatPage {
     }
 
     /** The session's attached-files panel (built by SessionFileService). */
-    private ai.mindconnect.ui.model.UiNode attachments;
 
-    /** The attachment list, for the dialog behind the "+". */
-    public ai.mindconnect.ui.model.UiNode attachmentsNode() {
-        return attachments != null ? attachments
-                : ai.mindconnect.ui.model.UiStack.of("chat-attachments");
-    }
 
-    public ChatPage withAttachments(ai.mindconnect.ui.model.UiNode attachments) {
-        this.attachments = attachments;
-        return this;
-    }
 
     /** The count the composer shows on its "+". */
     public ChatPage withAttachmentCount(int count) {

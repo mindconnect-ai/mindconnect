@@ -80,6 +80,18 @@ public record AgentSession(
         if (attachedFiles == null) attachedFiles = java.util.List.of();
         if (approvedTools == null) approvedTools = java.util.Set.of();
         if (sessionAgents == null) sessionAgents = java.util.List.of();
+        // "Exactly one main" is the invariant the whole resolution path rests
+        // on: without a main agent, mainAgent() is empty and the runtime falls
+        // back to agentDefinitionId — which for an inline agent resolves to
+        // nothing, so every turn would fail with a confusing notFound.
+        if (!sessionAgents.isEmpty()) {
+            long mains = sessionAgents.stream()
+                    .filter(ai.mindconnect.agent.domain.session.SessionAgent::main).count();
+            if (mains != 1) {
+                throw new IllegalArgumentException(
+                        "A session needs exactly one main agent, found " + mains);
+            }
+        }
     }
 
     /** Pre-activatedTools constructor: nothing activated. */

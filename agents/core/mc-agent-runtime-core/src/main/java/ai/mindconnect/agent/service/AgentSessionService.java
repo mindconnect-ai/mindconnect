@@ -138,14 +138,23 @@ public class AgentSessionService {
      * Swaps the agent a session runs — the model-and-tools dialog, or
      * attaching the chat to a registry agent.
      *
-     * <p>{@code agentDefinitionId} deliberately keeps its original value: it
-     * is the key the workspace and every message written so far are filed
-     * under, and rewriting it would orphan them mid-conversation.
+     * <p>{@code agentDefinitionId} moves with the agent. It is the id the
+     * session is listed under and the key its workspace is filed by, and both
+     * should describe the agent the chat actually runs — a chat detached from
+     * "Poet" has no business still appearing under {@code ?agentId=Poet}.
+     * The messages written so far keep the old id, which is right: they were
+     * said by that agent. What the new agent does not inherit is the previous
+     * one's workspace — a different agent, a different memory.
      */
     public AgentSession replaceSessionAgent(UUID sessionId,
                                             ai.mindconnect.agent.domain.session.SessionAgent agent) {
         AgentSession session = findSession(sessionId);
-        return sessionRepository.save(session.withSessionAgents(List.of(agent)));
+        AgentSession moved = new AgentSession(session.id(), agent.id(), session.namespace(),
+                session.userId(), session.conversationId(), session.title(), session.status(),
+                session.startedAt(), session.completedAt(), session.parentSessionId(),
+                session.parentTurnId(), session.parentToolCallId(), session.activatedTools(),
+                session.attachedFiles(), session.approvedTools(), List.of(agent));
+        return sessionRepository.save(moved);
     }
 
     public List<AgentSession> listSessions(UUID agentDefinitionId, Namespace namespace, String userId) {

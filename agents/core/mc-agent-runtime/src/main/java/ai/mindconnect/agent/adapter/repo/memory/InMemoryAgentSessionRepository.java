@@ -16,6 +16,15 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
 
     private final Map<UUID, AgentSession> store = new ConcurrentHashMap<>();
 
+    /**
+     * Newest first, and tolerant of a session without a start time: one
+     * unreadable timestamp should misplace a single row, not throw and take
+     * the user's whole session list with it.
+     */
+    private static final java.util.Comparator<AgentSession> NEWEST_FIRST =
+            java.util.Comparator.comparing(AgentSession::startedAt,
+                    java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()));
+
     @Override
     public AgentSession save(AgentSession session) {
         store.put(session.id(), session);
@@ -42,7 +51,7 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
                 .filter(s -> Objects.equals(s.namespace(), namespace)
                         && Objects.equals(s.userId(), userId)
                         && s.parentSessionId() == null)
-                .sorted((a, b) -> b.startedAt().compareTo(a.startedAt()))
+                .sorted(NEWEST_FIRST)
                 .toList();
     }
 

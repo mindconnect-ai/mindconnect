@@ -56,6 +56,58 @@ public final class AgentRuntime implements AutoCloseable {
         return sessionService.openChat(def.id(), namespace, userId);
     }
 
+    /**
+     * Opens a chat with no agent behind it: a model, a set of tools, and the
+     * default prompt. The session carries its own agent, so nothing is added
+     * to the registry and nothing has to be cleaned up afterwards — the chat
+     * dies with its session.
+     *
+     * <p>The counterpart to {@link #openSession(String, String)} for the case
+     * where an application wants a plain assistant rather than a curated one.
+     *
+     * @param llmConfigName the model, by the name of a stored LlmConfig
+     * @param toolNames     tools offered up front; empty for a chat without any
+     */
+    public AgentSession openSession(String llmConfigName, java.util.List<String> toolNames,
+                                    String userId) {
+        return openSession(llmConfigName, toolNames, DEFAULT_CHAT_PROMPT, true, userId);
+    }
+
+    /**
+     * The same, with the prompt and the tool-search switch under the caller's
+     * control.
+     *
+     * @param toolSearch lets the chat discover tools beyond {@code toolNames}
+     *                   at runtime instead of carrying every definition in its
+     *                   context
+     */
+    public AgentSession openSession(String llmConfigName, java.util.List<String> toolNames,
+                                    String systemPrompt, boolean toolSearch, String userId) {
+        if (llmConfigName == null || llmConfigName.isBlank()) {
+            throw new IllegalArgumentException("A session without an agent needs a model name");
+        }
+        if (llmConfigRepository.findByName(llmConfigName).isEmpty()) {
+            throw new IllegalArgumentException("No LLM config named '" + llmConfigName + "'");
+        }
+        var agent = ai.mindconnect.agent.domain.session.InlineSessionAgent.of(
+                "Chat", systemPrompt, llmConfigName, toolNames, toolSearch);
+        return sessionService.openChat(agent, namespace, userId);
+    }
+
+    /** Opens an agentless session and asks it one question. */
+    public String ask(String llmConfigName, java.util.List<String> toolNames,
+                      String userId, String message, Consumer<StreamEvent> events) {
+        AgentSession session = openSession(llmConfigName, toolNames, userId);
+        return chat(session.id(), message, events);
+    }
+
+    /** What an agentless chat is told about itself when the caller says nothing. */
+    public static final String DEFAULT_CHAT_PROMPT = """
+            You are a helpful assistant. Be concise and practical.
+
+            Today's date: {{ current_date }}
+            """;
+
     /** Sends one message in an existing session and blocks for the answer. */
     public String chat(UUID sessionId, String message, Consumer<StreamEvent> events) {
         ChatTurnHandle handle = chatService.submitChat(sessionId, message, events);

@@ -38,6 +38,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
   composer. The admin UI embeds it — `Chat` is its first menu entry and the
   root now lands there — and depends on the new module for its own chat page,
   so a chat client does not have to ship agent CRUD, LLM configs and traces.
+- **Session files over the REST API.** `GET /api/sessions/{id}/files` lists
+  what is attached to a chat with the number of searchable chunks each
+  produced, and `DELETE /api/sessions/{id}/files?file={fileId}` detaches one —
+  removing its chunks from the session's vector store and the spooled copy, so
+  the agent can no longer search it. The original in the file store stays; it
+  may belong to other sessions too. Uploading was already possible; listing and
+  detaching were only reachable from the admin UI.
+- **The embedding facade can start a chat without an agent.**
+  `AgentRuntime.openSession(llmConfigName, toolNames, userId)` (and an overload
+  taking the prompt and the tool-search switch) opens a session that carries
+  its own agent: a model, a set of tools, nothing in the registry and nothing
+  to clean up afterwards. `ask(...)` does the same in one call.
 - **A chat can only be opened, renamed or deleted by the user it belongs to.**
   Every endpoint under `/chat/api/sessions/{id}` now checks the session's
   owner before doing anything, and answers 404 otherwise. A session id travels

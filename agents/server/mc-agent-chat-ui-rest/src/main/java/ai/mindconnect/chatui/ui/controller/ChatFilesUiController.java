@@ -30,10 +30,16 @@ public class ChatFilesUiController {
 
     private final FileStore fileStore;
     private final SessionFileService sessionFiles;
+    private final ai.mindconnect.agent.port.out.AgentSessionRepository sessions;
+    private final ai.mindconnect.agent.service.SessionAgentResolver agentResolver;
 
-    public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles) {
+    public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
+                                 ai.mindconnect.agent.port.out.AgentSessionRepository sessions,
+                                 ai.mindconnect.agent.port.out.AgentDefinitionRepository agents) {
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
+        this.sessions = sessions;
+        this.agentResolver = new ai.mindconnect.agent.service.SessionAgentResolver(agents);
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -52,6 +58,7 @@ public class ChatFilesUiController {
         }
         patch.patch(UiPatch.Operation.replace("chat-attachments",
                 ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))));
+        patch.patch(attachmentCountRefresh(sessionId));
         return patch;
     }
 
@@ -62,6 +69,21 @@ public class ChatFilesUiController {
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace("chat-attachments",
                         ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))))
+                .patch(attachmentCountRefresh(sessionId))
                 .toast(UiToast.success("Removed from the conversation.").title("File removed"));
+    }
+
+    /**
+     * The composer carries the number of attached files on its "+", so a file
+     * arriving or leaving has to redraw it — otherwise the count keeps saying
+     * what was true before the upload until the page is reloaded.
+     */
+    private UiPatch.Operation attachmentCountRefresh(UUID sessionId) {
+        var agent = sessions.findById(sessionId).map(agentResolver::resolve).orElse(null);
+        var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
+                        sessionId, agent == null ? null : agent.id(), false)
+                .withModelLabel(agent == null ? null : agent.llmConfigName())
+                .withAttachmentCount(sessionFiles.listAttachments(sessionId).size());
+        return form.reset();
     }
 }

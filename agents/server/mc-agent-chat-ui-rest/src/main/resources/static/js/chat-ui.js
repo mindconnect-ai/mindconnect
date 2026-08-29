@@ -76,12 +76,41 @@
         });
     }
 
-    new MutationObserver(decorateRows).observe(document.documentElement, {
-        childList: true,
-        subtree: true,
-    });
-    document.addEventListener("DOMContentLoaded", decorateRows);
-    decorateRows();
+    /*
+     * Watch the menu, not the document: during a streaming turn the renderer
+     * patches the message list many times a second, and re-scanning the
+     * history on every one of those is work for nothing. The menu itself is
+     * replaced wholesale by page patches, so the observer re-attaches when
+     * that happens, and the work is coalesced into one animation frame.
+     */
+    let scheduled = false;
+    function schedule() {
+        if (scheduled) return;
+        scheduled = true;
+        requestAnimationFrame(function () {
+            scheduled = false;
+            decorateRows();
+            attachMenuObserver();
+        });
+    }
+
+    let menuObserver = null;
+    let watched = null;
+    function attachMenuObserver() {
+        const menu = document.getElementById(MENU_ID);
+        if (!menu || menu === watched) return;
+        if (menuObserver) menuObserver.disconnect();
+        menuObserver = new MutationObserver(schedule);
+        menuObserver.observe(menu, { childList: true, subtree: true });
+        watched = menu;
+    }
+
+    // One cheap watcher on the shell catches the menu being swapped out; the
+    // expensive subtree watching happens only inside the menu itself.
+    new MutationObserver(schedule).observe(document.body, { childList: true });
+
+    document.addEventListener("DOMContentLoaded", schedule);
+    schedule();
 
     document.addEventListener(
         "click",

@@ -109,13 +109,28 @@ public class ChatUiController {
      */
     @GetMapping({"", "/"})
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
-        String userId = userId(user);
-        var sessions = sessionRepository.findByUser(defaultNamespace, userId);
+        var sessions = sessionRepository.findByUser(defaultNamespace, userId(user));
         if (sessions.isEmpty()) {
-            var session = sessionService.openChat(defaultChatAgent(), defaultNamespace, userId);
-            return ResponseEntity.ok(shell(session, List.of(session)));
+            // A GET does not create anything: a prefetch, a link preview or two
+            // tabs opening at once would each leave an empty chat behind. The
+            // empty state offers the same button the sidebar does.
+            return ResponseEntity.ok(emptyShell());
         }
         return ResponseEntity.ok(shell(sessions.get(0), sessions));
+    }
+
+    /** What the chat looks like before there is anything to look at. */
+    private UiPage emptyShell() {
+        var invitation = ai.mindconnect.ui.model.UiList.of("chat-empty", null);
+        invitation.item(ai.mindconnect.ui.model.UiList.Item
+                .of("chat-empty-hint", "No conversations yet")
+                .description("Start one and pick a model and tools from the composer."));
+        invitation.action(UiAction.primary("start-first", "New chat").icon("add")
+                .dispatch("POST", "/chat/api/sessions"));
+
+        var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
+                List.of(), null, "Chat", invitation).render();
+        return UiPage.of("/chat", appShell);
     }
 
     /** Starts a chat on the defaults and opens it. */
@@ -171,11 +186,18 @@ public class ChatUiController {
             agent = new ai.mindconnect.agent.domain.session.SessionAgentRef(
                     def.id(), true, def.name(), null, null, null);
         } else {
+            // Staying inline keeps the same agent — and therefore the same
+            // workspace — while only the model and tools change. Coming from a
+            // ref agent it is a new one, and the switch says so.
             var previous = sessionOpt.get().mainAgent().orElse(null);
-            UUID inlineId = previous instanceof ai.mindconnect.agent.domain.session.InlineSessionAgent i
-                    ? i.id() : UUID.randomUUID();
-            agent = inlineAgent(inlineId, body.str("llmConfigName"),
+            var fresh = inlineAgent(body.str("llmConfigName"),
                     body.strList("tools"), body.bool("toolSearch", true));
+            agent = previous instanceof ai.mindconnect.agent.domain.session.InlineSessionAgent kept
+                    ? kept.withLlmConfigName(fresh.llmConfigName())
+                          .withTools(fresh.tools().stream()
+                                  .map(ai.mindconnect.agent.tool.AgentTool::name).toList(),
+                                  fresh.toolSearch().enabled())
+                    : fresh;
         }
         var saved = sessionService.replaceSessionAgent(sessionId, agent);
         String userId = userId(user);
@@ -284,38 +306,22 @@ public class ChatUiController {
 
     /** A chat on the defaults: the standard model, the standard tools. */
     private ai.mindconnect.agent.domain.session.InlineSessionAgent defaultChatAgent() {
-        return inlineAgent(UUID.randomUUID(), defaultLlmConfigName(),
+        return inlineAgent(defaultLlmConfigName(),
                 ai.mindconnect.chatui.ui.component.ChatSettingsComponent.DEFAULT_TOOLS, true);
     }
 
     /** The session's own agent, built from a model name and tool names. */
     private ai.mindconnect.agent.domain.session.InlineSessionAgent inlineAgent(
-            UUID id, String llmConfigName, List<String> tools, boolean toolSearch) {
+            String llmConfigName, List<String> tools, boolean toolSearch) {
         List<String> names = tools == null || tools.isEmpty()
                 ? ai.mindconnect.chatui.ui.component.ChatSettingsComponent.DEFAULT_TOOLS
                 : tools;
-        // run_agent / run_agents come from the runtime itself, not the registry
-        // (see InlineAgentTools), so they are never in toolNamesByGroup().
-        // Filtering against the registry alone would silently drop them.
-        var known = new java.util.HashSet<>(allToolNames());
-        known.add(ai.mindconnect.agent.service.InlineAgentTools.RUN_AGENT);
-        known.add(ai.mindconnect.agent.service.InlineAgentTools.RUN_AGENTS);
-        // The tools carry the agent's id, not null: SpiToolRegistry passes it
-        // into every ToolCallScope, and the AGENT_USER workspace is keyed by
-        // it. With null, workspace_write(scope=agent) dies on a NPE and the
-        // chat's persistent memory is unreachable.
-        var agentTools = names.stream()
-                .filter(known::contains)
-                .map(name -> new ai.mindconnect.agent.tool.AgentTool(
-                        UUID.randomUUID(), id, name, null, Map.of(), true, false, false))
-                .toList();
-        var search = toolSearch
-                ? new ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig(true, List.of("*"))
-                : ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig.OFF;
-        return new ai.mindconnect.agent.domain.session.InlineSessionAgent(
-                id, true, "Chat", CHAT_SYSTEM_PROMPT,
+        var known = allToolNames();
+        return ai.mindconnect.agent.domain.session.InlineSessionAgent.of(
+                "Chat", CHAT_SYSTEM_PROMPT,
                 llmConfigName == null ? defaultLlmConfigName() : llmConfigName,
-                agentTools, search);
+                names.stream().filter(known::contains).toList(),
+                toolSearch);
     }
 
     /** The default prompt of a chat that has no agent behind it. */
@@ -391,9 +397,9 @@ public class ChatUiController {
                 .node(sessionId, sessionFiles.listAttachments(sessionId)));
         body.child(ai.mindconnect.chatui.ui.page.ChatPage.attachZone(sessionId));
         var dlg = ai.mindconnect.ui.model.UiDialog.of("Attached files", null, body);
-        dlg.setId("session-dialog");
+        dlg.setId("chat-dialog");
         return ResponseEntity.ok(UiPatch.of()
-                .patch(UiPatch.Operation.remove("session-dialog"))
+                .patch(UiPatch.Operation.remove("chat-dialog"))
                 .patch(UiPatch.Operation.append("sui-dialogs", dlg)));
     }
 
@@ -425,7 +431,6 @@ public class ChatUiController {
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
-                .withAttachments(ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(session.id(), sessionFiles.listAttachments(session.id())))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks);
         // Hand the SPA the resume URL for this session's stream (when
