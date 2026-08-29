@@ -809,6 +809,13 @@
 #chat-menu.sui-menu--overlay {
     background: var(--sui-color-surface);
     border-inline-end: 1px solid var(--sui-color-border);
+}
+
+/* Shadow only while open. Hidden, the drawer is merely translated off to the
+   left — its right edge sits exactly on the content's left edge, and a shadow
+   on the hidden element bled past it into the page as a grey seam along the
+   sidebar. */
+#chat-menu.sui-menu--overlay:not(.sui-menu--hidden) {
     box-shadow: var(--sui-shadow-pop);
 }
 
