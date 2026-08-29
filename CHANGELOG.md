@@ -59,6 +59,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
   metrics now; the burger sits where a list header's icon sits and is sized
   like one.
 
+- **The chat is a page like the others, not an app inside the app.** It had
+  its own app-shell header — agent, session title, overflow — inside the
+  host's, so the screen carried two title bars where every other one carries
+  a single list header. That header is gone: the conversation's own header
+  names the agent, with the icon first, the same 17px title, the same
+  padding, the same hairline and the same white surface as the Agents list,
+  spanning the same width. The history is a drawer behind the button in that
+  header rather than a permanent second sidebar, so the layout is nav,
+  content, and nothing else.
+
 - **The chat is one surface, not a frame inside a frame.** The chat renders
   its own app shell — it also runs standalone — and nested in the admin shell
   that showed as a panel with its own edges floating in the page. It fills

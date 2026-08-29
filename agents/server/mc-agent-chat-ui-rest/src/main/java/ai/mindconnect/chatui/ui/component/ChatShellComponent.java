@@ -68,8 +68,13 @@ public final class ChatShellComponent implements UiComponent {
         // top-level shell and wrong for one that starts below the host's own
         // header — it would push the composer exactly that far off screen.
         // The stylesheet stretches it to its parent instead.
+        // No header. The chat used to render its own app-shell header — agent
+        // name, session title, overflow — inside the host's, so the screen
+        // carried two title bars where every other one carries a single list
+        // header. The conversation's own header does that job now, and the
+        // shell is left doing the one thing only it can: positioning the
+        // history drawer over the content.
         return UiAppShell.of(ID)
-                .header(header())
                 .menu(menu())
                 .content(content);
     }
@@ -140,8 +145,12 @@ public final class ChatShellComponent implements UiComponent {
         menu.side(UiMenu.Side.LEFT);
         // Collapsible and open by default: the history is the point of the
         // sidebar, but a wide conversation should be able to reclaim it.
-        menu.mode(UiMenu.Mode.PUSH);
-        menu.state(UiMenu.State.EXPANDED);
+        // A drawer, closed. The history is something you go and get, not
+        // something that stands beside the conversation taking a third of the
+        // width — and with it out of the flow the chat is laid out exactly
+        // like every other page: nav, content, nothing else.
+        menu.mode(UiMenu.Mode.OVERLAY);
+        menu.state(UiMenu.State.HIDDEN);
         menu.toggle(true);
         menu.item(UiMenuItem.of("chat-new", "New chat").icon("add")
                 .onClick(ai.mindconnect.ui.model.UiTrigger.api("POST", "/chat/api/sessions")));

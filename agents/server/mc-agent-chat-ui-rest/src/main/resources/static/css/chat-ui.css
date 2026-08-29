@@ -175,9 +175,14 @@
    Follows the window: it takes the width the shell gives it — which grows
    when the history folds to a rail — up to a line length that stays
    readable. No fixed pixel width anywhere. */
+/* The column fills the content area, exactly like a list on any other page,
+   so its header bar spans the same width as the one on Agents. The measure
+   moves down onto the things that are prose — the turns and the composer —
+   because it was never the container that needed to be narrow, only the
+   text inside it. */
 .chat-conversation {
     width: 100%;
-    max-width: min(var(--chat-measure, 72rem), 100%);
+    max-width: 100%;
     min-width: 0;
     margin-inline: auto;
     display: flex;
@@ -401,20 +406,33 @@
    The better long-term answer is a UiList variant (or a UiConversation node)
    in the framework that never renders the card in the first place — this is
    the CSS shape of that idea. */
+/* A list like any other. It used to be stripped to nothing — transparent,
+   no card — because the chat was a page of its own with a header of its own
+   and the conversation was the only thing on it. Now that the chat is a
+   normal screen, being a normal container is what makes it match: the same
+   surface and the same edges the Agents list has, which on a flush content
+   area means square corners and no side borders.
+
+   What stays undone is everything inside it: the rows keep no separators, no
+   hover, no card of their own. A conversation is still prose; it is the box
+   around the prose that had no reason to be different. */
 .chat-conversation .sui-list.chat-container,
 .chat-conversation .sui-list.chat-container:hover {
-    background: transparent;
+    background: var(--sui-color-surface);
     box-shadow: none;
+    border: none;
     border-radius: 0;
 }
 
 /* The list header carries the token bar. It is reference information, not a
    title bar, so it stops being a bar: no surface, no border, right-aligned,
    and quiet enough to ignore until you look for it. */
+/* Sticky, and otherwise a list header like any other — same padding, same
+   hairline. It used to be tightened and stripped of its border because it
+   was the second bar on the page and had to keep out of the way of the
+   first. It is the only one now, so it stops apologising for itself. */
 .chat-conversation .sui-scrollpane > .sui-list > .sui-list-header {
-    background: var(--sui-color-bg);
-    border-bottom: none;
-    padding-block: 10px;
+    background: var(--sui-color-surface);
 }
 
 .chat-conversation .chat-token-usage {
@@ -438,6 +456,9 @@
 /* Turns are separated by space, not by lines. */
 .chat-container .sui-list-item {
     position: relative;
+    width: 100%;
+    max-width: var(--chat-measure, 48rem);
+    margin-inline: auto;
     padding: 0 20px;
     margin-block: var(--chat-turn-gap);
     border-bottom: none;
@@ -586,6 +607,9 @@
    makes this possible and is also why it is fiddly — a chat-composer variant
    in the framework would render this shape directly instead. */
 .chat-form.sui-form {
+    width: 100%;
+    max-width: var(--chat-measure, 48rem);
+    margin-inline: auto;
     background: var(--sui-color-surface);
     border: 1px solid var(--sui-color-border);
     border-radius: 20px;

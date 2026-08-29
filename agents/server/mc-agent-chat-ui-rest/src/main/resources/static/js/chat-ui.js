@@ -140,7 +140,12 @@
     document.addEventListener(
         "click",
         function (event) {
-            const button = event.target.closest('[data-menu-toggle="' + MENU_ID + '"]');
+            // Two ways to open it: the framework's own toggle inside the
+            // drawer, and the button in the conversation's header — which is
+            // a plain action, because whether a drawer is open is client
+            // state and there is nothing to ask the server.
+            const button = event.target.closest(
+                '[data-menu-toggle="' + MENU_ID + '"], .chat-history-toggle');
             if (!button) return;
             const menu = document.getElementById(MENU_ID);
             if (!menu) return;
@@ -148,6 +153,17 @@
             event.preventDefault();
             event.stopPropagation();
             apply(menu, menu.dataset.menuState === "hidden" ? "expanded" : "hidden");
+        },
+        true
+    );
+
+    // Clicking the scrim closes it, the way any drawer does.
+    document.addEventListener(
+        "click",
+        function (event) {
+            if (!event.target.classList.contains("sui-menu-backdrop")) return;
+            const menu = document.getElementById(MENU_ID);
+            if (menu) apply(menu, "hidden");
         },
         true
     );

@@ -130,11 +130,22 @@ public final class MessageListComponent implements UiComponent {
 
     @Override
     public UiList render() {
-        // No title: the header above already names the agent and the chat, and
-        // "Conversation" on top of a conversation says nothing. The token bar
-        // stays — it is the one thing here you cannot see anywhere else.
-        var list = UiList.of(id(), null);
+        // The conversation's own header, and the only one on the page. It used
+        // to be empty because the chat rendered a second app-shell header
+        // above it that named the agent — two title bars where every other
+        // screen has one, which is what made the chat look like it came from
+        // somewhere else. That header is gone; this one names the agent, the
+        // way "Agents" names the agents list.
+        var list = UiList.of(id(), agent == null ? "Chat" : agent.name());
+        // The icon leads the title, the way every other screen's does.
+        list.icon("chat");
         list.withCssClass("chat-container");
+        // The history is a drawer now, opened from here. chat-ui.js owns the
+        // click: the drawer is client state, and the server has no opinion
+        // about whether a sidebar happens to be open.
+        list.action(ai.mindconnect.ui.model.UiAction.icon("chat-history", "Chats")
+                .icon("menu")
+                .<ai.mindconnect.ui.model.UiAction>withCssClass("chat-history-toggle"));
         list.headerExtra(new TokenUsageComponent(id(), memory).render());
 
         // Sort by sequenceNum to be safe — persisted ordering should already
