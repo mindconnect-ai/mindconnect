@@ -1,4 +1,4 @@
-package ai.mindconnect.adminui.ui.controller;
+package ai.mindconnect.chatui.ui.controller;
 
 import ai.mindconnect.agentrest.service.SessionFileService;
 import ai.mindconnect.filestore.FileStore;
@@ -25,7 +25,7 @@ import java.util.UUID;
  * the outcome in place — the REST endpoint answers raw JSON instead.
  */
 @RestController
-@RequestMapping("/admin/api/sessions/{sessionId}/chat-files")
+@RequestMapping("/chat/api/sessions/{sessionId}/chat-files")
 public class ChatFilesUiController {
 
     private final FileStore fileStore;
@@ -51,7 +51,7 @@ public class ChatFilesUiController {
                     : UiToast.error(result.message()).title("Attach failed"));
         }
         patch.patch(UiPatch.Operation.replace("chat-attachments",
-                ai.mindconnect.adminui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))));
+                ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))));
         return patch;
     }
 
@@ -61,7 +61,7 @@ public class ChatFilesUiController {
         sessionFiles.deleteAttachment(sessionId, fileId);
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace("chat-attachments",
-                        ai.mindconnect.adminui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))))
+                        ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))))
                 .toast(UiToast.success("Removed from the conversation.").title("File removed"));
     }
 }

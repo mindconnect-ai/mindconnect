@@ -72,6 +72,7 @@ public final class AdminLayout {
     private UiMenu buildMenu(String navigate) {
         UiMenu menu = UiMenu.of("app-menu", null);
         menu.mode(UiMenu.Mode.RESPONSIVE);
+        menu.item(navItem("nav-chat", "Chat", "/chat", "chat", navigate));
         menu.item(navItem("nav-agents", "Agents", "/admin/agents", "bot", navigate));
         menu.item(navItem("nav-tools", "Tools", "/admin/tools", "tools", navigate));
         menu.item(navItem("nav-llm-configs", "LLM Configs", "/admin/llm-configs", "ai", navigate));

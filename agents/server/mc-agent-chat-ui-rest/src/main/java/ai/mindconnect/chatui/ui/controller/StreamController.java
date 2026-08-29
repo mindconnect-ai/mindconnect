@@ -1,6 +1,6 @@
-package ai.mindconnect.adminui.controller;
+package ai.mindconnect.chatui.ui.controller;
 
-import ai.mindconnect.adminui.service.ActiveStreams;
+import ai.mindconnect.chatui.service.ActiveStreams;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -23,8 +23,8 @@ import java.util.Map;
  *
  * <ul>
  *   <li>{@code GET  /admin/api/streams}              — list all currently live streams.</li>
- *   <li>{@code GET  /admin/api/streams/{channelId}}  — single-stream lookup, 404 if not running.</li>
- *   <li>{@code DELETE /admin/api/streams/{channelId}} — cooperatively cancel the named stream.</li>
+ *   <li>{@code GET  /chat/api/streams/{channelId}}  — single-stream lookup, 404 if not running.</li>
+ *   <li>{@code DELETE /chat/api/streams/{channelId}} — cooperatively cancel the named stream.</li>
  * </ul>
  *
  * <p>The chat-page renderer uses the single-stream lookup to decide
@@ -32,7 +32,7 @@ import java.util.Map;
  * "what's running?" indicator would use the list endpoint.
  */
 @RestController
-@RequestMapping("/admin/api/streams")
+@RequestMapping("/chat/api/streams")
 public class StreamController {
 
     private final ActiveStreams activeStreams;

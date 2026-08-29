@@ -1,6 +1,6 @@
-package ai.mindconnect.adminui.ui.component;
+package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -27,6 +27,23 @@ public final class SessionInfoComponent implements UiComponent {
     private final AgentSession session;
     private final AgentDefinition agent;
 
+    private ai.mindconnect.chatui.ui.ChatHostLinks hostLinks =
+            ai.mindconnect.chatui.ui.ChatHostLinks.NONE;
+
+    /** Host-contributed links (the LLM-config href). Default: none. */
+    public SessionInfoComponent withHostLinks(ai.mindconnect.chatui.ui.ChatHostLinks links) {
+        this.hostLinks = links == null ? ai.mindconnect.chatui.ui.ChatHostLinks.NONE : links;
+        return this;
+    }
+
+    /** A link when the host offers one, otherwise the bare config name. */
+    private UiLink llmConfigLink() {
+        String href = hostLinks.llmConfigHref(agent.llmConfigName());
+        return UiLink.of("llmConfigName",
+                href == null ? "" : href,
+                agent.llmConfigName());
+    }
+
     public SessionInfoComponent(AgentSession session, AgentDefinition agent) {
         this.session = session;
         this.agent = agent;
@@ -39,14 +56,10 @@ public final class SessionInfoComponent implements UiComponent {
 
     @Override
     public UiDetail render() {
-        String agentId = agent.id().toString();
-        String backHref = "/admin/agents/" + agentId
-                + "?section=sessions&row=" + session.id();
-
         return UiDetail.of(id(), "Session Info")
                 .field(UiField.text("sessionId", "Session ID", session.id().toString()))
                 .field(UiField.text("agent",     "Agent",      agent.name()))
-                .link(UiLink.of("llmConfigName", "/admin/api/llm-configs/byName/" + agent.llmConfigName(), agent.llmConfigName()))
+                .link(llmConfigLink())
                 .field(UiField.text("status",    "Status",
                         session.status() != null ? session.status().name() : ""))
                 .field(UiField.text("userId",    "User",       session.userId()))
@@ -55,6 +68,14 @@ public final class SessionInfoComponent implements UiComponent {
                                 ? STARTED_AT_FMT.format(session.startedAt())
                                 : ""))
                 .field(UiField.text("title",     "Title",      session.title()))
-                .link(UiLink.of("back", backHref, "← Back to Agent"));
+                .link(backLink());
+    }
+
+    /** The host's way back, or an inert entry when it offers none. */
+    private UiLink backLink() {
+        String href = hostLinks.backHref(agent.id(), session.id());
+        return href == null
+                ? UiLink.of("back", "", "")
+                : UiLink.of("back", href, "← Back to Agent");
     }
 }

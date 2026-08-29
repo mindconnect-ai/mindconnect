@@ -25,6 +25,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **A chat that needs no agent.** A session can now carry its own agent:
+  either a reference to one from the registry, or an inline one that lives
+  only in that session — a model, a set of tools, and nothing in the
+  registry. Pick a model and tools and start typing; the chat is not findable
+  under any agent, because it belongs to none. Sessions written before this
+  keep working unchanged: an empty `sessionAgents` list means the agent
+  behind `agentDefinitionId` decides, exactly as before.
+- **A user-facing chat UI, in its own module.** `mc-agent-chat-ui-rest`
+  serves it under `/chat`: the conversation history down the left, the agent
+  and session title across the top, model and tools behind a button on the
+  composer. The admin UI embeds it — `Chat` is its first menu entry and the
+  root now lands there — and depends on the new module for its own chat page,
+  so a chat client does not have to ship agent CRUD, LLM configs and traces.
+- `AgentSessionRepository.findByUser(namespace, userId)` — every top-level
+  session of one user, newest first. Sub-agent sessions are left out: they
+  belong to the turn that spawned them, not to the user's history.
 - **The workspace files an agent wrote are readable over the API.**
   `GET /api/workspaces/session/{id}/files`, `/api/workspaces/agent/{agentId}/user/{userId}/files`
   and `/api/workspaces/user/{userId}/files` list them, and appending

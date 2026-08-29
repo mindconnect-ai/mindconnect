@@ -1,6 +1,6 @@
-package ai.mindconnect.adminui.ui.component;
+package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -58,6 +58,43 @@ public final class ChatFormComponent implements UiComponent {
         return streaming ? streamingForm() : idleForm();
     }
 
+    /** How many files hang on this conversation — shown on the "+". */
+    private int attachmentCount;
+
+    /** Puts the file count on the attach button, so it is visible while typing. */
+    public ChatFormComponent withAttachmentCount(int count) {
+        this.attachmentCount = Math.max(count, 0);
+        return this;
+    }
+
+    /**
+     * The "+": an icon on its own while nothing is attached, an icon with a
+     * count once something is. The files themselves live behind it, in the
+     * dialog it opens — a strip above the input pushed the conversation up
+     * for something you only look at when you go looking.
+     */
+    private UiAction attachAction() {
+        String url = "/chat/api/sessions/" + sessionId + "/attach-dialog";
+        if (attachmentCount == 0) {
+            return UiAction.icon("attach", "Attach files").icon("add")
+                    .dispatch("GET", url);
+        }
+        return UiAction.secondary("attach", "(" + attachmentCount + ")").icon("add")
+                .dispatch("GET", url)
+                .<UiAction>withCssClass("chat-attach-btn");
+    }
+
+    /** What the composer's model button says — the chat's current model. */
+    private String modelLabel = "Model & tools";
+
+    /** Shows the running model on the composer button. */
+    public ChatFormComponent withModelLabel(String llmConfigName) {
+        if (llmConfigName != null && !llmConfigName.isBlank()) {
+            this.modelLabel = llmConfigName;
+        }
+        return this;
+    }
+
     // ── Patch operations ───────────────────────────────────────────────────
 
     /**
@@ -94,11 +131,15 @@ public final class ChatFormComponent implements UiComponent {
                 // "+" opens the attach dialog (drop-zone lives there, not on
                 // the page); the paper plane sends. Labels become the
                 // accessible names, the sprite tokens the glyphs.
-                .action(UiAction.icon("attach", "Attach files").icon("add")
-                        .dispatch("GET", "/admin/api/sessions/" + sessionId + "/attach-dialog"))
+                .action(attachAction())
+                // Model and tools sit on the composer, where you notice them
+                // while typing — not in a settings page you have to go find.
+                .action(UiAction.secondary("model", modelLabel).icon("ai")
+                        .dispatch("GET", "/chat/api/sessions/" + sessionId + "/settings")
+                        .<UiAction>withCssClass("chat-model-btn"))
                 .action(UiAction.icon("send", "Send").icon("send")
                         .style(UiAction.Style.PRIMARY)
-                        .stream("POST", "/admin/api/sessions/" + sessionId + "/chat/stream", id()));
+                        .stream("POST", "/chat/api/sessions/" + sessionId + "/chat/stream", id()));
         return form.<UiForm>withCssClass("chat-form");
     }
 
@@ -117,7 +158,7 @@ public final class ChatFormComponent implements UiComponent {
         row.child(ai.mindconnect.ui.model.UiText.of(id() + ":thinking", "AI is thinking")
                 .withCssClass("chat-thinking"));
         row.child(UiAction.danger("stop", "Stop").icon("stop")
-                .dispatch("DELETE", "/admin/api/streams/" + channelId));
+                .dispatch("DELETE", "/chat/api/streams/" + channelId));
         return row;
     }
 }

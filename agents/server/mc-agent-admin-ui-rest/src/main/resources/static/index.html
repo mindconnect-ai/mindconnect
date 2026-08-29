@@ -6,6 +6,8 @@
     <title>Agent Admin</title>
     <link rel="stylesheet" href="/sui/sui.css">
     <link rel="stylesheet" href="/css/app.css">
+    <!-- Chat shell (sidebar + conversation) — ships with mc-agent-chat-ui-rest. -->
+    <link rel="stylesheet" href="/css/chat-ui.css">
     <!-- Embedded workflow admin (/workflow-admin): step cards, base <sui-diagram>
          styling (ships with the diagram extension JAR) and workflow domain colours. -->
     <link rel="stylesheet" href="/css/workflow-admin.css">
@@ -24,5 +26,7 @@
          are now loaded lazily on demand by their mc-semantic-ui-extensions
          handlers (see app.js). No CDN script tags needed here. -->
     <script type="module" src="/js/app.js"></script>
+    <!-- Chat: two-state history toggle — ships with mc-agent-chat-ui-rest. -->
+    <script src="/js/chat-ui.js" defer></script>
 </body>
 </html>

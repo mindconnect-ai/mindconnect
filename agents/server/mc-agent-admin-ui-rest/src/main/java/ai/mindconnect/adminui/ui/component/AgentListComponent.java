@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.common.Page;
 import ai.mindconnect.ui.model.UiAction;
@@ -67,7 +67,7 @@ public final class AgentListComponent implements UiComponent {
                     // Straight into a conversation: starts a fresh session
                     // with this agent and lands on its chat page.
                     .action(UiAction.primary("chat", "Chat").icon("chat")
-                            .dispatch("POST", "/admin/api/agents/" + a.id() + "/sessions"))
+                            .dispatch("POST", "/chat/api/agents/" + a.id() + "/sessions"))
                     .action(UiAction.secondary("copy", "Copy").icon("copy")
                             .dispatch("POST", "/admin/api/agents/" + a.id() + "/copy"))
                     .action(UiAction.danger("delete", "Delete").icon("delete")

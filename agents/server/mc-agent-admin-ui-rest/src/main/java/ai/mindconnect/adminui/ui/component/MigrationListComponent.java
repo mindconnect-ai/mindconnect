@@ -4,7 +4,7 @@ import ai.mindconnect.adminui.service.MigrationService.EntityType;
 import ai.mindconnect.adminui.service.MigrationService.FieldDiff;
 import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
 import ai.mindconnect.adminui.service.MigrationService.Status;
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiColumn;
 import ai.mindconnect.ui.model.UiList;

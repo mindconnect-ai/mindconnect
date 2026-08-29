@@ -1,4 +1,4 @@
-package ai.mindconnect.adminui.ui;
+package ai.mindconnect.chatui.ui;
 
 import ai.mindconnect.ui.model.UiNode;
 

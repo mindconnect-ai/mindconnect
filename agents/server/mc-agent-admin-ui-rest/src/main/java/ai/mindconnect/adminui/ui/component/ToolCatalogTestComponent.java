@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.service.JsonSchemaSample;
 import ai.mindconnect.adminui.service.ToolTestService;
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.common.Namespace;

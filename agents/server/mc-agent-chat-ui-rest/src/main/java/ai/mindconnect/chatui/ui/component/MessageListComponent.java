@@ -1,6 +1,6 @@
-package ai.mindconnect.adminui.ui.component;
+package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.message.domain.Message;
@@ -10,17 +10,14 @@ import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPatch;
-import ai.mindconnect.ui.model.UiTrigger;
-import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.DT_FMT;
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.MAPPER;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 
 /**
  * The main conversation list of a chat page. Renders the message
@@ -88,6 +85,8 @@ public final class MessageListComponent implements UiComponent {
     /** Bubbled sub-agent approval cards (from the ToolApprovalStore), rendered after the history. */
     private List<UiList.Item> bubbledApprovalCards = List.of();
 
+
+
     public MessageListComponent(UUID sessionId, AgentDefinition agent,
                                 List<Message> history, WorkingMemory memory) {
         this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE);
@@ -131,13 +130,12 @@ public final class MessageListComponent implements UiComponent {
 
     @Override
     public UiList render() {
-        var list = UiList.of(id(), "Conversation");
+        // No title: the header above already names the agent and the chat, and
+        // "Conversation" on top of a conversation says nothing. The token bar
+        // stays — it is the one thing here you cannot see anywhere else.
+        var list = UiList.of(id(), null);
         list.withCssClass("chat-container");
-        list.headerExtra(tokenUsageBar(memory));
-
-        // Header action links — navigation only (no method), so the bus
-        // calls navigate(href) instead of fetchPage(method, href).
-        addHeaderActions(list);
+        list.headerExtra(new TokenUsageComponent(id(), memory).render());
 
         // Sort by sequenceNum to be safe — persisted ordering should already
         // be correct but the component does not trust upstream.
@@ -163,20 +161,20 @@ public final class MessageListComponent implements UiComponent {
         for (Message m : chatMessages) {
             boolean isUser = m.senderType() == ParticipantType.USER;
             if (!isUser) {
-                List<TaskCardComponent> tasks = buildHistoricTaskCards(sorted, prevAgentSeq, m.sequenceNum());
+                List<TaskCardComponent> tasks = toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, m.sequenceNum());
                 for (TaskCardComponent t : tasks) {
                     // Reuse the wrapper render to get the same <li> shape.
                     list.item(((UiList) t.render()).getItems().get(0));
                 }
             }
-            list.item(chatItem(m, isUser));
+            list.item(messageItem(m, isUser));
             prevAgentSeq = m.sequenceNum();
         }
         // The IN-FLIGHT turn's activity: task messages after the last CHAT
         // have no agent answer to group under yet — render them anyway, or a
         // mid-turn rebuild (approval answered, page reloaded) would make the
         // running tool and sub-agent cards vanish until the turn ends.
-        for (TaskCardComponent t : buildHistoricTaskCards(sorted, prevAgentSeq, Integer.MAX_VALUE)) {
+        for (TaskCardComponent t : toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, Integer.MAX_VALUE)) {
             list.item(((UiList) t.render()).getItems().get(0));
         }
         // Open approval questions live ONLY in the ToolApprovalStore now
@@ -186,64 +184,6 @@ public final class MessageListComponent implements UiComponent {
         return list;
     }
 
-    // ── Approval cards ─────────────────────────────────────────────────────
-
-    /** The tool name and pretty-printed arguments out of a request's content JSON. */
-    public record ApprovalCall(String toolName, String argsJson) { }
-
-    public static ApprovalCall parseApprovalContent(String content) {
-        String toolName = "?";
-        String argsJson = "{}";
-        try {
-            var node = APPROVAL_MAPPER.readTree(content);
-            if (node.hasNonNull("name")) toolName = node.get("name").asText();
-            if (node.has("arguments")) {
-                argsJson = APPROVAL_MAPPER.writerWithDefaultPrettyPrinter()
-                        .writeValueAsString(node.get("arguments"));
-            }
-        } catch (Exception ignored) {
-            // unreadable content — the card still renders with the raw call id
-        }
-        return new ApprovalCall(toolName, argsJson);
-    }
-
-    /**
-     * The approval card — ONE shape for every open question (root tool or
-     * sub-agent alike): the answer is a plain dispatch identified by callId
-     * alone, the ToolApprovalStore knows the rest. The turn never ended, so
-     * there is no stream to start — the ORIGINAL stream carries the
-     * continuation once the parked tool task is woken.
-     */
-    public static UiList.Item approvalCard(UUID sessionId, String callId,
-                                           String toolName, String argsJson, String time) {
-        String base = "/admin/api/sessions/" + sessionId + "/approval"
-                + "?callId=" + java.net.URLEncoder.encode(callId, java.nio.charset.StandardCharsets.UTF_8);
-
-        // Buttons live IN the card body (a plain stack renders them as real,
-        // always-visible buttons — item.action() would make them hover icons);
-        // the arguments fold away behind their own collapsible row.
-        var intro = UiMarkdown.of("approval-intro-" + callId,
-                "The agent wants to run **`" + toolName + "`**.");
-        var params = ai.mindconnect.ui.model.UiList.of("approval-params-list-" + callId, null);
-        params.item(UiList.Item.of("approval-params-" + callId, "Parameters")
-                .collapsible("show", false)
-                .content(UiMarkdown.of("approval-args-" + callId,
-                        "```json\n" + argsJson + "\n```")));
-        var buttons = ai.mindconnect.ui.model.UiStack.of(
-                        UiAction.danger("approval-deny-" + callId, "Deny")
-                                .dispatch("POST", base + "&approved=false&scope=once"),
-                        UiAction.secondary("approval-once-" + callId, "Allow once")
-                                .dispatch("POST", base + "&approved=true&scope=once"),
-                        UiAction.primary("approval-session-" + callId, "Allow for this session")
-                                .dispatch("POST", base + "&approved=true&scope=session"))
-                .direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL)
-                .gap(8);
-        var bodyStack = ai.mindconnect.ui.model.UiStack.of(intro, params, buttons);
-        bodyStack.setId("approval-body-" + callId);
-        bodyStack.withCssClass("approval-request");
-        return UiList.Item.of("approval-" + callId, "Approval required  [" + time + "]")
-                .content(bodyStack);
-    }
 
     /**
      * APPEND a visible failure notice — a turn that FAILED (context overflow,
@@ -267,9 +207,6 @@ public final class MessageListComponent implements UiComponent {
         wrapper.item(card);
         return UiPatch.Operation.append(id(), wrapper);
     }
-
-    private static final com.fasterxml.jackson.databind.ObjectMapper APPROVAL_MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
 
     // ── Patch operations ───────────────────────────────────────────────────
 
@@ -373,37 +310,8 @@ public final class MessageListComponent implements UiComponent {
         return UiPatch.Operation.replace(card.id(), card.render());
     }
 
-    // ── Internal: header actions + welcome/empty ───────────────────────────
+    // ── Internal: welcome / empty ──────────────────────────────────────────
 
-    private void addHeaderActions(UiList list) {
-        String agentId = agent.id().toString();
-
-        // Sub-agent sessions link back up to the session that spawned them.
-        // Sprite icons instead of emoji: same icon language as the rest of
-        // the chrome, consistent size and color.
-        if (parentSessionId != null) {
-            UiAction parentAction = UiAction.link("parent", "Parent Session").icon("arrow-up");
-            parentAction.setHref("/admin/sessions/" + parentSessionId);
-            list.action(parentAction);
-        }
-
-        UiAction backAction = UiAction.link("back", "Back to Agent").icon("back");
-        backAction.setHref("/admin/agents/" + agentId
-                + "?section=sessions&row=" + sessionId);
-        list.action(backAction);
-
-        // The session tools open as dialogs over the conversation — a chat
-        // shouldn't navigate away from itself for a quick look at memory,
-        // traces, todos or the workspace.
-        list.action(UiAction.link("memory", "Working Memory").icon("chart")
-                .dispatch("GET", "/admin/api/sessions/" + sessionId + "/memory?dialog=true"));
-        list.action(UiAction.link("traces", "Traces").icon("list")
-                .dispatch("GET", "/admin/api/sessions/" + sessionId + "/traces?dialog=true"));
-        list.action(UiAction.link("todos", "Todos").icon("check")
-                .dispatch("GET", "/admin/api/sessions/" + sessionId + "/todos?dialog=true"));
-        list.action(UiAction.link("workspace", "Workspace").icon("folder")
-                .dispatch("GET", "/admin/api/sessions/" + sessionId + "/workspace?dialog=true"));
-    }
 
     private void addWelcomeOrEmpty(UiList list) {
         String welcome = agent.welcomeMessage();
@@ -416,41 +324,6 @@ public final class MessageListComponent implements UiComponent {
         }
     }
 
-    // ── Internal: chat-message item ────────────────────────────────────────
-
-    private UiList.Item chatItem(Message m, boolean isUser) {
-        String speaker = isUser ? "You" : agent.name();
-        String time    = DT_FMT.format(m.sentAt());
-        String label   = speaker + "  [" + time + "]" + messageTokenSuffix(m);
-        String css     = isUser ? "user-message" : "bot-message";
-        int seq        = m.sequenceNum();
-
-        var item = UiList.Item.of(m.id().toString(), label)
-                .content(UiMarkdown.of("msg-" + m.id(), m.content()).withCssClass(css));
-
-        // Regenerate (USER messages only): delete this message + everything
-        // after it, then re-run the turn (streaming) with the same text. Uses
-        // the STREAM behaviour so the live tokens/task-cards flow exactly like
-        // a normal send.
-        if (isUser) {
-            item.action(UiAction.icon("regen-" + m.id(), "🔄")
-                    .confirm("Delete the response(s) after this message and generate a new one?")
-                    .onClick(UiTrigger.stream("POST",
-                            "/admin/api/sessions/" + sessionId
-                                    + "/messages/" + seq + "/regenerate", null)));
-        }
-
-        // Delete-from-here: remove this message and every message after it.
-        // toSeq = MAX_VALUE → the range delete runs to the end of the
-        // conversation. Sub-agent sessions are not cleaned up.
-        item.action(UiAction.icon("delete-" + m.id(), "🗑")
-                .style(UiAction.Style.DANGER)
-                .confirm("Delete this message and all following messages?")
-                .dispatch("DELETE",
-                        "/admin/api/sessions/" + sessionId
-                                + "/messages?fromSeq=" + seq + "&toSeq=" + Integer.MAX_VALUE));
-        return item;
-    }
 
     // ── Internal: historic task cards ──────────────────────────────────────
 
@@ -466,7 +339,7 @@ public final class MessageListComponent implements UiComponent {
         List<Message> sorted = history.stream()
                 .sorted(Comparator.comparingInt(Message::sequenceNum))
                 .toList();
-        return buildHistoricTaskCards(sorted, Integer.MIN_VALUE, Integer.MAX_VALUE);
+        return toolCallHistory().buildHistoricTaskCards(sorted, Integer.MIN_VALUE, Integer.MAX_VALUE);
     }
 
     /** The final assistant CHAT text in this component's history, or {@code null}. */
@@ -479,179 +352,15 @@ public final class MessageListComponent implements UiComponent {
                 .orElse(null);
     }
 
-    /**
-     * Builds one task card per tool / sub-agent call from persisted
-     * TOOL_CALL + TOOL_RESULT messages that lived between the previous
-     * agent CHAT ({@code fromSeq}, exclusive) and the current one
-     * ({@code toSeq}, exclusive).
-     *
-     * <p>Pairs TOOL_CALL entries (by tool-call id from the JSON payload)
-     * with the matching TOOL_RESULT so the card shows both input and
-     * output. Orphan TOOL_RESULTs (e.g. from older runs) render as
-     * output-only cards.
-     */
-    List<TaskCardComponent> buildHistoricTaskCards(List<Message> sorted,
-                                                           int fromSeq, int toSeq) {
-        LinkedHashMap<String, List<TaskCardComponent>> byCallId = new LinkedHashMap<>();
-        java.util.Map<String, String> argsByCallId = new java.util.HashMap<>();
-        java.util.Map<String, String> nameByCallId = new java.util.HashMap<>();
+    // ── Internal: the pieces this list is assembled from ───────────────────
 
-        // Pass 1: collect inputs from TOOL_CALL messages.
-        for (Message m : sorted) {
-            if (m.sequenceNum() <= fromSeq || m.sequenceNum() >= toSeq) continue;
-            if (m.type() != MessageType.TOOL_CALL) continue;
-            try {
-                JsonNode node  = MAPPER.readTree(m.content());
-                JsonNode calls = node.path("toolCalls");
-                if (calls.isArray()) {
-                    for (JsonNode tc : calls) {
-                        String id   = tc.path("id").asText("");
-                        String name = tc.path("name").asText("tool");
-                        JsonNode args = tc.path("arguments");
-                        String prettyArgs = MAPPER.writerWithDefaultPrettyPrinter()
-                                .writeValueAsString(args);
-                        nameByCallId.put(id, name);
-                        argsByCallId.put(id, prettyArgs);
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
-
-        // Pass 2: collect outputs from TOOL_RESULT messages, build cards.
-        for (Message m : sorted) {
-            if (m.sequenceNum() <= fromSeq || m.sequenceNum() >= toSeq) continue;
-            if (m.type() != MessageType.TOOL_RESULT) continue;
-            try {
-                JsonNode node = MAPPER.readTree(m.content());
-                String callId   = node.path("toolCallId").asText("");
-                String toolName = node.path("toolName").asText(nameByCallId.getOrDefault(callId, "tool"));
-                String result   = node.path("result").asText("");
-                long   duration = m.durationMs() != null ? m.durationMs() : 0L;
-
-                boolean isSubAgent = "run_agent".equals(toolName) || "run_agents".equals(toolName);
-                boolean failed     = result != null && result.startsWith("Error:");
-                String key = callId.isEmpty() ? ("task-hist-" + m.id()) : callId;
-
-                // Sub-agent call WITH a persisted result → done. Prefer the
-                // recursively-built nested tree (child sessions found by
-                // parentToolCallId); fall back to a flat card only when no
-                // sub-sessions resolve.
-                if (isSubAgent && !callId.isEmpty()) {
-                    List<TaskCardComponent> subCards = subAgentTree.cardsFor(
-                            callId, false, argsByCallId.get(callId), result);
-                    if (subCards != null && !subCards.isEmpty()) {
-                        byCallId.put(key, subCards);
-                        continue;
-                    }
-                }
-
-                String header;
-                String displayName;
-                if (isSubAgent) {
-                    displayName = extractSubAgentName(argsByCallId.get(callId)).orElse("sub-agent");
-                    header = failed
-                            ? TaskCardComponent.failedSubAgentHeader(displayName)
-                            : TaskCardComponent.doneSubAgentHeader(displayName, duration);
-                } else {
-                    displayName = toolName;
-                    header = failed
-                            ? TaskCardComponent.failedToolHeader(displayName, duration)
-                            : TaskCardComponent.doneToolHeader(displayName, duration);
-                }
-
-                String body = TaskCardComponent.taskCardBody(argsByCallId.get(callId), result);
-                String nodeId = "task-hist-" + m.id();
-                byCallId.put(key, List.of(TaskCardComponent.historic(nodeId, header, body)));
-            } catch (Exception ignored) {}
-        }
-
-        // Pass 3: sub-agent TOOL_CALLs that have NO TOOL_RESULT yet — i.e.
-        // sub-agents still running when the page was (re)loaded mid-turn.
-        // Their assistant TOOL_CALL message is persisted before dispatch, so
-        // the callId is known here even though the result isn't. Surface the
-        // (running) nested tree via the provider, which finds the ACTIVE
-        // child sessions. Inserted in TOOL_CALL order so they read correctly.
-        for (Message m : sorted) {
-            if (m.sequenceNum() <= fromSeq || m.sequenceNum() >= toSeq) continue;
-            if (m.type() != MessageType.TOOL_CALL) continue;
-            try {
-                JsonNode calls = MAPPER.readTree(m.content()).path("toolCalls");
-                if (!calls.isArray()) continue;
-                for (JsonNode tc : calls) {
-                    String id   = tc.path("id").asText("");
-                    String name = tc.path("name").asText("");
-                    boolean isSubAgent = "run_agent".equals(name) || "run_agents".equals(name);
-                    if (!isSubAgent || id.isEmpty() || byCallId.containsKey(id)) continue;
-                    List<TaskCardComponent> subCards = subAgentTree.cardsFor(
-                            id, true, argsByCallId.get(id), null);
-                    if (subCards != null && !subCards.isEmpty()) {
-                        byCallId.put(id, subCards);
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
-
-        return byCallId.values().stream().flatMap(List::stream).toList();
+    /** One message, rendered by its own component. */
+    private UiList.Item messageItem(Message m, boolean isUser) {
+        return new MessageComponent(sessionId, agent, m, isUser, DT_FMT).item();
     }
 
-    /** Pulls the "name" field out of a run_agent arguments JSON. */
-    private java.util.Optional<String> extractSubAgentName(String argsJson) {
-        if (argsJson == null) return java.util.Optional.empty();
-        try {
-            JsonNode node = MAPPER.readTree(argsJson);
-            String name = node.path("name").asText("");
-            return name.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(name);
-        } catch (Exception e) {
-            return java.util.Optional.empty();
-        }
-    }
-
-    // ── Internal: token-usage formatting ───────────────────────────────────
-
-    /**
-     * Context-window usage as a compact progress bar + readout for the
-     * header's extra slot. Tints warning at 75%%, error at 90%%. Null (no
-     * bar) when there is no memory snapshot.
-     */
-    private ai.mindconnect.ui.model.UiNode tokenUsageBar(WorkingMemory memory) {
-        if (memory == null) return null;
-        int used = memory.totalTokens();
-        Integer max = memory.contextWindowTokens();
-        var label = ai.mindconnect.ui.model.UiText
-                .of(id() + ":tok-label", tokenUsageSuffix(memory).replace("  —  ", ""))
-                .withCssClass("chat-token-text");
-        if (max == null || max <= 0) {
-            return used > 0 ? label : null;
-        }
-        double pct = 100.0 * used / max;
-        var bar = ai.mindconnect.ui.model.UiProgress.of(used, max).showValue(false);
-        bar.setId(id() + ":tok-bar");
-        if (pct >= 90) bar.status(ai.mindconnect.ui.model.UiProgress.Status.ERROR);
-        else if (pct >= 75) bar.status(ai.mindconnect.ui.model.UiProgress.Status.WARNING);
-        var wrap = ai.mindconnect.ui.model.UiStack.of(id() + ":tok");
-        wrap.direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL);
-        wrap.gap(8);
-        wrap.withCssClass("chat-token-usage");
-        wrap.child(bar).child(label);
-        return wrap;
-    }
-
-    /** " — 1,234 / 200,000 tok (0.6%)" or empty when no memory snapshot. */
-    private String tokenUsageSuffix(WorkingMemory memory) {
-        if (memory == null) return "";
-        int used = memory.totalTokens();
-        Integer max = memory.contextWindowTokens();
-        if (max == null || max <= 0) {
-            return used > 0 ? String.format("  —  %,d tok", used) : "";
-        }
-        double pct = 100.0 * used / max;
-        return String.format("  —  %,d / %,d tok (%.1f%%)", used, max, pct);
-    }
-
-    /** " · 42 tok" for a single message; empty when not counted. */
-    private String messageTokenSuffix(Message m) {
-        Integer t = m.tokenCount();
-        if (t == null || t <= 0) return "";
-        return "  ·  " + String.format("%,d", t) + " tok";
+    /** Rebuilds the tool cards of a past turn. */
+    private ToolCallHistory toolCallHistory() {
+        return new ToolCallHistory(subAgentTree);
     }
 }

@@ -1,4 +1,4 @@
-package ai.mindconnect.adminui.ui.component;
+package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiNode;
@@ -30,7 +30,7 @@ public final class ChatAttachmentsComponent {
                 .column(UiTable.Column.text("chunks", "Chunks"))
                 .rowAction(UiAction.danger("remove", "Remove").icon("remove")
                         .confirm("Remove this file from the conversation? The agent can no longer search it.")
-                        .dispatch("DELETE", "/admin/api/sessions/" + sessionId + "/chat-files?file={id}"));
+                        .dispatch("DELETE", "/chat/api/sessions/" + sessionId + "/chat-files?file={id}"));
         files.forEach((fileId, count) -> table.row(Map.of(
                 "id", java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8),
                 "file", Path.of(fileId).getFileName().toString(),

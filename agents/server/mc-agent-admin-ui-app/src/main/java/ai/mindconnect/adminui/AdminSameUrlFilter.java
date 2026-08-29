@@ -39,6 +39,9 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
             "/admin/agents", "/admin/sessions", "/admin/tools",
             "/admin/llm-configs", "/admin/migrations", "/admin/api-explorer");
 
+    /** The chat lives under its own prefix: /chat/... → /chat/api/... */
+    private static final List<String> CHAT_SECTION = List.of("/chat");
+
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
                                     FilterChain chain) throws ServletException, IOException {
@@ -46,6 +49,17 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
             String path = req.getRequestURI();
             boolean sameUrl = matches(path, SAME_URL_SECTIONS);
             boolean legacy = matches(path, LEGACY_SECTIONS);
+            boolean chat = matches(path, CHAT_SECTION) && !path.startsWith("/chat/api");
+            if (chat) {
+                if (wantsHtml(req)) {
+                    req.getRequestDispatcher("/index.html").forward(req, res);
+                    return;
+                }
+                // /chat/... → /chat/api/... (query params survive the forward)
+                req.getRequestDispatcher("/chat/api" + path.substring("/chat".length()))
+                        .forward(req, res);
+                return;
+            }
             if (sameUrl || legacy) {
                 if (wantsHtml(req)) {
                     req.getRequestDispatcher("/index.html").forward(req, res);

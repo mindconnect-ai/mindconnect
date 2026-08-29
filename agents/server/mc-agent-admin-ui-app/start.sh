@@ -33,4 +33,8 @@ else
 fi
 
 cd "$REPO_ROOT"
-exec mvn -f "$SCRIPT_DIR/pom.xml" spring-boot:run "$@"
+# spring-boot:run forks the app with the PROJECT basedir as its working
+# directory, so the `cd` above is not enough — without this the app would read
+# and write agents/server/mc-agent-admin-ui-app/data instead of the repo's.
+exec mvn -f "$SCRIPT_DIR/pom.xml" spring-boot:run \
+    -Dspring-boot.run.workingDirectory="$REPO_ROOT" "$@"

@@ -1,10 +1,8 @@
-package ai.mindconnect.adminui.ui.page;
+package ai.mindconnect.chatui.ui.page;
 
-import ai.mindconnect.adminui.ui.AdminPage;
-import ai.mindconnect.adminui.ui.component.ChatFormComponent;
-import ai.mindconnect.adminui.ui.component.MessageListComponent;
-import ai.mindconnect.adminui.ui.component.SessionInfoComponent;
-import ai.mindconnect.adminui.ui.component.TaskCardComponent;
+import ai.mindconnect.chatui.ui.component.ChatFormComponent;
+import ai.mindconnect.chatui.ui.component.MessageListComponent;
+import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
@@ -42,14 +40,20 @@ import java.util.List;
  * needed, throw it away. No fields beyond the components and their
  * model; no caches.
  */
-public final class ChatPage extends AdminPage {
+public final class ChatPage {
+
+    /** Was ChatPage inherited from AdminPage before this module split. */
+    private static UiPatch patch(UiPatch.Operation... ops) {
+        var p = UiPatch.of();
+        for (var op : ops) p.patch(op);
+        return p;
+    }
 
     private final AgentSession session;
     private final AgentDefinition agent;
 
     private final MessageListComponent messages;
     private final ChatFormComponent    chatForm;
-    private final SessionInfoComponent info;
 
     public ChatPage(AgentSession session, AgentDefinition agent,
                     List<Message> history, WorkingMemory memory) {
@@ -81,8 +85,13 @@ public final class ChatPage extends AdminPage {
         this.agent = agent;
         this.messages = new MessageListComponent(session.id(), agent, history, memory, subAgentTree)
                 .withParentSession(session.parentSessionId());
-        this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming);
-        this.info     = new SessionInfoComponent(session, agent);
+        this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
+                .withModelLabel(agent.llmConfigName());
+    }
+
+    /** Hands the host's links to the components that render them. */
+    public ChatPage withHostLinks(ai.mindconnect.chatui.ui.ChatHostLinks links) {
+        return this;
     }
 
     // ── Full render ────────────────────────────────────────────────────────
@@ -107,8 +116,20 @@ public final class ChatPage extends AdminPage {
     /** The session's attached-files panel (built by SessionFileService). */
     private ai.mindconnect.ui.model.UiNode attachments;
 
+    /** The attachment list, for the dialog behind the "+". */
+    public ai.mindconnect.ui.model.UiNode attachmentsNode() {
+        return attachments != null ? attachments
+                : ai.mindconnect.ui.model.UiStack.of("chat-attachments");
+    }
+
     public ChatPage withAttachments(ai.mindconnect.ui.model.UiNode attachments) {
         this.attachments = attachments;
+        return this;
+    }
+
+    /** The count the composer shows on its "+". */
+    public ChatPage withAttachmentCount(int count) {
+        this.chatForm.withAttachmentCount(count);
         return this;
     }
 
@@ -134,35 +155,43 @@ public final class ChatPage extends AdminPage {
                 .multiple()
                 .dropText("Attach files (searchable by the agent)")
                 .buttonLabel("Attach…")
-                .uploadTo("/admin/api/sessions/" + sessionId + "/chat-files");
+                .uploadTo("/chat/api/sessions/" + sessionId + "/chat-files");
     }
 
-    @Override
-    public UiPage render() {
-        // Title-less inner section stacks the Chat children without a tab bar
-        // (see renderer); the outer section gives us the Chat/Info tabs.
-        // Classic chat layout: the conversation takes the space between the
-        // header and the composer (CSS: .chat-container flexes), attachment
-        // chips sit just above the input, attach itself is the form's "+".
-
-        // The attachments panel must always render (stable id) so attach/
-        // delete patches have a target even before the first file arrives.
-        var attachmentsPanel = attachments != null ? attachments
-                : ai.mindconnect.ui.model.UiStack.of("chat-attachments");
-
+    /**
+     * Just the conversation — messages, attachments, composer. No Info tab: a
+     * chat is a conversation, not a diagnostics view, and what used to be in
+     * that tab (session id, status, LLM config) belongs to whoever debugs the
+     * runtime. The admin UI keeps its own dialogs for it.
+     *
+     * <p>Separate from {@link #render()} so a host can put the conversation
+     * inside its own shell instead of taking the whole page.
+     */
+    public UiSection renderContent() {
+        // No attachment strip above the input: the files live behind the "+",
+        // which carries their count. A panel that is empty most of the time
+        // should not take a row away from the conversation.
         var chatPanel = UiSection.of("chat-panel-" + session.id(), null)
                 .section("messages", null,
                         ai.mindconnect.ui.model.UiScrollPane
                                 .of("chat-scroll-" + session.id(), messages.render())
                                 .stickToLatest(true))
-                .section("files",    null, attachmentsPanel)
                 .section("input",    null, chatForm.render());
 
-        var root = UiSection.of("session-" + session.id(), agent.name())
-                .section("chat", "Chat", chatPanel)
-                .section("info", "Info", info.render());
+        // Stable class so the stylesheet can size the conversation without
+        // reaching for the session id.
+        return UiSection.of("session-" + session.id(), null)
+                .section("chat", null, chatPanel)
+                .withCssClass("chat-conversation");
+    }
 
-        var page = UiPage.of("/admin/sessions/" + session.id(), root);
+    /** The live streams this page would reattach to — for hosts that wrap it. */
+    public java.util.List<UiPage.ActiveStream> activeStreams() {
+        return activeStreams == null ? java.util.List.of() : activeStreams;
+    }
+
+    public UiPage render() {
+        var page = UiPage.of("/chat/sessions/" + session.id(), renderContent());
         if (activeStreams != null && !activeStreams.isEmpty()) {
             page.setActiveStreams(activeStreams);
         }

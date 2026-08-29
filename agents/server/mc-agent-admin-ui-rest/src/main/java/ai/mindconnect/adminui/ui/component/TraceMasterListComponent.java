@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.LlmCallTrace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
@@ -13,8 +13,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.DT_FMT;
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.previewOf;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.previewOf;
 
 /**
  * Master-list pane of the trace inspector — one row per top-level chat

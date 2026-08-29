@@ -1,4 +1,4 @@
-package ai.mindconnect.adminui.service;
+package ai.mindconnect.chatui.service;
 
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 

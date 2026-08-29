@@ -1,0 +1,276 @@
+/* ── The chat's own app shell ─────────────────────────────────────────────
+   It nests inside the host's shell, so everything here is scoped to it.
+
+   The rule that matters most: every flex ancestor between the viewport and
+   a message needs `min-width: 0`. A flex item defaults to `min-width: auto`,
+   which means "never shrink below your content" — and since the message
+   list's header carries a token bar plus the host's action links, that
+   content is wide. Without these the inner shell simply grows past the
+   viewport and gets clipped by an ancestor's overflow:hidden, which is what
+   "runs out of the window" looks like. */
+#chat-app-shell {
+    /* Fill the host's content area: grow into it (flex 1) and never exceed it
+       (max-width + min-width:0). Without the grow the shell sizes to its
+       content and leaves the right third of the page empty. */
+    flex: 1 1 auto;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+#chat-app-shell .sui-shell-body,
+#chat-app-shell .sui-shell-content {
+    min-width: 0;
+}
+
+/* ── Heights ──────────────────────────────────────────────────────────────
+   The chat ends where the window ends. Three things have to hold for that:
+   the shell stretches to its parent instead of to the viewport, every flex
+   ancestor may shrink (min-height: 0), and only the two scrollers — the
+   history and the message list — actually scroll. The composer keeps its
+   own height and therefore always stays in view. */
+#chat-app-shell {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#chat-app-shell > .sui-shell-body,
+#chat-app-shell .sui-shell-content {
+    min-height: 0;
+}
+
+/* The content area pads itself by 20px on every side, which left the
+   conversation hanging below the history and stopping short of it — the two
+   columns have to start and end on the same line. Only the horizontal inset
+   survives, as the gap between them. */
+#chat-app-shell > .sui-shell-body > .sui-shell-content {
+    padding-block: 0;
+}
+
+/* The history scrolls on its own, full height, no viewport arithmetic. */
+#chat-menu {
+    align-self: stretch;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+}
+
+/* Inside the conversation column: the message list takes whatever is left,
+   the attachment chips and the composer keep their own height. The panel ids
+   are the section keys ChatPage builds (messages / files / input). */
+.chat-conversation .sui-section,
+.chat-conversation .sui-panels,
+.chat-conversation .sui-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.chat-conversation #chat,
+.chat-conversation #messages {
+    flex: 1 1 auto;
+}
+
+.chat-conversation #files,
+.chat-conversation #input {
+    flex: 0 0 auto;
+}
+
+/* The only scroller in the column — and the reason the composer below it
+   never leaves the window. */
+.chat-conversation .sui-scrollpane {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+/* The chat's header is not a second site header. It reuses the framework's
+   own header tokens rather than fighting the rules that use them, so the bar
+   turns into a quiet surface with ordinary text on it — which is also what
+   makes the session title readable again (muted grey on dark navy was not). */
+#chat-app-shell .sui-header {
+    --sui-header-bg: var(--sui-color-surface-alt, #f4f5f7);
+    --sui-header-fg: var(--sui-color-text-body, #374151);
+    --sui-header-brand-fg: var(--sui-color-text-strong, #111827);
+    --sui-header-nav-fg: var(--sui-color-text-body, #374151);
+    --sui-header-nav-fg-hover: var(--sui-color-text-strong, #111827);
+    --sui-header-nav-bg-hover: var(--sui-color-surface, #fff);
+    border-bottom: 1px solid var(--sui-color-border-soft, #e5e7eb);
+    box-shadow: none;
+}
+
+/* The header reads as one phrase: agent first, session title behind it. The
+   framework parks extras on the right, so the whole group is pulled back
+   against the brand and only the overflow button keeps to the far end. */
+#chat-app-shell .sui-header-right {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-inline-start: 0.75rem;
+}
+
+#chat-app-shell .sui-header-extras {
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    overflow: hidden;
+}
+
+/* The title is the quieter half, and truncates rather than pushing the
+   header wider than the window. */
+/* One step below the agent name, but not below readability: the muted token
+   lands at 4.3:1 on this surface, just under AA for body text. */
+#chat-app-shell .sui-header-extras .sui-text {
+    color: var(--sui-color-text-body, #475569);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Everything that leaves the conversation lives behind this one button. */
+#chat-app-shell .sui-header-extras .sui-menu-button {
+    margin-inline-start: auto;
+    flex: 0 0 auto;
+}
+
+/* ── The conversation ─────────────────────────────────────────────────────
+   Follows the window: it takes the width the shell gives it — which grows
+   when the history folds to a rail — up to a line length that stays
+   readable. No fixed pixel width anywhere. */
+.chat-conversation {
+    width: 100%;
+    max-width: min(72rem, 100%);
+    min-width: 0;
+    margin-inline: auto;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+}
+
+.chat-conversation > *,
+.chat-conversation .sui-scrollpane,
+.chat-conversation .sui-list {
+    min-width: 0;
+}
+
+/* The list header (title, token bar, the host's dialog links) wraps onto a
+   second line instead of deciding how wide the chat has to be. */
+.chat-conversation .sui-list-header {
+    flex-wrap: wrap;
+    row-gap: 0.35rem;
+    min-width: 0;
+}
+
+.chat-conversation .sui-list-header .sui-actions {
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.chat-conversation .sui-list-header .sui-header-extra {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.chat-conversation .chat-token-usage {
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.chat-conversation .chat-token-usage > .sui-progress {
+    flex: 1 1 4rem;
+    min-width: 3rem;
+}
+
+/* Long content scrolls in its own box rather than widening the layout. */
+.chat-conversation pre,
+.chat-conversation table {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+@media (max-width: 900px) {
+    .chat-conversation {
+        max-width: 100%;
+        margin-inline: 0;
+    }
+}
+
+/* ── The composer's footer row ────────────────────────────────────────────
+   Attach, the model button, Send. The framework sizes buttons in this row
+   like icon buttons, which squeezes a text label to 32px and wraps it over
+   two lines on top of Send. The model button opts out: it keeps its text,
+   truncates when the window is narrow, and holds the left edge so Send stays
+   where the thumb expects it. */
+/* The framework parks this row absolutely in the composer's bottom-right
+   corner (inset: 56px 18px 18px auto), so the three buttons huddle there.
+   Anchoring it on BOTH sides spreads them across the field instead — width
+   must stay auto, or a set width plus a set right edge pushes the row out
+   past the card's left border. */
+.chat-form .sui-form-footer {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    gap: 0.5rem;
+    align-items: center;
+    justify-content: flex-start;
+}
+
+/* Send holds the right edge, whatever sits before it. */
+.chat-form .sui-form-footer > :last-child {
+    margin-inline-start: auto;
+}
+
+/* The labelled buttons in this row (the model, and the "+" once it carries a
+   count) are plain .sui-btn; the icon-only ones are .sui-icon-btn. The row
+   squeezes a .sui-btn to icon size, which folded "agent-default" onto two
+   lines under the send button — so they take their text width back and
+   truncate instead of wrapping. */
+.chat-form .sui-form-footer .sui-btn {
+    width: auto;
+    min-width: 0;
+    max-width: 14rem;
+    height: 36px;
+    padding: 0 0.75rem;
+    font-size: 0.85em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* ── Per-chat actions in the history ──────────────────────────────────────
+   The menu button is injected per row (see chat-ui.js) and only shows on
+   hover or while its popover is open — a list of chats should read as a list
+   of chats, not as a column of buttons. */
+#chat-menu li.sui-menu-item.chat-row {
+    position: relative;
+}
+
+#chat-menu .chat-row-menu {
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-end: 6px;
+    transform: translateY(-50%);
+    opacity: 0;
+    transition: opacity 120ms ease;
+}
+
+#chat-menu li.sui-menu-item:hover .chat-row-menu,
+#chat-menu li.sui-menu-item:focus-within .chat-row-menu,
+#chat-menu .chat-row-menu[open] {
+    opacity: 1;
+}
+
+/* The row's own badge steps aside so the two never overlap. */
+#chat-menu li.sui-menu-item:hover .sui-menu-badge,
+#chat-menu li.sui-menu-item:focus-within .sui-menu-badge {
+    visibility: hidden;
+}
+
+/* Hidden while the history is a rail or gone. */
+#chat-menu.sui-menu--rail .chat-row-menu,
+#chat-menu.sui-menu--hidden .chat-row-menu {
+    display: none;
+}

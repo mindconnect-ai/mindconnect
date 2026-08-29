@@ -1,4 +1,4 @@
-package ai.mindconnect.adminui.service;
+package ai.mindconnect.chatui.service;
 
 import ai.mindconnect.common.Cancellation;
 import org.springframework.stereotype.Component;

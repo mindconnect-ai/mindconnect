@@ -1,4 +1,4 @@
-package ai.mindconnect.adminui.assembler.session;
+package ai.mindconnect.chatui.ui;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

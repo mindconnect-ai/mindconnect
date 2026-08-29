@@ -1,7 +1,7 @@
-package ai.mindconnect.adminui.ui.component;
+package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.adminui.assembler.session.SessionUiCommons;
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.SessionUiCommons;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiList;
@@ -172,7 +172,7 @@ public final class TaskCardComponent implements UiComponent {
      */
     public static UiLink openSessionLink(String subSessionId) {
         return UiLink.external("open-sub-" + subSessionId,
-                "/admin/sessions/" + subSessionId,
+                "/chat/sessions/" + subSessionId,
                 "↗ Open sub-agent session");
     }
 

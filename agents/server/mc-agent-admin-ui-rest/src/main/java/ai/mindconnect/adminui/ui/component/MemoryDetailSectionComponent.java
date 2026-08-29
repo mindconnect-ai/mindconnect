@@ -1,13 +1,13 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiSection;
 
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.MAPPER;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 
 /**
  * Detail pane of the working-memory inspector — two tabs:

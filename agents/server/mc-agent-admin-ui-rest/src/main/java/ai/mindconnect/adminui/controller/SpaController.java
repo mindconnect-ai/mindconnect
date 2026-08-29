@@ -8,8 +8,15 @@ public class SpaController {
 
     // Matches all /admin/* paths that do NOT contain /api/ — REST controllers
     // registered under /admin/api/** take precedence and are never reached here.
+    /** The root lands in the chat — the admin sections are one click away. */
+    @RequestMapping("/")
+    public String root() {
+        return "redirect:/chat";
+    }
+
     @RequestMapping({
-        "/",
+        "/chat",
+        "/chat/**",
         "/admin",
         "/admin/agents",
         "/admin/agents/**",
