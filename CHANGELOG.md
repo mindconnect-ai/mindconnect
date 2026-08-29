@@ -43,6 +43,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **Two dark looks.** *Dark* is the framework's own `sui-dark.css`, now
+  linked and offered in the picker rather than reinvented. *Amethyst* is new:
+  violet on a violet-cast dark ground, where the colour is the theme's
+  character rather than an accent pointing at things.
+
+- **The themes agree on type size.** Gipiti was a point smaller than Clody.
+  A theme decides how the app looks, not how big its text is — switching one
+  should not resize the screen you were reading — so all three of the themes
+  shipped here now set the same 16px. *Dark* and *Default* are the
+  framework's own sheets and keep its 15px base.
+
 - **A second theme, Gipiti, and a way to switch.** Where Clody is a document
   — one warm plane, a clay accent — Gipiti is an application: achromatic
   neutrals with no temperature at all, a grey frame around a white working
