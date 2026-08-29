@@ -43,6 +43,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **The LLM-config badge on an agent row is a column.** Its width followed
+  its own text, so the left edge landed on a different pixel in almost every
+  row and the eye had no line to follow. Fixed width, one edge.
+
 - **Compact, the framework's look at close range.** The one theme that
   changes no colour at all: smaller type, tighter rows, less padding
   throughout, so a list of agents shows more of itself and the eye travels

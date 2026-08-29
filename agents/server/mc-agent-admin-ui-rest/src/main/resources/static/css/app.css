@@ -430,8 +430,18 @@ body {
 .sui-list-item-label:has(.agent-head) { display: block; width: 100%; }
 .agent-head { width: 100%; align-items: baseline; }
 /* Push the badge to the right edge of the row, with a clear gap before the
-   action buttons so it reads as metadata, not a third button. */
-.agent-head .agent-llm-badge { margin-left: auto; margin-right: 16px; }
+   action buttons so it reads as metadata, not a third button.
+
+   The fixed width is what makes it a column rather than a floating pill: the
+   badge's own width follows its text ("agent-default" is wider than
+   "openai-default" is not), so without it the left edge landed on a
+   different pixel in almost every row and the eye had no line to follow. */
+.agent-head .agent-llm-badge {
+    margin-left: auto;
+    margin-right: 16px;
+    min-width: 8rem;
+    text-align: center;
+}
 
 /* LLM-config tag at the right of the name row. Soft green pill — sits apart
    from the blue name links and the blue "New Agent" button, and reads as a
