@@ -73,7 +73,7 @@ body {
     width: 32px; height: 32px;
     padding: 0;
     border-radius: 50%;
-    font-size: 13px;
+    font-size: var(--sui-text-sm, 13px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -96,7 +96,7 @@ body {
 .chat-thinking {
     color: var(--sui-color-text-muted);
     font-style: italic;
-    font-size: 14px;
+    font-size: var(--sui-text-md, 14px);
 }
 .chat-thinking::after {
     content: "";
@@ -128,7 +128,7 @@ body {
 }
 .memory-page .sui-list-item-description {
     color: var(--sui-color-text-muted);
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     font-family: var(--sui-font-mono);
     white-space: nowrap;
     overflow: hidden;
@@ -160,7 +160,7 @@ body {
     text-decoration-color: var(--sui-color-border-strong);
     text-underline-offset: 2px;
     font-weight: 500;
-    font-size: 13px;
+    font-size: var(--sui-text-sm, 13px);
     cursor: pointer;
 }
 .memory-master .sui-list-item-label:hover {
@@ -173,7 +173,7 @@ body {
     cursor: pointer;
     white-space: pre-line;
     font-family: inherit;
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     color: var(--sui-color-text-body);
 }
 .memory-page pre {
@@ -181,7 +181,7 @@ body {
     color: var(--sui-color-code-fg);
     border-radius: 6px;
     padding: 12px 14px;
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     line-height: 1.5;
     overflow-x: auto;
     white-space: pre-wrap;
@@ -251,7 +251,7 @@ body {
 /* Token usage in the chat header: compact bar + muted readout. */
 .chat-token-usage { align-items: center; white-space: nowrap; }
 .chat-token-usage .sui-progress--bar { width: 140px; }
-.chat-token-text { font-size: 12px; color: var(--sui-color-text-muted); font-variant-numeric: tabular-nums; }
+.chat-token-text { font-size: var(--sui-text-xs, 12px); color: var(--sui-color-text-muted); font-variant-numeric: tabular-nums; }
 
 .user-message, .bot-message {
     padding: 10px 14px;
@@ -309,7 +309,7 @@ body {
 }
 .chat-container .sui-list-item-main { width: 100%; }
 .chat-container .sui-list-item-label {
-    font-size: 11px;
+    font-size: var(--sui-text-xs, 12px);
     font-weight: 500;
     color: var(--sui-color-text-subtle);
     margin-bottom: 2px;
@@ -324,7 +324,7 @@ body {
 .chat-container .sui-list-item:hover .sui-list-item-actions { opacity: 1; }
 .chat-container .sui-list-item-actions .sui-btn {
     padding: 2px 6px;
-    font-size: 11px;
+    font-size: var(--sui-text-xs, 12px);
     background: transparent;
     color: var(--sui-color-text-subtle);
 }
@@ -335,7 +335,7 @@ body {
 
 /* ── Legacy activity-log block (still used by some tool messages) ──────── */
 
-.activity-log { font-size: 12px; color: var(--sui-color-text-muted); line-height: 1.5; }
+.activity-log { font-size: var(--sui-text-xs, 12px); color: var(--sui-color-text-muted); line-height: 1.5; }
 .activity-log p, .activity-log li { margin: 0 0 .15em; }
 .activity-log ul { margin: 0; padding-left: 1.2em; list-style: none; }
 .activity-log li::before { content: ""; }
@@ -343,7 +343,7 @@ body {
 /* ── Task cards (tool calls + sub-agent calls) ─────────────────────────── */
 
 .task-card-body {
-    font-size: 13px;
+    font-size: var(--sui-text-sm, 13px);
     color: var(--sui-color-text);
     background: var(--sui-color-border-soft);
     border-radius: 6px;
@@ -359,19 +359,19 @@ body {
     padding: 8px 10px;
     margin: 4px 0 10px;
     overflow-x: auto;
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     font-family: var(--sui-font-mono);
     white-space: pre-wrap;
     word-break: break-word;
 }
 .task-card-body code {
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     color: var(--sui-color-text);
     font-family: var(--sui-font-mono);
 }
 .task-card-body strong {
     color: var(--sui-color-text-strong);
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -394,7 +394,7 @@ body {
 .sub-agent-children > ul { list-style: none; padding: 0; margin: 0; }
 
 .sub-agent-status {
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     color: var(--sui-color-text-muted);
     margin: 4px 0;
 }
@@ -410,7 +410,7 @@ body {
 .sui-stack > .sui-link {
     display: inline-block;
     margin: 2px 0 6px;
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     font-weight: 600;
 }
 
@@ -443,15 +443,6 @@ body {
     text-align: center;
 }
 
-/* On the scale like everything else. 11px at weight 600 was the last size on
-   the agents screen that belonged to no scale at all, and it was the reason
-   that page still measured differently from the others after the framework
-   was tidied. */
-.agent-llm-badge {
-    font-size: var(--sui-text-xs, 12px);
-    font-weight: 500;
-}
-
 /* LLM-config tag at the right of the name row. Soft green pill — sits apart
    from the blue name links and the blue "New Agent" button, and reads as a
    metadata label rather than a third action button. */
@@ -462,8 +453,8 @@ body {
     background: var(--sui-color-success-bg, #dcfce7);
     color: var(--sui-color-success, #15803d);
     border: 1px solid var(--sui-color-success-border, #86efac);
-    font-size: 11px;
-    font-weight: 600;
+    font-size: var(--sui-text-xs, 12px);
+    font-weight: 500;
     line-height: 1.6;
     white-space: nowrap;
 }
@@ -485,7 +476,7 @@ body {
 .llm-test-result--ok  { background: var(--sui-color-success-bg, #f0fdf4); border-color: var(--sui-color-success-border, #bbf7d0); }
 .llm-test-result--err { background: var(--sui-color-danger-bg, #fef2f2); border-color: var(--sui-color-danger-bg-hover, var(--sui-color-danger-bg-hover)); }
 .llm-test-meta {
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     color: var(--sui-color-text-body);
     margin-bottom: 6px;
     font-family: var(--sui-font-mono);
@@ -494,7 +485,7 @@ body {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-family: var(--sui-font-mono);
-    font-size: 13px;
+    font-size: var(--sui-text-sm, 13px);
     line-height: 1.5;
     color: var(--sui-color-text);
 }
@@ -505,13 +496,13 @@ body {
    framework default (12px, subtle gray, meant for background activity) is
    too quiet for it. */
 .tool-catalog .sui-activity-summary {
-    font-size: 14px;
+    font-size: var(--sui-text-md, 14px);
     color: var(--sui-color-text);
     padding: 6px 0;
 }
 /* Group headers read as section titles above their tools. */
 .tool-catalog > ul > li > .sui-list-item-main > details > .sui-activity-summary {
-    font-size: 15px;
+    font-size: var(--sui-text-lg, 15px);
     font-weight: 600;
 }
 /* The nested per-group list needs no header block of its own. */
@@ -532,7 +523,7 @@ body {
 }
 
 .sui-theme-switch-hint {
-    font-size: 11px;
+    font-size: var(--sui-text-xs, 12px);
     color: var(--sui-color-text-muted);
 }
 
