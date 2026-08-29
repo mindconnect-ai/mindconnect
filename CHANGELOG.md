@@ -38,6 +38,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   composer. The admin UI embeds it — `Chat` is its first menu entry and the
   root now lands there — and depends on the new module for its own chat page,
   so a chat client does not have to ship agent CRUD, LLM configs and traces.
+- **A chat can only be opened, renamed or deleted by the user it belongs to.**
+  Every endpoint under `/chat/api/sessions/{id}` now checks the session's
+  owner before doing anything, and answers 404 otherwise. A session id travels
+  in URLs, links and logs — it was never meant to be the only thing standing
+  between two users' conversations.
 - `AgentSessionRepository.findByUser(namespace, userId)` — every top-level
   session of one user, newest first. Sub-agent sessions are left out: they
   belong to the turn that spawned them, not to the user's history.

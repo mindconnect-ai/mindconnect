@@ -130,8 +130,9 @@ public class ChatUiController {
 
     /** Model and tools of this chat, as a dialog over the conversation. */
     @GetMapping("/sessions/{sessionId}/settings")
-    public ResponseEntity<UiPatch> settingsDialog(@PathVariable UUID sessionId) {
-        var sessionOpt = sessionRepository.findById(sessionId);
+    public ResponseEntity<UiPatch> settingsDialog(@PathVariable UUID sessionId,
+                                                  @AuthenticationPrincipal OidcUser user) {
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
         var effective = agentResolver.resolve(session);
@@ -158,7 +159,7 @@ public class ChatUiController {
     public ResponseEntity<UiPage> applySettings(@PathVariable UUID sessionId,
                                                 @RequestBody Map<String, Object> raw,
                                                 @AuthenticationPrincipal OidcUser user) {
-        var sessionOpt = sessionRepository.findById(sessionId);
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var body = new FormBody(raw);
         String agentId = body.str("agentId");
@@ -184,8 +185,9 @@ public class ChatUiController {
 
     /** The rename dialog for one chat. */
     @GetMapping("/sessions/{sessionId}/rename")
-    public ResponseEntity<UiPatch> renameDialog(@PathVariable UUID sessionId) {
-        var sessionOpt = sessionRepository.findById(sessionId);
+    public ResponseEntity<UiPatch> renameDialog(@PathVariable UUID sessionId,
+                                                @AuthenticationPrincipal OidcUser user) {
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String current = sessionOpt.get().title();
 
@@ -209,7 +211,7 @@ public class ChatUiController {
     public ResponseEntity<UiPage> rename(@PathVariable UUID sessionId,
                                          @RequestBody Map<String, Object> raw,
                                          @AuthenticationPrincipal OidcUser user) {
-        var sessionOpt = sessionRepository.findById(sessionId);
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String title = new FormBody(raw).str("title");
         if (title != null && !title.isBlank()) {
@@ -229,6 +231,9 @@ public class ChatUiController {
     public ResponseEntity<UiPage> deleteSession(@PathVariable UUID sessionId,
                                                 @AuthenticationPrincipal OidcUser user) {
         String userId = userId(user);
+        if (ownedSession(sessionId, user).isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
         sessionService.deleteSession(sessionId);
         log.info("Chat {} deleted", sessionId);
 
@@ -238,6 +243,19 @@ public class ChatUiController {
             return ResponseEntity.ok(shell(fresh, List.of(fresh)));
         }
         return ResponseEntity.ok(shell(sessions.get(0), sessions));
+    }
+
+    /**
+     * The session, but only for the user it belongs to. Every endpoint that
+     * addresses a session by id goes through here: the id is the only thing
+     * standing between one user's chat and another's, and an id is not a
+     * secret — it travels in URLs, links and logs.
+     */
+    private java.util.Optional<ai.mindconnect.agent.domain.AgentSession> ownedSession(
+            UUID sessionId, OidcUser user) {
+        String userId = userId(user);
+        return sessionRepository.findById(sessionId)
+                .filter(session -> userId.equals(session.userId()));
     }
 
     /** Closes the settings dialog without touching anything. */
@@ -282,10 +300,14 @@ public class ChatUiController {
         var known = new java.util.HashSet<>(allToolNames());
         known.add(ai.mindconnect.agent.service.InlineAgentTools.RUN_AGENT);
         known.add(ai.mindconnect.agent.service.InlineAgentTools.RUN_AGENTS);
+        // The tools carry the agent's id, not null: SpiToolRegistry passes it
+        // into every ToolCallScope, and the AGENT_USER workspace is keyed by
+        // it. With null, workspace_write(scope=agent) dies on a NPE and the
+        // chat's persistent memory is unreachable.
         var agentTools = names.stream()
                 .filter(known::contains)
                 .map(name -> new ai.mindconnect.agent.tool.AgentTool(
-                        UUID.randomUUID(), null, name, null, Map.of(), true, false, false))
+                        UUID.randomUUID(), id, name, null, Map.of(), true, false, false))
                 .toList();
         var search = toolSearch
                 ? new ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig(true, List.of("*"))
@@ -355,8 +377,9 @@ public class ChatUiController {
     }
 
     @GetMapping("/sessions/{sessionId}/attach-dialog")
-    public ResponseEntity<UiPatch> attachDialog(@PathVariable UUID sessionId) {
-        if (sessionRepository.findById(sessionId).isEmpty()) {
+    public ResponseEntity<UiPatch> attachDialog(@PathVariable UUID sessionId,
+                                                @AuthenticationPrincipal OidcUser user) {
+        if (ownedSession(sessionId, user).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
         // The dialog carries both halves: what is already attached, and the
@@ -377,7 +400,7 @@ public class ChatUiController {
     @GetMapping("/sessions/{sessionId}")
     public ResponseEntity<UiPage> getSession(@PathVariable UUID sessionId,
                                              @AuthenticationPrincipal OidcUser user) {
-        return sessionRepository.findById(sessionId)
+        return ownedSession(sessionId, user)
                 .map(session -> ResponseEntity.ok(shell(session,
                         sessionRepository.findByUser(defaultNamespace, userId(user)))))
                 .orElse(ResponseEntity.notFound().build());
@@ -536,14 +559,15 @@ public class ChatUiController {
 
     @PostMapping("/sessions/{sessionId}/chat")
     public ResponseEntity<UiPatch> chat(@PathVariable UUID sessionId,
-                                        @RequestBody Map<String, Object> raw) {
+                                        @RequestBody Map<String, Object> raw,
+                                        @AuthenticationPrincipal OidcUser user) {
         var body    = new FormBody(raw);
         String text = body.str("message");
         if (text == null || text.isBlank()) {
             return ResponseEntity.badRequest().build();
         }
 
-        var sessionOpt = sessionRepository.findById(sessionId);
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
@@ -581,9 +605,10 @@ public class ChatUiController {
     @DeleteMapping("/sessions/{sessionId}/messages")
     public ResponseEntity<UiPatch> deleteMessages(@PathVariable UUID sessionId,
                                                    @RequestParam int fromSeq,
-                                                   @RequestParam int toSeq) {
+                                                   @RequestParam int toSeq,
+                                                   @AuthenticationPrincipal OidcUser user) {
         log.info("DELETE /chat/api/sessions/{}/messages fromSeq={} toSeq={}", sessionId, fromSeq, toSeq);
-        var sessionOpt = sessionRepository.findById(sessionId);
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
@@ -632,8 +657,9 @@ public class ChatUiController {
     public ResponseEntity<UiPatch> approvalAnswered(@PathVariable UUID sessionId,
                                                     @RequestParam String callId,
                                                     @RequestParam boolean approved,
-                                                    @RequestParam(defaultValue = "once") String scope) {
-        var sessionOpt = sessionRepository.findById(sessionId);
+                                                    @RequestParam(defaultValue = "once") String scope,
+                                                    @AuthenticationPrincipal OidcUser user) {
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();

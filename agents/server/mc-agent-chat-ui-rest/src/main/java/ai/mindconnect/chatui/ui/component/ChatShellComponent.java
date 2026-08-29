@@ -112,9 +112,14 @@ public final class ChatShellComponent implements UiComponent {
             items.add(UiMenuItem.link("parent", "Parent session",
                     "/chat/sessions/" + active.parentSessionId()).icon("arrow-up"));
         }
-        String back = hostLinks.backHref(active.agentDefinitionId(), active.id());
-        if (back != null) {
-            items.add(UiMenuItem.link("back", "Back to agent", back).icon("back"));
+        // Only a chat that references a registry agent has an agent to go back
+        // to. An inline session agent's id resolves to nothing, so the link
+        // would land on an agent page for an agent that does not exist.
+        if (boundToRegistryAgent()) {
+            String back = hostLinks.backHref(active.agentDefinitionId(), active.id());
+            if (back != null) {
+                items.add(UiMenuItem.link("back", "Back to agent", back).icon("back"));
+            }
         }
         for (var tool : hostLinks.sessionTools(active.id())) {
             items.add(UiMenuItem.of(tool.id(), tool.label()).icon(tool.icon())
@@ -151,6 +156,17 @@ public final class ChatShellComponent implements UiComponent {
                     .selected(s.id().equals(activeId)));
         }
         return menu;
+    }
+
+    /**
+     * Whether this chat runs an agent from the registry — either a
+     * {@code ref} session agent, or a session from before session agents
+     * existed, whose {@code agentDefinitionId} was always a real one.
+     */
+    private boolean boundToRegistryAgent() {
+        return active.mainAgent()
+                .map(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
+                .orElse(true);
     }
 
     private static String ago(Instant when) {
