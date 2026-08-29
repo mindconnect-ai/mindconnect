@@ -77,37 +77,36 @@
     }
 
     /*
-     * Watch the menu, not the document: during a streaming turn the renderer
-     * patches the message list many times a second, and re-scanning the
-     * history on every one of those is work for nothing. The menu itself is
-     * replaced wholesale by page patches, so the observer re-attaches when
-     * that happens, and the work is coalesced into one animation frame.
+     * The rows are decorated after every render, coalesced into one animation
+     * frame. Watching only the menu is not enough: the SPA replaces the whole
+     * page inside its mount, menu and all, so the observer has to sit above
+     * it. The frame gate is what keeps this cheap — a streaming turn patches
+     * the message list many times a second, and this runs at most once per
+     * frame, over one querySelectorAll scoped to the menu.
      */
     let scheduled = false;
     function schedule() {
         if (scheduled) return;
         scheduled = true;
-        requestAnimationFrame(function () {
+        // A timeout, not requestAnimationFrame: rAF does not run in a hidden
+        // tab, so a chat opened in a background tab came up with undecorated
+        // rows and stayed that way until it was looked at. The flag still
+        // collapses a burst of mutations into one pass.
+        setTimeout(function () {
             scheduled = false;
             decorateRows();
-            attachMenuObserver();
-        });
+        }, 0);
     }
 
-    let menuObserver = null;
-    let watched = null;
-    function attachMenuObserver() {
-        const menu = document.getElementById(MENU_ID);
-        if (!menu || menu === watched) return;
-        if (menuObserver) menuObserver.disconnect();
-        menuObserver = new MutationObserver(schedule);
-        menuObserver.observe(menu, { childList: true, subtree: true });
-        watched = menu;
-    }
-
-    // One cheap watcher on the shell catches the menu being swapped out; the
-    // expensive subtree watching happens only inside the menu itself.
-    new MutationObserver(schedule).observe(document.body, { childList: true });
+    // Deliberately the document: the SPA re-renders the page inside its mount
+    // and the mount element itself is not guaranteed to survive, so an
+    // observer anchored below the root goes deaf after the first navigation —
+    // which is exactly what happened when this watched #main. The frame gate
+    // above is what makes the wide scope affordable.
+    new MutationObserver(schedule).observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+    });
 
     document.addEventListener("DOMContentLoaded", schedule);
     schedule();

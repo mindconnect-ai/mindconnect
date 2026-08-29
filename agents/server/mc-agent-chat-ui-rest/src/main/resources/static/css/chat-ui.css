@@ -248,11 +248,16 @@
     position: relative;
 }
 
+/* No transform here, deliberately: the event bus re-positions the popover
+   with position:fixed so it can escape the scrolling history, and a
+   transformed ancestor turns "fixed" into "relative to me" — the menu then
+   opened hundreds of pixels away from the row it belongs to. Centred with a
+   margin instead. */
 #chat-menu .chat-row-menu {
     position: absolute;
     inset-block-start: 50%;
+    margin-block-start: -0.9rem;
     inset-inline-end: 6px;
-    transform: translateY(-50%);
     opacity: 0;
     transition: opacity 120ms ease;
 }
