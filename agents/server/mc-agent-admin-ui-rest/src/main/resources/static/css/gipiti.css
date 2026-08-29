@@ -270,7 +270,7 @@
 :root.sui-theme-gipiti :is(.sui-field input, .sui-field textarea, .sui-field select) {
     border-color: var(--sui-color-border-strong);
     border-radius: var(--sui-radius-sm);
-    background: var(--sui-color-surface);
+    background-color: var(--sui-color-surface);
 }
 
 :root.sui-theme-gipiti :is(.sui-field input, .sui-field textarea, .sui-field select):focus {

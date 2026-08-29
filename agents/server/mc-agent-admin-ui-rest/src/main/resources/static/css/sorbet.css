@@ -245,7 +245,7 @@
 }
 
 :root.sui-theme-sorbet :is(.sui-field input, .sui-field textarea, .sui-field select) {
-    background: var(--sui-color-surface);
+    background-color: var(--sui-color-surface);
     border-color: var(--sui-color-border-strong);
     border-radius: 12px;
 }

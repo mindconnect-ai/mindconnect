@@ -36,6 +36,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **Selects no longer tile their dropdown chevron across the field on the
+  dark themes.** The themes restyled inputs with the `background` shorthand,
+  which reset the `no-repeat` behind the framework's custom select arrow —
+  the arrow repeated as a pattern over the whole control.
+- **"Add parameter" no longer invents the description "null".** Untouched
+  fields arrive from the SPA as JSON `null`; re-rendering the dialog after a
+  type change stringified that into the literal text `null` (and, for a
+  boolean parameter, a default of `false` the user never chose).
+
 - **The Stores tab can create stores again.** Moving the Vector Stores actions
   into the page header had tied the button to the tab the page was opened on;
   switching tabs now swaps the header action with it, so Stores gets New Store
@@ -51,6 +60,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
   ink was a hard-coded slate instead of the theme's text token — invisible on
   Amethyst and Dark. The tool groups also drop their extra size and weight and
   read like the migration rows.
+
+- **Workflow steps carry an icon, one type size, and their wiring.** Each
+  editor row starts with an icon for the step's kind, type and name share one
+  size (told apart by weight), a quiet detail says what makes the step itself
+  (`file in files`, the code language, `GET <url>`), and `→ variable` shows
+  where the result lands. Nesting guide lines are full-strength and close at
+  the bottom like a bracket. The step Details dialog grew up with it: every
+  populated property of the step — code, headers, variable assignments —
+  shown under an icon-and-type head, not just name/type/var.
 
 - **The workflow detail page wears the standard header, and its editor reads
   as a list.** The ad-hoc "Workflow: name" text-and-buttons row becomes the

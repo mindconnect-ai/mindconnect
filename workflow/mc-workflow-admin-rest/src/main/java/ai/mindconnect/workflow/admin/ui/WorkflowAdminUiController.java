@@ -336,21 +336,78 @@ public class WorkflowAdminUiController {
     // Step details & edit
     // -----------------------------------------------------------------------
 
+    /** Step properties the dialog renders itself (or that are children). */
+    private static final java.util.Set<String> STEP_DETAIL_SKIP =
+            java.util.Set.of("@class", "name", "type", "steps", "conditions", "elseBlock");
+
     @GetMapping("/{wf}/step/{ref}")
     public UiPatch stepDetails(@PathVariable String wf, @PathVariable String ref) {
         WorkflowData data = require(wf);
         StepData step = requireStep(data, ref);
-        UiDetail detail = UiDetail.of("step-detail", step.getType() + " step")
-                .field(UiField.text("name", "Name", step.getName()))
-                .field(UiField.text("type", "Type", step.getType()))
-                .field(UiField.text("assignResultToVar", "Assign result to var",
-                        step.getAssignResultToVar()));
-        UiStack body = UiStack.of("step-detail-page")
-                .child(detail)
+
+        // The kind, drawn and named — same icon as the step's row in the list.
+        UiStack head = UiStack.of("step-detail-head")
+                .direction(UiStack.Direction.HORIZONTAL).gap(10)
+                .child(ai.mindconnect.ui.model.UiIcon.of("step-detail-icon",
+                        WorkflowUiBuilder.iconFor(step.getType())))
+                .child(UiText.of("step-detail-type", step.getType()));
+        head.withCssClass("wf-detail-head");
+        String var = step.getAssignResultToVar();
+        if (var != null && !var.isBlank()) {
+            head.child(UiText.of("step-detail-var", "→ " + var).withCssClass("wf-step-var"));
+        }
+
+        // Every populated property, not just the three shared ones: the walk
+        // over the step's JSON shape covers each type — plugins included —
+        // without a hand-written view per type. Short scalars become detail
+        // rows; code and nested values become blocks below.
+        UiDetail detail = UiDetail.of("step-detail", null);
+        List<UiNode> blocks = new ArrayList<>();
+        for (var entry : StepJsonMapper.toMap(step).entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            if (value == null || STEP_DETAIL_SKIP.contains(key)) continue;
+            if (value instanceof java.util.Map<?, ?> map) {
+                if (!map.isEmpty()) addDetailBlock(blocks, key, StepJsonMapper.prettyValue(value));
+            } else if (value instanceof List<?> list) {
+                if (!list.isEmpty()) addDetailBlock(blocks, key, StepJsonMapper.prettyValue(value));
+            } else {
+                String text = String.valueOf(value);
+                if (text.isBlank()) continue;
+                if (text.contains("\n") || text.length() > 80) {
+                    addDetailBlock(blocks, key, text);
+                } else {
+                    detail.field(UiField.text(key, humanize(key), text));
+                }
+            }
+        }
+
+        UiStack body = UiStack.of("step-detail-page").child(head);
+        if (!detail.getFields().isEmpty()) body.child(detail);
+        blocks.forEach(body::child);
+        UiStack actions = UiStack.of("step-detail-actions")
+                .direction(UiStack.Direction.HORIZONTAL).gap(8)
                 .child(UiAction.primary("edit", "Edit").icon("edit")
-                        .onClick(UiTrigger.api("GET", stepUrl(wf, ref, "edit"))));
+                        .onClick(UiTrigger.api("GET", stepUrl(wf, ref, "edit"))))
+                .child(UiAction.secondary("json", "JSON").icon("code")
+                        .onClick(UiTrigger.api("GET", stepUrl(wf, ref, "json"))));
+        body.child(actions);
         // Open as a modal dialog over the current list — no page navigation.
-        return openDialog(step.getType() + " step", body);
+        return openDialog(step.getName(), body);
+    }
+
+    /** A labelled mono block for a property too big for a detail row. */
+    private static void addDetailBlock(List<UiNode> blocks, String key, String text) {
+        blocks.add(UiText.of("step-detail-label:" + key, humanize(key))
+                .withCssClass("wf-detail-label"));
+        blocks.add(UiText.of("step-detail-block:" + key, text)
+                .withCssClass("wf-detail-block"));
+    }
+
+    /** {@code "assignResultToVar"} → {@code "Assign result to var"}. */
+    private static String humanize(String key) {
+        String spaced = key.replaceAll("([a-z0-9])([A-Z])", "$1 $2").toLowerCase();
+        return Character.toUpperCase(spaced.charAt(0)) + spaced.substring(1);
     }
 
     @GetMapping("/{wf}/step/{ref}/edit")
@@ -1835,10 +1892,21 @@ public class WorkflowAdminUiController {
         return paramForm(wf, originalName, nameValue, prop, required);
     }
 
+    /**
+     * A submitted field as text. {@code getOrDefault} is not enough: the SPA
+     * posts untouched fields as JSON {@code null}, and {@code String.valueOf}
+     * would mint the literal string {@code "null"} — which then turns up as a
+     * parameter description a user never wrote.
+     */
+    private static String formText(Map<String, Object> form, String key, String fallback) {
+        Object value = form.get(key);
+        return value == null ? fallback : String.valueOf(value);
+    }
+
     /** Builds the property {@link Schema} from the submitted form fields. */
     private static Schema paramSchemaFrom(Map<String, Object> form) {
-        String type = String.valueOf(form.getOrDefault("type", "string"));
-        String enumValues = String.valueOf(form.getOrDefault("enumValues", ""));
+        String type = formText(form, "type", "string");
+        String enumValues = formText(form, "enumValues", "");
         Schema prop = switch (type) {
             case "multiline" -> Schema.string().multiline();
             case "path" -> Schema.string().path();
@@ -1852,11 +1920,11 @@ public class WorkflowAdminUiController {
             case "object" -> Schema.object();
             default -> Schema.string();
         };
-        String description = String.valueOf(form.getOrDefault("description", "")).trim();
+        String description = formText(form, "description", "").trim();
         if (!description.isEmpty()) {
             prop.description(description);
         }
-        String defaultValue = String.valueOf(form.getOrDefault("defaultValue", "")).trim();
+        String defaultValue = formText(form, "defaultValue", "").trim();
         if (!defaultValue.isEmpty()) {
             prop.defaultValue(switch (prop.getType()) {
                 case INTEGER -> parseOr(defaultValue, () -> Long.parseLong(defaultValue));

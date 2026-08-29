@@ -1,6 +1,7 @@
 package ai.mindconnect.workflow.admin.ui;
 
 import ai.mindconnect.ui.model.UiAction;
+import ai.mindconnect.ui.model.UiIcon;
 import ai.mindconnect.ui.model.UiMenuButton;
 import ai.mindconnect.ui.model.UiMenuItem;
 import ai.mindconnect.ui.model.UiNode;
@@ -8,7 +9,12 @@ import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTrigger;
 import ai.mindconnect.workflow.domain.BlockData;
+import ai.mindconnect.workflow.domain.CallWorkflowData;
+import ai.mindconnect.workflow.domain.CodeData;
+import ai.mindconnect.workflow.domain.ForEachData;
+import ai.mindconnect.workflow.domain.HttpCallData;
 import ai.mindconnect.workflow.domain.IfData;
+import ai.mindconnect.workflow.domain.JumpToData;
 import ai.mindconnect.workflow.domain.StepContainerData;
 import ai.mindconnect.workflow.domain.StepData;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -95,14 +101,29 @@ public class WorkflowUiBuilder {
 
         UiStack row = UiStack.of(id)
                 .direction(UiStack.Direction.HORIZONTAL).gap(10)
+                // The icon says the kind before the words do — a glance down
+                // the list reads like a margin of pictograms.
+                .child(UiIcon.of(id + ":icon", iconFor(step.getType()))
+                        .withCssClass("wf-step-icon"))
                 .child(UiText.of(id + ":type", step.getType()).withCssClass("wf-step-type"))
                 .child(UiText.of(id + ":name", ref).withCssClass("wf-step-name"))
                 // The "+" behind the name — visible only while the pointer is
                 // on the row. It inserts BELOW this row, in the same list.
                 .child(UiAction.icon(id + ":add", "Add step below").icon("add")
                         .onClick(UiTrigger.api("GET",
-                                url("/" + wfId + "/add/" + enc("after:" + ref)))))
-                .child(menu);
+                                url("/" + wfId + "/add/" + enc("after:" + ref)))));
+        String detail = detailFor(step);
+        if (detail != null && !detail.isBlank()) {
+            row.child(UiText.of(id + ":detail", detail).withCssClass("wf-step-detail"));
+        }
+        // Where the step's result lands. Until now this lived only in the
+        // Details dialog, so the one thing that wires steps together was
+        // invisible in the list.
+        String var = step.getAssignResultToVar();
+        if (var != null && !var.isBlank()) {
+            row.child(UiText.of(id + ":var", "→ " + var).withCssClass("wf-step-var"));
+        }
+        row.child(menu);
         row.withCssClass("wf-step");
 
         UiNode nested = renderNested(step, ref);
@@ -143,7 +164,11 @@ public class WorkflowUiBuilder {
      * than a dead card you can only delete.
      */
     private UiNode renderIf(IfData ifData, String ref) {
-        UiStack branches = indent(ref);
+        // The branches container draws no guide line of its own: each branch
+        // stack below already draws one, and two parallel lines per if turned
+        // the margin into a ruled notebook.
+        UiStack branches = UiStack.of("indent:" + wfId + ":" + ref);
+        branches.withCssClass("wf-branches");
         String id = stepId(wfId, ref);
 
         IfData.Condition[] conditions = ifData.getConditions();
@@ -182,6 +207,57 @@ public class WorkflowUiBuilder {
     // -----------------------------------------------------------------------
     // Actions & helpers
     // -----------------------------------------------------------------------
+
+    /**
+     * One icon per step kind. Types register openly (any {@code FooData} is a
+     * type), so unknown kinds get a neutral box rather than nothing.
+     */
+    static String iconFor(String type) {
+        return switch (type) {
+            case "assignvariables" -> "variable";
+            case "block" -> "brackets";
+            case "callworkflow" -> "workflow";
+            case "code" -> "code";
+            case "foreach" -> "repeat";
+            case "halt" -> "circle-pause";
+            case "httpcall" -> "globe";
+            case "if" -> "split";
+            case "jumpto" -> "corner-down-right";
+            case "formstep" -> "form";
+            // Registered by the agent modules; matched by type string so this
+            // module needs no dependency on them.
+            case "toolcall" -> "wrench";
+            case "agentcall" -> "bot";
+            default -> "box";
+        };
+    }
+
+    /**
+     * The one detail that tells this step apart from another of its kind —
+     * what a for-each loops over, where an http call goes — so the list
+     * answers "what does it do" without opening a dialog. Null when the kind
+     * has no such headline.
+     */
+    private static String detailFor(StepData step) {
+        if (step instanceof ForEachData fe) {
+            if (fe.getLoopOver() == null || fe.getLoopOver().isBlank()) return null;
+            String item = fe.getRunVar() == null || fe.getRunVar().isBlank() ? "item" : fe.getRunVar();
+            return item + " in " + fe.getLoopOver();
+        }
+        if (step instanceof CodeData code) {
+            return code.getLanguage();
+        }
+        if (step instanceof HttpCallData http) {
+            return http.getMethod() + " " + (http.getUrl() == null ? "" : http.getUrl());
+        }
+        if (step instanceof CallWorkflowData call) {
+            return call.getWorkflow();
+        }
+        if (step instanceof JumpToData jump) {
+            return "to " + jump.getJumpTo();
+        }
+        return null;
+    }
 
     /** {@code containerPath} is {@link #ROOT} or the mutator's container DSL. */
     private UiNode addStepControl(String containerPath) {

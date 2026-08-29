@@ -8,7 +8,8 @@
 
 .wf-body,
 .wf-step-group,
-.wf-nested {
+.wf-nested,
+.wf-branches {
   gap: 0;
 }
 
@@ -50,40 +51,135 @@
   opacity: 1;
 }
 
-/* The type as written, not shouted: small caps and the faintest ink made
-   the one thing that says what a step DOES the hardest thing to read. */
-/* No column: the name follows its type at the row gap, the way a label
-   follows a keyword. The 8.5rem column aligned names vertically but pushed
-   every name a hand's width away from what it belongs to. */
+/* The kind, drawn: a small icon in muted ink at the row's start. */
+.wf-step > .wf-step-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--sui-color-text-muted);
+}
+
+/* Type and name at ONE size — two sizes on one line made every row look
+   like a heading with a stray subtitle. They differ by weight only: the
+   type is the keyword, the name is what the reader scans for. */
 .wf-step-type {
   display: inline-block;
-  font-size: var(--sui-text-sm);
-  font-weight: 500;
-  /* Full body ink. Muted was still a grey next to the name — the type is
-     half of what a row says, not a footnote to it. */
+  font-weight: 400;
   color: var(--sui-color-text-body);
 }
 
 .wf-step-name {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--sui-color-text);
+}
+
+/* The step's headline detail (what a loop loops over, where a call goes):
+   quiet mono, swallowed before it can widen the row. */
+.wf-step-detail {
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* "→ variable": where the result lands. Right-aligned, in front of the
+   menu — the wiring between steps, visible without a dialog. */
+.wf-step-var {
+  margin-inline-start: auto;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-muted);
+  white-space: nowrap;
+}
+
+.wf-step > .wf-step-var ~ .sui-menu-button {
+  margin-inline-start: 0;
+}
+
+/* --- Step details dialog ----------------------------------------------- */
+
+/* Icon + type under the dialog's name-title: what kind of step this is. */
+.wf-detail-head {
+  align-items: center;
+  color: var(--sui-color-text-body);
+}
+
+.wf-detail-head .sui-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--sui-color-text-muted);
+}
+
+/* Label over a block value (code, headers, variable assignments). */
+.wf-detail-label {
+  font-size: var(--sui-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sui-color-text-muted);
+  margin-top: var(--sui-space-sm);
+}
+
+/* The block value itself: keep the author's newlines and indents. */
+.wf-detail-block {
+  display: block;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--sui-color-surface-alt);
+  border: 1px solid var(--sui-color-border-soft);
+  border-radius: 6px;
+  padding: var(--sui-space-md);
+  max-height: 320px;
+  overflow-y: auto;
 }
 
 /* "if <condition>" / "else" — labels the indented run that follows. */
 .wf-branch-label {
   font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: var(--sui-text-xs);
+  font-size: var(--sui-text-sm);
   font-weight: 600;
-  color: var(--sui-color-text-muted);
+  color: var(--sui-color-text-body);
   padding: var(--sui-space-xs) var(--sui-space-md);
 }
 
 /* Nested container (block body, for-each body, if branches): indentation
-   with a guide line instead of a dashed box. */
+   along a guide line that turns and CLOSES at the bottom — the line is a
+   bracket around the children, not a rule that trails off mid-air. Full
+   border ink, not the soft hairline: the structure is the message here. */
 .wf-nested {
+  position: relative;
   padding-inline-start: var(--sui-space-2xl);
   margin-inline-start: var(--sui-space-md);
-  border-inline-start: 2px solid var(--sui-color-border-soft);
+}
+
+.wf-nested::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--sui-space-lg);
+  border-inline-start: 2px solid var(--sui-color-border);
+  border-block-end: 2px solid var(--sui-color-border);
+  border-end-start-radius: 10px;
+  pointer-events: none;
+}
+
+/* The bracket closes the group; a hairline under the last row would draw
+   a second floor right above it. */
+.wf-nested > .wf-step:last-child {
+  border-bottom: 0;
+}
+
+/* The if's branches sit a notch to the right of their if row, so the
+   "if …"/"else" labels read as belonging to it, not as its siblings. */
+.wf-branches {
+  margin-inline-start: var(--sui-space-lg);
 }
 
 /* The add-step row keeps a little air so it reads as an affordance, not a
