@@ -896,15 +896,17 @@ public class WorkflowAdminUiController {
 
         private final class Row {
             final Object key;
-            final String label;
+            final String name;
+            final String type;
             String state = "running";
             final long startMs = System.currentTimeMillis();
             long endMs;
             String error;
 
-            Row(Object key, String label) {
+            Row(Object key, String name, String type) {
                 this.key = key;
-                this.label = label;
+                this.name = name;
+                this.type = type;
             }
         }
 
@@ -938,7 +940,9 @@ public class WorkflowAdminUiController {
         @Override
         public synchronized void beforeStepExecute(ai.mindconnect.workflow.execution.StepInstance<?> step) {
             if (step instanceof ai.mindconnect.workflow.execution.StepContainerInstance) return;
-            rows.add(new Row(step, label(step)));
+            var cfg = step.getConfig();
+            rows.add(new Row(step,
+                    cfg.getName() != null ? cfg.getName() : "(unnamed)", cfg.getType()));
             push();
         }
 
@@ -975,34 +979,57 @@ public class WorkflowAdminUiController {
             push();
         }
 
-        private static String label(ai.mindconnect.workflow.execution.StepInstance<?> step) {
-            var cfg = step.getConfig();
-            String name = cfg.getName() != null ? cfg.getName() : "(unnamed)";
-            return name + "  ·  " + cfg.getType();
-        }
-
         private void push() {
             sendPatch(UiPatch.of().patch(UiPatch.Operation.replace(channelId, progressNode())));
         }
 
         private UiNode progressNode() {
             UiStack panel = UiStack.of(channelId).gap(6);
-            panel.child(UiText.of(channelId + ":title", "Running " + wf + "…").withCssClass("wf-run-title"));
+            // The same header bar as every other screen — a run page is still
+            // a page. It lives INSIDE the streamed node so each patch carries
+            // it along and the finished view (with its own header) replaces
+            // it cleanly rather than stacking a second bar underneath.
+            UiList header = UiList.of(channelId + ":header", wf).icon("workflow");
+            header.action(UiAction.secondary(channelId + ":back", "Back to workflow").icon("back")
+                    .onClick(UiTrigger.go(BASE + "/" + wf)));
+            panel.child(header);
+            panel.child(UiText.of(channelId + ":status", "Running…").withCssClass("wf-run-meta"));
+            // The same row grammar as the editor and the finished trace:
+            // icon, type, name — joined rows, the state at the row's end.
+            UiStack list = UiStack.of(channelId + ":rows");
+            list.withCssClass("wf-body");
             for (int i = 0; i < rows.size(); i++) {
                 Row row = rows.get(i);
-                String icon = switch (row.state) {
-                    case "done" -> "✅";
-                    case "error" -> "❌";
-                    default -> "⏳";
-                };
-                String duration = row.endMs > 0 ? "  (" + (row.endMs - row.startMs) + " ms)" : "";
-                String suffix = row.error != null ? "  — " + row.error : "";
-                panel.child(UiText.of(channelId + ":row:" + i,
-                        icon + "  " + row.label + duration + suffix));
+                String rid = channelId + ":row:" + i;
+                UiStack line = UiStack.of(rid)
+                        .direction(UiStack.Direction.HORIZONTAL).gap(10)
+                        .child(ai.mindconnect.ui.model.UiIcon.of(rid + ":icon",
+                                        WorkflowUiBuilder.iconFor(row.type))
+                                .withCssClass("wf-step-icon"))
+                        .child(UiText.of(rid + ":type", row.type).withCssClass("wf-step-type"))
+                        .child(UiText.of(rid + ":name", row.name).withCssClass("wf-step-name"));
+                if (row.endMs > 0) {
+                    line.child(UiText.of(rid + ":duration", (row.endMs - row.startMs) + " ms")
+                            .withCssClass("wf-run-meta"));
+                }
+                switch (row.state) {
+                    case "running" -> line.child(UiText.of(rid + ":state", "RUNNING")
+                            .withCssClass("wf-run-state"));
+                    case "error" -> line.child(UiText.of(rid + ":state", "ERROR")
+                            .withCssClass("wf-run-state wf-run-state--error"));
+                    default -> { }
+                }
+                if (row.error != null) {
+                    line.child(UiText.of(rid + ":error", row.error)
+                            .withCssClass("wf-run-error-text"));
+                }
+                line.withCssClass("wf-step");
+                list.child(line);
             }
             if (rows.isEmpty()) {
-                panel.child(UiText.of(channelId + ":empty", "Starting…"));
+                list.child(UiText.of(channelId + ":empty", "Starting…"));
             }
+            panel.child(list);
             return panel;
         }
 
@@ -1182,12 +1209,21 @@ public class WorkflowAdminUiController {
         String runId = runStore.put(report);
 
         String base = "run:" + wf;
-        UiStack page = UiStack.of(base).gap(8);
-        page.child(UiStack.of(base + ":bar")
-                .direction(UiStack.Direction.HORIZONTAL).gap(12)
-                .child(UiText.of(base + ":title", "Run of " + wf).withCssClass("wf-run-title"))
-                .child(UiAction.primary(base + ":scope", "Variable scope")
-                        .onClick(UiTrigger.api("GET", runUrl(wf, runId, "scope")))));
+        // The same header bar as the editor: icon, the workflow's own name,
+        // the page-level actions on the right — instead of a lone coloured
+        // title that all but vanished on the dark themes.
+        UiList header = UiList.of(base + ":header", wf).icon("workflow");
+        header.action(UiAction.secondary(base + ":back", "Back to workflow").icon("back")
+                .onClick(UiTrigger.go(BASE + "/" + wf)));
+        header.action(UiAction.secondary(base + ":scope", "Variable scope")
+                .onClick(UiTrigger.api("GET", runUrl(wf, runId, "scope"))));
+        header.action(UiAction.primary(base + ":rerun", "Run again").icon("refresh")
+                .onClick(UiTrigger.go(BASE + "/" + wf + "/run")));
+
+        // The trace joins its rows like the editor's list — no gaps, hairline
+        // separators, the same wf-body/wf-step/wf-nested classes.
+        UiStack page = UiStack.of(base + ":trace");
+        page.withCssClass("wf-body");
 
         // The root card's Input shows only what actually went IN — the
         // declared workflow params — not the scope's end state (every
@@ -1219,7 +1255,8 @@ public class WorkflowAdminUiController {
                 var tabs = ai.mindconnect.ui.model.UiSection.of(base + ":halt-tabs", null)
                         .section("resume", "Resume", form)
                         .section("log", "Log", page);
-                UiStack halted = UiStack.of(base + ":halted").gap(8).child(tabs);
+                // Header above the tabs, so Resume and Log both sit under it.
+                UiStack halted = UiStack.of(base + ":halted").gap(8).child(header).child(tabs);
                 return UiPage.of(BASE + "/" + wf + "/run", halted);
             } catch (RuntimeException e) {
                 actions.child(UiAction.primary("continue", "Continue this run").icon("forward")
@@ -1227,13 +1264,14 @@ public class WorkflowAdminUiController {
                                 + enc(report.instanceId()) + "/continue"));
             }
         }
-        actions.child(UiAction.primary("back", "Back to workflow").icon("back")
-                        .onClick(UiTrigger.go(BASE + "/" + wf)))
-                .child(UiAction.primary("rerun", "Run again").icon("refresh")
-                        .onClick(UiTrigger.go(BASE + "/" + wf + "/run")));
-        page.child(actions);
+        // Back / Run again moved into the header; the trailing row only
+        // remains for the rare halted-but-unreadable fallback above.
+        if (!actions.getChildren().isEmpty()) {
+            page.child(actions);
+        }
 
-        return UiPage.of(BASE + "/" + wf + "/run", page);
+        return UiPage.of(BASE + "/" + wf + "/run",
+                UiStack.of(base).gap(8).child(header).child(page));
     }
 
     /**
@@ -1248,32 +1286,17 @@ public class WorkflowAdminUiController {
         String rid = base + ":" + e.index();
         UiNode card = runStepCard(wf, runId, rid, e.index(), e, declaredParams);
 
-        UiNode box = card;
-        if (!e.children().isEmpty()) {
-            UiStack inner = UiStack.of(rid + ":children").gap(6);
-            inner.withCssClass("wf-nested");
-            for (WorkflowRunService.RunEntry child : e.children()) {
-                inner.child(runStepNode(wf, runId, base, child, declaredParams));
-            }
-            box = UiStack.of(rid + ":group").gap(6).child(card).child(inner);
+        if (e.children().isEmpty()) {
+            return card;
         }
-
-        // A step that assigns a variable reads as "variable = value", with the
-        // step box beneath as where that value came from. The name-and-value line
-        // sits in front of the whole box (sub-steps included). Clearer than an
-        // arrow tucked inside. A failed step assigned nothing, so no prefix.
-        if (e.error() == null && e.assignedVar() != null && !e.assignedVar().isBlank()) {
-            String assigned = valueOrDash(e.result());
-            if (assigned.length() > 100) {
-                assigned = assigned.substring(0, 100) + "…";
-            }
-            String assignment = e.assignedVar() + " = " + assigned;
-            return UiStack.of(rid + ":assign").gap(2)
-                    .child(UiText.of(rid + ":assign:var", assignment)
-                            .withCssClass("wf-run-assign-var"))
-                    .child(box);
+        UiStack inner = UiStack.of(rid + ":children");
+        inner.withCssClass("wf-nested");
+        for (WorkflowRunService.RunEntry child : e.children()) {
+            inner.child(runStepNode(wf, runId, base, child, declaredParams));
         }
-        return box;
+        UiStack group = UiStack.of(rid + ":group").child(card).child(inner);
+        group.withCssClass("wf-step-group");
+        return group;
     }
 
     /**
@@ -1285,17 +1308,36 @@ public class WorkflowAdminUiController {
     private UiNode runStepCard(String wf, String runId, String rid, int index,
                                WorkflowRunService.RunEntry e,
                                java.util.Set<String> declaredParams) {
+        // The same row grammar as the editor — icon, type, name — so a run
+        // reads as the workflow it came from, annotated with what happened
+        // (duration, a state pill when it is not plain success, and the
+        // assignment the step left behind, right-aligned like the editor's
+        // "→ variable").
         UiStack row = UiStack.of(rid)
-                .direction(UiStack.Direction.HORIZONTAL).gap(8)
+                .direction(UiStack.Direction.HORIZONTAL).gap(10)
+                .child(ai.mindconnect.ui.model.UiIcon.of(rid + ":icon",
+                                WorkflowUiBuilder.iconFor(e.type()))
+                        .withCssClass("wf-step-icon"))
+                .child(UiText.of(rid + ":type", e.type()).withCssClass("wf-step-type"))
                 .child(UiAction.link(rid + ":open", e.name())
-                        .onClick(UiTrigger.api("GET", runStepUrl(wf, runId, index, "details"))))
+                        .onClick(UiTrigger.api("GET", runStepUrl(wf, runId, index, "details")))
+                        .withCssClass("wf-step-name"))
                 .child(UiText.of(rid + ":duration", e.durationInMs() + " ms")
                         .withCssClass("wf-run-meta"));
         if (!"FINISHED".equals(e.state())) {
             row.child(UiText.of(rid + ":state", e.state())
                     .withCssClass("wf-run-state wf-run-state--" + e.state().toLowerCase()));
         }
-        row.withCssClass("wf-run-step");
+        // A failed step assigned nothing, so no arrow on an error row.
+        if (e.error() == null && e.assignedVar() != null && !e.assignedVar().isBlank()) {
+            String assigned = valueOrDash(e.result());
+            if (assigned.length() > 60) {
+                assigned = assigned.substring(0, 60) + "…";
+            }
+            row.child(UiText.of(rid + ":assign", "→ " + e.assignedVar() + " = " + assigned)
+                    .withCssClass("wf-step-var"));
+        }
+        row.withCssClass("wf-step");
         return row;
     }
 

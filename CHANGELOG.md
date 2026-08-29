@@ -25,6 +25,25 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **Workflow run pages carry the same header bar as every other screen.** The
+  live progress view, the finished trace and the halted Resume/Log view all
+  open with the workflow's icon, its name and the page actions (Back, Variable
+  scope, Run again) — instead of a lone coloured title that all but vanished
+  on the dark themes.
+- **A run reads as the workflow it came from.** The run log uses the editor's
+  own row grammar — step icon, type and name on one joined line, hairline
+  separators, bracket guide lines around nested steps — annotated with the
+  duration, a state pill when a step did not plainly succeed, and the
+  assignment it produced (`→ variable = value`) right-aligned on the row. The
+  live progress view shows the same rows while the run is still going.
+- **The run view follows the theme.** Step rows, state pills, outcome banner
+  and the log/JSON inspectors draw in theme tokens instead of a hard-coded
+  light palette, so they no longer render as white islands on the dark themes.
+  The standalone workflow admin app's stylesheet is synced to the same sheet.
+- **The vector store detail page opens with the standard header** — the
+  store's name with a back action, its template/backend/embedding settings as
+  a quiet meta line — instead of a coloured all-in-one title sentence.
+
 - **The chat reads as a conversation rather than as a list of records.** The
   message list drops its card, its row separators and its hover highlight; the
   agent's turns lose the grey bubble and are set as prose at a readable

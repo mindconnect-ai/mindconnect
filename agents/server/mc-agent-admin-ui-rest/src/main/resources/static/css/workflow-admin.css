@@ -203,20 +203,19 @@
 
 /* --- Run view ---------------------------------------------------------- */
 
-.wf-run-title {
-  font-size: var(--sui-text-xl);
-  font-weight: 700;
-  color: #1a3a5c;
-}
+/* Everything below draws in theme tokens, not literals: the run view is the
+   one screen the user stares at while something happens, and a hard-coded
+   light palette turned it into a white island on the dark themes. Status
+   colours mix the theme's success/warning/danger ink with transparency for
+   their washes, so one token pair serves light and dark. */
 
-/* One executed step. Same card treatment as the editor's steps, so the run
-   reads as the same workflow, just annotated with what happened. */
-.wf-run-step {
-  border: 1px solid #c9d4df;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #ffffff;
-  margin: 4px 0;
+/* Run rows reuse the editor's own classes (wf-body / wf-step / wf-nested):
+   the run IS the workflow, just annotated with duration and state. The step
+   name doubles as the link into the details dialog — it keeps the link ink
+   (that is what says "clickable") but takes the name's weight, so the eye
+   scans the run the same way it scans the editor. */
+.wf-step > .sui-link {
+  font-weight: 600;
 }
 
 /* State pill — colour carries the meaning, the label spells it out. */
@@ -228,29 +227,28 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #eef2f6;
-  color: #5a7fa3;
+  background: var(--sui-color-surface-alt);
+  color: var(--sui-color-text-muted);
 }
 
-.wf-run-state--finished { background: #e7f6ec; color: #14653b; }
-.wf-run-state--halted   { background: #fff4de; color: #7a5200; }
-.wf-run-state--error    { background: #fdecec; color: #9b1c1c; }
+.wf-run-state--finished {
+  background: color-mix(in srgb, var(--sui-color-success) 14%, transparent);
+  color: var(--sui-color-success);
+}
+.wf-run-state--halted {
+  background: color-mix(in srgb, var(--sui-color-warning) 16%, transparent);
+  color: var(--sui-color-warning);
+}
+.wf-run-state--error {
+  background: color-mix(in srgb, var(--sui-color-danger) 14%, transparent);
+  color: var(--sui-color-danger);
+}
 
 /* Start → end → duration. Quiet on purpose: it is context, not the result. */
 .wf-run-meta {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--sui-text-xs);
-  color: #8aa0b5;
-}
-
-/* "variable =" in front of a step box: the step (with its sub-steps) is the
-   value that landed in this variable. */
-.wf-run-assign-var {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: var(--sui-text-sm);
-  font-weight: 700;
-  color: #14653b;
-  padding-left: 2px;
+  color: var(--sui-color-text-muted);
 }
 
 /* "Input" / "Output" label in front of a value line. */
@@ -259,21 +257,21 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #8aa0b5;
+  color: var(--sui-color-text-muted);
   min-width: 54px;
 }
 
 .wf-run-result {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--sui-text-sm);
-  color: #37516b;
+  color: var(--sui-color-text-body);
   word-break: break-word;
 }
 
 .wf-run-error-text {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--sui-text-sm);
-  color: #9b1c1c;
+  color: var(--sui-color-danger);
   word-break: break-word;
 }
 
@@ -293,51 +291,51 @@
 }
 
 .wf-run-outcome-detail {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--sui-text-sm);
   word-break: break-word;
 }
 
 .wf-run-outcome--success {
-  background: #e7f6ec;
-  border-color: #3f9b6d;
-  color: #14653b;
+  background: color-mix(in srgb, var(--sui-color-success) 12%, transparent);
+  border-color: var(--sui-color-success);
+  color: var(--sui-color-success);
 }
 
 .wf-run-outcome--halted {
-  background: #fff4de;
-  border-color: #d19a1e;
-  color: #7a5200;
+  background: color-mix(in srgb, var(--sui-color-warning) 14%, transparent);
+  border-color: var(--sui-color-warning);
+  color: var(--sui-color-warning);
 }
 
 .wf-run-outcome--error {
-  background: #fdecec;
-  border-color: #d16a6a;
-  color: #9b1c1c;
+  background: color-mix(in srgb, var(--sui-color-danger) 12%, transparent);
+  border-color: var(--sui-color-danger);
+  color: var(--sui-color-danger);
 }
 
 /* --- Run inspection dialogs (log / StepInstance JSON) ------------------- */
 
 .wf-run-log-line {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--sui-text-xs);
-  color: #37516b;
+  color: var(--sui-color-text-body);
   white-space: pre-wrap;
   padding: 2px 0;
-  border-bottom: 1px solid #eef2f6;
+  border-bottom: 1px solid var(--sui-color-border-soft);
 }
 
 /* The raw instance JSON: preserve the pretty-printer's newlines and indents,
    which a normal text node would collapse into one run-on line. */
 .wf-run-json {
   display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--sui-text-xs);
-  color: #37516b;
+  color: var(--sui-color-text-body);
   white-space: pre;
   overflow-x: auto;
-  background: #f7fafc;
-  border: 1px solid #c9d4df;
+  background: var(--sui-color-surface-alt);
+  border: 1px solid var(--sui-color-border-soft);
   border-radius: 6px;
   padding: 10px 12px;
 }

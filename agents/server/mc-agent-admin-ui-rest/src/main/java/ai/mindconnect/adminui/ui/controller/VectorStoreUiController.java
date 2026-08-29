@@ -15,6 +15,7 @@ import ai.mindconnect.ui.model.UiSectionEntry;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTable;
 import ai.mindconnect.ui.model.UiText;
+import ai.mindconnect.ui.model.UiTrigger;
 import ai.mindconnect.vectorstore.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
@@ -408,9 +409,15 @@ public class VectorStoreUiController {
         VectorStore store = stores.openWith(instance);
 
         UiStack page = UiStack.of("vs-detail").gap(16);
-        page.child(UiText.of("vs-detail-head", "Store '" + name + "' — template " + instance.templateName()
-                + ", backend " + instance.backend() + ", embedding " + instance.embeddingConfig()
-                + ", scope " + instance.scope()).withCssClass("wf-run-title"));
+        // The same header bar as every other detail screen: icon, the store's
+        // name as the title, its settings as a quiet meta line underneath.
+        UiList header = UiList.of("vs-detail-head", name).icon("server");
+        header.action(UiAction.secondary("back", "All vector stores").icon("back")
+                .onClick(UiTrigger.go(BASE)));
+        page.child(header);
+        page.child(UiText.of("vs-detail-meta", "template " + instance.templateName()
+                + " · backend " + instance.backend() + " · embedding " + instance.embeddingConfig()
+                + " · scope " + instance.scope()).withCssClass("wf-run-meta"));
         if (message != null) {
             page.child(UiText.of("vs-ingest-result", message).withCssClass("task-card-body"));
         }
@@ -458,7 +465,6 @@ public class VectorStoreUiController {
             page.child(UiLink.of("ingest", "/workflow-admin/" + instance.ingestionWorkflow() + "/run",
                     "→ Ingest file… (workflow " + instance.ingestionWorkflow() + ")"));
         }
-        page.child(UiLink.of("back", BASE, "← Back to Vector Stores"));
         return UiPage.of(BASE + "/stores/" + name, page);
     }
 
