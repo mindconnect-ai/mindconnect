@@ -14,8 +14,15 @@
 
 .wf-step {
   align-items: center;
-  padding: var(--sui-space-sm) var(--sui-space-md);
+  padding: var(--sui-space-xs) var(--sui-space-md);
   border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+/* The row's height is set by its tallest thing — the default 36px "…"
+   square. Smaller here, so the rows sit as close as code lines. */
+.wf-step .sui-menu-button--icon .sui-menu-button-trigger {
+  width: 28px;
+  height: 28px;
 }
 
 .wf-step:hover {
@@ -27,14 +34,14 @@
   margin-inline-start: auto;
 }
 
+/* The type as written, not shouted: small caps and the faintest ink made
+   the one thing that says what a step DOES the hardest thing to read. */
 .wf-step-type {
   display: inline-block;
   min-width: 8.5rem;
-  font-size: var(--sui-text-xs);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--sui-color-text-subtle);
+  font-size: var(--sui-text-sm);
+  font-weight: 500;
+  color: var(--sui-color-text-muted);
 }
 
 .wf-step-name {
