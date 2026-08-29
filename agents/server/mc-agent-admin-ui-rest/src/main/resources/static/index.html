@@ -1,11 +1,16 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="sui-theme-clody">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent Admin</title>
     <link rel="stylesheet" href="/sui/sui.css">
     <link rel="stylesheet" href="/css/app.css">
+    <!-- Clody: the warm theme. An overlay on sui.css + app.css, switched on
+         by the sui-theme-clody class on <html> above — drop the class (or this
+         link) and the app is back to the framework default. Must stay ahead of
+         chat-ui.css, whose chat rules are meant to win over the generic ones. -->
+    <link rel="stylesheet" href="/css/clody.css">
     <!-- Chat shell (sidebar + conversation) — ships with mc-agent-chat-ui-rest. -->
     <link rel="stylesheet" href="/css/chat-ui.css">
     <!-- Embedded workflow admin (/workflow-admin): step cards, base <sui-diagram>

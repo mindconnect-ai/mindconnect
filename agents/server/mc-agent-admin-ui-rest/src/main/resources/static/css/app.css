@@ -94,7 +94,7 @@ body {
     box-shadow: var(--sui-shadow-card);
 }
 .chat-thinking {
-    color: #64748b;
+    color: var(--sui-color-text-muted);
     font-style: italic;
     font-size: 14px;
 }
@@ -127,7 +127,7 @@ body {
     min-width: 0; /* prevent grid blow-up from long preformatted lines */
 }
 .memory-page .sui-list-item-description {
-    color: #64748b;
+    color: var(--sui-color-text-muted);
     font-size: 12px;
     font-family: var(--sui-font-mono);
     white-space: nowrap;
@@ -148,23 +148,23 @@ body {
     list-style: none;
 }
 .memory-master .sui-list-item {
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--sui-color-border);
     padding: 0;
 }
-.memory-master .sui-list-item:hover { background: #f1f5f9; }
+.memory-master .sui-list-item:hover { background: var(--sui-color-border-soft); }
 .memory-master .sui-list-item-main { padding: 8px 10px; }
 .memory-master .sui-list-item-label {
     display: block;
-    color: #2563eb;
+    color: var(--sui-color-primary);
     text-decoration: underline;
-    text-decoration-color: #cbd5e1;
+    text-decoration-color: var(--sui-color-border-strong);
     text-underline-offset: 2px;
     font-weight: 500;
     font-size: 13px;
     cursor: pointer;
 }
 .memory-master .sui-list-item-label:hover {
-    color: #1d4ed8;
+    color: var(--sui-color-primary-hover);
     text-decoration-color: currentColor;
 }
 .memory-master .sui-list-item-desc {
@@ -174,11 +174,11 @@ body {
     white-space: pre-line;
     font-family: inherit;
     font-size: 12px;
-    color: #475569;
+    color: var(--sui-color-text-body);
 }
 .memory-page pre {
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--sui-color-code-bg);
+    color: var(--sui-color-code-fg);
     border-radius: 6px;
     padding: 12px 14px;
     font-size: 12px;
@@ -194,11 +194,11 @@ body {
 }
 
 /* Indentation per nesting level for sub-agent roundtrip cards. */
-.trace-depth-1 { margin-left: 24px;  border-left: 3px solid #cbd5e1; padding-left: 10px; }
-.trace-depth-2 { margin-left: 48px;  border-left: 3px solid #94a3b8; padding-left: 10px; }
-.trace-depth-3 { margin-left: 72px;  border-left: 3px solid #64748b; padding-left: 10px; }
-.trace-depth-4 { margin-left: 96px;  border-left: 3px solid #475569; padding-left: 10px; }
-.trace-depth-5 { margin-left: 120px; border-left: 3px solid #334155; padding-left: 10px; }
+.trace-depth-1 { margin-left: 24px;  border-left: 3px solid var(--sui-color-border-strong); padding-left: 10px; }
+.trace-depth-2 { margin-left: 48px;  border-left: 3px solid var(--sui-color-text-subtle); padding-left: 10px; }
+.trace-depth-3 { margin-left: 72px;  border-left: 3px solid var(--sui-color-text-muted); padding-left: 10px; }
+.trace-depth-4 { margin-left: 96px;  border-left: 3px solid var(--sui-color-text-body); padding-left: 10px; }
+.trace-depth-5 { margin-left: 120px; border-left: 3px solid var(--sui-color-text-strong); padding-left: 10px; }
 
 /* ── Embedded API explorer (Swagger UI in a UiIFrame) ──────────────────── */
 
@@ -251,7 +251,7 @@ body {
 /* Token usage in the chat header: compact bar + muted readout. */
 .chat-token-usage { align-items: center; white-space: nowrap; }
 .chat-token-usage .sui-progress--bar { width: 140px; }
-.chat-token-text { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+.chat-token-text { font-size: 12px; color: var(--sui-color-text-muted); font-variant-numeric: tabular-nums; }
 
 .user-message, .bot-message {
     padding: 10px 14px;
@@ -259,16 +259,20 @@ body {
     margin: 4px 0;
 }
 .user-message {
-    background: #dcfce7;
-    color: #14532d;
+    /* The bubble's tint is the chat module's variable (chat-ui.css), so a
+       theme retunes it in one place; the value here is what it was before
+       that variable existed and is what a host without the chat module
+       still gets. */
+    background: var(--chat-user-bubble, #dcfce7);
+    color: var(--sui-color-text, #14532d);
     margin-left: auto;
     max-width: 80%;
     border-bottom-right-radius: 4px;
 }
 .user-message p { margin: 0; }
 .bot-message {
-    background: #f1f5f9;
-    color: #1a1a1a;
+    background: var(--sui-color-border-soft);
+    color: var(--sui-color-text);
     width: 100%;
     border-bottom-left-radius: 4px;
 }
@@ -279,7 +283,7 @@ body {
    replaced (without the class) as soon as a token arrives, so the
    animation disappears once the real reply starts streaming. */
 .bot-message--thinking {
-    color: #64748b;
+    color: var(--sui-color-text-muted);
     font-style: italic;
 }
 .bot-message--thinking p::after {
@@ -307,7 +311,7 @@ body {
 .chat-container .sui-list-item-label {
     font-size: 11px;
     font-weight: 500;
-    color: #94a3b8;
+    color: var(--sui-color-text-subtle);
     margin-bottom: 2px;
     display: block;
 }
@@ -322,16 +326,16 @@ body {
     padding: 2px 6px;
     font-size: 11px;
     background: transparent;
-    color: #9ca3af;
+    color: var(--sui-color-text-subtle);
 }
 .chat-container .sui-list-item-actions .sui-btn:hover:not(:disabled) {
-    background: #fee2e2;
-    color: #dc2626;
+    background: var(--sui-color-danger-bg);
+    color: var(--sui-color-danger);
 }
 
 /* ── Legacy activity-log block (still used by some tool messages) ──────── */
 
-.activity-log { font-size: 12px; color: #64748b; line-height: 1.5; }
+.activity-log { font-size: 12px; color: var(--sui-color-text-muted); line-height: 1.5; }
 .activity-log p, .activity-log li { margin: 0 0 .15em; }
 .activity-log ul { margin: 0; padding-left: 1.2em; list-style: none; }
 .activity-log li::before { content: ""; }
@@ -340,17 +344,17 @@ body {
 
 .task-card-body {
     font-size: 13px;
-    color: #111827;
-    background: #f1f5f9;
+    color: var(--sui-color-text);
+    background: var(--sui-color-border-soft);
     border-radius: 6px;
     padding: 10px 12px;
     margin-top: 6px;
     line-height: 1.5;
 }
 .task-card-body pre {
-    background: #ffffff;
-    color: #0f172a;
-    border: 1px solid #cbd5e1;
+    background: var(--sui-color-surface);
+    color: var(--sui-color-text);
+    border: 1px solid var(--sui-color-border-strong);
     border-radius: 4px;
     padding: 8px 10px;
     margin: 4px 0 10px;
@@ -362,11 +366,11 @@ body {
 }
 .task-card-body code {
     font-size: 12px;
-    color: #0f172a;
+    color: var(--sui-color-text);
     font-family: var(--sui-font-mono);
 }
 .task-card-body strong {
-    color: #1e293b;
+    color: var(--sui-color-text-strong);
     font-size: 12px;
     font-weight: 600;
     text-transform: uppercase;
@@ -383,7 +387,7 @@ body {
  */
 .sub-agent-children {
     margin: 6px 0 0;
-    border-left: 2px solid #cbd5e1;
+    border-left: 2px solid var(--sui-color-border-strong);
     padding-left: 12px;
 }
 .sub-agent-children > .sui-list-header { display: none; }
@@ -391,14 +395,14 @@ body {
 
 .sub-agent-status {
     font-size: 12px;
-    color: #64748b;
+    color: var(--sui-color-text-muted);
     margin: 4px 0;
 }
-.sub-agent-status--error { color: #b91c1c; }
+.sub-agent-status--error { color: var(--sui-color-danger); }
 
 .sub-agent-answer {
     margin-top: 8px;
-    background: #eef2ff;
+    background: var(--sui-color-primary-soft);
 }
 
 /* "Open sub-agent session ↗" link at the top of a sub-agent card body. */
@@ -436,9 +440,9 @@ body {
     display: inline-block;
     padding: 2px 10px;
     border-radius: 999px;
-    background: #dcfce7;
-    color: #15803d;
-    border: 1px solid #86efac;
+    background: var(--sui-color-success-bg, #dcfce7);
+    color: var(--sui-color-success, #15803d);
+    border: 1px solid var(--sui-color-success-border, #86efac);
     font-size: 11px;
     font-weight: 600;
     line-height: 1.6;
@@ -459,11 +463,11 @@ body {
     padding: 12px 14px;
     border: 1px solid;
 }
-.llm-test-result--ok  { background: #f0fdf4; border-color: #bbf7d0; }
-.llm-test-result--err { background: #fef2f2; border-color: #fecaca; }
+.llm-test-result--ok  { background: var(--sui-color-success-bg, #f0fdf4); border-color: var(--sui-color-success-border, #bbf7d0); }
+.llm-test-result--err { background: var(--sui-color-danger-bg, #fef2f2); border-color: var(--sui-color-danger-bg-hover, var(--sui-color-danger-bg-hover)); }
 .llm-test-meta {
     font-size: 12px;
-    color: #475569;
+    color: var(--sui-color-text-body);
     margin-bottom: 6px;
     font-family: var(--sui-font-mono);
 }
@@ -473,9 +477,9 @@ body {
     font-family: var(--sui-font-mono);
     font-size: 13px;
     line-height: 1.5;
-    color: #0f172a;
+    color: var(--sui-color-text);
 }
-.llm-test-result--err .llm-test-body { color: #991b1b; }
+.llm-test-result--err .llm-test-body { color: var(--sui-color-danger); }
 
 /* ── Tool catalog ──────────────────────────────────────────────────────────
    The collapsed summary line is the primary reading surface here — the

@@ -43,6 +43,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **Clody, a warm theme for the admin UI and the chat.** The admin app now
+  ships a second look: bone-and-clay neutrals instead of the cool slate scale,
+  a light header band, flat surfaces (no card shadows, no hover elevation),
+  16px type at a reading line-height, and a single accent colour that every
+  tint derives from. It is an overlay on the framework stylesheet, switched on
+  by the `sui-theme-clody` class on `<html>` in `index.html` — remove the class
+  and the app renders exactly as before. Change the three
+  `--sui-color-primary*` values in `css/clody.css` to move the whole app onto
+  another accent.
+
 - **A chat that needs no agent.** A session can now carry its own agent:
   either a reference to one from the registry, or an inline one that lives
   only in that session — a model, a set of tools, and nothing in the

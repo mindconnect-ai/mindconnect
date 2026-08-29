@@ -1,0 +1,473 @@
+/*
+ * Clody — a warm, quiet theme for semantic-ui.
+ *
+ * Loaded after sui.css and scoped to :root.sui-theme-clody, so it is an
+ * overlay, not a fork: every rule below either sets a framework variable or
+ * turns off one specific piece of the default sheet's surface language.
+ * Remove the class from <html> and the app is back to stock, byte for byte.
+ *
+ * (sui-sbb.css takes the other route — a standalone sheet that replaces
+ * sui.css. That is the right shape for a design system with its own opinion
+ * about every control. Clody only disagrees about colour, depth and rhythm,
+ * and an overlay says exactly that much and no more. It also means Clody
+ * keeps working when sui.css gains a component.)
+ *
+ * The three ideas:
+ *
+ *   1. Warm neutrals. The default scale is cool slate, which reads as
+ *      dashboard. The same layout on a bone/clay/ink scale reads as paper.
+ *
+ *   2. No depth. Cards, shadows and hover elevation are how the default
+ *      sheet separates things; Clody separates with space and a hairline.
+ *      Depth is kept for the things that genuinely float — popovers,
+ *      dialogs, toasts.
+ *
+ *   3. One accent. Everything tinted derives from --sui-color-primary.
+ *      Swap those three values and the whole app follows.
+ *
+ * There is deliberately nothing in here that names an admin-app class. The
+ * app's own stylesheet speaks in framework tokens, so a theme only has to
+ * set tokens — if a rule here ever has to reach for .some-app-class, that is
+ * a colour app.css should have taken from the scale in the first place.
+ *
+ * This belongs in mc-semantic-ui next to sui-sbb.css once it settles; it
+ * lives in the admin app for now because that is where it can be iterated
+ * on against a real screen.
+ */
+
+
+/* ══ Tokens ══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-clody {
+    /* Surfaces & text — bone, clay, ink. */
+    --sui-color-bg:            #faf9f6;
+    --sui-color-surface:       #ffffff;
+    --sui-color-surface-alt:   #f2efe9;
+    --sui-color-text:          #1c1b18;
+    --sui-color-text-strong:   #14130f;
+    --sui-color-text-body:     #35322c;
+    --sui-color-text-muted:    #6d6960;
+    --sui-color-text-subtle:   #9b9589;
+    --sui-color-border:        #e7e2d8;
+    --sui-color-border-soft:   #f0ece4;
+    --sui-color-border-strong: #cfc8ba;
+
+    /* The accent. Three values, and everything tinted follows them. */
+    --sui-color-primary:       #b0552e;
+    --sui-color-primary-hover: #91431e;
+    --sui-color-primary-soft:  #f6ece5;
+    --sui-color-on-primary:    #ffffff;
+
+    /* Solid actions stay near-black, but warm rather than blue-black. */
+    --sui-color-action:        #26241f;
+    --sui-color-action-hover:  #3b3831;
+    --sui-color-on-action:     #ffffff;
+
+    /* Semantic colours, re-mixed on the same warm base so a toast or an
+       error field does not arrive from a different palette. Danger is kept
+       clearly redder than the clay accent — the two must never be mistaken
+       for each other. */
+    --sui-color-danger:          #a3231b;
+    --sui-color-danger-bg:       #f8e7e3;
+    --sui-color-danger-bg-hover: #f2d6d0;
+    --sui-color-success:         #4f7a43;
+    --sui-color-success-bg:      #ecf1e5;
+    --sui-color-success-border:  #cfdcc2;
+    --sui-color-warning:         #8f6410;
+    --sui-color-warning-bg:      #f7eeda;
+
+    --sui-color-required:      #a3231b;
+    --sui-color-empty:         #9b9589;
+
+    --sui-color-code-bg:       #2b2925;
+    --sui-color-code-fg:       #e9e5db;
+    --sui-color-blockquote-border: #d8d2c5;
+
+    /* Rounder than the default scale. */
+    --sui-radius-sm:   8px;
+    --sui-radius-md:   12px;
+    --sui-radius-lg:   16px;
+    --sui-radius-pill: 50%;
+
+    /* 16px is the smallest size at which long prose stops reading as tool
+       output; 15px is a dashboard size. */
+    --sui-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
+                       system-ui, Roboto, sans-serif;
+    --sui-font-mono:   ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sui-font-size:   16px;
+
+    /* No card depth. What is left is for things that actually float. */
+    --sui-shadow-sm:      none;
+    --sui-shadow-card:    none;
+    --sui-shadow-pop:     0 2px 8px rgba(28, 27, 24, .06), 0 12px 32px rgba(28, 27, 24, .10);
+    --sui-shadow-popover: 0 2px 8px rgba(28, 27, 24, .08), 0 16px 40px rgba(28, 27, 24, .14);
+    --sui-focus-ring:     0 0 0 3px rgba(176, 85, 46, .16);
+
+    /* A light header band that sits on the page instead of floating over it. */
+    --sui-header-bg:           #faf9f6;
+    --sui-header-fg:           #35322c;
+    --sui-header-brand-fg:     #14130f;
+    --sui-header-nav-fg:       #6d6960;
+    --sui-header-nav-fg-hover: #14130f;
+    --sui-header-nav-bg-hover: #f0ece4;
+    --sui-header-radius:       0;
+    --sui-header-shadow:       none;
+    /* The logos stroke dark and the band is light now, so the invert that
+       makes them readable on the default navy band has to go. */
+    --sui-header-logo-filter:  none;
+
+    color-scheme: light;
+}
+
+
+/* ══ Base ════════════════════════════════════════════════════════════════ */
+
+/* line-height is hard-coded on body in the default sheet rather than being a
+   variable, so it takes a rule. 1.6 is the difference between text you read
+   and text you scan, and every list row and table cell benefits, not just
+   prose. */
+:root.sui-theme-clody body {
+    line-height: 1.6;
+}
+
+:root.sui-theme-clody :is(h1, h2, h3, h4) {
+    letter-spacing: -.011em;
+    color: var(--sui-color-text-strong);
+}
+
+/* The page itself carries the colour; nothing inset into it needs its own. */
+:root.sui-theme-clody .sui-shell,
+:root.sui-theme-clody .sui-shell-body,
+:root.sui-theme-clody .sui-shell-content {
+    background: var(--sui-color-bg);
+}
+
+
+/* ══ Depth ═══════════════════════════════════════════════════════════════
+   The default sheet gives every container a card shadow and lifts it further
+   on hover. Both are turned off here in one place — the shadow through the
+   token, the hover lift through the two rules that hard-code it. What is
+   left is a hairline, and containers that do not move when the mouse crosses
+   them. */
+
+:root.sui-theme-clody :is(.sui-list, .sui-table, .sui-tree):hover {
+    box-shadow: none;
+}
+
+/* Same for the header rule below and the item rules further down: the
+   conversation's own header is styled by the chat module. */
+:root.sui-theme-clody .sui-list.chat-container > .sui-list-header {
+    border-bottom: none;
+}
+
+/* .chat-container is excluded throughout this file: the chat module renders a
+   conversation through UiList and has already decided that it is prose, not a
+   container. A theme that draws a frame around it would be overruling the
+   component that knows better — and would win, because a theme selector
+   carries the :root class and is a step more specific than the module's own
+   rules. Better to say so once, here, than to fight it there. */
+:root.sui-theme-clody :is(.sui-table, .sui-tree, .sui-form, .sui-detail, .sui-menu),
+:root.sui-theme-clody .sui-list:not(.chat-container) {
+    border: 1px solid var(--sui-color-border);
+    box-shadow: none;
+}
+
+/* Panels inside tabs are already frameless in the default sheet; keep them
+   that way rather than giving them the border above. */
+:root.sui-theme-clody .sui-tabs + .sui-panels > .sui-panel > :is(.sui-list, .sui-table, .sui-detail, .sui-form),
+:root.sui-theme-clody .sui-tabs + .sui-panels > .sui-panel > .sui-stack > :is(.sui-list, .sui-table) {
+    border: none;
+}
+
+
+/* ══ Header ══════════════════════════════════════════════════════════════
+   A band, not a floating bar: full width, square, and separated from the
+   page by a hairline instead of by a shadow. */
+
+:root.sui-theme-clody .sui-header {
+    border-bottom: 1px solid var(--sui-color-border);
+}
+
+:root.sui-theme-clody .sui-header-brand {
+    font-weight: 600;
+    letter-spacing: -.01em;
+}
+
+/* The user avatar is the one place the accent appears in the header. */
+:root.sui-theme-clody .sui-header-user .sui-avatar,
+:root.sui-theme-clody .sui-header-avatar {
+    background: var(--sui-color-primary);
+    color: var(--sui-color-on-primary);
+}
+
+
+/* ══ Navigation ══════════════════════════════════════════════════════════
+   The sidebar is a place you look, not a panel you work in: no frame, and
+   the current page marked by a tint rather than by coloured text. Coloured
+   text on a nav item reads as "link you have not visited"; a tint reads as
+   "you are here". */
+
+:root.sui-theme-clody .sui-menu {
+    background: transparent;
+    border: none;
+}
+
+:root.sui-theme-clody .sui-menu-link {
+    border-radius: 10px;
+    font-size: 15px;
+}
+
+:root.sui-theme-clody .sui-menu-item.is-active > .sui-menu-link,
+:root.sui-theme-clody .sui-menu-item.is-active > .sui-menu-group > .sui-menu-link {
+    background: var(--sui-color-primary-soft);
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+}
+
+/* Only the icon carries the accent on the active row. */
+:root.sui-theme-clody .sui-menu-item.is-active > .sui-menu-link .sui-icon {
+    color: var(--sui-color-primary);
+}
+
+
+/* ══ Lists & tables ══════════════════════════════════════════════════════ */
+
+:root.sui-theme-clody :is(.sui-list-header, .sui-table-header) {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-clody :is(.sui-list-header, .sui-table-header) h2 {
+    font-size: 16px;
+    letter-spacing: -.01em;
+}
+
+/* A row label is the row's name, not a link to somewhere else. It stays ink
+   and picks up the accent only under the cursor — which is also where the
+   underline belongs. */
+:root.sui-theme-clody .sui-list:not(.chat-container) .sui-list-item-label {
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+}
+
+:root.sui-theme-clody .sui-list:not(.chat-container) .sui-list-item-label:hover {
+    color: var(--sui-color-primary);
+}
+
+:root.sui-theme-clody .sui-list:not(.chat-container) .sui-list-item {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-clody .sui-list:not(.chat-container) .sui-list-item:hover {
+    background: var(--sui-color-border-soft);
+}
+
+:root.sui-theme-clody :is(.sui-table th, .sui-table-header) {
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+    letter-spacing: .01em;
+}
+
+:root.sui-theme-clody .sui-table tbody tr:hover {
+    background: var(--sui-color-border-soft);
+}
+
+/* Inside a data table a link is the row's identity, not a reference to
+   somewhere else — same reasoning as the list label above. A column of
+   accent-coloured names next to a column of red delete buttons is two
+   warnings where there is only one. */
+:root.sui-theme-clody .sui-table td .sui-link {
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+:root.sui-theme-clody .sui-table td .sui-link:hover {
+    color: var(--sui-color-primary);
+    text-decoration: underline;
+}
+
+
+/* ══ Forms ═══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-clody .sui-field label {
+    color: var(--sui-color-text-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+:root.sui-theme-clody :is(.sui-field input, .sui-field textarea, .sui-field select) {
+    border-color: var(--sui-color-border-strong);
+    border-radius: 10px;
+    background: var(--sui-color-surface);
+}
+
+:root.sui-theme-clody :is(.sui-field input, .sui-field textarea, .sui-field select):focus {
+    border-color: var(--sui-color-primary);
+}
+
+:root.sui-theme-clody :is(.sui-field input, .sui-field textarea)::placeholder {
+    color: var(--sui-color-text-subtle);
+}
+
+
+/* ══ Buttons ═════════════════════════════════════════════════════════════
+   The default sheet draws the secondary button's outline with an inset
+   shadow, which survives --sui-shadow-card being switched off but reads a
+   shade heavier than everything else here. It becomes a real hairline. */
+
+:root.sui-theme-clody .sui-btn {
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+:root.sui-theme-clody .sui-btn--secondary {
+    box-shadow: none;
+    border: 1px solid var(--sui-color-border-strong);
+}
+
+:root.sui-theme-clody .sui-btn--primary {
+    box-shadow: none;
+}
+
+:root.sui-theme-clody .sui-icon-btn {
+    border-radius: 10px;
+}
+
+:root.sui-theme-clody .sui-icon-btn--primary {
+    border-radius: var(--sui-radius-pill);
+}
+
+:root.sui-theme-clody .sui-link {
+    color: var(--sui-color-primary);
+    text-decoration-color: var(--sui-color-border-strong);
+    text-underline-offset: 2px;
+}
+
+:root.sui-theme-clody .sui-link:hover {
+    color: var(--sui-color-primary-hover);
+    text-decoration-color: currentColor;
+}
+
+
+/* ══ Tabs ════════════════════════════════════════════════════════════════
+   The active tab is marked by its own weight and a rule under it, in the
+   accent — the one place a coloured underline is worth the ink. */
+
+:root.sui-theme-clody .sui-tabs {
+    border-bottom-color: var(--sui-color-border);
+    gap: 2px;
+}
+
+:root.sui-theme-clody .sui-tab {
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+:root.sui-theme-clody .sui-tab.active {
+    color: var(--sui-color-text-strong);
+    border-bottom-color: var(--sui-color-primary);
+}
+
+
+/* ══ Things that float ═══════════════════════════════════════════════════
+   Dialogs, popovers and toasts are the exception to rule 2: they sit above
+   the page and have to say so. They keep a shadow — a warm one, and softer
+   than the default's cool drop. */
+
+:root.sui-theme-clody :is(.sui-dialog, .sui-menu-button-popover, .sui-tab-more-menu, .sui-toast) {
+    border: 1px solid var(--sui-color-border);
+    box-shadow: var(--sui-shadow-pop);
+}
+
+:root.sui-theme-clody .sui-dialog {
+    border-radius: 18px;
+}
+
+:root.sui-theme-clody .sui-dialog-backdrop {
+    background: rgba(28, 27, 24, .28);
+    backdrop-filter: blur(2px);
+}
+
+:root.sui-theme-clody .sui-dialog-header {
+    border-bottom-color: var(--sui-color-border-soft);
+}
+
+:root.sui-theme-clody .sui-dialog-title {
+    font-size: 16px;
+    letter-spacing: -.01em;
+}
+
+/* Toasts, on the warm semantic set rather than the stock blue/green/amber. */
+:root.sui-theme-clody .sui-toast--info    { --sui-toast-bg: var(--sui-color-primary-soft); --sui-toast-ring: #e6d3c6; --sui-toast-fg: var(--sui-color-primary-hover); }
+:root.sui-theme-clody .sui-toast--success { --sui-toast-bg: var(--sui-color-success-bg);   --sui-toast-ring: #cfdcc2; --sui-toast-fg: var(--sui-color-success); }
+:root.sui-theme-clody .sui-toast--warn    { --sui-toast-bg: var(--sui-color-warning-bg);   --sui-toast-ring: #e6d3a8; --sui-toast-fg: var(--sui-color-warning); }
+:root.sui-theme-clody .sui-toast--error   { --sui-toast-bg: var(--sui-color-danger-bg);    --sui-toast-ring: #e8c4bc; --sui-toast-fg: var(--sui-color-danger); }
+
+/* The scroll-to-latest button floats over the conversation, so it is the one
+   round thing on the page that keeps a shadow — otherwise it disappears into
+   whatever it happens to be sitting on. */
+:root.sui-theme-clody .sui-scroll-latest {
+    background: var(--sui-color-surface);
+    border: 1px solid var(--sui-color-border);
+    box-shadow: var(--sui-shadow-pop);
+    color: var(--sui-color-text-body);
+}
+
+
+/* ══ Progress & badges ═══════════════════════════════════════════════════ */
+
+:root.sui-theme-clody .sui-progress-track {
+    background: var(--sui-color-border-soft);
+}
+
+:root.sui-theme-clody .sui-progress-fill {
+    background: var(--sui-color-primary);
+}
+
+:root.sui-theme-clody .sui-menu-button-item-badge,
+:root.sui-theme-clody .sui-menu-badge {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-muted);
+    font-weight: 400;
+}
+
+
+/* ══ Prose & code ════════════════════════════════════════════════════════
+   `.sui-list ul { list-style: none }` is meant for the list's own rows, but
+   markdown lists nest inside a list too — which is why bullets go missing in
+   any markdown rendered into a list. The framework fix is to scope that rule
+   to the list's own `> ul`; until then the markers are put back here, for
+   every markdown block rather than only the chat's. */
+
+:root.sui-theme-clody .sui-markdown ul { list-style: disc;    padding-inline-start: 1.35em; }
+:root.sui-theme-clody .sui-markdown ol { list-style: decimal; padding-inline-start: 1.35em; }
+:root.sui-theme-clody .sui-markdown li { margin-block: .25em; }
+:root.sui-theme-clody .sui-markdown li::marker { color: var(--sui-color-text-subtle); }
+
+:root.sui-theme-clody .sui-markdown :not(pre) > code {
+    background: var(--sui-color-surface-alt);
+    border: none;
+    border-radius: 5px;
+    padding: .1em .35em;
+    font-size: .9em;
+}
+
+:root.sui-theme-clody .sui-markdown pre {
+    border-radius: var(--sui-radius-md);
+    padding: 1rem 1.1rem;
+    font-size: .875em;
+    line-height: 1.6;
+}
+
+:root.sui-theme-clody .sui-markdown blockquote {
+    color: var(--sui-color-text-muted);
+}
+
+
+/* The chat's own tint. It defaults to surface-alt, which on this palette is
+   a hair away from the page the conversation sits on — so the theme names a
+   shade deeper. This is the whole contract between a theme and the chat
+   module: one variable. */
+:root.sui-theme-clody #chat-app-shell {
+    --chat-user-bubble: #eee9df;
+}
