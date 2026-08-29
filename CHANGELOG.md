@@ -43,6 +43,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **Sorbet, a pastel light theme.** The first look that uses more than one
+  colour on purpose: a lilac ground, a mint badge, a peach warning and a rose
+  error can share a screen because none of them is saturated. It is also the
+  only one here that keeps its shadows — plum-tinted, not grey — since a
+  hairline on a tinted page reads as a scratch. The tints stay in the
+  backgrounds and the type is a deep plum-ink: every text-on-background pair
+  clears WCAG AA for body text, the worst at 4.62.
+
 - **Two dark looks.** *Dark* is the framework's own `sui-dark.css`, now
   linked and offered in the picker rather than reinvented. *Amethyst* is new:
   violet on a violet-cast dark ground, where the colour is the theme's

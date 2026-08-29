@@ -23,6 +23,7 @@
     const THEMES = [
         { id: "clody",    label: "Clody",    hint: "Warm, one plane" },
         { id: "gipiti",   label: "Gipiti",   hint: "Neutral, two planes" },
+        { id: "sorbet",   label: "Sorbet",   hint: "Pastels, light" },
         { id: "dark",     label: "Dark",     hint: "The framework's own dark" },
         { id: "amethyst", label: "Amethyst", hint: "Violet on a dark ground" },
         { id: "default",  label: "Default",  hint: "The framework's own" },

@@ -1,0 +1,386 @@
+/*
+ * Sorbet — pastels, light.
+ *
+ * The fifth look, and the first that uses more than one colour on purpose.
+ * Clody has a clay accent and Gipiti has none; both spend their colour
+ * pointing at things. Sorbet treats colour as a coding system: a lilac
+ * ground, a mint badge, a peach warning and a rose error can all be on one
+ * screen without any of them shouting, because none of them is saturated.
+ *
+ * Its three ideas:
+ *
+ *   1. Many pastels, not one accent. Every status has its own hue and every
+ *      hue is in the same low-saturation family, so the screen reads as one
+ *      palette rather than as a neutral page with a coloured button on it.
+ *
+ *   2. Depth by soft tinted shadow. Clody separates with a hairline and
+ *      Gipiti with a plane; this one lifts its containers off the page with
+ *      a shadow that carries the ground's hue instead of being grey. It is
+ *      the only theme here with visible depth, and pastel is why: a hairline
+ *      on a tinted page reads as a scratch.
+ *
+ *   3. Pastel fills, never pastel text. This is the rule that makes the
+ *      difference between a pastel theme and an unreadable one — the tints
+ *      go in the backgrounds and the type stays a deep plum-ink. Every
+ *      text-on-background pair below clears WCAG AA for body text; the
+ *      numbers are in the commit that added this.
+ *
+ * Same mechanism as the others: an overlay on sui.css, one class on <html>,
+ * naming no admin-app class. The type scale is the 16px the other themes
+ * here use — a theme decides how the app looks, not how big its text is.
+ */
+
+
+/* ══ Tokens ══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet {
+    /* The ground is tinted, not white. A pastel palette on a pure white page
+       looks like decoration applied to something else; on a page that is
+       itself faintly coloured it looks like one material. */
+    --sui-color-bg:            #faf7fd;
+    --sui-color-surface:       #ffffff;
+    --sui-color-surface-alt:   #f3edfa;
+
+    /* Deep plum-ink rather than black: it belongs to the palette's hue
+       family, and it is dark enough that none of the tints below can drag it
+       under the contrast line. */
+    --sui-color-text:          #2b2340;
+    --sui-color-text-strong:   #1d1730;
+    --sui-color-text-body:     #443a5e;
+    --sui-color-text-muted:    #675c85;
+    --sui-color-text-subtle:   #797092;
+    --sui-color-border:        #eae2f5;
+    --sui-color-border-soft:   #f4eefb;
+    --sui-color-border-strong: #d6cae8;
+
+    /* The accent comes in two strengths, and the split is the whole trick:
+       `primary` is a mid-tone that can carry text, `primary-soft` is the
+       pastel it fills with. A pastel used as text would fail every contrast
+       check there is. */
+    --sui-color-primary:       #7a56ad;
+    --sui-color-primary-hover: #63428f;
+    --sui-color-primary-soft:  #efe6fa;
+    --sui-color-on-primary:    #ffffff;
+
+    /* Solid actions are a deep plum, not near-black — a black button on a
+       tinted page is a hole in it. */
+    --sui-color-action:        #3d3159;
+    --sui-color-action-hover:  #4e4070;
+    --sui-color-on-action:     #ffffff;
+
+    /* Each status gets its own hue, each in the same register: a pastel fill
+       and a mid-tone of the same colour for the text on it. */
+    --sui-color-danger:          #b03a5b;
+    --sui-color-danger-bg:       #fceaf0;
+    --sui-color-danger-bg-hover: #f8d9e4;
+    --sui-color-danger-border:   #f2c4d4;
+    --sui-color-success:         #2b795f;
+    --sui-color-success-bg:      #e6f5ef;
+    --sui-color-success-border:  #c2e6d8;
+    --sui-color-warning:         #976128;
+    --sui-color-warning-bg:      #fdf0e4;
+    --sui-color-warning-border:  #f5dcc2;
+
+    --sui-color-required:      #b03a5b;
+    --sui-color-empty:         #797092;
+
+    /* The code slab keeps a plum cast so it belongs to the page rather than
+       arriving from a different theme. */
+    --sui-color-code-bg:       #322950;
+    --sui-color-code-fg:       #ece7f5;
+    --sui-color-blockquote-border: #d6cae8;
+
+    /* Rounder than Clody. Pastel and sharp corners argue with each other. */
+    --sui-radius-sm:   10px;
+    --sui-radius-md:   14px;
+    --sui-radius-lg:   20px;
+    --sui-radius-pill: 999px;
+
+    --sui-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
+                       system-ui, Roboto, sans-serif;
+    --sui-font-mono:   ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sui-font-size:   16px;
+
+    /* The one theme here that keeps its shadows — and they are plum, not
+       grey. A neutral shadow on a tinted page reads as dirt. */
+    --sui-shadow-sm:      0 1px 2px rgba(61, 49, 89, .05);
+    --sui-shadow-card:    0 1px 2px rgba(61, 49, 89, .04), 0 6px 18px rgba(61, 49, 89, .07);
+    --sui-shadow-pop:     0 2px 8px rgba(61, 49, 89, .08), 0 16px 40px rgba(61, 49, 89, .14);
+    --sui-shadow-popover: 0 2px 8px rgba(61, 49, 89, .10), 0 20px 48px rgba(61, 49, 89, .18);
+    --sui-focus-ring:     0 0 0 3px rgba(122, 86, 173, .20);
+
+    --sui-header-bg:           #faf7fd;
+    --sui-header-fg:           #443a5e;
+    --sui-header-brand-fg:     #1d1730;
+    --sui-header-nav-fg:       #675c85;
+    --sui-header-nav-fg-hover: #1d1730;
+    --sui-header-nav-bg-hover: #f3edfa;
+    --sui-header-radius:       0;
+    --sui-header-shadow:       none;
+    --sui-header-logo-filter:  none;
+
+    color-scheme: light;
+}
+
+
+/* ══ Base ════════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet body {
+    line-height: 1.6;
+}
+
+:root.sui-theme-sorbet :is(h1, h2, h3, h4) {
+    letter-spacing: -.011em;
+    color: var(--sui-color-text-strong);
+}
+
+:root.sui-theme-sorbet .sui-shell,
+:root.sui-theme-sorbet .sui-shell-body,
+:root.sui-theme-sorbet .sui-shell-content {
+    background: var(--sui-color-bg);
+}
+
+
+/* ══ Depth ═══════════════════════════════════════════════════════════════
+   The others switch the card shadow off; this one keeps it and drops the
+   border instead. The tokens above already made it plum, so nothing here
+   does more than say which of the two mechanisms is in charge.
+
+   The hover elevation stays off, though: a container that rises whenever the
+   mouse crosses it is restless whatever colour it is. The chat's list and
+   composer are excluded — a theme selector carries the :root class and
+   outranks the module's own rules. */
+
+:root.sui-theme-sorbet :is(.sui-list, .sui-table, .sui-tree):hover {
+    box-shadow: var(--sui-shadow-card);
+}
+
+:root.sui-theme-sorbet :is(.sui-table, .sui-tree, .sui-detail, .sui-menu),
+:root.sui-theme-sorbet .sui-form:not(.chat-form),
+:root.sui-theme-sorbet .sui-list:not(.chat-container) {
+    border: none;
+    box-shadow: var(--sui-shadow-card);
+}
+
+:root.sui-theme-sorbet .sui-tabs + .sui-panels > .sui-panel > :is(.sui-list, .sui-table, .sui-detail, .sui-form),
+:root.sui-theme-sorbet .sui-tabs + .sui-panels > .sui-panel > .sui-stack > :is(.sui-list, .sui-table) {
+    box-shadow: none;
+}
+
+:root.sui-theme-sorbet .sui-list.chat-container > .sui-list-header {
+    border-bottom: none;
+}
+
+
+/* ══ Header & navigation ═════════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet .sui-header {
+    border-bottom: 1px solid var(--sui-color-border);
+}
+
+:root.sui-theme-sorbet .sui-header-user .sui-avatar,
+:root.sui-theme-sorbet .sui-header-avatar {
+    background: var(--sui-color-primary);
+    color: var(--sui-color-on-primary);
+}
+
+/* The sidebar has no card of its own — it would be a second lifted surface
+   next to the content's, and two competing lifts is where soft shadows start
+   to look like fog. */
+:root.sui-theme-sorbet .sui-menu {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+}
+
+:root.sui-theme-sorbet .sui-menu-link {
+    border-radius: 12px;
+}
+
+:root.sui-theme-sorbet .sui-menu-item.is-active > .sui-menu-link,
+:root.sui-theme-sorbet .sui-menu-item.is-active > .sui-menu-group > .sui-menu-link {
+    background: var(--sui-color-primary-soft);
+    color: var(--sui-color-primary);
+    font-weight: 500;
+}
+
+
+/* ══ Lists & tables ══════════════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet :is(.sui-list-header, .sui-table-header) {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-sorbet .sui-list:not(.chat-container) .sui-list-item-label,
+:root.sui-theme-sorbet .sui-table td .sui-link {
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+:root.sui-theme-sorbet .sui-list:not(.chat-container) .sui-list-item-label:hover,
+:root.sui-theme-sorbet .sui-table td .sui-link:hover {
+    color: var(--sui-color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+:root.sui-theme-sorbet .sui-list:not(.chat-container) .sui-list-item {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-sorbet .sui-list:not(.chat-container) .sui-list-item:hover,
+:root.sui-theme-sorbet .sui-table tbody tr:hover {
+    background: var(--sui-color-border-soft);
+}
+
+:root.sui-theme-sorbet .sui-table .column-header-background,
+:root.sui-theme-sorbet .sui-table th {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+
+/* ══ Forms & buttons ═════════════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet .sui-field label {
+    color: var(--sui-color-text-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+:root.sui-theme-sorbet :is(.sui-field input, .sui-field textarea, .sui-field select) {
+    background: var(--sui-color-surface);
+    border-color: var(--sui-color-border-strong);
+    border-radius: 12px;
+}
+
+:root.sui-theme-sorbet :is(.sui-field input, .sui-field textarea, .sui-field select):focus {
+    border-color: var(--sui-color-primary);
+}
+
+:root.sui-theme-sorbet .sui-btn {
+    border-radius: var(--sui-radius-pill);
+    font-weight: 500;
+}
+
+:root.sui-theme-sorbet .sui-btn--secondary {
+    box-shadow: none;
+    border: 1px solid var(--sui-color-border-strong);
+    background: var(--sui-color-surface);
+}
+
+:root.sui-theme-sorbet .sui-btn--secondary:hover:not(:disabled) {
+    background: var(--sui-color-surface-alt);
+}
+
+:root.sui-theme-sorbet .sui-icon-btn {
+    border-radius: var(--sui-radius-pill);
+}
+
+:root.sui-theme-sorbet .sui-link {
+    color: var(--sui-color-primary);
+    text-decoration-color: var(--sui-color-border-strong);
+    text-underline-offset: 2px;
+}
+
+:root.sui-theme-sorbet .sui-link:hover {
+    color: var(--sui-color-primary-hover);
+    text-decoration-color: currentColor;
+}
+
+
+/* ══ Tabs & things that float ════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet .sui-tabs {
+    border-bottom-color: var(--sui-color-border);
+}
+
+:root.sui-theme-sorbet .sui-tab {
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+:root.sui-theme-sorbet .sui-tab.active {
+    color: var(--sui-color-text-strong);
+    border-bottom-color: var(--sui-color-primary);
+}
+
+:root.sui-theme-sorbet :is(.sui-dialog, .sui-menu-button-popover, .sui-tab-more-menu, .sui-toast) {
+    border: none;
+    box-shadow: var(--sui-shadow-pop);
+}
+
+:root.sui-theme-sorbet .sui-dialog {
+    border-radius: var(--sui-radius-lg);
+}
+
+:root.sui-theme-sorbet .sui-dialog-backdrop {
+    background: rgba(45, 36, 68, .32);
+}
+
+/* Four hues, one register — this is the theme's argument in four lines. */
+:root.sui-theme-sorbet .sui-toast--info    { --sui-toast-bg: var(--sui-color-primary-soft); --sui-toast-ring: #ddcaf2; --sui-toast-fg: var(--sui-color-primary); }
+:root.sui-theme-sorbet .sui-toast--success { --sui-toast-bg: var(--sui-color-success-bg);   --sui-toast-ring: var(--sui-color-success-border); --sui-toast-fg: var(--sui-color-success); }
+:root.sui-theme-sorbet .sui-toast--warn    { --sui-toast-bg: var(--sui-color-warning-bg);   --sui-toast-ring: var(--sui-color-warning-border); --sui-toast-fg: var(--sui-color-warning); }
+:root.sui-theme-sorbet .sui-toast--error   { --sui-toast-bg: var(--sui-color-danger-bg);    --sui-toast-ring: var(--sui-color-danger-border); --sui-toast-fg: var(--sui-color-danger); }
+
+:root.sui-theme-sorbet .sui-scroll-latest {
+    background: var(--sui-color-surface);
+    border: none;
+    box-shadow: var(--sui-shadow-pop);
+    color: var(--sui-color-text-body);
+}
+
+
+/* ══ Progress & badges ═══════════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet .sui-progress-track {
+    background: var(--sui-color-surface-alt);
+}
+
+:root.sui-theme-sorbet .sui-progress-fill {
+    background: var(--sui-color-primary);
+}
+
+:root.sui-theme-sorbet .sui-menu-button-item-badge,
+:root.sui-theme-sorbet .sui-menu-badge {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-muted);
+    font-weight: 400;
+}
+
+
+/* ══ Prose & code ════════════════════════════════════════════════════════
+   The same framework bug the other themes patch: `.sui-list ul { list-style:
+   none }` is meant for the list's own rows, and markdown nests inside a list
+   too. One line in sui.css would retire all four copies by now. */
+
+:root.sui-theme-sorbet .sui-markdown ul { list-style: disc;    padding-inline-start: 1.35em; }
+:root.sui-theme-sorbet .sui-markdown ol { list-style: decimal; padding-inline-start: 1.35em; }
+:root.sui-theme-sorbet .sui-markdown li { margin-block: .25em; }
+:root.sui-theme-sorbet .sui-markdown li::marker { color: var(--sui-color-text-subtle); }
+
+:root.sui-theme-sorbet .sui-markdown :not(pre) > code {
+    background: var(--sui-color-primary-soft);
+    color: var(--sui-color-primary);
+    border: none;
+    border-radius: 6px;
+    padding: .1em .35em;
+    font-size: .9em;
+}
+
+:root.sui-theme-sorbet .sui-markdown pre {
+    border-radius: var(--sui-radius-md);
+    padding: 1rem 1.1rem;
+    font-size: .875em;
+    line-height: 1.6;
+}
+
+
+/* ══ The chat ════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-sorbet #chat-app-shell {
+    --chat-user-bubble: var(--sui-color-primary-soft);
+}
