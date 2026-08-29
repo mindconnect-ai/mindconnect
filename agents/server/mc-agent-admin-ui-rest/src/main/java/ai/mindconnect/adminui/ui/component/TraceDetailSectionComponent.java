@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.LlmCallTrace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.MAPPER;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 
 /**
  * Detail-pane of the trace inspector — a stack of {@link

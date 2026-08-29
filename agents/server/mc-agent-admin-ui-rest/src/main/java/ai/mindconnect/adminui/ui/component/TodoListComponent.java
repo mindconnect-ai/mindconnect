@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.tools.todo.TodoItem;
 import ai.mindconnect.agent.tools.todo.TodoList;
 import ai.mindconnect.ui.model.UiList;

@@ -1,0 +1,93 @@
+/*
+ * Compact — the framework's own look, at close range.
+ *
+ * The odd one out. The other themes change what the app looks like and leave
+ * its proportions alone; this one changes nothing but the proportions. Not a
+ * single colour appears below. What it does is take the space out: smaller
+ * type, tighter rows, less padding everywhere, so more fits on a screen and
+ * the eye travels less between related things.
+ *
+ * This file used to be 190 lines. It had to name every component one by one
+ * — list row, table cell, field, button, menu link, dialog, toast — because
+ * sui.css wrote its padding as literals and there was nothing to override
+ * but the rules themselves. Since the framework put its spacing on a scale,
+ * a density theme is what it should always have been: the same scale, one
+ * step down. What is left below the token block is only the handful of
+ * sizes that are deliberately not spacing.
+ *
+ * The steps keep their proportions to each other rather than each being
+ * chosen again — this is the framework's rhythm at about three quarters,
+ * not a new one.
+ */
+
+:root.sui-theme-compact {
+    --sui-space-hair: 2px;
+    --sui-space-xs:   3px;
+    --sui-space-sm:   6px;
+    --sui-space-md:   8px;
+    --sui-space-lg:   12px;
+    --sui-space-xl:   14px;
+    --sui-space-2xl:  18px;
+    --sui-space-3xl:  24px;
+
+    /* One step down, and the leading with it. This is the only theme here
+       that moves the size — the others agree on 16px precisely so switching
+       between them does not resize the screen you were reading. Compact is
+       the exception that says what it is in its name. */
+    --sui-font-size: 14px;
+    --sui-text-xs:  11px;
+    --sui-text-sm:  12px;
+    --sui-text-md:  13px;
+    --sui-text-lg:  14px;
+    --sui-text-xl:  15px;
+    --sui-text-2xl: 19px;
+
+    /* Corners come down with the spacing: a tight row inside a 12px radius
+       reads as a rounded box that someone squeezed. */
+    --sui-radius-sm: 5px;
+    --sui-radius-md: 7px;
+    --sui-radius-lg: 9px;
+}
+
+:root.sui-theme-compact body {
+    line-height: 1.45;
+}
+
+
+/* ── What the scale does not reach ────────────────────────────────────────
+   Three sizes that are not spacing, and so were deliberately left as
+   literals in sui.css. They have to be named here, and this short list is
+   the honest measure of how far the tokens got: everything else above is
+   the scale doing the work. */
+
+/* A control's height is a hit target, not a rhythm. 30px keeps it above the
+   point where a dense toolbar becomes a game of accuracy. */
+:root.sui-theme-compact .sui-icon-btn {
+    min-width: 30px;
+    height: 30px;
+}
+
+/* A textarea's minimum is about how much text you want to see at once. */
+:root.sui-theme-compact .sui-field textarea {
+    min-height: 72px;
+}
+
+/* The inset that keeps a leading icon clear of the text is measured from the
+   icon's own position, so it does not scale with the padding around it. */
+:root.sui-theme-compact .sui-input-icon > :is(input, select),
+:root.sui-theme-compact .sui-input-icon > .sui-input-reveal > input {
+    padding-left: 30px;
+}
+
+
+/* ── The chat ────────────────────────────────────────────────────────────
+   Through the two variables the chat module offers, rather than by reaching
+   into its rules: turns sit closer together, and the column narrows a little
+   because a shorter line suits a smaller face. The measure stays wide enough
+   to read — density is about the space between things, not about cramming
+   the prose. */
+
+:root.sui-theme-compact #chat-app-shell {
+    --chat-turn-gap: .9rem;
+    --chat-measure: 44rem;
+}

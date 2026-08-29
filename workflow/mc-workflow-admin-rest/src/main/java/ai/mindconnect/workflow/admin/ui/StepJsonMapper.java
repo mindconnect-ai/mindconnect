@@ -21,6 +21,26 @@ public final class StepJsonMapper {
 
     private StepJsonMapper() {}
 
+    /**
+     * The step's properties as an ordered map — what the details dialog walks
+     * to show every populated field without a per-type view. Children and the
+     * {@code @class} discriminator are in the map too; the caller skips what
+     * it renders elsewhere.
+     */
+    public static java.util.Map<String, Object> toMap(StepData step) {
+        return MAPPER.convertValue(step,
+                new com.fasterxml.jackson.core.type.TypeReference<java.util.LinkedHashMap<String, Object>>() {});
+    }
+
+    /** Pretty-printed JSON for a single property value (a map or list). */
+    public static String prettyValue(Object value) {
+        try {
+            return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(value);
+        } catch (JsonProcessingException ex) {
+            return String.valueOf(value);
+        }
+    }
+
     /** Pretty-printed JSON for {@code step}, including its children. */
     public static String toJson(StepData step) {
         try {

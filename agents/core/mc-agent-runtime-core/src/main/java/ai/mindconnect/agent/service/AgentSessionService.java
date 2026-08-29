@@ -108,6 +108,55 @@ public class AgentSessionService {
         return sessionRepository.save(session);
     }
 
+    /**
+     * Opens a chat for a session agent — either an inline one the user
+     * assembled from a model and some tools, or a reference to a registry
+     * agent with this chat's overrides.
+     *
+     * <p>{@code agentDefinitionId} is set to the session agent's id either
+     * way, so the workspace scope, the message attribution and the
+     * conversation participant keep working unchanged. For an inline agent
+     * that id resolves to nothing in the registry — which is the point: the
+     * chat is not findable under any agent, because it belongs to none.
+     */
+    public AgentSession openChat(ai.mindconnect.agent.domain.session.SessionAgent agent,
+                                 Namespace namespace, String userId) {
+        List<Participant> participants = List.of(
+                Participant.user(UUID.randomUUID(), userId, userId),
+                Participant.agent(UUID.randomUUID(), agent.id().toString(), agent.label())
+        );
+        var conversation = conversationManager.createConversation(
+                namespace, "Chat with " + agent.label(), ConversationType.USER_AGENT, participants);
+
+        AgentSession session = AgentSession
+                .start(agent.id(), namespace, userId, conversation.id())
+                .withSessionAgents(List.of(agent));
+        return sessionRepository.save(session);
+    }
+
+    /**
+     * Swaps the agent a session runs — the model-and-tools dialog, or
+     * attaching the chat to a registry agent.
+     *
+     * <p>{@code agentDefinitionId} moves with the agent. It is the id the
+     * session is listed under and the key its workspace is filed by, and both
+     * should describe the agent the chat actually runs — a chat detached from
+     * "Poet" has no business still appearing under {@code ?agentId=Poet}.
+     * The messages written so far keep the old id, which is right: they were
+     * said by that agent. What the new agent does not inherit is the previous
+     * one's workspace — a different agent, a different memory.
+     */
+    public AgentSession replaceSessionAgent(UUID sessionId,
+                                            ai.mindconnect.agent.domain.session.SessionAgent agent) {
+        AgentSession session = findSession(sessionId);
+        AgentSession moved = new AgentSession(session.id(), agent.id(), session.namespace(),
+                session.userId(), session.conversationId(), session.title(), session.status(),
+                session.startedAt(), session.completedAt(), session.parentSessionId(),
+                session.parentTurnId(), session.parentToolCallId(), session.activatedTools(),
+                session.attachedFiles(), session.approvedTools(), List.of(agent));
+        return sessionRepository.save(moved);
+    }
+
     public List<AgentSession> listSessions(UUID agentDefinitionId, Namespace namespace, String userId) {
         return sessionRepository.findByAgentDefinitionId(agentDefinitionId, namespace, userId);
     }

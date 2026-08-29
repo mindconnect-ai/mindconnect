@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
@@ -55,14 +55,14 @@ public final class SessionTableComponent implements UiComponent {
 
         var table = UiTable.of(id(), "Sessions")
                 .action(UiAction.primary("new-session", "New Session").icon("add")
-                        .dispatch("POST", "/admin/api/agents/" + agent.id() + "/sessions"))
+                        .dispatch("POST", "/chat/api/agents/" + agent.id() + "/sessions"))
                 .column(UiTable.Column.text("title", "Title").asSortable())
                 .column(UiTable.Column.text("status", "Status"))
                 .column(UiTable.Column.text("userId", "User"))
                 .column(UiTable.Column.date("startedAt", "Started").asSortable())
                 .column(UiTable.Column.date("completedAt", "Completed"))
                 .rowAction(UiAction.secondary("open", "Open").icon("show")
-                        .dispatch("GET", "/admin/api/sessions/{id}"))
+                        .dispatch("GET", "/chat/api/sessions/{id}"))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this session?")
                         .dispatch("DELETE", "/admin/api/agents/" + agent.id() + "/sessions/{id}"));

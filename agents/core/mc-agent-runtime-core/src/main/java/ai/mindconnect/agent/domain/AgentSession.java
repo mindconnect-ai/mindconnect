@@ -64,12 +64,34 @@ public record AgentSession(
          * show and revoke it. The APPROVAL_RESPONSE message still records the
          * decision moment for audit. Per tool name, never per parameter set.
          */
-        java.util.Set<String> approvedTools
+        java.util.Set<String> approvedTools,
+        /**
+         * The agents this session runs, exactly one of them {@code main}.
+         * Empty for every session written before session agents existed —
+         * then {@link #agentDefinitionId} alone decides, as it always did.
+         *
+         * <p>A list because a session will eventually host several agents
+         * talking to each other; today anything but one entry is a bug.
+         */
+        java.util.List<ai.mindconnect.agent.domain.session.SessionAgent> sessionAgents
 ) {
     public AgentSession {
         if (activatedTools == null) activatedTools = java.util.List.of();
         if (attachedFiles == null) attachedFiles = java.util.List.of();
         if (approvedTools == null) approvedTools = java.util.Set.of();
+        if (sessionAgents == null) sessionAgents = java.util.List.of();
+        // "Exactly one main" is the invariant the whole resolution path rests
+        // on: without a main agent, mainAgent() is empty and the runtime falls
+        // back to agentDefinitionId — which for an inline agent resolves to
+        // nothing, so every turn would fail with a confusing notFound.
+        if (!sessionAgents.isEmpty()) {
+            long mains = sessionAgents.stream()
+                    .filter(ai.mindconnect.agent.domain.session.SessionAgent::main).count();
+            if (mains != 1) {
+                throw new IllegalArgumentException(
+                        "A session needs exactly one main agent, found " + mains);
+            }
+        }
     }
 
     /** Pre-activatedTools constructor: nothing activated. */
@@ -79,7 +101,7 @@ public record AgentSession(
                         UUID parentTurnId, String parentToolCallId) {
         this(id, agentDefinitionId, namespace, userId, conversationId, title, status,
                 startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
-                java.util.List.of(), java.util.List.of(), java.util.Set.of());
+                java.util.List.of(), java.util.List.of(), java.util.Set.of(), java.util.List.of());
     }
 
     /** Pre-approvedTools constructor: nothing approved yet. */
@@ -90,7 +112,7 @@ public record AgentSession(
                         java.util.List<String> activatedTools, java.util.List<String> attachedFiles) {
         this(id, agentDefinitionId, namespace, userId, conversationId, title, status,
                 startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
-                activatedTools, attachedFiles, java.util.Set.of());
+                activatedTools, attachedFiles, java.util.Set.of(), java.util.List.of());
     }
 
     /** This session plus one tool approved for the rest of it. */
@@ -99,7 +121,7 @@ public record AgentSession(
         merged.add(toolName);
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, attachedFiles, java.util.Set.copyOf(merged));
+                parentToolCallId, activatedTools, attachedFiles, java.util.Set.copyOf(merged), sessionAgents);
     }
 
     /** This session plus one activated tool (no-op if already active). */
@@ -108,7 +130,7 @@ public record AgentSession(
         merged.addAll(names);
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, java.util.List.copyOf(merged), attachedFiles, approvedTools);
+                parentToolCallId, java.util.List.copyOf(merged), attachedFiles, approvedTools, sessionAgents);
     }
 
     /** This session plus attached file names (deduplicated, order kept). */
@@ -117,7 +139,7 @@ public record AgentSession(
         merged.addAll(names);
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, java.util.List.copyOf(merged), approvedTools);
+                parentToolCallId, activatedTools, java.util.List.copyOf(merged), approvedTools, sessionAgents);
     }
 
     /** This session without the given attached file name. */
@@ -125,7 +147,7 @@ public record AgentSession(
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, activatedTools,
-                attachedFiles.stream().filter(f -> !f.equals(name)).toList(), approvedTools);
+                attachedFiles.stream().filter(f -> !f.equals(name)).toList(), approvedTools, sessionAgents);
     }
 
     /** Jackson deserialisation — unknown legacy fields (compressionWatermark, lastCompressedAt) are silently ignored. */
@@ -145,10 +167,30 @@ public record AgentSession(
             @JsonProperty("parentToolCallId")  String parentToolCallId,
             @JsonProperty("activatedTools")    java.util.List<String> activatedTools,
             @JsonProperty("attachedFiles")     java.util.List<String> attachedFiles,
-            @JsonProperty("approvedTools")     java.util.Set<String> approvedTools) {
+            @JsonProperty("approvedTools")     java.util.Set<String> approvedTools,
+            @JsonProperty("sessionAgents")     java.util.List<ai.mindconnect.agent.domain.session.SessionAgent> sessionAgents) {
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, attachedFiles, approvedTools);
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
+    }
+
+    /**
+     * The agent that drives the turn, or empty for a session written before
+     * session agents existed (then {@link #agentDefinitionId} is the whole
+     * story, exactly as before).
+     */
+    public java.util.Optional<ai.mindconnect.agent.domain.session.SessionAgent> mainAgent() {
+        return sessionAgents.stream()
+                .filter(ai.mindconnect.agent.domain.session.SessionAgent::main)
+                .findFirst();
+    }
+
+    /** This session with its agents replaced. */
+    public AgentSession withSessionAgents(
+            java.util.List<ai.mindconnect.agent.domain.session.SessionAgent> agents) {
+        return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
+                title, status, startedAt, completedAt, parentSessionId, parentTurnId,
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, agents);
     }
 
     /** Top-level session — no parent linkage. */
@@ -176,18 +218,18 @@ public record AgentSession(
     public AgentSession withTitle(String title) {
         return new AgentSession(id, agentDefinitionId, namespace, userId,
                 conversationId, title, status, startedAt, completedAt,
-                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools);
+                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
     }
 
     public AgentSession complete() {
         return new AgentSession(id, agentDefinitionId, namespace, userId,
                 conversationId, title, SessionStatus.COMPLETED, startedAt, Instant.now(),
-                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools);
+                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
     }
 
     public AgentSession error() {
         return new AgentSession(id, agentDefinitionId, namespace, userId,
                 conversationId, title, SessionStatus.ERROR, startedAt, Instant.now(),
-                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools);
+                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
     }
 }

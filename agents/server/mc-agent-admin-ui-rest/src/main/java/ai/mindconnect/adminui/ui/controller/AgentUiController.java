@@ -19,6 +19,7 @@ import ai.mindconnect.agent.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.service.AgentRegistryService;
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;

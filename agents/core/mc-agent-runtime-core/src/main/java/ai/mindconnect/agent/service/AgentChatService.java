@@ -119,9 +119,7 @@ public class AgentChatService {
     public ChatTurnHandle submitChat(UUID sessionId, String userMessage,
                                      Consumer<StreamEvent> eventHandler) {
         AgentSession session = sessionService.findSession(sessionId);
-        AgentDefinition def = definitionRepository.findById(session.agentDefinitionId())
-                .orElseThrow(() -> DomainException.notFound(
-                        "AgentDefinition", session.agentDefinitionId().toString()));
+        AgentDefinition def = effectiveDefinition(session);
 
         boolean isFirstMessage = conversationManager
                 .loadHistory(session.conversationId(), new PageRequest(0, 1)).isEmpty();
@@ -373,8 +371,7 @@ public class AgentChatService {
      */
     public WorkingMemory memorySnapshot(UUID sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
-        AgentDefinition def = definitionRepository.findById(session.agentDefinitionId())
-                .orElseThrow(() -> DomainException.notFound("AgentDefinition", session.agentDefinitionId().toString()));
+        AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
         return WorkingMemoryBuilder.build(promptRenderer, memoryStrategyFactory.create(def),
                 def, session, auth);
@@ -389,8 +386,7 @@ public class AgentChatService {
      */
     public int compressMemory(UUID sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
-        AgentDefinition def = definitionRepository.findById(session.agentDefinitionId())
-                .orElseThrow(() -> DomainException.notFound("AgentDefinition", session.agentDefinitionId().toString()));
+        AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
 
         MemoryStrategy strategy = memoryStrategyFactory.create(def);
@@ -410,4 +406,14 @@ public class AgentChatService {
     private static AuthenticationInfo authFor(AgentSession session) {
         return AuthenticationInfo.of(session.userId(), session.namespace());
     }
+
+    /**
+     * The definition this session runs — its own inline agent, a registry
+     * agent with this chat's overrides, or (older sessions) the definition
+     * behind {@code agentDefinitionId}.
+     */
+    private AgentDefinition effectiveDefinition(AgentSession session) {
+        return new SessionAgentResolver(definitionRepository).resolve(session);
+    }
+
 }

@@ -26,7 +26,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  *       can't double-wrap.</li>
  * </ul>
  */
-@ControllerAdvice(basePackages = {"ai.mindconnect.adminui.ui.controller", "ai.mindconnect.workflow.admin"})
+@ControllerAdvice(basePackages = {"ai.mindconnect.adminui.ui.controller",
+        "ai.mindconnect.chatui.ui.controller", "ai.mindconnect.workflow.admin"})
 public class AdminLayoutAdvice implements ResponseBodyAdvice<Object> {
 
     /** Root-node id used by {@link AdminLayout#withLayout}; marks a wrapped page. */

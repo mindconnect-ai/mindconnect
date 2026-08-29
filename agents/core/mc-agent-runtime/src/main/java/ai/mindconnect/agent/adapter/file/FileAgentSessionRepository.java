@@ -34,6 +34,15 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
         log.info("AgentSessionRepository base: " + this.baseDir);
     }
 
+    /**
+     * Newest first, and tolerant of a session without a start time: one
+     * unreadable timestamp should misplace a single row, not throw and take
+     * the user's whole session list with it.
+     */
+    private static final java.util.Comparator<AgentSession> NEWEST_FIRST =
+            java.util.Comparator.comparing(AgentSession::startedAt,
+                    java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()));
+
     @Override
     public AgentSession save(AgentSession session) {
         Path file = fileFor(session);
@@ -101,7 +110,33 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
                     .filter(s -> s.agentDefinitionId().equals(agentDefinitionId)
                             && s.namespace().equals(namespace)
                             && s.userId().equals(userId))
-                    .sorted((a, b) -> b.startedAt().compareTo(a.startedAt()))
+                    .sorted(NEWEST_FIRST)
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public List<AgentSession> findByUser(Namespace namespace, String userId) {
+        Path sessionsDir = userSessionsDir(userId);
+        if (!Files.exists(sessionsDir)) return List.of();
+        try (var stream = Files.list(sessionsDir)) {
+            return stream
+                    .filter(Files::isDirectory)
+                    .map(d -> d.resolve(FILE_NAME))
+                    .filter(Files::exists)
+                    .map(f -> {
+                        try {
+                            return objectMapper.readValue(f.toFile(), AgentSession.class);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    })
+                    .filter(s -> s.namespace().equals(namespace)
+                            && s.userId().equals(userId)
+                            && s.parentSessionId() == null)
+                    .sorted(NEWEST_FIRST)
                     .toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);

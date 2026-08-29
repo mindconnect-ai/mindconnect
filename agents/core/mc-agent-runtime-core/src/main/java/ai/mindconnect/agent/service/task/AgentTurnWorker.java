@@ -175,9 +175,7 @@ public final class AgentTurnWorker implements TaskWorker {
         }
 
         AgentSession session = sessionService.findSession(sessionId);
-        AgentDefinition def = definitionRepository.findById(session.agentDefinitionId())
-                .orElseThrow(() -> DomainException.notFound(
-                        "AgentDefinition", session.agentDefinitionId().toString()));
+        AgentDefinition def = effectiveDefinition(session);
 
         try (var ignored = LoggingContext.session(session.id(), session.conversationId(), def.name())) {
             return runTurn(ctx, turnId, run, parentTurnId, depth, session, def);
@@ -346,4 +344,14 @@ public final class AgentTurnWorker implements TaskWorker {
     private static String string(Object value) {
         return value == null ? null : String.valueOf(value);
     }
+
+    /**
+     * The definition this session runs — its own inline agent, a registry
+     * agent with this chat's overrides, or (older sessions) the definition
+     * behind {@code agentDefinitionId}.
+     */
+    private AgentDefinition effectiveDefinition(AgentSession session) {
+        return new ai.mindconnect.agent.service.SessionAgentResolver(definitionRepository).resolve(session);
+    }
+
 }

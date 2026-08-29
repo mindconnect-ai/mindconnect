@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.LlmCallTrace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
@@ -11,8 +11,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.Map;
 
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.MAPPER;
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.codeBlock;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.codeBlock;
 
 /**
  * One LLM-call roundtrip rendered as a three-tab card:
@@ -60,7 +60,7 @@ public final class RoundtripCardComponent implements UiComponent {
                 ? trace.context().agentName() : "agent";
 
         String header = "R" + globalIdx + " · "
-                + ai.mindconnect.adminui.assembler.session.SessionUiCommons.DT_FMT.format(trace.startedAt())
+                + ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT.format(trace.startedAt())
                 + (depth > 0 ? " · ↳ " + agentLabel : "")
                 + " · " + trace.modelName()
                 + " · " + trace.durationMs() + "ms"

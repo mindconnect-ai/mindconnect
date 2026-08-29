@@ -37,11 +37,11 @@ body {
    a centred card reads as a floating island on a wide monitor, while the
    right-hand whitespace reads as intentional breathing room. Two caps:
    tables and lists may run wide, forms and detail cards stay at a
-   readable line length. */
+   readable line length. (No auto margin here: the content area is a flex
+   column now, and an auto cross-axis margin eats the stretch — every card
+   collapsed to the width of its own content.) */
 .sui-shell-content > * {
     max-width: 1400px;
-    margin-left: 0;
-    margin-right: auto;
 }
 .sui-shell-content .sui-form:not(.chat-form),
 .sui-shell-content .sui-detail {
@@ -73,7 +73,7 @@ body {
     width: 32px; height: 32px;
     padding: 0;
     border-radius: 50%;
-    font-size: 13px;
+    font-size: var(--sui-text-sm, 13px);
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -90,13 +90,13 @@ body {
     min-height: 56px;
     padding: 12px 16px;
     background: var(--sui-color-surface);
+    border: 1px solid var(--sui-color-border);
     border-radius: var(--sui-radius-lg);
-    box-shadow: var(--sui-shadow-card);
 }
 .chat-thinking {
-    color: #64748b;
+    color: var(--sui-color-text-muted);
     font-style: italic;
-    font-size: 14px;
+    font-size: var(--sui-text-md, 14px);
 }
 .chat-thinking::after {
     content: "";
@@ -127,8 +127,8 @@ body {
     min-width: 0; /* prevent grid blow-up from long preformatted lines */
 }
 .memory-page .sui-list-item-description {
-    color: #64748b;
-    font-size: 12px;
+    color: var(--sui-color-text-muted);
+    font-size: var(--sui-text-xs, 12px);
     font-family: var(--sui-font-mono);
     white-space: nowrap;
     overflow: hidden;
@@ -148,23 +148,23 @@ body {
     list-style: none;
 }
 .memory-master .sui-list-item {
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid var(--sui-color-border);
     padding: 0;
 }
-.memory-master .sui-list-item:hover { background: #f1f5f9; }
+.memory-master .sui-list-item:hover { background: var(--sui-color-border-soft); }
 .memory-master .sui-list-item-main { padding: 8px 10px; }
 .memory-master .sui-list-item-label {
     display: block;
-    color: #2563eb;
+    color: var(--sui-color-primary);
     text-decoration: underline;
-    text-decoration-color: #cbd5e1;
+    text-decoration-color: var(--sui-color-border-strong);
     text-underline-offset: 2px;
     font-weight: 500;
-    font-size: 13px;
+    font-size: var(--sui-text-sm, 13px);
     cursor: pointer;
 }
 .memory-master .sui-list-item-label:hover {
-    color: #1d4ed8;
+    color: var(--sui-color-primary-hover);
     text-decoration-color: currentColor;
 }
 .memory-master .sui-list-item-desc {
@@ -173,15 +173,15 @@ body {
     cursor: pointer;
     white-space: pre-line;
     font-family: inherit;
-    font-size: 12px;
-    color: #475569;
+    font-size: var(--sui-text-xs, 12px);
+    color: var(--sui-color-text-body);
 }
 .memory-page pre {
-    background: #0f172a;
-    color: #e2e8f0;
+    background: var(--sui-color-code-bg);
+    color: var(--sui-color-code-fg);
     border-radius: 6px;
     padding: 12px 14px;
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     line-height: 1.5;
     overflow-x: auto;
     white-space: pre-wrap;
@@ -194,11 +194,11 @@ body {
 }
 
 /* Indentation per nesting level for sub-agent roundtrip cards. */
-.trace-depth-1 { margin-left: 24px;  border-left: 3px solid #cbd5e1; padding-left: 10px; }
-.trace-depth-2 { margin-left: 48px;  border-left: 3px solid #94a3b8; padding-left: 10px; }
-.trace-depth-3 { margin-left: 72px;  border-left: 3px solid #64748b; padding-left: 10px; }
-.trace-depth-4 { margin-left: 96px;  border-left: 3px solid #475569; padding-left: 10px; }
-.trace-depth-5 { margin-left: 120px; border-left: 3px solid #334155; padding-left: 10px; }
+.trace-depth-1 { margin-left: 24px;  border-left: 3px solid var(--sui-color-border-strong); padding-left: 10px; }
+.trace-depth-2 { margin-left: 48px;  border-left: 3px solid var(--sui-color-text-subtle); padding-left: 10px; }
+.trace-depth-3 { margin-left: 72px;  border-left: 3px solid var(--sui-color-text-muted); padding-left: 10px; }
+.trace-depth-4 { margin-left: 96px;  border-left: 3px solid var(--sui-color-text-body); padding-left: 10px; }
+.trace-depth-5 { margin-left: 120px; border-left: 3px solid var(--sui-color-text-strong); padding-left: 10px; }
 
 /* ── Embedded API explorer (Swagger UI in a UiIFrame) ──────────────────── */
 
@@ -251,7 +251,7 @@ body {
 /* Token usage in the chat header: compact bar + muted readout. */
 .chat-token-usage { align-items: center; white-space: nowrap; }
 .chat-token-usage .sui-progress--bar { width: 140px; }
-.chat-token-text { font-size: 12px; color: #64748b; font-variant-numeric: tabular-nums; }
+.chat-token-text { font-size: var(--sui-text-xs, 12px); color: var(--sui-color-text-muted); font-variant-numeric: tabular-nums; }
 
 .user-message, .bot-message {
     padding: 10px 14px;
@@ -259,16 +259,20 @@ body {
     margin: 4px 0;
 }
 .user-message {
-    background: #dcfce7;
-    color: #14532d;
+    /* The bubble's tint is the chat module's variable (chat-ui.css), so a
+       theme retunes it in one place; the value here is what it was before
+       that variable existed and is what a host without the chat module
+       still gets. */
+    background: var(--chat-user-bubble, #dcfce7);
+    color: var(--sui-color-text, #14532d);
     margin-left: auto;
     max-width: 80%;
     border-bottom-right-radius: 4px;
 }
 .user-message p { margin: 0; }
 .bot-message {
-    background: #f1f5f9;
-    color: #1a1a1a;
+    background: var(--sui-color-border-soft);
+    color: var(--sui-color-text);
     width: 100%;
     border-bottom-left-radius: 4px;
 }
@@ -279,7 +283,7 @@ body {
    replaced (without the class) as soon as a token arrives, so the
    animation disappears once the real reply starts streaming. */
 .bot-message--thinking {
-    color: #64748b;
+    color: var(--sui-color-text-muted);
     font-style: italic;
 }
 .bot-message--thinking p::after {
@@ -305,9 +309,9 @@ body {
 }
 .chat-container .sui-list-item-main { width: 100%; }
 .chat-container .sui-list-item-label {
-    font-size: 11px;
+    font-size: var(--sui-text-xs, 12px);
     font-weight: 500;
-    color: #94a3b8;
+    color: var(--sui-color-text-subtle);
     margin-bottom: 2px;
     display: block;
 }
@@ -320,18 +324,18 @@ body {
 .chat-container .sui-list-item:hover .sui-list-item-actions { opacity: 1; }
 .chat-container .sui-list-item-actions .sui-btn {
     padding: 2px 6px;
-    font-size: 11px;
+    font-size: var(--sui-text-xs, 12px);
     background: transparent;
-    color: #9ca3af;
+    color: var(--sui-color-text-subtle);
 }
 .chat-container .sui-list-item-actions .sui-btn:hover:not(:disabled) {
-    background: #fee2e2;
-    color: #dc2626;
+    background: var(--sui-color-danger-bg);
+    color: var(--sui-color-danger);
 }
 
 /* ── Legacy activity-log block (still used by some tool messages) ──────── */
 
-.activity-log { font-size: 12px; color: #64748b; line-height: 1.5; }
+.activity-log { font-size: var(--sui-text-xs, 12px); color: var(--sui-color-text-muted); line-height: 1.5; }
 .activity-log p, .activity-log li { margin: 0 0 .15em; }
 .activity-log ul { margin: 0; padding-left: 1.2em; list-style: none; }
 .activity-log li::before { content: ""; }
@@ -339,35 +343,35 @@ body {
 /* ── Task cards (tool calls + sub-agent calls) ─────────────────────────── */
 
 .task-card-body {
-    font-size: 13px;
-    color: #111827;
-    background: #f1f5f9;
+    font-size: var(--sui-text-sm, 13px);
+    color: var(--sui-color-text);
+    background: var(--sui-color-border-soft);
     border-radius: 6px;
     padding: 10px 12px;
     margin-top: 6px;
     line-height: 1.5;
 }
 .task-card-body pre {
-    background: #ffffff;
-    color: #0f172a;
-    border: 1px solid #cbd5e1;
+    background: var(--sui-color-surface);
+    color: var(--sui-color-text);
+    border: 1px solid var(--sui-color-border-strong);
     border-radius: 4px;
     padding: 8px 10px;
     margin: 4px 0 10px;
     overflow-x: auto;
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     font-family: var(--sui-font-mono);
     white-space: pre-wrap;
     word-break: break-word;
 }
 .task-card-body code {
-    font-size: 12px;
-    color: #0f172a;
+    font-size: var(--sui-text-xs, 12px);
+    color: var(--sui-color-text);
     font-family: var(--sui-font-mono);
 }
 .task-card-body strong {
-    color: #1e293b;
-    font-size: 12px;
+    color: var(--sui-color-text-strong);
+    font-size: var(--sui-text-xs, 12px);
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -383,22 +387,22 @@ body {
  */
 .sub-agent-children {
     margin: 6px 0 0;
-    border-left: 2px solid #cbd5e1;
+    border-left: 2px solid var(--sui-color-border-strong);
     padding-left: 12px;
 }
 .sub-agent-children > .sui-list-header { display: none; }
 .sub-agent-children > ul { list-style: none; padding: 0; margin: 0; }
 
 .sub-agent-status {
-    font-size: 12px;
-    color: #64748b;
+    font-size: var(--sui-text-xs, 12px);
+    color: var(--sui-color-text-muted);
     margin: 4px 0;
 }
-.sub-agent-status--error { color: #b91c1c; }
+.sub-agent-status--error { color: var(--sui-color-danger); }
 
 .sub-agent-answer {
     margin-top: 8px;
-    background: #eef2ff;
+    background: var(--sui-color-primary-soft);
 }
 
 /* "Open sub-agent session ↗" link at the top of a sub-agent card body. */
@@ -406,7 +410,7 @@ body {
 .sui-stack > .sui-link {
     display: inline-block;
     margin: 2px 0 6px;
-    font-size: 12px;
+    font-size: var(--sui-text-xs, 12px);
     font-weight: 600;
 }
 
@@ -426,8 +430,18 @@ body {
 .sui-list-item-label:has(.agent-head) { display: block; width: 100%; }
 .agent-head { width: 100%; align-items: baseline; }
 /* Push the badge to the right edge of the row, with a clear gap before the
-   action buttons so it reads as metadata, not a third button. */
-.agent-head .agent-llm-badge { margin-left: auto; margin-right: 16px; }
+   action buttons so it reads as metadata, not a third button.
+
+   The fixed width is what makes it a column rather than a floating pill: the
+   badge's own width follows its text ("agent-default" is wider than
+   "openai-default" is not), so without it the left edge landed on a
+   different pixel in almost every row and the eye had no line to follow. */
+.agent-head .agent-llm-badge {
+    margin-left: auto;
+    margin-right: 16px;
+    min-width: 8rem;
+    text-align: center;
+}
 
 /* LLM-config tag at the right of the name row. Soft green pill — sits apart
    from the blue name links and the blue "New Agent" button, and reads as a
@@ -436,11 +450,11 @@ body {
     display: inline-block;
     padding: 2px 10px;
     border-radius: 999px;
-    background: #dcfce7;
-    color: #15803d;
-    border: 1px solid #86efac;
-    font-size: 11px;
-    font-weight: 600;
+    background: var(--sui-color-success-bg, #dcfce7);
+    color: var(--sui-color-success, #15803d);
+    border: 1px solid var(--sui-color-success-border, #86efac);
+    font-size: var(--sui-text-xs, 12px);
+    font-weight: 500;
     line-height: 1.6;
     white-space: nowrap;
 }
@@ -459,11 +473,11 @@ body {
     padding: 12px 14px;
     border: 1px solid;
 }
-.llm-test-result--ok  { background: #f0fdf4; border-color: #bbf7d0; }
-.llm-test-result--err { background: #fef2f2; border-color: #fecaca; }
+.llm-test-result--ok  { background: var(--sui-color-success-bg, #f0fdf4); border-color: var(--sui-color-success-border, #bbf7d0); }
+.llm-test-result--err { background: var(--sui-color-danger-bg, #fef2f2); border-color: var(--sui-color-danger-bg-hover, var(--sui-color-danger-bg-hover)); }
 .llm-test-meta {
-    font-size: 12px;
-    color: #475569;
+    font-size: var(--sui-text-xs, 12px);
+    color: var(--sui-color-text-body);
     margin-bottom: 6px;
     font-family: var(--sui-font-mono);
 }
@@ -471,25 +485,50 @@ body {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-family: var(--sui-font-mono);
-    font-size: 13px;
+    font-size: var(--sui-text-sm, 13px);
     line-height: 1.5;
-    color: #0f172a;
+    color: var(--sui-color-text);
 }
-.llm-test-result--err .llm-test-body { color: #991b1b; }
+.llm-test-result--err .llm-test-body { color: var(--sui-color-danger); }
 
 /* ── Tool catalog ──────────────────────────────────────────────────────────
    The collapsed summary line is the primary reading surface here — the
    framework default (12px, subtle gray, meant for background activity) is
    too quiet for it. */
 .tool-catalog .sui-activity-summary {
-    font-size: 14px;
+    font-size: var(--sui-text-md, 14px);
     color: var(--sui-color-text);
     padding: 6px 0;
 }
-/* Group headers read as section titles above their tools. */
-.tool-catalog > ul > li > .sui-list-item-main > details > .sui-activity-summary {
-    font-size: 15px;
-    font-weight: 600;
-}
 /* The nested per-group list needs no header block of its own. */
 .tool-catalog .sui-activity-body .sui-list-header { display: none; }
+
+/* ── Theme picker ─────────────────────────────────────────────────────────
+   Injected into the header by js/theme-switch.js in the framework's own
+   menu-button markup, so it needs no styling of its own beyond the second
+   line each item carries and the check on the active one. In app.css rather
+   than in a theme: the control has to read correctly under every theme,
+   including none. */
+
+.sui-theme-switch .sui-menu-button-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+}
+
+.sui-theme-switch-hint {
+    font-size: var(--sui-text-xs, 12px);
+    color: var(--sui-color-text-muted);
+}
+
+/* The active theme is marked with a check rather than a fill — the popover
+   is a choice among three, not a list of things to do. */
+.sui-theme-switch .sui-menu-button-item[aria-checked="true"] .sui-menu-button-item-label::after {
+    content: " ✓";
+    color: var(--sui-color-text-muted);
+}
+
+.sui-theme-switch .sui-menu-button-item[aria-checked="true"] {
+    font-weight: 500;
+}

@@ -6,6 +6,48 @@
     <title>Agent Admin</title>
     <link rel="stylesheet" href="/sui/sui.css">
     <link rel="stylesheet" href="/css/app.css">
+    <!-- Themes. Each is an overlay scoped to its own class on <html>, so an
+         inactive one costs bytes and nothing else. The script below picks
+         which class is set; with none, the app renders as the framework
+         default. Both must stay ahead of chat-ui.css, whose chat rules are
+         meant to win over the generic ones. -->
+    <link rel="stylesheet" href="/css/clody.css">
+    <link rel="stylesheet" href="/css/gipiti.css">
+    <link rel="stylesheet" href="/css/sorbet.css">
+    <link rel="stylesheet" href="/css/compact.css">
+    <!-- Dark is the framework's own theme (html.sui-theme-dark), shipped in
+         mc-semantic-ui-core; there is no reason to write a second one. -->
+    <link rel="stylesheet" href="/sui/sui-dark.css">
+    <link rel="stylesheet" href="/css/amethyst.css">
+    <script>
+        /*
+         * Theme selection, before first paint.
+         *
+         * Inline and in <head> on purpose: as a separate file this would run
+         * after the first paint and the page would flash the previous theme.
+         * It deliberately knows no theme names — it applies whatever was
+         * remembered (or asked for in ?theme=), and js/theme-switch.js owns
+         * the list of what is real. A stale or invented name simply matches
+         * no stylesheet and the app renders as the framework default.
+         */
+        (function () {
+            var url = new URL(window.location.href);
+            var wanted = url.searchParams.get("theme");
+            if (wanted) {
+                try { localStorage.setItem("sui-theme", wanted); } catch (e) { /* private mode */ }
+            }
+            var active = wanted;
+            if (!active) {
+                try { active = localStorage.getItem("sui-theme"); } catch (e) { active = null; }
+            }
+            if (active === null) active = "clody";        // the default look
+            if (/^[a-z][a-z0-9-]*$/.test(active) && active !== "default") {
+                document.documentElement.classList.add("sui-theme-" + active);
+            }
+        })();
+    </script>
+    <!-- Chat shell (sidebar + conversation) — ships with mc-agent-chat-ui-rest. -->
+    <link rel="stylesheet" href="/css/chat-ui.css">
     <!-- Embedded workflow admin (/workflow-admin): step cards, base <sui-diagram>
          styling (ships with the diagram extension JAR) and workflow domain colours. -->
     <link rel="stylesheet" href="/css/workflow-admin.css">
@@ -24,5 +66,10 @@
          are now loaded lazily on demand by their mc-semantic-ui-extensions
          handlers (see app.js). No CDN script tags needed here. -->
     <script type="module" src="/js/app.js"></script>
+    <!-- Chat: two-state history toggle — ships with mc-agent-chat-ui-rest. -->
+    <script src="/js/chat-ui.js" defer></script>
+    <!-- The theme picker in the header. Purely client-side: it swaps a class
+         on <html> and remembers the choice per browser. -->
+    <script src="/js/theme-switch.js" defer></script>
 </body>
 </html>

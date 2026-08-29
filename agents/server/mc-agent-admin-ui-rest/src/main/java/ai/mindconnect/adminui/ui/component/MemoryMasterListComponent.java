@@ -1,12 +1,12 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.ui.UiComponent;
+import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.ui.model.UiList;
 
 import java.util.UUID;
 
-import static ai.mindconnect.adminui.assembler.session.SessionUiCommons.previewOf;
+import static ai.mindconnect.chatui.ui.SessionUiCommons.previewOf;
 
 /**
  * Master list of the working-memory inspector: every entry in the

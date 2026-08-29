@@ -75,6 +75,10 @@ class ToolSearchToolTest {
                     UUID agentDefinitionId, Namespace namespace, String userId) {
                 return List.of();
             }
+            @Override public List<ai.mindconnect.agent.domain.AgentSession> findByUser(
+                    Namespace namespace, String userId) {
+                return List.of();
+            }
             @Override public List<ai.mindconnect.agent.domain.AgentSession> findByParentSessionId(
                     UUID parentSessionId) {
                 return List.of();

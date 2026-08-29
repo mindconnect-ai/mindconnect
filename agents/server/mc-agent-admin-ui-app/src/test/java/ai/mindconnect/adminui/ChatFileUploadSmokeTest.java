@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * The chat UI's file-upload path end to end, through the REAL app: multipart
- * {@code POST /admin/api/sessions/{id}/chat-files} → file store → ingestion
+ * {@code POST /chat/api/sessions/{id}/chat-files} → file store → ingestion
  * into the session's vector store → {@code vector_search} activation +
  * attached-file note on the session. Complements the runtime-level
  * {@code RuntimeFileQaExampleTest}, which covers attach+ask via the builder
@@ -120,7 +120,7 @@ class ChatFileUploadSmokeTest {
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         ResponseEntity<String> response = rest.postForEntity(
-                "/admin/api/sessions/" + session.id() + "/chat-files",
+                "/chat/api/sessions/" + session.id() + "/chat-files",
                 new HttpEntity<>(form, headers), String.class);
 
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();

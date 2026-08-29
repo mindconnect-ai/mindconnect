@@ -1,0 +1,323 @@
+/*
+ * Amethyst — violet on a dark ground.
+ *
+ * The fourth look, and the only one with a colour that is there to be seen
+ * rather than to point at something. Clody's clay and Gipiti's near-black
+ * are working accents; this one is the theme's whole character, so the
+ * ground is tinted to match it and the neutrals carry the same violet cast
+ * all the way down. A grey dark theme with a purple button would be a
+ * different, duller thing.
+ *
+ * Self-contained, like the others: one class on <html>, one look. It would
+ * have been shorter to layer this on top of the framework's sui-dark.css and
+ * only override the accent, but that makes a theme two classes instead of
+ * one and puts load order into the picker's job. The price is the four
+ * things restated below that any dark theme has to say — CSS cannot extend
+ * a stylesheet, and four rules is a cheaper answer than a composition rule.
+ *
+ * The type size is the framework's own, like every theme here. A theme
+ * decides how the app looks, not how big its text is.
+ */
+
+
+/* ══ Tokens ══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-amethyst {
+    /* Every neutral is violet-cast rather than grey — on a dark ground a
+       truly neutral scale next to a saturated accent reads as a mistake,
+       like two themes fighting. */
+    --sui-color-bg:            #14101f;
+    --sui-color-surface:       #1c1730;
+    --sui-color-surface-alt:   #252041;
+    --sui-color-text:          #ece9f5;
+    --sui-color-text-strong:   #ffffff;
+    --sui-color-text-body:     #d7d2e8;
+    --sui-color-text-muted:    #a09ab8;
+    --sui-color-text-subtle:   #7b7496;
+    --sui-color-border:        #322b4d;
+    --sui-color-border-soft:   #241f3a;
+    --sui-color-border-strong: #4a4270;
+
+    /* The accent, and this time it is the point of the theme. Light enough
+       to read as text on the dark ground, saturated enough to be the thing
+       you notice. */
+    --sui-color-primary:       #b39dff;
+    --sui-color-primary-hover: #cbbcff;
+    --sui-color-primary-soft:  #2e2450;
+    --sui-color-on-primary:    #14101f;
+
+    /* Solid actions are the accent at full strength — on a dark ground the
+       near-black fill the light themes use would disappear into the page. */
+    --sui-color-action:        #7c5cf5;
+    --sui-color-action-hover:  #8f73ff;
+    --sui-color-on-action:     #ffffff;
+
+    /* Status colours lifted for a dark ground: the text side bright enough
+       to read, the fill deep enough to stay a background. */
+    --sui-color-danger:          #ff8b8b;
+    --sui-color-danger-bg:       #3b1420;
+    --sui-color-danger-bg-hover: #4e1a2a;
+    --sui-color-danger-border:   #6b2438;
+    --sui-color-success:         #7fe0b0;
+    --sui-color-success-bg:      #10301f;
+    --sui-color-success-border:  #1d5237;
+    --sui-color-warning:         #f5c563;
+    --sui-color-warning-bg:      #33240a;
+
+    --sui-color-required:      #ff8b8b;
+    --sui-color-empty:         #7b7496;
+
+    /* The code slab goes darker than the page rather than lighter — it is
+       the one place the eye should drop, not rise. */
+    --sui-color-code-bg:       #0e0b17;
+    --sui-color-code-fg:       #e2ddf0;
+    --sui-color-blockquote-border: #4a4270;
+
+    --sui-radius-sm:   8px;
+    --sui-radius-md:   12px;
+    --sui-radius-lg:   16px;
+    --sui-radius-pill: 999px;
+
+    --sui-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter,
+                       system-ui, Roboto, sans-serif;
+    --sui-font-mono:   ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sui-font-size:   15px;
+
+    /* A shadow on a dark ground does almost nothing, so the containers below
+       take a border instead and the depth is kept for what floats. */
+    --sui-shadow-pop:     0 2px 8px rgba(0, 0, 0, .5), 0 16px 40px rgba(0, 0, 0, .55);
+    --sui-shadow-popover: 0 2px 8px rgba(0, 0, 0, .55), 0 20px 48px rgba(0, 0, 0, .6);
+    --sui-focus-ring:     0 0 0 3px rgba(179, 157, 255, .28);
+
+    --sui-header-bg:           #14101f;
+    --sui-header-fg:           #d7d2e8;
+    --sui-header-brand-fg:     #ffffff;
+    --sui-header-nav-fg:       #a09ab8;
+    --sui-header-nav-fg-hover: #ffffff;
+    --sui-header-nav-bg-hover: #252041;
+    --sui-header-radius:       0;
+    --sui-header-shadow:       none;
+    /* The logos stroke dark, which is invisible here — the invert sui.css
+       uses for its own dark header is exactly right again. */
+    --sui-header-logo-filter:  brightness(0) invert(1);
+}
+
+
+/* ══ What any dark theme has to say ══════════════════════════════════════
+   Four things the token scale cannot reach. They are restated from the
+   framework's sui-dark.css rather than inherited, because a stylesheet
+   cannot extend another one — see the note at the top of this file. */
+
+/* Without this, native controls, scrollbars and form widgets stay light and
+   the theme falls apart at exactly the places a user touches it. */
+:root.sui-theme-amethyst {
+    color-scheme: dark;
+}
+
+/* The select chevron is a data-URI SVG with its stroke colour baked in, so a
+   dark theme has to redraw it or lose the arrow into the background. */
+:root.sui-theme-amethyst .sui-field select:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23a09ab8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+/* Toast tints are declared as literal light fills in sui.css. */
+:root.sui-theme-amethyst .sui-toast--info    { --sui-toast-bg: var(--sui-color-primary-soft); --sui-toast-ring: #453a73; --sui-toast-fg: var(--sui-color-primary); }
+:root.sui-theme-amethyst .sui-toast--success { --sui-toast-bg: var(--sui-color-success-bg);   --sui-toast-ring: var(--sui-color-success-border); --sui-toast-fg: var(--sui-color-success); }
+:root.sui-theme-amethyst .sui-toast--warn    { --sui-toast-bg: var(--sui-color-warning-bg);   --sui-toast-ring: #5c4413; --sui-toast-fg: var(--sui-color-warning); }
+:root.sui-theme-amethyst .sui-toast--error   { --sui-toast-bg: var(--sui-color-danger-bg);    --sui-toast-ring: var(--sui-color-danger-border); --sui-toast-fg: var(--sui-color-danger); }
+
+/* The dialog backdrop is a hard-coded slate wash; on this ground it should
+   be plain black, or the modal sits in a blue haze. */
+:root.sui-theme-amethyst .sui-dialog-backdrop {
+    background: rgba(0, 0, 0, .6);
+}
+
+
+/* ══ Base ════════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-amethyst body {
+    line-height: 1.6;
+}
+
+:root.sui-theme-amethyst .sui-shell,
+:root.sui-theme-amethyst .sui-shell-body,
+:root.sui-theme-amethyst .sui-shell-content {
+    background: var(--sui-color-bg);
+}
+
+
+/* ══ Depth ═══════════════════════════════════════════════════════════════
+   Same move as Clody, different reason: there the shadows were too loud for
+   the paper, here they would simply not be visible. Either way a hairline
+   does the work. The chat's list and composer are excluded — a theme
+   selector carries the :root class and outranks the module's own rules. */
+
+:root.sui-theme-amethyst :is(.sui-table, .sui-tree, .sui-detail, .sui-menu),
+:root.sui-theme-amethyst .sui-form:not(.chat-form),
+:root.sui-theme-amethyst .sui-list:not(.chat-container) {
+    border: 1px solid var(--sui-color-border);
+}
+
+:root.sui-theme-amethyst .sui-tabs + .sui-panels > .sui-panel > :is(.sui-list, .sui-table, .sui-detail, .sui-form),
+:root.sui-theme-amethyst .sui-tabs + .sui-panels > .sui-panel > .sui-stack > :is(.sui-list, .sui-table) {
+    border: none;
+}
+
+:root.sui-theme-amethyst .sui-list.chat-container > .sui-list-header {
+    border-bottom: none;
+}
+
+
+/* ══ Header & navigation ═════════════════════════════════════════════════ */
+
+:root.sui-theme-amethyst .sui-header {
+    border-bottom: 1px solid var(--sui-color-border);
+}
+
+:root.sui-theme-amethyst .sui-header-user .sui-avatar,
+:root.sui-theme-amethyst .sui-header-avatar {
+    background: var(--sui-color-action);
+    color: var(--sui-color-on-action);
+}
+
+:root.sui-theme-amethyst .sui-menu {
+    background: transparent;
+    border: none;
+}
+
+:root.sui-theme-amethyst .sui-menu-link {
+    border-radius: 10px;
+}
+
+/* Here the active row does get the accent in its text as well as its fill:
+   on a dark ground a tint alone is a very quiet signal, and this theme has
+   a colour to spend. */
+:root.sui-theme-amethyst .sui-menu-item.is-active > .sui-menu-link,
+:root.sui-theme-amethyst .sui-menu-item.is-active > .sui-menu-group > .sui-menu-link {
+    background: var(--sui-color-primary-soft);
+    color: var(--sui-color-primary);
+    font-weight: 500;
+}
+
+
+/* ══ Lists & tables ══════════════════════════════════════════════════════ */
+
+:root.sui-theme-amethyst :is(.sui-list-header, .sui-table-header) {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-amethyst .sui-list:not(.chat-container) .sui-list-item-label,
+:root.sui-theme-amethyst .sui-table td .sui-link {
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+:root.sui-theme-amethyst .sui-list:not(.chat-container) .sui-list-item-label:hover,
+:root.sui-theme-amethyst .sui-table td .sui-link:hover {
+    color: var(--sui-color-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+:root.sui-theme-amethyst .sui-list:not(.chat-container) .sui-list-item {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-amethyst .sui-list:not(.chat-container) .sui-list-item:hover,
+:root.sui-theme-amethyst .sui-table tbody tr:hover {
+    background: var(--sui-color-surface-alt);
+}
+
+:root.sui-theme-amethyst .sui-table .column-header-background,
+:root.sui-theme-amethyst .sui-table th {
+    background: var(--sui-color-surface);
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+
+/* ══ Forms & buttons ═════════════════════════════════════════════════════ */
+
+:root.sui-theme-amethyst .sui-field label {
+    color: var(--sui-color-text-muted);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+:root.sui-theme-amethyst :is(.sui-field input, .sui-field textarea, .sui-field select) {
+    background-color: var(--sui-color-surface);
+    border-color: var(--sui-color-border-strong);
+    border-radius: 10px;
+    color: var(--sui-color-text);
+}
+
+:root.sui-theme-amethyst :is(.sui-field input, .sui-field textarea, .sui-field select):focus {
+    border-color: var(--sui-color-primary);
+}
+
+:root.sui-theme-amethyst .sui-btn {
+    border-radius: 10px;
+    font-weight: 500;
+}
+
+:root.sui-theme-amethyst .sui-btn--secondary {
+    border: 1px solid var(--sui-color-border-strong);
+    background: var(--sui-color-surface);
+}
+
+:root.sui-theme-amethyst .sui-btn--secondary:hover:not(:disabled) {
+    background: var(--sui-color-surface-alt);
+}
+
+:root.sui-theme-amethyst .sui-icon-btn {
+    border-radius: 10px;
+}
+
+:root.sui-theme-amethyst .sui-icon-btn--primary {
+    background: var(--sui-color-action);
+    color: var(--sui-color-on-action);
+    border-radius: var(--sui-radius-pill);
+}
+
+:root.sui-theme-amethyst .sui-link {
+    color: var(--sui-color-primary);
+    text-decoration-color: var(--sui-color-border-strong);
+    text-underline-offset: 2px;
+}
+
+
+/* ══ Tabs & things that float ════════════════════════════════════════════ */
+
+:root.sui-theme-amethyst .sui-tabs {
+    border-bottom-color: var(--sui-color-border);
+}
+
+:root.sui-theme-amethyst .sui-tab {
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+:root.sui-theme-amethyst .sui-tab.active {
+    color: var(--sui-color-text-strong);
+    border-bottom-color: var(--sui-color-primary);
+}
+
+
+/* ══ Progress & badges ═══════════════════════════════════════════════════ */
+
+
+/* ══ Prose & code ════════════════════════════════════════════════════════
+   The same framework bug the other themes patch: `.sui-list ul { list-style:
+   none }` is meant for the list's own rows, and markdown nests inside a list
+   too. One line in sui.css would retire all three copies. */
+
+
+/* ══ The chat ════════════════════════════════════════════════════════════
+   The user's bubble is the raised surface here, not a deeper tint: on a dark
+   ground "closer" means lighter, so the same asymmetry the light themes get
+   from a darker bubble comes from a lighter one. */
+
+:root.sui-theme-amethyst #chat-app-shell {
+    --chat-user-bubble: var(--sui-color-surface-alt);
+}

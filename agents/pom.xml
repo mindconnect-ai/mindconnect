@@ -54,6 +54,7 @@
         <module>core/mc-agent-tools-gmail</module>
         <module>server/mc-agent-api-rest</module>
         <module>server/mc-agent-api-app</module>
+        <module>server/mc-agent-chat-ui-rest</module>
         <module>server/mc-agent-admin-ui-rest</module>
         <module>server/mc-agent-admin-ui-app</module>
         <module>client/mc-agent-cli</module>

@@ -2,17 +2,20 @@ package ai.mindconnect.adminui.ui.controller;
 
 
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiSection;
 import ai.mindconnect.ui.model.UiSectionEntry;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTable;
 import ai.mindconnect.ui.model.UiText;
+import ai.mindconnect.ui.model.UiTrigger;
 import ai.mindconnect.vectorstore.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
@@ -68,8 +71,6 @@ public class VectorStoreUiController {
     /** The overview as tabs; {@code tab} picks which one opens (after an action, the one it happened in). */
     private UiPage list(String tab) {
         UiTable templates = UiTable.of("vs-templates", null)
-                .action(UiAction.primary("new-template", "New Template").icon("add")
-                        .dispatch("GET", "/admin/vector-stores/templates/new"))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("backend", "Backend"))
                 .column(UiTable.Column.text("embedding", "Embedding Config"))
@@ -91,8 +92,6 @@ public class VectorStoreUiController {
         }
 
         UiTable instances = UiTable.of("vs-instances", null)
-                .action(UiAction.primary("new-store", "New Store").icon("add")
-                        .dispatch("GET", "/admin/vector-stores/stores/new"))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("template", "Template"))
                 .column(UiTable.Column.text("backend", "Backend"))
@@ -162,14 +161,68 @@ public class VectorStoreUiController {
         UiStack filesTab = UiStack.of("vs-files-tab").gap(20)
                 .child(files).child(upload);
 
-        // One tab per concern, each carrying its icon; the table titles are
-        // gone (the tab label is the heading), their header actions stay.
-        UiSection page = UiSection.of("vs-page", "Vector Stores");
-        page.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database"));
-        page.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server"));
-        page.getSections().add(UiSectionEntry.of("files", "Files", filesTab).icon("file"));
-        page.initialSection(tab);
+        // The page's header, and it is a UiList with no items on purpose.
+        //
+        // This screen needs what every other one has — an icon, a title and
+        // the primary action in one bar — above a set of tabs. UiSection can
+        // only carry a title, which it renders as a bare <h2>, and that is
+        // exactly what made this page look like it came from somewhere else.
+        // A header-only list renders the identical bar to the one on Agents,
+        // down to the padding and the hairline, because it *is* that bar.
+        //
+        // The honest fix is a UiSection that takes an icon and actions; then
+        // this is one node instead of two and the empty <ul> goes away. Until
+        // then, borrowing the right-looking header beats hand-building a
+        // lookalike that drifts from it.
+        UiList header = headerFor(tab);
+
+        // One tab per concern, each carrying its icon. The tables carry no
+        // titles: the tab label names them and the header above names the
+        // screen. Switching a tab is a client-side panel swap, but the
+        // header's action belongs to the tab you are on — so each click also
+        // asks the server for the matching header (a REPLACE patch on
+        // vs-header). Without this, the button rendered for the initial tab
+        // simply stayed, and the Stores tab had no way to create a store.
+        UiSection tabs = UiSection.of("vs-page", null);
+        tabs.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database")
+                .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=templates")));
+        tabs.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server")
+                .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=stores")));
+        tabs.getSections().add(UiSectionEntry.of("files", "Files", filesTab).icon("file")
+                .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=files")));
+        tabs.initialSection(tab);
+
+        UiStack page = UiStack.of("vs-shell").child(header).child(tabs);
         return UiPage.of(BASE, page);
+    }
+
+    /**
+     * The page's header, and it is a UiList with no items on purpose.
+     * This screen needs what every other one has — an icon, a title and
+     * the primary action in one bar — above a set of tabs, and a
+     * header-only list renders the identical bar to the one on Agents.
+     * The action follows the active tab; Files has none (its uploads
+     * happen inside the tab).
+     */
+    private UiList headerFor(String tab) {
+        UiList header = UiList.of("vs-header", "Vector Stores").icon("database");
+        String active = tab == null ? "templates" : tab;
+        if ("stores".equals(active)) {
+            header.action(UiAction.primary("new-store", "New Store").icon("add")
+                    .dispatch("GET", "/admin/vector-stores/stores/new"));
+        } else if ("templates".equals(active)) {
+            header.action(UiAction.primary("new-template", "New Template").icon("add")
+                    .dispatch("GET", "/admin/vector-stores/templates/new"));
+        }
+        return header;
+    }
+
+    /** The header that matches a tab — fired by the tab's onClick, REPLACEs vs-header. */
+    @GetMapping("/header")
+    public ai.mindconnect.ui.model.UiPatch headerPatch(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String tab) {
+        return ai.mindconnect.ui.model.UiPatch.of()
+                .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-header", headerFor(tab)));
     }
 
     private static String readableSize(long bytes) {
@@ -356,9 +409,15 @@ public class VectorStoreUiController {
         VectorStore store = stores.openWith(instance);
 
         UiStack page = UiStack.of("vs-detail").gap(16);
-        page.child(UiText.of("vs-detail-head", "Store '" + name + "' — template " + instance.templateName()
-                + ", backend " + instance.backend() + ", embedding " + instance.embeddingConfig()
-                + ", scope " + instance.scope()).withCssClass("wf-run-title"));
+        // The same header bar as every other detail screen: icon, the store's
+        // name as the title, its settings as a quiet meta line underneath.
+        UiList header = UiList.of("vs-detail-head", name).icon("server");
+        header.action(UiAction.secondary("back", "All vector stores").icon("back")
+                .onClick(UiTrigger.go(BASE)));
+        page.child(header);
+        page.child(UiText.of("vs-detail-meta", "template " + instance.templateName()
+                + " · backend " + instance.backend() + " · embedding " + instance.embeddingConfig()
+                + " · scope " + instance.scope()).withCssClass("wf-run-meta"));
         if (message != null) {
             page.child(UiText.of("vs-ingest-result", message).withCssClass("task-card-body"));
         }
@@ -406,7 +465,6 @@ public class VectorStoreUiController {
             page.child(UiLink.of("ingest", "/workflow-admin/" + instance.ingestionWorkflow() + "/run",
                     "→ Ingest file… (workflow " + instance.ingestionWorkflow() + ")"));
         }
-        page.child(UiLink.of("back", BASE, "← Back to Vector Stores"));
         return UiPage.of(BASE + "/stores/" + name, page);
     }
 

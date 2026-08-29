@@ -27,6 +27,14 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>
         </dependency>
+        <!-- The shared chat surface: message list, composer, attachments.
+             The dependency points this way on purpose — a user-facing chat
+             must not drag agent CRUD, LLM configs and traces along. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-chat-ui-rest</artifactId>
+            <version>0.0.3-SNAPSHOT</version>
+        </dependency>
         <!-- Tool providers (discovered via ServiceLoader SPI) -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

@@ -1,60 +1,221 @@
-/* Workflow admin — step cards. Layered on top of /sui/sui.css. */
+/* Workflow admin — the editor is one list. Layered on top of /sui/sui.css.
 
-.wf-step {
-  border: 1px solid #c9d4df;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #ffffff;
-  margin: 4px 0;
+   Steps used to be spaced-out cards, each carrying three buttons and each
+   nesting level a dashed box — a page of frames around frames. Now a step
+   is a row: type, name, and a "…" menu on the right; rows join without
+   gaps, separated by hairlines, and nesting is shown by indentation along
+   a guide line, the way code shows it. */
+
+.wf-body,
+.wf-step-group,
+.wf-nested,
+.wf-branches {
+  gap: 0;
 }
 
+.wf-step {
+  align-items: center;
+  padding: var(--sui-space-xs) var(--sui-space-md);
+  border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+/* The row's height is set by its tallest thing — the default 36px "…"
+   square. Smaller here, so the rows sit as close as code lines. */
+.wf-step .sui-menu-button--icon .sui-menu-button-trigger {
+  width: 28px;
+  height: 28px;
+}
+
+.wf-step:hover {
+  background: var(--sui-color-surface-alt);
+}
+
+/* The row's one control sits at its far end. */
+.wf-step > .sui-menu-button {
+  margin-inline-start: auto;
+}
+
+/* The "+" behind the name: no space of its own, no ink until the pointer
+   is on the row (or the keyboard reaches it). It inserts below this row. */
+.wf-step > .sui-icon-btn {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity var(--sui-duration-fast, 120ms);
+}
+
+.wf-step:hover > .sui-icon-btn,
+.wf-step:focus-within > .sui-icon-btn {
+  opacity: 1;
+}
+
+/* The kind, drawn: a small icon in muted ink at the row's start. */
+.wf-step > .wf-step-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--sui-color-text-muted);
+}
+
+/* Type and name at ONE size — two sizes on one line made every row look
+   like a heading with a stray subtitle. They differ by weight only: the
+   type is the keyword, the name is what the reader scans for. */
 .wf-step-type {
   display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #5a7fa3;
+  font-weight: 400;
+  color: var(--sui-color-text-body);
 }
 
 .wf-step-name {
   font-weight: 600;
-  color: #1a3a5c;
+  color: var(--sui-color-text);
 }
 
-/* "if <condition>" / "else" — labels the branch box that follows them. */
-.wf-branch-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
+/* The step's headline detail (what a loop loops over, where a call goes):
+   quiet mono, swallowed before it can widen the row. */
+.wf-step-detail {
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* "→ variable": where the result lands. Right-aligned, in front of the
+   menu — the wiring between steps, visible without a dialog. */
+.wf-step-var {
+  margin-inline-start: auto;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-muted);
+  white-space: nowrap;
+}
+
+.wf-step > .wf-step-var ~ .sui-menu-button {
+  margin-inline-start: 0;
+}
+
+/* --- Step details dialog ----------------------------------------------- */
+
+/* Icon + type under the dialog's name-title: what kind of step this is. */
+.wf-detail-head {
+  align-items: center;
+  color: var(--sui-color-text-body);
+}
+
+.wf-detail-head .sui-icon {
+  width: 18px;
+  height: 18px;
+  color: var(--sui-color-text-muted);
+}
+
+/* Label over a block value (code, headers, variable assignments). */
+.wf-detail-label {
+  font-size: var(--sui-text-xs);
   font-weight: 700;
-  color: #5a7fa3;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sui-color-text-muted);
+  margin-top: var(--sui-space-sm);
 }
 
-/* Nested container (block body, for-each body, if branches) */
+/* The block value itself: keep the author's newlines and indents. */
+.wf-detail-block {
+  display: block;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--sui-color-surface-alt);
+  border: 1px solid var(--sui-color-border-soft);
+  border-radius: 6px;
+  padding: var(--sui-space-md);
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* "if <condition>" / "else" — labels the indented run that follows. */
+.wf-branch-label {
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-sm);
+  font-weight: 600;
+  color: var(--sui-color-text-body);
+  padding: var(--sui-space-xs) var(--sui-space-md);
+}
+
+/* Nested container (block body, for-each body, if branches): indentation
+   along a guide line that turns and CLOSES at the bottom — the line is a
+   bracket around the children, not a rule that trails off mid-air. Full
+   border ink, not the soft hairline: the structure is the message here. */
 .wf-nested {
-  border: 1px dashed #c9d4df;
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin: 4px 0 4px 20px;
-  background: #f7fafc;
+  position: relative;
+  padding-inline-start: var(--sui-space-2xl);
+  margin-inline-start: var(--sui-space-md);
+}
+
+.wf-nested::before {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: var(--sui-space-lg);
+  border-inline-start: 2px solid var(--sui-color-border);
+  border-block-end: 2px solid var(--sui-color-border);
+  border-end-start-radius: 10px;
+  pointer-events: none;
+}
+
+/* The bracket closes the group; a hairline under the last row would draw
+   a second floor right above it. */
+.wf-nested > .wf-step:last-child {
+  border-bottom: 0;
+}
+
+/* The if's branches sit a notch to the right of their if row, so the
+   "if …"/"else" labels read as belonging to it, not as its siblings. */
+.wf-branches {
+  margin-inline-start: var(--sui-space-lg);
+}
+
+/* The add-step row keeps a little air so it reads as an affordance, not a
+   row of the list — and it only appears when the mouse is over its
+   container (or a keyboard reaches it): a list of steps should read as
+   the workflow, not as the workflow plus one button per nesting level.
+   Opacity, not display, so nothing jumps when it fades in. */
+.wf-body > .sui-btn,
+.wf-nested > .sui-btn {
+  margin: var(--sui-space-xs) var(--sui-space-md);
+  opacity: 0;
+  transition: opacity var(--sui-duration-fast, 120ms);
+}
+
+.wf-body:hover > .sui-btn,
+.wf-nested:hover > .sui-btn,
+.wf-body:focus-within > .sui-btn,
+.wf-nested:focus-within > .sui-btn {
+  opacity: 1;
 }
 
 /* --- Run view ---------------------------------------------------------- */
 
-.wf-run-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #1a3a5c;
-}
+/* Everything below draws in theme tokens, not literals: the run view is the
+   one screen the user stares at while something happens, and a hard-coded
+   light palette turned it into a white island on the dark themes. Status
+   colours mix the theme's success/warning/danger ink with transparency for
+   their washes, so one token pair serves light and dark. */
 
-/* One executed step. Same card treatment as the editor's steps, so the run
-   reads as the same workflow, just annotated with what happened. */
-.wf-run-step {
-  border: 1px solid #c9d4df;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #ffffff;
-  margin: 4px 0;
+/* Run rows reuse the editor's own classes (wf-body / wf-step / wf-nested):
+   the run IS the workflow, just annotated with duration and state. The step
+   name doubles as the link into the details dialog — it keeps the link ink
+   (that is what says "clickable") but takes the name's weight, so the eye
+   scans the run the same way it scans the editor. */
+.wf-step > .sui-link {
+  font-weight: 600;
 }
 
 /* State pill — colour carries the meaning, the label spells it out. */
@@ -62,56 +223,55 @@
   display: inline-block;
   padding: 1px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--sui-text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  background: #eef2f6;
-  color: #5a7fa3;
+  background: var(--sui-color-surface-alt);
+  color: var(--sui-color-text-muted);
 }
 
-.wf-run-state--finished { background: #e7f6ec; color: #14653b; }
-.wf-run-state--halted   { background: #fff4de; color: #7a5200; }
-.wf-run-state--error    { background: #fdecec; color: #9b1c1c; }
+.wf-run-state--finished {
+  background: color-mix(in srgb, var(--sui-color-success) 14%, transparent);
+  color: var(--sui-color-success);
+}
+.wf-run-state--halted {
+  background: color-mix(in srgb, var(--sui-color-warning) 16%, transparent);
+  color: var(--sui-color-warning);
+}
+.wf-run-state--error {
+  background: color-mix(in srgb, var(--sui-color-danger) 14%, transparent);
+  color: var(--sui-color-danger);
+}
 
 /* Start → end → duration. Quiet on purpose: it is context, not the result. */
 .wf-run-meta {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: #8aa0b5;
-}
-
-/* "variable =" in front of a step box: the step (with its sub-steps) is the
-   value that landed in this variable. */
-.wf-run-assign-var {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  font-weight: 700;
-  color: #14653b;
-  padding-left: 2px;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-muted);
 }
 
 /* "Input" / "Output" label in front of a value line. */
 .wf-run-label {
-  font-size: 11px;
+  font-size: var(--sui-text-xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #8aa0b5;
+  color: var(--sui-color-text-muted);
   min-width: 54px;
 }
 
 .wf-run-result {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  color: #37516b;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-sm);
+  color: var(--sui-color-text-body);
   word-break: break-word;
 }
 
 .wf-run-error-text {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  color: #9b1c1c;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-sm);
+  color: var(--sui-color-danger);
   word-break: break-word;
 }
 
@@ -126,56 +286,56 @@
 }
 
 .wf-run-outcome-headline {
-  font-size: 16px;
+  font-size: var(--sui-text-lg);
   font-weight: 700;
 }
 
 .wf-run-outcome-detail {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-sm);
   word-break: break-word;
 }
 
 .wf-run-outcome--success {
-  background: #e7f6ec;
-  border-color: #3f9b6d;
-  color: #14653b;
+  background: color-mix(in srgb, var(--sui-color-success) 12%, transparent);
+  border-color: var(--sui-color-success);
+  color: var(--sui-color-success);
 }
 
 .wf-run-outcome--halted {
-  background: #fff4de;
-  border-color: #d19a1e;
-  color: #7a5200;
+  background: color-mix(in srgb, var(--sui-color-warning) 14%, transparent);
+  border-color: var(--sui-color-warning);
+  color: var(--sui-color-warning);
 }
 
 .wf-run-outcome--error {
-  background: #fdecec;
-  border-color: #d16a6a;
-  color: #9b1c1c;
+  background: color-mix(in srgb, var(--sui-color-danger) 12%, transparent);
+  border-color: var(--sui-color-danger);
+  color: var(--sui-color-danger);
 }
 
 /* --- Run inspection dialogs (log / StepInstance JSON) ------------------- */
 
 .wf-run-log-line {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  color: #37516b;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-body);
   white-space: pre-wrap;
   padding: 2px 0;
-  border-bottom: 1px solid #eef2f6;
+  border-bottom: 1px solid var(--sui-color-border-soft);
 }
 
 /* The raw instance JSON: preserve the pretty-printer's newlines and indents,
    which a normal text node would collapse into one run-on line. */
 .wf-run-json {
   display: block;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-  color: #37516b;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: var(--sui-text-xs);
+  color: var(--sui-color-text-body);
   white-space: pre;
   overflow-x: auto;
-  background: #f7fafc;
-  border: 1px solid #c9d4df;
+  background: var(--sui-color-surface-alt);
+  border: 1px solid var(--sui-color-border-soft);
   border-radius: 6px;
   padding: 10px 12px;
 }
@@ -191,8 +351,8 @@
 .migration-diff td:nth-child(2),
 .migration-diff td:nth-child(3) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13.5px;
-  color: #1f2933;
+  font-size: var(--sui-text-sm);
+  color: var(--sui-color-text);
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 40vw;
@@ -203,7 +363,9 @@
    toggles, but here it IS the content — make it read like a list entry. */
 #migration-list .sui-activity-summary,
 .tool-catalog .sui-activity-summary {
-  font-size: 14px;
+  font-size: var(--sui-text-md);
   font-weight: 500;
-  color: #1f2933;
+  /* The theme's own ink, not a literal: a hard-coded slate was invisible
+     on the dark themes' surfaces. */
+  color: var(--sui-color-text);
 }
