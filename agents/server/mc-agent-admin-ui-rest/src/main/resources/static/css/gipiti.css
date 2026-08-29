@@ -448,8 +448,9 @@
     background: var(--sui-color-surface);
 }
 
-/* The composer is a pill, which is the shape the rest of the theme has been
-   promising. */
+/* The composer takes this theme's input corner, not a pill. The pill belongs
+   to the controls; a text field is a text field on every screen, and the
+   composer is the one on the chat screen. */
 :root.sui-theme-gipiti .chat-form.sui-form {
-    border-radius: 26px;
+    border-radius: var(--sui-radius-sm);
 }

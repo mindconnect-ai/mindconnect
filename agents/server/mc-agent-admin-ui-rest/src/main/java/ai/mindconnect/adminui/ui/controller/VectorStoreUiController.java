@@ -9,6 +9,7 @@ import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiSection;
 import ai.mindconnect.ui.model.UiSectionEntry;
 import ai.mindconnect.ui.model.UiStack;
@@ -68,9 +69,7 @@ public class VectorStoreUiController {
 
     /** The overview as tabs; {@code tab} picks which one opens (after an action, the one it happened in). */
     private UiPage list(String tab) {
-        UiTable templates = UiTable.of("vs-templates", "Templates")
-                .action(UiAction.primary("new-template", "New Template").icon("add")
-                        .dispatch("GET", "/admin/vector-stores/templates/new"))
+        UiTable templates = UiTable.of("vs-templates", null)
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("backend", "Backend"))
                 .column(UiTable.Column.text("embedding", "Embedding Config"))
@@ -91,9 +90,7 @@ public class VectorStoreUiController {
                     "description", t.metadata().getOrDefault("description", "")));
         }
 
-        UiTable instances = UiTable.of("vs-instances", "Stores")
-                .action(UiAction.primary("new-store", "New Store").icon("add")
-                        .dispatch("GET", "/admin/vector-stores/stores/new"))
+        UiTable instances = UiTable.of("vs-instances", null)
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("template", "Template"))
                 .column(UiTable.Column.text("backend", "Backend"))
@@ -132,7 +129,7 @@ public class VectorStoreUiController {
 
         // The file store (Files API): raw uploads addressed by id, independent
         // of any store — attach them to a chat via POST /api/sessions/{id}/files.
-        UiTable files = UiTable.of("vs-files-all", "Files")
+        UiTable files = UiTable.of("vs-files-all", null)
                 .column(UiTable.Column.text("fid", "Id"))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("type", "Type"))
@@ -163,25 +160,44 @@ public class VectorStoreUiController {
         UiStack filesTab = UiStack.of("vs-files-tab").gap(20)
                 .child(files).child(upload);
 
-        // One tab per concern, each carrying its icon.
+        // The page's header, and it is a UiList with no items on purpose.
         //
-        // Two levels of heading, and both earn their place. The page keeps
-        // its own title above the tabs — it is the only screen with tabs, and
-        // without it the page began abruptly on a tab strip. Each table then
-        // carries its own, so its header bar reads like the one on Agents or
-        // Tools: name on the left, action on the right. Before, the title was
-        // only on the page and every tab's bar held one lone button in an
-        // otherwise empty band, which is what made this screen look like it
-        // came from somewhere else.
+        // This screen needs what every other one has — an icon, a title and
+        // the primary action in one bar — above a set of tabs. UiSection can
+        // only carry a title, which it renders as a bare <h2>, and that is
+        // exactly what made this page look like it came from somewhere else.
+        // A header-only list renders the identical bar to the one on Agents,
+        // down to the padding and the hairline, because it *is* that bar.
         //
-        // Yes, the tab label and the table title say the same word. That is
-        // the cheaper of the two redundancies: the alternative is a bar that
-        // looks empty on every tab.
-        UiSection page = UiSection.of("vs-page", "Vector Stores");
-        page.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database"));
-        page.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server"));
-        page.getSections().add(UiSectionEntry.of("files", "Files", filesTab).icon("file"));
-        page.initialSection(tab);
+        // The honest fix is a UiSection that takes an icon and actions; then
+        // this is one node instead of two and the empty <ul> goes away. Until
+        // then, borrowing the right-looking header beats hand-building a
+        // lookalike that drifts from it.
+        UiList header = UiList.of("vs-header", "Vector Stores").icon("database");
+
+        // The action belongs to the tab you are on, and the controller knows
+        // which that is — so it sits in the page header and changes with the
+        // tab, rather than each table keeping a header bar of its own that
+        // holds nothing but a button.
+        String active = tab == null ? "templates" : tab;
+        if ("stores".equals(active)) {
+            header.action(UiAction.primary("new-store", "New Store").icon("add")
+                    .dispatch("GET", "/admin/vector-stores/stores/new"));
+        } else if ("templates".equals(active)) {
+            header.action(UiAction.primary("new-template", "New Template").icon("add")
+                    .dispatch("GET", "/admin/vector-stores/templates/new"));
+        }
+
+        // One tab per concern, each carrying its icon. The tables carry no
+        // titles: the tab label names them and the header above names the
+        // screen.
+        UiSection tabs = UiSection.of("vs-page", null);
+        tabs.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database"));
+        tabs.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server"));
+        tabs.getSections().add(UiSectionEntry.of("files", "Files", filesTab).icon("file"));
+        tabs.initialSection(tab);
+
+        UiStack page = UiStack.of("vs-shell").child(header).child(tabs);
         return UiPage.of(BASE, page);
     }
 

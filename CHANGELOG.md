@@ -59,6 +59,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
   metrics now; the burger sits where a list header's icon sits and is sized
   like one.
 
+- **Vector Stores gets the Agents header.** Icon, title and the primary
+  action in one bar at the top of the page content, with the tabs below it.
+  The action follows the tab you are on, so no table needs a header bar of
+  its own holding nothing but a button.
+
+- **The chat's history drawer works.** Opening it is a floating button just
+  under the header on the left, where the drawer comes from; closing it is an
+  × in the drawer's own top-right corner, or a click on the scrim. The drawer
+  is opaque, which it was not — it slid over the conversation transparently
+  and was unusable.
+
+- **The composer looks like an input again.** Its 20px corner was a pill's
+  radius on a text field; it takes the same corner every other input in the
+  app has, and so does the send button.
+
 - **The chat is a page like the others, not an app inside the app.** It had
   its own app-shell header — agent, session title, overflow — inside the
   host's, so the screen carried two title bars where every other one carries

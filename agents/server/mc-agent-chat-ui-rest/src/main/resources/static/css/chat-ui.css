@@ -612,7 +612,11 @@
     margin-inline: auto;
     background: var(--sui-color-surface);
     border: 1px solid var(--sui-color-border);
-    border-radius: 20px;
+    /* The same corner every other input in the app has. It was 20px, which
+       is a pill's radius on a box the height of a paragraph — it read as a
+       different kind of control from every text field on every other screen,
+       which is exactly what it is not. */
+    border-radius: var(--sui-radius-md, 8px);
     padding: 6px 6px 52px;
     margin-bottom: 18px;
     box-shadow: 0 1px 2px rgba(28, 27, 24, .04);
@@ -685,8 +689,9 @@
     color: var(--sui-color-text);
 }
 
+/* Send is an icon button like any other, with the icon button's corner. */
 .chat-form .sui-form-footer .sui-icon-btn--primary {
-    border-radius: 50%;
+    border-radius: var(--sui-radius-md, 8px);
 }
 
 /* The streaming state is the same surface, so the composer does not jump
@@ -694,7 +699,7 @@
 .chat-form--streaming {
     background: var(--sui-color-surface);
     border: 1px solid var(--sui-color-border);
-    border-radius: 20px;
+    border-radius: var(--sui-radius-md, 8px);
     padding: 14px 14px 14px 20px;
     margin-bottom: 18px;
     align-items: center;
@@ -738,4 +743,77 @@
     background: var(--chat-user-bubble);
     color: var(--sui-color-text-strong);
     font-weight: 500;
+}
+
+
+/* ── The history drawer's two buttons ─────────────────────────────────────
+   Opening it and closing it are different gestures in different places, so
+   they are different controls.
+
+   Open: a small floating button just under the header, hard against the left
+   edge of the content — where the drawer will come from. It is rendered into
+   the conversation's header (that is where the server puts an action), and
+   moved here, because a button that opens a panel belongs beside the panel
+   rather than in a bar at the other end of the screen.
+
+   Close: the drawer's own toggle, pushed into its top-right corner. Once the
+   drawer is open, the thing you want is at its edge, next to what you just
+   opened — not back where you started. */
+
+#chat-app-shell > .sui-shell-body {
+    position: relative;
+}
+
+.chat-container .sui-list-header #chat-history {
+    position: absolute;
+    /* Just below the header's hairline, and on the content's left edge. */
+    inset-block-start: calc(100% + var(--sui-space-sm, 8px));
+    inset-inline-start: var(--sui-space-sm, 8px);
+    z-index: 30;
+    background: var(--sui-color-surface);
+    border: 1px solid var(--sui-color-border);
+    box-shadow: var(--sui-shadow-card);
+    color: var(--sui-color-text-body);
+}
+
+.chat-container .sui-list-header #chat-history:hover:not(:disabled) {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-strong);
+}
+
+/* The header has to allow it out: it is the positioning parent. */
+.chat-conversation .sui-scrollpane > .sui-list > .sui-list-header {
+    position: sticky;
+    overflow: visible;
+}
+
+/* The drawer's own toggle goes to its far corner, and the head keeps its
+   title on the left. */
+#chat-menu .sui-menu-head {
+    justify-content: space-between;
+}
+
+#chat-menu .sui-menu-toggle {
+    order: 2;
+    margin-inline-start: auto;
+}
+
+
+/* ── The drawer is a drawer ───────────────────────────────────────────────
+   It slides over the conversation, so it needs to be opaque and to cast a
+   shadow. The framework's overlay mode only positions the menu — the
+   surface comes from `.sui-menu`, and the chat's own rules further up had
+   made that transparent back when the history was a column standing beside
+   the conversation rather than sliding over it. Over text, transparent is
+   simply broken. */
+#chat-menu.sui-menu--overlay {
+    background: var(--sui-color-surface);
+    border-inline-end: 1px solid var(--sui-color-border);
+    box-shadow: var(--sui-shadow-pop);
+}
+
+/* The close sits in the drawer's own top-right corner: once it is open, the
+   control you want is at its edge, next to what you just opened. */
+#chat-menu .chat-drawer-close {
+    margin-inline-start: auto;
 }

@@ -63,6 +63,34 @@
         return el;
     }
 
+    /* ── The drawer's close button ────────────────────────────────────────
+     * UiAppShell switches a menu's own toggle off when it wires the menu to
+     * a header's burger, and the chat has no header any more — so the drawer
+     * renders without one. The button belongs to the drawer, not to the
+     * server's idea of the page, so it is built here, in the framework's own
+     * icon-button markup, and re-added whenever the menu is re-rendered.
+     */
+    function addDrawerClose() {
+        const menu = document.getElementById(MENU_ID);
+        if (!menu) return;
+        const head = menu.querySelector(".sui-menu-head");
+        if (!head || head.querySelector(".chat-drawer-close")) return;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "sui-icon-btn sui-icon-btn--secondary chat-drawer-close";
+        button.setAttribute("aria-label", "Close");
+        button.innerHTML =
+            '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none"' +
+            ' stroke="currentColor" stroke-width="2" stroke-linecap="round">' +
+            '<path d="M18 6 6 18M6 6l12 12"/></svg>';
+        button.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            apply(menu, "hidden");
+        });
+        head.appendChild(button);
+    }
+
     /** Gives every history row its menu; runs again after each patch. */
     function decorateRows() {
         const menu = document.getElementById(MENU_ID);
@@ -120,6 +148,7 @@
         setTimeout(function () {
             scheduled = false;
             applyPlaceholder();
+            addDrawerClose();
             decorateRows();
         }, 0);
     }
@@ -144,8 +173,12 @@
             // drawer, and the button in the conversation's header — which is
             // a plain action, because whether a drawer is open is client
             // state and there is nothing to ask the server.
+            // By id, not by class: UiAction's icon appearance does not carry
+            // a cssClass through to the button, so a class selector here
+            // matched nothing and the button did nothing. The id it is given
+            // server-side does arrive.
             const button = event.target.closest(
-                '[data-menu-toggle="' + MENU_ID + '"], .chat-history-toggle');
+                '[data-menu-toggle="' + MENU_ID + '"], #chat-history');
             if (!button) return;
             const menu = document.getElementById(MENU_ID);
             if (!menu) return;

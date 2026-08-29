@@ -143,9 +143,10 @@ public final class MessageListComponent implements UiComponent {
         // The history is a drawer now, opened from here. chat-ui.js owns the
         // click: the drawer is client state, and the server has no opinion
         // about whether a sidebar happens to be open.
+        // No cssClass: an icon action does not carry one through to the
+        // button. The id is what the stylesheet and chat-ui.js hold on to.
         list.action(ai.mindconnect.ui.model.UiAction.icon("chat-history", "Chats")
-                .icon("menu")
-                .<ai.mindconnect.ui.model.UiAction>withCssClass("chat-history-toggle"));
+                .icon("menu"));
         list.headerExtra(new TokenUsageComponent(id(), memory).render());
 
         // Sort by sequenceNum to be safe — persisted ordering should already
