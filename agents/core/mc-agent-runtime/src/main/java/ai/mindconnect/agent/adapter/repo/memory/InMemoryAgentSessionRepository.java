@@ -37,6 +37,16 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
+    public List<AgentSession> findByUser(Namespace namespace, String userId) {
+        return store.values().stream()
+                .filter(s -> Objects.equals(s.namespace(), namespace)
+                        && Objects.equals(s.userId(), userId)
+                        && s.parentSessionId() == null)
+                .sorted((a, b) -> b.startedAt().compareTo(a.startedAt()))
+                .toList();
+    }
+
+    @Override
     public List<AgentSession> findByParentSessionId(UUID parentSessionId) {
         return store.values().stream()
                 .filter(s -> Objects.equals(s.parentSessionId(), parentSessionId))

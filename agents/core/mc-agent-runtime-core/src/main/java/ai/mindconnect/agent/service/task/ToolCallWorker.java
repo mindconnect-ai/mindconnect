@@ -148,9 +148,7 @@ public final class ToolCallWorker implements TaskWorker {
                 ? (Map<String, Object>) m : Map.of();
 
         AgentSession session = sessionService.findSession(sessionId);
-        AgentDefinition def = definitionRepository.findById(session.agentDefinitionId())
-                .orElseThrow(() -> DomainException.notFound(
-                        "AgentDefinition", session.agentDefinitionId().toString()));
+        AgentDefinition def = effectiveDefinition(session);
 
         try (var ignored = LoggingContext.session(session.id(), session.conversationId(), def.name())) {
             // At-least-once made harmless: a retry that finds the result
@@ -369,6 +367,16 @@ public final class ToolCallWorker implements TaskWorker {
             throw new IllegalArgumentException("Tool task is missing payload key '" + key + "'");
         }
         return value.toString();
+    }
+
+
+    /**
+     * The definition this session runs — its own inline agent, a registry
+     * agent with this chat's overrides, or (older sessions) the definition
+     * behind {@code agentDefinitionId}.
+     */
+    private AgentDefinition effectiveDefinition(AgentSession session) {
+        return new ai.mindconnect.agent.service.SessionAgentResolver(definitionRepository).resolve(session);
     }
 
 }

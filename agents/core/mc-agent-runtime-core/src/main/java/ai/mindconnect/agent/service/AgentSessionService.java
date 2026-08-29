@@ -108,6 +108,46 @@ public class AgentSessionService {
         return sessionRepository.save(session);
     }
 
+    /**
+     * Opens a chat for a session agent — either an inline one the user
+     * assembled from a model and some tools, or a reference to a registry
+     * agent with this chat's overrides.
+     *
+     * <p>{@code agentDefinitionId} is set to the session agent's id either
+     * way, so the workspace scope, the message attribution and the
+     * conversation participant keep working unchanged. For an inline agent
+     * that id resolves to nothing in the registry — which is the point: the
+     * chat is not findable under any agent, because it belongs to none.
+     */
+    public AgentSession openChat(ai.mindconnect.agent.domain.session.SessionAgent agent,
+                                 Namespace namespace, String userId) {
+        List<Participant> participants = List.of(
+                Participant.user(UUID.randomUUID(), userId, userId),
+                Participant.agent(UUID.randomUUID(), agent.id().toString(), agent.label())
+        );
+        var conversation = conversationManager.createConversation(
+                namespace, "Chat with " + agent.label(), ConversationType.USER_AGENT, participants);
+
+        AgentSession session = AgentSession
+                .start(agent.id(), namespace, userId, conversation.id())
+                .withSessionAgents(List.of(agent));
+        return sessionRepository.save(session);
+    }
+
+    /**
+     * Swaps the agent a session runs — the model-and-tools dialog, or
+     * attaching the chat to a registry agent.
+     *
+     * <p>{@code agentDefinitionId} deliberately keeps its original value: it
+     * is the key the workspace and every message written so far are filed
+     * under, and rewriting it would orphan them mid-conversation.
+     */
+    public AgentSession replaceSessionAgent(UUID sessionId,
+                                            ai.mindconnect.agent.domain.session.SessionAgent agent) {
+        AgentSession session = findSession(sessionId);
+        return sessionRepository.save(session.withSessionAgents(List.of(agent)));
+    }
+
     public List<AgentSession> listSessions(UUID agentDefinitionId, Namespace namespace, String userId) {
         return sessionRepository.findByAgentDefinitionId(agentDefinitionId, namespace, userId);
     }

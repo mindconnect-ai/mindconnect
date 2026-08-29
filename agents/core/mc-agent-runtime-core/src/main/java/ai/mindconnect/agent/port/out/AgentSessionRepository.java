@@ -16,6 +16,13 @@ public interface AgentSessionRepository {
     List<AgentSession> findByAgentDefinitionId(UUID agentDefinitionId, Namespace namespace, String userId);
 
     /**
+     * Every top-level session of one user, newest first — the chat's session
+     * list. Sub-agent sessions ({@code parentSessionId != null}) are left out:
+     * they belong to the turn that spawned them, not to the user's history.
+     */
+    List<AgentSession> findByUser(Namespace namespace, String userId);
+
+    /**
      * Returns every session whose {@code parentSessionId} equals
      * {@code parentSessionId} — i.e. all sub-agent sessions directly
      * spawned by the given session. Empty list for top-level sessions

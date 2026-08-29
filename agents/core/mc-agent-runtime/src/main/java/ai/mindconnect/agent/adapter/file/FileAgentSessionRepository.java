@@ -109,6 +109,32 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
+    public List<AgentSession> findByUser(Namespace namespace, String userId) {
+        Path sessionsDir = userSessionsDir(userId);
+        if (!Files.exists(sessionsDir)) return List.of();
+        try (var stream = Files.list(sessionsDir)) {
+            return stream
+                    .filter(Files::isDirectory)
+                    .map(d -> d.resolve(FILE_NAME))
+                    .filter(Files::exists)
+                    .map(f -> {
+                        try {
+                            return objectMapper.readValue(f.toFile(), AgentSession.class);
+                        } catch (IOException e) {
+                            throw new UncheckedIOException(e);
+                        }
+                    })
+                    .filter(s -> s.namespace().equals(namespace)
+                            && s.userId().equals(userId)
+                            && s.parentSessionId() == null)
+                    .sorted((a, b) -> b.startedAt().compareTo(a.startedAt()))
+                    .toList();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
     public List<AgentSession> findByParentSessionId(UUID parentSessionId) {
         // Sub-agent sessions can live under any user's sessions/ dir, so we
         // walk every user. The session.json files are tiny so the scan is
