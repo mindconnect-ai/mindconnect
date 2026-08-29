@@ -84,6 +84,31 @@
      * the message list many times a second, and this runs at most once per
      * frame, over one querySelectorAll scoped to the menu.
      */
+    /* ── The composer's placeholder ───────────────────────────────────────
+     * UiField carries a placeholder and the server sets one, but the
+     * framework's field template only writes the attribute for the input
+     * branches — the textarea branch drops it. So the value is read back out
+     * of the form's own node JSON, where the server already put it, and set
+     * on the element.
+     *
+     * Delete this the day field.hbs renders placeholder on <textarea>: the
+     * server side needs no change, the attribute simply arrives on its own.
+     */
+    function applyPlaceholder() {
+        document.querySelectorAll("form.chat-form[data-node]").forEach(function (form) {
+            const area = form.querySelector("textarea");
+            if (!area || area.placeholder) return;
+            let node;
+            try {
+                node = JSON.parse(form.dataset.node);
+            } catch (e) {
+                return;
+            }
+            const field = (node.fields || []).find(function (f) { return f.id === area.name; });
+            if (field && field.placeholder) area.placeholder = field.placeholder;
+        });
+    }
+
     let scheduled = false;
     function schedule() {
         if (scheduled) return;
@@ -94,6 +119,7 @@
         // collapses a burst of mutations into one pass.
         setTimeout(function () {
             scheduled = false;
+            applyPlaceholder();
             decorateRows();
         }, 0);
     }

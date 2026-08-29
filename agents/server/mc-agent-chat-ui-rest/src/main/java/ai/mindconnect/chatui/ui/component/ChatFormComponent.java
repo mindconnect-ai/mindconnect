@@ -126,6 +126,11 @@ public final class ChatFormComponent implements UiComponent {
         UiForm form = UiForm.of(id(), null)
                 .field(UiField.textarea("message", "Message", null)
                         .asEditable().asRequired()
+                        // The label stays for the accessible name; the
+                        // placeholder is what the composer shows, so the
+                        // field reads as an invitation rather than as a
+                        // labelled form control.
+                        .placeholder("Ask anything \u2026")
                         // Chat-style commit: Enter sends, Shift+Enter newline.
                         .submitOnEnter())
                 // "+" opens the attach dialog (drop-zone lives there, not on

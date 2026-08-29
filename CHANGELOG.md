@@ -23,6 +23,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Changed
+
+- **The chat reads as a conversation rather than as a list of records.** The
+  message list drops its card, its row separators and its hover highlight; the
+  agent's turns lose the grey bubble and are set as prose at a readable
+  measure, the sender/timestamp line and the per-message actions appear on
+  hover instead of taking a band of space on every turn, and the composer is a
+  single rounded field with a placeholder that starts two lines tall instead of
+  four. Markdown bullets are visible again — a list nested in a `UiList` was
+  inheriting the list's own `list-style: none`.
+
 ### Fixed
 
 - **The session tools in the admin UI work for a chat without an agent.**
