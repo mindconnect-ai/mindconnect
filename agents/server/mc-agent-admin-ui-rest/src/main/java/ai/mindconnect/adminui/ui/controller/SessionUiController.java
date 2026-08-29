@@ -58,6 +58,13 @@ public class SessionUiController {
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
     private final ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory;
     private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
+    /**
+     * The session tools (memory, traces, todos, workspace) have to resolve the
+     * agent the same way the run does. A chat with an inline session agent has
+     * no entry in the registry, and looking it up there answered 404 for every
+     * one of these dialogs.
+     */
+    private final ai.mindconnect.agent.service.SessionAgentResolver agentResolver;
 
     public SessionUiController(AgentSessionService sessionService,
                              AgentChatService chatService,
@@ -84,6 +91,7 @@ public class SessionUiController {
         this.activeStreams = activeStreams;
         this.layoutFactory = layoutFactory;
         this.approvalStore = approvalStore;
+        this.agentResolver = new ai.mindconnect.agent.service.SessionAgentResolver(agentRepository);
     }
 
     /**
@@ -127,7 +135,7 @@ public class SessionUiController {
             return ResponseEntity.status(503).body("Working memory unavailable for this session");
         }
         return sessionRepository.findById(sessionId)
-                .flatMap(session -> agentRepository.findById(session.agentDefinitionId())
+                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> {
                             var page = new MemoryPage(session, agent, memory);
                             if (seq != null) return ResponseEntity.ok(page.selectEntry(seq));
@@ -158,7 +166,7 @@ public class SessionUiController {
             return ResponseEntity.status(503).body("Working memory unavailable after compression");
         }
         return sessionRepository.findById(sessionId)
-                .flatMap(session -> agentRepository.findById(session.agentDefinitionId())
+                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> ResponseEntity.ok(new MemoryPage(session, agent, memory).render())))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -210,7 +218,7 @@ public class SessionUiController {
         final List<ai.mindconnect.agent.domain.LlmCallTrace> tracesFinal = traces;
         final List<Message> historyFinal = combinedHistory;
         return sessionRepository.findById(sessionId)
-                .flatMap(session -> agentRepository.findById(session.agentDefinitionId())
+                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> {
                             var page = new TracesPage(session, agent,
                                     tracesFinal, historyFinal, turnId);
@@ -231,7 +239,7 @@ public class SessionUiController {
     public ResponseEntity<?> getTodos(@PathVariable UUID sessionId,
                                       @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         return sessionRepository.findById(sessionId)
-                .flatMap(session -> agentRepository.findById(session.agentDefinitionId())
+                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> {
                             var list = todoListService.load(sessionId);
                             var page = new TodosPage(session, agent, list).render();
@@ -261,7 +269,7 @@ public class SessionUiController {
     public ResponseEntity<?> getWorkspace(@PathVariable UUID sessionId,
                                           @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         return sessionRepository.findById(sessionId)
-                .flatMap(session -> agentRepository.findById(session.agentDefinitionId())
+                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> {
                             var page = new WorkspacePage(session, agent, workspaceStore).render();
                             if (dialog) return sessionDialog(sessionId, "Workspace", page);

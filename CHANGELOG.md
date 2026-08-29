@@ -23,6 +23,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The session tools in the admin UI work for a chat without an agent.**
+  Working memory, traces, todos and the workspace dialog resolved the agent
+  straight from the registry, so all four answered 404 for a chat whose agent
+  lives in its session. They now resolve the same way the run does.
+
 ### Added
 
 - **A chat that needs no agent.** A session can now carry its own agent:
