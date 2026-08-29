@@ -61,6 +61,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
   working through `subscribeTurn(...)`; the turn is a coordinate in the
   envelope now, not a channel of its own.
 
+### Fixed
+
+- **The agent server starts again.** `mc-agent-api-app` failed at startup with
+  `required a bean of type 'ai.mindconnect.common.Namespace'`: the workflow
+  tools resolve agents by name and need the namespace, which only the admin UI
+  app defined. The agent server now declares it too.
+- **Swagger on the agent server lists the REST API only.** The workflow
+  admin's page controller arrives on the classpath with the workflow tools and
+  mapped 40 `/workflow-admin` routes into the OpenAPI document. Those are
+  server-rendered UI, not API, and their recursive `UiNode` schemas made
+  Swagger UI crawl. The document is now scoped to `/api/**`.
+
 ### Documentation
 
 - The REST API has a page of its own, including the stream and the approvals:
