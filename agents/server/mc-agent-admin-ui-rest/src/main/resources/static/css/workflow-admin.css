@@ -34,6 +34,22 @@
   margin-inline-start: auto;
 }
 
+/* The "+" behind the name: no space of its own, no ink until the pointer
+   is on the row (or the keyboard reaches it). It inserts below this row. */
+.wf-step > .sui-icon-btn {
+  min-width: 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity var(--sui-duration-fast, 120ms);
+}
+
+.wf-step:hover > .sui-icon-btn,
+.wf-step:focus-within > .sui-icon-btn {
+  opacity: 1;
+}
+
 /* The type as written, not shouted: small caps and the faintest ink made
    the one thing that says what a step DOES the hardest thing to read. */
 /* No column: the name follows its type at the row gap, the way a label

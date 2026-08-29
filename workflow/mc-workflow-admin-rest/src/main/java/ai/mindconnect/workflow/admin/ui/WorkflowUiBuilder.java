@@ -56,7 +56,12 @@ public class WorkflowUiBuilder {
         UiStack body = UiStack.of("wf-body:" + wfId);
         body.withCssClass("wf-body");
         renderSteps(body, wf.getSteps());
-        body.child(addStepControl(ROOT));
+        // Every row inserts below itself via its own "+", so a standing
+        // control is only needed where there is no row to hover: an empty
+        // workflow.
+        if (wf.getSteps() == null || wf.getSteps().isEmpty()) {
+            body.child(addStepControl(ROOT));
+        }
         return body;
     }
 
@@ -92,6 +97,11 @@ public class WorkflowUiBuilder {
                 .direction(UiStack.Direction.HORIZONTAL).gap(10)
                 .child(UiText.of(id + ":type", step.getType()).withCssClass("wf-step-type"))
                 .child(UiText.of(id + ":name", ref).withCssClass("wf-step-name"))
+                // The "+" behind the name — visible only while the pointer is
+                // on the row. It inserts BELOW this row, in the same list.
+                .child(UiAction.icon(id + ":add", "Add step below").icon("add")
+                        .onClick(UiTrigger.api("GET",
+                                url("/" + wfId + "/add/" + enc("after:" + ref)))))
                 .child(menu);
         row.withCssClass("wf-step");
 
@@ -116,7 +126,11 @@ public class WorkflowUiBuilder {
             String kind = step instanceof BlockData ? "block" : "foreach";
             UiStack inner = indent(ref);
             renderSteps(inner, container.getSteps());
-            inner.child(addStepControl(kind + ":" + ref));
+            // A container with rows is filled through their "+"; an empty one
+            // has nothing to hover, so it keeps a control of its own.
+            if (container.getSteps() == null || container.getSteps().isEmpty()) {
+                inner.child(addStepControl(kind + ":" + ref));
+            }
             return inner;
         }
         return null;
@@ -144,17 +158,22 @@ public class WorkflowUiBuilder {
                 if (then != null) {
                     renderSteps(thenStack, then.getSteps());
                 }
-                thenStack.child(addStepControl("if:" + ref + ":then:" + c));
+                if (then == null || then.getSteps() == null || then.getSteps().isEmpty()) {
+                    thenStack.child(addStepControl("if:" + ref + ":then:" + c));
+                }
                 branches.child(thenStack);
             }
         }
 
         branches.child(UiText.of(id + ":elseLabel", "else").withCssClass("wf-branch-label"));
         UiStack elseStack = indent(ref + ":else");
-        if (ifData.getElseBlock() != null) {
-            renderSteps(elseStack, ifData.getElseBlock().getSteps());
+        BlockData elseBlock = ifData.getElseBlock();
+        if (elseBlock != null) {
+            renderSteps(elseStack, elseBlock.getSteps());
         }
-        elseStack.child(addStepControl("if:" + ref + ":else"));
+        if (elseBlock == null || elseBlock.getSteps() == null || elseBlock.getSteps().isEmpty()) {
+            elseStack.child(addStepControl("if:" + ref + ":else"));
+        }
         branches.child(elseStack);
 
         return branches;

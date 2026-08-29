@@ -442,8 +442,9 @@ public class WorkflowAdminUiController {
     // -----------------------------------------------------------------------
 
     /**
-     * @param container {@link WorkflowUiBuilder#ROOT}, or the mutator's container
-     *                  DSL ({@code block:<name>}, {@code foreach:<name>},
+     * @param container {@link WorkflowUiBuilder#ROOT}, {@code after:<name>}
+     *                  (insert below that step, same list), or the mutator's
+     *                  container DSL ({@code block:<name>}, {@code foreach:<name>},
      *                  {@code if:<name>:then:<i>}, {@code if:<name>:else})
      */
     @GetMapping("/{wf}/add/{container}")
@@ -484,6 +485,10 @@ public class WorkflowAdminUiController {
 
         if (WorkflowUiBuilder.ROOT.equals(container)) {
             data.getSteps().add(step);
+        } else if (container.startsWith("after:")) {
+            // The row's own "+": the new step lands right below the row it
+            // was clicked on, in the same list.
+            mutator.insertAfter(data, container.substring("after:".length()), step);
         } else {
             // Creates a missing then/else block on the way in, which is what
             // makes an if with empty branches fillable.
