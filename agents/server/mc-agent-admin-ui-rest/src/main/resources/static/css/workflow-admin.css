@@ -192,7 +192,7 @@
 .migration-diff td:nth-child(3) {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: var(--sui-text-sm);
-  color: #1f2933;
+  color: var(--sui-color-text);
   white-space: pre-wrap;
   word-break: break-word;
   max-width: 40vw;
@@ -205,5 +205,7 @@
 .tool-catalog .sui-activity-summary {
   font-size: var(--sui-text-md);
   font-weight: 500;
-  color: #1f2933;
+  /* The theme's own ink, not a literal: a hard-coded slate was invisible
+     on the dark themes' surfaces. */
+  color: var(--sui-color-text);
 }

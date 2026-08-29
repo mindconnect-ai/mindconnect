@@ -47,6 +47,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   (workspace, traces, memory, todos) is back in the chat header, and the
   token-usage gauge is no longer faded.
 
+- **Tool and migration group headings are legible on the dark themes.** Their
+  ink was a hard-coded slate instead of the theme's text token — invisible on
+  Amethyst and Dark. The tool groups also drop their extra size and weight and
+  read like the migration rows.
+
 - **The session tools in the admin UI work for a chat without an agent.**
   Working memory, traces, todos and the workspace dialog resolved the agent
   straight from the registry, so all four answered 404 for a chat whose agent

@@ -500,11 +500,6 @@ body {
     color: var(--sui-color-text);
     padding: 6px 0;
 }
-/* Group headers read as section titles above their tools. */
-.tool-catalog > ul > li > .sui-list-item-main > details > .sui-activity-summary {
-    font-size: var(--sui-text-lg, 15px);
-    font-weight: 600;
-}
 /* The nested per-group list needs no header block of its own. */
 .tool-catalog .sui-activity-body .sui-list-header { display: none; }
 
