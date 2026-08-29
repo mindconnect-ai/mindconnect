@@ -497,3 +497,33 @@ body {
 }
 /* The nested per-group list needs no header block of its own. */
 .tool-catalog .sui-activity-body .sui-list-header { display: none; }
+
+/* ── Theme picker ─────────────────────────────────────────────────────────
+   Injected into the header by js/theme-switch.js in the framework's own
+   menu-button markup, so it needs no styling of its own beyond the second
+   line each item carries and the check on the active one. In app.css rather
+   than in a theme: the control has to read correctly under every theme,
+   including none. */
+
+.sui-theme-switch .sui-menu-button-item {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+}
+
+.sui-theme-switch-hint {
+    font-size: 11px;
+    color: var(--sui-color-text-muted);
+}
+
+/* The active theme is marked with a check rather than a fill — the popover
+   is a choice among three, not a list of things to do. */
+.sui-theme-switch .sui-menu-button-item[aria-checked="true"] .sui-menu-button-item-label::after {
+    content: " ✓";
+    color: var(--sui-color-text-muted);
+}
+
+.sui-theme-switch .sui-menu-button-item[aria-checked="true"] {
+    font-weight: 500;
+}

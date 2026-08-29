@@ -49,10 +49,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   surface, near-black actions instead of an accent colour, and pill-shaped
   controls. Colour appears only where it means something.
 
-  Pick one with `?theme=clody`, `?theme=gipiti` or `?theme=default` on any
-  admin URL; the choice is remembered per browser. Both stylesheets are
-  always linked and each is scoped to its own class on `<html>`, so the
-  inactive one costs bytes and nothing else.
+  Switch with the palette button in the header, or with `?theme=clody`,
+  `?theme=gipiti`, `?theme=default` on any admin URL. The choice is
+  remembered per browser and applies without a reload — nothing about it
+  reaches the server, so two people on the same login can disagree. Both
+  stylesheets are always linked and each is scoped to its own class on
+  `<html>`, so the inactive one costs bytes and nothing else.
 
 - **Clody, a warm theme for the admin UI and the chat.** The admin app now
   ships a second look: bone-and-clay neutrals instead of the cool slate scale,

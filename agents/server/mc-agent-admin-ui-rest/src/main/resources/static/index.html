@@ -17,18 +17,14 @@
         /*
          * Theme selection, before first paint.
          *
-         * Inline and in <head> on purpose: as a separate file it would load
-         * after the first paint and the page would flash the default theme
-         * first. Four lines are worth not having that flash.
-         *
-         *   ?theme=gipiti   switch and remember
-         *   ?theme=default  back to the framework's own look
-         *
-         * The choice is per browser, not per user — it is a preference about
-         * this screen, not something the server needs to know.
+         * Inline and in <head> on purpose: as a separate file this would run
+         * after the first paint and the page would flash the previous theme.
+         * It deliberately knows no theme names — it applies whatever was
+         * remembered (or asked for in ?theme=), and js/theme-switch.js owns
+         * the list of what is real. A stale or invented name simply matches
+         * no stylesheet and the app renders as the framework default.
          */
         (function () {
-            var THEMES = ["clody", "gipiti"];
             var url = new URL(window.location.href);
             var wanted = url.searchParams.get("theme");
             if (wanted) {
@@ -38,8 +34,8 @@
             if (!active) {
                 try { active = localStorage.getItem("sui-theme"); } catch (e) { active = null; }
             }
-            if (active === null) active = "clody";   // the default look
-            if (THEMES.indexOf(active) >= 0) {
+            if (active === null) active = "clody";        // the default look
+            if (/^[a-z][a-z0-9-]*$/.test(active) && active !== "default") {
                 document.documentElement.classList.add("sui-theme-" + active);
             }
         })();
@@ -66,5 +62,8 @@
     <script type="module" src="/js/app.js"></script>
     <!-- Chat: two-state history toggle — ships with mc-agent-chat-ui-rest. -->
     <script src="/js/chat-ui.js" defer></script>
+    <!-- The theme picker in the header. Purely client-side: it swaps a class
+         on <html> and remembers the choice per browser. -->
+    <script src="/js/theme-switch.js" defer></script>
 </body>
 </html>
