@@ -52,11 +52,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
   Amethyst and Dark. The tool groups also drop their extra size and weight and
   read like the migration rows.
 
-- **The workflow detail page wears the standard header.** The ad-hoc
-  "Workflow: name" text-and-buttons row becomes the same icon + title +
-  actions bar every other screen carries, and the per-container "+ Add step"
-  is a quiet secondary button at its natural width instead of a page-wide
-  primary bar.
+- **The workflow detail page wears the standard header, and its editor reads
+  as a list.** The ad-hoc "Workflow: name" text-and-buttons row becomes the
+  same icon + title + actions bar every other screen carries. Steps are no
+  longer spaced-out cards with three buttons each: they are joined rows —
+  type, name, and a "…" menu holding Details/Edit/Delete — with nesting
+  shown by indentation along a guide line, and "+ Add step" as a quiet
+  secondary button at its natural width.
 
 - **The session tools in the admin UI work for a chat without an agent.**
   Working memory, traces, todos and the workspace dialog resolved the agent

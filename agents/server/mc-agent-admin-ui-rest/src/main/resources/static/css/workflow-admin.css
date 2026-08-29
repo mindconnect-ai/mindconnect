@@ -1,42 +1,69 @@
-/* Workflow admin — step cards. Layered on top of /sui/sui.css. */
+/* Workflow admin — the editor is one list. Layered on top of /sui/sui.css.
+
+   Steps used to be spaced-out cards, each carrying three buttons and each
+   nesting level a dashed box — a page of frames around frames. Now a step
+   is a row: type, name, and a "…" menu on the right; rows join without
+   gaps, separated by hairlines, and nesting is shown by indentation along
+   a guide line, the way code shows it. */
+
+.wf-body,
+.wf-step-group,
+.wf-nested {
+  gap: 0;
+}
 
 .wf-step {
-  border: 1px solid #c9d4df;
-  border-radius: 8px;
-  padding: 10px 12px;
-  background: #ffffff;
-  margin: 4px 0;
+  align-items: center;
+  padding: var(--sui-space-sm) var(--sui-space-md);
+  border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+.wf-step:hover {
+  background: var(--sui-color-surface-alt);
+}
+
+/* The row's one control sits at its far end. */
+.wf-step > .sui-menu-button {
+  margin-inline-start: auto;
 }
 
 .wf-step-type {
   display: inline-block;
+  min-width: 8.5rem;
   font-size: var(--sui-text-xs);
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #5a7fa3;
+  color: var(--sui-color-text-subtle);
 }
 
 .wf-step-name {
-  font-weight: 600;
-  color: #1a3a5c;
+  font-weight: 500;
+  color: var(--sui-color-text);
 }
 
-/* "if <condition>" / "else" — labels the branch box that follows them. */
+/* "if <condition>" / "else" — labels the indented run that follows. */
 .wf-branch-label {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: var(--sui-text-xs);
-  font-weight: 700;
-  color: #5a7fa3;
+  font-weight: 600;
+  color: var(--sui-color-text-muted);
+  padding: var(--sui-space-xs) var(--sui-space-md);
 }
 
-/* Nested container (block body, for-each body, if branches) */
+/* Nested container (block body, for-each body, if branches): indentation
+   with a guide line instead of a dashed box. */
 .wf-nested {
-  border: 1px dashed #c9d4df;
-  border-radius: 8px;
-  padding: 8px 10px;
-  margin: 4px 0 4px 20px;
-  background: #f7fafc;
+  padding-inline-start: var(--sui-space-2xl);
+  margin-inline-start: var(--sui-space-md);
+  border-inline-start: 2px solid var(--sui-color-border-soft);
+}
+
+/* The add-step row keeps a little air so it reads as an affordance, not a
+   row of the list. */
+.wf-body > .sui-btn,
+.wf-nested > .sui-btn {
+  margin: var(--sui-space-sm) var(--sui-space-md);
 }
 
 /* --- Run view ---------------------------------------------------------- */

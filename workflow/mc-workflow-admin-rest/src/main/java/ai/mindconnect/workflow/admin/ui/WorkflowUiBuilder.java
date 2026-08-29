@@ -1,6 +1,8 @@
 package ai.mindconnect.workflow.admin.ui;
 
 import ai.mindconnect.ui.model.UiAction;
+import ai.mindconnect.ui.model.UiMenuButton;
+import ai.mindconnect.ui.model.UiMenuItem;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiText;
@@ -18,9 +20,11 @@ import java.util.List;
 /**
  * Renders a {@link WorkflowData} tree into nested semantic-ui stacks.
  *
- * <p>Each step is a card: {@code [type] [name] [actions]}. Container steps
- * (block, for-each, if-branches) recurse, their children rendered in an
- * indented stack underneath.
+ * <p>The editor reads as one list: each step is a row — {@code [type]
+ * [name] … [⋯]} — joined to its neighbours without gaps, with the row's
+ * actions (details, edit, delete) behind a single overflow menu on the
+ * right. Container steps (block, for-each, if-branches) recurse, their
+ * children indented underneath rather than boxed.
  *
  * <p><b>Steps are addressed by name.</b> Every action a card emits carries the
  * step's name, not its position in the tree — so a button still sitting in an
@@ -47,9 +51,10 @@ public class WorkflowUiBuilder {
         return "step:" + wfId + ":" + stepRef;
     }
 
-    /** Renders the whole workflow body as a vertical stack of step cards. */
+    /** Renders the whole workflow body as one joined list of step rows. */
     public UiNode render(WorkflowData wf) {
         UiStack body = UiStack.of("wf-body:" + wfId);
+        body.withCssClass("wf-body");
         renderSteps(body, wf.getSteps());
         body.child(addStepControl(ROOT));
         return body;
@@ -70,28 +75,33 @@ public class WorkflowUiBuilder {
         String ref = step.getName();
         String id = stepId(wfId, ref);
 
-        UiStack actions = UiStack.of(id + ":actions")
-                .direction(UiStack.Direction.HORIZONTAL)
-                .gap(8)
-                .child(UiAction.secondary(id + ":details", "Details")
-                        .onClick(UiTrigger.api("GET", stepUrl(ref, ""))))
-                .child(UiAction.secondary(id + ":edit", "Edit")
-                        .onClick(UiTrigger.api("GET", stepUrl(ref, "edit"))))
-                .child(UiAction.danger(id + ":delete", "Delete")
-                        .confirm("Delete this step?")
-                        .dispatch("POST", stepUrl(ref, "delete")));
+        // Three buttons per row turned the editor into a wall of controls;
+        // the row shows what a step IS, and everything you can do to it
+        // waits behind one "…" button.
+        UiMenuButton menu = UiMenuButton.of(id + ":menu");
+        menu.icon("more");
+        menu.item(UiMenuItem.of(id + ":details", "Details").icon("show")
+                .onClick(UiTrigger.api("GET", stepUrl(ref, ""))));
+        menu.item(UiMenuItem.of(id + ":edit", "Edit").icon("edit")
+                .onClick(UiTrigger.api("GET", stepUrl(ref, "edit"))));
+        menu.item(UiMenuItem.of(id + ":delete", "Delete").icon("delete")
+                .confirm("Delete this step?")
+                .onClick(UiTrigger.api("POST", stepUrl(ref, "delete"))));
 
-        UiStack card = UiStack.of(id).gap(4)
+        UiStack row = UiStack.of(id)
+                .direction(UiStack.Direction.HORIZONTAL).gap(10)
                 .child(UiText.of(id + ":type", step.getType()).withCssClass("wf-step-type"))
                 .child(UiText.of(id + ":name", ref).withCssClass("wf-step-name"))
-                .child(actions);
-        card.withCssClass("wf-step");
+                .child(menu);
+        row.withCssClass("wf-step");
 
         UiNode nested = renderNested(step, ref);
         if (nested == null) {
-            return card;
+            return row;
         }
-        return UiStack.of(id + ":group").gap(6).child(card).child(nested);
+        UiStack group = UiStack.of(id + ":group").child(row).child(nested);
+        group.withCssClass("wf-step-group");
+        return group;
     }
 
     // -----------------------------------------------------------------------
@@ -163,7 +173,7 @@ public class WorkflowUiBuilder {
     }
 
     private UiStack indent(String key) {
-        UiStack box = UiStack.of("indent:" + wfId + ":" + key).gap(6);
+        UiStack box = UiStack.of("indent:" + wfId + ":" + key);
         box.withCssClass("wf-nested");
         return box;
     }
