@@ -26,6 +26,7 @@
         { id: "sorbet",   label: "Sorbet",   hint: "Pastels, light" },
         { id: "dark",     label: "Dark",     hint: "The framework's own dark" },
         { id: "amethyst", label: "Amethyst", hint: "Violet on a dark ground" },
+        { id: "compact",  label: "Compact",  hint: "The default, tighter" },
         { id: "default",  label: "Default",  hint: "The framework's own" },
     ];
 

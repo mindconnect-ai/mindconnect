@@ -43,6 +43,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **Compact, the framework's look at close range.** The one theme that
+  changes no colour at all: smaller type, tighter rows, less padding
+  throughout, so a list of agents shows more of itself and the eye travels
+  less. Ten rows plus the pager where the default fits nine.
+
 - **Sorbet, a pastel light theme.** The first look that uses more than one
   colour on purpose: a lilac ground, a mint badge, a peach warning and a rose
   error can share a screen because none of them is saturated. It is also the

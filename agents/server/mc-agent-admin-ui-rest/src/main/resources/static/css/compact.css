@@ -1,0 +1,192 @@
+/*
+ * Compact — the framework's own look, at close range.
+ *
+ * The odd one out. The other four themes here change what the app looks
+ * like and leave its proportions alone; this one changes nothing but the
+ * proportions. The palette is the framework's, untouched — no colour token
+ * appears below. What it does is take the space out: smaller type, tighter
+ * rows, less padding everywhere, so more fits on a screen and the eye
+ * travels less between related things.
+ *
+ * That makes it the one theme worth having *alongside* the others rather
+ * than instead of them, and it is also why it is more rules than any of
+ * them. Colour is fully tokenised in sui.css — a palette is variables and
+ * nothing else — but spacing is not: every padding below is a literal in
+ * the framework sheet, so a density theme has to name components one by
+ * one. Six --sui-space-* tokens would collapse this whole file to a block
+ * the size of Clody's palette, and that is the argument for adding them.
+ *
+ * The proportions are kept in step with each other rather than each shrunk
+ * to taste: type drops one step (15 → 14), the padding scale drops about a
+ * quarter, and the radii come down with it, because a tight row inside a
+ * 12px corner looks like a mistake.
+ */
+
+
+/* ══ Type ════════════════════════════════════════════════════════════════
+   One step down, and the leading with it. This is the only theme here that
+   moves the size — the other four agree on 16px precisely so that switching
+   between them does not resize the screen. Compact is the exception that
+   says what it is in its name, which is the only kind of exception worth
+   having. */
+
+:root.sui-theme-compact {
+    --sui-font-size: 14px;
+
+    /* Corners come down with the spacing: a 14px row inside a 12px radius
+       reads as a rounded box that someone squeezed. */
+    --sui-radius-sm: 5px;
+    --sui-radius-md: 7px;
+    --sui-radius-lg: 9px;
+}
+
+:root.sui-theme-compact body {
+    line-height: 1.45;
+}
+
+:root.sui-theme-compact :is(.sui-list-header, .sui-table-header) h2 {
+    font-size: 15px;
+}
+
+:root.sui-theme-compact :is(.sui-form, .sui-detail) h2 {
+    font-size: 15px;
+    margin-bottom: 12px;
+}
+
+
+/* ══ The page ════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-compact .sui-shell-content {
+    padding: 12px;
+}
+
+
+/* ══ Rows ════════════════════════════════════════════════════════════════
+   The biggest single gain: a list of forty agents is mostly row padding at
+   14px top and bottom. Down to 8 and the same screen holds a third more of
+   them without anything touching. */
+
+:root.sui-theme-compact .sui-list-item {
+    padding: 8px 14px;
+}
+
+:root.sui-theme-compact .sui-list-item-main {
+    gap: 1px;
+}
+
+:root.sui-theme-compact :is(.sui-list-header, .sui-table-header) {
+    padding: 10px 14px;
+}
+
+:root.sui-theme-compact .sui-table tbody td {
+    padding: 7px 12px;
+    font-size: 14px;
+}
+
+:root.sui-theme-compact .sui-detail-row dt {
+    padding: 7px 0;
+    font-size: 13px;
+}
+
+:root.sui-theme-compact .sui-detail-row dd {
+    padding: 6px 0;
+}
+
+
+/* ══ Forms ═══════════════════════════════════════════════════════════════
+   A form is a column of fields, so its gap is felt more than any single
+   padding — 18px between every label group adds up to a screenful on a
+   long one. */
+
+:root.sui-theme-compact :is(.sui-form, .sui-detail) {
+    padding: 14px;
+}
+
+:root.sui-theme-compact .sui-field {
+    margin-bottom: 10px;
+    gap: 3px;
+}
+
+:root.sui-theme-compact :is(.sui-field input, .sui-field textarea, .sui-field select) {
+    padding: 5px 8px;
+}
+
+/* A field with a leading icon keeps room for it. The framework sets that
+   inset with `padding-left` alone, so the shorthand above wiped it and the
+   magnifier landed on top of the placeholder — the framework itself restores
+   it in two other places for the same reason. */
+:root.sui-theme-compact .sui-input-icon > :is(input, select),
+:root.sui-theme-compact .sui-input-icon > .sui-input-reveal > input {
+    padding-left: 30px;
+}
+
+:root.sui-theme-compact .sui-field textarea {
+    min-height: 72px;
+}
+
+:root.sui-theme-compact .sui-section-entry {
+    padding: 8px;
+}
+
+
+/* ══ Controls ════════════════════════════════════════════════════════════
+   Buttons shrink too, but not below the size a finger can hit: 30px keeps
+   them comfortably above the point where a dense toolbar becomes a game of
+   accuracy. */
+
+:root.sui-theme-compact .sui-btn {
+    padding: 5px 11px;
+    font-size: 13px;
+}
+
+:root.sui-theme-compact .sui-icon-btn {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 6px;
+}
+
+:root.sui-theme-compact .sui-menu-link {
+    padding: 5px 8px;
+    font-size: 14px;
+}
+
+:root.sui-theme-compact .sui-menu {
+    padding: 6px;
+}
+
+:root.sui-theme-compact .sui-menu-head {
+    min-height: 32px;
+    padding: 4px 6px;
+}
+
+:root.sui-theme-compact .sui-tab {
+    padding: 5px 12px;
+}
+
+
+/* ══ Things that float ═══════════════════════════════════════════════════ */
+
+:root.sui-theme-compact .sui-dialog-body {
+    padding: 14px;
+}
+
+:root.sui-theme-compact .sui-dialog-header {
+    padding: 10px 14px;
+}
+
+:root.sui-theme-compact .sui-toast {
+    padding: 8px 12px;
+}
+
+
+/* ══ The chat ════════════════════════════════════════════════════════════
+   The conversation gets the same treatment through the two variables the
+   chat module offers, rather than by reaching into its rules: turns sit
+   closer together, and the column narrows a little because a shorter line
+   suits a smaller face. The measure stays wide enough to read — density is
+   about the space between things, not about cramming the prose. */
+
+:root.sui-theme-compact #chat-app-shell {
+    --chat-turn-gap: .9rem;
+    --chat-measure: 44rem;
+}
