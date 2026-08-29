@@ -191,4 +191,19 @@ mvn -f agents/client/mc-agent-cli/pom.xml spring-boot:run
 - Build parent POMs and shared/core modules before the modules that depend on them.
 - Manual regression tests live in `agents/manual-tests/` — human/LLM-executable
   scripts with per-step expectations; update `last-verified` stamps only on PASS.
+- **Everything written is in English** — code comments, javadoc, documentation,
+  commit messages, PR titles and descriptions, issue replies. This is an open
+  source project; a German commit message or PR body shuts out most of the
+  people who might read it. Conversation with the maintainer can be in German,
+  but nothing that lands in the repository or on GitHub.
 - Git commits: do **not** add a `Co-Authored-By` trailer.
+- **Before committing a user-facing change, add a line to `CHANGELOG.md`**
+  under `## [Unreleased]`. User-facing means someone using the libraries or
+  running the apps would want to know: a new endpoint, a changed behaviour, a
+  fixed bug whose symptom they may have been living with. Refactorings, tests,
+  docs and build plumbing do not need one — write the entry for a reader
+  deciding whether to upgrade, not for the commit log, which the releases page
+  already has. A PR that touches shipped Java without touching the changelog
+  fails the `changelog` check; label it `no-changelog` when that is the right
+  answer. The release workflow renames `[Unreleased]` to the version being cut
+  and opens a fresh one, so nothing is moved by hand.
