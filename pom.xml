@@ -100,6 +100,7 @@
         <module>agents/core/mc-agent-tools-gmail</module>
         <module>agents/server/mc-agent-api-rest</module>
         <module>agents/server/mc-agent-api-app</module>
+        <module>agents/server/mc-agent-chat-ui-rest</module>
         <module>agents/server/mc-agent-admin-ui-rest</module>
         <module>agents/server/mc-agent-admin-ui-app</module>
         <module>agents/client/mc-agent-cli</module>
