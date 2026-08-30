@@ -21,7 +21,7 @@ fresh empty one, so nothing has to be moved by hand at release time.
 [keepachangelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
 
-## [Unreleased]
+## [0.1.0] - 2026-08-30
 
 ### Changed
 
