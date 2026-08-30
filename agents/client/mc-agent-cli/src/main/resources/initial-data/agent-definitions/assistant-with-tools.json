@@ -174,7 +174,8 @@
       "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
       "name": "gmail_send_email",
       "description": "Sends an email from the user's Gmail account. Confirm recipients with the user before calling.",
-      "enabled": true
+      "enabled": true,
+      "needsApproval": true
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",
