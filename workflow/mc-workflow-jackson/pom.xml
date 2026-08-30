@@ -6,7 +6,7 @@
 <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.0.3</version>
+        <version>0.0.4-SNAPSHOT</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
@@ -14,7 +14,7 @@
     <artifactId>mc-workflow-jackson</artifactId>
     <name>mc-workflow-jackson</name>
     <description>JSON (de)serialization of workflow definitions</description>
-    <version>0.0.3</version>
+    <version>0.0.4-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -29,7 +29,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow</artifactId>
-            <version>0.0.3</version>
+            <version>0.0.4-SNAPSHOT</version>
         </dependency>
 
         <!-- Jackson — the whole point of this module -->

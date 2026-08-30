@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.0.3</version>
+        <version>0.0.4-SNAPSHOT</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
@@ -36,7 +36,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-ui-diagram</artifactId>
-            <version>0.0.3</version>
+            <version>0.0.4-SNAPSHOT</version>
         </dependency>
         <!--
             mc-semantic-ui-ext-diagram and mc-semantic-ui-core are transitive
@@ -61,7 +61,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-jackson</artifactId>
-            <version>0.0.3</version>
+            <version>0.0.4-SNAPSHOT</version>
         </dependency>
 
         <dependency>
