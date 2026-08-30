@@ -25,6 +25,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **The seeded assistant asks before sending e-mail.** `gmail_send_email` in
+  the "Assistant with tools" binding now carries `needsApproval` — reading and
+  searching mail stay unattended, but every send waits for a human yes (with
+  "allow for this session" available on the approval card). Existing data
+  directories keep their seeded binding; this affects fresh installs.
+
+### Changed
+
 - **The seeded `web-researcher` agent runs on `agent-default`.** It was the
   one agent pinned to `openai-default`, so a fresh install without an OpenAI
   key shipped an agent that could not start.
