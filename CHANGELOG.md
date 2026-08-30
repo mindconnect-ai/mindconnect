@@ -23,6 +23,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Changed
+
+- **The seeded `web-researcher` agent runs on `agent-default`.** It was the
+  one agent pinned to `openai-default`, so a fresh install without an OpenAI
+  key shipped an agent that could not start.
+
 ## [0.0.3] - 2026-08-30
 
 ### Changed
