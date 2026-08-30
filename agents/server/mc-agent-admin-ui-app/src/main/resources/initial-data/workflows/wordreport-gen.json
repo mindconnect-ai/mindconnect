@@ -1,6 +1,6 @@
 {
   "@class": "ai.mindconnect.workflow.domain.WorkflowData",
-  "name": "donoreport-gen",
+  "name": "wordreport-gen",
   "params": {
     "type": "object",
     "properties": {
@@ -55,7 +55,7 @@
       "@class": "ai.mindconnect.workflow.domain.CodeData",
       "name": "select-sections",
       "language": "javascript",
-      "code": "var all = JSON.parse(String(allSections));\nvar sel = [];\nfor (var i = 0; i < all.length; i++) { if (String(this['keep-' + i]) === 'true') { sel.push({ idx: sel.length, title: all[i].title || ('Section ' + (i + 1)), level: all[i].level || 1, content: String(all[i].content || '') }); } }\nselectedJson = JSON.stringify(sel);\nts = String(new Date().getTime());\nstore = 'donoreport-' + ts;\ntemplateFileName = String(workDir) + '/template_' + ts + '.json';",
+      "code": "var all = JSON.parse(String(allSections));\nvar sel = [];\nfor (var i = 0; i < all.length; i++) { if (String(this['keep-' + i]) === 'true') { sel.push({ idx: sel.length, title: all[i].title || ('Section ' + (i + 1)), level: all[i].level || 1, content: String(all[i].content || '') }); } }\nselectedJson = JSON.stringify(sel);\nts = String(new Date().getTime());\nstore = 'wordreport-' + ts;\ntemplateFileName = String(workDir) + '/template_' + ts + '.json';",
       "wrapInFunction": false,
       "injectVariables": true,
       "exportVariables": true,
@@ -150,7 +150,7 @@
             "name": "section-writer",
             "description": "Writes report sections from the project knowledge store.",
             "llmConfigName": "agent-default",
-            "systemPrompt": "You write sections for a donor report. Use the search_project_docs tool (multiple queries if needed) to find facts in the project documents, then write the section. Write ONLY the section body text — no headings, no meta commentary. Be factual; if the documents lack the information, say so briefly.",
+            "systemPrompt": "You write sections of a report from a Word template. Use the search_project_docs tool (multiple queries if needed) to find facts in the project documents, then write the section. Write ONLY the section body text — no headings, no meta commentary. Be factual; if the documents lack the information, say so briefly.",
             "tools": [
               {
                 "name": "search_project_docs",
@@ -226,7 +226,7 @@
       "@class": "ai.mindconnect.workflow.domain.CodeData",
       "name": "build-doc-args",
       "language": "javascript",
-      "code": "var sel = JSON.parse(String(selectedJson));\nvar contents = JSON.parse(String(contentsJson));\nwriteArgs = { path: String(workDir) + '/donoreport_' + ts + '.docx', template: String(templateFile), sections: sel.map(function (s) { return { title: s.title, level: s.level, content: String(contents[String(s.idx)] || '') }; }) };",
+      "code": "var sel = JSON.parse(String(selectedJson));\nvar contents = JSON.parse(String(contentsJson));\nwriteArgs = { path: String(workDir) + '/wordreport_' + ts + '.docx', template: String(templateFile), sections: sel.map(function (s) { return { title: s.title, level: s.level, content: String(contents[String(s.idx)] || '') }; }) };",
       "wrapInFunction": false,
       "injectVariables": true,
       "exportVariables": true,
