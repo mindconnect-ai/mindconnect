@@ -25,6 +25,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **The seeded `donoreport-gen` workflow is now `wordreport-gen`.** Same
+  workflow — pick sections from a Word template, research each against the
+  ingested documents, write the report — under the generic name it deserved;
+  the client-specific one leaked out of the project it was born in. Existing
+  data directories keep whatever name they were seeded with.
+
+### Changed
+
 - **The admin UIs draw on semantic-ui 0.2.0.** The released sheet brings the
   spacing and type scale, list/table row alignment, one header height, calmer
   separators and view transitions that this cycle's UI work was built against
