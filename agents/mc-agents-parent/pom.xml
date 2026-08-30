@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-java-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.1.1-SNAPSHOT</version>
         <relativePath>../../mc-java-parent/pom.xml</relativePath>
     </parent>
 
@@ -34,132 +34,132 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-common</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-task-queue</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-llm-gateway-core</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-llm-gateway</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-credentials</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-message-repository-core</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-message-repository</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-runtime-core</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-memory-strategies</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-runtime</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tool-spi</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tools</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tools-web</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tools-web-browser</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tools-code</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-vector-store</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-vector-store-pgvector</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-vector-store-tools</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-file-store</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-runtime-builder</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tools-document</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tools-workflow</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-mcp-proxy</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-tools-gmail</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-api-rest</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-api-app</artifactId>
-                <version>0.1.0</version>
+                <version>0.1.1-SNAPSHOT</version>
             </dependency>
 
             <!-- SpringDoc OpenAPI -->

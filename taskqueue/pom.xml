@@ -7,12 +7,12 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-java-parent</artifactId>
-        <version>0.1.0</version>
+        <version>0.1.1-SNAPSHOT</version>
         <relativePath>../mc-java-parent/pom.xml</relativePath>
     </parent>
 
     <artifactId>mc-task-queue-aggregator</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1-SNAPSHOT</version>
     <packaging>pom</packaging>
     <description>
         Multi-module build for the task queue: the ports and their local
