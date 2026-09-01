@@ -19,9 +19,7 @@
       "aboveTokens": 500
     }
   },
-  "responseReviewers": [
-    "answer-relevance-checker"
-  ],
+  "responseReviewers": [],
   "status": "ACTIVE",
   "tools": [
     {
