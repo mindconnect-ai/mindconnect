@@ -6,7 +6,7 @@
   "baseUrl": "http://localhost:1234",
   "apiKey": "lm-studio",
   "defaultTemperature": 0.7,
-  "maxOutputTokens": 8192,
+  "maxOutputTokens": 4096,
   "additionalParams": {},
-  "contextWindowTokens": 131072
+  "contextWindowTokens": 32768
 }

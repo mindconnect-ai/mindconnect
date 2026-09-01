@@ -170,10 +170,14 @@ public class SpiToolRegistry implements ToolRegistry {
 
         ToolFactory factory = factoriesByName.get(registryName);
         if (factory != null) {
-            // Alias first (so pins reference the real parameter names), then
-            // pinning — the single funnel every tool source passes through.
+            // Alias innermost (so pins reference the real parameter names),
+            // then the required-parameter guard, then pinning outermost: a
+            // pinned value must satisfy the requirement it would otherwise
+            // trip, and pinning is what removes the name from the schema
+            // again. The single funnel every tool source passes through.
             return Optional.of(PinnedParamsTool.wrap(agentTool,
-                    AliasTool.wrap(agentTool, factory.create(agentTool, scope))));
+                    RequiredParamsTool.wrap(agentTool,
+                            AliasTool.wrap(agentTool, factory.create(agentTool, scope)))));
         }
 
         for (MultiToolProvider provider : providers) {
@@ -185,7 +189,8 @@ public class SpiToolRegistry implements ToolRegistry {
                 log.error("MultiToolProvider {} claimed '{}' but returned empty on create — tool will be unavailable",
                         provider.getClass().getSimpleName(), registryName);
             }
-            return built.map(tool -> PinnedParamsTool.wrap(agentTool, AliasTool.wrap(agentTool, tool)));
+            return built.map(tool -> PinnedParamsTool.wrap(agentTool,
+                    RequiredParamsTool.wrap(agentTool, AliasTool.wrap(agentTool, tool))));
         }
 
         log.error("Tool '{}' is configured on agent but has no registered implementation — tool will be unavailable",
