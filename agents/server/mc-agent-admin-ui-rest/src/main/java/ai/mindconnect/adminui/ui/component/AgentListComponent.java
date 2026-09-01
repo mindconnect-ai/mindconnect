@@ -2,6 +2,11 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.chatui.ui.controller.ChatUiController;
+
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -68,7 +73,7 @@ public final class AgentListComponent implements UiComponent {
                 .asEditable()
                 .icon("search")
                 .placeholder("Search name or description…")
-                .onChange(UiTrigger.api("POST", "/admin/api/agents/search", formId)));
+                .onChange(trigger(on(AgentUiController.class).search(null), formId)));
         return form;
     }
 
@@ -77,7 +82,7 @@ public final class AgentListComponent implements UiComponent {
                 .icon("bot")
                 .headerExtra(searchForm())
                 .action(UiAction.primary("create", "New Agent").icon("add")
-                        .dispatch("GET", "/admin/api/agents/new"));
+                        .onClick(trigger(on(AgentUiController.class).newForm())));
 
         if (agents.isEmpty()) {
             list.item(UiList.Item.of("empty", "No agents yet")
@@ -130,12 +135,12 @@ public final class AgentListComponent implements UiComponent {
                 // Straight into a conversation: starts a fresh session
                 // with this agent and lands on its chat page.
                 .action(UiAction.primary("chat", "Chat").icon("chat")
-                        .dispatch("POST", "/chat/api/agents/" + a.id() + "/sessions"))
+                        .onClick(trigger(on(ChatUiController.class).startSession(a.id(), null))))
                 .action(UiAction.secondary("copy", "Copy").icon("copy")
-                        .dispatch("POST", "/admin/api/agents/" + a.id() + "/copy"))
+                        .onClick(trigger(on(AgentUiController.class).copy(a.id()))))
                 .action(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete agent '" + a.name() + "'?")
-                        .dispatch("DELETE", "/admin/api/agents/" + a.id()));
+                        .onClick(trigger(on(AgentUiController.class).delete(a.id()))));
     }
 
     /**

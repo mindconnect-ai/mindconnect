@@ -5,6 +5,10 @@ import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAppShell;
 import ai.mindconnect.ui.model.UiMenu;
 import ai.mindconnect.ui.model.UiMenuItem;
+import ai.mindconnect.chatui.ui.controller.ChatUiController;
+
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiNode;
 
 import java.time.Duration;
@@ -93,7 +97,7 @@ public final class ChatShellComponent implements UiComponent {
         menu.state(UiMenu.State.HIDDEN);
         menu.toggle(true);
         menu.item(UiMenuItem.of("chat-new", "New chat").icon("add")
-                .onClick(ai.mindconnect.ui.model.UiTrigger.api("POST", "/chat/api/sessions")));
+                .onClick(trigger(on(ChatUiController.class).createSession(null))));
         menu.item(UiMenuItem.divider());
 
         UUID activeId = active == null ? null : active.id();

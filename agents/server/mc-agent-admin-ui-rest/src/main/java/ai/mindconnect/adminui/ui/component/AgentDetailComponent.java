@@ -2,6 +2,11 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.adminui.ui.controller.AgentUiController;
+
+import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
@@ -98,13 +103,13 @@ public final class AgentDetailComponent implements UiComponent {
                 .field(UiField.number("maxIterations", "Max Iterations", agent.maxIterations()))
                 .field(UiField.text("memory", "Memory", memorySummary()))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
-                        .dispatch("GET", "/admin/api/agents/" + agent.id() + "/edit"))
+                        .onClick(trigger(on(AgentUiController.class).editForm(agent.id()))))
                 // No back link: "Agents" in the sidebar is the way back now —
                 // a link squeezed between the buttons just read as a third,
                 // differently-styled action.
                 .action(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete agent '" + agent.name() + "'?")
-                        .dispatch("DELETE", "/admin/api/agents/" + agent.id()));
+                        .onClick(trigger(on(AgentUiController.class).delete(agent.id()))));
     }
 
     /** The roster, or the word for having none — which means all of them. */

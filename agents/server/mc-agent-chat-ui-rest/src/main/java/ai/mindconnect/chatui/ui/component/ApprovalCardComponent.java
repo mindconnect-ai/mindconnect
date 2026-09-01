@@ -2,6 +2,11 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
+import ai.mindconnect.ui.model.UiTrigger;
+import ai.mindconnect.chatui.ui.controller.ChatUiController;
+
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiList;
 
 import java.util.UUID;
@@ -50,10 +55,19 @@ public final class ApprovalCardComponent {
      * there is no stream to start — the ORIGINAL stream carries the
      * continuation once the parked tool task is woken.
      */
+    /**
+     * One answer to an approval card. The three buttons differ in exactly two
+     * values — whether it is a yes, and how far it reaches — which the old
+     * concatenated query string buried among the punctuation. Passing them as
+     * arguments also hands the encoding of callId to the URI builder.
+     */
+    private static UiTrigger answer(UUID sessionId, String callId, boolean approved, String scope) {
+        return trigger(on(ChatUiController.class)
+                .approvalAnswered(sessionId, callId, approved, scope, null));
+    }
+
     public static UiList.Item approvalCard(UUID sessionId, String callId,
                                            String toolName, String argsJson, String time) {
-        String base = "/chat/api/sessions/" + sessionId + "/approval"
-                + "?callId=" + java.net.URLEncoder.encode(callId, java.nio.charset.StandardCharsets.UTF_8);
 
         // Buttons live IN the card body (a plain stack renders them as real,
         // always-visible buttons — item.action() would make them hover icons);
@@ -67,11 +81,11 @@ public final class ApprovalCardComponent {
                         "```json\n" + argsJson + "\n```")));
         var buttons = ai.mindconnect.ui.model.UiStack.of(
                         UiAction.danger("approval-deny-" + callId, "Deny")
-                                .dispatch("POST", base + "&approved=false&scope=once"),
+                                .onClick(answer(sessionId, callId, false, "once")),
                         UiAction.secondary("approval-once-" + callId, "Allow once")
-                                .dispatch("POST", base + "&approved=true&scope=once"),
+                                .onClick(answer(sessionId, callId, true, "once")),
                         UiAction.primary("approval-session-" + callId, "Allow for this session")
-                                .dispatch("POST", base + "&approved=true&scope=session"))
+                                .onClick(answer(sessionId, callId, true, "session")))
                 .direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL)
                 .gap(8);
         var bodyStack = ai.mindconnect.ui.model.UiStack.of(intro, params, buttons);
