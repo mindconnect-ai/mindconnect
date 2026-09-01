@@ -4,6 +4,10 @@ import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiAction;
+import ai.mindconnect.chatui.ui.controller.ChatUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiFieldGroup;
@@ -121,8 +125,8 @@ public final class ChatSettingsComponent implements UiComponent {
         return UiForm.of(id(), "Chat settings")
                 .content(tabs)
                 .action(UiAction.primary("apply", "Apply").icon("save")
-                        .dispatch("POST", "/chat/api/sessions/" + sessionId + "/settings"))
+                        .onClick(trigger(on(ChatUiController.class).applySettings(sessionId, null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel")
-                        .dispatch("POST", "/chat/api/close-dialog"));
+                        .onClick(trigger(on(ChatUiController.class).closeDialog())));
     }
 }

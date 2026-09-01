@@ -82,9 +82,14 @@ public final class UiActions {
         // The baseUrl overload on purpose: the no-arg variant reads the
         // current request from RequestContextHolder and throws on any thread
         // without one — which is exactly where a streaming turn renders.
+        // encode() matters: a path or query value carrying a space or a
+        // reserved character would otherwise land raw in the URL. The strings
+        // this replaces called URLEncoder by hand, and forgetting it here
+        // would break exactly the ids that are hardest to notice — an
+        // approval callId, a file name.
         String url = MvcUriComponentsBuilder
                 .fromMethodCall(UriComponentsBuilder.newInstance(), recordedCall)
-                .build().toUriString();
+                .build().encode().toUriString();
         // Put the placeholder back AFTER building, so the braces are never
         // percent-encoded on their way through the URI builder.
         return url.replace(ROW_ID.toString(), ROW_ID_PLACEHOLDER);

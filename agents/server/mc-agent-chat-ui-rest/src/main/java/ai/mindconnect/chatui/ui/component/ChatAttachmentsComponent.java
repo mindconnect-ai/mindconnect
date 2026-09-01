@@ -1,6 +1,11 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.ui.model.UiAction;
+import ai.mindconnect.chatui.ui.controller.ChatFilesUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.ROW_ID;
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTable;
@@ -30,7 +35,8 @@ public final class ChatAttachmentsComponent {
                 .column(UiTable.Column.text("chunks", "Chunks"))
                 .rowAction(UiAction.danger("remove", "Remove").icon("remove")
                         .confirm("Remove this file from the conversation? The agent can no longer search it.")
-                        .dispatch("DELETE", "/chat/api/sessions/" + sessionId + "/chat-files?file={id}"));
+                        .onClick(trigger(on(ChatFilesUiController.class)
+                                .remove(sessionId, ROW_ID.toString()))));
         files.forEach((fileId, count) -> table.row(Map.of(
                 "id", java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8),
                 "file", Path.of(fileId).getFileName().toString(),
