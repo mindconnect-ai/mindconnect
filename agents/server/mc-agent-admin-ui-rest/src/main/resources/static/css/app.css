@@ -48,6 +48,39 @@ body {
     height: 100dvh;
 }
 
+/* A drawer needs a ground of its own.
+
+   The sidebar has no background: what reads as its colour is the shell body
+   showing through it. That holds while the menu pushes the content aside, and
+   falls apart the moment it floats above it — below 768px the RESPONSIVE menu
+   becomes a drawer, and the page shows straight through the nav labels.
+
+   The framework does give its drawer an elevation, but `.sui-shell-body >
+   .sui-menu` (two classes) outweighs the `.sui-menu--responsive` rule inside
+   the media query (one class — a media query adds no specificity), so the
+   shadow is reset before it ever lands. Ground and elevation are therefore
+   both set here, in the very token the shell body paints itself with, so the
+   drawer is the sidebar's own colour in every theme.
+
+   The selector weight is deliberate. Every theme states `.sui-menu {
+   background: transparent }` on purpose — a pushed sidebar should read as one
+   plane with the shell — and does so as `:root.sui-theme-x .sui-menu`: three
+   classes, from a sheet that loads after this one. Matching that count would
+   lose the tie on order, so `:root` plus the repeated modifier takes these to
+   four and settles it by weight rather than by `!important`, which nothing
+   downstream could then override. Only the floating case is exempted; a pushed
+   sidebar keeps the transparency its theme asked for. */
+:root .sui-shell-body > .sui-menu--overlay.sui-menu--overlay {
+    background: var(--sui-color-bg);
+    box-shadow: 4px 0 16px rgb(0 0 0 / .28);
+}
+@media (max-width: 768px) {
+    :root .sui-shell-body > .sui-menu--responsive.sui-menu--responsive {
+        background: var(--sui-color-bg);
+        box-shadow: 4px 0 16px rgb(0 0 0 / .28);
+    }
+}
+
 /* Content is anchored to the sidebar, not centred in the leftover space —
    a centred card reads as a floating island on a wide monitor, while the
    right-hand whitespace reads as intentional breathing room. Two caps:
