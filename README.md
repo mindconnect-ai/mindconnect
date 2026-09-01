@@ -1,11 +1,11 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/logo-dark.svg">
-    <img alt="MindConnect" src=".github/assets/logo-light.svg" width="200">
+    <img alt="Mindconnect" src=".github/assets/logo-light.svg" width="200">
   </picture>
 </p>
 
-<h1 align="center">MindConnect</h1>
+<h1 align="center">Mindconnect</h1>
 
 [![Build](https://github.com/mindconnect-ai/mindconnect/actions/workflows/build.yml/badge.svg)](https://github.com/mindconnect-ai/mindconnect/actions/workflows/build.yml)
 [![Docs](https://img.shields.io/badge/Docs-mindconnect--ai.github.io-blue.svg)](https://mindconnect-ai.github.io/mindconnect/)
@@ -74,7 +74,7 @@ appreciated.
 
 ## Adopters & consulting
 
-Using MindConnect? Add yourself to **[ADOPTERS.md](ADOPTERS.md)** via a pull
+Using Mindconnect? Add yourself to **[ADOPTERS.md](ADOPTERS.md)** via a pull
 request — optional, but it helps the project and gives you a public
 reference. For integration help, custom development or support, the
 maintainer offers consulting; reach out via
@@ -82,7 +82,7 @@ maintainer offers consulting; reach out via
 
 ## Support the project
 
-MindConnect is free and Apache-2.0 licensed, built and maintained in the
+Mindconnect is free and Apache-2.0 licensed, built and maintained in the
 open. If it's useful to you, you can support continued development:
 
 - ☕ **[Ko-fi](https://ko-fi.com/beisdog)** — buy me a coffee

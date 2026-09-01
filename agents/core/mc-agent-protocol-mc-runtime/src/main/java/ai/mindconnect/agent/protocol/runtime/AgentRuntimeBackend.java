@@ -37,7 +37,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * Backend adapter: the protocol surface implemented against the MindConnect
+ * Backend adapter: the protocol surface implemented against the Mindconnect
  * agent runtime. The runtime is the server side OpenAI cannot be: registered
  * tools execute inside the turn (the inner loop), so {@code clientTools}
  * are rejected here until the runtime supports per-request tools.

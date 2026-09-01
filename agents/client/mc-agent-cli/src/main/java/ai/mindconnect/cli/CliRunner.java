@@ -879,7 +879,7 @@ public class CliRunner implements CommandLineRunner {
 
     private void printBanner() {
         System.out.println("╔══════════════════════════════════════╗");
-        System.out.println("║     MindConnect Agent CLI  v0.1      ║");
+        System.out.println("║     Mindconnect Agent CLI  v0.1      ║");
         System.out.println("╚══════════════════════════════════════╝");
         System.out.println("Type /help for commands, /quit to exit.");
     }

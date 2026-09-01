@@ -7,11 +7,11 @@ sidebar_position: 3
 # Compared to LangChain4j & Spring AI
 
 LangChain4j and Spring AI are excellent **libraries** for calling LLMs from
-Java. The MindConnect agent runtime is a different kind of thing: a
+Java. The Mindconnect agent runtime is a different kind of thing: a
 **configuration-driven platform**. The core difference is where the work lives.
 
 > With LangChain4j or Spring AI you **write an application** that talks to an
-> LLM. With the MindConnect agent runtime you **configure an agent** — and a
+> LLM. With the Mindconnect agent runtime you **configure an agent** — and a
 > running server already knows how to chat, stream, call tools, orchestrate
 > sub-agents, and manage memory.
 
@@ -43,7 +43,7 @@ With a library, each of those is something you wire up and compile yourself.
 
 ## Side by side
 
-| | **LangChain4j** | **Spring AI** | **MindConnect agent runtime** |
+| | **LangChain4j** | **Spring AI** | **Mindconnect agent runtime** |
 |---|---|---|---|
 | What it is | Java LLM library | Spring LLM abstraction | Configuration-driven agent platform |
 | You ship | Your own app code | Your own app code | Configuration (JSON or UI) |
@@ -60,7 +60,7 @@ With a library, each of those is something you wire up and compile yourself.
 - **Reach for LangChain4j or Spring AI** when you're embedding LLM calls inside
   a larger Java application and want full programmatic control over every step —
   they are libraries, and that is their strength.
-- **Reach for the MindConnect agent runtime** when you want to **stand up and
+- **Reach for the Mindconnect agent runtime** when you want to **stand up and
   operate agents** — define them, give them tools, wire them into multi-agent
   systems, and change all of that without touching code or redeploying.
 

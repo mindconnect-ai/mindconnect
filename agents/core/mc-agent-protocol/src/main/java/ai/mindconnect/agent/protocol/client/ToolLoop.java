@@ -20,7 +20,7 @@ import java.util.Map;
  * feeds the outputs back as the next request's input.
  *
  * <p>Backend-agnostic on purpose — the same loop runs against the
- * MindConnect runtime or the OpenAI backend, because the interruption
+ * Mindconnect runtime or the OpenAI backend, because the interruption
  * mechanic is part of the protocol, not of any implementation.
  */
 public final class ToolLoop {

@@ -1,6 +1,6 @@
 # Contributor License Agreement (CLA)
 
-Thank you for contributing to MindConnect (the "Project"), maintained by
+Thank you for contributing to Mindconnect (the "Project"), maintained by
 David Beisert (the "Maintainer"). To keep the Project legally clean and
 sustainable, we ask every contributor to agree to the terms below before
 their contribution is merged.

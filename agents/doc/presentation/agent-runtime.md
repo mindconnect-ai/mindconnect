@@ -1,6 +1,6 @@
 ---
 marp: true
-title: MindConnect Agent Runtime
+title: Mindconnect Agent Runtime
 description: Architecture overview & how sub-agents work together
 theme: default
 paginate: true
@@ -20,14 +20,14 @@ style: |
 
 <!-- _class: lead -->
 
-# Meta-assistants — the MindConnect Agent Runtime
+# Meta-assistants — the Mindconnect Agent Runtime
 
 ### Architecture & sub-agents
 
 <span class="muted">David Beisert · Live demo</span>
 
 ---
-# MindConnect System Architecture
+# Mindconnect System Architecture
 
 ![w:1000](../images/system-overview.svg)
 
@@ -221,4 +221,4 @@ Transition: with that, I am at the end.
 
 ### Questions & discussion
 
-<span class="muted">David Beisert · MindConnect Agent Runtime</span>
+<span class="muted">David Beisert · Mindconnect Agent Runtime</span>

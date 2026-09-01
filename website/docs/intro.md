@@ -1,10 +1,10 @@
 ---
 slug: /
-title: MindConnect
+title: Mindconnect
 sidebar_position: 1
 ---
 
-# MindConnect
+# Mindconnect
 
 **LLM-powered agents, a workflow engine, and a task queue — plain Java
 libraries at the core, Spring Boot apps on top.**

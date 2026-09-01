@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-MindConnect (repo `mindconnect-ai/mindconnect`) is a multi-module Maven monorepo for building LLM-powered agents.
+Mindconnect (repo `mindconnect-ai/mindconnect`) is a multi-module Maven monorepo for building LLM-powered agents.
 It is built with Java 21; the deployable apps use Spring Boot 3.5.x, the core
 libraries are plain Java. The repo is organized into four areas plus one shared
 parent POM.

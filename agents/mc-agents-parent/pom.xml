@@ -14,7 +14,7 @@
     <artifactId>mc-agents-parent</artifactId>
     <name>mc-agents-parent</name>
     <packaging>pom</packaging>
-    <description>Parent POM for all MindConnect agent platform modules</description>
+    <description>Parent POM for all Mindconnect agent platform modules</description>
 
     <properties>
         <jackson.version>2.16.1</jackson.version>

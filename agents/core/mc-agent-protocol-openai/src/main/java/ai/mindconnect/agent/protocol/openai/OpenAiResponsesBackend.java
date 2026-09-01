@@ -35,7 +35,7 @@ import java.util.function.Consumer;
 /**
  * Backend adapter: the whole protocol surface ({@link Sessions},
  * {@link AgentResponses}, {@link Conversations}) implemented against the
- * real OpenAI Responses + Conversations API. No MindConnect runtime involved
+ * real OpenAI Responses + Conversations API. No Mindconnect runtime involved
  * — agents are {@link PseudoAgent}s registered locally.
  *
  * <pre>

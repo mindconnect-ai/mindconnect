@@ -1,7 +1,7 @@
 # mc-agent-protocol-mc-runtime
 
 Backend adapter: the `mc-agent-protocol` surface implemented against the
-**MindConnect agent runtime** (`mc-agent-runtime`). Here the runtime is the
+**Mindconnect agent runtime** (`mc-agent-runtime`). Here the runtime is the
 server side OpenAI cannot be: registered tools, sub-agents and memory run
 inside the turn.
 

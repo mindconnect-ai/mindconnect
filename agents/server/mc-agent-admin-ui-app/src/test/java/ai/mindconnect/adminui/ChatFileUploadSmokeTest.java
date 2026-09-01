@@ -110,7 +110,7 @@ class ChatFileUploadSmokeTest {
         AgentDefinition agent = agents.findByNamespace(namespace).stream().findFirst().orElseThrow();
         AgentSession session = sessionService.openChat(agent.id(), namespace, "upload-tester");
 
-        String text = "MindConnect upload smoke test.\n"
+        String text = "Mindconnect upload smoke test.\n"
                 + "The secret ingredient of the test soup is paprika.\n".repeat(40);
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("chat-attach", new ByteArrayResource(text.getBytes(StandardCharsets.UTF_8)) {
