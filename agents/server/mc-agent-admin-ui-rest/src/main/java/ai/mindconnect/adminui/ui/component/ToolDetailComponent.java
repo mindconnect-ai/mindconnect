@@ -2,6 +2,11 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.adminui.ui.controller.AgentUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.ROW_ID;
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.service.AgentChatService;
@@ -67,11 +72,9 @@ public final class ToolDetailComponent implements UiComponent {
                 .field(UiField.textarea("overrides", "Overrides (JSON)", overridesJson))
                 .field(UiField.text("enabled",     "Enabled",     tool.enabled() ? "Yes" : "No"))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
-                        .dispatch("GET",
-                                "/admin/api/agents/" + agent.id() + "/tools/" + tool.id() + "/edit"))
+                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id(), tool.id()))))
                 .action(UiAction.secondary("test", "Test").icon("flash")
-                        .dispatch("GET",
-                                "/admin/api/agents/" + agent.id() + "/tools/" + tool.id() + "/test"))
+                        .onClick(trigger(on(AgentUiController.class).testToolDialog(agent.id(), tool.id()))))
                 .link(UiLink.of("back",
                         "/admin/agents/" + agent.id() + "?section=tools&row=" + tool.id(),
                         "← Back to Agent"));

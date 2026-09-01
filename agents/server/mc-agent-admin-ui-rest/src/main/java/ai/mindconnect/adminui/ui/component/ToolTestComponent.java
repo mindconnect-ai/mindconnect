@@ -3,6 +3,12 @@ package ai.mindconnect.adminui.ui.component;
 import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.adminui.ui.controller.AgentUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.ROW_ID;
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
+import ai.mindconnect.adminui.ui.controller.ToolCatalogUiController;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.ui.model.UiAction;
@@ -69,13 +75,12 @@ public final class ToolTestComponent implements UiComponent {
                 .asEditable().asRequired()
                 .hint("A JSON object passed to Tool.execute(Map). Empty object = no arguments."))
             .action(UiAction.primary("send", "Send").icon("send")
-                    .dispatch("POST",
-                            "/admin/api/agents/" + agent.id() + "/tools/" + tool.id() + "/test",
-                            id()))
+                    .onClick(trigger(on(AgentUiController.class).runToolTest(agent.id(), tool.id(), null),
+                            id())))
             // Close only removes the overlay (a tiny remove-patch) — never a
             // page reload, so the page state behind the dialog survives.
             .action(UiAction.secondary("close", "Close").icon("close")
-                    .dispatch("POST", "/admin/api/tools/test-dialog/close"));
+                    .onClick(trigger(on(ToolCatalogUiController.class).closeTestDialog())));
 
         var stack = UiStack.of(id() + "-stack").child(form);
         if (result != null) stack.child(renderResult());

@@ -34,6 +34,26 @@ public final class UiActions {
     private UiActions() {
     }
 
+    /**
+     * Stands in for a value the CLIENT fills in, not the server: pass it where
+     * a table row supplies its own id and the rendered URL keeps the literal
+     * {@code {id}} placeholder that {@code UiTable.rowAction} expects.
+     *
+     * <pre>{@code
+     * .rowAction(UiAction.secondary("view", "View")
+     *         .onClick(trigger(on(AgentUiController.class).viewTool(agent.id(), ROW_ID))));
+     * }</pre>
+     *
+     * <p>A sentinel rather than a string parameter because the handler's
+     * signature is what gets checked — passing {@code ROW_ID} still proves the
+     * argument is a tool id in the right position.
+     */
+    public static final java.util.UUID ROW_ID =
+            java.util.UUID.fromString("00000000-0000-0000-0000-0000000000ff");
+
+    /** What {@link #ROW_ID} becomes in the rendered URL. */
+    private static final String ROW_ID_PLACEHOLDER = "{id}";
+
     /** The trigger for a recorded call, e.g. {@code on(X.class).delete(id)}. */
     public static UiTrigger trigger(Object recordedCall) {
         return UiTrigger.api(verbOf(recordedCall), urlOf(recordedCall));
@@ -53,9 +73,12 @@ public final class UiActions {
         // The baseUrl overload on purpose: the no-arg variant reads the
         // current request from RequestContextHolder and throws on any thread
         // without one — which is exactly where a streaming turn renders.
-        return MvcUriComponentsBuilder
+        String url = MvcUriComponentsBuilder
                 .fromMethodCall(UriComponentsBuilder.newInstance(), recordedCall)
                 .build().toUriString();
+        // Put the placeholder back AFTER building, so the braces are never
+        // percent-encoded on their way through the URI builder.
+        return url.replace(ROW_ID.toString(), ROW_ID_PLACEHOLDER);
     }
 
     /** The handler's own mapping decides the verb; an unannotated one is a GET. */
