@@ -16,11 +16,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  * The chat composer and the per-message actions, pinned to the routes their
  * URL strings produced.
  *
- * <p>Two things here that the admin pages did not have. Send and Regenerate
- * are SSE triggers, so they go through {@code UiActions.streaming} and must
- * keep the STREAM behaviour — applying such a response in one go would break
- * live token rendering. And Delete-from-here carries two query parameters that
- * used to be concatenated by hand.
+ * <p>One thing here the admin pages did not have: Delete-from-here carries two
+ * query parameters that used to be concatenated by hand.
+ *
+ * <p>Send and Regenerate used to be SSE triggers. They are not any more — the
+ * turn's output travels on the session's stream, which every client of the
+ * session is already reading, so submitting is an ordinary request that
+ * returns as soon as the turn is queued.
  */
 class ChatActionUrlsTest {
 
@@ -40,12 +42,18 @@ class ChatActionUrlsTest {
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION + "/chat/stream\"");
     }
 
-    /** Send must stay a stream, not become an ordinary request. */
+    /**
+     * Send is an ordinary request. Streaming it back to whoever pressed it is
+     * exactly what stopped a second client from seeing anything: a stream that
+     * belongs to one submission can only ever reach the submitter. The tokens
+     * arrive on the session's stream instead, which every client of the
+     * session already holds open.
+     */
     @Test
-    void sendKeepsTheStreamingBehaviour() throws Exception {
+    void sendIsNotAStream() throws Exception {
         String out = json(new ChatFormComponent(SESSION, AGENT).render());
 
-        assertThat(out).contains("\"behavior\":\"STREAM\"");
+        assertThat(out).doesNotContain("\"behavior\":\"STREAM\"");
     }
 
     /** While a turn runs the composer shows Stop, which cancels the session's stream. */
