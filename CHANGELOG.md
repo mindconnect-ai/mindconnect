@@ -103,6 +103,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **`default-chat` no longer runs a reviewer over every answer.** It was seeded
+  with `answer-relevance-checker` in its `responseReviewers`, and a reviewer is
+  a sub-agent that runs on each response — so every reply, however small, paid
+  an extra LLM round-trip before you saw it. The agent itself stays bundled and
+  can still be attached to any agent that wants it.
+
 - **A running turn is no longer announced while you are on another page.** The
   floating status toast came from semantic-ui, which stopped drawing it in
   0.3.0 — rendering and wording belong to the application, since a layer that
