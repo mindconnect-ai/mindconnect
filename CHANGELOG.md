@@ -53,9 +53,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `default-chat` agent.** Its prompt, model, tools and the agents it may
   delegate to are configuration you can edit, instead of defaults compiled
   into the chat controller. The agent is the former "Assistant with tools",
-  renamed; it may reach `web-researcher` and `explorer` and nothing else,
-  which is what stops a passing question from being handed to a research
-  orchestrator that fans out and takes a minute. It also gains `code_execute`,
+  renamed; it may reach `web-researcher`, `file-finder` and `explorer` and
+  nothing else, which is what stops a passing question from being handed to a
+  research orchestrator that fans out and takes a minute. It also gains `code_execute`,
   so a calculation runs in a container rather than in the model's head. Tool
   search is on and the eight rarely-used tools (documents, Gmail, `file_write`)
   are deferred, so a turn carries twelve tool definitions instead of twenty.
