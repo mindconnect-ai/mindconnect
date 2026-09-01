@@ -144,6 +144,7 @@ public class AgentUiController {
                 .withIcon(body.str("icon"))
                 .withMaxIterations(body.num("maxIterations", agent.maxIterations()))
                 .withResponseReviewers(body.strList("responseReviewers"))
+                .withCallableAgents(body.strList("callableAgents"))
                 .withToolSearch(toolSearchFromForm(body));
         try {
             patch = withMemoryConfig(patch, body);
@@ -172,6 +173,7 @@ public class AgentUiController {
                             .withLlmConfigName(body.str("llmConfigName"))
                             .withMaxIterations(body.num("maxIterations", existing.maxIterations()))
                             .withResponseReviewers(body.strList("responseReviewers"))
+                            .withCallableAgents(body.strList("callableAgents"))
                             .withToolSearch(toolSearchFromForm(body));
                     try {
                         patch = withMemoryConfig(patch, body);

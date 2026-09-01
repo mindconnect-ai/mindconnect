@@ -92,7 +92,8 @@ final class LmStudioSupport {
                 tools.stream().map(t -> new AgentTool(t.id(), base.id(), t.name(), t.description(),
                         t.overrides(), t.enabled(), t.deferred(), t.needsApproval(), t.maxResultChars()))
                         .toList(),
-                base.responseReviewers(), base.toolSearch(), base.createdAt(), base.updatedAt());
+                base.responseReviewers(), base.callableAgents(), base.toolSearch(),
+                base.createdAt(), base.updatedAt());
         return AgentRuntimeBuilder.useInMemoryPersistence()
                 .llmConfig(LlmConfig.lmStudio("it-llm", model, BASE_URL))
                 .agentDefinition(def)

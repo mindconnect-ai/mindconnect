@@ -196,7 +196,7 @@ public final class ToolCallWorker implements TaskWorker {
                 try {
                     output = InlineAgentTools.RUN_AGENT.equals(toolName)
                             || InlineAgentTools.RUN_AGENTS.equals(toolName)
-                            ? subAgents.run(ctx, session, turnId, depth, stream, toolName, callId, arguments)
+                            ? subAgents.run(ctx, session, def, turnId, depth, stream, toolName, callId, arguments)
                             : runRegistryTool(session, def, tokenCounter, stream, callId, toolName, arguments);
                     failed = output != null && output.startsWith("Error:");
                 } catch (RuntimeException e) {
