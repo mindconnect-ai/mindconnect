@@ -49,6 +49,24 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **A chat you did not start from an agent now runs on the seeded
+  `default-chat` agent.** Its prompt, model, tools and the agents it may
+  delegate to are configuration you can edit, instead of defaults compiled
+  into the chat controller. The agent is the former "Assistant with tools",
+  renamed; it may reach `web-researcher`, `file-finder` and `explorer` and
+  nothing else, which is what stops a passing question from being handed to a
+  research orchestrator that fans out and takes a minute. It also gains `code_execute`,
+  so a calculation runs in a container rather than in the model's head. Tool
+  search is on and the eight rarely-used tools (documents, Gmail, `file_write`)
+  are deferred, so a turn carries twelve tool definitions instead of twenty.
+  Installations seeded before this agent existed keep the built-in defaults
+  until they install it.
+- **The seeded orchestrators name the agents they delegate to.** `planner`,
+  `research-lead` and `web-researcher` carry the roster their own prompts
+  already described, so it is enforced rather than merely suggested. `planner`
+  and `research-lead` also get 25 iterations instead of 10 — planning,
+  delegating, verifying and synthesising in one loop did not fit in ten, and
+  they ran out mid-plan.
 - **The agent list is grouped and no longer paginated.** One collapsible
   section per rubric, closed by default, the way the tool catalog reads —
   assistants first, then sub-agents, then utilities. Paging cut across the
