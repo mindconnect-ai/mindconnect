@@ -3,6 +3,7 @@ package ai.mindconnect.agent.tools.browser;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.HtmlLinkExtractor;
 import ai.mindconnect.agent.tools.document.HtmlToMarkdown;
+import ai.mindconnect.agent.tools.document.RelevantExcerpts;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.Page;
@@ -61,7 +62,9 @@ public class WebReadBrowserTool implements Tool {
         return "Fetches a URL via a headless browser (JavaScript executed) and returns the rendered "
              + "page as Markdown with inline `[text](url)` links. Use this when web_read returns an "
              + "empty body, a cookie banner, or only the SPA loading shell. Much slower than web_read "
-             + "(1-5 seconds per call) — always try web_read first.";
+             + "(1-5 seconds per call) — always try web_read first.\n"
+             + "Pass the same `query` you gave web_read: only the passages bearing on it are "
+             + "returned, so a long page cannot flood the context.";
     }
 
     @Override
@@ -72,6 +75,12 @@ public class WebReadBrowserTool implements Tool {
                         "url", Map.of(
                                 "type", "string",
                                 "description", "The fully-qualified URL to load."
+                        ),
+                        "query", Map.of(
+                                "type", "string",
+                                "description", "What you want to find on this page, in a few "
+                                        + "words. Only the matching passages are returned. Omit "
+                                        + "only when you genuinely need the whole page."
                         ),
                         "createLinkList", Map.of(
                                 "type", "boolean",
@@ -93,8 +102,9 @@ public class WebReadBrowserTool implements Tool {
         String url = (String) arguments.get("url");
         if (url == null || url.isBlank()) return "Error: url is required";
         boolean createLinkList = Boolean.TRUE.equals(arguments.get("createLinkList"));
+        String query = arguments.get("query") instanceof String q && !q.isBlank() ? q : null;
 
-        log.info("web_read_browser url={} createLinkList={}", url, createLinkList);
+        log.info("web_read_browser url={} query={} createLinkList={}", url, query, createLinkList);
         long t0 = System.currentTimeMillis();
         Browser browser = PlaywrightHolder.browser();
         // Fresh context per call: isolated cookies, no leak between requests.
@@ -145,7 +155,7 @@ public class WebReadBrowserTool implements Tool {
 
             String title = page.title();
             Document doc = parseRendered(page);
-            String bodyMarkdown = doc == null ? "" : cap(HtmlToMarkdown.convert(doc));
+            String bodyMarkdown = doc == null ? "" : reduce(HtmlToMarkdown.convert(doc), query);
 
             long durMs = System.currentTimeMillis() - t0;
             // Anti-bot pages are technically a 200 OK with HTML that says
@@ -286,6 +296,17 @@ public class WebReadBrowserTool implements Tool {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /**
+     * Cuts the rendered page down: by relevance when the caller said what it is
+     * after, by position otherwise. Bot detection runs on the result, so the
+     * reduction has to keep enough text for {@link #detectBotBlock} to judge —
+     * which it does: an interstitial is short enough to survive either path.
+     */
+    private static String reduce(String markdown, String query) {
+        if (query == null || query.isBlank()) return cap(markdown);
+        return RelevantExcerpts.select(markdown, query);
     }
 
     private static String cap(String s) {

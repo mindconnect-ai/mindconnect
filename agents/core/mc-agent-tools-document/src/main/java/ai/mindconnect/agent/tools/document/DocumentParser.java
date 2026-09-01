@@ -28,11 +28,22 @@ public class DocumentParser {
      */
     public static String parseString(String url, String contentType, String body, String title,
                                      boolean createLinkList) throws IOException, TikaException {
+        return parseString(url, contentType, body, title, createLinkList, null);
+    }
+
+    /**
+     * As above, but when {@code query} is non-blank the body is reduced to the
+     * passages that bear on it (see {@link RelevantExcerpts}) instead of being
+     * cut at {@link #MAX_CHARS}. A head-truncated page drops whatever sits in
+     * the last third — often exactly the figure the caller asked for.
+     */
+    public static String parseString(String url, String contentType, String body, String title,
+                                     boolean createLinkList, String query) throws IOException, TikaException {
         if (contentType != null && contentType.contains("text/html")) {
             Document doc = Jsoup.parse(body, url);
-            return renderHtml(url, title, doc, createLinkList);
+            return renderHtml(url, title, doc, createLinkList, query);
         }
-        return "URL: " + url + "\n\n" + truncate(body);
+        return "URL: " + url + "\n\n" + reduce(body, query);
     }
 
     /** Backwards-compatible overload: no link list (current default behaviour). */
@@ -42,12 +53,18 @@ public class DocumentParser {
 
     public static String parseUrl(String url, String contentType, InputStream body, String title,
                                   boolean createLinkList) throws IOException, TikaException {
+        return parseUrl(url, contentType, body, title, createLinkList, null);
+    }
+
+    /** As above, with relevance filtering when {@code query} is non-blank. */
+    public static String parseUrl(String url, String contentType, InputStream body, String title,
+                                  boolean createLinkList, String query) throws IOException, TikaException {
         if (contentType != null && contentType.contains("text/html")) {
             String html = new String(body.readAllBytes());
             Document doc = Jsoup.parse(html, url);
-            return renderHtml(url, title, doc, createLinkList);
+            return renderHtml(url, title, doc, createLinkList, query);
         }
-        return "URL: " + url + "\n\n" + truncate(TIKA.parseToString(body));
+        return "URL: " + url + "\n\n" + reduce(TIKA.parseToString(body), query);
     }
 
     /** Backwards-compatible overload: no link list. */
@@ -67,10 +84,11 @@ public class DocumentParser {
      * (e.g. for citation, or when downstream code wants to follow links
      * mechanically rather than via the LLM).
      */
-    private static String renderHtml(String url, String title, Document doc, boolean createLinkList) {
+    private static String renderHtml(String url, String title, Document doc,
+                                     boolean createLinkList, String query) {
         String resolvedTitle = title != null ? title : doc.title();
         String markdown = HtmlToMarkdown.convert(doc);
-        String bodyText = truncate(markdown);
+        String bodyText = reduce(markdown, query);
         String head = "URL: " + url + "\nTitle: " + resolvedTitle + "\n\n" + bodyText;
         if (!createLinkList) return head;
         String linkBlock = HtmlLinkExtractor.extract(doc);
@@ -89,6 +107,16 @@ public class DocumentParser {
                 return truncate(TIKA.parseToString(in));
             }
         }
+    }
+
+    /**
+     * Cuts {@code text} down to size: by relevance when a query is given, by
+     * position otherwise. The query path has the smaller budget on purpose —
+     * selected passages carry far more answer per character than a prefix does.
+     */
+    private static String reduce(String text, String query) {
+        if (query == null || query.isBlank()) return truncate(text);
+        return RelevantExcerpts.select(text, query);
     }
 
     public static String truncate(String text) {
