@@ -6,7 +6,7 @@
 <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.2.0</version>
+        <version>0.2.1-SNAPSHOT</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
@@ -14,7 +14,7 @@
     <artifactId>mc-workflow-code-groovy</artifactId>
     <name>mc-workflow-code-groovy</name>
     <description>Groovy script step support for the workflow engine</description>
-    <version>0.2.0</version>
+    <version>0.2.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -29,7 +29,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow</artifactId>
-            <version>0.2.0</version>
+            <version>0.2.1-SNAPSHOT</version>
         </dependency>
 
         <!--
