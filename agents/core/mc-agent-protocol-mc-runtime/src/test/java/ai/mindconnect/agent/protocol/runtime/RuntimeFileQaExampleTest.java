@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Live parity example: upload a file and ask against it — the SAME caller
- * code as the OpenAI backend's example 3, now against the MindConnect
+ * code as the OpenAI backend's example 3, now against the Mindconnect
  * runtime. The mechanics differ by design (OpenAI stuffs the document into
  * context; the runtime ingests it into the session's vector store and the
  * agent retrieves via {@code vector_search}) — the protocol hides that.

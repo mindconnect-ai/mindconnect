@@ -1,6 +1,6 @@
 # Adopters
 
-Are you using MindConnect — the agent runtime, the workflow engine, or
+Are you using Mindconnect — the agent runtime, the workflow engine, or
 semantic-ui — in a project, product, or experiment? **We'd love to know.**
 
 Listing yourself is **optional and free**. It helps the project (social

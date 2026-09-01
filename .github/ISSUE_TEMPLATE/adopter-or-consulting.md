@@ -1,6 +1,6 @@
 ---
 name: Adopter / Consulting enquiry
-about: Tell us you're using MindConnect, or ask about consulting & support
+about: Tell us you're using Mindconnect, or ask about consulting & support
 title: "[adopter] "
 labels: ["adopter"]
 ---
@@ -13,7 +13,7 @@ labels: ["adopter"]
 **Who are you / your project?**
 
 
-**How are you using MindConnect?**
+**How are you using Mindconnect?**
 <!-- agent runtime · workflow engine · semantic-ui · other -->
 
 

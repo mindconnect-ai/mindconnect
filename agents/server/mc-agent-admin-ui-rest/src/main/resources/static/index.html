@@ -71,5 +71,9 @@
     <!-- The theme picker in the header. Purely client-side: it swaps a class
          on <html> and remembers the choice per browser. -->
     <script src="/js/theme-switch.js" defer></script>
+    <!-- Hands the active theme's colours to the json-viewer web component,
+         which paints from a palette inside its own shadow root and so cannot
+         be reached from app.css. -->
+    <script src="/js/json-viewer-theme.js" defer></script>
 </body>
 </html>

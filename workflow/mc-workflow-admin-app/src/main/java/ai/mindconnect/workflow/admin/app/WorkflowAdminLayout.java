@@ -7,7 +7,7 @@ import ai.mindconnect.ui.model.UiStack;
 
 /**
  * App-level chrome for the standalone workflow admin: a header with the
- * MindConnect logo, the "Workflow Admin" brand, a Workflows nav link, and a
+ * Mindconnect logo, the "Workflow Admin" brand, a Workflows nav link, and a
  * fixed default user. Lives in the app (not the embeddable rest module) so the
  * rest module stays chrome-free and droppable into other hosts (e.g. the agent
  * UI, which brings its own header).

@@ -8,7 +8,7 @@ const [owner, repo] = (process.env.GITHUB_REPOSITORY ?? 'mindconnect-ai/mindconn
 
 /** @type {import('@docusaurus/types').Config} */
 const config = {
-  title: 'MindConnect',
+  title: 'Mindconnect',
   tagline: 'LLM-powered agents, a workflow engine, and a task queue',
   favicon: 'img/favicon.svg',
 
@@ -50,9 +50,9 @@ const config = {
       image: 'img/agents/research-lead-flow.svg',
       colorMode: {defaultMode: 'light', respectPrefersColorScheme: true},
       navbar: {
-        title: 'MindConnect',
+        title: 'Mindconnect',
         logo: {
-          alt: 'MindConnect logo',
+          alt: 'Mindconnect logo',
           src: 'img/logo.svg',
           srcDark: 'img/logo-dark.svg',
         },

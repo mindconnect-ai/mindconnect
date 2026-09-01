@@ -1,4 +1,4 @@
-# Contributing to MindConnect
+# Contributing to Mindconnect
 
 Thanks for your interest in contributing! 🎉 This project is maintained by
 David Beisert and welcomes contributions from everyone.

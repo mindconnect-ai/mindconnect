@@ -27,7 +27,7 @@ carry the implementations.
 | Module | Purpose |
 |--------|---------|
 | `mc-agent-protocol` | The protocol vocabulary: `Response`, `Item`, `Conversation`, events and commands — pure types, zero runtime dependencies. |
-| `mc-agent-protocol-mc-runtime` | The protocol surface implemented against the MindConnect runtime. |
+| `mc-agent-protocol-mc-runtime` | The protocol surface implemented against the Mindconnect runtime. |
 | `mc-agent-protocol-openai` | The same surface implemented against the real OpenAI Responses + Conversations API. |
 
 ## `core/` — tools

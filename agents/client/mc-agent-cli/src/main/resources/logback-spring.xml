@@ -56,7 +56,7 @@
         </encoder>
     </appender>
 
-    <!-- MindConnect: DEBUG to file -->
+    <!-- Mindconnect: DEBUG to file -->
     <logger name="ai.mindconnect" level="INFO" additivity="false">
         <appender-ref ref="FILE"/>
         <appender-ref ref="CONSOLE"/>

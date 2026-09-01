@@ -1,7 +1,7 @@
 {
   "realm": "mindconnect",
   "enabled": true,
-  "displayName": "MindConnect",
+  "displayName": "Mindconnect",
   "sslRequired": "external",
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,

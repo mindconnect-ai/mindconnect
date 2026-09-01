@@ -1,7 +1,7 @@
 # mc-agent-protocol-openai
 
 Backend adapter: the `mc-agent-protocol` surface implemented against the **real
-OpenAI Responses + Conversations API** — no MindConnect runtime involved.
+OpenAI Responses + Conversations API** — no Mindconnect runtime involved.
 Proves the protocol is backend-neutral; also usable standalone as a thin,
 typed OpenAI client.
 

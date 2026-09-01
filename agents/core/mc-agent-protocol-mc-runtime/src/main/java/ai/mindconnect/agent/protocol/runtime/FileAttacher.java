@@ -3,7 +3,7 @@ package ai.mindconnect.agent.protocol.runtime;
 import java.util.UUID;
 
 /**
- * Ingests an already-stored file into a session's context — in the MindConnect
+ * Ingests an already-stored file into a session's context — in the Mindconnect
  * runtime typically: chunk + embed into the session's vector store and
  * activate the {@code vector_search} tool. Supplied by the composition root
  * (e.g. {@code AgentRuntime::attachStored} from the builder); the backend

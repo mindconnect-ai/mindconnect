@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Local stand-in for an {@code AgentDefinition} when the MindConnect runtime
+ * Local stand-in for an {@code AgentDefinition} when the Mindconnect runtime
  * is not in play: everything the OpenAI Responses API needs per request,
  * registered under a name so the protocol's "agents are referenced by name"
  * contract keeps working.

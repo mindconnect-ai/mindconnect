@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Live parity examples — the SAME scenarios as the OpenAI backend's
- * {@code OpenAiHostedToolsExampleTest}, against the MindConnect runtime.
+ * {@code OpenAiHostedToolsExampleTest}, against the Mindconnect runtime.
  * What OpenAI hosts, the runtime runs as REGISTERED tools of the agent
  * definition; through the protocol both appear as identical
  * FunctionCall/Output item pairs:
