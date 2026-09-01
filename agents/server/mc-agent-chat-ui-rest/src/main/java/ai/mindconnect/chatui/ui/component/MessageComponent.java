@@ -4,6 +4,11 @@ import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
+import ai.mindconnect.chatui.ui.controller.ChatUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.streaming;
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiTrigger;
 
@@ -59,9 +64,7 @@ public final class MessageComponent {
         if (isUser) {
             item.action(UiAction.icon("regen-" + m.id(), "🔄")
                     .confirm("Delete the response(s) after this message and generate a new one?")
-                    .onClick(UiTrigger.stream("POST",
-                            "/chat/api/sessions/" + sessionId
-                                    + "/messages/" + seq + "/regenerate", null)));
+                    .onClick(streaming(on(ChatUiController.class).regenerate(sessionId, seq), null)));
         }
 
         // Delete-from-here: remove this message and every message after it.
@@ -70,9 +73,8 @@ public final class MessageComponent {
         item.action(UiAction.icon("delete-" + m.id(), "🗑")
                 .style(UiAction.Style.DANGER)
                 .confirm("Delete this message and all following messages?")
-                .dispatch("DELETE",
-                        "/chat/api/sessions/" + sessionId
-                                + "/messages?fromSeq=" + seq + "&toSeq=" + Integer.MAX_VALUE));
+                .onClick(trigger(on(ChatUiController.class)
+                        .deleteMessages(sessionId, seq, Integer.MAX_VALUE, null))));
         return item;
     }
     /** " · 42 tok" for a single message; empty when not counted. */

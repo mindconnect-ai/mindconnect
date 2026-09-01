@@ -69,6 +69,15 @@ public final class UiActions {
         return UiTrigger.api(verbOf(recordedCall), urlOf(recordedCall), payloadNodeId);
     }
 
+    /**
+     * The SSE variant: same derivation, but the trigger streams its response
+     * instead of applying it in one go. For the handlers that return an
+     * {@code SseEmitter} — sending a turn, regenerating one.
+     */
+    public static UiTrigger streaming(Object recordedCall, String payloadNodeId) {
+        return UiTrigger.stream(verbOf(recordedCall), urlOf(recordedCall), payloadNodeId);
+    }
+
     private static String urlOf(Object recordedCall) {
         // The baseUrl overload on purpose: the no-arg variant reads the
         // current request from RequestContextHolder and throws on any thread

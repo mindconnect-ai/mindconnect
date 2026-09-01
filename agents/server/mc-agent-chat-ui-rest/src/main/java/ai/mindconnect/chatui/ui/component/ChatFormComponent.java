@@ -2,6 +2,12 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAction;
+import ai.mindconnect.chatui.ui.controller.ChatUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.streaming;
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
+import ai.mindconnect.chatui.ui.controller.StreamController;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiPatch;
@@ -74,13 +80,13 @@ public final class ChatFormComponent implements UiComponent {
      * for something you only look at when you go looking.
      */
     private UiAction attachAction() {
-        String url = "/chat/api/sessions/" + sessionId + "/attach-dialog";
+        var open = trigger(on(ChatUiController.class).attachDialog(sessionId, null));
         if (attachmentCount == 0) {
             return UiAction.icon("attach", "Attach files").icon("add")
-                    .dispatch("GET", url);
+                    .onClick(open);
         }
         return UiAction.secondary("attach", "(" + attachmentCount + ")").icon("add")
-                .dispatch("GET", url)
+                .onClick(open)
                 .<UiAction>withCssClass("chat-attach-btn");
     }
 
@@ -140,11 +146,11 @@ public final class ChatFormComponent implements UiComponent {
                 // Model and tools sit on the composer, where you notice them
                 // while typing — not in a settings page you have to go find.
                 .action(UiAction.secondary("model", modelLabel).icon("ai")
-                        .dispatch("GET", "/chat/api/sessions/" + sessionId + "/settings")
+                        .onClick(trigger(on(ChatUiController.class).settingsDialog(sessionId, null)))
                         .<UiAction>withCssClass("chat-model-btn"))
                 .action(UiAction.icon("send", "Send").icon("send")
                         .style(UiAction.Style.PRIMARY)
-                        .stream("POST", "/chat/api/sessions/" + sessionId + "/chat/stream", id()));
+                        .onClick(streaming(on(ChatUiController.class).chatStream(sessionId, null), id())));
         return form.<UiForm>withCssClass("chat-form");
     }
 
@@ -163,7 +169,7 @@ public final class ChatFormComponent implements UiComponent {
         row.child(ai.mindconnect.ui.model.UiText.of(id() + ":thinking", "AI is thinking")
                 .withCssClass("chat-thinking"));
         row.child(UiAction.danger("stop", "Stop").icon("stop")
-                .dispatch("DELETE", "/chat/api/streams/" + channelId));
+                .onClick(trigger(on(StreamController.class).cancel(channelId))));
         return row;
     }
 }
