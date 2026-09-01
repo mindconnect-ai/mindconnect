@@ -151,16 +151,13 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
         var effective = agentResolver.resolve(session);
-        UUID agentId = session.mainAgent()
-                .filter(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
-                .map(ai.mindconnect.agent.domain.session.SessionAgent::id)
-                .orElse(null);
+        UUID agentId = boundAgentId(session);
 
         var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
                 sessionId, llmConfigRepository.findAll(), selectableAgents(agentId), allToolNames(),
                 effective.llmConfigName(),
                 effective.tools().stream().map(ai.mindconnect.agent.tool.AgentTool::name).toList(),
-                effective.toolSearchOrOff().enabled(), agentId).render();
+                effective.toolSearchOrOff().enabled(), agentId, effective.systemPrompt()).render();
 
         var dlg = ai.mindconnect.ui.model.UiDialog.of("Model & tools", null, form);
         dlg.setId("chat-dialog");
@@ -183,15 +180,23 @@ public class ChatUiController {
         if (agentId != null && !agentId.isBlank()) {
             var def = agentRepository.findById(UUID.fromString(agentId))
                     .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
+            // Only a prompt that actually differs is stored: an untouched
+            // field must not turn into an override that then stops tracking
+            // edits to the agent itself.
+            String prompt = body.str("systemPrompt");
+            String override = prompt == null || prompt.isBlank()
+                    || prompt.strip().equals(String.valueOf(def.systemPrompt()).strip())
+                    ? null : prompt;
             agent = new ai.mindconnect.agent.domain.session.SessionAgentRef(
-                    def.id(), true, def.name(), null, null, null);
+                    def.id(), true, def.name(), null, null, null, override);
         } else {
             // Staying inline keeps the same agent — and therefore the same
             // workspace — while only the model and tools change. Coming from a
             // ref agent it is a new one, and the switch says so.
             var previous = sessionOpt.get().mainAgent().orElse(null);
+            String prompt = body.str("systemPrompt");
             var fresh = inlineAgent(body.str("llmConfigName"),
-                    body.strList("tools"), body.bool("toolSearch", true));
+                    body.strList("tools"), body.bool("toolSearch", true), prompt);
             agent = previous instanceof ai.mindconnect.agent.domain.session.InlineSessionAgent kept
                     ? kept.withLlmConfigName(fresh.llmConfigName())
                           .withTools(fresh.tools().stream()
@@ -336,12 +341,18 @@ public class ChatUiController {
     /** The session's own agent, built from a model name and tool names. */
     private ai.mindconnect.agent.domain.session.InlineSessionAgent inlineAgent(
             String llmConfigName, List<String> tools, boolean toolSearch) {
+        return inlineAgent(llmConfigName, tools, toolSearch, null);
+    }
+
+    /** @param systemPrompt {@code null} or blank falls back to the built-in one. */
+    private ai.mindconnect.agent.domain.session.InlineSessionAgent inlineAgent(
+            String llmConfigName, List<String> tools, boolean toolSearch, String systemPrompt) {
         List<String> names = tools == null || tools.isEmpty()
                 ? ai.mindconnect.chatui.ui.component.ChatSettingsComponent.DEFAULT_TOOLS
                 : tools;
         var known = allToolNames();
         return ai.mindconnect.agent.domain.session.InlineSessionAgent.of(
-                "Chat", CHAT_SYSTEM_PROMPT,
+                "Chat", systemPrompt == null || systemPrompt.isBlank() ? CHAT_SYSTEM_PROMPT : systemPrompt,
                 llmConfigName == null ? defaultLlmConfigName() : llmConfigName,
                 names.stream().filter(known::contains).toList(),
                 toolSearch);
@@ -371,6 +382,34 @@ public class ChatUiController {
      * assistant, so opening the dialog on such a chat and pressing Apply does
      * not silently reassign it.
      */
+    /**
+     * The registry agent this chat runs on, or {@code null} for a chat with an
+     * agent of its own.
+     *
+     * <p>Two shapes mean the same thing. Picking an agent in the settings
+     * dialog writes a {@link ai.mindconnect.agent.domain.session.SessionAgentRef};
+     * opening a chat from an agent — which is now every chat, via
+     * {@code default-chat} — sets only {@code agentDefinitionId} and leaves the
+     * session-agent list empty. Reading just the ref reported "no agent" for
+     * the second kind, and pressing Apply on one detached the chat from the
+     * agent it was plainly running on.
+     *
+     * <p>The id is checked against the registry: an inline agent's id is minted
+     * for the session and would otherwise look like a binding.
+     */
+    private UUID boundAgentId(ai.mindconnect.agent.domain.AgentSession session) {
+        UUID ref = session.mainAgent()
+                .filter(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
+                .map(ai.mindconnect.agent.domain.session.SessionAgent::id)
+                .orElse(null);
+        if (ref != null) {
+            return ref;
+        }
+        UUID fromSession = session.agentDefinitionId();
+        return fromSession != null && agentRepository.findById(fromSession).isPresent()
+                ? fromSession : null;
+    }
+
     /**
      * Icon name per agent-definition id, for the history drawer. Read from the
      * registry in one go: a row only needs the icon, and resolving every

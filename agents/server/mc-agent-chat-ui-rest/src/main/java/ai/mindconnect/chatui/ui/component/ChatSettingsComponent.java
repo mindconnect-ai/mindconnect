@@ -33,11 +33,23 @@ public final class ChatSettingsComponent implements UiComponent {
     private final List<String> currentTools;
     private final boolean toolSearchOn;
     private final UUID currentAgentId;
+    /** What this chat runs on today — the agent's prompt, or its own override. */
+    private final String currentSystemPrompt;
 
     public ChatSettingsComponent(UUID sessionId, List<LlmConfig> llmConfigs,
                                  List<AgentDefinition> agents, List<String> toolNames,
                                  String currentLlmConfigName, List<String> currentTools,
                                  boolean toolSearchOn, UUID currentAgentId) {
+        this(sessionId, llmConfigs, agents, toolNames, currentLlmConfigName, currentTools,
+                toolSearchOn, currentAgentId, null);
+    }
+
+    public ChatSettingsComponent(UUID sessionId, List<LlmConfig> llmConfigs,
+                                 List<AgentDefinition> agents, List<String> toolNames,
+                                 String currentLlmConfigName, List<String> currentTools,
+                                 boolean toolSearchOn, UUID currentAgentId,
+                                 String currentSystemPrompt) {
+        this.currentSystemPrompt = currentSystemPrompt;
         this.sessionId = sessionId;
         this.llmConfigs = llmConfigs;
         this.agents = agents;
@@ -83,6 +95,14 @@ public final class ChatSettingsComponent implements UiComponent {
                         currentAgentId == null ? "" : currentAgentId.toString(), agentOptions)
                         .asEditable()
                         .hint("Takes over prompt, model and tools — the fields above stop applying"))
+                // Last, because it is the longest field and the one you scroll
+                // past when you came for the model. Pre-filled with what the
+                // chat runs on today: the agent's prompt until it is edited.
+                .field(UiField.textarea("systemPrompt", "System prompt", currentSystemPrompt)
+                        .asEditable()
+                        .hint("Starts as the agent's own. Edit it and this chat alone uses "
+                                + "yours — the agent, its tools and the agents it may call "
+                                + "stay as they are"))
                 .action(UiAction.primary("apply", "Apply").icon("save")
                         .dispatch("POST", "/chat/api/sessions/" + sessionId + "/settings"))
                 .action(UiAction.secondary("cancel", "Cancel")

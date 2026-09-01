@@ -72,16 +72,21 @@ public class SessionAgentResolver {
     }
 
     /**
-     * The agent as configured, with this chat's choices on top. Only the model
-     * and the tools: overriding the system prompt would make the agent's name
-     * on the session a lie, and detaching into an inline agent is the honest
-     * way to do that.
+     * The agent as configured, with this chat's choices on top: model, tools,
+     * and — since the roster made detaching costly — the system prompt. See
+     * {@link SessionAgentRef} for why that last one stopped being forbidden.
+     * Everything the chat does not name stays the agent's own, the roster
+     * included.
      */
     private static AgentDefinition withOverrides(AgentDefinition base, SessionAgentRef ref) {
         AgentDefinition out = base;
         if (ref.llmConfigName() != null && !ref.llmConfigName().isBlank()) {
             out = out.withBasicFields(out.name(), out.description(), out.systemPrompt(),
                     out.welcomeMessage(), ref.llmConfigName());
+        }
+        if (ref.hasPromptOverride()) {
+            out = out.withBasicFields(out.name(), out.description(), ref.systemPrompt(),
+                    out.welcomeMessage(), out.llmConfigName());
         }
         if (ref.tools() != null) {
             out = out.withTools(ref.tools());

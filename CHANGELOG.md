@@ -25,6 +25,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **A chat can run on a system prompt of its own.** The settings dialog gains
+  the field, pre-filled with what the chat runs on today — its agent's prompt
+  until you edit it. Editing it changes this one conversation; the agent, its
+  tools and the agents it may call stay as they are, and the header marks the
+  chat as running its own prompt so the agent's name on it is not misleading.
+  Leaving the field alone stores no override, so the chat keeps tracking edits
+  to the agent itself.
+
+
 - **`code_execute` can be given a host directory to see.** The container used
   to have nothing but its session scratch space, so sandboxed code could not
   read the user's own files. A `mountDir` on the tool's agent binding — or the
@@ -94,6 +103,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
   in the picker so opening the dialog cannot silently reassign it.
 
 ### Fixed
+
+- **The chat settings dialog sees the agent the chat is running on.** A chat
+  opened from an agent carries only its `agentDefinitionId`; the dialog read
+  the session-agent list, found it empty, and reported "no agent" — so pressing
+  Apply detached the chat from the agent it was plainly running on, losing its
+  tools and the agents it may call. It has always been wrong for chats started
+  from an agent page; with `default-chat` it became the ordinary case.
+
 
 - **The chat header names the conversation again.** Since the chat stopped
   rendering its own app-shell header, the header said which agent was

@@ -85,6 +85,11 @@ public final class ChatPage {
         this.agent = agent;
         this.messages = new MessageListComponent(session.id(), agent, history, memory, subAgentTree)
                 .withSessionTitle(session.title())
+                .withCustomPrompt(session.mainAgent()
+                        .filter(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
+                        .map(a -> ((ai.mindconnect.agent.domain.session.SessionAgentRef) a)
+                                .hasPromptOverride())
+                        .orElse(false))
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName());
