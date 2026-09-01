@@ -74,4 +74,19 @@ class AgentDetailActionUrlsTest {
         assertThat(out).doesNotContain("%7Bid%7D");
         assertThat(out).doesNotContain("0000000000ff");
     }
+
+    /**
+     * The session table spans two controllers: opening a session is a chat-UI
+     * route, deleting it an admin one. The strings gave no hint of that; the
+     * method names do.
+     */
+    @Test
+    void theSessionTableReachesBothControllers() throws Exception {
+        String out = json(new SessionTableComponent(agent(), "u", NO_SESSIONS).render());
+
+        assertThat(out).contains("\"url\":\"/chat/api/agents/" + AGENT_ID + "/sessions\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/{id}\"");
+        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "/sessions/{id}\"");
+        assertThat(out).doesNotContain("%7Bid%7D");
+    }
 }
