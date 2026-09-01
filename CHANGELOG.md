@@ -25,6 +25,39 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **An agent can make an optional tool parameter mandatory for itself.** A
+  `requiredParams` list in a tool binding's `overrides` adds those names to the
+  schema the model is offered, and refuses a call that omits one before the
+  tool runs. It is the counterpart to the existing `params` pinning: pinning
+  takes a decision away from the model, requiring insists it make one. Needed
+  because prose does not carry far enough — a description saying "always pass
+  `query`" is followed by a large model and ignored by a small one perhaps half
+  the time, and each omission costs the very context the parameter was meant to
+  save. The seeded `url-reader` now requires `query` on both readers. Applied
+  centrally in the tool registry, so it works for every tool source.
+
+- **Web reads can say what they are looking for.** `web_read` and
+  `web_read_browser` take a `query`, and return the passages of the page that
+  bear on it instead of its first 20.000 characters. On a long page the figure
+  you were after usually sits past that cut, so the old behaviour answered
+  "not found" about pages that said it plainly — and the retry that provoked
+  cost another read. Selection is lexical (BM25 over the page's own passages),
+  so it costs no model call and no network: a 237.000-character Wikipedia
+  article comes back as 6.000 characters. Passing no query keeps the previous
+  behaviour.
+
+- **`web_search` returns the relevant part of each result page.** Tavily
+  already fetched those pages; taking its content costs one request, while
+  re-fetching them ourselves costs a page load each and fails outright on the
+  many sites that refuse an automated GET. Each result now carries the
+  passages matching your query, filtered as above, in place of the snippet —
+  the snippet was an extract of that same page, so printing both paid twice
+  for one text. The provider's own generated answer is included too, marked as
+  a lead rather than a citation. The result is no larger than before (measured
+  on a Swiss price-comparison query: 7.098 characters against 7.438) while
+  carrying page content the old output only pointed at. Set
+  `include_content: false` for the old URL-list behaviour.
+
 - **A chat can run on a system prompt of its own.** The settings dialog gains
   the field, pre-filled with what the chat runs on today — its agent's prompt
   until you edit it. Editing it changes this one conversation; the agent, its
@@ -102,7 +135,43 @@ fresh empty one, so nothing has to be moved by hand at release time.
   chat with. A chat already bound to another agent keeps it — the agent stays
   in the picker so opening the dialog cannot silently reassign it.
 
+### Changed
+
+- **The seeded LM Studio configs no longer claim a context window nobody
+  loaded.** `agent-default` and `lm-studio-default` shipped with 131.072
+  tokens — the model's maximum, not what LM Studio actually loads, which
+  defaults far lower. The runtime believed the larger number, so it never
+  compacted and LM Studio silently cut the front off the prompt, taking the
+  system prompt with it. Both now seed 32.768, and `maxOutputTokens` drops
+  from 8.192 to 4.096 — output equal to the whole window left nothing for the
+  prompt. Under-declaring the window is harmless; over-declaring is the bug.
+  Existing installations keep their stored values: seeds are only imported
+  when no config of that name exists.
+
+- **A `gemma-reader` config ships alongside them.** A small local model, 16.384
+  tokens, temperature 0.2 — meant for the reading and summarizing roles, where
+  prefill dominates and a 120B model buys nothing. Point `url-reader` at it to
+  keep the large model for planning and synthesis. Model and base URL are
+  overridable via `GEMMA_MODEL` and `LM_STUDIO_BASE_URL`.
+
 ### Fixed
+
+- **An agent pointed at an LLM alias was measured against the wrong model.**
+  Memory strategies read the model name and context-window size straight off
+  the config named by the agent — but an alias carries neither, so every agent
+  on one was counted with the character-based fallback counter instead of the
+  model's tokenizer, and sized against whatever window the alias record
+  happened to hold rather than its target's. Compaction therefore triggered at
+  the wrong point, in either direction. Alias resolution now lives in
+  `LlmConfigRepository.findResolvedByName` and is used everywhere a model
+  property is read.
+
+- **A blocked page no longer provokes the same request again.** `web_read`
+  answered "Error: HTTP 403" and left the model to invent a recovery, which
+  was reliably the same URL under a different language path — blocked
+  identically, one wasted round each time. The message now names the dead end:
+  which retries will fail, and what to do instead.
+
 
 - **Chat settings no longer discard what you changed — or what you didn't.**
   Applying the dialog dropped the model you had just picked, and quietly
