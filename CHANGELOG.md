@@ -25,6 +25,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **`code_execute` can be given a host directory to see.** The container used
+  to have nothing but its session scratch space, so sandboxed code could not
+  read the user's own files. A `mountDir` on the tool's agent binding — or the
+  runtime-wide `codeExecMountDir` — mounts one directory at `/mnt/host`,
+  read-only unless `mountWritable` says otherwise. The seeded `default-chat`
+  mounts the user's home (`~`). The path comes from the operator, never from a
+  tool argument: a directory chosen by model output is one that eventually
+  reads `/`. Mounting nothing stays the default for every other agent, and the
+  mount is part of the container's identity, so two bindings that disagree
+  about it do not share one.
+
+
 - **An agent can be given a roster of the agents it may delegate to.**
   `AgentDefinition.callableAgents` names them; the admin form offers the same
   multiselect the response reviewers use. `list_agents` then answers with that

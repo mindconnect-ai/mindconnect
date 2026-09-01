@@ -19,9 +19,17 @@ public final class CodeExecuteTool implements Tool {
     private final String sessionKey;
     /** Container network mode: {@code none} (default) or {@code bridge}. */
     private final String network;
+    /** Host directory visible inside the container, or {@code null} for none. */
+    private final HostMount mount;
 
     public CodeExecuteTool(CodeExecutionService service, Map<String, CodeLanguage> languages,
                            String sessionKey, String network) {
+        this(service, languages, sessionKey, network, null);
+    }
+
+    public CodeExecuteTool(CodeExecutionService service, Map<String, CodeLanguage> languages,
+                           String sessionKey, String network, HostMount mount) {
+        this.mount = mount;
         this.service = service;
         this.languages = languages;
         this.sessionKey = sessionKey;
@@ -43,9 +51,24 @@ public final class CodeExecuteTool implements Tool {
         return "Executes a program in an isolated container and returns exit code, stdout and stderr. "
                 + "Languages: " + String.join(", ", languages.keySet()) + ". "
                 + networkNote
+                + mountNote()
                 + "Each call runs a fresh interpreter process, so variables do NOT carry over between calls — "
                 + "but the working directory /workspace persists for this session. "
                 + "Write files to /workspace to pass data between calls.";
+    }
+
+    /**
+     * The model can only use the host directory if it is told it exists, and
+     * told where — the mount is invisible from inside otherwise.
+     */
+    private String mountNote() {
+        if (mount == null) {
+            return "";
+        }
+        return "The host directory " + mount.dir() + " is mounted at " + HostMount.MOUNT_POINT
+                + (mount.readOnly() ? " READ-ONLY" : " and is WRITABLE")
+                + " — read the user's own files from there. "
+                + "Paths outside it do not exist inside the container. ";
     }
 
     @Override
@@ -78,7 +101,7 @@ public final class CodeExecuteTool implements Tool {
         }
         CodeExecutionService.ExecResult result;
         try {
-            result = service.execute(sessionKey, language, network, source);
+            result = service.execute(sessionKey, language, network, mount, source);
         } catch (RuntimeException e) {
             return "Error: code execution failed: " + e.getMessage();
         }
