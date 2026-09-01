@@ -7,6 +7,9 @@ import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiLink;
+import ai.mindconnect.ui.model.UiList;
+import ai.mindconnect.ui.model.UiNode;
+import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiSection;
 
 import java.util.UUID;
@@ -51,7 +54,7 @@ public final class AgentDetailComponent implements UiComponent {
     }
 
     @Override
-    public UiSection render() {
+    public UiNode render() {
         var details = buildDetailsTab();
 
         // selectedRow applies only to whichever section it was deep-linked for.
@@ -61,12 +64,20 @@ public final class AgentDetailComponent implements UiComponent {
         var toolTable    = new ToolTableComponent(agent, selectedToolId).render();
         var sessionTable = new SessionTableComponent(agent, userId, sessionRepository, selectedSessId).render();
 
-        var section = UiSection.of(id(), agent.name())
+        // The section's own title is a plain string — the renderer escapes it,
+        // so an icon cannot go in it. A header-only UiList draws the same bar
+        // the agent list and the workflow detail page carry, and that one does
+        // take an icon. The section then goes untitled: with the bar above it,
+        // a title would say the agent's name twice in a row.
+        var header = UiList.of(id() + "-header", agent.name()).icon(agent.iconOrDefault());
+
+        var section = UiSection.of(id(), null)
                 .section("details",  "Details", details)
                 .section("tools",    "Tools (" + agent.tools().size() + ")", toolTable)
                 .section("sessions", "Sessions", sessionTable);
         if (initialSection != null) section.initialSection(initialSection);
-        return section;
+
+        return UiStack.of(id() + "-page").child(header).child(section);
     }
 
     private UiDetail buildDetailsTab() {
