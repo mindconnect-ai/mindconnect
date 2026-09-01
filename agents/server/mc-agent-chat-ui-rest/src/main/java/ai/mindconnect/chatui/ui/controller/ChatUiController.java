@@ -137,7 +137,7 @@ public class ChatUiController {
     @PostMapping("/sessions")
     public ResponseEntity<UiPage> createSession(@AuthenticationPrincipal OidcUser user) {
         String userId = userId(user);
-        var session = sessionService.openChat(defaultChatAgent(), defaultNamespace, userId);
+        var session = openDefaultChat(userId);
         log.info("New chat {}", session.id());
         return ResponseEntity.ok(
                 shell(session, sessionRepository.findByUser(defaultNamespace, userId)));
@@ -261,7 +261,7 @@ public class ChatUiController {
 
         var sessions = sessionRepository.findByUser(defaultNamespace, userId);
         if (sessions.isEmpty()) {
-            var fresh = sessionService.openChat(defaultChatAgent(), defaultNamespace, userId);
+            var fresh = openDefaultChat(userId);
             return ResponseEntity.ok(shell(fresh, List.of(fresh)));
         }
         return ResponseEntity.ok(shell(sessions.get(0), sessions));
@@ -303,8 +303,32 @@ public class ChatUiController {
         return page;
     }
 
-    /** A chat on the defaults: the standard model, the standard tools. */
-    private ai.mindconnect.agent.domain.session.InlineSessionAgent defaultChatAgent() {
+    /** The seeded agent a chat runs on when it did not come from one. */
+    private static final String DEFAULT_CHAT_AGENT = "default-chat";
+
+    /**
+     * Opens a chat that nobody started from an agent page.
+     *
+     * <p>It runs on the seeded {@code default-chat} agent where the namespace
+     * has one, so its prompt, its model, its tools and the roster it may
+     * delegate to are configuration like every other agent's — changed in the
+     * admin UI rather than compiled in here. That is the point: the defaults
+     * of the chat everyone lands in should not be the one thing you cannot
+     * edit.
+     *
+     * <p>A namespace seeded before that agent existed has no such definition,
+     * and falls back to the inline agent this controller has always built. So
+     * upgrading changes nothing until the agent is installed.
+     */
+    private ai.mindconnect.agent.domain.AgentSession openDefaultChat(String userId) {
+        return agentRepository.findByName(defaultNamespace, DEFAULT_CHAT_AGENT)
+                .map(a -> sessionService.openChat(a.id(), defaultNamespace, userId))
+                .orElseGet(() -> sessionService.openChat(inlineDefaultChatAgent(),
+                        defaultNamespace, userId));
+    }
+
+    /** The fallback chat agent: the standard model, the standard tools. */
+    private ai.mindconnect.agent.domain.session.InlineSessionAgent inlineDefaultChatAgent() {
         return inlineAgent(defaultLlmConfigName(),
                 ai.mindconnect.chatui.ui.component.ChatSettingsComponent.DEFAULT_TOOLS, true);
     }
