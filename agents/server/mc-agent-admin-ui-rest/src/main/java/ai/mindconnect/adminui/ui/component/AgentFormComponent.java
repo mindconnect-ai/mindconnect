@@ -9,6 +9,9 @@ import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiLink;
+import ai.mindconnect.ui.model.UiList;
+import ai.mindconnect.ui.model.UiNode;
+import ai.mindconnect.ui.model.UiStack;
 
 import java.util.List;
 
@@ -51,7 +54,7 @@ public final class AgentFormComponent implements UiComponent {
     }
 
     @Override
-    public UiForm render() {
+    public UiNode render() {
         boolean isNew = agent == null;
 
         List<UiField.Option> llmOptions = llmConfigRepository.findAll().stream()
@@ -85,7 +88,16 @@ public final class AgentFormComponent implements UiComponent {
                 .map(other -> UiField.Option.of(other.name(), other.name()))
                 .toList();
 
-        return UiForm.of(id(), isNew ? "New Agent" : "Edit Agent: " + agent.name())
+        // Same bar as the list and the detail page. A form's title is a plain
+        // escaped string, so the icon has to come from a header-only UiList
+        // above it — and the form then goes untitled, or the name would stand
+        // twice in a row. A new agent has no icon yet, so it gets the generic
+        // one, which is what it will be drawn with until someone picks another.
+        var header = UiList.of(id() + "-header",
+                        isNew ? "New Agent" : "Edit Agent: " + agent.name())
+                .icon(isNew ? AgentDefinition.DEFAULT_ICON : agent.iconOrDefault());
+
+        var form = UiForm.of(id(), null)
                 .field(UiField.select("namespace", "Namespace",
                         isNew ? defaultNamespace.value() : agent.namespace().value(), nsOptions)
                         .asEditable().asRequired())
@@ -151,6 +163,8 @@ public final class AgentFormComponent implements UiComponent {
                         .dispatch("GET", isNew ? "/admin/api/agents"
                                               : "/admin/api/agents/" + agent.id()))
                 .link(UiLink.of("back", "/admin/agents", "← Back to Agents"));
+
+        return UiStack.of(id() + "-page").child(header).child(form);
     }
 
     /**
