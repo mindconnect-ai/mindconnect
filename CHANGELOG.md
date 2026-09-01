@@ -57,6 +57,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **The chat header names the conversation again.** Since the chat stopped
+  rendering its own app-shell header, the header said which agent was
+  answering but not which conversation you were in — and the history is a
+  closed drawer, so there was nowhere else to look. The conversation's title
+  leads it now, with the agent beside it as a badge; an untitled chat still
+  shows the agent's name.
+
 - **The admin UI's JSON views follow the theme.** Working memory, LLM traces
   and tool arguments were painted on a white slab whatever theme was on — a
   glaring hole in the middle of Dark, Amethyst and Gipiti. They now take the
