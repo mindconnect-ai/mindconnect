@@ -1,7 +1,7 @@
 ---
 id: approval-parallel-resume
 area: approval
-requires: [server-9091, lm-studio-parallel-toolcall-model]
+requires: [server-9090, lm-studio-parallel-toolcall-model]
 duration: ~5 min
 last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
 ---
@@ -15,7 +15,7 @@ one result.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio with a model that emits MULTIPLE tool calls in one response.
   **Premise-skip rule:** if after 3 attempts the model always calls the tools
   sequentially, record SKIPPED ("model serialises tool calls") — gpt-oss via

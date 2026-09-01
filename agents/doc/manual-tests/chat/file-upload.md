@@ -1,7 +1,7 @@
 ---
 id: chat-file-upload
 area: chat
-requires: [server-9091, lm-studio-embedding-model]
+requires: [server-9090, lm-studio-embedding-model]
 duration: ~5 min
 last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
@@ -14,7 +14,7 @@ it via `vector_search`.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with BOTH a tool-capable LLM and an EMBEDDINGS model
   loaded (`GET http://localhost:1234/api/v0/models` shows a loaded
   `"type": "embeddings"` entry — otherwise: SKIPPED)
