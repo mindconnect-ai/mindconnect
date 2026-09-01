@@ -197,6 +197,17 @@
       "enabled": true,
       "needsApproval": true,
       "deferred": true
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000070",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
+      "name": "code_execute",
+      "description": "Runs a program in an isolated container and returns exit code, stdout and stderr. Use it for calculations, data wrangling and quick scripts instead of doing the arithmetic yourself.",
+      "overrides": {},
+      "enabled": true,
+      "deferred": false,
+      "needsApproval": false,
+      "maxResultChars": null
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",
