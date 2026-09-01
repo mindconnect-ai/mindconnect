@@ -25,6 +25,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **One slow tab no longer slows the chat for everyone else.** The SSE fan-out
+  behind a chat session used to write to each connected client in turn, while
+  holding the lock that publishing needs — so a client whose socket had stopped
+  draining held up the agent's output for every other client on that session.
+  It now runs on the task queue's `Channel`, which gives each subscriber its own
+  bounded queue and drains it on its own thread: a reader that falls behind
+  loses history, never the turn, and never anybody else's. Reconnects also
+  reach further back, since the replay buffer grew from 200 events to 2048.
+
 - **Everyone watching a chat sees it live.** A chat's stream now belongs to the
   session rather than to one turn, so a second browser tab — or a colleague on
   the same session — receives the same tokens, tool cards and approval prompts

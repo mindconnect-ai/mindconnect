@@ -26,6 +26,15 @@
     </description>
 
     <dependencies>
+
+        <!-- Channel: the SSE bus's sequencing, replay buffer and fan-out.
+             Reached transitively through the runtime today; named here because
+             this module uses it directly. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-task-queue</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Agent platform — domain types plus the REST controllers the UI drives -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
