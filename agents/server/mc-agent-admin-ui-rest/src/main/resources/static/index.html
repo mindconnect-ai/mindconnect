@@ -40,7 +40,7 @@
             if (!active) {
                 try { active = localStorage.getItem("sui-theme"); } catch (e) { active = null; }
             }
-            if (active === null) active = "clody";        // the default look
+            if (active === null) active = "amethyst";     // the default look
             if (/^[a-z][a-z0-9-]*$/.test(active) && active !== "default") {
                 document.documentElement.classList.add("sui-theme-" + active);
             }

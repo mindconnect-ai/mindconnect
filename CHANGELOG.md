@@ -46,6 +46,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   assistants first, then sub-agents, then utilities. Paging cut across the
   grouping, so it is gone; `page` and `size` on `GET /admin/agents` are gone
   with it.
+- **Amethyst is the admin UI's default theme.** It was Clody. Anyone who has
+  picked a theme before keeps theirs — the choice lives in the browser, and
+  only a browser that never made one sees the change.
 - **The chat's agent picker offers assistants only.** A sub-agent expects a
   self-contained brief from an orchestrator and a utility answers in the one
   shape the runtime calls it for, so neither belongs in a list of things to

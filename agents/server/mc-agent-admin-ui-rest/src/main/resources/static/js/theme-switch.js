@@ -43,7 +43,10 @@
             // this page; it just will not be remembered.
         }
         if (stored && THEMES.some((t) => t.id === stored)) return stored;
-        return "clody";
+        // Keep this in step with the inline script in index.html, which
+        // applies the default before this file has loaded — the two
+        // disagreeing means the picker ticks a theme the page is not wearing.
+        return "amethyst";
     }
 
     /** The one place the class is actually swapped. */
