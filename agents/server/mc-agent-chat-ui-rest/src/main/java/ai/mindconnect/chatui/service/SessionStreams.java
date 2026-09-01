@@ -25,8 +25,8 @@ import java.util.concurrent.TimeUnit;
  * runs — and stay attached. A turn resolves the session's bus, publishes its
  * patches, and ends; the subscribers remain.
  *
- * <p><b>Only the current turn is replayed.</b> {@link #turnStarted} clears
- * the bus's ring buffer, so a client joining a quiet session replays nothing
+ * <p><b>Only the current turn is replayed.</b> {@link #turnStarted} raises
+ * the bus's replay floor, so a client joining a quiet session replays nothing
  * and simply reads the persisted history — which is the truth. Carrying a
  * finished turn's patches across the boundary would be actively wrong:
  * they are APPEND operations against a page that already contains what they
@@ -81,15 +81,15 @@ public class SessionStreams {
     }
 
     /**
-     * A turn begins publishing: pin the bus against eviction and drop the
-     * previous turn's patches, so anyone joining from here on replays this
-     * turn and nothing older.
+     * A turn begins publishing: pin the bus against eviction and move its
+     * replay floor to here, so anyone joining from now on replays this turn
+     * and nothing older.
      */
     public StreamBus turnStarted(String channelId) {
         busy.add(channelId);
         catchUps.remove(channelId);
         StreamBus bus = bus(channelId);
-        bus.resetBuffer();
+        bus.startTurn();
         return bus;
     }
 

@@ -1,171 +1,186 @@
 package ai.mindconnect.chatui.service;
 
+import ai.mindconnect.channel.Channel;
+import ai.mindconnect.channel.ChannelRegistry;
+import ai.mindconnect.channel.Subscription;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Iterator;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Per-channel multiplexing fan-out used by {@link ActiveStreams}. One
- * instance is created per live SSE stream and lives on the channel's
- * {@link ActiveStreams.Handle}. Producers call {@link #publish} to push an
- * event; every currently-attached {@link SseEmitter} sees a copy.
+ * Per-session multiplexing fan-out used by {@link ActiveStreams}. One instance
+ * lives per chat session (see {@link SessionStreams}); producers call
+ * {@link #publish} and every attached {@link SseEmitter} sees a copy.
  *
- * <p>Each event gets a monotonically-increasing sequence number, and the
- * last {@link #BUFFER_SIZE} events are kept in a ring buffer. A client
- * that reconnects with a {@code lastSeq} parameter via {@link #attach}
- * receives every event in the buffer with {@code seq > lastSeq} before
- * being subscribed to the live feed — closing the small race window
- * between a disconnect and a reconnect (typically a few seconds on F5).
+ * <p>The sequencing, the replay buffer and the fan-out belong to
+ * {@link Channel} from the task queue — the same machinery the agent runtime's
+ * own session channels run on. What is left here is the SSE edge: mapping
+ * emitters to subscriptions, writing frames onto the wire, and keeping idle
+ * connections alive.
  *
- * <p>Thread-safety:
- * <ul>
- *   <li>{@code publish} is synchronized so seq assignment and the
- *       buffer/subscriber writes are atomic.</li>
- *   <li>The subscriber list is a {@link CopyOnWriteArrayList} — fine for
- *       a low number of concurrent subscribers (1-3 in practice; one tab
- *       streaming, maybe one observer tab).</li>
- *   <li>{@link #attach} synchronizes against {@code publish} so a freshly
- *       attached subscriber can't miss an event that's in flight while
- *       the buffer-replay loop runs.</li>
- * </ul>
+ * <p><b>Why not our own fan-out.</b> This class used to write to each
+ * subscriber inline while holding the publish lock, so a subscriber whose
+ * socket had stopped draining blocked the producer — and with it every other
+ * subscriber. That was harmless while a stream served the one client that had
+ * opened it. It stopped being harmless when several clients on one session
+ * became the point. Channel gives each subscriber a bounded queue drained by
+ * its own virtual thread, dropping the oldest events when one falls behind: a
+ * slow reader loses history, never the turn, and never anybody else's.
+ *
+ * <p><b>The replay floor.</b> Patches are APPEND operations against a page
+ * rendered from persisted history, so replaying a finished turn would add
+ * every message a second time. A turn therefore raises the floor
+ * ({@link #startTurn}), and no subscriber is replayed from before it. Clamping
+ * rather than clearing: the events stay in the buffer for anything that
+ * legitimately asks for them, and nothing has to reach into the channel.
  */
 public final class StreamBus {
 
     /**
-     * Ring-buffer depth. Sized for a chat-turn's worth of token-by-token
-     * patches plus task-card state changes — typical turn produces well
-     * under 200 events. Bumping this is cheap (a few KB per stream).
+     * Replay depth, in events. A turn's token-by-token patches plus its task
+     * cards stay well under this; the channel default is larger than the 200
+     * this class used to keep, which only makes reconnects more forgiving.
      */
-    public static final int BUFFER_SIZE = 200;
+    public static final int BUFFER_SIZE = ChannelRegistry.DEFAULT_BUFFER;
 
     /**
-     * One past event held in the ring buffer. {@code seq} starts at 1 and
-     * grows monotonically per stream. {@code name} is the SSE event name
-     * (e.g. {@code "patch"}, {@code "error"}, {@code "done"}); {@code data}
-     * is the JSON-serialised payload.
+     * One SSE frame. {@code seq} is the channel's position, filled in on the
+     * way out. {@code name} is the SSE event name ({@code "patch"},
+     * {@code "error"}, {@code "done"}); {@code data} is the payload.
      */
     public record Event(long seq, String name, String data) { }
 
-    private final List<SseEmitter> subscribers = new CopyOnWriteArrayList<>();
-    private final Deque<Event> buffer = new ArrayDeque<>(BUFFER_SIZE);
-    private final AtomicLong seqGen = new AtomicLong(0);
+    /** What travels on the channel: a frame that does not know its position. */
+    record Frame(String name, String data) { }
 
     /**
-     * Records the event in the ring buffer and broadcasts it to every
-     * currently attached subscriber. Failures on a single subscriber drop
-     * that subscriber from the list — its emitter is already broken at
-     * that point, no benefit in retrying.
+     * Channels are normally handed out by a registry keyed by id. Here the bus
+     * IS the identity — {@link SessionStreams} already keeps one per session —
+     * so each bus owns a private registry with a single channel rather than
+     * inventing a second id space.
      */
-    public synchronized void publish(String name, String data) {
-        long seq = seqGen.incrementAndGet();
-        Event event = new Event(seq, name, data);
-        if (buffer.size() == BUFFER_SIZE) buffer.removeFirst();
-        buffer.addLast(event);
+    private static final AtomicLong CHANNEL_IDS = new AtomicLong();
 
-        Iterator<SseEmitter> it = subscribers.iterator();
-        while (it.hasNext()) {
-            SseEmitter sub = it.next();
-            if (!sendTo(sub, event)) subscribers.remove(sub);
-        }
+    private final ChannelRegistry registry = new ChannelRegistry();
+    private final Channel<Frame> channel = registry.channel("chat-ui-" + CHANNEL_IDS.incrementAndGet());
+    private final Map<SseEmitter, Subscription> subscriptions = new ConcurrentHashMap<>();
+
+    /**
+     * No subscriber is replayed from before this point. Raised at each turn
+     * start, so a client attaching with an old cursor still sees only the turn
+     * that is running.
+     */
+    private volatile long replayFloor;
+
+    /** Records the event and broadcasts it. Never blocks on a slow reader. */
+    public void publish(String name, String data) {
+        channel.publish(new Frame(name, data));
     }
 
     /**
-     * Subscribes {@code emitter} to the live feed. If {@code lastSeq} is
-     * non-negative, every buffered event with seq > lastSeq is replayed
-     * synchronously before the emitter is added to the subscriber list —
-     * the holding lock guarantees no live event interleaves.
-     *
-     * <p>Pass {@code -1} as {@code lastSeq} to replay everything in the
-     * buffer (initial attach from a reconnecting client that has no seq
-     * yet). Pass {@code Long.MAX_VALUE} to skip replay entirely (the
-     * stream's own producer thread doesn't need replay).
+     * Everything published from here on belongs to a new turn; nothing older
+     * may be replayed into a page that already renders it.
      */
-    public synchronized void attach(SseEmitter emitter, long lastSeq) {
+    public void startTurn() {
+        replayFloor = channel.lastSeq();
+    }
+
+    /**
+     * Subscribes {@code emitter} to the live feed, replaying buffered events
+     * after {@code lastSeq} first. Pass {@link #lastSeq()} to skip replay
+     * entirely. The cursor is clamped to the current turn — see the class
+     * comment.
+     */
+    public void attach(SseEmitter emitter, long lastSeq) {
         attach(emitter, lastSeq, List.of());
     }
 
     /**
-     * Attach with a PRELUDE sent ahead of the replay — the frames that bring
-     * a client joining mid-turn up to the current state. Sent inside the
-     * lock, so a token published concurrently cannot slip in front of the
-     * prelude and land on a DOM node the prelude has yet to create.
+     * Attach with a PRELUDE — the frames that bring a client joining mid-turn
+     * up to the current state, sent ahead of the replay.
+     *
+     * <p>The cursor is read <em>before</em> the prelude goes out, so anything
+     * published while it is being written is still delivered by the
+     * subscription: no gap, and no duplicate either, since the subscription
+     * starts from exactly that point. The old implementation needed a lock
+     * held across both steps to get the same guarantee.
      */
-    public synchronized void attach(SseEmitter emitter, long lastSeq, List<Event> prelude) {
+    public void attach(SseEmitter emitter, long lastSeq, List<Event> prelude) {
+        long cursor = Math.max(Math.max(lastSeq, replayFloor), 0);
+        cursor = Math.min(cursor, channel.lastSeq());
+
         for (Event e : prelude) {
-            if (!sendTo(emitter, e)) return;
-        }
-        for (Event e : buffer) {
-            if (e.seq() > lastSeq) {
-                if (!sendTo(emitter, e)) return; // emitter already broken
+            if (!sendTo(emitter, e)) {
+                return;                        // emitter already broken
             }
         }
-        subscribers.add(emitter);
+
+        Subscription subscription = channel.subscribe(cursor,
+                event -> sendTo(emitter, new Event(event.seq(),
+                        event.value().name(), event.value().data())));
+        Subscription previous = subscriptions.put(emitter, subscription);
+        if (previous != null) {
+            previous.close();                  // a re-attach of the same emitter
+        }
     }
 
-    /** Drops an emitter from the subscriber list. No-op if not present. */
+    /** Drops an emitter from the feed. No-op if it was not attached. */
     public void detach(SseEmitter emitter) {
-        subscribers.remove(emitter);
+        Subscription subscription = subscriptions.remove(emitter);
+        if (subscription != null) {
+            subscription.close();
+        }
     }
 
     /** How many clients are currently attached. */
     public int subscriberCount() {
-        return subscribers.size();
+        return subscriptions.size();
+    }
+
+    /** The newest sequence published on this bus. */
+    public long lastSeq() {
+        return channel.lastSeq();
     }
 
     /**
-     * Forgets the buffered past without touching the sequence or the
-     * subscribers. Called when a turn starts: a client that attaches later
-     * replays THIS turn and nothing before it. The patches are APPEND
-     * operations, so replaying a finished turn into a page that already
-     * renders it from persisted history would duplicate every message.
-     */
-    public synchronized void resetBuffer() {
-        buffer.clear();
-    }
-
-    /**
-     * Sends an SSE comment to every subscriber and drops those that fail.
-     * Two jobs in one: it keeps a connection alive that would otherwise be
-     * cut as idle by a proxy, and a failed write is how a client that went
-     * away is noticed — there is no other signal.
+     * Sends an SSE comment to every subscriber and drops those that fail. Two
+     * jobs in one: it keeps alive a connection a proxy would otherwise cut as
+     * idle, and a failed write is how a client that went away is noticed — the
+     * channel deliberately does not drop a consumer that throws, so nothing
+     * else would tell us.
      *
-     * <p>A comment carries no event name and no data, so it costs the client
-     * nothing; its SSE reader parses the block and finds nothing to
-     * dispatch.
+     * <p>Written straight to the emitters rather than published: a heartbeat
+     * is not part of the stream's history and must not take a sequence number
+     * or a buffer slot.
      */
-    public synchronized void ping() {
-        Iterator<SseEmitter> it = subscribers.iterator();
-        while (it.hasNext()) {
-            SseEmitter sub = it.next();
+    public void ping() {
+        for (SseEmitter emitter : subscriptions.keySet()) {
             try {
-                sub.send(SseEmitter.event().comment("hb"));
+                emitter.send(SseEmitter.event().comment("hb"));
             } catch (Exception e) {
-                subscribers.remove(sub);
+                detach(emitter);
             }
         }
     }
 
-    /** Last published seq, for clients that need to track "where am I". */
-    public long lastSeq() {
-        return seqGen.get();
-    }
-
     /**
-     * Completes every attached subscriber and clears the list. Called by the
-     * channel's owner after the producer is fully done (after the {@code done}
-     * event has been published) so reconnect-tabs see a clean stream end
-     * rather than hanging on an open SSE forever.
+     * Completes every attached subscriber and clears the list — the shutdown
+     * path, so clients see a clean stream end rather than hanging on an open
+     * SSE forever.
      */
-    public synchronized void closeAll() {
-        for (SseEmitter sub : subscribers) {
-            try { sub.complete(); } catch (Exception ignore) {}
+    public void closeAll() {
+        for (Map.Entry<SseEmitter, Subscription> entry : subscriptions.entrySet()) {
+            entry.getValue().close();
+            try {
+                entry.getKey().complete();
+            } catch (Exception ignore) {
+                // already gone
+            }
         }
-        subscribers.clear();
+        subscriptions.clear();
     }
 
     private static boolean sendTo(SseEmitter emitter, Event event) {
@@ -176,7 +191,9 @@ public final class StreamBus {
                     .data(event.data()));
             return true;
         } catch (Exception e) {
-            // Emitter closed by client or transport error. Caller drops it.
+            // Emitter closed by the client, or a transport error. The
+            // heartbeat reaps it; throwing here would only be logged by the
+            // channel and must not take the drain thread down.
             return false;
         }
     }
