@@ -70,6 +70,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **A running turn is no longer announced while you are on another page.** The
+  floating status toast came from semantic-ui, which stopped drawing it in
+  0.3.0 — rendering and wording belong to the application, since a layer that
+  moves bytes cannot know it is carrying a chat. Nothing replaces it here yet,
+  so a turn started in one tab runs unseen from another until you return to the
+  conversation. The stream itself, its reconnect and its Stop button are
+  unaffected. Restoring an equivalent is part of the session-stream work, using
+  the `onStreamStateChange` hook 0.3.0 added for it.
+
 - **A chat you did not start from an agent now runs on the seeded
   `default-chat` agent.** Its prompt, model, tools and the agents it may
   delegate to are configuration you can edit, instead of defaults compiled
