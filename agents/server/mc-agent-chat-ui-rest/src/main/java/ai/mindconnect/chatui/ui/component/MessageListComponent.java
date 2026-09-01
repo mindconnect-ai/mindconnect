@@ -84,6 +84,8 @@ public final class MessageListComponent implements UiComponent {
     private UUID parentSessionId;
     /** This conversation's title, when it has one — the header's subject. */
     private String sessionTitle;
+    /** Whether this chat replaced its agent's system prompt with its own. */
+    private boolean customPrompt;
     /** Bubbled sub-agent approval cards (from the ToolApprovalStore), rendered after the history. */
     private List<UiList.Item> bubbledApprovalCards = List.of();
     /** The host's overflow menu (parent session, back to agent, memory/trace
@@ -117,6 +119,18 @@ public final class MessageListComponent implements UiComponent {
      */
     public MessageListComponent withSessionTitle(String sessionTitle) {
         this.sessionTitle = sessionTitle;
+        return this;
+    }
+
+    /**
+     * Marks that this chat runs on its own system prompt rather than the
+     * agent's. The badge says so: the header still names the agent, because
+     * its tools and the agents it may call are still the agent's — but the
+     * name would be misleading on its own. Returns {@code this} for fluent
+     * chaining.
+     */
+    public MessageListComponent withCustomPrompt(boolean customPrompt) {
+        this.customPrompt = customPrompt;
         return this;
     }
 
@@ -194,8 +208,16 @@ public final class MessageListComponent implements UiComponent {
         var tools = ai.mindconnect.ui.model.UiStack.of(id() + "-tools")
                 .direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL)
                 .<ai.mindconnect.ui.model.UiStack>withCssClass("chat-header-tools");
-        if (titled) {
-            tools.child(ai.mindconnect.ui.model.UiText.of(id() + "-agent", agentName)
+        // Titled: the badge names the agent, because the header names the
+        // conversation. Untitled: the header already names the agent, so the
+        // badge is only worth drawing when there is something else to say —
+        // and an overridden prompt is exactly that, on the chat where the
+        // header would otherwise claim the agent's own.
+        String badge = titled
+                ? (customPrompt ? agentName + " · own prompt" : agentName)
+                : (customPrompt ? "own prompt" : null);
+        if (badge != null) {
+            tools.child(ai.mindconnect.ui.model.UiText.of(id() + "-agent", badge)
                     .<ai.mindconnect.ui.model.UiText>withCssClass("chat-agent-badge"));
         }
         tools.child(new TokenUsageComponent(id(), memory).render());

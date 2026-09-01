@@ -25,6 +25,27 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **A chat can run on a system prompt of its own.** The settings dialog gains
+  the field, pre-filled with what the chat runs on today — its agent's prompt
+  until you edit it. Editing it changes this one conversation; the agent, its
+  tools and the agents it may call stay as they are, and the header marks the
+  chat as running its own prompt so the agent's name on it is not misleading.
+  Leaving the field alone stores no override, so the chat keeps tracking edits
+  to the agent itself.
+
+
+- **`code_execute` can be given a host directory to see.** The container used
+  to have nothing but its session scratch space, so sandboxed code could not
+  read the user's own files. A `mountDir` on the tool's agent binding — or the
+  runtime-wide `codeExecMountDir` — mounts one directory at `/mnt/host`,
+  read-only unless `mountWritable` says otherwise. The seeded `default-chat`
+  mounts the user's home (`~`). The path comes from the operator, never from a
+  tool argument: a directory chosen by model output is one that eventually
+  reads `/`. Mounting nothing stays the default for every other agent, and the
+  mount is part of the container's identity, so two bindings that disagree
+  about it do not share one.
+
+
 - **An agent can be given a roster of the agents it may delegate to.**
   `AgentDefinition.callableAgents` names them; the admin form offers the same
   multiselect the response reviewers use. `list_agents` then answers with that
@@ -82,6 +103,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
   in the picker so opening the dialog cannot silently reassign it.
 
 ### Fixed
+
+- **Chat settings no longer discard what you changed — or what you didn't.**
+  Applying the dialog dropped the model you had just picked, and quietly
+  stripped every tool the tool registry could not offer: on a machine without
+  Gmail credentials, opening the settings and pressing Apply cost the chat its
+  three Gmail tools. The dialog now writes back only the settings that actually
+  differ from the agent's, and leaves tools it never asked about alone.
+
+- **The chat settings dialog sees the agent the chat is running on.** A chat
+  opened from an agent carries only its `agentDefinitionId`; the dialog read
+  the session-agent list, found it empty, and reported "no agent" — so pressing
+  Apply detached the chat from the agent it was plainly running on, losing its
+  tools and the agents it may call. It has always been wrong for chats started
+  from an agent page; with `default-chat` it became the ordinary case.
+
 
 - **The chat header names the conversation again.** Since the chat stopped
   rendering its own app-shell header, the header said which agent was

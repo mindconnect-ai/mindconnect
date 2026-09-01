@@ -41,6 +41,8 @@ public final class CodeExecuteToolFactory implements ToolFactory {
     private Map<String, CodeLanguage> languages = CodeLanguages.defaults();
     private CodeExecutionService service;
     private String defaultNetwork = "none";
+    /** Host directory offered to every binding that does not name its own; null = none. */
+    private String defaultMountDir;
 
     @Override
     public String name() {
@@ -62,6 +64,7 @@ public final class CodeExecuteToolFactory implements ToolFactory {
         }
         this.languages = CodeLanguages.parse(env.getString("codeExecLanguages").orElse(null));
         this.defaultNetwork = networkOrDefault(env.getString("codeExecNetwork").orElse(null), "none");
+        this.defaultMountDir = env.getString("codeExecMountDir").orElse(null);
         Path scratchRoot = Path.of(env.getString("dataBaseDir").orElse("data")).resolve("code-exec");
         CodeExecutionService.Settings settings = new CodeExecutionService.Settings(
                 env.getString("codeExecMemory").orElse("512m"),
@@ -93,7 +96,22 @@ public final class CodeExecuteToolFactory implements ToolFactory {
         network.put("default", defaultNetwork);
         network.put("description", "Container network mode. 'bridge' enables internet access "
                 + "(HTTP requests, pip/npm installs); 'none' fully isolates the container.");
-        return Map.of("type", "object", "properties", Map.of("network", network));
+        Map<String, Object> mountDir = new java.util.LinkedHashMap<>();
+        mountDir.put("type", "string");
+        mountDir.put("description", "Host directory to mount at " + HostMount.MOUNT_POINT
+                + " so the sandboxed code can read the user's own files. '~' is the user's "
+                + "home directory. Empty = nothing beyond the session scratch space.");
+        Map<String, Object> mountWritable = new java.util.LinkedHashMap<>();
+        mountWritable.put("type", "boolean");
+        mountWritable.put("default", false);
+        mountWritable.put("description", "Mount the directory writable instead of read-only. "
+                + "Model-written code can then change real files — leave this off unless that "
+                + "is the point.");
+        Map<String, Object> props = new java.util.LinkedHashMap<>();
+        props.put("network", network);
+        props.put("mountDir", mountDir);
+        props.put("mountWritable", mountWritable);
+        return Map.of("type", "object", "properties", props);
     }
 
     @Override
@@ -103,7 +121,42 @@ public final class CodeExecuteToolFactory implements ToolFactory {
         // for everything unlisted or invalid.
         String network = agentTool == null ? defaultNetwork
                 : networkOrDefault(String.valueOf(agentTool.overrides().getOrDefault("network", "")), defaultNetwork);
-        return new CodeExecuteTool(service, languages, sessionKey(scope), network);
+        return new CodeExecuteTool(service, languages, sessionKey(scope), network, mount(agentTool));
+    }
+
+    /**
+     * The host directory this binding may see, or {@code null}. Operator input
+     * only — the runtime setting, or a {@code mountDir} override on the agent's
+     * tool binding. Never a tool argument: a path the model chose is a path
+     * that eventually reads {@code /}.
+     */
+    private HostMount mount(AgentTool agentTool) {
+        Object raw = agentTool == null ? null : agentTool.overrides().get("mountDir");
+        String dir = raw == null || String.valueOf(raw).isBlank()
+                ? defaultMountDir : String.valueOf(raw);
+        if (dir == null || dir.isBlank()) {
+            return null;
+        }
+        java.nio.file.Path path = expandHome(dir.trim());
+        if (!java.nio.file.Files.isDirectory(path)) {
+            log.warn("code_execute mountDir '{}' is not a directory — mounting nothing", path);
+            return null;
+        }
+        boolean writable = agentTool != null
+                && Boolean.parseBoolean(String.valueOf(agentTool.overrides().getOrDefault("mountWritable", "false")));
+        return new HostMount(path, !writable);
+    }
+
+    /** {@code ~} and {@code ~/x} resolve against the user's home directory. */
+    private static java.nio.file.Path expandHome(String dir) {
+        java.nio.file.Path home = java.nio.file.Path.of(System.getProperty("user.home"));
+        if (dir.equals("~")) {
+            return home;
+        }
+        if (dir.startsWith("~/")) {
+            return home.resolve(dir.substring(2));
+        }
+        return java.nio.file.Path.of(dir);
     }
 
     /** Allowlist: only {@code none} and {@code bridge} are accepted network modes. */
