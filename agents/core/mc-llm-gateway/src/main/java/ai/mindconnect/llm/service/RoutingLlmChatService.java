@@ -32,9 +32,8 @@ public class RoutingLlmChatService implements LlmChat {
     }
 
     private LlmConfig resolveConfig(LlmRequest request) {
-        LlmConfig config = configRepository.findByName(request.configName())
+        // Aliases point at another config by name — findResolvedByName follows the chain.
+        return configRepository.findResolvedByName(request.configName())
                 .orElseThrow(() -> DomainException.notFound("LlmConfig", request.configName()));
-        // Aliases point at another config by name — follow the chain to a concrete config.
-        return config.resolveAlias(name -> configRepository.findByName(name).orElse(null));
     }
 }

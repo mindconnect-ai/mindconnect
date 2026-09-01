@@ -34,7 +34,7 @@ public record ContextTokenBudget(
                                              SummarizingWindowConfig cfg,
                                              LlmConfigRepository llmConfigRepository,
                                              TokenCounters tokenCounterRegistry) {
-        LlmConfig llmConfig = llmConfigRepository.findByName(def.llmConfigName()).orElse(null);
+        LlmConfig llmConfig = llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null);
 
         TokenCounter counter = llmConfig != null
                 ? tokenCounterRegistry.forModel(llmConfig.model())

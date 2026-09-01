@@ -201,7 +201,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
 
     @Override
     public TokenCounter resolveTokenCounter(AgentDefinition def) {
-        LlmConfig llmConfig = llmConfigRepository.findByName(def.llmConfigName()).orElse(null);
+        LlmConfig llmConfig = llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null);
         return llmConfig != null
                 ? tokenCounterRegistry.forModel(llmConfig.model())
                 : tokenCounterRegistry.fallback();
@@ -209,7 +209,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
 
     @Override
     public Integer contextWindowTokens(AgentDefinition def) {
-        LlmConfig llmConfig = llmConfigRepository.findByName(def.llmConfigName()).orElse(null);
+        LlmConfig llmConfig = llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null);
         return llmConfig != null ? llmConfig.contextWindowTokens() : null;
     }
 
