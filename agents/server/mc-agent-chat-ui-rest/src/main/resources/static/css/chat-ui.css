@@ -839,3 +839,18 @@
     width: 30px;
     height: 30px;
 }
+
+/* The agent beside the conversation's title: the header names the chat, and
+   this says who is answering in it. Same pill the agents list uses for an
+   agent's LLM config — a quiet fact next to a name, not a status. */
+.chat-agent-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-muted);
+    border: 1px solid var(--sui-color-border);
+    font-size: var(--sui-text-xs, 12px);
+    font-weight: 500;
+    white-space: nowrap;
+}

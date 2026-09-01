@@ -84,6 +84,7 @@ public final class ChatPage {
         this.session = session;
         this.agent = agent;
         this.messages = new MessageListComponent(session.id(), agent, history, memory, subAgentTree)
+                .withSessionTitle(session.title())
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName());
