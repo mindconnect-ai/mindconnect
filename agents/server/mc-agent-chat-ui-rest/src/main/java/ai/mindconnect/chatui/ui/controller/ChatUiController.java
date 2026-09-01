@@ -180,15 +180,41 @@ public class ChatUiController {
         if (agentId != null && !agentId.isBlank()) {
             var def = agentRepository.findById(UUID.fromString(agentId))
                     .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
-            // Only a prompt that actually differs is stored: an untouched
-            // field must not turn into an override that then stops tracking
-            // edits to the agent itself.
-            String prompt = body.str("systemPrompt");
-            String override = prompt == null || prompt.isBlank()
-                    || prompt.strip().equals(String.valueOf(def.systemPrompt()).strip())
-                    ? null : prompt;
+            // Switching to another agent hands the chat over completely: that
+            // agent's model, tools and prompt win, which is what the picker
+            // promises. Staying on the same one keeps what this chat chose —
+            // the ref carries exactly these three overrides for that.
+            boolean sameAgent = def.id().equals(boundAgentId(sessionOpt.get()));
+
+            // Only a value that actually differs is stored: an untouched field
+            // must not turn into an override that then stops tracking edits to
+            // the agent itself.
+            String prompt = sameAgent ? differing(body.str("systemPrompt"), def.systemPrompt()) : null;
+            String llm = sameAgent ? differing(body.str("llmConfigName"), def.llmConfigName()) : null;
+
+            List<ai.mindconnect.agent.tool.AgentTool> toolOverride = null;
+            ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig searchOverride = null;
+            if (sameAgent) {
+                // Compared against what the dialog could actually offer, not
+                // against everything the agent has: a tool the registry does
+                // not know — Gmail without credentials — never reaches the
+                // multiselect, so it can neither be kept nor removed there.
+                List<String> chosen = body.strList("tools");
+                var offerable = def.tools().stream()
+                        .map(ai.mindconnect.agent.tool.AgentTool::name)
+                        .filter(allToolNames()::contains)
+                        .collect(java.util.stream.Collectors.toSet());
+                if (chosen != null && !new java.util.HashSet<>(chosen).equals(offerable)) {
+                    toolOverride = pickTools(def, chosen);
+                }
+                boolean search = body.bool("toolSearch", def.toolSearchOrOff().enabled());
+                if (search != def.toolSearchOrOff().enabled()) {
+                    searchOverride = new ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig(
+                            search, def.toolSearchOrOff().groups());
+                }
+            }
             agent = new ai.mindconnect.agent.domain.session.SessionAgentRef(
-                    def.id(), true, def.name(), null, null, null, override);
+                    def.id(), true, def.name(), llm, toolOverride, searchOverride, prompt);
         } else {
             // Staying inline keeps the same agent — and therefore the same
             // workspace — while only the model and tools change. Coming from a
@@ -382,6 +408,50 @@ public class ChatUiController {
      * assistant, so opening the dialog on such a chat and pressing Apply does
      * not silently reassign it.
      */
+
+    /** The submitted value when it says something other than the agent's own. */
+    private static String differing(String submitted, String agentsOwn) {
+        if (submitted == null || submitted.isBlank()) {
+            return null;
+        }
+        return submitted.strip().equals(String.valueOf(agentsOwn).strip()) ? null : submitted;
+    }
+
+    /**
+     * The chat's tool selection as {@link ai.mindconnect.agent.tool.AgentTool}s,
+     * reusing the agent's own binding for every name it already has.
+     *
+     * <p>Rebuilding them from bare names would quietly drop what the binding
+     * carries beyond the name — {@code needsApproval} on bash and
+     * {@code code_execute}, the {@code mountDir} that gives the sandbox its
+     * host directory, a deferred flag. Turning the model dropdown would have
+     * been enough to lose all of it.
+     */
+    private List<ai.mindconnect.agent.tool.AgentTool> pickTools(
+            ai.mindconnect.agent.domain.AgentDefinition def, List<String> names) {
+        var byName = def.tools().stream().collect(java.util.stream.Collectors.toMap(
+                ai.mindconnect.agent.tool.AgentTool::name, t -> t, (a, b) -> a));
+        var known = allToolNames();
+        var picked = new java.util.LinkedHashMap<String, ai.mindconnect.agent.tool.AgentTool>();
+        // Whatever the dialog could not show stays: the chat did not drop it,
+        // it was never asked about. Without this, opening the settings and
+        // pressing Apply would silently strip an agent's Gmail tools on a
+        // machine where Gmail is not configured.
+        for (var t : def.tools()) {
+            if (!known.contains(t.name())) {
+                picked.put(t.name(), t);
+            }
+        }
+        for (String n : names) {
+            if (!known.contains(n)) {
+                continue;
+            }
+            picked.put(n, byName.containsKey(n)
+                    ? byName.get(n)
+                    : ai.mindconnect.agent.tool.AgentTool.of(def.id(), n));
+        }
+        return List.copyOf(picked.values());
+    }
     /**
      * The registry agent this chat runs on, or {@code null} for a chat with an
      * agent of its own.

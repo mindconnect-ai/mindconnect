@@ -104,6 +104,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **Chat settings no longer discard what you changed — or what you didn't.**
+  Applying the dialog dropped the model you had just picked, and quietly
+  stripped every tool the tool registry could not offer: on a machine without
+  Gmail credentials, opening the settings and pressing Apply cost the chat its
+  three Gmail tools. The dialog now writes back only the settings that actually
+  differ from the agent's, and leaves tools it never asked about alone.
+
 - **The chat settings dialog sees the agent the chat is running on.** A chat
   opened from an agent carries only its `agentDefinitionId`; the dialog read
   the session-agent list, found it empty, and reported "no agent" — so pressing
