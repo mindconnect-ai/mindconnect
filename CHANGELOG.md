@@ -25,6 +25,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **Everyone watching a chat sees it live.** A chat's stream now belongs to the
+  session rather than to one turn, so a second browser tab — or a colleague on
+  the same session — receives the same tokens, tool cards and approval prompts
+  as the person who typed, at the same moment. Clients attach when they open
+  the session and stay attached across turns, which is what lets them see a
+  turn somebody else starts; previously a client could only ever join a turn it
+  had started itself. Only the running turn is streamed: joining a quiet
+  session replays nothing and reads the persisted history, as before.
 - **An agent can make an optional tool parameter mandatory for itself.** A
   `requiredParams` list in a tool binding's `overrides` adds those names to the
   schema the model is offered, and refuses a call that omits one before the
@@ -57,6 +65,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
   on a Swiss price-comparison query: 7.098 characters against 7.438) while
   carrying page content the old output only pointed at. Set
   `include_content: false` for the old URL-list behaviour.
+
+- **The "still running" indicator names the chat you left.** It used to say
+  "Open chat", because semantic-ui drew it and had one guess for every
+  application — a layer that moves bytes cannot know it is carrying a chat
+  rather than a report or an import. 0.3.0 stopped drawing it and publishes
+  stream state instead; the admin UI now renders it, so it says what the
+  session is actually called (its title, or the agent's name while the chat is
+  untitled) and offers "Watch" while the agent works, "Read it" once the answer
+  is there. It also no longer appears for a chat where nothing is running,
+  which the old one did as soon as a stream was merely connected.
 
 - **A chat can run on a system prompt of its own.** The settings dialog gains
   the field, pre-filled with what the chat runs on today — its agent's prompt

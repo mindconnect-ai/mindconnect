@@ -150,7 +150,11 @@ public final class ChatFormComponent implements UiComponent {
                         .<UiAction>withCssClass("chat-model-btn"))
                 .action(UiAction.icon("send", "Send").icon("send")
                         .style(UiAction.Style.PRIMARY)
-                        .onClick(streaming(on(ChatUiController.class).chatStream(sessionId, null), id())));
+                        // A plain dispatch, not a stream: the turn's output
+                        // comes back on the session stream this client already
+                        // reads, the same one every other client of the session
+                        // reads.
+                        .onClick(trigger(on(ChatUiController.class).chatStream(sessionId, null), id())));
         return form.<UiForm>withCssClass("chat-form");
     }
 

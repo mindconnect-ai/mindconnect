@@ -55,6 +55,7 @@ public class ChatUiController {
     /** Optional — null in setups where trace persistence is disabled. */
     private final ai.mindconnect.agent.port.out.LlmCallTraceRepository traceRepository;
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
+    private final ai.mindconnect.chatui.service.SessionStreams sessionStreams;
 
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
     private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
@@ -75,6 +76,7 @@ public class ChatUiController {
                              ObjectMapper objectMapper,
                              ai.mindconnect.agent.port.out.LlmCallTraceRepository traceRepository,
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
+                             ai.mindconnect.chatui.service.SessionStreams sessionStreams,
                              ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
                              ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.chatui.ui.ChatHostLinks> hostLinks,
@@ -90,6 +92,7 @@ public class ChatUiController {
         this.objectMapper = objectMapper;
         this.traceRepository = traceRepository;
         this.activeStreams = activeStreams;
+        this.sessionStreams = sessionStreams;
         this.approvalStore = approvalStore;
         this.hostLinks = hostLinks.getIfAvailable(() -> ai.mindconnect.chatui.ui.ChatHostLinks.NONE);
         this.defaultNamespace = defaultNamespace;
@@ -598,15 +601,34 @@ public class ChatUiController {
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks);
-        // Hand the SPA the resume URL for this session's stream (when
-        // any). The bus re-attaches via GET on every applyPage so F5,
-        // tab close/reopen, and second-tab observers all converge.
-        handleOpt.ifPresent(h -> page.withActiveStreams(java.util.List.of(
+        // Every render hands the SPA this session's stream — whether or not
+        // a turn is running. That is the whole point: a client with nothing
+        // to listen to cannot find out that someone else started a turn, so
+        // it attaches while the session is quiet and stays attached.
+        //
+        // The cursor matters. This page already renders everything the
+        // stream has published so far, and the patches are APPENDs, so a
+        // replay from 0 would add the user message and the task cards a
+        // second time. Asking for what comes AFTER the current position is
+        // the only correct request; a client joining mid-turn is brought up
+        // to date by the catch-up frames instead (see StreamController).
+        long from = sessionStreams.find(channelId)
+                .map(ai.mindconnect.chatui.service.StreamBus::lastSeq).orElse(0L);
+        String agentLabel = agent.name() != null ? agent.name() : "Agent";
+        // What to call this page on a surface that links back to it. The
+        // framework must not guess: it has no idea it is streaming a chat.
+        // The session's own title first, the agent's name while the chat is
+        // still untitled.
+        String returnLabel = session.title() != null && !session.title().isBlank()
+                ? session.title() : agentLabel;
+        page.withActiveStreams(java.util.List.of(
                 ai.mindconnect.ui.model.UiPage.ActiveStream.of(
-                        h.channelId(),
-                        "/chat/api/streams/" + h.channelId() + "/sse",
-                        h.label(),
-                        h.returnHref()))));
+                        channelId,
+                        "/chat/api/streams/" + channelId + "/sse?from=" + from,
+                        handleOpt.map(ai.mindconnect.chatui.service.ActiveStreams.Handle::label)
+                                .orElse(agentLabel),
+                        "/chat/sessions/" + session.id(),
+                        returnLabel)));
         return page;
     }
 
@@ -789,28 +811,22 @@ public class ChatUiController {
                 buildChatPage(sessionOpt.get(), agentOpt.get()).headerOnly());
     }
 
-    @PostMapping(value = "/sessions/{sessionId}/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<SseEmitter> chatStream(@PathVariable UUID sessionId,
+    @PostMapping("/sessions/{sessionId}/chat/stream")
+    public ResponseEntity<ai.mindconnect.ui.model.UiPatch> chatStream(@PathVariable UUID sessionId,
                                                  @RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         String text = body.str("message");
         if (text == null || text.isBlank()) {
-            var emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalArgumentException("message required"));
-            return ResponseEntity.ok(emitter);
+            return ResponseEntity.badRequest().build();
         }
 
         var sessionOpt = sessionRepository.findById(sessionId);
         if (sessionOpt.isEmpty()) {
-            var emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("session not found"));
-            return ResponseEntity.ok(emitter);
+            return ResponseEntity.badRequest().build();
         }
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
-            var emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("agent not found"));
-            return ResponseEntity.ok(emitter);
+            return ResponseEntity.badRequest().build();
         }
         return runChatStream(sessionOpt.get(), agentOpt.get(), text, false);
     }
@@ -849,21 +865,16 @@ public class ChatUiController {
      * Sub-agent sessions spawned by the discarded turns are intentionally
      * left in place (not cleaned up).
      */
-    @PostMapping(value = "/sessions/{sessionId}/messages/{seq}/regenerate",
-            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<SseEmitter> regenerate(@PathVariable UUID sessionId,
+    @PostMapping(value = "/sessions/{sessionId}/messages/{seq}/regenerate")
+    public ResponseEntity<ai.mindconnect.ui.model.UiPatch> regenerate(@PathVariable UUID sessionId,
                                                  @PathVariable int seq) {
         var sessionOpt = sessionRepository.findById(sessionId);
         if (sessionOpt.isEmpty()) {
-            var emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("session not found"));
-            return ResponseEntity.ok(emitter);
+            return ResponseEntity.badRequest().build();
         }
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
-            var emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("agent not found"));
-            return ResponseEntity.ok(emitter);
+            return ResponseEntity.badRequest().build();
         }
 
         // Capture the user text at `seq` before we delete it.
@@ -875,10 +886,7 @@ public class ChatUiController {
                 .findFirst()
                 .orElse(null);
         if (text == null || text.isBlank()) {
-            var emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalArgumentException(
-                    "no user message at seq " + seq));
-            return ResponseEntity.ok(emitter);
+            return ResponseEntity.badRequest().build();
         }
 
         // Drop this message and everything after it; the turn below re-adds
@@ -903,7 +911,7 @@ public class ChatUiController {
      *                       before the turn starts — used by regenerate so the
      *                       just-deleted messages leave the DOM immediately.
      */
-    private ResponseEntity<SseEmitter> runChatStream(ai.mindconnect.agent.domain.AgentSession session,
+    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(ai.mindconnect.agent.domain.AgentSession session,
                                                      ai.mindconnect.agent.domain.AgentDefinition agent,
                                                      String text, boolean initialRefresh) {
         return runTurnStream(session, agent, text, initialRefresh,
@@ -915,27 +923,18 @@ public class ChatUiController {
      * message ({@code text} echoed as a user bubble) or an approval answer
      * ({@code text == null} — the card click is the input, nothing to echo).
      */
-    private ResponseEntity<SseEmitter> runTurnStream(ai.mindconnect.agent.domain.AgentSession session,
+    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(ai.mindconnect.agent.domain.AgentSession session,
                                                      ai.mindconnect.agent.domain.AgentDefinition agent,
                                                      String text, boolean initialRefresh,
                                                      java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
         UUID sessionId = session.id();
-        var emitter = new SseEmitter(0L); // no timeout — agent can take a while
-        // Custom headers consumed by the client-side StreamRegistry:
-        // {@code Sui-Stream-Channel} keys the live stream so a re-mount of
-        // the chat page can replay buffered patches; {@code Return-Href}
-        // is what the floating running-agent toast navigates to; the label
-        // is what the toast displays.
         // Channel id == the id of the message-list container the patches
-        // target. This way the bus's getElementById fallback in
-        // {@code findStreamTarget} naturally detects "chat page mounted".
+        // target. This way the client's {@code findStreamTarget} lookup
+        // naturally detects "chat page mounted", and both the submitter and
+        // any observer resolve the same stream.
         String channelId = "msg-list-" + sessionId;
         String returnHref = "/chat/sessions/" + sessionId;
         String streamLabel = agent.name() != null ? agent.name() : "Agent";
-        var streamHeaders = new HttpHeaders();
-        streamHeaders.add("Sui-Stream-Channel", channelId);
-        streamHeaders.add("Sui-Stream-Return-Href", returnHref);
-        streamHeaders.add("Sui-Stream-Label", streamLabel);
         String pendingId  = "bot-pending-"  + sessionId;
         String thinkingId = "bot-thinking-" + sessionId;
 
@@ -946,12 +945,13 @@ public class ChatUiController {
         // reflects what's actually been persisted.
         ChatPage liveView = buildChatPage(session, agent);
 
-        // Per-channel multiplex bus + ring buffer. The original POST
-        // emitter attaches as the first subscriber; reconnect GETs from
-        // /chat/api/streams/{channelId}/sse subscribe later with their
-        // own emitters and replay missed events from the buffer.
-        var bus = new ai.mindconnect.chatui.service.StreamBus();
-        bus.attach(emitter, Long.MAX_VALUE);  // skip replay — this is the producer's own emitter
+        // The turn does not stream back to whoever submitted it. It
+        // publishes into the SESSION's stream, which every client of this
+        // session is already attached to — the submitter included. One path
+        // for everyone is what makes a second client see the same tokens at
+        // the same time, and it means this request can return as soon as the
+        // turn is queued.
+        var bus = sessionStreams.turnStarted(channelId);
 
         // Register the stream so the chat-page renderer (and the generic
         // /chat/api/streams endpoint) can see "this session is streaming".
@@ -965,15 +965,6 @@ public class ChatUiController {
                 java.time.Instant.now(),
                 () -> chatService.cancelChat(sessionId),
                 bus));
-        // Detach this emitter from the bus when the client goes away. We
-        // do NOT deregister the channel-level entry here — other
-        // subscribers (reconnect tabs) may still be on it, and the
-        // producer is the source of truth for "is this stream alive".
-        // The whenComplete handler below removes the channel from the
-        // registry once the producer is fully done.
-        emitter.onCompletion(() -> bus.detach(emitter));
-        emitter.onError(t -> bus.detach(emitter));
-        emitter.onTimeout(() -> bus.detach(emitter));
 
         // 0. Regenerate only: replace the message list with the trimmed
         //    (post-delete) history so the discarded messages vanish before the
@@ -1014,10 +1005,17 @@ public class ChatUiController {
                         // First token: drop the thinking indicator and append
                         // the streaming bot-reply placeholder BELOW any task
                         // cards that arrived during the thinking phase.
-                        publishPatch(bus, liveView.streamFirstToken(pendingId, thinkingId));
+                        // Kept as the catch-up frame: a client that opens the
+                        // page mid-turn has no bubble, and every token after
+                        // it is a REPLACE that would land nowhere.
+                        sessionStreams.rememberBubble(channelId,
+                                publishPatch(bus, liveView.streamFirstToken(pendingId, thinkingId)));
                         pendingAppended[0] = true;
                     }
-                    publishPatch(bus, liveView.streamToken(pendingId, cumulativeText.toString()));
+                    // Token patches carry the CUMULATIVE text, so the newest
+                    // one alone restores the full reply so far.
+                    sessionStreams.rememberText(channelId,
+                            publishPatch(bus, liveView.streamToken(pendingId, cumulativeText.toString())));
                 }
                 case StreamEvent.ApprovalRequested ar -> {
                     // Durable already (request message / store entry written
@@ -1080,12 +1078,11 @@ public class ChatUiController {
                 try {
                     bus.publish("error", message);
                 } catch (Exception ignored) {}
-                try { bus.closeAll(); } catch (Exception ignored) {}
-                try { emitter.complete(); } catch (Exception ignored) {}
-                // The producer is done — drop the channel so the next page
-                // render sees Send instead of Stop. Subscribers (incl.
-                // reconnects) already saw the error event via the bus.
+                // The stream stays open — it belongs to the session, not to
+                // this turn. Only the "a turn is running" entry goes, so the
+                // next page render shows Send instead of Stop.
                 activeStreams.deregister(channelId);
+                sessionStreams.turnEnded(channelId);
                 return;
             }
             try {
@@ -1095,25 +1092,24 @@ public class ChatUiController {
                 ChatPage finalView = buildChatPage(session, agent);
                 publishPatch(bus, finalView.streamDone());
 
+                // "done" ends the TURN, not the stream: subscribers stay
+                // attached and are still there when the next turn — possibly
+                // started by another client — begins.
                 bus.publish("done", "");
-                // Close every attached subscriber (incl. reconnect tabs)
-                // and the original POST emitter. emitter.complete() inside
-                // closeAll() is idempotent enough; explicit complete kept
-                // for clarity on the legacy path.
-                bus.closeAll();
-                try { emitter.complete(); } catch (Exception ignored) {}
             } catch (Exception e) {
                 log.error("SSE chat finalize error", e);
-                emitter.completeWithError(e);
             } finally {
-                // Producer fully done — drop the channel so subsequent page
-                // renders show Send instead of Stop. Subscribers see the
-                // final patch + done event via the bus before this fires.
+                // Drop the "a turn is running" entry so subsequent page
+                // renders show Send instead of Stop. Subscribers saw the
+                // final patch and the done event before this fires.
                 activeStreams.deregister(channelId);
+                sessionStreams.turnEnded(channelId);
             }
         });
 
-        return ResponseEntity.ok().headers(streamHeaders).body(emitter);
+        // Nothing to hand back: the turn's output travels on the session
+        // stream this client is already reading.
+        return ResponseEntity.ok(ai.mindconnect.ui.model.UiPatch.of());
     }
 
     /** Per-task state held while a turn is streaming. */
@@ -1338,12 +1334,14 @@ public class ChatUiController {
      * reconnect-GET emitters from {@code /streams/{id}/sse}) sees it; the
      * ring buffer keeps the last N for late joiners.
      */
-    private void publishPatch(ai.mindconnect.chatui.service.StreamBus bus, UiPatch patch) {
+    private String publishPatch(ai.mindconnect.chatui.service.StreamBus bus, UiPatch patch) {
         try {
             String json = objectMapper.writeValueAsString(patch);
             bus.publish("patch", json);
+            return json;
         } catch (Exception e) {
             log.warn("Failed to publish SSE patch", e);
+            return null;
         }
     }
 
