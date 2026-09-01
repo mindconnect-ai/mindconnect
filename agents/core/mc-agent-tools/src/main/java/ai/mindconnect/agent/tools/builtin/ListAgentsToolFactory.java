@@ -19,6 +19,6 @@ public final class ListAgentsToolFactory implements ToolFactory {
     }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new ListAgentsTool(definitionRepository, scope.namespace());
+        return new ListAgentsTool(definitionRepository, scope.namespace(), scope.agentDefinitionId());
     }
 }

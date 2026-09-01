@@ -67,7 +67,7 @@ public class SessionAgentResolver {
                 inline.id(), session.namespace(), inline.label(), "", null, null,
                 inline.systemPrompt(), null, inline.llmConfigName(),
                 DEFAULT_MAX_ITERATIONS, SummarizingWindowConfig.DEFAULT,
-                AgentDefinitionStatus.ACTIVE, inline.tools(), java.util.List.of(),
+                AgentDefinitionStatus.ACTIVE, inline.tools(), java.util.List.of(), null,
                 inline.toolSearch(), now, now);
     }
 

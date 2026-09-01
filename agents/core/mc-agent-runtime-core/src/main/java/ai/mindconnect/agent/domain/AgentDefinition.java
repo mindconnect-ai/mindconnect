@@ -52,6 +52,19 @@ public record AgentDefinition(
          */
         List<String> responseReviewers,
         /**
+         * The other agents this one may see and call, by name — the roster it
+         * delegates to. {@code null} or empty means no restriction: it sees
+         * every agent in its namespace, which is what an agent that was never
+         * given a roster has always done.
+         *
+         * <p>Governs both halves of delegating, because half of it would be
+         * theatre: {@code list_agents} returns only these, and a
+         * {@code run_agent} for anything else is refused. Filtering the list
+         * alone would leave a model free to call a name it read in its own
+         * prompt.
+         */
+        List<String> callableAgents,
+        /**
          * Agent-level tool-search setting. {@code null} (older persisted
          * agents) means disabled. When enabled, the runtime injects the
          * {@code tool_search} tool automatically; its search space is the
@@ -99,7 +112,7 @@ public record AgentDefinition(
                            List<AgentTool> tools, List<String> responseReviewers,
                            Instant createdAt, Instant updatedAt) {
         this(id, namespace, name, description, null, null, systemPrompt, welcomeMessage, llmConfigName,
-                maxIterations, memoryConfig, status, tools, responseReviewers, null,
+                maxIterations, memoryConfig, status, tools, responseReviewers, null, null,
                 createdAt, updatedAt);
     }
 
@@ -148,44 +161,71 @@ public record AgentDefinition(
         return icon == null || icon.isBlank() ? DEFAULT_ICON : icon;
     }
 
+    /** The roster as a list, empty when the agent may reach everything. */
+    public List<String> effectiveCallableAgents() {
+        return callableAgents != null ? callableAgents : List.of();
+    }
+
+    /**
+     * Whether this agent may see and call the named one. An empty roster is
+     * no restriction, not a ban — an agent that names nobody reaches everyone,
+     * which is how every agent behaved before the field existed.
+     *
+     * <p>The comparison ignores case, like the name lookup a sub-agent call
+     * does: a roster entry that differs only in case would otherwise pass the
+     * lookup and fail this check.
+     */
+    public boolean mayCall(String agentName) {
+        List<String> roster = effectiveCallableAgents();
+        if (roster.isEmpty()) return true;
+        return agentName != null && roster.stream().anyMatch(agentName::equalsIgnoreCase);
+    }
+
+    /** Replaces the roster of agents this one may see and call. */
+    public AgentDefinition withCallableAgents(List<String> callableAgents) {
+        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+                llmConfigName, maxIterations, memoryConfig,
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
+    }
+
     /** Replaces the Lucide icon name (see {@link #icon()}). */
     public AgentDefinition withIcon(String icon) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, toolSearch, createdAt, Instant.now());
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     /** Refiles the agent under another rubric. */
     public AgentDefinition withGroup(String group) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, toolSearch, createdAt, Instant.now());
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     /** Replaces the tool-search setting (see {@link ToolSearchConfig}). */
     public AgentDefinition withToolSearch(ToolSearchConfig toolSearch) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, toolSearch, createdAt, Instant.now());
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition withMemoryConfig(MemoryConfig memoryConfig) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig, status, tools, responseReviewers,
-                toolSearch, createdAt, Instant.now());
+                callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition withTools(List<AgentTool> tools) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, toolSearch, createdAt, Instant.now());
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition withBasicFields(String name, String description, String systemPrompt,
                                            String welcomeMessage, String llmConfigName) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, toolSearch, createdAt, Instant.now());
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition withBasicFields(Namespace namespace, String name, String description,
@@ -193,7 +233,7 @@ public record AgentDefinition(
                                            String llmConfigName, List<String> responseReviewers) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, toolSearch, createdAt, Instant.now());
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     /**
@@ -209,13 +249,13 @@ public record AgentDefinition(
                                            List<String> responseReviewers) {
         return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, toolSearch, createdAt, Instant.now());
+                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition asCopy() {
         Instant now = Instant.now();
         return new AgentDefinition(UUID.randomUUID(), namespace, name + "-copy", description, group, icon,
                 systemPrompt, welcomeMessage, llmConfigName, maxIterations, memoryConfig,
-                AgentDefinitionStatus.ACTIVE, List.of(), responseReviewers, toolSearch, now, now);
+                AgentDefinitionStatus.ACTIVE, List.of(), responseReviewers, callableAgents, toolSearch, now, now);
     }
 }

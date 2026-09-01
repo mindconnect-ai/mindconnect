@@ -25,6 +25,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **An agent can be given a roster of the agents it may delegate to.**
+  `AgentDefinition.callableAgents` names them; the admin form offers the same
+  multiselect the response reviewers use. `list_agents` then answers with that
+  roster instead of the whole namespace, and a `run_agent` for anything else is
+  refused with "agent 'x' is not available to you". Naming nobody is no
+  restriction, not a ban — an agent without a roster reaches everyone, which is
+  how every agent behaved before the field existed, so nothing on disk changes
+  behaviour.
 - **An agent carries a group and an icon.** `AgentDefinition` grows two
   fields. The group is the rubric the admin list files it under — the same
   idea as a tool's group, except an agent is configuration, so it carries it

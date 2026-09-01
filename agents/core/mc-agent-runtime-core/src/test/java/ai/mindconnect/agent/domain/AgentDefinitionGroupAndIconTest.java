@@ -23,7 +23,7 @@ class AgentDefinitionGroupAndIconTest {
     private static AgentDefinition withGroupAndIcon(String group, String icon) {
         return new AgentDefinition(UUID.randomUUID(), new Namespace("local"), "n", "d", group, icon,
                 "prompt", null, "cfg", 5, null, AgentDefinitionStatus.ACTIVE,
-                List.of(), List.of(), null, null, null);
+                List.of(), List.of(), null, null, null, null);
     }
 
     @Test

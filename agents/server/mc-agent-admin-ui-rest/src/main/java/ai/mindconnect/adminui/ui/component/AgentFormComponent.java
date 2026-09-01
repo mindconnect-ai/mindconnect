@@ -150,6 +150,14 @@ public final class AgentFormComponent implements UiComponent {
                         .hint("Comma-separated registry groups searchable beyond the agent's own "
                                 + "deferred tools, e.g. web, documents — or * for every group. "
                                 + "Empty = only deferred assigned tools are searchable"))
+                // The roster this agent delegates to. Empty is not "none" but
+                // "no restriction" — the hint has to say so, or an empty
+                // multiselect reads as a locked door.
+                .field(UiField.multiselect("callableAgents", "Callable Agents",
+                        isNew ? List.of() : agent.effectiveCallableAgents(), reviewerOptions)
+                        .asEditable()
+                        .hint("The agents this one may see in list_agents and reach with "
+                                + "run_agent. Select none to leave it unrestricted"))
                 .field(UiField.multiselect("responseReviewers", "Response Reviewers",
                         isNew ? List.of() : agent.effectiveResponseReviewers(), reviewerOptions)
                         .asEditable()

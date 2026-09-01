@@ -72,13 +72,13 @@ final class SubAgentCalls {
         this.queue = queue;
     }
 
-    String run(TaskContext ctx, AgentSession parentSession, UUID parentTurnId,
+    String run(TaskContext ctx, AgentSession parentSession, AgentDefinition caller, UUID parentTurnId,
                                 int parentDepth, Consumer<StreamEvent> parentStream,
                                 String toolName, String toolCallId, Map<String, Object> arguments) {
         return InlineAgentTools.RUN_AGENTS.equals(toolName)
-                ? dispatchBatch(ctx, parentSession, parentTurnId, parentDepth, parentStream,
+                ? dispatchBatch(ctx, parentSession, caller, parentTurnId, parentDepth, parentStream,
                         toolCallId, arguments)
-                : dispatchOne(ctx, parentSession, parentTurnId, parentDepth, parentStream,
+                : dispatchOne(ctx, parentSession, caller, parentTurnId, parentDepth, parentStream,
                         toolCallId, 0, arguments);
     }
 
@@ -94,7 +94,8 @@ final class SubAgentCalls {
      *
      * <p>Never throws for tool failures — errors become text.
      */
-    private String dispatchOne(TaskContext ctx, AgentSession parentSession, UUID parentTurnId,
+    private String dispatchOne(TaskContext ctx, AgentSession parentSession, AgentDefinition caller,
+                               UUID parentTurnId,
                                int parentDepth, Consumer<StreamEvent> parentStream,
                                String toolCallId, int slot, Map<String, Object> arguments) {
         if (parentDepth + 1 > AgentTurnWorker.MAX_DEPTH) {
@@ -108,6 +109,14 @@ final class SubAgentCalls {
         }
         if (message == null || message.isBlank()) {
             return "Error: message is required";
+        }
+        // The roster is a permission, not a display filter: an agent that
+        // cannot see a name in list_agents cannot reach it by knowing the name
+        // from somewhere else either. Refused by its own word rather than as
+        // "not found", so a trace says which of the two it was.
+        if (caller != null && !caller.mayCall(agentName)) {
+            return "Error: agent '" + agentName + "' is not available to you. "
+                    + "Available: " + String.join(", ", caller.effectiveCallableAgents());
         }
 
         // Deterministic per call AND slot: all run_agents batch tasks share the
@@ -190,7 +199,8 @@ final class SubAgentCalls {
 
     /** {@code run_agents}: submit all, await all — they run concurrently on the queue. */
     @SuppressWarnings("unchecked")
-    private String dispatchBatch(TaskContext ctx, AgentSession parentSession, UUID parentTurnId,
+    private String dispatchBatch(TaskContext ctx, AgentSession parentSession, AgentDefinition caller,
+                                 UUID parentTurnId,
                                  int parentDepth, Consumer<StreamEvent> parentStream,
                                  String toolCallId, Map<String, Object> arguments) {
         if (parentDepth + 1 > AgentTurnWorker.MAX_DEPTH) {
@@ -210,7 +220,7 @@ final class SubAgentCalls {
             final Object rawTask = taskList.get(i);
             threads.add(Thread.ofVirtual().start(() -> {
                 String result = rawTask instanceof Map<?, ?> taskMap
-                        ? dispatchOne(ctx, parentSession, parentTurnId, parentDepth, parentStream,
+                        ? dispatchOne(ctx, parentSession, caller, parentTurnId, parentDepth, parentStream,
                                 toolCallId, index, (Map<String, Object>) taskMap)
                         : "Error: task " + (index + 1) + " is not an object with 'name' and 'message'";
                 synchronized (results) {

@@ -79,6 +79,9 @@ public class AgentRegistryService {
         if (patch.icon().isPresent()) {
             updated = updated.withIcon(patch.icon().get());
         }
+        if (patch.callableAgents().isPresent()) {
+            updated = updated.withCallableAgents(patch.callableAgents().get());
+        }
         if (patch.toolSearch().isPresent()) {
             updated = updated.withToolSearch(patch.toolSearch().get());
         }
