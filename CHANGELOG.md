@@ -32,6 +32,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
   block in the app, and a theme that retunes its tokens is followed without a
   second edit.
 
+- **The admin UI's header and sidebar stay put while a page scrolls.** Only the
+  chat page and the API explorer capped themselves to the window; on every
+  other screen a long list scrolled the whole document and carried the header
+  and the navigation off the top. The shell is now capped once for all of them,
+  which is what lets the content area do the scrolling — the behaviour the
+  framework's own shell was already built for.
+
+- **The navigation drawer is opaque on a narrow screen.** Below 768px the
+  sidebar slides over the content instead of pushing it, and it had no
+  background of its own — what reads as its colour on a wide screen is the
+  shell showing through. The page was legible straight through the nav labels.
+  The drawer now carries the sidebar's own colour and an edge shadow, in every
+  theme; the pushed sidebar is unchanged.
+
 ## [0.1.0] - 2026-08-30
 
 ### Changed

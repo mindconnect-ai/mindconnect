@@ -31,7 +31,55 @@ body {
     flex-direction: column;
     width: 100%;
 }
-#main > .sui-shell { flex: 1 1 auto; }
+/* The shell ends at the bottom of the window, on every page.
+
+   The framework says `min-height: 100dvh`, which fills the window but lets
+   the shell grow past it once the content is taller — and then the window
+   scrolls, carrying the header and the sidebar off the top. Its own
+   `.sui-shell-body { overflow: hidden }` and `.sui-shell-content { overflow:
+   auto }` are already waiting to scroll the content pane instead; they only
+   ever engage when something caps the height. The chat page and the API
+   explorer each capped it for themselves, so those two behaved and every
+   other screen did not.
+
+   `height` instead of `min-height` caps it here, once, for all of them. */
+#main > .sui-shell {
+    flex: 1 1 auto;
+    height: 100dvh;
+}
+
+/* A drawer needs a ground of its own.
+
+   The sidebar has no background: what reads as its colour is the shell body
+   showing through it. That holds while the menu pushes the content aside, and
+   falls apart the moment it floats above it — below 768px the RESPONSIVE menu
+   becomes a drawer, and the page shows straight through the nav labels.
+
+   The framework does give its drawer an elevation, but `.sui-shell-body >
+   .sui-menu` (two classes) outweighs the `.sui-menu--responsive` rule inside
+   the media query (one class — a media query adds no specificity), so the
+   shadow is reset before it ever lands. Ground and elevation are therefore
+   both set here, in the very token the shell body paints itself with, so the
+   drawer is the sidebar's own colour in every theme.
+
+   The selector weight is deliberate. Every theme states `.sui-menu {
+   background: transparent }` on purpose — a pushed sidebar should read as one
+   plane with the shell — and does so as `:root.sui-theme-x .sui-menu`: three
+   classes, from a sheet that loads after this one. Matching that count would
+   lose the tie on order, so `:root` plus the repeated modifier takes these to
+   four and settles it by weight rather than by `!important`, which nothing
+   downstream could then override. Only the floating case is exempted; a pushed
+   sidebar keeps the transparency its theme asked for. */
+:root .sui-shell-body > .sui-menu--overlay.sui-menu--overlay {
+    background: var(--sui-color-bg);
+    box-shadow: 4px 0 16px rgb(0 0 0 / .28);
+}
+@media (max-width: 768px) {
+    :root .sui-shell-body > .sui-menu--responsive.sui-menu--responsive {
+        background: var(--sui-color-bg);
+        box-shadow: 4px 0 16px rgb(0 0 0 / .28);
+    }
+}
 
 /* Content is anchored to the sidebar, not centred in the leftover space —
    a centred card reads as a floating island on a wide monitor, while the
@@ -202,9 +250,8 @@ body {
 
 /* ── Embedded API explorer (Swagger UI in a UiIFrame) ──────────────────── */
 
-/* Same viewport-capping trick as the chat page: the shell stops growing and
-   the frame takes everything between header and pane edges. */
-.sui-shell:has(.app-fill-frame) { height: 100dvh; }
+/* The shell is capped for every page now (see #main > .sui-shell); the frame
+   only has to claim what is left between the header and the pane edges. */
 .sui-shell-content:has(.app-fill-frame) { display: flex; flex-direction: column; }
 .sui-shell-content > .app-fill-frame { max-width: none; }
 
@@ -216,10 +263,9 @@ body {
    the .chat-container must each become growing flex columns — :has() walks
    exactly that chain and nothing else (the Info tab and every other page
    keep the default flow). */
-/* Cap the shell to the viewport on the chat page — its min-height would
-   otherwise let the whole shell grow with the history and push the composer
-   below the fold; with the cap, the conversation list is the scrollpane. */
-.sui-shell:has(.chat-container) { height: 100dvh; }
+/* The shell is capped for every page now (see #main > .sui-shell), which is
+   what keeps the composer above the fold however long the history grows and
+   leaves the conversation list as the scrollpane. */
 .sui-shell-content:has(.chat-container) {
     display: flex;
     flex-direction: column;
