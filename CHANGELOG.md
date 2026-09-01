@@ -23,6 +23,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The admin UI's JSON views follow the theme.** Working memory, LLM traces
+  and tool arguments were painted on a white slab whatever theme was on — a
+  glaring hole in the middle of Dark, Amethyst and Gipiti. They now take the
+  page's own code-slab colours, so a JSON view looks like every other code
+  block in the app, and a theme that retunes its tokens is followed without a
+  second edit.
+
 ## [0.1.0] - 2026-08-30
 
 ### Changed

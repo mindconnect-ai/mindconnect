@@ -95,13 +95,11 @@ public final class MemoryDetailSectionComponent implements UiComponent {
         }
 
         UiNode rawNode = UiJsonViewer.of(RAW_ID + "-json", rawJson)
-                .expandLevel(2)
-                .theme("default-light");
+                .expandLevel(2);
         UiNode llmNode;
         if (llmJsonContent != null) {
             llmNode = UiJsonViewer.of(LLM_ID + "-json", llmJsonContent)
-                    .expandLevel(2)
-                    .theme("default-light");
+                    .expandLevel(2);
         } else {
             llmNode = UiMarkdown.of(LLM_ID + "-md", "```\n" + nullSafe(llmText) + "\n```");
         }

@@ -69,8 +69,7 @@ public final class RoundtripCardComponent implements UiComponent {
                 + (trace.errorStatus() != null ? " · ✗ HTTP " + trace.errorStatus() : "");
 
         UiNode requestNode = UiJsonViewer.of(id() + "-req-json", trace.requestJson())
-                .expandLevel(1)
-                .theme("default-light");
+                .expandLevel(1);
         UiNode responseNode = buildResponseTab();
         UiNode rawNode;
         if (trace.responseEvents() == null || trace.responseEvents().isEmpty()) {
@@ -129,8 +128,7 @@ public final class RoundtripCardComponent implements UiComponent {
                 }
                 stack.section(tcId + "-args", null,
                         UiJsonViewer.of(tcId + "-args-json", argsJson)
-                                .expandLevel(2)
-                                .theme("default-light"));
+                                .expandLevel(2));
 
                 appendToolResult(stack, tcId, resultsByCallId.get(tc.id()));
             }
@@ -183,8 +181,7 @@ public final class RoundtripCardComponent implements UiComponent {
         UiNode body;
         if ("{".equals(firstChar) || "[".equals(firstChar)) {
             body = UiJsonViewer.of(tcId + "-result-json", resultText)
-                    .expandLevel(2)
-                    .theme("default-light");
+                    .expandLevel(2);
         } else {
             body = UiMarkdown.of(tcId + "-result-md", codeBlock(resultText, null));
         }
