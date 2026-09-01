@@ -6,7 +6,7 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 
-import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;

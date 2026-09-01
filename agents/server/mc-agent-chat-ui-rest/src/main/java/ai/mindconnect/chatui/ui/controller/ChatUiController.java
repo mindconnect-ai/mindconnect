@@ -18,7 +18,7 @@ import ai.mindconnect.common.Namespace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.ui.model.UiAction;
 
-import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;

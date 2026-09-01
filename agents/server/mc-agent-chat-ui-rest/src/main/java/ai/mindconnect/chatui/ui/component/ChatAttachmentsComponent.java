@@ -3,8 +3,8 @@ package ai.mindconnect.chatui.ui.component;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatFilesUiController;
 
-import static ai.mindconnect.chatui.ui.UiActions.ROW_ID;
-import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;

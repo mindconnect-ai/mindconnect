@@ -4,7 +4,7 @@ import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
-import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
 import ai.mindconnect.common.Namespace;

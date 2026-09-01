@@ -37,7 +37,7 @@
     <properties>
         <!-- Version of the published semantic-ui artifacts (their own repo:
              mindconnect-ai/mc-semantic-ui) consumed across the monorepo. -->
-        <semantic-ui.version>0.2.0</semantic-ui.version>
+        <semantic-ui.version>0.2.2-SNAPSHOT</semantic-ui.version>
         <java.version>21</java.version>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
