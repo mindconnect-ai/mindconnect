@@ -17,6 +17,9 @@ import ai.mindconnect.common.LoggingContext;
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.ui.model.UiAction;
+
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
@@ -126,7 +129,7 @@ public class ChatUiController {
                 .of("chat-empty-hint", "No conversations yet")
                 .description("Start one and pick a model and tools from the composer."));
         invitation.action(UiAction.primary("start-first", "New chat").icon("add")
-                .dispatch("POST", "/chat/api/sessions"));
+                .onClick(trigger(on(ChatUiController.class).createSession(null))));
 
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
                 List.of(), null, "Chat", invitation).render();
@@ -248,9 +251,10 @@ public class ChatUiController {
                 .field(ai.mindconnect.ui.model.UiField.text("title", "Title", current)
                         .asEditable().asRequired())
                 .action(UiAction.primary("save", "Save").icon("save")
-                        .dispatch("POST", "/chat/api/sessions/" + sessionId + "/rename"))
+                        .onClick(trigger(on(ChatUiController.class).rename(sessionId, null, null),
+                                "chat-rename-" + sessionId)))
                 .action(UiAction.secondary("cancel", "Cancel")
-                        .dispatch("POST", "/chat/api/close-dialog"));
+                        .onClick(trigger(on(ChatUiController.class).closeDialog())));
 
         var dlg = ai.mindconnect.ui.model.UiDialog.of("Rename chat", null, form);
         dlg.setId("chat-dialog");
