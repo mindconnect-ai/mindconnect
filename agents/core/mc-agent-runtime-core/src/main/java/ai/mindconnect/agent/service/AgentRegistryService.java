@@ -73,6 +73,12 @@ public class AgentRegistryService {
                 patch.llmConfigName().orElse(def.llmConfigName()),
                 patch.maxIterations().orElse(def.maxIterations()),
                 patch.responseReviewers().orElse(def.responseReviewers()));
+        if (patch.group().isPresent()) {
+            updated = updated.withGroup(patch.group().get());
+        }
+        if (patch.icon().isPresent()) {
+            updated = updated.withIcon(patch.icon().get());
+        }
         if (patch.toolSearch().isPresent()) {
             updated = updated.withToolSearch(patch.toolSearch().get());
         }

@@ -71,6 +71,12 @@
     <!-- The theme picker in the header. Purely client-side: it swaps a class
          on <html> and remembers the choice per browser. -->
     <script src="/js/theme-switch.js" defer></script>
+    <!-- Turns the agent form's icon field into a searchable grid of the
+         framework's Lucide sprite. The field stays the source of truth. -->
+    <script src="/js/icon-picker.js" defer></script>
+    <!-- "New group" next to the agent form's group select: the rubrics come
+         from the agents themselves, so naming a new one needs a field. -->
+    <script src="/js/group-picker.js" defer></script>
     <!-- Hands the active theme's colours to the json-viewer web component,
          which paints from a palette inside its own shadow root and so cannot
          be reached from app.css. -->

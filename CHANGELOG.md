@@ -23,6 +23,35 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **An agent carries a group and an icon.** `AgentDefinition` grows two
+  fields. The group is the rubric the admin list files it under — the same
+  idea as a tool's group, except an agent is configuration, so it carries it
+  as data; the seeds use `assistants`, `sub-agents` and `utilities`. The icon
+  is a Lucide name, drawn wherever the agent is named: the admin list, the
+  chat header, the chat history. Both are optional; agents already on disk
+  read as `general` with the generic bot icon and keep working untouched.
+- **The agent form picks both instead of spelling them.** The group is a
+  dropdown of the rubrics in use — read off the agents themselves, there is no
+  group registry — with a button for naming a new one. The icon field opens a
+  searchable grid of the whole Lucide set the framework ships. Both degrade to
+  a plain field if scripting is off, and `GET /admin/api/icons` serves the
+  icon names for anyone else who wants them.
+
+### Changed
+
+- **The agent list is grouped and no longer paginated.** One collapsible
+  section per rubric, closed by default, the way the tool catalog reads —
+  assistants first, then sub-agents, then utilities. Paging cut across the
+  grouping, so it is gone; `page` and `size` on `GET /admin/agents` are gone
+  with it.
+- **The chat's agent picker offers assistants only.** A sub-agent expects a
+  self-contained brief from an orchestrator and a utility answers in the one
+  shape the runtime calls it for, so neither belongs in a list of things to
+  chat with. A chat already bound to another agent keeps it — the agent stays
+  in the picker so opening the dialog cannot silently reassign it.
+
 ### Fixed
 
 - **The admin UI's JSON views follow the theme.** Working memory, LLM traces

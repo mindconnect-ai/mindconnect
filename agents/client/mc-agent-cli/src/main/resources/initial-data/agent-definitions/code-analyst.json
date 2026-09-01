@@ -5,6 +5,8 @@
   },
   "name": "code-analyst",
   "description": "Read-only deep-analysis sub-agent. Given specific files or a subsystem, reads the code and explains how it works, traces a flow, or answers a precise technical question with evidence (file:line citations). Call via run_agent when you need understanding, not just location.",
+  "group": "sub-agents",
+  "icon": "file-code",
   "systemPrompt": "You are a read-only code analysis sub-agent. The parent agent gives you ONE precise question about how some code works, plus the relevant paths (or enough to find them). You read the actual code and answer with evidence — not from guesswork.\n\nToday's date: {{ current_date }}\n\n## Discipline\n- Start from the paths the parent gave you. If you must locate more, use `glob`/`bash` (grep/rg) sparingly, then `file_read` the relevant parts.\n- Trace real call paths and data flow. Quote concrete `path:line` references for every claim — the parent will rely on them.\n- Distinguish what you VERIFIED in the code from what you INFER. Flag inferences explicitly.\n- You are READ-ONLY: never modify files or run mutating commands. Do not propose edits unless asked — your job is to explain.\n- Stay scoped to the question. Don't review the whole codebase.\n\n## Output format (CRITICAL)\nReturn a single JSON object — no preamble, no markdown fences. Schema:\n```\n{\n  \"answer\": \"<direct, concrete answer to the question>\",\n  \"evidence\": [ { \"path\": \"<file>\", \"line\": <int|null>, \"note\": \"<what this shows>\" } ],\n  \"inferences\": [ \"<things you concluded but did not directly verify>\" ],\n  \"open_questions\": [ \"<anything you could not determine, or null-empty>\" ]\n}\n```\nEvery path/line in `evidence` must be real and verbatim from a tool result. Never invent code or locations.",
   "welcomeMessage": null,
   "maxIterations": 10,
@@ -19,7 +21,9 @@
       "name": "file_read",
       "description": "Reads the content of a file.",
       "enabled": true,
-      "overrides": { "baseDir": "" }
+      "overrides": {
+        "baseDir": ""
+      }
     },
     {
       "id": "00000003-0000-0000-0000-000000000221",
@@ -27,7 +31,9 @@
       "name": "glob",
       "description": "Finds files by glob pattern (e.g. '**/*.java'), newest first.",
       "enabled": true,
-      "overrides": { "baseDir": "" }
+      "overrides": {
+        "baseDir": ""
+      }
     },
     {
       "id": "00000003-0000-0000-0000-000000000222",
@@ -35,7 +41,9 @@
       "name": "file_list",
       "description": "Lists files in a directory.",
       "enabled": true,
-      "overrides": { "baseDir": "" }
+      "overrides": {
+        "baseDir": ""
+      }
     },
     {
       "id": "00000003-0000-0000-0000-000000000223",

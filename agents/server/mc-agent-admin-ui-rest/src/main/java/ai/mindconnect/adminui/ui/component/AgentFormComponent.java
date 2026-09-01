@@ -63,6 +63,21 @@ public final class AgentFormComponent implements UiComponent {
         List<UiField.Option> nsOptions = List.of(
                 UiField.Option.of("local", "local"));
 
+        // The rubrics that exist, read off the agents themselves — there is no
+        // group registry, and inventing one for a value only the list groups by
+        // would be a table to keep in sync for nothing. The seeded three are
+        // always offered so a fresh install has somewhere to file an agent, and
+        // the current value is offered even if this is the last agent holding
+        // it, so opening the form cannot silently refile the agent.
+        java.util.SortedSet<String> groupNames = new java.util.TreeSet<>(
+                List.of("assistants", "sub-agents", "utilities"));
+        agentRepository.findByNamespace(isNew ? defaultNamespace : agent.namespace())
+                .forEach(other -> groupNames.add(other.groupOrDefault()));
+        if (!isNew) groupNames.add(agent.groupOrDefault());
+        List<UiField.Option> groupOptions = groupNames.stream()
+                .map(g -> UiField.Option.of(g, ToolCatalogComponent.displayGroup(g)))
+                .toList();
+
         // Reviewer candidates: every other agent in the same namespace.
         List<UiField.Option> reviewerOptions = agentRepository
                 .findByNamespace(isNew ? defaultNamespace : agent.namespace()).stream()
@@ -78,6 +93,18 @@ public final class AgentFormComponent implements UiComponent {
                         .asEditable().asRequired())
                 .field(UiField.text("description", "Description", isNew ? null : agent.description())
                         .asEditable())
+                // The rubric this agent is filed under in the list. A choice
+                // among the rubrics in use; js/group-picker.js adds the button
+                // that turns it into a field for naming a new one.
+                .field(UiField.select("group", "Group",
+                        isNew ? AgentDefinition.DEFAULT_GROUP : agent.groupOrDefault(), groupOptions)
+                        .asEditable())
+                // A Lucide name. js/icon-picker.js grows a searchable grid out
+                // of this field; typed by hand it works just the same.
+                .field(UiField.text("icon", "Icon", isNew ? null : agent.icon())
+                        .asEditable()
+                        .placeholder("bot, telescope, wand-sparkles, …")
+                        .hint("Shown next to the agent in the list, the chat and the history"))
                 .field(UiField.textarea("systemPrompt", "System Prompt",
                         isNew ? null : agent.systemPrompt())
                         .asEditable())

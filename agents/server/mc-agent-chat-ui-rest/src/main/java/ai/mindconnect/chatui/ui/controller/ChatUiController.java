@@ -157,7 +157,7 @@ public class ChatUiController {
                 .orElse(null);
 
         var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
-                sessionId, llmConfigRepository.findAll(), selectableAgents(), allToolNames(),
+                sessionId, llmConfigRepository.findAll(), selectableAgents(agentId), allToolNames(),
                 effective.llmConfigName(),
                 effective.tools().stream().map(ai.mindconnect.agent.tool.AgentTool::name).toList(),
                 effective.toolSearchOrOff().enabled(), agentId).render();
@@ -294,7 +294,7 @@ public class ChatUiController {
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
-                sessions, session, agent.name(), chat.renderContent()).render();
+                sessions, session, agent.name(), chat.renderContent(), agentIcons()).render();
         var page = UiPage.of("/chat/sessions/" + session.id(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.
         if (!chat.activeStreams().isEmpty()) {
@@ -335,11 +335,40 @@ public class ChatUiController {
             publish a plan before starting anything with several steps.
             """;
 
-    private List<AgentDefinition> selectableAgents() {
+    /**
+     * The agents a person may pick for a chat: the ones filed under
+     * {@code assistants}. The others are not for chatting with — a sub-agent
+     * expects a self-contained brief from an orchestrator and has no memory of
+     * a conversation, and a utility like the title generator answers in the one
+     * shape the runtime calls it for. Offering all sixteen made the picker a
+     * list of things that mostly disappoint when you pick them.
+     *
+     * <p>The chat's current agent stays in the list even when it is not an
+     * assistant, so opening the dialog on such a chat and pressing Apply does
+     * not silently reassign it.
+     */
+    /**
+     * Icon name per agent-definition id, for the history drawer. Read from the
+     * registry in one go: a row only needs the icon, and resolving every
+     * session's agent separately would be one lookup per conversation.
+     */
+    private java.util.Map<UUID, String> agentIcons() {
+        var icons = new java.util.HashMap<UUID, String>();
+        for (AgentDefinition a : agentRepository.findByNamespace(defaultNamespace)) {
+            icons.put(a.id(), a.iconOrDefault());
+        }
+        return icons;
+    }
+
+    private List<AgentDefinition> selectableAgents(UUID currentAgentId) {
         return agentRepository.findByNamespace(defaultNamespace).stream()
                 .filter(a -> a.status() != ai.mindconnect.agent.domain.AgentDefinitionStatus.DEPRECATED)
+                .filter(a -> CHAT_GROUP.equals(a.groupOrDefault()) || a.id().equals(currentAgentId))
                 .toList();
     }
+
+    /** The one rubric whose agents a person opens a chat with. */
+    private static final String CHAT_GROUP = "assistants";
 
     /** Everything a chat can be given: the registry plus the runtime's own two. */
     private List<String> allToolNames() {

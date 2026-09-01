@@ -71,18 +71,15 @@ public class AgentUiController {
     }
 
     @GetMapping
-    public UiPage list(@RequestParam(defaultValue = "1") int page,
-                       @RequestParam(defaultValue = "10") int size,
-                       @RequestParam(required = false) String q) {
+    public UiPage list(@RequestParam(required = false) String q) {
         List<AgentDefinition> all = filterAgents(registryService.list(defaultNamespace), q);
-        return new AgentListPage(Page.of(all, page, size), q).render();
+        return new AgentListPage(all, q).render();
     }
 
-    /** The search field posts its form here; the response is the filtered first page. */
+    /** The search field posts its form here; the response is the filtered list. */
     @PostMapping("/search")
     public UiPage search(@RequestBody Map<String, Object> raw) {
-        String q = new FormBody(raw).str("q");
-        return list(1, 10, q);
+        return list(new FormBody(raw).str("q"));
     }
 
     /** Case-insensitive contains on name and description. */
@@ -143,6 +140,8 @@ public class AgentUiController {
         // applied as a follow-up patch (AgentSpec doesn't carry them yet).
         // Default maxIterations = whatever create() picked (10).
         AgentPatch patch = AgentPatch.of()
+                .withGroup(body.str("group"))
+                .withIcon(body.str("icon"))
                 .withMaxIterations(body.num("maxIterations", agent.maxIterations()))
                 .withResponseReviewers(body.strList("responseReviewers"))
                 .withToolSearch(toolSearchFromForm(body));
@@ -166,6 +165,8 @@ public class AgentUiController {
                             .withNamespace(new Namespace(body.str("namespace")))
                             .withName(body.str("name"))
                             .withDescription(body.str("description"))
+                            .withGroup(body.str("group"))
+                            .withIcon(body.str("icon"))
                             .withSystemPrompt(body.str("systemPrompt"))
                             .withWelcomeMessage(body.str("welcomeMessage"))
                             .withLlmConfigName(body.str("llmConfigName"))
@@ -412,7 +413,7 @@ public class AgentUiController {
                 .map(existing -> {
                     registryService.delete(existing.namespace(), id);
                     List<AgentDefinition> all = registryService.list(existing.namespace());
-                    return ResponseEntity.ok(new AgentListPage(Page.of(all, 1, 10)).render());
+                    return ResponseEntity.ok(new AgentListPage(all).render());
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

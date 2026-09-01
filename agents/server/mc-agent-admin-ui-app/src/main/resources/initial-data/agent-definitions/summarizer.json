@@ -5,6 +5,8 @@
   },
   "name": "Summarizer",
   "description": "Writes concise Markdown summaries of any text it is given",
+  "group": "utilities",
+  "icon": "align-left",
   "systemPrompt": "You summarize text. Reply with a concise Markdown summary of the text you are given — a few sentences, bullet points where they help. No preamble, no closing remarks, no repetition of the instructions. Keep the language of the source text.",
   "welcomeMessage": "Give me any text and I will summarize it.",
   "maxIterations": 3,

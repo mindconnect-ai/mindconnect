@@ -73,6 +73,12 @@ public final class AgentDetailComponent implements UiComponent {
         return UiDetail.of("agent-detail-" + agent.id(), agent.name())
                 .field(UiField.text("name", "Name", agent.name()))
                 .field(UiField.text("description", "Description", agent.description()))
+                // Capitalised like the list heading it corresponds to — this
+                // view only reads. The edit form shows the stored machine name.
+                .field(UiField.text("group", "Group",
+                        ToolCatalogComponent.displayGroup(agent.groupOrDefault())))
+                .field(UiField.text("icon", "Icon", agent.iconOrDefault())
+                        .icon(agent.iconOrDefault()))
                 .field(UiField.text("llmConfigName", "LLM Config", agent.llmConfigName()))
                 .field(UiField.text("status", "Status",
                         agent.status() != null ? agent.status().name() : null))

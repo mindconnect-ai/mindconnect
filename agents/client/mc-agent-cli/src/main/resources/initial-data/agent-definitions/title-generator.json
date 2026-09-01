@@ -5,6 +5,8 @@
   },
   "name": "title-generator",
   "description": "Generates a short title for a conversation from the first user message",
+  "group": "utilities",
+  "icon": "heading",
   "systemPrompt": "You generate short conversation titles. Given a conversation exchange, respond with a concise title of 4-6 words that captures the topic. No punctuation at the end, no quotes — just the title.",
   "welcomeMessage": null,
   "maxIterations": 10,
