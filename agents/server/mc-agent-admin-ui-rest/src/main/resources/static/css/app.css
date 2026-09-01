@@ -31,7 +31,22 @@ body {
     flex-direction: column;
     width: 100%;
 }
-#main > .sui-shell { flex: 1 1 auto; }
+/* The shell ends at the bottom of the window, on every page.
+
+   The framework says `min-height: 100dvh`, which fills the window but lets
+   the shell grow past it once the content is taller — and then the window
+   scrolls, carrying the header and the sidebar off the top. Its own
+   `.sui-shell-body { overflow: hidden }` and `.sui-shell-content { overflow:
+   auto }` are already waiting to scroll the content pane instead; they only
+   ever engage when something caps the height. The chat page and the API
+   explorer each capped it for themselves, so those two behaved and every
+   other screen did not.
+
+   `height` instead of `min-height` caps it here, once, for all of them. */
+#main > .sui-shell {
+    flex: 1 1 auto;
+    height: 100dvh;
+}
 
 /* Content is anchored to the sidebar, not centred in the leftover space —
    a centred card reads as a floating island on a wide monitor, while the
@@ -202,9 +217,8 @@ body {
 
 /* ── Embedded API explorer (Swagger UI in a UiIFrame) ──────────────────── */
 
-/* Same viewport-capping trick as the chat page: the shell stops growing and
-   the frame takes everything between header and pane edges. */
-.sui-shell:has(.app-fill-frame) { height: 100dvh; }
+/* The shell is capped for every page now (see #main > .sui-shell); the frame
+   only has to claim what is left between the header and the pane edges. */
 .sui-shell-content:has(.app-fill-frame) { display: flex; flex-direction: column; }
 .sui-shell-content > .app-fill-frame { max-width: none; }
 
@@ -216,10 +230,9 @@ body {
    the .chat-container must each become growing flex columns — :has() walks
    exactly that chain and nothing else (the Info tab and every other page
    keep the default flow). */
-/* Cap the shell to the viewport on the chat page — its min-height would
-   otherwise let the whole shell grow with the history and push the composer
-   below the fold; with the cap, the conversation list is the scrollpane. */
-.sui-shell:has(.chat-container) { height: 100dvh; }
+/* The shell is capped for every page now (see #main > .sui-shell), which is
+   what keeps the composer above the fold however long the history grows and
+   leaves the conversation list as the scrollpane. */
 .sui-shell-content:has(.chat-container) {
     display: flex;
     flex-direction: column;

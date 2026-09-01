@@ -32,6 +32,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
   block in the app, and a theme that retunes its tokens is followed without a
   second edit.
 
+- **The admin UI's header and sidebar stay put while a page scrolls.** Only the
+  chat page and the API explorer capped themselves to the window; on every
+  other screen a long list scrolled the whole document and carried the header
+  and the navigation off the top. The shell is now capped once for all of them,
+  which is what lets the content area do the scrolling — the behaviour the
+  framework's own shell was already built for.
+
 ## [0.1.0] - 2026-08-30
 
 ### Changed
