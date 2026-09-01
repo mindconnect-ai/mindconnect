@@ -37,9 +37,13 @@ public class StreamController {
 
     private final ActiveStreams activeStreams;
 
+    private final ai.mindconnect.chatui.service.SessionStreams sessionStreams;
+
     @Autowired
-    public StreamController(ActiveStreams activeStreams) {
+    public StreamController(ActiveStreams activeStreams,
+                            ai.mindconnect.chatui.service.SessionStreams sessionStreams) {
         this.activeStreams = activeStreams;
+        this.sessionStreams = sessionStreams;
     }
 
     @GetMapping
@@ -87,28 +91,51 @@ public class StreamController {
      * <p>404 when the stream is no longer registered (already finished).
      */
     @GetMapping(value = "/{channelId}/sse", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public ResponseEntity<SseEmitter> resume(@PathVariable String channelId,
-                                             @RequestParam(name = "lastSeq", defaultValue = "0") long lastSeq) {
-        var handleOpt = activeStreams.findHandle(channelId);
-        if (handleOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var handle = handleOpt.get();
+    public ResponseEntity<SseEmitter> resume(
+            @PathVariable String channelId,
+            @RequestParam(name = "lastSeq", defaultValue = "0") long lastSeq,
+            @RequestParam(name = "from", required = false) Long from) {
+        // `from` wins over `lastSeq`. The page renderer knows exactly what
+        // the page it just rendered already shows and puts that position in
+        // the resume URL; the client appends its own lastSeq=0 blindly, and
+        // honouring that would replay APPEND patches the page already has.
+        long cursor = from != null ? from : lastSeq;
 
-        // Long-lived: agent turns can take minutes. The handle's cancel
-        // path applies just like for the original POST connection.
+        // No 404 when nothing is running. The stream belongs to the SESSION,
+        // and a client attaches precisely so that it is already listening
+        // when a turn starts — turning it away while the session is quiet
+        // would defeat the purpose.
+        var bus = sessionStreams.bus(channelId);
+        var handleOpt = activeStreams.findHandle(channelId);
+
+        // Long-lived: agent turns can take minutes, and the connection
+        // outlives them. Idle time is covered by the heartbeat.
         var emitter = new SseEmitter(0L);
-        handle.bus().attach(emitter, lastSeq);
-        // Drop subscriber when the client goes away — same lifecycle hooks
-        // as the original POST, scoped to *this* emitter rather than the
-        // channel as a whole (the channel keeps producing while other
-        // subscribers stay attached).
-        emitter.onCompletion(() -> handle.bus().detach(emitter));
-        emitter.onError(t -> handle.bus().detach(emitter));
-        emitter.onTimeout(() -> handle.bus().detach(emitter));
+
+        // A client that arrives mid-turn has no streaming bubble in its DOM,
+        // so every cumulative token REPLACE would land nowhere. The catch-up
+        // frames create it and fill it with the reply so far.
+        var prelude = new java.util.ArrayList<ai.mindconnect.chatui.service.StreamBus.Event>();
+        sessionStreams.catchUp(channelId).ifPresent(c -> {
+            if (c.bubblePatch() != null) {
+                prelude.add(new ai.mindconnect.chatui.service.StreamBus.Event(0, "patch", c.bubblePatch()));
+            }
+            if (c.textPatch() != null) {
+                prelude.add(new ai.mindconnect.chatui.service.StreamBus.Event(0, "patch", c.textPatch()));
+            }
+        });
+        bus.attach(emitter, cursor, prelude);
+
+        emitter.onCompletion(() -> bus.detach(emitter));
+        emitter.onError(t -> bus.detach(emitter));
+        emitter.onTimeout(() -> bus.detach(emitter));
 
         var headers = new HttpHeaders();
-        headers.add("Sui-Stream-Channel",    handle.channelId());
-        headers.add("Sui-Stream-Return-Href", handle.returnHref());
-        headers.add("Sui-Stream-Label",      handle.label());
+        headers.add("Sui-Stream-Channel", channelId);
+        headers.add("Sui-Stream-Return-Href",
+                handleOpt.map(ActiveStreams.Handle::returnHref).orElse(""));
+        headers.add("Sui-Stream-Label",
+                handleOpt.map(ActiveStreams.Handle::label).orElse("Agent"));
         return ResponseEntity.ok().headers(headers).body(emitter);
     }
 

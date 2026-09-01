@@ -86,6 +86,19 @@ public final class StreamBus {
      * stream's own producer thread doesn't need replay).
      */
     public synchronized void attach(SseEmitter emitter, long lastSeq) {
+        attach(emitter, lastSeq, List.of());
+    }
+
+    /**
+     * Attach with a PRELUDE sent ahead of the replay — the frames that bring
+     * a client joining mid-turn up to the current state. Sent inside the
+     * lock, so a token published concurrently cannot slip in front of the
+     * prelude and land on a DOM node the prelude has yet to create.
+     */
+    public synchronized void attach(SseEmitter emitter, long lastSeq, List<Event> prelude) {
+        for (Event e : prelude) {
+            if (!sendTo(emitter, e)) return;
+        }
         for (Event e : buffer) {
             if (e.seq() > lastSeq) {
                 if (!sendTo(emitter, e)) return; // emitter already broken
@@ -97,6 +110,44 @@ public final class StreamBus {
     /** Drops an emitter from the subscriber list. No-op if not present. */
     public void detach(SseEmitter emitter) {
         subscribers.remove(emitter);
+    }
+
+    /** How many clients are currently attached. */
+    public int subscriberCount() {
+        return subscribers.size();
+    }
+
+    /**
+     * Forgets the buffered past without touching the sequence or the
+     * subscribers. Called when a turn starts: a client that attaches later
+     * replays THIS turn and nothing before it. The patches are APPEND
+     * operations, so replaying a finished turn into a page that already
+     * renders it from persisted history would duplicate every message.
+     */
+    public synchronized void resetBuffer() {
+        buffer.clear();
+    }
+
+    /**
+     * Sends an SSE comment to every subscriber and drops those that fail.
+     * Two jobs in one: it keeps a connection alive that would otherwise be
+     * cut as idle by a proxy, and a failed write is how a client that went
+     * away is noticed — there is no other signal.
+     *
+     * <p>A comment carries no event name and no data, so it costs the client
+     * nothing; its SSE reader parses the block and finds nothing to
+     * dispatch.
+     */
+    public synchronized void ping() {
+        Iterator<SseEmitter> it = subscribers.iterator();
+        while (it.hasNext()) {
+            SseEmitter sub = it.next();
+            try {
+                sub.send(SseEmitter.event().comment("hb"));
+            } catch (Exception e) {
+                subscribers.remove(sub);
+            }
+        }
     }
 
     /** Last published seq, for clients that need to track "where am I". */

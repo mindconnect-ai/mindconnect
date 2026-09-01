@@ -64,7 +64,9 @@ public final class MessageComponent {
         if (isUser) {
             item.action(UiAction.icon("regen-" + m.id(), "🔄")
                     .confirm("Delete the response(s) after this message and generate a new one?")
-                    .onClick(streaming(on(ChatUiController.class).regenerate(sessionId, seq), null)));
+                    // Plain dispatch — the regenerated turn streams on the
+                    // session's stream like any other.
+                    .onClick(trigger(on(ChatUiController.class).regenerate(sessionId, seq))));
         }
 
         // Delete-from-here: remove this message and every message after it.
