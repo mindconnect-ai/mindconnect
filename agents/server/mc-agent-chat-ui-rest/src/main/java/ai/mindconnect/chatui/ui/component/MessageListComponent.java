@@ -82,6 +82,8 @@ public final class MessageListComponent implements UiComponent {
     private final SubAgentTreeProvider subAgentTree;
     /** Set when this session was spawned by a parent (sub-agent session) — drives the header link. */
     private UUID parentSessionId;
+    /** This conversation's title, when it has one — the header's subject. */
+    private String sessionTitle;
     /** Bubbled sub-agent approval cards (from the ToolApprovalStore), rendered after the history. */
     private List<UiList.Item> bubbledApprovalCards = List.of();
     /** The host's overflow menu (parent session, back to agent, memory/trace
@@ -104,6 +106,18 @@ public final class MessageListComponent implements UiComponent {
         this.history = history;
         this.memory = memory;
         this.subAgentTree = subAgentTree != null ? subAgentTree : SubAgentTreeProvider.NONE;
+    }
+
+    /**
+     * Sets the conversation's title, which then leads the header with the
+     * agent beside it as a badge. Pass {@code null} or blank for a chat that
+     * has not been titled yet — the agent's name leads instead, which says
+     * more about an empty conversation than "New chat" does. Returns
+     * {@code this} for fluent chaining.
+     */
+    public MessageListComponent withSessionTitle(String sessionTitle) {
+        this.sessionTitle = sessionTitle;
+        return this;
     }
 
     /**
@@ -149,9 +163,16 @@ public final class MessageListComponent implements UiComponent {
         // to be empty because the chat rendered a second app-shell header
         // above it that named the agent — two title bars where every other
         // screen has one, which is what made the chat look like it came from
-        // somewhere else. That header is gone; this one names the agent, the
-        // way "Agents" names the agents list.
-        var list = UiList.of(id(), agent == null ? "Chat" : agent.name());
+        // somewhere else. That header is gone; this one names the conversation.
+        //
+        // The title leads and the agent follows as a badge: in a conversation
+        // the agent is the constant and the title is what tells this one apart
+        // from the others — and with the history a closed drawer, the header is
+        // the only place that can say which chat you are in. An untitled chat
+        // falls back to the agent's name; "New chat" would say nothing at all.
+        String agentName = agent == null ? "Chat" : agent.name();
+        boolean titled = sessionTitle != null && !sessionTitle.isBlank();
+        var list = UiList.of(id(), titled ? sessionTitle : agentName);
         // The icon leads the title, the way every other screen's does — the
         // agent's own where it has one, so the conversation is recognisable
         // as this agent's and not just as "a chat".
@@ -167,17 +188,19 @@ public final class MessageListComponent implements UiComponent {
         // arrows read as forward/back navigation, which this is not.
         list.action(ai.mindconnect.ui.model.UiAction.icon("chat-history", "Chats")
                 .icon("panel-left-open"));
-        var tokenBar = new TokenUsageComponent(id(), memory).render();
-        if (overflow == null) {
-            list.headerExtra(tokenBar);
-        } else {
-            // Token bar and overflow share the headerExtra slot, side by side.
-            list.headerExtra(ai.mindconnect.ui.model.UiStack.of(id() + "-tools")
-                    .direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL)
-                    .child(tokenBar)
-                    .child(overflow)
-                    .withCssClass("chat-header-tools"));
+        // Agent badge, token bar and overflow share the headerExtra slot,
+        // side by side. The badge only appears when the title has taken over
+        // the header — otherwise it would repeat the name standing next to it.
+        var tools = ai.mindconnect.ui.model.UiStack.of(id() + "-tools")
+                .direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL)
+                .<ai.mindconnect.ui.model.UiStack>withCssClass("chat-header-tools");
+        if (titled) {
+            tools.child(ai.mindconnect.ui.model.UiText.of(id() + "-agent", agentName)
+                    .<ai.mindconnect.ui.model.UiText>withCssClass("chat-agent-badge"));
         }
+        tools.child(new TokenUsageComponent(id(), memory).render());
+        if (overflow != null) tools.child(overflow);
+        list.headerExtra(tools);
 
         // Sort by sequenceNum to be safe — persisted ordering should already
         // be correct but the component does not trust upstream.
