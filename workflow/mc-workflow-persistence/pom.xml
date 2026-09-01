@@ -6,14 +6,14 @@
 <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.1.1-SNAPSHOT</version>
+        <version>0.2.0</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-persistence</artifactId>
     <name>mc-workflow-persistence</name>
-    <version>0.1.1-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <description>
@@ -37,14 +37,14 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow</artifactId>
-            <version>0.1.1-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
 
         <!-- Existing Jackson serializer + ObjectMapper factory for WorkflowData. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-jackson</artifactId>
-            <version>0.1.1-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
 
         <!-- Jackson — execution-state serialization goes via WorkflowObjectMapperFactory. -->

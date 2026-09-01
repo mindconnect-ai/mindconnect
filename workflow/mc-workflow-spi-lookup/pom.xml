@@ -6,14 +6,14 @@
 <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.1.1-SNAPSHOT</version>
+        <version>0.2.0</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-spi-lookup</artifactId>
     <name>mc-workflow-spi-lookup</name>
-    <version>0.1.1-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>jar</packaging>
 
     <description>
@@ -34,20 +34,20 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow</artifactId>
-            <version>0.1.1-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
 
         <!-- TEST: verify discovery with a real subset of modules on the classpath -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-code-javascript</artifactId>
-            <version>0.1.1-SNAPSHOT</version>
+            <version>0.2.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-code-groovy</artifactId>
-            <version>0.1.1-SNAPSHOT</version>
+            <version>0.2.0</version>
             <scope>test</scope>
         </dependency>
 

@@ -6,7 +6,7 @@
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mindconnect</artifactId>
-    <version>0.1.1-SNAPSHOT</version>
+    <version>0.2.0</version>
     <packaging>pom</packaging>
     <name>mindconnect</name>
     <description>Release reactor — every publishable module exactly once (whole-repo build &amp; deploy)</description>

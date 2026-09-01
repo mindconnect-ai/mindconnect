@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-agents-parent</artifactId>
-        <version>0.1.1-SNAPSHOT</version>
+        <version>0.2.0</version>
         <relativePath>../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
@@ -66,7 +66,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-code-javascript</artifactId>
-            <version>0.1.1-SNAPSHOT</version>
+            <version>0.2.0</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
@@ -90,7 +90,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-initial-data</artifactId>
-            <version>0.1.1-SNAPSHOT</version>
+            <version>0.2.0</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
