@@ -189,7 +189,7 @@ mvn -f agents/client/mc-agent-cli/pom.xml spring-boot:run
 - Parent POMs (`mc-java-parent/`, `agents/mc-agents-parent`, `workflow/mc-workflow-parent`)
   own dependency versions and plugin config — prefer them over per-module version declarations.
 - Build parent POMs and shared/core modules before the modules that depend on them.
-- Manual regression tests live in `agents/manual-tests/` — human/LLM-executable
+- Manual regression tests live in `agents/doc/manual-tests/` — human/LLM-executable
   scripts with per-step expectations; update `last-verified` stamps only on PASS.
 - **Everything written is in English** — code comments, javadoc, documentation,
   commit messages, PR titles and descriptions, issue replies. This is an open

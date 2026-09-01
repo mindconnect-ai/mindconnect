@@ -1,7 +1,7 @@
 ---
 id: chat-file-upload
 area: chat
-requires: [server-9091, lm-studio-embedding-model]
+requires: [server-9090, lm-studio-embedding-model]
 duration: ~5 min
 last-verified: never (endpoint path verified by ChatFileUploadSmokeTest, 2026-08-27)
 ---
@@ -14,7 +14,7 @@ it via `vector_search`.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with BOTH a tool-capable LLM and an EMBEDDINGS model
   loaded (`GET http://localhost:1234/api/v0/models` shows a loaded
   `"type": "embeddings"` entry — otherwise: SKIPPED)
@@ -30,7 +30,7 @@ it via `vector_search`.
 
 ## Steps
 
-1. New session with an agent that has tools (e.g. `assistant-with-tools`);
+1. New session with an agent that has tools (e.g. `default-chat`);
    click the **+** next to the input → attach `soup.md`.
    **Expected:** A success toast ("… attached — the agent can now search
    it."); the file appears as a chip above the input.

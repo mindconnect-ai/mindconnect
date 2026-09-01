@@ -1,7 +1,7 @@
 ---
 id: reviewer-response-chain
 area: reviewer
-requires: [server-9091, lm-studio-tool-model]
+requires: [server-9090, lm-studio-tool-model]
 duration: ~8 min
 last-verified: never (chain logic verified by ResponseReviewerChainTest + AgentLoopTest, 2026-08-27)
 ---
@@ -15,7 +15,7 @@ the chain.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded (otherwise: SKIPPED)
 
 ## Setup
@@ -26,7 +26,7 @@ the chain.
      draft contains the word "BANANA", reply exactly: BLOCK: Answer withheld
      by reviewer. Otherwise reply with the draft unchanged but append the
      line "— reviewed". Never explain yourself.`
-2. On the agent under test (e.g. `assistant-with-tools`): Edit → Response
+2. On the agent under test (e.g. `default-chat`): Edit → Response
    Reviewers → select `tone-reviewer` → Save.
 
 ## Steps

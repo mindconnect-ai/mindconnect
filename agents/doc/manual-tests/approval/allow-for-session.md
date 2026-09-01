@@ -1,7 +1,7 @@
 ---
 id: approval-allow-for-session
 area: approval
-requires: [server-9091, lm-studio-tool-model]
+requires: [server-9090, lm-studio-tool-model]
 duration: ~4 min
 last-verified: 2026-08-27 (commit 20667bf, runs/2026-08-27-approval-und-kompression — via automated LM Studio suite)
 ---
@@ -13,7 +13,7 @@ in this session (and its sub-agents), while a fresh session asks again.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded (otherwise: SKIPPED)
 
 ## Setup

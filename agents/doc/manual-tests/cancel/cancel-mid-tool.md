@@ -1,7 +1,7 @@
 ---
 id: cancel-mid-tool
 area: cancel
-requires: [server-9091, lm-studio-tool-model]
+requires: [server-9090, lm-studio-tool-model]
 duration: ~3 min
 last-verified: 2026-08-27 (commit 20667bf, runs/2026-08-27-approval-und-kompression — via automated LM Studio suite)
 ---
@@ -15,7 +15,7 @@ result for the same callId.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded (otherwise: SKIPPED)
 - The agent has a tool that takes several seconds (a web search against a
   slow site, or code execution with a sleep).

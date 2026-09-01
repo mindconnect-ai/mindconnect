@@ -1,7 +1,7 @@
 ---
 id: approval-deny
 area: approval
-requires: [server-9091, lm-studio-tool-model]
+requires: [server-9090, lm-studio-tool-model]
 duration: ~3 min
 last-verified: 2026-08-27 (commit 20667bf, runs/2026-08-27-approval-und-kompression — via automated LM Studio suite)
 ---
@@ -14,16 +14,21 @@ assistant answer.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded
   (`GET http://localhost:1234/api/v0/models` shows `"state": "loaded"` and
   `"tool_use"` — otherwise: SKIPPED)
 
 ## Setup
 
-1. Open http://localhost:9091/admin/agents → an agent with a web tool (e.g.
-   `assistant-with-tools`) → Tools → `web_search` → Edit → check
+1. Open http://localhost:9090/admin/agents → an agent that has `web_search`
+   ITSELF (e.g. `web-researcher`) → Tools → `web_search` → Edit → check
    **Needs approval** → Save.
+
+   Not `default-chat`: it reaches the web through the `web-researcher`
+   sub-agent rather than carrying `web_search`, so the card would come from
+   the sub-agent and this case would be testing `subagent-bubbling.md`
+   instead.
 
 ## Steps
 

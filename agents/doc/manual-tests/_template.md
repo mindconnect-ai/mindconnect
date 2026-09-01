@@ -1,7 +1,7 @@
 ---
 id: <area>-<short-name>
 area: <area>
-requires: [server-9091, lm-studio-tool-model]   # environment preconditions, see README
+requires: [server-9090, lm-studio-tool-model]   # environment preconditions, see README
 duration: ~X min
 last-verified: never
 ---
@@ -12,7 +12,7 @@ last-verified: never
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - <Agent/tool/config prerequisites — name them exactly, and how to set them>
 
 ## Setup
