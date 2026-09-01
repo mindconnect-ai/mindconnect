@@ -193,7 +193,7 @@ class ToolSearchToolTest {
 
     private static AgentDefinition definition(UUID agentId, List<AgentTool> tools,
                                               AgentDefinition.ToolSearchConfig toolSearch) {
-        return new AgentDefinition(agentId, new Namespace("test"), "a", null, null, null,
+        return new AgentDefinition(agentId, new Namespace("test"), "a", null, null, null, null, null,
                 "cfg", 5, null, null, tools, List.of(), toolSearch, null, null);
     }
 

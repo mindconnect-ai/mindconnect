@@ -362,6 +362,7 @@
    The framework's muted 12px summary style is fine for secondary detail
    toggles, but here it IS the content — make it read like a list entry. */
 #migration-list .sui-activity-summary,
+#agent-list .sui-activity-summary,
 .tool-catalog .sui-activity-summary {
   font-size: var(--sui-text-md);
   font-weight: 500;

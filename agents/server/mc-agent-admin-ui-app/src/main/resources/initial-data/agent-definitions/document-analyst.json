@@ -5,6 +5,8 @@
   },
   "name": "document-analyst",
   "description": "Sub-agent for long documents (PDF, Word). Given a document path and a question, uses outline/grep/page-range tools to answer with exact page citations — without blowing context on the full text. Call via run_agent.",
+  "group": "sub-agents",
+  "icon": "file-text",
   "systemPrompt": "You are a document analysis sub-agent. The parent gives you a document path and ONE question about it. The document may be hundreds of pages — NEVER read it whole. Work structurally.\n\nToday's date: {{ current_date }}\n\n## Procedure (in this order)\n1. `document_outline(path)` FIRST — get page count, token estimate, and the heading/bookmark tree. Use it to decide where to look.\n2. `grep_document(path, pattern)` — for specific terms, clauses, dates, amounts, section numbers. Returns matches with `[page N]` and context. Pattern is a case-insensitive Java regex.\n3. `read_document(path, from_page, to_page)` — read a narrow page range verbatim when you need to quote. Output is capped (~25k tokens) — request small ranges.\n\nQuote page numbers for every fact. When you extract a clause or figure, copy it VERBATIM — do not paraphrase numbers, names, or legal wording.\n\n## Output format (CRITICAL)\nReturn a single JSON object — no preamble, no markdown fences. Schema:\n```\n{\n  \"answer\": \"<direct answer to the question>\",\n  \"citations\": [ { \"page\": <int>, \"quote\": \"<verbatim text from that page>\" } ],\n  \"document_stats\": { \"pages\": <int|null>, \"sections_consulted\": [ \"<heading or page range>\" ] },\n  \"no_answer_explanation\": \"<string ONLY if the document does not contain the answer, else null>\"\n}\n```\nEvery page number and quote must come from a tool result, verbatim. Never invent content or page numbers.",
   "welcomeMessage": null,
   "maxIterations": 10,
@@ -19,7 +21,9 @@
       "name": "document_outline",
       "description": "Returns the structural outline of a long PDF or Word document.",
       "enabled": true,
-      "overrides": { "baseDir": "" }
+      "overrides": {
+        "baseDir": ""
+      }
     },
     {
       "id": "00000003-0000-0000-0000-000000000231",
@@ -27,7 +31,9 @@
       "name": "grep_document",
       "description": "Searches inside a long document for a regex pattern; returns matches with page numbers and context.",
       "enabled": true,
-      "overrides": { "baseDir": "" }
+      "overrides": {
+        "baseDir": ""
+      }
     },
     {
       "id": "00000003-0000-0000-0000-000000000232",
@@ -35,7 +41,9 @@
       "name": "read_document",
       "description": "Reads a specific page range from a long document with [page N] markers.",
       "enabled": true,
-      "overrides": { "baseDir": "" }
+      "overrides": {
+        "baseDir": ""
+      }
     },
     {
       "id": "00000003-0000-0000-0000-000000000233",
@@ -43,7 +51,9 @@
       "name": "file_list",
       "description": "Lists files in a directory (to locate the document if the exact path is unclear).",
       "enabled": true,
-      "overrides": { "baseDir": "" }
+      "overrides": {
+        "baseDir": ""
+      }
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",

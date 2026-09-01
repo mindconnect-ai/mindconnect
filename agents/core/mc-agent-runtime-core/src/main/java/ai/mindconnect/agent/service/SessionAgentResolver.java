@@ -64,7 +64,7 @@ public class SessionAgentResolver {
     private static AgentDefinition inlineDefinition(AgentSession session, InlineSessionAgent inline) {
         Instant now = session.startedAt() != null ? session.startedAt() : Instant.now();
         return new AgentDefinition(
-                inline.id(), session.namespace(), inline.label(), "",
+                inline.id(), session.namespace(), inline.label(), "", null, null,
                 inline.systemPrompt(), null, inline.llmConfigName(),
                 DEFAULT_MAX_ITERATIONS, SummarizingWindowConfig.DEFAULT,
                 AgentDefinitionStatus.ACTIVE, inline.tools(), java.util.List.of(),

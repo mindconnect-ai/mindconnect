@@ -152,8 +152,10 @@ public final class MessageListComponent implements UiComponent {
         // somewhere else. That header is gone; this one names the agent, the
         // way "Agents" names the agents list.
         var list = UiList.of(id(), agent == null ? "Chat" : agent.name());
-        // The icon leads the title, the way every other screen's does.
-        list.icon("chat");
+        // The icon leads the title, the way every other screen's does — the
+        // agent's own where it has one, so the conversation is recognisable
+        // as this agent's and not just as "a chat".
+        list.icon(agent == null ? "chat" : agent.iconOrDefault());
         list.withCssClass("chat-container");
         // The history is a drawer now, opened from here. chat-ui.js owns the
         // click: the drawer is client state, and the server has no opinion

@@ -537,17 +537,19 @@ body {
 }
 .llm-test-result--err .llm-test-body { color: var(--sui-color-danger); }
 
-/* ── Tool catalog ──────────────────────────────────────────────────────────
-   The collapsed summary line is the primary reading surface here — the
-   framework default (12px, subtle gray, meant for background activity) is
-   too quiet for it. */
-.tool-catalog .sui-activity-summary {
+/* ── Grouped catalogs: tools, agents ───────────────────────────────────────
+   The collapsed summary line is the primary reading surface here — it is the
+   group heading, not a detail toggle — so the framework default (12px, subtle
+   gray, meant for background activity) is too quiet for it. */
+.tool-catalog .sui-activity-summary,
+#agent-list .sui-activity-summary {
     font-size: var(--sui-text-md, 14px);
     color: var(--sui-color-text);
     padding: 6px 0;
 }
 /* The nested per-group list needs no header block of its own. */
-.tool-catalog .sui-activity-body .sui-list-header { display: none; }
+.tool-catalog .sui-activity-body .sui-list-header,
+#agent-list .sui-activity-body .sui-list-header { display: none; }
 
 /* ── Theme picker ─────────────────────────────────────────────────────────
    Injected into the header by js/theme-switch.js in the framework's own
@@ -578,3 +580,82 @@ body {
 .sui-theme-switch .sui-menu-button-item[aria-checked="true"] {
     font-weight: 500;
 }
+
+/* ── Icon picker (js/icon-picker.js) ───────────────────────────────────────
+   The agent form's icon field grows a button that opens a searchable grid of
+   the framework's sprite. The input stays the control the form submits; the
+   button is a preview and a way in. */
+.icon-picker { position: relative; display: flex; align-items: center; gap: 8px; }
+.icon-picker > input { flex: 1 1 auto; min-width: 0; }
+
+.icon-picker-trigger {
+    flex: 0 0 auto;
+    width: 38px; height: 38px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--sui-color-border);
+    border-radius: var(--sui-radius-md, 8px);
+    background: var(--sui-color-surface);
+    color: var(--sui-color-text);
+    cursor: pointer;
+}
+.icon-picker-trigger:hover { border-color: var(--sui-color-border-strong); }
+/* Nothing chosen yet: the placeholder glyph should read as absence. */
+.icon-picker-trigger.is-empty { color: var(--sui-color-text-muted); }
+.icon-picker-trigger .sui-icon { width: 20px; height: 20px; }
+
+.icon-picker-popover {
+    position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+    width: min(420px, 90vw);
+    padding: 10px;
+    background: var(--sui-color-surface);
+    border: 1px solid var(--sui-color-border);
+    border-radius: var(--sui-radius-lg, 10px);
+    box-shadow: 0 8px 28px rgb(0 0 0 / .28);
+}
+.icon-picker-search {
+    width: 100%; margin-bottom: 8px;
+    padding: 7px 10px;
+    background: var(--sui-color-bg);
+    color: var(--sui-color-text);
+    border: 1px solid var(--sui-color-border);
+    border-radius: var(--sui-radius-md, 8px);
+}
+.icon-picker-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+    gap: 4px;
+    /* Tall enough to browse, short enough to leave the form reachable. */
+    max-height: 260px; overflow-y: auto;
+}
+.icon-picker-item {
+    aspect-ratio: 1; display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid transparent; border-radius: var(--sui-radius-md, 8px);
+    background: none; color: var(--sui-color-text); cursor: pointer;
+}
+.icon-picker-item:hover {
+    background: var(--sui-color-border-soft);
+    border-color: var(--sui-color-border);
+}
+.icon-picker-item .sui-icon { width: 18px; height: 18px; }
+.icon-picker-note {
+    margin: 8px 0 0;
+    font-size: var(--sui-text-xs, 12px);
+    color: var(--sui-color-text-muted);
+}
+
+/* ── Group picker (js/group-picker.js) ─────────────────────────────────────
+   The select and the button that swaps it for a field to name a new rubric. */
+.group-picker { display: flex; align-items: center; gap: 8px; }
+.group-picker > select,
+.group-picker > input { flex: 1 1 auto; min-width: 0; }
+.group-picker-toggle {
+    flex: 0 0 auto;
+    padding: 8px 12px;
+    white-space: nowrap;
+    font-size: var(--sui-text-sm, 13px);
+    color: var(--sui-color-text);
+    background: var(--sui-color-surface);
+    border: 1px solid var(--sui-color-border);
+    border-radius: var(--sui-radius-md, 8px);
+    cursor: pointer;
+}
+.group-picker-toggle:hover { border-color: var(--sui-color-border-strong); }

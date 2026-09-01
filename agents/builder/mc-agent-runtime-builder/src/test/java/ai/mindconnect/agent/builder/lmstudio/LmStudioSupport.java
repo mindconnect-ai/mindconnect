@@ -85,7 +85,8 @@ final class LmStudioSupport {
         AgentDefinition base = AgentDefinition.create(new Namespace("local"), agentName,
                 "integration test agent", systemPrompt, null, "it-llm");
         AgentDefinition def = new AgentDefinition(base.id(), base.namespace(), base.name(),
-                base.description(), base.systemPrompt(), base.welcomeMessage(), base.llmConfigName(),
+                base.description(), base.group(), base.icon(), base.systemPrompt(), base.welcomeMessage(),
+                base.llmConfigName(),
                 base.maxIterations(), memoryConfig != null ? memoryConfig : base.memoryConfig(),
                 base.status(),
                 tools.stream().map(t -> new AgentTool(t.id(), base.id(), t.name(), t.description(),

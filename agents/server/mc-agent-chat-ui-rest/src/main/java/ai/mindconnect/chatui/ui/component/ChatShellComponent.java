@@ -33,13 +33,28 @@ public final class ChatShellComponent implements UiComponent {
     private final AgentSession active;
     private final String agentName;
     private final UiNode content;
+    private final java.util.Map<UUID, String> agentIcons;
 
     public ChatShellComponent(List<AgentSession> sessions, AgentSession active,
                               String agentName, UiNode content) {
+        this(sessions, active, agentName, content, java.util.Map.of());
+    }
+
+    /**
+     * @param agentIcons icon name per agent-definition id, so a history row
+     *                   can wear the icon of the agent whose conversation it
+     *                   is. A session whose agent is missing from the map —
+     *                   an inline session agent, a deleted definition — falls
+     *                   back to the generic one.
+     */
+    public ChatShellComponent(List<AgentSession> sessions, AgentSession active,
+                              String agentName, UiNode content,
+                              java.util.Map<UUID, String> agentIcons) {
         this.sessions = sessions;
         this.active = active;
         this.agentName = agentName;
         this.content = content;
+        this.agentIcons = agentIcons == null ? java.util.Map.of() : agentIcons;
     }
 
     @Override
@@ -85,11 +100,18 @@ public final class ChatShellComponent implements UiComponent {
         for (AgentSession s : sessions) {
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
             menu.item(UiMenuItem.link("chat-" + s.id(), label, "/chat/sessions/" + s.id())
-                    .icon("chat")
+                    .icon(iconFor(s))
                     .badge(ago(s.startedAt()))
                     .selected(s.id().equals(activeId)));
         }
         return menu;
+    }
+
+    /** The icon of the agent this conversation belongs to, or the generic one. */
+    private String iconFor(AgentSession s) {
+        UUID agentId = s.agentDefinitionId();
+        String icon = agentId == null ? null : agentIcons.get(agentId);
+        return icon == null ? ai.mindconnect.agent.domain.AgentDefinition.DEFAULT_ICON : icon;
     }
 
     private static String ago(Instant when) {
