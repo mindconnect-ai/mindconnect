@@ -93,8 +93,8 @@ class CodeExecutionServiceTest {
     void firstCallStartsContainerFurtherCallsReuseIt() throws IOException {
         var svc = newService(stub(0, ""), Duration.ofSeconds(10));
 
-        var first = svc.execute("session-a", python(), "none", "print(1)");
-        var second = svc.execute("session-a", python(), "none", "print(2)");
+        var first = svc.execute("session-a", python(), "none", null, "print(1)");
+        var second = svc.execute("session-a", python(), "none", null, "print(2)");
 
         assertThat(first.stdout()).contains("ran[print(1)]");
         assertThat(second.stdout()).contains("ran[print(2)]");
@@ -110,7 +110,7 @@ class CodeExecutionServiceTest {
     void containerIsHardenedAndSessionScratchDirMounted() throws IOException {
         var svc = newService(stub(0, ""), Duration.ofSeconds(10));
 
-        svc.execute("session-b", python(), "none", "print(1)");
+        svc.execute("session-b", python(), "none", null, "print(1)");
 
         String run = calls().stream().filter(c -> c.startsWith("run ")).findFirst().orElseThrow();
         assertThat(run).contains("--network none")
@@ -126,8 +126,8 @@ class CodeExecutionServiceTest {
     void differentSessionsGetDifferentContainers() throws IOException {
         var svc = newService(stub(0, ""), Duration.ofSeconds(10));
 
-        svc.execute("session-a", python(), "none", "print(1)");
-        svc.execute("session-c", python(), "none", "print(1)");
+        svc.execute("session-a", python(), "none", null, "print(1)");
+        svc.execute("session-c", python(), "none", null, "print(1)");
 
         assertThat(calls().stream().filter(c -> c.startsWith("run ")).toList()).hasSize(2);
     }
@@ -136,13 +136,13 @@ class CodeExecutionServiceTest {
     void timedOutExecutionKillsTheSessionContainer() throws IOException {
         var svc = newService(stub(3, ""), Duration.ofMillis(400));
 
-        var result = svc.execute("session-d", python(), "none", "while True: pass");
+        var result = svc.execute("session-d", python(), "none", null, "while True: pass");
 
         assertThat(result.timedOut()).isTrue();
         assertThat(calls()).anySatisfy(c -> assertThat(c).startsWith("rm -f container-1"));
 
         // The next call must start over with a fresh container.
-        svc.execute("session-d", python(), "none", "print(1)");
+        svc.execute("session-d", python(), "none", null, "print(1)");
         assertThat(calls().stream().filter(c -> c.startsWith("run ")).toList()).hasSize(2);
     }
 
@@ -182,8 +182,8 @@ class CodeExecutionServiceTest {
     void networkModeIsPartOfContainerCreationAndSessionKey() throws IOException {
         var svc = newService(stub(0, ""), Duration.ofSeconds(10));
 
-        svc.execute("session-n", python(), "none", "print(1)");
-        svc.execute("session-n", python(), "bridge", "print(1)");
+        svc.execute("session-n", python(), "none", null, "print(1)");
+        svc.execute("session-n", python(), "bridge", null, "print(1)");
 
         List<String> runs = calls().stream().filter(c -> c.startsWith("run ")).toList();
         assertThat(runs).hasSize(2);
