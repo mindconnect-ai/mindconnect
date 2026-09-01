@@ -2,6 +2,10 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.adminui.ui.controller.AgentUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -163,13 +167,13 @@ public final class AgentFormComponent implements UiComponent {
                         .asEditable()
                         .hint("Agents that review and may rewrite the response, in order"))
                 .action(UiAction.primary("save", "Save").icon("save")
-                        .dispatch(isNew ? "POST" : "PUT",
-                                  isNew ? "/admin/api/agents"
-                                        : "/admin/api/agents/" + agent.id(),
-                                  id()))
+                        .onClick(isNew
+                                ? trigger(on(AgentUiController.class).create(null, null), id())
+                                : trigger(on(AgentUiController.class).update(agent.id(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel")
-                        .dispatch("GET", isNew ? "/admin/api/agents"
-                                              : "/admin/api/agents/" + agent.id()))
+                        .onClick(isNew
+                                ? trigger(on(AgentUiController.class).list(null))
+                                : trigger(on(AgentUiController.class).detail(agent.id(), null, null, null))))
                 .link(UiLink.of("back", "/admin/agents", "← Back to Agents"));
 
         return UiStack.of(id() + "-page").child(header).child(form);

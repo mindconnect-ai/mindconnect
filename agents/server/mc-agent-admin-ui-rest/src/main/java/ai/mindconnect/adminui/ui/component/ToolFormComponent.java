@@ -2,6 +2,10 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.adminui.ui.controller.AgentUiController;
+
+import static ai.mindconnect.chatui.ui.UiActions.trigger;
+import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.service.AgentChatService;
@@ -159,10 +163,10 @@ public final class ToolFormComponent implements UiComponent {
                 + (isNew ? "" : "&row=" + tool.id());
 
         form.action(UiAction.primary("save", "Save").icon("save")
-                        .dispatch(isNew ? "POST" : "PUT",
-                                  isNew ? "/admin/api/agents/" + agent.id() + "/tools"
-                                        : "/admin/api/agents/" + agent.id() + "/tools/" + tool.id(),
-                                  id()))
+                        .onClick(isNew
+                                ? trigger(on(AgentUiController.class).addTool(agent.id(), null, null), id())
+                                : trigger(on(AgentUiController.class)
+                                          .updateTool(agent.id(), tool.id(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel")
                         .dispatch("GET", backHref))
                 .link(UiLink.of("back", backHref, "← Back to Agent"));
