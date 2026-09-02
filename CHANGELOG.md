@@ -25,6 +25,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **An OpenAI Responses client can talk to a Mindconnect agent unchanged.**
+  The new `mc-agent-api-responses-rest` serves `/v1/responses` — create,
+  retrieve, cancel, and the SSE stream — in OpenAI's own wire format, so
+  pointing an official SDK at a Mindconnect server is a `base_url` change and
+  nothing else. Served by the admin UI app; no separate process.
+
+  What the client calls a **model** is an agent or an llm-config here:
+  `model: "web-researcher"` has that agent answer with its prompt, tools and
+  sub-agents, while `model: "claude-haiku-default"` runs the default agent on
+  that model instead. A name that is neither is refused, rather than quietly
+  answered by something else. What the client calls a **conversation** is a
+  session, so `previous_response_id` continues one.
+
+  Client-side function tools are not supported: this runtime executes tools
+  inside the turn rather than handing them back to the caller. Skills are not
+  implemented yet either.
 - **agents:** the Admin UI's LLM-config form reads the models installed in
   LM Studio. Switch the provider to LM Studio and the model field becomes a
   dropdown of what the server at the base URL has (chat models for a chat
