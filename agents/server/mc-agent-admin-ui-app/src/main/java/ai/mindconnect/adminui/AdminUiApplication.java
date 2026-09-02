@@ -23,7 +23,8 @@ import org.springframework.context.annotation.Import;
     LlmConfig.class,
     MessageRepositoryConfig.class,
     DefaultAgentRuntimeConfig.class,
-    TodoToolsConfig.class
+    TodoToolsConfig.class,
+    ai.mindconnect.agent.responses.config.ResponsesApiConfiguration.class
 })
 @Slf4j
 public class AdminUiApplication {

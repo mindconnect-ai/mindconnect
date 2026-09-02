@@ -53,6 +53,7 @@
         <module>core/mc-mcp-proxy</module>
         <module>core/mc-agent-tools-gmail</module>
         <module>server/mc-agent-api-rest</module>
+        <module>server/mc-agent-api-responses-rest</module>
         <module>server/mc-agent-api-app</module>
         <module>server/mc-agent-chat-ui-rest</module>
         <module>server/mc-agent-admin-ui-rest</module>

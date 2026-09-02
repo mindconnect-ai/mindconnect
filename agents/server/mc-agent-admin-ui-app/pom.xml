@@ -24,6 +24,13 @@
         <!-- Runtime providers: tools discovered via ServiceLoader, storage
              backends and the script engine for workflow code steps. The UI
              library compiles against none of them. -->
+        <!-- The OpenAI Responses API over this runtime; served alongside
+             the admin UI so one process answers both. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-api-responses-rest</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tools</artifactId>
