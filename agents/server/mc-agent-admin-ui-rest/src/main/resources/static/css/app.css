@@ -659,35 +659,3 @@ body {
     cursor: pointer;
 }
 .group-picker-toggle:hover { border-color: var(--sui-color-border-strong); }
-
-/* ── Floating "still running" indicator ──────────────────────────────────────
-   Ours, not the framework's: what a live stream should look like — and what to
-   call it — is an application decision. Mounted on body rather than in the
-   toast container so it survives navigation independently of the regular
-   toast queue. Rendered by renderStreamStatus() in app.js. */
-.stream-status {
-    position: fixed;
-    bottom: 16px;
-    right: 16px;
-    z-index: 1500;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    background: var(--sui-color-surface, #fff);
-    border: 1px solid var(--sui-color-border, #d4d4d8);
-    border-left-width: 4px;
-    border-left-color: var(--sui-color-primary, #3b82f6);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    font-size: 14px;
-}
-.stream-status .sui-toast-link {
-    background: none;
-    border: none;
-    color: var(--sui-color-primary, #3b82f6);
-    cursor: pointer;
-    font-weight: 600;
-    padding: 0;
-}
-.stream-status .sui-toast-link:hover { text-decoration: underline; }
