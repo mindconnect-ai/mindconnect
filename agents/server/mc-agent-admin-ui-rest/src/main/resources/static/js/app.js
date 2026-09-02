@@ -53,7 +53,62 @@ const bus = new SuiEventBus(renderer, main);
 bus.setFetcher(bffFetch)
    .setOnUnauthenticated(handle401)
    // App-defined SSE event: chat errors come over the same stream as patches.
-   .onStreamEvent("error", (msg) => showStreamError(msg));
+   .onStreamEvent("error", (msg) => showStreamError(msg))
+   // The framework tells us when a stream's state changes; what to do about
+   // a lost one is our call.
+   .onStreamStateChange(noticeLostStream);
+
+// ── "Connection lost" notice ─────────────────────────────────────────────────
+
+/**
+ * A session's stream never ends on its own while its page is mounted — it
+ * belongs to the session, not to a turn. So a stream that reaches "completed"
+ * or "errored" with its page still attached did not finish: the server went
+ * away (a restart, a crash) and took the running turn with it. The client
+ * registers that internally and would otherwise say nothing, leaving the
+ * composer on "AI is thinking" for good and a half-streamed reply frozen.
+ *
+ * This is a notice, deliberately not an automatic re-fetch of the page. A
+ * re-fetch would re-attach the stream, and a connection that keeps dropping —
+ * a proxy cutting idle connections, say — would then re-fetch the page in a
+ * loop. A person clicking Reload cannot loop.
+ */
+function noticeLostStream(streams) {
+    const lost = streams.some(s => s.pageAttached
+            && (s.state === "completed" || s.state === "errored"));
+    if (!lost || document.getElementById("stream-lost-banner")) return;
+
+    const banner = document.createElement("div");
+    banner.id = "stream-lost-banner";
+    banner.setAttribute("role", "alert");
+    banner.style.cssText = "position:fixed;top:16px;right:16px;max-width:480px;z-index:9999;"
+        + "display:flex;align-items:center;gap:12px;padding:10px 14px;"
+        + "background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:6px;"
+        + "box-shadow:0 4px 12px rgba(0,0,0,.1);font-size:13px;line-height:1.4;";
+
+    const text = document.createElement("span");
+    text.textContent = "⚠ Connection to the server was lost. What you see may be out of date.";
+    banner.appendChild(text);
+
+    const reload = document.createElement("button");
+    reload.type = "button";
+    reload.textContent = "Reload";
+    reload.style.cssText = "font:inherit;font-weight:600;padding:4px 10px;border-radius:4px;"
+        + "border:1px solid #d97706;background:#fff;color:#92400e;cursor:pointer;";
+    reload.addEventListener("click", () => location.reload());
+    banner.appendChild(reload);
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.setAttribute("aria-label", "Dismiss");
+    close.textContent = "×";
+    close.style.cssText = "font:inherit;font-size:16px;line-height:1;padding:0 4px;border:none;"
+        + "background:none;color:inherit;cursor:pointer;";
+    close.addEventListener("click", () => banner.remove());
+    banner.appendChild(close);
+
+    document.body.appendChild(banner);
+}
 
 // ── Transient error banner used by the streaming chat ───────────────────────
 
