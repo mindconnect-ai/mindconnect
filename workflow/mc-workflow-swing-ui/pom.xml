@@ -6,14 +6,14 @@
 <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.2.1</version>
+        <version>0.2.2-SNAPSHOT</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-swing-ui</artifactId>
     <name>mc-workflow-swing-ui</name>
-    <version>0.2.1</version>
+    <version>0.2.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <description>
@@ -31,17 +31,17 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow</artifactId>
-            <version>0.2.1</version>
+            <version>0.2.2-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-jackson</artifactId>
-            <version>0.2.1</version>
+            <version>0.2.2-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-dsl-puml</artifactId>
-            <version>0.2.1</version>
+            <version>0.2.2-SNAPSHOT</version>
         </dependency>
 
         <!--
@@ -69,25 +69,25 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-code-beanshell</artifactId>
-            <version>0.2.1</version>
+            <version>0.2.2-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-code-jython</artifactId>
-            <version>0.2.1</version>
+            <version>0.2.2-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-code-javascript</artifactId>
-            <version>0.2.1</version>
+            <version>0.2.2-SNAPSHOT</version>
         </dependency>
 
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-code-groovy</artifactId>
-            <version>0.2.1</version>
+            <version>0.2.2-SNAPSHOT</version>
         </dependency>
     </dependencies>
 
