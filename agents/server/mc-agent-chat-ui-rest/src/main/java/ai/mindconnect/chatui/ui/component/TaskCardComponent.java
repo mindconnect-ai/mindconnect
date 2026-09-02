@@ -139,6 +139,28 @@ public final class TaskCardComponent implements UiComponent {
                 false);
     }
 
+    /**
+     * Card for a reviewer that has just started. Reviewers run AFTER the
+     * answer is on screen, so without this the chat sits on "thinking" with
+     * nothing to show for it — see the body, which names what is being
+     * checked rather than leaving the reader to guess.
+     */
+    public static TaskCardComponent runningReviewer(String nodeId, String reviewerName) {
+        return new TaskCardComponent(nodeId,
+                runningReviewerHeader(reviewerName),
+                taskCardBody("Checking the answer before it is final.", null),
+                true);
+    }
+
+    /** Card for a reviewer that has reached a verdict. */
+    public static TaskCardComponent doneReviewer(String nodeId, String reviewerName,
+                                                 String verdict, String detail) {
+        return new TaskCardComponent(nodeId,
+                reviewerVerdictHeader(reviewerName, verdict),
+                taskCardBody("Checking the answer before it is final.", detail),
+                false);
+    }
+
     /** Card representing a tool call that failed. */
     public static TaskCardComponent failedTool(String nodeId, String toolName,
                                                Object arguments, String error, long durationMs) {
@@ -286,6 +308,25 @@ public final class TaskCardComponent implements UiComponent {
     /** "⏳ toolName — running…". */
     public static String runningToolHeader(String toolName) {
         return "⏳ " + toolName + " — running…";
+    }
+
+    /** "⏳ reviewerName — reviewing…". */
+    public static String runningReviewerHeader(String reviewerName) {
+        return "⏳ " + reviewerName + " — reviewing…";
+    }
+
+    /**
+     * The verdict, with the mark the reader already knows from tool cards:
+     * a pass is a tick, a rewrite is a pencil, a block is a cross.
+     */
+    public static String reviewerVerdictHeader(String reviewerName, String verdict) {
+        String mark = switch (verdict) {
+            case "PASSED" -> "✓";
+            case "MODIFIED" -> "✎";
+            case "BLOCKED" -> "✗";
+            default -> "•";
+        };
+        return mark + " " + reviewerName + "  (" + verdict.toLowerCase(java.util.Locale.ROOT) + ")";
     }
 
     /** "✓ toolName (123 ms)". */

@@ -23,6 +23,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **A response reviewer says that it is running, and what it decided.** The
+  reviewers run *after* the answer is already on screen, so the conversation
+  sat there apparently finished while another model call was still going —
+  seconds of "AI is thinking" with nothing to explain them. The chat now shows
+  a card naming the reviewer while it checks, which then turns into its verdict
+  (passed, modified, blocked) with the reason where one was given. The events
+  had been in the stream all along; only the log was listening.
+
 ### Fixed
 
 - **A cancelled or failed turn no longer leaves the UI thinking it is still

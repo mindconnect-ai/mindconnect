@@ -996,6 +996,11 @@ public class ChatUiController {
         // correlated only by taskId, so this is how we resolve their
         // container's session-keyed id.
         java.util.Map<java.util.UUID, java.util.UUID> taskToSession = new java.util.concurrent.ConcurrentHashMap<>();
+        // Why a reviewer rewrote or blocked the answer, keyed by reviewer.
+        // ResponseRevised arrives before the decision it explains.
+        java.util.Map<String, String> reviewerDetail = new java.util.concurrent.ConcurrentHashMap<>();
+        java.util.List<ai.mindconnect.chatui.ui.component.TaskCardComponent> reviewerVerdicts =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
 
         ChatTurnHandle turn = turnStarter.apply(event -> {
             switch (event) {
@@ -1054,6 +1059,34 @@ public class ChatUiController {
                             sErr.taskId(), sErr.agentName(), null, sErr.error());
                 case StreamEvent.SubAgentEvent wrapper ->
                     handleSubAgentInner(wrapper, liveView, liveTasks, openTaskNodeId, bus, taskToSession);
+                // Reviewers run AFTER the answer is already on screen. Without
+                // a card the chat just sits there, which is what made a
+                // finished-looking turn feel stuck.
+                case StreamEvent.Reviewing rv -> {
+                    String node = reviewerNodeId(sessionId, rv.reviewerName());
+                    publishPatch(bus, appendCard(liveView, null,
+                            ai.mindconnect.chatui.ui.component.TaskCardComponent
+                                    .runningReviewer(node, rv.reviewerName())));
+                    openTaskNodeId[0] = node;
+                }
+                case StreamEvent.ReviewerDecision rd -> {
+                    var verdictCard = ai.mindconnect.chatui.ui.component.TaskCardComponent.doneReviewer(
+                            reviewerNodeId(sessionId, rd.reviewerName()),
+                            rd.reviewerName(), String.valueOf(rd.verdict()),
+                            reviewerDetail.get(LAST_REVISION));
+                    publishPatch(bus, liveView.streamTaskUpdate(verdictCard));
+                    // Kept for after the turn: streamDone rebuilds the list
+                    // from persisted history, and a reviewer run is not part
+                    // of it, so the verdict would vanish the moment it
+                    // arrived. Re-appending is not persistence — a reload
+                    // still loses it — but the reader gets to see it.
+                    reviewerVerdicts.add(verdictCard);
+                }
+                // A reviewer that rewrote or blocked the answer says why; the
+                // verdict card is where that belongs, so keep it for the
+                // decision event that follows.
+                case StreamEvent.ResponseRevised rev ->
+                    reviewerDetail.put(LAST_REVISION, rev.reason());
                 default -> {}
             }
             logEvent(event, agent.name());
@@ -1098,6 +1131,11 @@ public class ChatUiController {
                 // (assistant message, historic task cards, updated tokens).
                 ChatPage finalView = buildChatPage(session, agent);
                 publishPatch(bus, finalView.streamDone());
+                // After the rebuild, or they would be wiped by it. They sit
+                // below the answer, which is also when they ran.
+                for (var verdict : reviewerVerdicts) {
+                    publishPatch(bus, finalView.streamTaskStart(verdict));
+                }
 
                 // "done" ends the TURN, not the stream: subscribers stay
                 // attached and are still there when the next turn — possibly
@@ -1206,6 +1244,18 @@ public class ChatUiController {
         // Fall back to the taskId itself if the mapping is somehow missing —
         // still consistent within this live stream.
         return (sid != null ? sid : parentTaskId).toString();
+    }
+
+    /** Marker key under which a pending revision reason is parked. */
+    private static final String LAST_REVISION = "__revision__";
+
+    /**
+     * One node per reviewer and session, so the running card and the verdict
+     * card are the same node — the verdict REPLACEs the "reviewing…" header
+     * instead of appending a second entry.
+     */
+    private static String reviewerNodeId(UUID sessionId, String reviewerName) {
+        return "task-review-" + sessionId + "-" + reviewerName.replaceAll("[^A-Za-z0-9_-]", "-");
     }
 
     private void startToolCard(ChatPage liveView,
