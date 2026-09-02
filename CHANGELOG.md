@@ -23,6 +23,25 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cancelled or failed turn no longer leaves the UI thinking it is still
+  running.** The stream now belongs to the session and outlives the turn, so
+  nothing closes it when a turn ends badly — and the error path forgot to say
+  the turn was over at all. A client that saw a turn fail therefore stayed in
+  streaming state for good, and the floating "agent running" indicator kept
+  announcing work that had long since stopped, for that session and then for
+  older ones as they piled up.
+
+### Removed
+
+- **The floating "still running" indicator is gone.** It existed so that a
+  turn started in one place was not lost when you looked elsewhere. Since a
+  session's stream is reattached the moment you open the conversation, there
+  is nothing left to lose, and the indicator was reporting from what the
+  browser last heard rather than from what the server knows — which is how it
+  came to claim that finished turns were working.
+
 ## [0.2.0] - 2026-09-01
 
 ### Added

@@ -1078,6 +1078,13 @@ public class ChatUiController {
                 try {
                     bus.publish("error", message);
                 } catch (Exception ignored) {}
+                try {
+                    // "done" says the TURN is over, not that it succeeded. A
+                    // failed turn is over too, and a subscriber that never
+                    // hears so stays in streaming state for good — the stream
+                    // outlives the turn now, so nothing else ends it.
+                    bus.publish("done", "");
+                } catch (Exception ignored) {}
                 // The stream stays open — it belongs to the session, not to
                 // this turn. Only the "a turn is running" entry goes, so the
                 // next page render shows Send instead of Stop.

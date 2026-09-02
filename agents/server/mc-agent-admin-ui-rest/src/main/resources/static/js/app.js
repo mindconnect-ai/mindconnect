@@ -53,59 +53,7 @@ const bus = new SuiEventBus(renderer, main);
 bus.setFetcher(bffFetch)
    .setOnUnauthenticated(handle401)
    // App-defined SSE event: chat errors come over the same stream as patches.
-   .onStreamEvent("error", (msg) => showStreamError(msg))
-   // The framework publishes stream state; what it looks like is ours.
-   .onStreamStateChange(renderStreamStatus);
-
-// ── Floating "still running" indicator ──────────────────────────────────────
-
-/**
- * Shows what is running somewhere the user cannot see. Only streams whose
- * page is NOT mounted qualify: while you are looking at the chat, the chat
- * itself is the status display.
- *
- * The wording lives here rather than in the framework, which moves bytes and
- * has no idea whether a stream carries a chat, a report or an import. The
- * destination names itself through `returnLabel` (the chat page sends its
- * session title); `returnHref` is where the button goes.
- */
-function renderStreamStatus(streams) {
-    const away = streams.filter(s => !s.pageAttached);
-    const running = away.filter(s => s.state === "running");
-    const finished = away.filter(s => s.state === "completed" || s.state === "errored");
-
-    const existing = document.getElementById("stream-status-toast");
-    if (running.length === 0 && finished.length === 0) {
-        if (existing) existing.remove();
-        return;
-    }
-
-    // Prefer what still needs waiting for; an answer already sitting there
-    // can wait a moment longer.
-    const isRunning = running.length > 0;
-    const focus = isRunning ? running[0] : finished[0];
-    const what = focus.returnLabel || focus.label || "Agent";
-
-    const toast = existing || document.createElement("div");
-    if (!existing) {
-        toast.id = "stream-status-toast";
-        toast.className = "sui-toast sui-toast--info stream-status";
-        toast.setAttribute("role", "status");
-        document.body.appendChild(toast);
-    }
-    toast.replaceChildren();
-
-    const text = document.createElement("span");
-    text.textContent = isRunning ? `${what} is working…` : `${what}: answer ready`;
-    toast.appendChild(text);
-
-    const link = document.createElement("button");
-    link.type = "button";
-    link.className = "sui-toast-link";
-    link.textContent = isRunning ? "Watch" : "Read it";
-    link.addEventListener("click", () => { void bus.navigate(focus.returnHref); });
-    toast.appendChild(link);
-}
+   .onStreamEvent("error", (msg) => showStreamError(msg));
 
 // ── Transient error banner used by the streaming chat ───────────────────────
 
