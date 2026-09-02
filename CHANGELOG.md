@@ -35,6 +35,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **Losing the server no longer leaves the chat silently stuck.** When the
+  server went away mid-turn — a restart, a crash — the composer stayed on
+  "AI is thinking" and a half-streamed reply froze in place, with nothing to
+  say why: the browser noticed the connection drop and told no one. It now
+  shows a notice with a Reload button. A notice rather than an automatic
+  reload on purpose: a connection that keeps dropping would otherwise re-fetch
+  the page in a loop, and a person pressing Reload cannot.
 - **The chat no longer changes shape while it streams.** The reply spanned the
   full window as the tokens arrived and only snapped back into its column once
   the turn ended, taking the composer with it. Two causes, both to do with the
