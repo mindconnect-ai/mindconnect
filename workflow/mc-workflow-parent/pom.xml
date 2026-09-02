@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-java-parent</artifactId>
-        <version>0.2.1-SNAPSHOT</version>
+        <version>0.2.1</version>
         <relativePath>../../mc-java-parent/pom.xml</relativePath>
     </parent>
 
@@ -21,52 +21,52 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-jackson</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-persistence</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-dsl-puml</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-spi-lookup</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-ui-diagram</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-code-javascript</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-code-groovy</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-code-beanshell</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-workflow-code-jython</artifactId>
-                <version>0.2.1-SNAPSHOT</version>
+                <version>0.2.1</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
