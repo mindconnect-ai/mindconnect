@@ -35,6 +35,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **The chat no longer changes shape while it streams.** The reply spanned the
+  full window as the tokens arrived and only snapped back into its column once
+  the turn ended, taking the composer with it. Two causes, both to do with the
+  live patches not matching what the finished page renders: the streaming reply
+  and its list item shared one id, so the first token replaced the item instead
+  of filling it, and the composer's width was tied to a selector that only its
+  idle state matched.
+
+
 - **A cancelled or failed turn no longer leaves the UI thinking it is still
   running.** The stream now belongs to the session and outlives the turn, so
   nothing closes it when a turn ends badly — and the error path forgot to say

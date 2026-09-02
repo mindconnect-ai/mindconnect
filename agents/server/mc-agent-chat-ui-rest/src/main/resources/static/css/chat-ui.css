@@ -601,10 +601,18 @@
    The absolute-positioning of the footer row (further up this file) is what
    makes this possible and is also why it is fiddly — a chat-composer variant
    in the framework would render this shape directly instead. */
-.chat-form.sui-form {
+/* The measure belongs to BOTH states of the composer. It used to sit on
+   .chat-form.sui-form alone — but the streaming state is a stack, not a
+   form, so while a turn ran the composer lost its width and stretched across
+   the whole panel while the conversation stayed in its column. The card look
+   below is the idle form's own; the streaming state brings its own. */
+.chat-form {
     width: 100%;
     max-width: var(--chat-measure, 48rem);
     margin-inline: auto;
+}
+
+.chat-form.sui-form {
     background: var(--sui-color-surface);
     border: 1px solid var(--sui-color-border);
     /* The same corner every other input in the app has. It was 20px, which

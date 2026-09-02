@@ -333,9 +333,22 @@ public final class MessageListComponent implements UiComponent {
         String time = DT_FMT.format(java.time.Instant.now());
         var wrapper = UiList.of("bot-pending-wrapper", null);
         wrapper.item(UiList.Item.of(pendingId, agentName + "  [" + time + "]")
-                .content(UiMarkdown.of(pendingId, "…")
+                .content(UiMarkdown.of(pendingBodyId(pendingId), "…")
                         .<UiMarkdown>withCssClass("bot-message")));
         return UiPatch.Operation.append(id(), wrapper);
+    }
+
+    /**
+     * The id of the pending reply's BODY, distinct from the list item that
+     * holds it. They used to share one id, and a REPLACE resolves the
+     * outermost match — so the first token replaced the whole {@code <li>}
+     * with a bare markdown div. The reply then sat directly in the
+     * {@code <ul>}, losing the list item's width and spacing until the turn
+     * ended and the page was rebuilt from history. Same convention the
+     * persisted messages use: item id, and {@code msg-} + it for the body.
+     */
+    private static String pendingBodyId(String pendingId) {
+        return "msg-" + pendingId;
     }
 
     /**
@@ -344,8 +357,8 @@ public final class MessageListComponent implements UiComponent {
      * {@link #appendBotPending(String, String)}.
      */
     public UiPatch.Operation replaceBotPending(String pendingId, String cumulativeText) {
-        return UiPatch.Operation.replace(pendingId,
-                UiMarkdown.of(pendingId, cumulativeText)
+        return UiPatch.Operation.replace(pendingBodyId(pendingId),
+                UiMarkdown.of(pendingBodyId(pendingId), cumulativeText)
                         .<UiMarkdown>withCssClass("bot-message"));
     }
 
