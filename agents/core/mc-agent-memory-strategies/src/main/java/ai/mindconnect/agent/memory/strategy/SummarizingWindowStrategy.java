@@ -12,6 +12,7 @@ import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.port.out.ToolResultSummarizer;
 import ai.mindconnect.agent.memory.port.out.ConversationSummaryRepository;
+import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
 import ai.mindconnect.agent.service.StatelessAgentSeeder;
 import ai.mindconnect.agent.port.out.TokenCounters;
@@ -54,7 +55,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
     private final AgentTaskRunner agentTaskRunner;
     private final TokenCounters tokenCounterRegistry;
     private final LlmConfigRepository llmConfigRepository;
-    private final MessageToLlmMessageMapper messageMapper = new MessageToLlmMessageMapper();
+    private final LlmMessageMapper messageMapper;
 
     public SummarizingWindowStrategy(SummarizingWindowConfig cfg,
                                      ConversationManager conversationManager,
@@ -63,6 +64,19 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
                                      AgentTaskRunner agentTaskRunner,
                                      TokenCounters tokenCounterRegistry,
                                      LlmConfigRepository llmConfigRepository) {
+        this(cfg, conversationManager, summaryRepository, toolResultSummarizer, agentTaskRunner, tokenCounterRegistry, llmConfigRepository, new MessageToLlmMessageMapper());
+    }
+
+    /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
+    public SummarizingWindowStrategy(SummarizingWindowConfig cfg,
+                                     ConversationManager conversationManager,
+                                     ConversationSummaryRepository summaryRepository,
+                                     ToolResultSummarizer toolResultSummarizer,
+                                     AgentTaskRunner agentTaskRunner,
+                                     TokenCounters tokenCounterRegistry,
+                                     LlmConfigRepository llmConfigRepository,
+                                     LlmMessageMapper messageMapper) {
+        this.messageMapper = messageMapper;
         this.cfg = cfg;
         this.conversationManager = conversationManager;
         this.summaryRepository = summaryRepository;

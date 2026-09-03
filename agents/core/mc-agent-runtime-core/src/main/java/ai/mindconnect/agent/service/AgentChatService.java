@@ -2,6 +2,8 @@ package ai.mindconnect.agent.service;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.domain.StreamEvent;
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
@@ -37,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -57,6 +60,9 @@ import java.util.function.Consumer;
  * bookkeeping here.
  */
 public class AgentChatService {
+
+    /** How far back a turn looks for earlier attachment notices — a conversation longer than this is paged by the memory strategy anyway. */
+    private static final int HISTORY_SCAN = 10_000;
 
     private static final Logger log = LoggerFactory.getLogger(AgentChatService.class);
 
@@ -121,8 +127,9 @@ public class AgentChatService {
         AgentSession session = sessionService.findSession(sessionId);
         AgentDefinition def = effectiveDefinition(session);
 
-        boolean isFirstMessage = conversationManager
-                .loadHistory(session.conversationId(), new PageRequest(0, 1)).isEmpty();
+        List<Message> history = conversationManager
+                .loadHistory(session.conversationId(), new PageRequest(0, HISTORY_SCAN));
+        boolean isFirstMessage = history.isEmpty();
 
         UUID turnId = UUID.randomUUID();
 
@@ -131,9 +138,13 @@ public class AgentChatService {
         approvalStore.deleteForRoot(sessionId);
 
         // 1. The question becomes conversation truth — BEFORE the task exists.
+        //    A file attached since the last turn is recorded on this message
+        //    (metadata); the model reads the notice with the question, the
+        //    text stays what the user typed.
         TokenCounter tokenCounter = memoryStrategyFactory.create(def).resolveTokenCounter(def);
+        List<String> fresh = AttachmentNotice.unannounced(session, history);
         AgentTurnWorker.appendUserMessage(conversationManager, session.conversationId(),
-                userMessage, turnId, tokenCounter);
+                userMessage, turnId, tokenCounter, AttachmentNotice.metadata(fresh));
 
         // 2.+3. Listen on the turn's channel, make the turn a task — the queue
         //        is the only registry of running work, nothing is tracked here.

@@ -156,8 +156,11 @@ public final class VectorTools {
 
         @Override public String description() {
             return "Semantic search over a vector store: embeds the query and returns the most "
-                    + "similar stored chunks with their source file and score. Use this to answer "
-                    + "questions from ingested documents.";
+                    + "similar stored chunks with their source file and score. "
+                    + "USE THIS for any question about a file the user attached to this chat "
+                    + "(omit 'store') and for knowledge stores by name. Attached files are not on "
+                    + "the filesystem — this is the only way to read them. NOT for files that have "
+                    + "a path on disk: those go to file_read or the document tools.";
         }
 
         @Override public Map<String, Object> parametersSchema() {

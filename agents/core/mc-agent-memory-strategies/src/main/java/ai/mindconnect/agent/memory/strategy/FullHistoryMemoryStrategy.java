@@ -8,6 +8,7 @@ import ai.mindconnect.agent.memory.domain.FullHistoryMemoryConfig;
 import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
+import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
 import ai.mindconnect.agent.port.out.TokenCounters;
 import ai.mindconnect.common.AuthenticationInfo;
@@ -35,12 +36,22 @@ public class FullHistoryMemoryStrategy implements MemoryStrategy {
     private final ConversationManager conversationManager;
     private final LlmConfigRepository llmConfigRepository;
     private final TokenCounters tokenCounterRegistry;
-    private final MessageToLlmMessageMapper messageMapper = new MessageToLlmMessageMapper();
+    private final LlmMessageMapper messageMapper;
 
     public FullHistoryMemoryStrategy(FullHistoryMemoryConfig cfg,
                                      ConversationManager conversationManager,
                                      LlmConfigRepository llmConfigRepository,
                                      TokenCounters tokenCounterRegistry) {
+        this(cfg, conversationManager, llmConfigRepository, tokenCounterRegistry, new MessageToLlmMessageMapper());
+    }
+
+    /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
+    public FullHistoryMemoryStrategy(FullHistoryMemoryConfig cfg,
+                                     ConversationManager conversationManager,
+                                     LlmConfigRepository llmConfigRepository,
+                                     TokenCounters tokenCounterRegistry,
+                                     LlmMessageMapper messageMapper) {
+        this.messageMapper = messageMapper;
         this.cfg = cfg;
         this.conversationManager = conversationManager;
         this.llmConfigRepository = llmConfigRepository;

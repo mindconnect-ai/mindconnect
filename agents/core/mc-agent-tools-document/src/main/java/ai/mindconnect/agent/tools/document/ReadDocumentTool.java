@@ -37,7 +37,8 @@ public class ReadDocumentTool implements Tool {
 
     @Override
     public String description() {
-        return "Reads a specific page range from a long document (PDF or Word .docx). Returns " +
+        return "On the filesystem only — a file the user attached to this chat has no path, use vector_search for it. " +
+               "Reads a specific page range from a long document (PDF or Word .docx). Returns " +
                "the text with `[page N]` markers so you can cite exact pages back to the user.\n" +
                "Always use `document_outline` FIRST to see how many pages exist and where the " +
                "section you want is. Then call this with `from_page` and `to_page`.\n" +

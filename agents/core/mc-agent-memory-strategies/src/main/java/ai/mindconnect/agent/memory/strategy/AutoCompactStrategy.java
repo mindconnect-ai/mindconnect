@@ -11,6 +11,7 @@ import ai.mindconnect.agent.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.memory.port.out.ConversationSummaryRepository;
+import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
 import ai.mindconnect.agent.service.StatelessAgentSeeder;
 import ai.mindconnect.agent.port.out.TokenCounters;
@@ -54,7 +55,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
     private final AgentTaskRunner agentTaskRunner;
     private final TokenCounters tokenCounterRegistry;
     private final LlmConfigRepository llmConfigRepository;
-    private final MessageToLlmMessageMapper messageMapper = new MessageToLlmMessageMapper();
+    private final LlmMessageMapper messageMapper;
 
     public AutoCompactStrategy(AutoCompactConfig cfg,
                                ConversationManager conversationManager,
@@ -62,6 +63,18 @@ public class AutoCompactStrategy implements MemoryStrategy {
                                AgentTaskRunner runTask,
                                TokenCounters tokenCounterRegistry,
                                LlmConfigRepository llmConfigRepository) {
+        this(cfg, conversationManager, summaryRepository, runTask, tokenCounterRegistry, llmConfigRepository, new MessageToLlmMessageMapper());
+    }
+
+    /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
+    public AutoCompactStrategy(AutoCompactConfig cfg,
+                               ConversationManager conversationManager,
+                               ConversationSummaryRepository summaryRepository,
+                               AgentTaskRunner runTask,
+                               TokenCounters tokenCounterRegistry,
+                               LlmConfigRepository llmConfigRepository,
+                               LlmMessageMapper messageMapper) {
+        this.messageMapper = messageMapper;
         this.cfg = cfg;
         this.conversationManager = conversationManager;
         this.summaryRepository = summaryRepository;

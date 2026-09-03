@@ -32,16 +32,19 @@ public final class SystemPromptRenderer {
      * fresh every round from the session, so the list is always current —
      * a removed file disappears from the prompt with it.
      */
-    private static String attachedFilesSection(AgentSession session) {
+    static String attachedFilesSection(AgentSession session) {
         if (session == null || session.attachedFiles().isEmpty()) {
             return "";
         }
-        return "\n\n## Attached files\n"
-                + "The user attached these files to this conversation:\n"
-                + session.attachedFiles().stream().map(f -> "- " + f)
-                        .reduce((a, b) -> a + "\n" + b).orElse("")
-                + "\nTheir content is indexed for semantic search. Use the vector_search tool "
-                + "(no 'store' argument needed) to look inside them before answering questions "
-                + "about them.";
+        StringBuilder out = new StringBuilder("\n\n## Attached files\n"
+                + "The user attached these files to this conversation:\n");
+        for (String file : session.attachedFiles()) {
+            out.append("- ").append(file).append(" (").append(AttachmentNotice.kind(file)).append(")\n");
+        }
+        return out.append("Their content is indexed for semantic search. To answer anything about them, "
+                + "call `vector_search` with your question (no `store` argument needed) and read the "
+                + "returned chunks. They are NOT files on the filesystem: `file_read`, `document_outline`, "
+                + "`read_document`, `grep_document` and `bash` cannot open them, and a file name is not a path.")
+                .toString();
     }
 }

@@ -47,6 +47,17 @@ public final class MessageComponent {
     }
 
 
+    /**
+     * A user message that announced attachments (metadata written by the
+     * runtime when the message was persisted) shows them as a line above the
+     * text — rendering only; the stored text is what the user typed.
+     */
+    private static String withAttachmentChip(Message m) {
+        var files = ai.mindconnect.agent.service.prompt.AttachmentNotice.announcedBy(m);
+        if (files.isEmpty()) return m.content();
+        return "📎 *" + String.join(", ", files) + "*\n\n" + m.content();
+    }
+
     private UiList.Item chatItem(Message m, boolean isUser) {
         String speaker = isUser ? "You" : agent.name();
         String time    = timeFormat.format(m.sentAt());
@@ -55,7 +66,7 @@ public final class MessageComponent {
         int seq        = m.sequenceNum();
 
         var item = UiList.Item.of(m.id().toString(), label)
-                .content(UiMarkdown.of("msg-" + m.id(), m.content()).withCssClass(css));
+                .content(UiMarkdown.of("msg-" + m.id(), withAttachmentChip(m)).withCssClass(css));
 
         // Regenerate (USER messages only): delete this message + everything
         // after it, then re-run the turn (streaming) with the same text. Uses
