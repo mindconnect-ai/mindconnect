@@ -23,6 +23,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **The "connection lost" notice no longer appears while the server is fine.**
+  It fired on any stream that ended while its page was mounted — but the
+  framework also marks a stream that way when a turn finishes while you are on
+  another page, and keeps it so for a few seconds after you come back. The
+  notice now asks the server before claiming it is gone: a reachable server
+  means nothing was lost, and a dead one cannot answer. And once it *is* gone,
+  the tab heals itself: it keeps asking with a growing interval, and when the
+  server answers again it re-requests the page — composer back to Send, stream
+  re-attached, notice gone — without anybody clicking Reload.
+
 ## [0.2.1] - 2026-09-02
 
 ### Added
@@ -36,17 +48,6 @@ fresh empty one, so nothing has to be moved by hand at release time.
   had been in the stream all along; only the log was listening.
 
 ### Fixed
-
-- **The "connection lost" notice no longer appears while the server is fine.**
-  It fired on any stream that ended while its page was mounted — but the
-  framework also marks a stream that way when a turn finishes while you are on
-  another page, and keeps it so for a few seconds after you come back. The
-  notice now asks the server before claiming it is gone: a reachable server
-  means nothing was lost, and a dead one cannot answer. And once it *is* gone,
-  the tab heals itself: it keeps asking with a growing interval, and when the
-  server answers again it re-requests the page — composer back to Send, stream
-  re-attached, notice gone — without anybody clicking Reload.
-
 
 - **Losing the server no longer leaves the chat silently stuck.** When the
   server went away mid-turn — a restart, a crash — the composer stayed on
@@ -62,7 +63,6 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and its list item shared one id, so the first token replaced the item instead
   of filling it, and the composer's width was tied to a selector that only its
   idle state matched.
-
 
 - **A cancelled or failed turn no longer leaves the UI thinking it is still
   running.** The stream now belongs to the session and outlives the turn, so
