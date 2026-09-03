@@ -30,6 +30,7 @@ matching adapter in `adapter/file`:
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
 | `LlmConfigRepository` | LLM configs (credentials encrypted) | `FileLlmConfigRepository` | `PgLlmConfigRepository` |
 | `WorkspaceStore` | Workspace files | `FileWorkspaceStore` | `PgWorkspaceStore` |
+| `FileStore` | Uploaded files (ports in `mc-file-store-core`) | `FilesystemFileStore` | `PgFileStore` |
 | `WorkflowDataRepository` | Workflow definitions ([workflow area](../workflow/overview.md)) | `FileWorkflowDataRepository` | `PgWorkflowDataRepository` |
 | `WorkflowInstanceRepository` | Suspended workflow runs | `FileWorkflowInstanceRepository` | `PgWorkflowInstanceRepository` |
 
@@ -47,11 +48,11 @@ public interface AgentSessionRepository {
 
 ## The default: file persistence
 
-In the Spring apps the file adapters are **component-scanned** (they are
-`@Component`s, not `@Bean` definitions), all rooted at one directory
-(`mindconnect.data.base-dir`, default `data/`). Two exceptions: the LLM-config
-repository is wrapped in an `EncryptingLlmConfigRepository` in the Admin UI, and
-LLM call traces live under `conversations/` with a
+In the Spring apps the file adapters come from the **`mc-agent-starter-file`**
+starter (`agents/springstarter/`), all rooted at one directory
+(`mindconnect.data.base-dir`, default `data/`). The LLM-config repository is
+wrapped in an `EncryptingLlmConfigRepository` when the app has an
+`EncryptionHelper`, and LLM call traces live under `conversations/` with a
 `mindconnect.agent.trace.max-per-session` retention cap (default 50).
 
 This makes the runtime zero-dependency: it boots and persists with nothing but a
@@ -81,7 +82,10 @@ MC_POSTGRES_PASSWORD=…
 The `start.sh` scripts read these from the git-ignored `mc.env`; as Spring
 properties they are `mindconnect.persistence` and `mindconnect.postgres.url` /
 `username` / `password` / `pool-size`. The Admin UI, the agent server and the
-standalone workflow admin app all honour the same switch.
+standalone workflow admin app all honour the same switch. Behind it stand two
+Spring Boot starters in `agents/springstarter/` — `mc-agent-starter-file` and
+`mc-agent-starter-postgres`; an application has both on the classpath and the
+property decides which one configures the repositories.
 
 What happens on start:
 
@@ -93,6 +97,9 @@ What happens on start:
 - The bundled [initial data](./initial-data.md) — agent definitions, LLM
   configs, example workflows — is seeded into the database exactly as it
   would be seeded into `data/`, and skipped when already present.
+- Uploaded files go to the database as well (`mc_file`, content as
+  `bytea`) unless `mindconnect.file-store.backend` names another backend —
+  keeping records in Postgres and files on a volume is a valid pairing.
 - The file adapters step back automatically. `mindconnect.data.base-dir`
   still exists for what has no database form: workflow scratch files,
   vector-store files of the `memory` backend, code-execution mounts.
@@ -109,10 +116,11 @@ have written, rendered by the application's `ObjectMapper`.
 The tables are named `mc_agent_definition`, `mc_agent_session`,
 `mc_conversation`, `mc_message`, `mc_working_memory`, `mc_conversation_summary`,
 `mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`, `mc_workspace_file`,
-`mc_workflow` and `mc_workflow_instance`. The small JDBC layer underneath —
-`Sql`, `Row`, `DocumentTable` — lives in `common/mc-jdbc`; the adapters are the
-`agents/adapter/postgres/*-pg` and `workflow/mc-workflow-persistence-pg`
-modules, with `mc-agent-postgres-config` holding the Spring wiring.
+`mc_workflow`, `mc_workflow_instance` and `mc_file`. The small JDBC layer
+underneath — `Sql`, `Row`, `DocumentTable` — lives in `common/mc-jdbc`; the
+adapters are the `agents/adapter/postgres/*-pg` and
+`workflow/mc-workflow-persistence-pg` modules, the Spring wiring is
+`mc-agent-starter-postgres`.
 
 Two lists are read without touching a document at all:
 `AgentSessionRepository.findHeadersByUser` (the chat sidebar) and
@@ -122,19 +130,16 @@ from the columns.
 
 ### What stays on disk
 
-Uploaded files (`FileStore`, `mindconnect.file-store.*`), the registry of
-vector-store templates and instances, and the vectors of the `memory`
-backend are still file-based in Postgres mode. Vectors move to the database
-with the `pgvector` backend (`mindconnect.vector-store.backend=pgvector`),
-which has its own connection settings. The file store and the registry are
-the next candidates; until then a deployment without a persistent disk
-should expect uploads not to survive a restart.
+The registry of vector-store templates and instances, and the vectors of the
+`memory` backend are still file-based in Postgres mode. Vectors move to the
+database with the `pgvector` backend (`mindconnect.vector-store.backend=pgvector`),
+which has its own connection settings. The registry is the next candidate.
 
 ### Embedding without Spring
 
 `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)` wires the same adapters
 for a plain-Java host; `dataDir` roots the file-based side channels as before.
-Workflows follow when the workflow modules are on the classpath.
+Workflows and uploads follow when their modules are on the classpath.
 
 ### Moving an installation
 

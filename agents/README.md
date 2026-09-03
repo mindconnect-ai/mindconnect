@@ -60,7 +60,7 @@ the finished `report.md` in the workspace:
 | `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres — one JSONB document per config, via `mc-jdbc` |
 | `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres — paged by `created_at` / `seq` |
 | `postgres/mc-agent-runtime-pg` | The runtime's seven ports on Postgres — definitions, sessions, LLM traces, todo lists, summaries, working memory, workspace files |
-| `postgres/mc-agent-postgres-config` | Spring wiring: `mindconnect.persistence=postgres` switches every repository to its Postgres adapter over one pooled `DataSource` |
+| `postgres/mc-file-store-pg` | `FileStore` on Postgres — uploads as `bytea` rows |
 
 The default stores are file-based and need no database. A `-pg` module is a
 drop-in for the matching `File*` repository: same port, same constructor
@@ -77,6 +77,15 @@ MC_POSTGRES_PASSWORD=…
 ```
 
 Embedding without Spring: `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)`.
+
+### `springstarter/` — Spring Boot starters
+
+| Module | Purpose |
+|--------|---------|
+| `mc-agent-starter-file` | File persistence, the default — every repository, the LLM-config store and the file store under `mindconnect.data.base-dir` |
+| `mc-agent-starter-postgres` | `mindconnect.persistence=postgres` — every repository over one pooled `DataSource`, tables created on start |
+
+An app adds both; the property picks.
 
 ### `server/` — deployable Spring Boot services
 

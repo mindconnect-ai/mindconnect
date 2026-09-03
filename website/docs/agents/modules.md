@@ -51,7 +51,8 @@ carry the implementations.
 | `mc-vector-store` | Vector-store SPI + built-in file-persisted `memory` backend |
 | `mc-vector-store-pgvector` | pgvector backend (one table per store, HNSW index) |
 | `mc-vector-store-tools` | The `knowledge` tool group: `vector_upsert/search/delete_file/ingest_file` |
-| `mc-file-store` | Id-addressed file storage with a filesystem backend |
+| `mc-file-store-core` | The file store's ports: `FileStore`, `StoredFile`, the `FileStoreBackend` SPI |
+| `mc-file-store` | The filesystem backend |
 
 See [vector store & file store](./vector-store.md).
 
@@ -62,10 +63,22 @@ See [vector store & file store](./vector-store.md).
 | `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres. |
 | `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres. |
 | `postgres/mc-agent-runtime-pg` | The runtime's seven repository ports on Postgres — definitions, sessions, traces, todo lists, summaries, working memory, workspace files. |
-| `postgres/mc-agent-postgres-config` | Spring auto-configuration: `mindconnect.persistence=postgres` serves every port from one pooled `DataSource` and creates the tables on start. |
+| `postgres/mc-file-store-pg` | `FileStore` on Postgres — uploads as `bytea` rows; also the `postgres` backend of the SPI. |
 
 All of them build on `common/mc-jdbc`, a tiny JDBC helper (JSONB document
 tables, typed rows, transactions — no ORM). See [Persistence](./persistence.md#postgres).
+
+## `springstarter/` — Spring Boot starters
+
+| Module | Purpose |
+|--------|---------|
+| `mc-agent-starter-file` | File persistence, the default: every repository port, the LLM-config store and the file store under `mindconnect.data.base-dir`. |
+| `mc-agent-starter-postgres` | `mindconnect.persistence=postgres`: every port from one pooled `DataSource`, tables created on start. |
+
+An app has both on the classpath; the property picks. The runtime's own
+Spring wiring (`DefaultAgentRuntimeConfig`) still lives in `mc-agent-runtime`
+and is imported by the apps — moving it into a starter of its own is the
+next step.
 
 ## `builder/` & `demo/` — embedding
 

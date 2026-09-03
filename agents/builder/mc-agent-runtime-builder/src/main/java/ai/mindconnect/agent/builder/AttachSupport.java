@@ -56,14 +56,15 @@ final class AttachSupport {
                                          AgentSessionRepository sessions,
                                          LlmEmbeddings embeddings,
                                          LlmConfigRepository llmConfigs,
-                                         ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows) {
+                                         ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
+                                         ai.mindconnect.filestore.FileStore hostFileStore) {
         try {
             Class.forName("ai.mindconnect.filestore.FileStoreBackend");
             Class.forName("ai.mindconnect.vectorstore.tools.VectorStores");
         } catch (ClassNotFoundException e) {
             return null;
         }
-        return create(environment, activations, sessions, embeddings, llmConfigs, workflows);
+        return create(environment, activations, sessions, embeddings, llmConfigs, workflows, hostFileStore);
     }
 
     /** Separate method so optional types are only linked once the guard passed. */
@@ -72,8 +73,9 @@ final class AttachSupport {
                                         AgentSessionRepository sessions,
                                         LlmEmbeddings embeddings,
                                         LlmConfigRepository llmConfigs,
-                                         ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows) {
-        var fileStore = ai.mindconnect.filestore.FileStoreBackend
+                                         ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
+                                        ai.mindconnect.filestore.FileStore hostFileStore) {
+        var fileStore = hostFileStore != null ? hostFileStore : ai.mindconnect.filestore.FileStoreBackend
                 .byType(environment.getOrDefault("fileStoreBackend", "filesystem"))
                 .orElseThrow()
                 .open(Map.of("dir", environment.getOrDefault("fileStoreDir",

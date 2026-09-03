@@ -431,8 +431,10 @@ public final class AgentRuntimeBuilder {
         for (AgentDefinition definition : pendingAgentDefinitions) definitionRepository.save(definition);
         seedWorkflows(workflows);
 
+        ai.mindconnect.filestore.FileStore fileStore =
+                sql != null && PostgresFileStore.present() ? PostgresFileStore.open(sql) : null;
         AttachSupport attachSupport = AttachSupport.createIfPresent(
-                environment, activations, sessionRepository, embeddings, llmConfigRepository, workflows);
+                environment, activations, sessionRepository, embeddings, llmConfigRepository, workflows, fileStore);
         return new AgentRuntime(chatService, sessionService, definitionRepository,
                 llmConfigRepository, conversationManager, namespace, turnExecutor, attachSupport,
                 approvalStore);

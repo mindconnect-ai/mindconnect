@@ -2,8 +2,6 @@ package ai.mindconnect.adminui.config;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
-import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
-import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
 import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
 import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
@@ -17,23 +15,12 @@ import okhttp3.OkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
 @Configuration
 public class LlmConfig {
-
-    @Bean
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    LlmConfigRepository llmConfigRepository(
-            @Value("${mindconnect.data.base-dir:data}") String baseDir,
-            EncryptionHelper encryptionHelper) {
-        return new EncryptingLlmConfigRepository(
-                new FileLlmConfigRepository(Path.of(baseDir)), encryptionHelper);
-    }
 
     @Bean
     OpenAiCompatibleGateway openAiCompatibleGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper,

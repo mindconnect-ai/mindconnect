@@ -1,10 +1,5 @@
 package ai.mindconnect.agent.adapter.config;
 
-import ai.mindconnect.agent.adapter.file.FileConversationSummaryRepository;
-import ai.mindconnect.agent.adapter.file.FileLlmCallTraceRepository;
-import ai.mindconnect.agent.adapter.file.FileTodoListRepository;
-import ai.mindconnect.agent.adapter.file.FileWorkingMemoryRepository;
-import ai.mindconnect.agent.adapter.file.FileWorkspaceStore;
 import ai.mindconnect.agent.adapter.llm.LlmToolResultSummarizer;
 import ai.mindconnect.agent.adapter.rule.RuleBasedToolResultSummarizer;
 import ai.mindconnect.agent.port.in.AgentTaskRunner;
@@ -51,9 +46,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -61,10 +54,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Configuration
-// Picks up the @Component file adapters. Explicit package, not
-// basePackageClasses: this config no longer sits next to them, and the
-// in-memory repositories must stay out of the scan.
-@ComponentScan(basePackages = "ai.mindconnect.agent.adapter.file")
 public class DefaultAgentRuntimeConfig {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultAgentRuntimeConfig.class);
@@ -76,30 +65,6 @@ public class DefaultAgentRuntimeConfig {
     @Bean
     Path agentStorageDir(@Value("${mindconnect.data.base-dir:data}") String dir) {
         return Path.of(dir);
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    WorkspaceStore workspaceStore(Path agentStorageDir) {
-        return new FileWorkspaceStore(agentStorageDir);
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    WorkingMemoryRepository workingMemoryRepository(Path agentStorageDir) {
-        return new FileWorkingMemoryRepository(agentStorageDir);
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    ConversationSummaryRepository conversationSummaryRepository(Path agentStorageDir) {
-        return new FileConversationSummaryRepository(agentStorageDir);
-    }
-
-    @Bean
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    TodoListRepository todoListRepository(Path agentStorageDir) {
-        return new FileTodoListRepository(agentStorageDir);
     }
 
     @Bean
@@ -136,7 +101,6 @@ public class DefaultAgentRuntimeConfig {
         }
         return new StatelessAgentTaskRunner(definitionRepository, llmChat, namespace, configName, promptRenderer);
     }
-
 
     /**
      * Selects the ToolResultSummarizer implementation.
@@ -357,20 +321,6 @@ public class DefaultAgentRuntimeConfig {
     @Bean
     ai.mindconnect.agent.service.approval.ToolApprovalStore toolApprovalStore() {
         return new ai.mindconnect.agent.service.approval.ToolApprovalStore();
-    }
-
-    /**
-     * Optional repository for LLM call traces — the turn worker passes it into
-     * every LLM round it makes.
-     */
-    @Bean
-    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    LlmCallTraceRepository llmCallTraceRepository(
-            Path agentStorageDir,
-            @Value("${mindconnect.agent.trace.max-per-session:50}") int maxPerSession) {
-        // Lives next to conversation messages — same {base}/conversations/{convId}
-        // root, with traces under a `traces/{turnId}/...` subtree.
-        return new FileLlmCallTraceRepository(agentStorageDir.resolve("conversations"), maxPerSession);
     }
 
     /**

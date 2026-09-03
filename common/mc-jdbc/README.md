@@ -17,7 +17,7 @@ JSON document next to the few columns a query needs. Plain JDBC on a
 | Class | Role |
 |-------|------|
 | `Sql` | `query`, `queryOne`, `scalar`, `update`, `execute`, `executeResource`, `inTransaction` on a `DataSource`; binds `UUID`, `Instant`, enums and `Jsonb` by type; throws `JdbcException` |
-| `Row` / `RowMapper` | Typed column access for the current row — `uuid`, `instant`, `enumValue`, `json(col, type)`, nullable where the column is |
+| `Row` / `RowMapper` | Typed column access for the current row — `uuid`, `instant`, `enumValue`, `bytes`, `json(col, type)`, nullable where the column is |
 | `Json` / `Jsonb` | The document codec around an `ObjectMapper` — yours, or `Json.defaults()` — and the wrapper that makes a parameter land as `jsonb` |
 | `DocumentTable<T>` | One document per row: upsert, `findById`, `find(tail, params…)`, `count`, `delete`, and the idempotent DDL for the table, its columns and indexes |
 

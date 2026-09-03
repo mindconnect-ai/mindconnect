@@ -64,13 +64,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** the admin UI and the agent server run on Postgres with
   `MC_PERSISTENCE=postgres` plus `MC_POSTGRES_URL` / `MC_POSTGRES_USER` /
   `MC_POSTGRES_PASSWORD` (`mindconnect.persistence` and `mindconnect.postgres.*`
-  in the yaml). The new `mc-agent-postgres-config` module wires every
-  repository over one pooled `DataSource` and creates the tables on start;
-  the file stores step back automatically. Embedders get
+  in the yaml). Two Spring Boot starters under the new `agents/springstarter/`
+  carry the wiring: `mc-agent-starter-file` (the default) and
+  `mc-agent-starter-postgres`, which serves every repository over one pooled
+  `DataSource` and creates the tables on start. An app adds both and the
+  property picks. Embedders get
   `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)`. Default stays
   `file` — nothing changes for an existing installation, and there is no
-  automatic migration of an existing `data/` directory. Uploaded files, the
-  vector-store registry and the `memory` vector backend stay on disk for now.
+  automatic migration of an existing `data/` directory. The vector-store
+  registry and the `memory` vector backend stay on disk for now.
+- **agents:** the file store got its ports module, `mc-file-store-core`
+  (`FileStore`, `StoredFile`, the `FileStoreBackend` SPI), and a Postgres
+  adapter, `mc-file-store-pg`: uploads as `bytea` rows in `mc_file`, also
+  registered as the `postgres` backend of the SPI. Under
+  `mindconnect.persistence=postgres` uploads go to the database unless
+  `mindconnect.file-store.backend` names another backend. The filesystem
+  adapter stays in `mc-file-store`.
 - **workflow:** `mc-workflow-persistence-pg` — `WorkflowDataRepository` and
   `WorkflowInstanceRepository` on Postgres, written through the workflow
   area's own serializers so a definition reads back exactly as from a file.
@@ -82,6 +91,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** the file adapters are no longer `@Component`s picked up by
+  `DefaultAgentRuntimeConfig` and `MessageRepositoryConfig`; those configs
+  wire the runtime only. A Spring host gets its repositories from a
+  persistence starter (`mc-agent-starter-file` or `-postgres`) — or defines
+  the beans itself, as before. The apps' own `LlmConfigRepository` and
+  `FileStore` beans moved into the starters as well.
 - **agents:** in the Spring apps, tools see the host's beans through the
   `ToolEnvironment` — an explicit entry first, otherwise any unambiguous
   Spring bean of the requested type. The workflow tools use this to offer the

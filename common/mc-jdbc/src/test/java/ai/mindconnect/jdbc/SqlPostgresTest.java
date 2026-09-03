@@ -46,6 +46,17 @@ class SqlPostgresTest {
     }
 
     @Test
+    void bytesGoInAsByteaAndComeBackWhole() {
+        sql.execute("CREATE TABLE IF NOT EXISTS mc_jdbc_test_blob (id UUID PRIMARY KEY, body BYTEA)");
+        UUID id = UUID.randomUUID();
+        byte[] body = new byte[] {0, 1, 2, (byte) 0xFF, 10, 13, 0};
+        sql.update("INSERT INTO mc_jdbc_test_blob VALUES (?, ?)", id, body);
+        assertThat(sql.queryOne("SELECT body FROM mc_jdbc_test_blob WHERE id = ?", r -> r.bytes("body"), id))
+                .contains(body);
+        sql.execute("DROP TABLE mc_jdbc_test_blob");
+    }
+
+    @Test
     void nullsAreNullsNotZeros() {
         UUID id = UUID.randomUUID();
         sql.update("INSERT INTO mc_jdbc_test_row (id, name, status, n, at, flag, attrs) VALUES (?,?,?,?,?,?,?)",

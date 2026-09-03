@@ -102,6 +102,11 @@
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-store-pg</artifactId>
+            <optional>true</optional>
+        </dependency>
         <!-- usePostgres() keeps workflows in the database too, when the workflow modules are present -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

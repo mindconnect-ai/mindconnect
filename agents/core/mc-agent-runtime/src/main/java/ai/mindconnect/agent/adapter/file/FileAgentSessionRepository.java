@@ -4,8 +4,6 @@ import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
 import ai.mindconnect.common.Namespace;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Component;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -20,8 +18,6 @@ import java.util.logging.Logger;
  * Stores sessions under:
  *   {base}/users/{userId}/sessions/{sessionId}/session.json
  */
-@Component
-@ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
 public class FileAgentSessionRepository implements AgentSessionRepository {
 
     private static final Logger log = Logger.getLogger(FileAgentSessionRepository.class.getName());

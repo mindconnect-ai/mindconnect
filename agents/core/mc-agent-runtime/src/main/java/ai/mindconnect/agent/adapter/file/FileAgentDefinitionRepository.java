@@ -4,8 +4,6 @@ import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
 import ai.mindconnect.common.Namespace;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Component;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -16,8 +14,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.logging.Logger;
 
-@Component
-@ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
 public class FileAgentDefinitionRepository implements AgentDefinitionRepository {
 
     private static final Logger log = Logger.getLogger(FileAgentDefinitionRepository.class.getName());

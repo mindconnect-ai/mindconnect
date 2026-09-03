@@ -4,8 +4,6 @@ import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.port.out.MessageRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Component;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,8 +21,6 @@ import java.nio.file.PathMatcher;
  *
  * Co-located with the conversation.json written by FileConversationRepository.
  */
-@Component
-@ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
 public class FileMessageRepository implements MessageRepository {
 
     private static final Logger log = Logger.getLogger(FileMessageRepository.class.getName());

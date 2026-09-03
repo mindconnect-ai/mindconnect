@@ -27,7 +27,7 @@ import javax.sql.DataSource;
  */
 // After the agent runtime's Postgres config when both are present, so its
 // pool is found and not a second one opened; harmless when it is absent.
-@AutoConfiguration(afterName = "ai.mindconnect.agent.adapter.pg.config.PostgresPersistenceConfig")
+@AutoConfiguration(afterName = "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig")
 @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
 public class WorkflowPostgresAutoConfiguration {
 

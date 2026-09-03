@@ -53,6 +53,11 @@ public final class Row {
         return name == null ? null : Enum.valueOf(type, name);
     }
 
+    /** A {@code bytea} column, whole. For content too large to hold, use {@link #raw()} and {@code getBinaryStream}. */
+    public byte[] bytes(String column) throws SQLException {
+        return rs.getBytes(column);
+    }
+
     /** A {@code jsonb} (or {@code text}) column deserialized as {@code type}. */
     public <T> T json(String column, Class<T> type) throws SQLException {
         return json.read(rs.getString(column), type);

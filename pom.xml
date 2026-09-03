@@ -46,6 +46,7 @@
         <module>agents/vectorstore/mc-vector-store</module>
         <module>agents/vectorstore/mc-vector-store-pgvector</module>
         <module>agents/vectorstore/mc-vector-store-tools</module>
+        <module>agents/vectorstore/mc-file-store-core</module>
         <module>agents/vectorstore/mc-file-store</module>
         <module>agents/builder/mc-agent-runtime-builder</module>
         <module>agents/demo/mc-agent-simple-demo</module>
@@ -93,7 +94,9 @@
         <module>agents/adapter/postgres/mc-llm-gateway-pg</module>
         <module>agents/adapter/postgres/mc-message-repository-pg</module>
         <module>agents/adapter/postgres/mc-agent-runtime-pg</module>
-        <module>agents/adapter/postgres/mc-agent-postgres-config</module>
+        <module>agents/adapter/postgres/mc-file-store-pg</module>
+        <module>agents/springstarter/mc-agent-starter-file</module>
+        <module>agents/springstarter/mc-agent-starter-postgres</module>
         <module>agents/core/mc-credentials</module>
         <module>agents/core/mc-message-repository-core</module>
         <module>agents/core/mc-message-repository</module>
