@@ -24,7 +24,9 @@ public class FileReadTool implements Tool {
     @Override
     public String description() {
         return "Reads the contents of a plain-text file at the given path (relative to the base directory). " +
-               "For PDF, Word, or other binary document formats use the document_file_read tool instead.";
+               "For PDF, Word, or other binary document formats use the document_file_read tool instead. " +
+               "Only for files on the filesystem: a file the user attached to this chat has no path — " +
+               "use vector_search for it.";
     }
 
     @Override

@@ -19,7 +19,12 @@ public final class InlineAgentTools {
 
     private static final ToolDefinition RUN_AGENT_DEF = ToolDefinition.of(
             RUN_AGENT,
-            "Delegates a task to another agent by name. Use this to call web-researcher for web searches, file-finder to locate files, and any other available agent.",
+            "Delegates a task to a specialist agent and returns its answer. Use it for: web-researcher "
+            + "(anything on the live web — current facts, a URL to read, 'the latest'), file-finder "
+            + "(locating the user's own files when you have no path), explorer (mapping a codebase or "
+            + "directory tree). Each starts with no memory of this chat, so put everything it needs in the "
+            + "message. NOT for reading a file attached to this chat (vector_search) or a file you already "
+            + "have a path for (file_read / document tools).",
             Map.of(
                     "type", "object",
                     "properties", Map.of(

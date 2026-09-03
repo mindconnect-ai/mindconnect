@@ -152,9 +152,17 @@ public final class AgentTurnWorker implements TaskWorker {
     public static Message appendUserMessage(ConversationManager conversationManager,
                                             UUID conversationId, String text,
                                             UUID turnId, TokenCounter tokenCounter) {
+        return appendUserMessage(conversationManager, conversationId, text, turnId, tokenCounter, Map.of());
+    }
+
+    /** Same, with metadata on the message — e.g. the attachments it announces. */
+    public static Message appendUserMessage(ConversationManager conversationManager,
+                                            UUID conversationId, String text,
+                                            UUID turnId, TokenCounter tokenCounter,
+                                            Map<String, Object> metadata) {
         Message persisted = conversationManager.addMessageToConversation(
                 conversationId, UUID.randomUUID() /* user sender — see follow-up task */,
-                ParticipantType.USER, MessageType.CHAT, text, turnId, 0, Map.of());
+                ParticipantType.USER, MessageType.CHAT, text, turnId, 0, metadata);
         conversationManager.updateTokenCount(conversationId, persisted.id(),
                 tokenCounter.countText(text));
         return persisted;

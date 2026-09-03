@@ -38,7 +38,8 @@ public final class DocumentSectionsTool implements Tool {
 
     @Override
     public String description() {
-        return "Splits a document (PDF, Word .docx, text/markdown) into its sections — one per " +
+        return "On the filesystem only — a file the user attached to this chat has no path, use vector_search for it. " +
+               "Splits a document (PDF, Word .docx, text/markdown) into its sections — one per " +
                "heading, each with its exact content — and returns them as a JSON array: " +
                "{\"path\", \"sectionCount\", \"sections\": [{\"index\", \"level\", \"title\", \"content\"}]}. " +
                "Word boundaries are exact (heading styles); PDFs are page-granular (bookmarks). " +

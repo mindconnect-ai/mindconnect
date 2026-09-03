@@ -8,7 +8,7 @@ import ai.mindconnect.agent.memory.domain.FullHistoryMemoryConfig;
 import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
-import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
+import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.port.out.TokenCounters;
 import ai.mindconnect.common.AuthenticationInfo;
 import ai.mindconnect.common.PageRequest;
@@ -35,12 +35,15 @@ public class FullHistoryMemoryStrategy implements MemoryStrategy {
     private final ConversationManager conversationManager;
     private final LlmConfigRepository llmConfigRepository;
     private final TokenCounters tokenCounterRegistry;
-    private final MessageToLlmMessageMapper messageMapper = new MessageToLlmMessageMapper();
+    private final LlmMessageMapper messageMapper;
 
+    /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
     public FullHistoryMemoryStrategy(FullHistoryMemoryConfig cfg,
                                      ConversationManager conversationManager,
                                      LlmConfigRepository llmConfigRepository,
-                                     TokenCounters tokenCounterRegistry) {
+                                     TokenCounters tokenCounterRegistry,
+                                     LlmMessageMapper messageMapper) {
+        this.messageMapper = messageMapper;
         this.cfg = cfg;
         this.conversationManager = conversationManager;
         this.llmConfigRepository = llmConfigRepository;
@@ -68,7 +71,7 @@ public class FullHistoryMemoryStrategy implements MemoryStrategy {
             log.warn("FullHistory strategy: {} messages ~{} tokens exceed context window {} — request may fail",
                     all.size(), total, budget.contextWindow());
         }
-        return messageMapper.toMessages(ToolPairSanitizer.sanitize(all), def, budget);
+        return messageMapper.toMessages(ToolPairSanitizer.sanitize(all), def, session, budget);
     }
 
     @Override
@@ -79,7 +82,7 @@ public class FullHistoryMemoryStrategy implements MemoryStrategy {
         List<WorkingMemory.WorkingMemoryMessage> messages = new ArrayList<>(all.size());
         for (Message m : all) {
             String effective = m.compressed() && m.compressedContent() != null
-                    ? m.compressedContent() : m.content();
+                    ? m.compressedContent() : messageMapper.modelText(m, def, session);
             int tokens = counter.countText(effective);
             String role = switch (m.senderType()) {
                 case USER  -> "USER";
@@ -89,7 +92,7 @@ public class FullHistoryMemoryStrategy implements MemoryStrategy {
             messages.add(new WorkingMemory.WorkingMemoryMessage(
                     m.type().name(), role, m.sequenceNum(),
                     m.sentAt().toEpochMilli(), tokens,
-                    m.content(), m.compressed(), m.compressedContent()));
+                    messageMapper.modelText(m, def, session), m.compressed(), m.compressedContent()));
         }
         return messages;
     }

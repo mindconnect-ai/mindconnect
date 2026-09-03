@@ -8,7 +8,7 @@ import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.memory.domain.WindowedMemoryConfig;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
-import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
+import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.port.out.TokenCounters;
 import ai.mindconnect.common.AuthenticationInfo;
 import ai.mindconnect.common.PageRequest;
@@ -31,12 +31,15 @@ public class WindowedMemoryStrategy implements MemoryStrategy {
     private final ConversationManager conversationManager;
     private final LlmConfigRepository llmConfigRepository;
     private final TokenCounters tokenCounterRegistry;
-    private final MessageToLlmMessageMapper messageMapper = new MessageToLlmMessageMapper();
+    private final LlmMessageMapper messageMapper;
 
+    /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
     public WindowedMemoryStrategy(WindowedMemoryConfig cfg,
                                   ConversationManager conversationManager,
                                   LlmConfigRepository llmConfigRepository,
-                                  TokenCounters tokenCounterRegistry) {
+                                  TokenCounters tokenCounterRegistry,
+                                  LlmMessageMapper messageMapper) {
+        this.messageMapper = messageMapper;
         this.cfg = cfg;
         this.conversationManager = conversationManager;
         this.llmConfigRepository = llmConfigRepository;
@@ -60,7 +63,7 @@ public class WindowedMemoryStrategy implements MemoryStrategy {
         // MessageMapper needs a budget for per-message truncation; use a permissive default
         // (per-message limit equal to the whole window) — strategy doesn't impose a per-msg cap.
         ContextTokenBudget budget = permissiveBudget(def);
-        return messageMapper.toMessages(ToolPairSanitizer.sanitize(tail), def, budget);
+        return messageMapper.toMessages(ToolPairSanitizer.sanitize(tail), def, session, budget);
     }
 
     @Override
@@ -70,7 +73,7 @@ public class WindowedMemoryStrategy implements MemoryStrategy {
         List<WorkingMemory.WorkingMemoryMessage> messages = new ArrayList<>(tail.size());
         for (Message m : tail) {
             String effective = m.compressed() && m.compressedContent() != null
-                    ? m.compressedContent() : m.content();
+                    ? m.compressedContent() : messageMapper.modelText(m, def, session);
             int tokens = counter.countText(effective);
             String role = switch (m.senderType()) {
                 case USER  -> "USER";
@@ -80,7 +83,7 @@ public class WindowedMemoryStrategy implements MemoryStrategy {
             messages.add(new WorkingMemory.WorkingMemoryMessage(
                     m.type().name(), role, m.sequenceNum(),
                     m.sentAt().toEpochMilli(), tokens,
-                    m.content(), m.compressed(), m.compressedContent()));
+                    messageMapper.modelText(m, def, session), m.compressed(), m.compressedContent()));
         }
         return messages;
     }

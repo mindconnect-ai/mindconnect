@@ -28,7 +28,9 @@ public class DocumentFileReadTool implements Tool {
     public String description() {
         return "Reads the contents of a file at the given path (relative to the base directory). " +
                "Supports plain text, PDF, Word, HTML, and other document formats via Apache Tika. " +
-               "For large multi-page documents prefer document_outline + read_document for targeted access.";
+               "For large multi-page documents prefer document_outline + read_document for targeted access. " +
+               "Only for files on the filesystem — a file the user attached to this chat has no path; " +
+               "use vector_search for it.";
     }
 
     @Override

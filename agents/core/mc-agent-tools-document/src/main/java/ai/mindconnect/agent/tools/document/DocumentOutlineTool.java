@@ -37,7 +37,8 @@ public class DocumentOutlineTool implements Tool {
 
     @Override
     public String description() {
-        return "Returns the structural outline of a long document (PDF or Word .docx) — total " +
+        return "On the filesystem only — a file the user attached to this chat has no path, use vector_search for it. " +
+               "Returns the structural outline of a long document (PDF or Word .docx) — total " +
                "page count, approximate token count, and a tree of headings/bookmarks with their " +
                "page ranges. Use this FIRST when asked about a long document so you can decide " +
                "which section to read or search.\n" +

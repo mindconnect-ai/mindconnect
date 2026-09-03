@@ -2,6 +2,8 @@ package ai.mindconnect.agent.service;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.domain.StreamEvent;
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
@@ -37,6 +39,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
@@ -131,9 +134,19 @@ public class AgentChatService {
         approvalStore.deleteForRoot(sessionId);
 
         // 1. The question becomes conversation truth — BEFORE the task exists.
+        //    A file attached since the last turn is recorded on this message
+        //    (metadata); the model reads the notice with the question, the
+        //    text stays what the user typed.
         TokenCounter tokenCounter = memoryStrategyFactory.create(def).resolveTokenCounter(def);
+        //    An attachment that was removed since is announced the same way,
+        //    so the model stops looking for it. Both are read off the record;
+        //    the record itself is never rewritten.
+        List<Message> history = isFirstMessage ? List.of()
+                : conversationManager.loadCompleteHistory(session.conversationId()).messages();
+        List<String> attached = AttachmentNotice.unannounced(session, history);
+        List<String> detached = AttachmentNotice.unannouncedRemovals(session, history);
         AgentTurnWorker.appendUserMessage(conversationManager, session.conversationId(),
-                userMessage, turnId, tokenCounter);
+                userMessage, turnId, tokenCounter, AttachmentNotice.metadata(attached, detached));
 
         // 2.+3. Listen on the turn's channel, make the turn a task — the queue
         //        is the only registry of running work, nothing is tracked here.

@@ -91,6 +91,29 @@ The Admin UI's chat **file attachments** and the vector-store file upload run
 through it, and `AgentRuntimeBuilder.attachFile(...)` uses it for embedding
 scenarios (see `mc-agent-simple-demo`).
 
+### How the agent learns about an attachment
+
+A file attached to a chat is ingested into the session's vector store and
+`vector_search` is activated for the session. The model is told twice, in
+two different places:
+
+- **In the user's next message.** That message records the newly attached
+  files in its metadata; when the request is built, the model reads a short
+  system note ahead of the user's text — the file names, their kind, and
+  that `vector_search` is the way to their content because they are not on
+  the filesystem. The stored text stays what the user typed; the chat shows
+  a 📎 line above it.
+- **In the system prompt.** An "Attached files" section lists every file
+  currently attached, rendered fresh each round.
+
+Removing a file is announced the same way: the next user message records
+it as removed and the model reads a note that the content is no longer
+available and must not be searched for. Neither event rewrites an earlier
+message — the record is read in order, so a file attached again after a
+removal is announced again, and an attach notice names only files that are
+still attached. All of this is rendered by the `LlmMessageMapper`
+(see [Memory](./memory.md#how-messages-reach-the-model)).
+
 ## Configuration
 
 | Property | Default | Notes |

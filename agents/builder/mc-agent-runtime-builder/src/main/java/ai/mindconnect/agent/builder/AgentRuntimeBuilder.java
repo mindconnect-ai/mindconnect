@@ -113,6 +113,8 @@ public final class AgentRuntimeBuilder {
     private String defaultLlmConfigName;
     private String encryptionKey;
     private String toolResultSummarizer = "rule";
+    private ai.mindconnect.agent.port.out.LlmMessageMapper llmMessageMapper =
+            new ai.mindconnect.agent.service.MessageToLlmMessageMapper();
     private final Map<String, String> environment = new LinkedHashMap<>();
     private final List<LlmConfig> pendingLlmConfigs = new ArrayList<>();
     private final List<AgentDefinition> pendingAgentDefinitions = new ArrayList<>();
@@ -198,6 +200,12 @@ public final class AgentRuntimeBuilder {
     /** {@code "rule"} (default, no LLM) or {@code "llm"} for tool-result summarization. */
     public AgentRuntimeBuilder toolResultSummarizer(String type) {
         this.toolResultSummarizer = type;
+        return this;
+    }
+
+    /** How stored messages read to the model; the default renders text, tool calls, results and attachment notices. */
+    public AgentRuntimeBuilder llmMessageMapper(ai.mindconnect.agent.port.out.LlmMessageMapper mapper) {
+        this.llmMessageMapper = mapper;
         return this;
     }
 
@@ -373,7 +381,7 @@ public final class AgentRuntimeBuilder {
                 ? new LlmToolResultSummarizer(statelessRunner) : new RuleBasedToolResultSummarizer();
         MemoryStrategyFactory memoryStrategyFactory = new DefaultMemoryStrategyFactory(
                 conversationManager, summaryRepository, summarizer, statelessRunner,
-                tokenCounterRegistry, llmConfigRepository);
+                tokenCounterRegistry, llmConfigRepository, llmMessageMapper);
 
         // 5. Tools: SPI over whatever capability modules are on the classpath.
         DynamicToolActivations activations = new DynamicToolActivations(sessionRepository);

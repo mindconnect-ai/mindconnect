@@ -2,11 +2,14 @@ package ai.mindconnect.agent.service;
 
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.service.ContextTokenBudget;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.ThinkingBlock;
 import ai.mindconnect.llm.domain.ToolCall;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -30,7 +33,7 @@ import java.util.Map;
  * <p>
  * No repository access, no summarization, no window logic — pure translation.
  */
-public class MessageToLlmMessageMapper {
+public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.LlmMessageMapper {
 
     private static final Logger log = LoggerFactory.getLogger(MessageToLlmMessageMapper.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -41,17 +44,18 @@ public class MessageToLlmMessageMapper {
      * Maps a list of stored messages to LLM-ready messages, enforcing the per-message
      * token limit from the supplied budget.
      */
+    @Override
     public List<LlmMessage> toMessages(List<Message> messages,
                                        AgentDefinition def,
+                                       AgentSession session,
                                        ContextTokenBudget budget) {
         List<LlmMessage> result = new ArrayList<>();
         for (Message m : messages) {
             switch (m.type()) {
                 case CHAT -> {
-                    String content = guard(m.content(), budget, m.sequenceNum(), "CHAT");
-                    result.add(m.senderId().equals(def.id())
-                            ? LlmMessage.assistant(content)
-                            : LlmMessage.user(content));
+                    boolean assistant = m.senderId().equals(def.id());
+                    String content = guard(modelText(m, def, session), budget, m.sequenceNum(), "CHAT");
+                    result.add(assistant ? LlmMessage.assistant(content) : LlmMessage.user(content));
                 }
                 case TOOL_CALL -> mapToolCall(m, result);
                 case TOOL_RESULT -> mapToolResult(m, result, budget);
@@ -59,6 +63,18 @@ public class MessageToLlmMessageMapper {
             }
         }
         return result;
+    }
+
+    /**
+     * A user message that announced attachments (metadata) gets the notice
+     * ahead of its text — the stored text stays what the user typed. Only
+     * files still attached are named: a removed one is gone from the store,
+     * so it must be gone from the notice too. Assistant text is as stored.
+     */
+    @Override
+    public String modelText(Message m, AgentDefinition def, AgentSession session) {
+        if (m.type() != MessageType.CHAT || m.senderId().equals(def.id())) return m.content();
+        return AttachmentNotice.forModel(m, session);
     }
 
     // ── private helpers ───────────────────────────────────────────────────────

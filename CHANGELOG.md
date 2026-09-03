@@ -23,6 +23,37 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Changed
+
+- **agents:** the default chat agent picks the right tool for uploaded
+  files more reliably. A file attached to the chat is now announced with the
+  user's next message — name, kind, and that `vector_search` is the way to
+  read it — instead of only in a section at the end of the system prompt.
+  The message records the announced files in its metadata; the model reads
+  the notice ahead of the text, the chat shows a 📎 line, the stored text
+  stays what the user typed. Removing a file is announced the same way —
+  the next message tells the model the content is gone and not to search
+  for it — and a file attached again after a removal is announced again;
+  no earlier message is rewritten. The Admin UI's working-memory view shows
+  the text and token counts the model receives. The system-prompt section itself now says the file
+  is not on the filesystem. The
+  `vector_search`, `file_read`, document and `run_agent` tools say in their
+  descriptions when they are the right choice and when another one is. The
+  seeded `default-chat` prompt no longer sends attached PDFs to the document
+  tools, explains `tool_search` (search before saying no, call on the next
+  step) and lists when a question must go to the web-researcher instead of
+  being answered from memory. Existing installations keep their stored
+  `default-chat`; the prompt changes reach them through Migrations.
+
+### Added
+
+- **agents:** `LlmMessageMapper` — the port through which every memory
+  strategy turns stored messages into the model's messages; the runtime's
+  `MessageToLlmMessageMapper` is the default. A Spring host replaces it by
+  defining a bean of that type, an embedder via
+  `AgentRuntimeBuilder.llmMessageMapper(...)`. The read-side extension point
+  for how a conversation reads to the model — one place, every message type.
+
 ## [0.3.0] - 2026-09-03
 
 ## [0.2.2] - 2026-09-03

@@ -11,7 +11,7 @@ import ai.mindconnect.common.AuthenticationInfo;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
+import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.port.in.ConversationManager;
 
@@ -32,11 +32,14 @@ public class NoMemoryStrategy implements MemoryStrategy {
     private final ConversationManager conversationManager;
     private final LlmConfigRepository llmConfigRepository;
     private final TokenCounters tokenCounterRegistry;
-    private final MessageToLlmMessageMapper messageMapper = new MessageToLlmMessageMapper();
+    private final LlmMessageMapper messageMapper;
 
+    /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
     public NoMemoryStrategy(ConversationManager conversationManager,
                             LlmConfigRepository llmConfigRepository,
-                            TokenCounters tokenCounterRegistry) {
+                            TokenCounters tokenCounterRegistry,
+                            LlmMessageMapper messageMapper) {
+        this.messageMapper = messageMapper;
         this.conversationManager = conversationManager;
         this.llmConfigRepository = llmConfigRepository;
         this.tokenCounterRegistry = tokenCounterRegistry;
@@ -53,7 +56,7 @@ public class NoMemoryStrategy implements MemoryStrategy {
     @Override
     public List<LlmMessage> buildWindow(AgentDefinition def, AgentSession session,
                                         AuthenticationInfo auth, List<Message> history) {
-        return messageMapper.toMessages(ToolPairSanitizer.sanitize(episode(history)), def,
+        return messageMapper.toMessages(ToolPairSanitizer.sanitize(episode(history)), def, session,
                 permissiveBudget(def));
     }
 

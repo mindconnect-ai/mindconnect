@@ -11,7 +11,7 @@ import ai.mindconnect.agent.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.memory.port.out.ConversationSummaryRepository;
-import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
+import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.service.StatelessAgentSeeder;
 import ai.mindconnect.agent.port.out.TokenCounters;
 import ai.mindconnect.common.AuthenticationInfo;
@@ -54,14 +54,17 @@ public class AutoCompactStrategy implements MemoryStrategy {
     private final AgentTaskRunner agentTaskRunner;
     private final TokenCounters tokenCounterRegistry;
     private final LlmConfigRepository llmConfigRepository;
-    private final MessageToLlmMessageMapper messageMapper = new MessageToLlmMessageMapper();
+    private final LlmMessageMapper messageMapper;
 
+    /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
     public AutoCompactStrategy(AutoCompactConfig cfg,
                                ConversationManager conversationManager,
                                ConversationSummaryRepository summaryRepository,
                                AgentTaskRunner runTask,
                                TokenCounters tokenCounterRegistry,
-                               LlmConfigRepository llmConfigRepository) {
+                               LlmConfigRepository llmConfigRepository,
+                               LlmMessageMapper messageMapper) {
+        this.messageMapper = messageMapper;
         this.cfg = cfg;
         this.conversationManager = conversationManager;
         this.summaryRepository = summaryRepository;
@@ -94,7 +97,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
         }
         // No budget-driven trimming, no per-message guard — auto-compact assumes the
         // window will not overflow because compact() ran when it crossed the threshold.
-        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(live), def, permissiveBudget(def)));
+        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(live), def, session, permissiveBudget(def)));
         return result;
     }
 
@@ -114,7 +117,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
                 new ArrayList<>(SummaryWindowMessages.render(summaries, counter));
         for (Message m : live) {
             String effective = m.compressed() && m.compressedContent() != null
-                    ? m.compressedContent() : m.content();
+                    ? m.compressedContent() : messageMapper.modelText(m, def, session);
             int tokens = counter.countText(effective);
             String role = switch (m.senderType()) {
                 case USER  -> "USER";
@@ -124,7 +127,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
             messages.add(new WorkingMemory.WorkingMemoryMessage(
                     m.type().name(), role, m.sequenceNum(),
                     m.sentAt().toEpochMilli(), tokens,
-                    m.content(), m.compressed(), m.compressedContent()));
+                    messageMapper.modelText(m, def, session), m.compressed(), m.compressedContent()));
         }
         return messages;
     }

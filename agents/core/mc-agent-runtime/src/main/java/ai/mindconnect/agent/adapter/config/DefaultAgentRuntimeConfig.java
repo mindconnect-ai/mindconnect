@@ -157,16 +157,23 @@ public class DefaultAgentRuntimeConfig {
         return new PebblePromptRenderer(providers);
     }
 
+    /**
+     * How messages read to the model: the host's {@link ai.mindconnect.agent.port.out.LlmMessageMapper}
+     * bean when it defines one, the runtime's default otherwise. Define a
+     * bean of that type to replace the default; nothing else to configure.
+     */
     @Bean
     MemoryStrategyFactory memoryStrategyFactory(ConversationManager conversationManager,
                                                 ConversationSummaryRepository conversationSummaryRepository,
                                                 ToolResultSummarizer toolResultSummarizer,
                                                 AgentTaskRunner runTaskUseCase,
                                                 TokenCounters tokenCounterRegistry,
-                                                LlmConfigRepository llmConfigRepository) {
+                                                LlmConfigRepository llmConfigRepository,
+                                                org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.port.out.LlmMessageMapper> messageMapper) {
         return new DefaultMemoryStrategyFactory(conversationManager,
                 conversationSummaryRepository, toolResultSummarizer, runTaskUseCase,
-                tokenCounterRegistry, llmConfigRepository);
+                tokenCounterRegistry, llmConfigRepository,
+                messageMapper.getIfAvailable(ai.mindconnect.agent.service.MessageToLlmMessageMapper::new));
     }
 
     /** Session-scoped tool activations written by tool_search, read per round. */
