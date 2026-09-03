@@ -137,7 +137,7 @@ mvn -f <module-path>/pom.xml clean install
 # Working on a branch: give the clone its own version suffix ONCE, and every
 # build in it installs as 0.x.y-<branch>-SNAPSHOT — parallel branches never
 # overwrite each other in the shared ~/.m2. The file is git-ignored.
-echo "-Dsha1=-$(git rev-parse --abbrev-ref HEAD | tr '/A-Z' '-a-z' | tr -c 'a-z0-9.-\n' '-')" > .mvn/maven.config
+echo "-Dsha1=-$(git rev-parse --abbrev-ref HEAD | tr '/A-Z' '-a-z' | tr -c 'a-z0-9.\n-' '-')" > .mvn/maven.config
 
 # If you change a core/shared module, rebuild it before dependent modules
 

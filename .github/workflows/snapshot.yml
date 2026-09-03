@@ -58,7 +58,7 @@ jobs:
           esac
           # A branch build carries the branch in its version, so two branches
           # never publish under the same name; main stays plain.
-          sha1=""; [ "$GITHUB_REF_NAME" = main ] || sha1="-$(echo "$GITHUB_REF_NAME" | tr '/A-Z' '-a-z' | tr -c 'a-z0-9.-\n' '-')"
+          sha1=""; [ "$GITHUB_REF_NAME" = main ] || sha1="-$(echo "$GITHUB_REF_NAME" | tr '/A-Z' '-a-z' | tr -c 'a-z0-9.\n-' '-')"
           echo "SHA1=$sha1" >> "$GITHUB_ENV"
           # The release each branch publishes to: main keeps the plain `snapshot`
           # channel the launcher reads; every other branch gets its own, named
