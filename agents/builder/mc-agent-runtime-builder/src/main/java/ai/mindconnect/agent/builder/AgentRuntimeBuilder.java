@@ -103,10 +103,11 @@ import java.util.concurrent.TimeUnit;
 public final class AgentRuntimeBuilder {
 
     /** Persistence backend. */
-    private enum Mode { FILE, IN_MEMORY }
+    private enum Mode { FILE, IN_MEMORY, POSTGRES }
 
     private final Mode mode;
     private final Path dataDir;   // in IN_MEMORY mode: a temp dir for file-rooted side channels
+    private final javax.sql.DataSource dataSource;   // POSTGRES only
     private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private String namespaceName = "local";
     private String defaultLlmConfigName;
@@ -118,8 +119,13 @@ public final class AgentRuntimeBuilder {
     private final List<String> pendingWorkflowResources = new ArrayList<>();
 
     private AgentRuntimeBuilder(Mode mode, Path dataDir) {
+        this(mode, dataDir, null);
+    }
+
+    private AgentRuntimeBuilder(Mode mode, Path dataDir, javax.sql.DataSource dataSource) {
         this.mode = mode;
         this.dataDir = dataDir;
+        this.dataSource = dataSource;
         environment.put("defaultBaseDir", System.getProperty("user.home"));
         environment.put("dataBaseDir", dataDir.toString());
         environment.put("workflowDir", dataDir.resolve("workflows").toString());
@@ -129,6 +135,16 @@ public final class AgentRuntimeBuilder {
     /** Starts a builder with file persistence rooted at {@code dataDir}. */
     public static AgentRuntimeBuilder useFilePersistence(Path dataDir) {
         return new AgentRuntimeBuilder(Mode.FILE, dataDir);
+    }
+
+    /**
+     * Every repository in Postgres, over the given (ideally pooled) data
+     * source; the tables are created on {@link #build()}. {@code dataDir}
+     * still roots the file-based side channels — workflows, vector-store
+     * files, code-execution scratch — that have no database form.
+     */
+    public static AgentRuntimeBuilder usePostgres(javax.sql.DataSource dataSource, Path dataDir) {
+        return new AgentRuntimeBuilder(Mode.POSTGRES, dataDir, dataSource);
     }
 
     /** File persistence under a fresh temp directory (deleted by the OS, not by us). */
@@ -258,25 +274,36 @@ public final class AgentRuntimeBuilder {
 
     public AgentRuntime build() {
         boolean inMemory = mode == Mode.IN_MEMORY;
+        // One Sql for every Postgres store, around this builder's mapper, so
+        // the documents in the database are the JSON the file store writes.
+        ai.mindconnect.jdbc.Sql sql = mode == Mode.POSTGRES
+                ? ai.mindconnect.jdbc.Sql.of(dataSource, new ai.mindconnect.jdbc.Json(objectMapper))
+                : null;
 
-        // 1. Persistence — file-based rooted at dataDir, or purely in-memory.
+        // 1. Persistence — file-based rooted at dataDir, Postgres, or purely in-memory.
         WorkspaceStore workspaceStore = inMemory
                 ? new InMemoryWorkspaceStore()
+                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgWorkspaceStore(sql).initSchema()
                 : new FileWorkspaceStore(dataDir);
         WorkingMemoryRepository workingMemoryRepository = inMemory
                 ? new InMemoryWorkingMemoryRepository()
+                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgWorkingMemoryRepository(sql).initSchema()
                 : new FileWorkingMemoryRepository(dataDir);
         ConversationSummaryRepository summaryRepository = inMemory
                 ? new InMemoryConversationSummaryRepository()
+                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgConversationSummaryRepository(sql).initSchema()
                 : new FileConversationSummaryRepository(dataDir);
         TodoListRepository todoListRepository = inMemory
                 ? new InMemoryTodoListRepository()
+                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgTodoListRepository(sql).initSchema()
                 : new FileTodoListRepository(dataDir);
         AgentDefinitionRepository definitionRepository = inMemory
                 ? new InMemoryAgentDefinitionRepository()
+                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgAgentDefinitionRepository(sql).initSchema()
                 : new FileAgentDefinitionRepository(dataDir, objectMapper);
         AgentSessionRepository sessionRepository = inMemory
                 ? new InMemoryAgentSessionRepository()
+                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgAgentSessionRepository(sql).initSchema()
                 : new FileAgentSessionRepository(dataDir, objectMapper);
 
         // 2. Messages / conversations.
@@ -286,6 +313,11 @@ public final class AgentRuntimeBuilder {
             var messageStore = new ai.mindconnect.message.adapter.memory.InMemoryMessageStore();
             conversationManager = messageStore.conversationManager();
             messageRepository = messageStore.messageRepository();
+        } else if (sql != null) {
+            var conversationRepository = new ai.mindconnect.message.adapter.pg.PgConversationRepository(sql).initSchema();
+            messageRepository = new ai.mindconnect.message.adapter.pg.PgMessageRepository(sql).initSchema();
+            conversationManager = new ai.mindconnect.message.service.ConversationService(
+                    conversationRepository, messageRepository);
         } else {
             var conversationRepository = new ai.mindconnect.message.adapter.file.FileConversationRepository(dataDir, objectMapper);
             messageRepository = new ai.mindconnect.message.adapter.file.FileMessageRepository(dataDir, objectMapper);
@@ -299,10 +331,15 @@ public final class AgentRuntimeBuilder {
         // then stored plain, which the builder javadoc calls out.
         LlmConfigRepository baseLlmConfigRepository = inMemory
                 ? new ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository()
+                : sql != null ? new ai.mindconnect.llm.adapter.pg.PgLlmConfigRepository(sql).initSchema()
                 : new FileLlmConfigRepository(dataDir);
         LlmConfigRepository llmConfigRepository = encryptionKey == null
                 ? baseLlmConfigRepository
                 : new EncryptingLlmConfigRepository(baseLlmConfigRepository, encryption);
+        // Workflows follow the same switch when the workflow modules are on
+        // the classpath; otherwise (and in file mode) they stay files.
+        ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows =
+                sql != null && PostgresWorkflows.present() ? PostgresWorkflows.open(sql) : null;
         OkHttpClient httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .readTimeout(120, TimeUnit.SECONDS)
@@ -351,6 +388,9 @@ public final class AgentRuntimeBuilder {
                 .service(DynamicToolActivations.class, activations)
                 .service(LlmEmbeddings.class, embeddings)
                 .service(LlmConfigRepository.class, llmConfigRepository);
+        if (workflows != null) {
+            PostgresWorkflows.register(env, workflows);
+        }
         environment.forEach(env::string);
         ToolRegistry toolRegistry = new SpiToolRegistry(env.build());
         registryRef.set(toolRegistry);
@@ -361,6 +401,7 @@ public final class AgentRuntimeBuilder {
         ToolExecutor toolExecutor = new ToolExecutor(List.of());
         LlmCallTraceRepository traceRepository = inMemory
                 ? new InMemoryLlmCallTraceRepository()
+                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgLlmCallTraceRepository(sql).initSchema()
                 : new ai.mindconnect.agent.adapter.file.FileLlmCallTraceRepository(dataDir);
         var approvalStore = new ai.mindconnect.agent.service.approval.ToolApprovalStore();
         AgentSessionService sessionService = new AgentSessionService(
@@ -388,17 +429,21 @@ public final class AgentRuntimeBuilder {
         // 7. Seed configs, agents, workflows.
         for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);
         for (AgentDefinition definition : pendingAgentDefinitions) definitionRepository.save(definition);
-        seedWorkflows();
+        seedWorkflows(workflows);
 
         AttachSupport attachSupport = AttachSupport.createIfPresent(
-                environment, activations, sessionRepository, embeddings, llmConfigRepository);
+                environment, activations, sessionRepository, embeddings, llmConfigRepository, workflows);
         return new AgentRuntime(chatService, sessionService, definitionRepository,
                 llmConfigRepository, conversationManager, namespace, turnExecutor, attachSupport,
                 approvalStore);
     }
 
-    private void seedWorkflows() {
+    private void seedWorkflows(ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows) {
         if (pendingWorkflowResources.isEmpty()) {
+            return;
+        }
+        if (workflows != null) {
+            PostgresWorkflows.seed(workflows, pendingWorkflowResources);
             return;
         }
         Path workflowDir = Path.of(environment.get("workflowDir"));
@@ -428,7 +473,7 @@ public final class AgentRuntimeBuilder {
         }
     }
 
-    private static InputStream classpath(String resource) {
+    static InputStream classpath(String resource) {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
         if (cl == null) cl = AgentRuntimeBuilder.class.getClassLoader();
         InputStream in = cl.getResourceAsStream(resource);

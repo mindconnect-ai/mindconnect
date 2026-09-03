@@ -53,6 +53,31 @@ the finished `report.md` in the workspace:
 | `mc-mcp-proxy` | Proxy for Model Context Protocol servers |
 | `mc-agent-tools*` | Built-in tool providers (web, browser, document, todo, gmail) |
 
+### `adapter/` — alternative implementations of the core ports
+
+| Module | Purpose |
+|--------|---------|
+| `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres — one JSONB document per config, via `mc-jdbc` |
+| `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres — paged by `created_at` / `seq` |
+| `postgres/mc-agent-runtime-pg` | The runtime's seven ports on Postgres — definitions, sessions, LLM traces, todo lists, summaries, working memory, workspace files |
+| `postgres/mc-agent-postgres-config` | Spring wiring: `mindconnect.persistence=postgres` switches every repository to its Postgres adapter over one pooled `DataSource` |
+
+The default stores are file-based and need no database. A `-pg` module is a
+drop-in for the matching `File*` repository: same port, same constructor
+shape (a `DataSource` instead of a directory), wrapped by the same decorators.
+
+To run an app on Postgres, set three variables (the `start.sh` scripts read
+them from `mc.env`) — the tables are created on start, no migration tool:
+
+```bash
+MC_PERSISTENCE=postgres            # default: file
+MC_POSTGRES_URL=jdbc:postgresql://localhost:5432/mindconnect
+MC_POSTGRES_USER=mindconnect
+MC_POSTGRES_PASSWORD=…
+```
+
+Embedding without Spring: `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)`.
+
 ### `server/` — deployable Spring Boot services
 
 | Module | Purpose |

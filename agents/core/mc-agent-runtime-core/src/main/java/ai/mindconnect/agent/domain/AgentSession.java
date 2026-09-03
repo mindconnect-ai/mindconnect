@@ -74,7 +74,7 @@ public record AgentSession(
          * talking to each other; today anything but one entry is a bug.
          */
         java.util.List<ai.mindconnect.agent.domain.session.SessionAgent> sessionAgents
-) {
+) implements ai.mindconnect.agent.domain.view.AgentSessionHeader {
     public AgentSession {
         if (activatedTools == null) activatedTools = java.util.List.of();
         if (attachedFiles == null) attachedFiles = java.util.List.of();

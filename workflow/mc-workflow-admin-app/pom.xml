@@ -28,6 +28,10 @@
             <artifactId>mc-workflow-admin-rest</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence-pg</artifactId>
+        </dependency>
         <!-- Seeds the bundled example workflows on first run. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

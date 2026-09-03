@@ -83,6 +83,8 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-mcp-proxy`: proxy for Model Context Protocol servers
   - `vectorstore/` — the knowledge layer: `mc-vector-store` (SPI + memory backend),
     `mc-vector-store-pgvector`, `mc-vector-store-tools`, `mc-file-store`
+  - `adapter/` — alternative implementations of the core ports; `postgres/mc-*-pg`
+    modules store domain objects as JSONB documents via `common/mc-jdbc`
   - `builder/mc-agent-runtime-builder` + `demo/mc-agent-simple-demo` — Spring-free
     embedding facade and runnable examples
   - `server/` — deployable Spring Boot services

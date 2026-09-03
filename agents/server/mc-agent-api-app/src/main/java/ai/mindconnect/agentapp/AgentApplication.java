@@ -24,6 +24,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
 
@@ -95,6 +96,7 @@ public class AgentApplication {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     LlmConfigRepository llmConfigRepository(
             @Value("${mindconnect.data.base-dir:data}") String baseDir,
             EncryptionHelper encryptionHelper) {

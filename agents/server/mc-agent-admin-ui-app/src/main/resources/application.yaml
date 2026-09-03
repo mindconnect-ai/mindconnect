@@ -23,6 +23,13 @@ logging:
     org.springframework.security.web.authentication: TRACE
 
 mindconnect:
+  # Where everything is stored: "file" under data.base-dir (default), or
+  # "postgres" — every repository in the database, tables created on start.
+  persistence: ${MC_PERSISTENCE:file}
+  postgres:
+    url: ${MC_POSTGRES_URL:jdbc:postgresql://localhost:5432/mindconnect}
+    username: ${MC_POSTGRES_USER:}
+    password: ${MC_POSTGRES_PASSWORD:}
   data:
     base-dir: ./data
   # Authentication is OFF by default so the app runs without Keycloak. In that

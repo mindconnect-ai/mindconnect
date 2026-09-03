@@ -37,6 +37,10 @@
         <module>core/mc-agent-protocol-mc-runtime</module>
         <module>core/mc-llm-gateway-core</module>
         <module>core/mc-llm-gateway</module>
+        <module>adapter/postgres/mc-llm-gateway-pg</module>
+        <module>adapter/postgres/mc-message-repository-pg</module>
+        <module>adapter/postgres/mc-agent-runtime-pg</module>
+        <module>adapter/postgres/mc-agent-postgres-config</module>
         <module>core/mc-credentials</module>
         <module>core/mc-message-repository-core</module>
         <module>core/mc-message-repository</module>

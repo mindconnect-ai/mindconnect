@@ -17,5 +17,11 @@ spring:
       enabled: true
 
 mindconnect:
+  # "file" (default, workflow-admin.dir) or "postgres" — tables created on start
+  persistence: ${MC_PERSISTENCE:file}
+  postgres:
+    url: ${MC_POSTGRES_URL:jdbc:postgresql://localhost:5432/mindconnect}
+    username: ${MC_POSTGRES_USER:}
+    password: ${MC_POSTGRES_PASSWORD:}
   workflow-admin:
     dir: data/workflows

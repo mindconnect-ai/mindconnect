@@ -41,6 +41,7 @@
 
         <!-- File-based persistence repositories — depends on api + jackson -->
         <module>mc-workflow-persistence</module>
+        <module>mc-workflow-persistence-pg</module>
         <module>mc-workflow-step-form</module>
 
         <!-- PlantUML activity diagram DSL parser/serializer — depends on api, code, http (optional) -->

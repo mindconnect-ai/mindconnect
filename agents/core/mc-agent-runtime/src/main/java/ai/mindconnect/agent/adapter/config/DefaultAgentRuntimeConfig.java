@@ -53,6 +53,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -78,21 +79,25 @@ public class DefaultAgentRuntimeConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     WorkspaceStore workspaceStore(Path agentStorageDir) {
         return new FileWorkspaceStore(agentStorageDir);
     }
 
     @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     WorkingMemoryRepository workingMemoryRepository(Path agentStorageDir) {
         return new FileWorkingMemoryRepository(agentStorageDir);
     }
 
     @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     ConversationSummaryRepository conversationSummaryRepository(Path agentStorageDir) {
         return new FileConversationSummaryRepository(agentStorageDir);
     }
 
     @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     TodoListRepository todoListRepository(Path agentStorageDir) {
         return new FileTodoListRepository(agentStorageDir);
     }
@@ -208,7 +213,8 @@ public class DefaultAgentRuntimeConfig {
     }
 
     @Bean
-    ToolRegistry toolRegistry(AgentDefinitionRepository definitionRepository,
+    ToolRegistry toolRegistry(org.springframework.context.ApplicationContext applicationContext,
+                               AgentDefinitionRepository definitionRepository,
                                DynamicToolActivations dynamicToolActivations,
                                AgentSessionRepository sessionRepository,
                                MessageRepository messageRepository,
@@ -277,9 +283,33 @@ public class DefaultAgentRuntimeConfig {
                 .string("vectorStorePassword", vectorStorePassword)
                 .string("vectorStoreEmbeddingConfig", vectorStoreEmbeddingConfig)
                 .build();
-        SpiToolRegistry registry = new SpiToolRegistry(env);
+        SpiToolRegistry registry = new SpiToolRegistry(hostBacked(env, applicationContext));
         registryRef.set(registry);
         return registry;
+    }
+
+    /**
+     * The environment the tools see: the explicit entries above first, and
+     * behind them every bean of the host by type. A tool from an optional
+     * module — the workflow tools asking for a {@code WorkflowDataRepository},
+     * say — thus finds the host's store without this config knowing the
+     * module's types. Only an unambiguous bean is served; two candidates
+     * read as none, exactly like an absent one.
+     */
+    private static ai.mindconnect.agent.tool.ToolEnvironment hostBacked(
+            MapToolEnvironment explicit, org.springframework.context.ApplicationContext context) {
+        return new ai.mindconnect.agent.tool.ToolEnvironment() {
+            @Override
+            public <T> java.util.Optional<T> get(Class<T> type) {
+                return explicit.get(type)
+                        .or(() -> java.util.Optional.ofNullable(context.getBeanProvider(type).getIfUnique()));
+            }
+
+            @Override
+            public java.util.Optional<String> getString(String key) {
+                return explicit.getString(key);
+            }
+        };
     }
 
     @Bean
@@ -334,6 +364,7 @@ public class DefaultAgentRuntimeConfig {
      * every LLM round it makes.
      */
     @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     LlmCallTraceRepository llmCallTraceRepository(
             Path agentStorageDir,
             @Value("${mindconnect.agent.trace.max-per-session:50}") int maxPerSession) {

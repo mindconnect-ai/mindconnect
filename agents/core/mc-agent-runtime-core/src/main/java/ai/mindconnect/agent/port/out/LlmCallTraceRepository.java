@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.port.out;
 
 import ai.mindconnect.agent.domain.LlmCallTrace;
+import ai.mindconnect.agent.domain.view.LlmCallTraceHeader;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,15 @@ public interface LlmCallTraceRepository {
      * the conversation id (e.g. from {@code AgentSession.conversationId()}).
      */
     List<LlmCallTrace> findByConversation(UUID conversationId);
+
+    /**
+     * The same traces as {@link #findByConversation}, as headers — the
+     * list without the payloads. The default serves the full traces; a
+     * store with the header's columns answers from those alone.
+     */
+    default List<? extends LlmCallTraceHeader> findHeadersByConversation(UUID conversationId) {
+        return findByConversation(conversationId);
+    }
 
     /**
      * Returns every trace whose context's {@code parentTurnId} chain leads

@@ -34,6 +34,51 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the tab heals itself: it keeps asking with a growing interval, and when the
   server answers again it re-requests the page — composer back to Send, stream
   re-attached, notice gone — without anybody clicking Reload.
+### Added
+
+- **common:** `mc-jdbc`, a tiny JDBC helper for repositories that store a
+  domain object as a JSONB document next to the few columns a query needs —
+  `Sql` (query/update/transaction on a `DataSource`), typed `Row` access, and
+  `DocumentTable` with upsert, find and idempotent DDL. Postgres dialect, no
+  Spring, no ORM. The groundwork for Postgres persistence in the agents area.
+- **agents:** `mc-llm-gateway-pg` (under the new `agents/adapter/postgres/`),
+  a Postgres-backed `LlmConfigRepository` — a drop-in for the file store,
+  wrapped by the same `EncryptingLlmConfigRepository`.
+- **agents:** `mc-message-repository-pg`, Postgres-backed `ConversationRepository`
+  and `MessageRepository` with the same paging and sequence-range semantics as
+  the file store.
+- **agents:** `mc-agent-runtime-pg`, the runtime's seven repository ports on
+  Postgres — agent definitions, sessions, LLM call traces (with the same
+  per-conversation retention), todo lists, conversation summaries, working
+  memory and the workspace file store. With the two modules above, the agent
+  runtime can now run entirely against Postgres.
+- **agents:** `AgentSessionRepository.findHeadersByUser` and
+  `LlmCallTraceRepository.findHeadersByConversation` return list views
+  (`AgentSessionHeader`, `LlmCallTraceHeader` in `domain.view`) that the
+  aggregates implement themselves. The file and in-memory stores serve the
+  full objects; the Postgres stores answer from columns without reading a
+  document, so a sidebar of sessions or a list of traces no longer
+  deserializes every row.
+- **agents:** the admin UI and the agent server run on Postgres with
+  `MC_PERSISTENCE=postgres` plus `MC_POSTGRES_URL` / `MC_POSTGRES_USER` /
+  `MC_POSTGRES_PASSWORD` (`mindconnect.persistence` and `mindconnect.postgres.*`
+  in the yaml). The new `mc-agent-postgres-config` module wires every
+  repository over one pooled `DataSource` and creates the tables on start;
+  the file stores step back automatically. Embedders get
+  `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)`. Default stays
+  `file` — nothing changes for an existing installation.
+- **workflow:** `mc-workflow-persistence-pg` — `WorkflowDataRepository` and
+  `WorkflowInstanceRepository` on Postgres, written through the workflow
+  area's own serializers so a definition reads back exactly as from a file.
+  The same `mindconnect.persistence=postgres` switch wires them, in the agent
+  apps and in the standalone workflow admin app alike. The admin UI seeds its
+  bundled example workflows through the repository, so they land in the
+  database too.
+- **agents:** tools now see the host's beans through the `ToolEnvironment`
+  — an explicit entry first, otherwise any unambiguous Spring bean of the
+  requested type. The workflow tools use this to offer the workflows of the
+  host's `WorkflowDataRepository` (file or Postgres) instead of opening their
+  own file store under `workflowDir`.
 
 ## [0.2.1] - 2026-09-02
 

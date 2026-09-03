@@ -45,8 +45,20 @@ public final class WorkflowToolProvider implements MultiToolProvider {
         return GROUP;
     }
 
+    /**
+     * The host's {@link WorkflowDataRepository} when it provides one — the
+     * same store the workflow admin writes to, whatever it is backed by —
+     * and the file store under {@code workflowDir} otherwise.
+     */
     @Override
     public void bind(ToolEnvironment env) {
+        Optional<WorkflowDataRepository> shared = env.get(WorkflowDataRepository.class);
+        if (shared.isPresent()) {
+            repository = shared.get();
+            log.info("WorkflowToolProvider: offering the host's workflows as tools (currently {})",
+                    toolNames().size());
+            return;
+        }
         String dir = env.getString("workflowDir").orElse("data/workflows");
         try {
             repository = new FileWorkflowDataRepository(Path.of(dir));

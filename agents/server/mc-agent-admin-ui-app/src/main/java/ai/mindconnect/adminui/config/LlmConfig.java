@@ -17,6 +17,7 @@ import okhttp3.OkHttpClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -26,6 +27,7 @@ import java.util.Map;
 public class LlmConfig {
 
     @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     LlmConfigRepository llmConfigRepository(
             @Value("${mindconnect.data.base-dir:data}") String baseDir,
             EncryptionHelper encryptionHelper) {

@@ -21,6 +21,15 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-postgres-config</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence-pg</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Tool providers (discovered via ServiceLoader SPI) -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

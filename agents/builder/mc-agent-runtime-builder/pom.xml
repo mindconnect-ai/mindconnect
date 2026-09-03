@@ -33,6 +33,19 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-message-repository</artifactId>
         </dependency>
+        <!-- usePostgres(): every store in the database -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-message-repository-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-llm-gateway-pg</artifactId>
+        </dependency>
 
         <!-- Everything below is OPTIONAL: present at compile time so the builder
              can offer typed APIs for every aspect, but never forced onto the
@@ -86,6 +99,13 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-admin-rest</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <!-- usePostgres() keeps workflows in the database too, when the workflow modules are present -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence-pg</artifactId>
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>

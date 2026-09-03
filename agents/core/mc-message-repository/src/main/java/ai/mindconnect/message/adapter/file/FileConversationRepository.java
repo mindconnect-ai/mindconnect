@@ -6,6 +6,7 @@ import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.port.out.ConversationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -24,6 +25,7 @@ import java.util.UUID;
  * makes it easy to find everything for a conversation in one folder.
  */
 @Component
+@ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
 public class FileConversationRepository implements ConversationRepository {
 
     private static final Logger log = Logger.getLogger(FileConversationRepository.class.getName());
