@@ -82,7 +82,7 @@ jobs:
       # poms (their parent isn't in that reactor), so replace the literal string
       # across every pom instead; it's complete and can't leave a mixed state.
       - name: Set release version
-        run: find . -name pom.xml -exec sed -i "s|<version>${{ steps.v.outputs.current }}</version>|<version>${{ steps.v.outputs.release }}</version>|g" {} +
+        run: sed -i "s|<revision>.*</revision>|<revision>${{ steps.v.outputs.release }}</revision>|; s|<changelist>.*</changelist>|<changelist></changelist>|" pom.xml mc-java-parent/pom.xml
 
       # Keep the copy-paste dependency snippets in the docs on the version people
       # can actually pull. Targets only a <version> that follows an mc-* artifactId,
@@ -135,7 +135,9 @@ jobs:
           git tag -a "v${{ steps.v.outputs.release }}" -m "Release v${{ steps.v.outputs.release }}"
 
       - name: Open next development version
-        run: find . -name pom.xml -exec sed -i "s|<version>${{ steps.v.outputs.release }}</version>|<version>${{ steps.v.outputs.next }}</version>|g" {} +
+        run: sed -i "s|<revision>.*</revision>|<revision>${NEXT%-SNAPSHOT}</revision>|; s|<changelist>.*</changelist>|<changelist>-SNAPSHOT</changelist>|" pom.xml mc-java-parent/pom.xml
+        env:
+          NEXT: ${{ steps.v.outputs.next }}
 
       # In the same commit as the version bump, so main always has somewhere to
       # write the next entry — the moment it does not, people stop writing them.

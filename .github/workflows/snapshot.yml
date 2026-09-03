@@ -56,7 +56,11 @@ jobs:
             cli)          pl="client/mc-agent-cli" ;;
             *)            pl="server/mc-agent-admin-ui-app,client/mc-agent-cli" ;;
           esac
-          mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am
+          # A branch build carries the branch in its version, so two branches
+          # never publish under the same name; main stays plain.
+          sha1=""; [ "$GITHUB_REF_NAME" = main ] || sha1="-$(echo "$GITHUB_REF_NAME" | tr '/A-Z' '-a-z' | tr -c 'a-z0-9.-\n' '-')"
+          echo "SHA1=$sha1" >> "$GITHUB_ENV"
+          mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am -Dsha1="$sha1"
 
       # The assets keep the version in their name — a jar sitting in a Downloads
       # folder has to be able to say what it is. That name is stable for as long
@@ -67,7 +71,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p snapshot-assets
-          ver=$(mvn -B -q -ntp -DforceStdout help:evaluate -Dexpression=project.version)
+          ver=$(mvn -B -q -ntp -DforceStdout help:evaluate -Dexpression=project.version -Dsha1="$SHA1")
           echo "VERSION=$ver" >> "$GITHUB_ENV"
           for m in server/mc-agent-admin-ui-app:mc-agent-admin-ui-app \
                    client/mc-agent-cli:mc-agent-cli; do

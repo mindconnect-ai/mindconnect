@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-agents-parent</artifactId>
-        <version>0.2.2-SNAPSHOT</version>
+        <version>${revision}${sha1}${changelist}</version>
         <relativePath>../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
@@ -34,7 +34,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-admin-rest</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Word/PDF text extraction for direct ingestion; optional — hosts
              without it fall back to UTF-8 (reflective guard). -->

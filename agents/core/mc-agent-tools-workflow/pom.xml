@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-agents-parent</artifactId>
-        <version>0.2.2-SNAPSHOT</version>
+        <version>${revision}${sha1}${changelist}</version>
         <relativePath>../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
@@ -24,22 +24,22 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-persistence</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-spi-lookup</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-schema</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>

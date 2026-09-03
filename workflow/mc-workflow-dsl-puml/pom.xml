@@ -6,14 +6,14 @@
 <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.2.2-SNAPSHOT</version>
+        <version>${revision}${sha1}${changelist}</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-workflow-dsl-puml</artifactId>
     <name>mc-workflow-dsl-puml</name>
-    <version>0.2.2-SNAPSHOT</version>
+    <version>${revision}${sha1}${changelist}</version>
     <packaging>jar</packaging>
 
     <description>
@@ -33,7 +33,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Lombok — compile-time only -->
         <dependency>

@@ -6,13 +6,13 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-java-parent</artifactId>
-        <version>0.2.2-SNAPSHOT</version>
+        <version>${revision}${sha1}${changelist}</version>
         <relativePath>../../mc-java-parent/pom.xml</relativePath>
     </parent>
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-file-manager</artifactId>
     <name>mc-file-manager</name>
-    <version>0.2.2-SNAPSHOT</version>
+    <version>${revision}${sha1}${changelist}</version>
     <description>microservice lib to upload, list and download files namespace aware</description>
     <packaging>jar</packaging>
     <properties>
