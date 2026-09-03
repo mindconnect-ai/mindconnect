@@ -140,12 +140,39 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- The repository's changelog rides inside the jar, so whoever
+                 holds a build - the desktop launcher, say - can show what it
+                 changes without asking GitHub. A branch build carries its own
+                 [Unreleased] section: the description of the very fix one
+                 installs it to try. Lands in META-INF/ of the plain jar and
+                 of the exec jar alike - repackaging keeps META-INF at the
+                 root. -->
+            <resource>
+                <directory>${project.basedir}/../../..</directory>
+                <includes>
+                    <include>CHANGELOG.md</include>
+                </includes>
+                <targetPath>META-INF</targetPath>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <executions>
+                    <!-- Version and build time next to the changelog, as
+                         META-INF/build-info.properties - the same file the
+                         actuator's /info reads. -->
                     <execution>
+                        <id>build-info</id>
+                        <goals><goal>build-info</goal></goals>
+                    </execution>
+                    <execution>
+                        <id>repackage</id>
                         <goals><goal>repackage</goal></goals>
                         <configuration>
                             <!-- The plain jar stays the main artifact (that is
