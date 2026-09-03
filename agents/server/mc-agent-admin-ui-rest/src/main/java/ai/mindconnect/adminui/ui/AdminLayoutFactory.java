@@ -18,14 +18,17 @@ import org.springframework.stereotype.Component;
 public class AdminLayoutFactory {
 
     private final boolean authEnabled;
+    private final BuildInfo buildInfo;
 
-    public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled) {
+    public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
+                              BuildInfo buildInfo) {
         this.authEnabled = authEnabled;
+        this.buildInfo = buildInfo;
     }
 
     /** Layout for the user currently in the {@link SecurityContextHolder}. */
     public AdminLayout current() {
-        return new AdminLayout(currentUserName(), authEnabled);
+        return new AdminLayout(currentUserName(), authEnabled, buildInfo.label());
     }
 
     private String currentUserName() {
