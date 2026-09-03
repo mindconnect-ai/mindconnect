@@ -53,9 +53,13 @@ public final class MessageComponent {
      * text — rendering only; the stored text is what the user typed.
      */
     private static String withAttachmentChip(Message m) {
-        var files = ai.mindconnect.agent.service.prompt.AttachmentNotice.announcedBy(m);
-        if (files.isEmpty()) return m.content();
-        return "📎 *" + String.join(", ", files) + "*\n\n" + m.content();
+        var attached = ai.mindconnect.agent.service.prompt.AttachmentNotice.announcedBy(m);
+        var removed = ai.mindconnect.agent.service.prompt.AttachmentNotice.detachedBy(m);
+        if (attached.isEmpty() && removed.isEmpty()) return m.content();
+        StringBuilder out = new StringBuilder();
+        if (!attached.isEmpty()) out.append("📎 *").append(String.join(", ", attached)).append("*\n\n");
+        if (!removed.isEmpty()) out.append("🗑 *").append(String.join(", ", removed)).append(" removed*\n\n");
+        return out.append(m.content()).toString();
     }
 
     private UiList.Item chatItem(Message m, boolean isUser) {

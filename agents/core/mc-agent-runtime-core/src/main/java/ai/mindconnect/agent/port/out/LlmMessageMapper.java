@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.port.out;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.service.ContextTokenBudget;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.message.domain.Message;
@@ -23,6 +24,21 @@ import java.util.List;
  */
 public interface LlmMessageMapper {
 
-    /** Maps a list of stored messages to LLM-ready messages, within the per-message token limit of {@code budget}. */
-    List<LlmMessage> toMessages(List<Message> messages, AgentDefinition def, ContextTokenBudget budget);
+    /**
+     * Maps a list of stored messages to LLM-ready messages, within the
+     * per-message token limit of {@code budget}. The session is the live
+     * state a record may have to be read against — what is attached to the
+     * chat <em>now</em>, not what was when the message was written.
+     */
+    List<LlmMessage> toMessages(List<Message> messages, AgentDefinition def, AgentSession session,
+                                ContextTokenBudget budget);
+
+    /**
+     * The text the model reads for one stored message — what {@link #toMessages}
+     * would put in its content. For the working-memory view, so the admin
+     * sees the same text and the same token count as the model.
+     */
+    default String modelText(Message message, AgentDefinition def, AgentSession session) {
+        return message.content();
+    }
 }

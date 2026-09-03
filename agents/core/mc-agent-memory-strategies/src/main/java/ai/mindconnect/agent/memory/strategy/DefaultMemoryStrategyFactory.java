@@ -33,17 +33,7 @@ public class DefaultMemoryStrategyFactory implements MemoryStrategyFactory {
     private final LlmConfigRepository llmConfigRepository;
     private final LlmMessageMapper messageMapper;
 
-    public DefaultMemoryStrategyFactory(ConversationManager conversationManager,
-                                        ConversationSummaryRepository summaryRepository,
-                                        ToolResultSummarizer toolResultSummarizer,
-                                        AgentTaskRunner agentTaskRunner,
-                                        TokenCounters tokenCounterRegistry,
-                                        LlmConfigRepository llmConfigRepository) {
-        this(conversationManager, summaryRepository, toolResultSummarizer, agentTaskRunner,
-                tokenCounterRegistry, llmConfigRepository, new MessageToLlmMessageMapper());
-    }
-
-    /** @param messageMapper how messages read to the model, handed to every strategy this factory creates */
+    /** @param messageMapper how messages read to the model — the host's {@link LlmMessageMapper}, or {@code new MessageToLlmMessageMapper()} */
     public DefaultMemoryStrategyFactory(ConversationManager conversationManager,
                                         ConversationSummaryRepository summaryRepository,
                                         ToolResultSummarizer toolResultSummarizer,

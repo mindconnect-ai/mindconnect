@@ -31,8 +31,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   read it — instead of only in a section at the end of the system prompt.
   The message records the announced files in its metadata; the model reads
   the notice ahead of the text, the chat shows a 📎 line, the stored text
-  stays what the user typed. The system-prompt section itself now says the
-  file is not on the filesystem. The
+  stays what the user typed. Removing a file is announced the same way —
+  the next message tells the model the content is gone and not to search
+  for it — and a file attached again after a removal is announced again;
+  no earlier message is rewritten. The Admin UI's working-memory view shows
+  the text and token counts the model receives. The system-prompt section itself now says the file
+  is not on the filesystem. The
   `vector_search`, `file_read`, document and `run_agent` tools say in their
   descriptions when they are the right choice and when another one is. The
   seeded `default-chat` prompt no longer sends attached PDFs to the document

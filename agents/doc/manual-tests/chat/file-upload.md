@@ -39,12 +39,29 @@ it via `vector_search`.
 3. Ask: `Was ist die Geheimzutat der Testsuppe? Nutze deine angehängten
    Dateien.`
    **Expected:** A `vector_search` task card runs; the answer names
+   **Paprika**. After the turn the user bubble shows a `📎 soup.md` line
+   above the question (rendered from the message's metadata; the text
+   itself is what you typed).
+4. Check the session's Memory view (session → Memory).
+   **Expected:** The user message is shown with a
+   `[System note — attached to this chat: soup.md (Markdown) …]` ahead of
+   the question — that is what the model received — and the system prompt
+   carries an "Attached files" section listing `soup.md (Markdown)`.
+5. Ask a second question about the file.
+   **Expected:** The answer is right again; the new user bubble has NO 📎
+   line — a file is announced once, later turns rely on the system-prompt
+   section.
+6. Remove the chip (×), then ask the same question again.
+   **Expected:** Removal toast. The new user bubble shows a
+   `🗑 soup.md removed` line; the agent answers that the file was removed
+   and does NOT search the web for it. In the Memory view the new message
+   carries a `[System note — removed from this chat: soup.md …]`, the
+   earlier attach note no longer names `soup.md`, and the "Attached files"
+   section is gone.
+7. Attach `soup.md` again and ask once more.
+   **Expected:** The new user bubble has a `📎 soup.md` line again (a
+   re-attach after a removal is announced afresh) and the answer names
    **Paprika**.
-4. Check the session's system-prompt context (session → Memory view).
-   **Expected:** The attached file is announced (attached-files note), and
-   `vector_search` is active for the session.
-5. Remove the chip (×), then ask the same question again.
-   **Expected:** Removal toast; the agent can no longer find the fact.
 
 ## Cleanup
 

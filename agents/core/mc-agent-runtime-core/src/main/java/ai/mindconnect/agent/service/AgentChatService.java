@@ -61,9 +61,6 @@ import java.util.function.Consumer;
  */
 public class AgentChatService {
 
-    /** How far back a turn looks for earlier attachment notices — a conversation longer than this is paged by the memory strategy anyway. */
-    private static final int HISTORY_SCAN = 10_000;
-
     private static final Logger log = LoggerFactory.getLogger(AgentChatService.class);
 
     /** Upper bound on one turn, sub-agents included — a safety net, not a target. */
@@ -127,9 +124,8 @@ public class AgentChatService {
         AgentSession session = sessionService.findSession(sessionId);
         AgentDefinition def = effectiveDefinition(session);
 
-        List<Message> history = conversationManager
-                .loadHistory(session.conversationId(), new PageRequest(0, HISTORY_SCAN));
-        boolean isFirstMessage = history.isEmpty();
+        boolean isFirstMessage = conversationManager
+                .loadHistory(session.conversationId(), new PageRequest(0, 1)).isEmpty();
 
         UUID turnId = UUID.randomUUID();
 
@@ -142,9 +138,15 @@ public class AgentChatService {
         //    (metadata); the model reads the notice with the question, the
         //    text stays what the user typed.
         TokenCounter tokenCounter = memoryStrategyFactory.create(def).resolveTokenCounter(def);
-        List<String> fresh = AttachmentNotice.unannounced(session, history);
+        //    An attachment that was removed since is announced the same way,
+        //    so the model stops looking for it. Both are read off the record;
+        //    the record itself is never rewritten.
+        List<Message> history = isFirstMessage ? List.of()
+                : conversationManager.loadCompleteHistory(session.conversationId()).messages();
+        List<String> attached = AttachmentNotice.unannounced(session, history);
+        List<String> detached = AttachmentNotice.unannouncedRemovals(session, history);
         AgentTurnWorker.appendUserMessage(conversationManager, session.conversationId(),
-                userMessage, turnId, tokenCounter, AttachmentNotice.metadata(fresh));
+                userMessage, turnId, tokenCounter, AttachmentNotice.metadata(attached, detached));
 
         // 2.+3. Listen on the turn's channel, make the turn a task — the queue
         //        is the only registry of running work, nothing is tracked here.

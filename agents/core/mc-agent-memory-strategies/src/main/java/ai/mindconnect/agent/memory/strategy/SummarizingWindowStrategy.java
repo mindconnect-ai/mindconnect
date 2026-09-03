@@ -13,7 +13,6 @@ import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.port.out.ToolResultSummarizer;
 import ai.mindconnect.agent.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.port.out.LlmMessageMapper;
-import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
 import ai.mindconnect.agent.service.StatelessAgentSeeder;
 import ai.mindconnect.agent.port.out.TokenCounters;
 import ai.mindconnect.common.AuthenticationInfo;
@@ -56,16 +55,6 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
     private final TokenCounters tokenCounterRegistry;
     private final LlmConfigRepository llmConfigRepository;
     private final LlmMessageMapper messageMapper;
-
-    public SummarizingWindowStrategy(SummarizingWindowConfig cfg,
-                                     ConversationManager conversationManager,
-                                     ConversationSummaryRepository summaryRepository,
-                                     ToolResultSummarizer toolResultSummarizer,
-                                     AgentTaskRunner agentTaskRunner,
-                                     TokenCounters tokenCounterRegistry,
-                                     LlmConfigRepository llmConfigRepository) {
-        this(cfg, conversationManager, summaryRepository, toolResultSummarizer, agentTaskRunner, tokenCounterRegistry, llmConfigRepository, new MessageToLlmMessageMapper());
-    }
 
     /** @param messageMapper how the selected messages read to the model — the host's {@link LlmMessageMapper} */
     public SummarizingWindowStrategy(SummarizingWindowConfig cfg,
@@ -123,7 +112,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
                 result.add(LlmMessage.user(summaryUserMsg));
             }
         }
-        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(windowed), def, budget));
+        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(windowed), def, session, budget));
         return result;
     }
 
@@ -147,7 +136,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
                 new ArrayList<>(SummaryWindowMessages.render(summaries, budget.counter()));
         for (Message m : windowed) {
             String effective = m.compressed() && m.compressedContent() != null
-                    ? m.compressedContent() : m.content();
+                    ? m.compressedContent() : messageMapper.modelText(m, def, session);
             int tokens = budget.counter().countText(effective);
             String role = switch (m.senderType()) {
                 case USER  -> "USER";
@@ -157,7 +146,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
             messages.add(new WorkingMemory.WorkingMemoryMessage(
                     m.type().name(), role, m.sequenceNum(),
                     m.sentAt().toEpochMilli(), tokens,
-                    m.content(), m.compressed(), m.compressedContent()));
+                    messageMapper.modelText(m, def, session), m.compressed(), m.compressedContent()));
         }
         return messages;
     }

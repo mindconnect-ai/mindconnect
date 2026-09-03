@@ -198,14 +198,14 @@ public final class AgentRuntimeBuilder {
     }
 
     /** {@code "rule"} (default, no LLM) or {@code "llm"} for tool-result summarization. */
-    /** How stored messages read to the model; the default renders text, tool calls, results and attachment notices. */
-    public AgentRuntimeBuilder llmMessageMapper(ai.mindconnect.agent.port.out.LlmMessageMapper mapper) {
-        this.llmMessageMapper = mapper;
+    public AgentRuntimeBuilder toolResultSummarizer(String type) {
+        this.toolResultSummarizer = type;
         return this;
     }
 
-    public AgentRuntimeBuilder toolResultSummarizer(String type) {
-        this.toolResultSummarizer = type;
+    /** How stored messages read to the model; the default renders text, tool calls, results and attachment notices. */
+    public AgentRuntimeBuilder llmMessageMapper(ai.mindconnect.agent.port.out.LlmMessageMapper mapper) {
+        this.llmMessageMapper = mapper;
         return this;
     }
 

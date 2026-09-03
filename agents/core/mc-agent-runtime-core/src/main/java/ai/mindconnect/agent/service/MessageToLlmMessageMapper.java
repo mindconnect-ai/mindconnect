@@ -2,12 +2,14 @@ package ai.mindconnect.agent.service;
 
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.service.ContextTokenBudget;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.ThinkingBlock;
 import ai.mindconnect.llm.domain.ToolCall;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -45,17 +47,14 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
     @Override
     public List<LlmMessage> toMessages(List<Message> messages,
                                        AgentDefinition def,
+                                       AgentSession session,
                                        ContextTokenBudget budget) {
         List<LlmMessage> result = new ArrayList<>();
         for (Message m : messages) {
             switch (m.type()) {
                 case CHAT -> {
                     boolean assistant = m.senderId().equals(def.id());
-                    // A user message that announced attachments (metadata) gets
-                    // the notice ahead of its text here, in the model's view —
-                    // the stored text stays what the user typed.
-                    String text = assistant ? m.content() : AttachmentNotice.forModel(m);
-                    String content = guard(text, budget, m.sequenceNum(), "CHAT");
+                    String content = guard(modelText(m, def, session), budget, m.sequenceNum(), "CHAT");
                     result.add(assistant ? LlmMessage.assistant(content) : LlmMessage.user(content));
                 }
                 case TOOL_CALL -> mapToolCall(m, result);
@@ -64,6 +63,18 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
             }
         }
         return result;
+    }
+
+    /**
+     * A user message that announced attachments (metadata) gets the notice
+     * ahead of its text — the stored text stays what the user typed. Only
+     * files still attached are named: a removed one is gone from the store,
+     * so it must be gone from the notice too. Assistant text is as stored.
+     */
+    @Override
+    public String modelText(Message m, AgentDefinition def, AgentSession session) {
+        if (m.type() != MessageType.CHAT || m.senderId().equals(def.id())) return m.content();
+        return AttachmentNotice.forModel(m, session);
     }
 
     // ── private helpers ───────────────────────────────────────────────────────

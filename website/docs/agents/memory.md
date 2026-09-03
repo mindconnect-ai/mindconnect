@@ -165,6 +165,22 @@ token floor guard it.
 No flags. Only the system prompt and the current turn's messages reach the
 LLM — for one-shot helpers and stateless task runners.
 
+## How messages reach the model
+
+Whatever a strategy selects, one port turns the stored messages into the
+model's messages: `LlmMessageMapper`, with `MessageToLlmMessageMapper` as
+the default. It maps user and assistant text, tool calls and tool results,
+and renders what a message's metadata means for the model — a user message
+that announced attachments gets the attachment notice ahead of its text
+(see [Vector store](./vector-store.md#how-the-agent-learns-about-an-attachment)).
+The working-memory view in the Admin UI shows the same text and token counts
+the model receives.
+
+It is the read-side extension point, and deliberately the only one: there
+is no per-message-type hook, the mapper sees them all. A Spring host
+replaces it by defining a bean of type `LlmMessageMapper`; an embedder
+passes one to `AgentRuntimeBuilder.llmMessageMapper(...)`.
+
 ## What the Compact button does
 
 The session view's *Compact* action calls the strategy's `compress()`:

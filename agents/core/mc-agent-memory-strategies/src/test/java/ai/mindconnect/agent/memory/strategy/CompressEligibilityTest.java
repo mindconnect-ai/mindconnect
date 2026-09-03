@@ -75,7 +75,7 @@ class CompressEligibilityTest {
                 null,                       // summaries — untouched by this hook
                 (toolName, fullResult) -> "STUB",
                 null,                       // task runner — untouched by this hook
-                counters, configs);
+                counters, configs, new ai.mindconnect.agent.service.MessageToLlmMessageMapper());
     }
 
     private AgentDefinition def() {
