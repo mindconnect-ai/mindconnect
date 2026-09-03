@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui;
 
 import ai.mindconnect.ui.model.UiAppShell;
+import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiHeader;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiMenu;
@@ -22,15 +23,19 @@ public final class AdminLayout {
 
     private final String userName;
     private final boolean authEnabled;
+    private final String versionLabel;
 
     /**
      * @param userName    display name of the current user (e.g. {@code "mc_user"})
      * @param authEnabled whether Keycloak auth is on; the logout link is shown
      *                    only then (with auth off the user is a fixed dev user)
+     * @param versionLabel the build's short version for the header, or null
+     *                     when this is not a packaged build
      */
-    public AdminLayout(String userName, boolean authEnabled) {
+    public AdminLayout(String userName, boolean authEnabled, String versionLabel) {
         this.userName = userName;
         this.authEnabled = authEnabled;
+        this.versionLabel = versionLabel;
     }
 
     /**
@@ -61,6 +66,15 @@ public final class AdminLayout {
         // logout), so it's a plain link, not a semantic-ui action. Shown only
         // when auth is enabled — with auth off there's a fixed dev user and
         // nothing to log out of.
+        // The build's version, small and muted, right of the brand: status,
+        // not identity, so it sits beside the user widget rather than in it.
+        // A click opens the About dialog with build time, commit, branch and
+        // the changelog section of this build.
+        if (versionLabel != null) {
+            header.extra(UiAction.link("about-version", versionLabel)
+                    .dispatch("GET", "/admin/api/about")
+                    .withCssClass("sui-hint"));
+        }
         if (authEnabled) {
             header.extra(UiLink.of("logout", "/admin/logout", "Logout"));
         }
