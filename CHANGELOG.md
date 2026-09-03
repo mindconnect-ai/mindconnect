@@ -42,7 +42,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   framework also marks a stream that way when a turn finishes while you are on
   another page, and keeps it so for a few seconds after you come back. The
   notice now asks the server before claiming it is gone: a reachable server
-  means nothing was lost, and a dead one cannot answer.
+  means nothing was lost, and a dead one cannot answer. And once it *is* gone,
+  the tab heals itself: it keeps asking with a growing interval, and when the
+  server answers again it re-requests the page — composer back to Send, stream
+  re-attached, notice gone — without anybody clicking Reload.
 
 
 - **Losing the server no longer leaves the chat silently stuck.** When the
