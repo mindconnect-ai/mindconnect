@@ -74,9 +74,58 @@ bus.setFetcher(bffFetch)
  * loop. A person clicking Reload cannot loop.
  */
 function noticeLostStream(streams) {
-    const lost = streams.some(s => s.pageAttached
+    const suspect = streams.some(s => s.pageAttached
             && (s.state === "completed" || s.state === "errored"));
-    if (!lost || document.getElementById("stream-lost-banner")) return;
+    if (!suspect || document.getElementById("stream-lost-banner") || noticeLostStream._probing) return;
+    // "completed" is not proof. The framework also uses it for a turn that
+    // finished while the page was away, and the handle keeps that state for a
+    // few seconds after the page comes back — long enough to look exactly
+    // like a lost connection. So ask the server before claiming it is gone:
+    // a reachable server means nothing was lost; a dead one cannot answer.
+    noticeLostStream._probing = true;
+    probeServer()
+        .then(alive => { if (!alive) connectionLost(); })
+        .finally(() => { noticeLostStream._probing = false; });
+}
+
+/** True when the server answers at all — any HTTP status below 500 is a live server. */
+function probeServer() {
+    return fetch("/chat/api/streams", { headers: { Accept: "application/json" }, cache: "no-store" })
+        .then(res => res.status < 500)
+        .catch(() => false);
+}
+
+/**
+ * The server is gone. Show the notice, then keep asking with a growing
+ * interval until it answers again — and when it does, re-request the current
+ * page once. That renders the composer from what the server actually knows
+ * (a turn that died with it is no longer "running") and re-attaches the
+ * session stream, so the tab heals without anybody clicking.
+ *
+ * The earlier worry about re-fetch loops was about re-fetching on every
+ * stream end. This re-fetches once per recovery, only after a real outage,
+ * and the backoff bounds the rate under a server that keeps flapping.
+ */
+function connectionLost() {
+    if (connectionLost._polling) return;
+    connectionLost._polling = true;
+    showLostStreamBanner();
+    let delay = 2000;
+    const tick = () => probeServer().then(alive => {
+        if (alive) {
+            connectionLost._polling = false;
+            document.getElementById("stream-lost-banner")?.remove();
+            void bus.navigate(window.location.pathname + window.location.search);
+            return;
+        }
+        delay = Math.min(delay * 2, 30000);
+        setTimeout(tick, delay);
+    });
+    setTimeout(tick, delay);
+}
+
+function showLostStreamBanner() {
+    if (document.getElementById("stream-lost-banner")) return;
 
     const banner = document.createElement("div");
     banner.id = "stream-lost-banner";
