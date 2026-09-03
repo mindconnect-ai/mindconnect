@@ -19,7 +19,7 @@
              ./after-branch-creation.sh into the git-ignored .mvn/maven.config. -->
         <revision>0.3.1</revision>
         <sha1></sha1>
-        <changelist>-SNAPSHOT</changelist>
+        <changelist></changelist>
         <!-- The root aggregator itself is never published. -->
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>

@@ -42,7 +42,7 @@
              ./after-branch-creation.sh into the git-ignored .mvn/maven.config. -->
         <revision>0.3.1</revision>
         <sha1></sha1>
-        <changelist>-SNAPSHOT</changelist>
+        <changelist></changelist>
         <!-- Version of the published semantic-ui artifacts (their own repo:
              mindconnect-ai/mc-semantic-ui) consumed across the monorepo. -->
         <semantic-ui.version>0.3.0</semantic-ui.version>
