@@ -14,7 +14,7 @@ parameter and produces a result.
 <dependency>
   <groupId>ai.mindconnect</groupId>
   <artifactId>mc-workflow</artifactId>
-  <version>0.2.2</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
@@ -100,12 +100,12 @@ For example, Groovy:
 <dependency>
   <groupId>ai.mindconnect</groupId>
   <artifactId>mc-workflow-code-groovy</artifactId>
-  <version>0.2.2</version>
+  <version>0.3.0</version>
 </dependency>
 <dependency>
   <groupId>ai.mindconnect</groupId>
   <artifactId>mc-workflow-spi-lookup</artifactId>
-  <version>0.2.2</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
@@ -167,7 +167,7 @@ With `mc-workflow-jackson` a workflow is a plain JSON document. Add the module:
 <dependency>
   <groupId>ai.mindconnect</groupId>
   <artifactId>mc-workflow-jackson</artifactId>
-  <version>0.2.2</version>
+  <version>0.3.0</version>
 </dependency>
 ```
 
