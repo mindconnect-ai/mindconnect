@@ -55,6 +55,18 @@ carry the implementations.
 
 See [vector store & file store](./vector-store.md).
 
+## `adapter/` — the ports on Postgres
+
+| Module | Purpose |
+|--------|---------|
+| `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres. |
+| `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres. |
+| `postgres/mc-agent-runtime-pg` | The runtime's seven repository ports on Postgres — definitions, sessions, traces, todo lists, summaries, working memory, workspace files. |
+| `postgres/mc-agent-postgres-config` | Spring auto-configuration: `mindconnect.persistence=postgres` serves every port from one pooled `DataSource` and creates the tables on start. |
+
+All of them build on `common/mc-jdbc`, a tiny JDBC helper (JSONB document
+tables, typed rows, transactions — no ORM). See [Persistence](./persistence.md#postgres).
+
 ## `builder/` & `demo/` — embedding
 
 | Module | Purpose |

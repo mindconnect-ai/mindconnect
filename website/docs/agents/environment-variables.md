@@ -22,6 +22,9 @@ export TAVILY_API_KEY=tvly-...
 | Variable | Default | Notes |
 |----------|---------|-------|
 | `MINDCONNECT_ENCRYPTION_SECRET_KEY` | _(none)_ | **Required.** Encrypts stored LLM credentials. No default on purpose — the app **fails to start** without it. Must be **16, 24 or 32 characters** (used directly as an AES key). |
+| `MC_PERSISTENCE` | `file` | `file` keeps everything under `mindconnect.data.base-dir`; `postgres` keeps it in the database — see [Persistence](./persistence.md#postgres). Since 0.3.0. |
+| `MC_POSTGRES_URL` | `jdbc:postgresql://localhost:5432/mindconnect` | JDBC URL, used with `MC_PERSISTENCE=postgres`. Tables are created on start. |
+| `MC_POSTGRES_USER` / `MC_POSTGRES_PASSWORD` | _(empty)_ | Database credentials. |
 
 ## Runtime configuration (Spring properties)
 
@@ -30,7 +33,9 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 
 | Property | Default | Notes |
 |----------|---------|-------|
-| `mindconnect.data.base-dir` | `data` | Root for **all** persistence (definitions, configs, conversations, workspaces). |
+| `mindconnect.persistence` | `file` | `file` or `postgres` — bound to `MC_PERSISTENCE` in the apps' yaml. |
+| `mindconnect.postgres.*` | — | `url`, `username`, `password`, `pool-size` (default 10) for `postgres` mode; bound to `MC_POSTGRES_*`. |
+| `mindconnect.data.base-dir` | `data` | Root for **all** file persistence (definitions, configs, conversations, workspaces); in `postgres` mode only the file-based side channels. |
 | `mindconnect.tools.base-dir` | user home | Working/base directory for `bash` and the file tools — security-relevant. |
 | `mindconnect.user.id` | app-specific | The user id that owns sessions and data (the CLI ships a hard-coded default). |
 | `mindconnect.remote.url` | _(unset)_ | Points the CLI at a remote agent server instead of local mode. |
