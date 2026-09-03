@@ -28,6 +28,7 @@
         <module>../common/mc-script-mini</module>
         <module>../common/mc-initial-data</module>
         <module>../common/mc-schema</module>
+        <module>../common/mc-jdbc</module>
         <!-- Core API — no internal dependencies -->
         <module>mc-workflow</module>
         <!-- Language engine registrations — each depends on mc-workflow-code -->
