@@ -35,6 +35,11 @@
     </scm>
 
     <properties>
+        <!-- CI-friendly version: Maven permits exactly these three placeholders in
+             <version>. revision is the number, changelist is -SNAPSHOT or empty for a
+             release, and sha1 - Maven's name, meant for a commit hash - is the one that
+             is free, so it carries the branch suffix: -Dsha1=-feature-x, written by
+             ./after-branch-creation.sh into the git-ignored .mvn/maven.config. -->
         <revision>0.2.2</revision>
         <sha1></sha1>
         <changelist>-SNAPSHOT</changelist>
