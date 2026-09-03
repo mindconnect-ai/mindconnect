@@ -23,7 +23,7 @@ permissions:
   contents: write   # move the `snapshot` tag and write its release
 
 concurrency:
-  group: snapshot
+  group: snapshot-${{ github.ref_name }}   # one channel per branch, so branches do not queue behind each other
   cancel-in-progress: false
 
 jobs:
@@ -60,6 +60,10 @@ jobs:
           # never publish under the same name; main stays plain.
           sha1=""; [ "$GITHUB_REF_NAME" = main ] || sha1="-$(echo "$GITHUB_REF_NAME" | tr '/A-Z' '-a-z' | tr -c 'a-z0-9.-\n' '-')"
           echo "SHA1=$sha1" >> "$GITHUB_ENV"
+          # The release each branch publishes to: main keeps the plain `snapshot`
+          # channel the launcher reads; every other branch gets its own, named
+          # after itself, so a branch run never replaces main's jars.
+          echo "TAG=snapshot$sha1" >> "$GITHUB_ENV"
           mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am -Dsha1="$sha1"
 
       # The assets keep the version in their name — a jar sitting in a Downloads
@@ -98,15 +102,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          base="https://github.com/$GITHUB_REPOSITORY/releases/download/snapshot"
-          gh release delete snapshot --yes --cleanup-tag || true
-          gh release create snapshot snapshot-assets/* \
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" snapshot-assets/* \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Snapshot $VERSION ($(date -u +%Y-%m-%d))" \
+            --title "Snapshot $GITHUB_REF_NAME · $VERSION ($(date -u +%Y-%m-%d))" \
             --notes "Version \`$VERSION\`, built from \`$GITHUB_REF_NAME\` at ${GITHUB_SHA::7}.
 
-          Not a release: these assets are replaced in place whenever the snapshot workflow runs. For something that stays put, take a version from [Maven Central](https://central.sonatype.com/namespace/ai.mindconnect) or a tagged release.
+          Not a release: these assets are replaced in place whenever the snapshot workflow runs for this branch. \`main\` publishes to \`snapshot\`; any other branch to \`snapshot-<branch>\`, with \`/\` in the name turned into \`-\`. For something that stays put, take a version from [Maven Central](https://central.sonatype.com/namespace/ai.mindconnect) or a tagged release.
 
           \`\`\`bash
           curl -LO $base/mc-agent-admin-ui-app-$VERSION-exec.jar
