@@ -37,6 +37,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **The "connection lost" notice no longer appears while the server is fine.**
+  It fired on any stream that ended while its page was mounted — but the
+  framework also marks a stream that way when a turn finishes while you are on
+  another page, and keeps it so for a few seconds after you come back. The
+  notice now asks the server before claiming it is gone: a reachable server
+  means nothing was lost, and a dead one cannot answer.
+
+
 - **Losing the server no longer leaves the chat silently stuck.** When the
   server went away mid-turn — a restart, a crash — the composer stayed on
   "AI is thinking" and a half-streamed reply froze in place, with nothing to

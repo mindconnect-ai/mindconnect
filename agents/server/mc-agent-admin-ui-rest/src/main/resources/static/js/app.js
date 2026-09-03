@@ -74,9 +74,23 @@ bus.setFetcher(bffFetch)
  * loop. A person clicking Reload cannot loop.
  */
 function noticeLostStream(streams) {
-    const lost = streams.some(s => s.pageAttached
+    const suspect = streams.some(s => s.pageAttached
             && (s.state === "completed" || s.state === "errored"));
-    if (!lost || document.getElementById("stream-lost-banner")) return;
+    if (!suspect || document.getElementById("stream-lost-banner") || noticeLostStream._probing) return;
+    // "completed" is not proof. The framework also uses it for a turn that
+    // finished while the page was away, and the handle keeps that state for a
+    // few seconds after the page comes back — long enough to look exactly
+    // like a lost connection. So ask the server before claiming it is gone:
+    // a reachable server means nothing was lost; a dead one cannot answer.
+    noticeLostStream._probing = true;
+    fetch("/chat/api/streams", { headers: { Accept: "application/json" }, cache: "no-store" })
+        .then(res => { if (!res.ok && res.status >= 500) showLostStreamBanner(); })
+        .catch(showLostStreamBanner)
+        .finally(() => { noticeLostStream._probing = false; });
+}
+
+function showLostStreamBanner() {
+    if (document.getElementById("stream-lost-banner")) return;
 
     const banner = document.createElement("div");
     banner.id = "stream-lost-banner";
