@@ -15,7 +15,7 @@ no leader election, no extra queue service.
 <dependency>
   <groupId>ai.mindconnect</groupId>
   <artifactId>mc-task-queue-jdbc</artifactId>
-  <version>0.2.1</version>
+  <version>0.2.2</version>
 </dependency>
 ```
 
