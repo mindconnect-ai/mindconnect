@@ -6,7 +6,7 @@
 
     <groupId>ai.mindconnect</groupId>
     <artifactId>mc-java-parent</artifactId>
-    <version>0.2.2-SNAPSHOT</version>
+    <version>${revision}${sha1}${changelist}</version>
     <packaging>pom</packaging>
     <name>mc-java-parent</name>
     <description>Lightweight parent for pure Java modules — no Spring, no framework</description>
@@ -35,6 +35,14 @@
     </scm>
 
     <properties>
+        <!-- CI-friendly version: Maven permits exactly these three placeholders in
+             <version>. revision is the number, changelist is -SNAPSHOT or empty for a
+             release, and sha1 - Maven's name, meant for a commit hash - is the one that
+             is free, so it carries the branch suffix: -Dsha1=-feature-x, written by
+             ./after-branch-creation.sh into the git-ignored .mvn/maven.config. -->
+        <revision>0.2.2</revision>
+        <sha1></sha1>
+        <changelist>-SNAPSHOT</changelist>
         <!-- Version of the published semantic-ui artifacts (their own repo:
              mindconnect-ai/mc-semantic-ui) consumed across the monorepo. -->
         <semantic-ui.version>0.3.0</semantic-ui.version>
@@ -118,6 +126,21 @@
                 </plugin>
             </plugins>
         </pluginManagement>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>flatten-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <updatePomFile>true</updatePomFile>
+                    <flattenMode>resolveCiFriendliesOnly</flattenMode>
+                </configuration>
+                <executions>
+                    <execution><id>flatten</id><phase>process-resources</phase><goals><goal>flatten</goal></goals></execution>
+                    <execution><id>flatten-clean</id><phase>clean</phase><goals><goal>clean</goal></goals></execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <!--

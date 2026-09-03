@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-workflow-parent</artifactId>
-        <version>0.2.2-SNAPSHOT</version>
+        <version>${revision}${sha1}${changelist}</version>
         <relativePath>../mc-workflow-parent/pom.xml</relativePath>
     </parent>
 

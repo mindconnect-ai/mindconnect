@@ -7,7 +7,7 @@
     <parent>
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-agents-parent</artifactId>
-        <version>0.2.2-SNAPSHOT</version>
+        <version>${revision}${sha1}${changelist}</version>
         <relativePath>../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
@@ -33,7 +33,7 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-chat-ui-rest</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Tool providers (discovered via ServiceLoader SPI) -->
         <dependency>
@@ -66,14 +66,14 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-admin-rest</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <!-- Code steps in workflows need a script engine (same choice as the standalone admin app) -->
         <!-- Seeds the bundled example workflows into the store on startup -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-initial-data</artifactId>
-            <version>0.2.2-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

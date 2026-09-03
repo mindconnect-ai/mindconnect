@@ -23,7 +23,7 @@ permissions:
   contents: write   # move the `snapshot` tag and write its release
 
 concurrency:
-  group: snapshot
+  group: snapshot-${{ github.ref_name }}   # one channel per branch, so branches do not queue behind each other
   cancel-in-progress: false
 
 jobs:
@@ -43,10 +43,24 @@ jobs:
       # The agents reactor consumes workflow artifacts it does not build
       # itself, and needs the base parent as an installed artifact — the same
       # prerequisites build.yml sets up for the agents area.
+      # One version for the whole run. The areas are built by separate Maven
+      # invocations, and every one of them must see the same -Dsha1 — the
+      # agents reactor resolves the workflow area's jars from the local
+      # repository by their full version, suffix included.
+      - name: Pick the version suffix
+        run: |
+          set -euo pipefail
+          sha1=""; [ "$GITHUB_REF_NAME" = main ] || sha1="-$(echo "$GITHUB_REF_NAME" | tr '/A-Z' '-a-z' | tr -c 'a-z0-9.\n-' '-')"
+          echo "SHA1=$sha1" >> "$GITHUB_ENV"
+          # main keeps the plain `snapshot` channel the launcher reads; every
+          # other branch publishes to its own, so a branch run never replaces
+          # main's jars.
+          echo "TAG=snapshot$sha1" >> "$GITHUB_ENV"
+
       - name: Install parent + workflow artifacts
         run: |
-          mvn -B -ntp -N -f mc-java-parent/pom.xml install
-          mvn -B -ntp -f workflow/pom.xml clean install -DskipTests
+          mvn -B -ntp -N -f mc-java-parent/pom.xml install -Dsha1="$SHA1"
+          mvn -B -ntp -f workflow/pom.xml clean install -DskipTests -Dsha1="$SHA1"
 
       - name: Build the executable jars
         run: |
@@ -56,7 +70,7 @@ jobs:
             cli)          pl="client/mc-agent-cli" ;;
             *)            pl="server/mc-agent-admin-ui-app,client/mc-agent-cli" ;;
           esac
-          mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am
+          mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am -Dsha1="$SHA1"
 
       # The assets keep the version in their name — a jar sitting in a Downloads
       # folder has to be able to say what it is. That name is stable for as long
@@ -67,7 +81,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p snapshot-assets
-          ver=$(mvn -B -q -ntp -DforceStdout help:evaluate -Dexpression=project.version)
+          ver=$(mvn -B -q -ntp -DforceStdout help:evaluate -Dexpression=project.version -Dsha1="$SHA1")
           echo "VERSION=$ver" >> "$GITHUB_ENV"
           for m in server/mc-agent-admin-ui-app:mc-agent-admin-ui-app \
                    client/mc-agent-cli:mc-agent-cli; do
@@ -94,15 +108,15 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          base="https://github.com/$GITHUB_REPOSITORY/releases/download/snapshot"
-          gh release delete snapshot --yes --cleanup-tag || true
-          gh release create snapshot snapshot-assets/* \
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          gh release create "$TAG" snapshot-assets/* \
             --prerelease \
             --target "$GITHUB_SHA" \
-            --title "Snapshot $VERSION ($(date -u +%Y-%m-%d))" \
+            --title "Snapshot $GITHUB_REF_NAME · $VERSION ($(date -u +%Y-%m-%d))" \
             --notes "Version \`$VERSION\`, built from \`$GITHUB_REF_NAME\` at ${GITHUB_SHA::7}.
 
-          Not a release: these assets are replaced in place whenever the snapshot workflow runs. For something that stays put, take a version from [Maven Central](https://central.sonatype.com/namespace/ai.mindconnect) or a tagged release.
+          Not a release: these assets are replaced in place whenever the snapshot workflow runs for this branch. \`main\` publishes to \`snapshot\`; any other branch to \`snapshot-<branch>\`, with \`/\` in the name turned into \`-\`. For something that stays put, take a version from [Maven Central](https://central.sonatype.com/namespace/ai.mindconnect) or a tagged release.
 
           \`\`\`bash
           curl -LO $base/mc-agent-admin-ui-app-$VERSION-exec.jar

@@ -85,3 +85,7 @@ semantic-ui/editor/mc-sui-editor/src/main/sui/
 # Marketing drafts: the LinkedIn post, its kit and its screenshots. Written
 # here because that is where the app is, published from somewhere else.
 /website/docs/agents/posts/
+
+# CI-friendly versions: flatten writes these beside each pom; the branch suffix lives per clone
+.flattened-pom.xml
+/.mvn/maven.config

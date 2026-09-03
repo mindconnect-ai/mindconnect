@@ -134,6 +134,12 @@ mvn -f taskqueue/pom.xml clean install -DskipTests
 # Build a single module
 mvn -f <module-path>/pom.xml clean install
 
+# Working on a branch: run this ONCE after creating (or checking out) the
+# branch. It writes the git-ignored .mvn/maven.config, and from then on every
+# build in this checkout installs as 0.x.y-<branch>-SNAPSHOT — parallel
+# branches never overwrite each other in the shared ~/.m2. Safe to re-run.
+./after-branch-creation.sh
+
 # If you change a core/shared module, rebuild it before dependent modules
 
 # Release to Maven Central (CI: .github/workflows/release.yml; needs the
