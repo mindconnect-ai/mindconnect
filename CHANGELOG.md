@@ -53,6 +53,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   defining a bean of that type, an embedder via
   `AgentRuntimeBuilder.llmMessageMapper(...)`. The read-side extension point
   for how a conversation reads to the model — one place, every message type.
+- **agents:** the admin-ui server jar carries the repository's `CHANGELOG.md`
+  as `META-INF/CHANGELOG.md`, plus Spring Boot build info
+  (`META-INF/build-info.properties`: version and build time). Whoever holds a
+  build — the desktop launcher, for one — can show what it changes without
+  asking GitHub, and a branch build carries its own `[Unreleased]` section:
+  the description of the very fix one installs it to try.
 
 ## [0.3.0] - 2026-09-03
 
