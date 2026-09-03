@@ -73,6 +73,20 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime</artifactId>
         </dependency>
+        <!-- persistence: one starter per backend, mindconnect.persistence picks -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-file</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-postgres</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence-pg</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-message-repository</artifactId>

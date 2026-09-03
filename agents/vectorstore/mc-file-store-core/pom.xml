@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-file-store-core</artifactId>
+    <name>mc-file-store-core</name>
+    <packaging>jar</packaging>
+    <description>
+        The file store's ports: FileStore (id-addressed save/find/content/list/
+        delete), StoredFile, and the FileStoreBackend SPI through which
+        backends register. No dependencies — an adapter implements this, a
+        consumer depends on this and nothing else.
+    </description>
+</project>

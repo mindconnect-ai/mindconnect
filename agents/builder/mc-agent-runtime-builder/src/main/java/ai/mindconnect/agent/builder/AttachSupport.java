@@ -34,16 +34,20 @@ final class AttachSupport {
     private final AgentSessionRepository sessions;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final ai.mindconnect.vectorstore.tools.VectorStores stores;
+    /** The host's workflow store when it has one (Postgres); null means the file store under {@code workflowDir}. */
+    private final ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows;
 
     private AttachSupport(Map<String, String> environment, DynamicToolActivations activations,
                           AgentSessionRepository sessions,
                           ai.mindconnect.filestore.FileStore fileStore,
-                          ai.mindconnect.vectorstore.tools.VectorStores stores) {
+                          ai.mindconnect.vectorstore.tools.VectorStores stores,
+                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows) {
         this.environment = environment;
         this.activations = activations;
         this.sessions = sessions;
         this.fileStore = fileStore;
         this.stores = stores;
+        this.workflows = workflows;
     }
 
     /** Null when the optional file/vector modules are not on the classpath. */
@@ -51,14 +55,16 @@ final class AttachSupport {
                                          DynamicToolActivations activations,
                                          AgentSessionRepository sessions,
                                          LlmEmbeddings embeddings,
-                                         LlmConfigRepository llmConfigs) {
+                                         LlmConfigRepository llmConfigs,
+                                         ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
+                                         ai.mindconnect.filestore.FileStore hostFileStore) {
         try {
             Class.forName("ai.mindconnect.filestore.FileStoreBackend");
             Class.forName("ai.mindconnect.vectorstore.tools.VectorStores");
         } catch (ClassNotFoundException e) {
             return null;
         }
-        return create(environment, activations, sessions, embeddings, llmConfigs);
+        return create(environment, activations, sessions, embeddings, llmConfigs, workflows, hostFileStore);
     }
 
     /** Separate method so optional types are only linked once the guard passed. */
@@ -66,8 +72,10 @@ final class AttachSupport {
                                         DynamicToolActivations activations,
                                         AgentSessionRepository sessions,
                                         LlmEmbeddings embeddings,
-                                        LlmConfigRepository llmConfigs) {
-        var fileStore = ai.mindconnect.filestore.FileStoreBackend
+                                        LlmConfigRepository llmConfigs,
+                                         ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
+                                        ai.mindconnect.filestore.FileStore hostFileStore) {
+        var fileStore = hostFileStore != null ? hostFileStore : ai.mindconnect.filestore.FileStoreBackend
                 .byType(environment.getOrDefault("fileStoreBackend", "filesystem"))
                 .orElseThrow()
                 .open(Map.of("dir", environment.getOrDefault("fileStoreDir",
@@ -88,7 +96,7 @@ final class AttachSupport {
         if (stores == null) {
             return null;
         }
-        return new AttachSupport(environment, activations, sessions, fileStore, stores);
+        return new AttachSupport(environment, activations, sessions, fileStore, stores, workflows);
     }
 
     String attach(UUID sessionId, String fileName, InputStream content) {
@@ -129,7 +137,7 @@ final class AttachSupport {
             String message;
             if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()
                     && workflowModulesPresent()) {
-                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore);
+                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows);
             } else {
                 String text = new String(fileStore.content(stored.id()).readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
@@ -161,7 +169,8 @@ final class AttachSupport {
                           ai.mindconnect.vectorstore.tools.VectorStores stores,
                           ai.mindconnect.vectorstore.tools.VectorStoreInstance instance,
                           ai.mindconnect.filestore.StoredFile stored,
-                          ai.mindconnect.filestore.FileStore fileStore) throws Exception {
+                          ai.mindconnect.filestore.FileStore fileStore,
+                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository hostWorkflows) throws Exception {
             java.nio.file.Path base = java.nio.file.Path.of(
                     environment.getOrDefault("defaultBaseDir", System.getProperty("user.home")));
             java.nio.file.Path dir = base.resolve("vector-store-uploads").resolve(instance.name());
@@ -171,8 +180,9 @@ final class AttachSupport {
                 java.nio.file.Files.copy(in, target,
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
-            var workflows = new ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository(
-                    java.nio.file.Path.of(environment.get("workflowDir")));
+            var workflows = hostWorkflows != null ? hostWorkflows
+                    : new ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository(
+                            java.nio.file.Path.of(environment.get("workflowDir")));
             var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                             + "' not found in " + environment.get("workflowDir")));

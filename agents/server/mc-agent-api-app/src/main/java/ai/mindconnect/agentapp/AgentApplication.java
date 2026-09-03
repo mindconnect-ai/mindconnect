@@ -5,8 +5,6 @@ import ai.mindconnect.agent.adapter.config.TodoToolsConfig;
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
-import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
-import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
 import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
 import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
@@ -27,7 +25,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Import;
 
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -92,14 +89,6 @@ public class AgentApplication {
                 + "private 32-character value).");
         }
         return new EncryptionHelper(secretKey);
-    }
-
-    @Bean
-    LlmConfigRepository llmConfigRepository(
-            @Value("${mindconnect.data.base-dir:data}") String baseDir,
-            EncryptionHelper encryptionHelper) {
-        return new EncryptingLlmConfigRepository(
-                new FileLlmConfigRepository(Path.of(baseDir)), encryptionHelper);
     }
 
     @Bean

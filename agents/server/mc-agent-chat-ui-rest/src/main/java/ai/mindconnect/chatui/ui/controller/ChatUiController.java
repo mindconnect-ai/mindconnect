@@ -115,14 +115,18 @@ public class ChatUiController {
      */
     @GetMapping({"", "/"})
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
-        var sessions = sessionRepository.findByUser(defaultNamespace, userId(user));
-        if (sessions.isEmpty()) {
+        // Headers for the sidebar; only the chat being shown is loaded whole.
+        var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId(user));
+        var latest = sessions.isEmpty()
+                ? java.util.Optional.<ai.mindconnect.agent.domain.AgentSession>empty()
+                : sessionRepository.findById(sessions.get(0).id());
+        if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
             // tabs opening at once would each leave an empty chat behind. The
             // empty state offers the same button the sidebar does.
             return ResponseEntity.ok(emptyShell());
         }
-        return ResponseEntity.ok(shell(sessions.get(0), sessions));
+        return ResponseEntity.ok(shell(latest.get(), sessions));
     }
 
     /** What the chat looks like before there is anything to look at. */
@@ -146,7 +150,7 @@ public class ChatUiController {
         var session = openDefaultChat(userId);
         log.info("New chat {}", session.id());
         return ResponseEntity.ok(
-                shell(session, sessionRepository.findByUser(defaultNamespace, userId)));
+                shell(session, sessionRepository.findHeadersByUser(defaultNamespace, userId)));
     }
 
     /** Model and tools of this chat, as a dialog over the conversation. */
@@ -239,7 +243,7 @@ public class ChatUiController {
         var saved = sessionService.replaceSessionAgent(sessionId, agent);
         String userId = userId(user);
         return ResponseEntity.ok(
-                shell(saved, sessionRepository.findByUser(defaultNamespace, userId)));
+                shell(saved, sessionRepository.findHeadersByUser(defaultNamespace, userId)));
     }
 
     /** The rename dialog for one chat. */
@@ -278,7 +282,7 @@ public class ChatUiController {
             sessionService.updateTitle(sessionId, title.trim());
         }
         String userId = userId(user);
-        var sessions = sessionRepository.findByUser(defaultNamespace, userId);
+        var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId);
         var current = sessionRepository.findById(sessionId).orElseThrow();
         return ResponseEntity.ok(shell(current, sessions));
     }
@@ -297,12 +301,15 @@ public class ChatUiController {
         sessionService.deleteSession(sessionId);
         log.info("Chat {} deleted", sessionId);
 
-        var sessions = sessionRepository.findByUser(defaultNamespace, userId);
-        if (sessions.isEmpty()) {
+        var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId);
+        var newest = sessions.isEmpty()
+                ? java.util.Optional.<ai.mindconnect.agent.domain.AgentSession>empty()
+                : sessionRepository.findById(sessions.get(0).id());
+        if (newest.isEmpty()) {
             var fresh = openDefaultChat(userId);
             return ResponseEntity.ok(shell(fresh, List.of(fresh)));
         }
-        return ResponseEntity.ok(shell(sessions.get(0), sessions));
+        return ResponseEntity.ok(shell(newest.get(), sessions));
     }
 
     /**
@@ -328,7 +335,7 @@ public class ChatUiController {
 
     /** The chat app shell: history left, agent and title on top, conversation. */
     private UiPage shell(ai.mindconnect.agent.domain.AgentSession session,
-                         List<ai.mindconnect.agent.domain.AgentSession> sessions) {
+                         List<? extends ai.mindconnect.agent.domain.view.AgentSessionHeader> sessions) {
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
@@ -545,7 +552,7 @@ public class ChatUiController {
                 .map(agent -> {
                     var session = sessionService.openChat(agentId, agent.namespace(), userId);
                     return ResponseEntity.ok(shell(session,
-                            sessionRepository.findByUser(defaultNamespace, userId)));
+                            sessionRepository.findHeadersByUser(defaultNamespace, userId)));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -576,7 +583,7 @@ public class ChatUiController {
                                              @AuthenticationPrincipal OidcUser user) {
         return ownedSession(sessionId, user)
                 .map(session -> ResponseEntity.ok(shell(session,
-                        sessionRepository.findByUser(defaultNamespace, userId(user)))))
+                        sessionRepository.findHeadersByUser(defaultNamespace, userId(user)))))
                 .orElse(ResponseEntity.notFound().build());
     }
 

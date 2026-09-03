@@ -63,7 +63,9 @@ These goals shaped the architecture:
   picked per step.
 - **Expressions** — `${...}` substitution and `mini:`/script resolution over
   scoped variables.
-- **Persistence** — pause and resume long-running workflow instances.
+- **Persistence** — pause and resume long-running workflow instances. Definitions
+  and suspended runs live in files by default or, since 0.3.0, in Postgres
+  (`mc-workflow-persistence-pg`, switched by `mindconnect.persistence=postgres`).
 - **Authoring** — build workflows in Java, from JSON (Jackson), or from
   **PlantUML** diagrams.
 - **UI** — a diagram view and a Swing editor (optional add-on modules).

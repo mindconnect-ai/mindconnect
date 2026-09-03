@@ -14,11 +14,16 @@
     <artifactId>mc-file-store</artifactId>
     <name>mc-file-store</name>
     <packaging>jar</packaging>
-    <description>Id-addressed file storage (OpenAI-Files-API-style): upload once, reference the id
+    <description>
+        The filesystem adapter of the file store (ports in mc-file-store-core):Id-addressed file storage (OpenAI-Files-API-style): upload once, reference the id
         from chats and vector stores. Backend SPI via ServiceLoader — filesystem ships built-in,
         object storage (s3) or database backends slot in as sibling modules.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-store-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>

@@ -37,6 +37,76 @@ fresh empty one, so nothing has to be moved by hand at release time.
   server answers again it re-requests the page — composer back to Send, stream
   re-attached, notice gone — without anybody clicking Reload.
 
+### Added
+
+- **common:** `mc-jdbc`, a tiny JDBC helper for repositories that store a
+  domain object as a JSONB document next to the few columns a query needs —
+  `Sql` (query/update/transaction on a `DataSource`), typed `Row` access, and
+  `DocumentTable` with upsert, find, column projections (`select`) and
+  idempotent DDL. Postgres dialect, no Spring, no ORM. The groundwork for the
+  Postgres persistence below.
+- **agents:** `mc-llm-gateway-pg` (under the new `agents/adapter/postgres/`),
+  a Postgres-backed `LlmConfigRepository` — a drop-in for the file store,
+  wrapped by the same `EncryptingLlmConfigRepository`.
+- **agents:** `mc-message-repository-pg`, Postgres-backed `ConversationRepository`
+  and `MessageRepository` with the same paging and sequence-range semantics as
+  the file store.
+- **agents:** `mc-agent-runtime-pg`, the runtime's seven repository ports on
+  Postgres — agent definitions, sessions, LLM call traces (with the same
+  per-conversation retention), todo lists, conversation summaries, working
+  memory and the workspace file store. With the two modules above, the agent
+  runtime can now run entirely against Postgres.
+- **agents:** `AgentSessionRepository.findHeadersByUser` and
+  `LlmCallTraceRepository.findHeadersByConversation` return list views
+  (`AgentSessionHeader`, `LlmCallTraceHeader` in `domain.view`) that the
+  aggregates implement themselves. The file and in-memory stores serve the
+  full objects; the Postgres stores answer from columns without reading a
+  document. The chat sidebar reads headers now; the admin UI's trace page
+  still loads full traces, as it renders their payloads.
+- **agents:** the admin UI and the agent server run on Postgres with
+  `MC_PERSISTENCE=postgres` plus `MC_POSTGRES_URL` / `MC_POSTGRES_USER` /
+  `MC_POSTGRES_PASSWORD` (`mindconnect.persistence` and `mindconnect.postgres.*`
+  in the yaml). Two Spring Boot starters under the new `agents/springstarter/`
+  carry the wiring: `mc-agent-starter-file` (the default) and
+  `mc-agent-starter-postgres`, which serves every repository over one pooled
+  `DataSource` and creates the tables on start. An app adds both and the
+  property picks. Embedders get
+  `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)`. Default stays
+  `file` — nothing changes for an existing installation, and there is no
+  automatic migration of an existing `data/` directory. The vector-store
+  registry and the `memory` vector backend stay on disk for now.
+- **agents:** the file store got its ports module, `mc-file-store-core`
+  (`FileStore`, `StoredFile`, the `FileStoreBackend` SPI), and a Postgres
+  adapter, `mc-file-store-pg`: uploads as `bytea` rows in `mc_file`, also
+  registered as the `postgres` backend of the SPI. Under
+  `mindconnect.persistence=postgres` uploads go to the database unless
+  `mindconnect.file-store.backend` names another backend. The filesystem
+  adapter stays in `mc-file-store`.
+- **workflow:** `mc-workflow-persistence-pg` — `WorkflowDataRepository` and
+  `WorkflowInstanceRepository` on Postgres, written through the workflow
+  area's own serializers so a definition reads back exactly as from a file.
+  The same `mindconnect.persistence=postgres` switch wires them, in the agent
+  apps and in the standalone workflow admin app alike, and
+  `AgentRuntimeBuilder.usePostgres` covers them when the workflow modules are
+  present. Both admin apps seed their bundled example workflows through the
+  repository, so the examples land in the database too.
+
+### Changed
+
+- **agents:** the file adapters are no longer `@Component`s picked up by
+  `DefaultAgentRuntimeConfig` and `MessageRepositoryConfig`; those configs
+  wire the runtime only. A Spring host gets its repositories from a
+  persistence starter (`mc-agent-starter-file` or `-postgres`) — or defines
+  the beans itself, as before. The apps' own `LlmConfigRepository` and
+  `FileStore` beans moved into the starters as well.
+- **agents:** in the Spring apps, tools see the host's beans through the
+  `ToolEnvironment` — an explicit entry first, otherwise any unambiguous
+  Spring bean of the requested type. The workflow tools use this to offer the
+  workflows of the host's `WorkflowDataRepository` (file or Postgres) instead
+  of opening their own file store under `workflowDir`. A tool that used to
+  get an empty `Optional` for a type the host happens to have as a bean now
+  gets that bean.
+
 ## [0.2.1] - 2026-09-02
 
 ### Added

@@ -24,10 +24,12 @@
         <module>mc-agents-parent</module>
         <!-- shared modules pulled in so this area builds standalone -->
         <module>../common/mc-common</module>
+        <module>../common/mc-jdbc</module>
         <module>../taskqueue/mc-task-queue</module>
         <module>vectorstore/mc-vector-store</module>
         <module>vectorstore/mc-vector-store-pgvector</module>
         <module>vectorstore/mc-vector-store-tools</module>
+        <module>vectorstore/mc-file-store-core</module>
         <module>vectorstore/mc-file-store</module>
         <module>builder/mc-agent-runtime-builder</module>
         <module>demo/mc-agent-simple-demo</module>
@@ -37,6 +39,12 @@
         <module>core/mc-agent-protocol-mc-runtime</module>
         <module>core/mc-llm-gateway-core</module>
         <module>core/mc-llm-gateway</module>
+        <module>adapter/postgres/mc-llm-gateway-pg</module>
+        <module>adapter/postgres/mc-message-repository-pg</module>
+        <module>adapter/postgres/mc-agent-runtime-pg</module>
+        <module>adapter/postgres/mc-file-store-pg</module>
+        <module>springstarter/mc-agent-starter-file</module>
+        <module>springstarter/mc-agent-starter-postgres</module>
         <module>core/mc-credentials</module>
         <module>core/mc-message-repository-core</module>
         <module>core/mc-message-repository</module>

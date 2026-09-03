@@ -5,7 +5,6 @@ import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.port.out.ConversationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -23,7 +22,6 @@ import java.util.UUID;
  * Co-locating with messages (stored by FileMessageRepository in the same dir)
  * makes it easy to find everything for a conversation in one folder.
  */
-@Component
 public class FileConversationRepository implements ConversationRepository {
 
     private static final Logger log = Logger.getLogger(FileConversationRepository.class.getName());

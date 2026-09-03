@@ -21,6 +21,20 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>
         </dependency>
+        <!-- persistence: one starter per backend, mindconnect.persistence picks -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-file</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-postgres</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence-pg</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- Tool providers (discovered via ServiceLoader SPI) -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

@@ -7,6 +7,7 @@ import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +41,7 @@ public class WorkflowAdminAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     public WorkflowDataRepository workflowDataRepository(
             @Value("${mindconnect.workflow-admin.dir:data/workflows}") String dir) {
         return new FileWorkflowDataRepository(Path.of(dir));
@@ -53,6 +55,7 @@ public class WorkflowAdminAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     public WorkflowInstanceRepository workflowInstanceRepository(
             @Value("${mindconnect.workflow-admin.dir:data/workflows}") String dir) {
         return new FileWorkflowInstanceRepository(Path.of(dir));

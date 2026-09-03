@@ -40,6 +40,7 @@ This area stands on its own — it does not depend on `agents/` or
 | `mc-workflow-code-jython` | Python (Jython) script step support |
 | `mc-workflow-jackson` | JSON (de)serialization of workflow definitions |
 | `mc-workflow-persistence` | Persist & resume workflow instances |
+| `mc-workflow-persistence-pg` | The same two repositories on Postgres (JSONB via `mc-jdbc`); `mindconnect.persistence=postgres` wires them in |
 | `mc-workflow-dsl-puml` | Build workflows from PlantUML diagrams |
 | `mc-workflow-spi-lookup` | Service-provider lookup for pluggable steps |
 | `mc-workflow-ui-diagram` | Diagram rendering of a workflow |

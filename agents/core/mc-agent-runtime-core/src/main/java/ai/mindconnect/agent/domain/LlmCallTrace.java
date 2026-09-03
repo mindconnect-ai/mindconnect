@@ -44,7 +44,7 @@ public record LlmCallTrace(
         Integer errorStatus,
         /** Error body (provider JSON or exception message) if the call failed, else null. */
         String errorBody
-) {
+) implements ai.mindconnect.agent.domain.view.LlmCallTraceHeader {
 
     /** Convenience constructor: combines a gateway {@link LlmCallEvent} with the runtime context. */
     public static LlmCallTrace of(TraceContext context, LlmCallEvent event) {

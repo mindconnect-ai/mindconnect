@@ -1,10 +1,5 @@
 package ai.mindconnect.agent.adapter.config;
 
-import ai.mindconnect.agent.adapter.file.FileConversationSummaryRepository;
-import ai.mindconnect.agent.adapter.file.FileLlmCallTraceRepository;
-import ai.mindconnect.agent.adapter.file.FileTodoListRepository;
-import ai.mindconnect.agent.adapter.file.FileWorkingMemoryRepository;
-import ai.mindconnect.agent.adapter.file.FileWorkspaceStore;
 import ai.mindconnect.agent.adapter.llm.LlmToolResultSummarizer;
 import ai.mindconnect.agent.adapter.rule.RuleBasedToolResultSummarizer;
 import ai.mindconnect.agent.port.in.AgentTaskRunner;
@@ -51,7 +46,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 
 import java.nio.file.Path;
@@ -60,10 +54,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 @Configuration
-// Picks up the @Component file adapters. Explicit package, not
-// basePackageClasses: this config no longer sits next to them, and the
-// in-memory repositories must stay out of the scan.
-@ComponentScan(basePackages = "ai.mindconnect.agent.adapter.file")
 public class DefaultAgentRuntimeConfig {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultAgentRuntimeConfig.class);
@@ -75,26 +65,6 @@ public class DefaultAgentRuntimeConfig {
     @Bean
     Path agentStorageDir(@Value("${mindconnect.data.base-dir:data}") String dir) {
         return Path.of(dir);
-    }
-
-    @Bean
-    WorkspaceStore workspaceStore(Path agentStorageDir) {
-        return new FileWorkspaceStore(agentStorageDir);
-    }
-
-    @Bean
-    WorkingMemoryRepository workingMemoryRepository(Path agentStorageDir) {
-        return new FileWorkingMemoryRepository(agentStorageDir);
-    }
-
-    @Bean
-    ConversationSummaryRepository conversationSummaryRepository(Path agentStorageDir) {
-        return new FileConversationSummaryRepository(agentStorageDir);
-    }
-
-    @Bean
-    TodoListRepository todoListRepository(Path agentStorageDir) {
-        return new FileTodoListRepository(agentStorageDir);
     }
 
     @Bean
@@ -131,7 +101,6 @@ public class DefaultAgentRuntimeConfig {
         }
         return new StatelessAgentTaskRunner(definitionRepository, llmChat, namespace, configName, promptRenderer);
     }
-
 
     /**
      * Selects the ToolResultSummarizer implementation.
@@ -208,7 +177,8 @@ public class DefaultAgentRuntimeConfig {
     }
 
     @Bean
-    ToolRegistry toolRegistry(AgentDefinitionRepository definitionRepository,
+    ToolRegistry toolRegistry(org.springframework.context.ApplicationContext applicationContext,
+                               AgentDefinitionRepository definitionRepository,
                                DynamicToolActivations dynamicToolActivations,
                                AgentSessionRepository sessionRepository,
                                MessageRepository messageRepository,
@@ -277,9 +247,33 @@ public class DefaultAgentRuntimeConfig {
                 .string("vectorStorePassword", vectorStorePassword)
                 .string("vectorStoreEmbeddingConfig", vectorStoreEmbeddingConfig)
                 .build();
-        SpiToolRegistry registry = new SpiToolRegistry(env);
+        SpiToolRegistry registry = new SpiToolRegistry(hostBacked(env, applicationContext));
         registryRef.set(registry);
         return registry;
+    }
+
+    /**
+     * The environment the tools see: the explicit entries above first, and
+     * behind them every bean of the host by type. A tool from an optional
+     * module — the workflow tools asking for a {@code WorkflowDataRepository},
+     * say — thus finds the host's store without this config knowing the
+     * module's types. Only an unambiguous bean is served; two candidates
+     * read as none, exactly like an absent one.
+     */
+    private static ai.mindconnect.agent.tool.ToolEnvironment hostBacked(
+            MapToolEnvironment explicit, org.springframework.context.ApplicationContext context) {
+        return new ai.mindconnect.agent.tool.ToolEnvironment() {
+            @Override
+            public <T> java.util.Optional<T> get(Class<T> type) {
+                return explicit.get(type)
+                        .or(() -> java.util.Optional.ofNullable(context.getBeanProvider(type).getIfUnique()));
+            }
+
+            @Override
+            public java.util.Optional<String> getString(String key) {
+                return explicit.getString(key);
+            }
+        };
     }
 
     @Bean
@@ -327,19 +321,6 @@ public class DefaultAgentRuntimeConfig {
     @Bean
     ai.mindconnect.agent.service.approval.ToolApprovalStore toolApprovalStore() {
         return new ai.mindconnect.agent.service.approval.ToolApprovalStore();
-    }
-
-    /**
-     * Optional repository for LLM call traces — the turn worker passes it into
-     * every LLM round it makes.
-     */
-    @Bean
-    LlmCallTraceRepository llmCallTraceRepository(
-            Path agentStorageDir,
-            @Value("${mindconnect.agent.trace.max-per-session:50}") int maxPerSession) {
-        // Lives next to conversation messages — same {base}/conversations/{convId}
-        // root, with traces under a `traces/{turnId}/...` subtree.
-        return new FileLlmCallTraceRepository(agentStorageDir.resolve("conversations"), maxPerSession);
     }
 
     /**

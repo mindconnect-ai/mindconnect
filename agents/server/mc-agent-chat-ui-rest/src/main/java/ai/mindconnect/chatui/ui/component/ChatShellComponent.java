@@ -1,6 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.domain.view.AgentSessionHeader;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAppShell;
 import ai.mindconnect.ui.model.UiMenu;
@@ -33,13 +34,13 @@ public final class ChatShellComponent implements UiComponent {
     /** The header's burger targets the menu by id. */
     private static final String MENU_ID = "chat-menu";
 
-    private final List<AgentSession> sessions;
+    private final List<? extends AgentSessionHeader> sessions;
     private final AgentSession active;
     private final String agentName;
     private final UiNode content;
     private final java.util.Map<UUID, String> agentIcons;
 
-    public ChatShellComponent(List<AgentSession> sessions, AgentSession active,
+    public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
                               String agentName, UiNode content) {
         this(sessions, active, agentName, content, java.util.Map.of());
     }
@@ -51,7 +52,7 @@ public final class ChatShellComponent implements UiComponent {
      *                   an inline session agent, a deleted definition — falls
      *                   back to the generic one.
      */
-    public ChatShellComponent(List<AgentSession> sessions, AgentSession active,
+    public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
                               String agentName, UiNode content,
                               java.util.Map<UUID, String> agentIcons) {
         this.sessions = sessions;
@@ -101,7 +102,7 @@ public final class ChatShellComponent implements UiComponent {
         menu.item(UiMenuItem.divider());
 
         UUID activeId = active == null ? null : active.id();
-        for (AgentSession s : sessions) {
+        for (AgentSessionHeader s : sessions) {
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
             menu.item(UiMenuItem.link("chat-" + s.id(), label, "/chat/sessions/" + s.id())
                     .icon(iconFor(s))
@@ -112,7 +113,7 @@ public final class ChatShellComponent implements UiComponent {
     }
 
     /** The icon of the agent this conversation belongs to, or the generic one. */
-    private String iconFor(AgentSession s) {
+    private String iconFor(AgentSessionHeader s) {
         UUID agentId = s.agentDefinitionId();
         String icon = agentId == null ? null : agentIcons.get(agentId);
         return icon == null ? ai.mindconnect.agent.domain.AgentDefinition.DEFAULT_ICON : icon;

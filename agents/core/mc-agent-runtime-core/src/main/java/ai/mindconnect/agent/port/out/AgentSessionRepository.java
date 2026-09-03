@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.port.out;
 
 import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.domain.view.AgentSessionHeader;
 import ai.mindconnect.common.Namespace;
 
 import java.util.List;
@@ -21,6 +22,16 @@ public interface AgentSessionRepository {
      * they belong to the turn that spawned them, not to the user's history.
      */
     List<AgentSession> findByUser(Namespace namespace, String userId);
+
+    /**
+     * The same sessions as {@link #findByUser}, as headers. A store that
+     * keeps the header's fields beside the document answers this without
+     * reading a single document; the default simply serves the full
+     * sessions, which are headers too.
+     */
+    default List<? extends AgentSessionHeader> findHeadersByUser(Namespace namespace, String userId) {
+        return findByUser(namespace, userId);
+    }
 
     /**
      * Returns every session whose {@code parentSessionId} equals
