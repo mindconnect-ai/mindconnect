@@ -35,6 +35,14 @@ on:
 permissions:
   contents: write   # push the version-bump commits and the tag
 
+# One release at a time. Two dispatches minutes apart once raced each other:
+# the second still held the pre-release checkout, cut the OLD version, uploaded
+# it to Central and only failed at the final push — after the upload. Queued,
+# the second run sees the first one's result and the guard below stops it.
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -76,6 +84,26 @@ jobs:
           echo "release=$RELEASE" >> "$GITHUB_OUTPUT"
           echo "next=$NEXT"       >> "$GITHUB_OUTPUT"
           echo "Releasing $CURRENT -> $RELEASE, then opening $NEXT"
+
+      # The checkout must be the branch's tip and the version must be new —
+      # checked BEFORE the build, because a Central upload cannot be undone by
+      # a failed push afterwards. A run queued behind another release fails
+      # here, cleanly, with the reason.
+      - name: Refuse a stale checkout or an existing version
+        env:
+          RELEASE: ${{ steps.v.outputs.release }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "$BRANCH"
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$BRANCH")" ]; then
+            echo "::error::$BRANCH moved since this run was queued (now $(git rev-parse --short "origin/$BRANCH"), run has $(git rev-parse --short HEAD)). Start the release again from the current tip."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$RELEASE" > /dev/null 2>&1; then
+            echo "::error::v$RELEASE is already released (tag exists). Pick another version."
+            exit 1
+          fi
 
       # Flat version scheme — every module shares the exact same version string,
       # in both <version> and <parent>. versions:set misses the area-aggregator
@@ -122,6 +150,20 @@ jobs:
 
       # The `release` profile (mc-java-parent) attaches sources + javadoc,
       # signs with GPG and hands the deploy to the central-publishing plugin.
+      # Last look before the point of no return: a merge that landed during
+      # the build makes this run's commit unpushable, so stop here, not after
+      # the upload.
+      - name: Refuse to upload if the branch moved during the build
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet origin "$BRANCH"
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/$BRANCH")" ]; then
+            echo "::error::$BRANCH moved during the build. Nothing was uploaded; start the release again."
+            exit 1
+          fi
+
       - name: Build & publish to Maven Central
         env:
           CENTRAL_TOKEN_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
@@ -157,9 +199,15 @@ jobs:
             || { echo "::error::failed to reopen [Unreleased]"; exit 1; }
 
       - name: Commit next version and push
+        env:
+          RELEASE: ${{ steps.v.outputs.release }}
         run: |
+          set -euo pipefail
           git commit -am "chore: start ${{ steps.v.outputs.next }} [skip ci]"
-          git push origin HEAD:${{ github.ref_name }} --follow-tags
+          if ! git push origin HEAD:${{ github.ref_name }} --follow-tags; then
+            echo "::error::Push rejected after the Central upload. v$RELEASE is NOT tagged or released; drop its deployment in the Central Portal (https://central.sonatype.com/publishing/deployments) before releasing again."
+            exit 1
+          fi
 
       # The changelog entry is the release note. Two sources would drift, and
       # the hand-written one is the one aimed at a reader deciding whether to
