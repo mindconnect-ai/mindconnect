@@ -63,7 +63,8 @@ public class WindowedMemoryStrategy implements MemoryStrategy {
         // MessageMapper needs a budget for per-message truncation; use a permissive default
         // (per-message limit equal to the whole window) — strategy doesn't impose a per-msg cap.
         ContextTokenBudget budget = permissiveBudget(def);
-        return messageMapper.toMessages(ToolPairSanitizer.sanitize(tail), def, session, budget);
+        return messageMapper.toMessages(ToolPairSanitizer.sanitize(tail), def, session, budget,
+                llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null));
     }
 
     @Override

@@ -71,7 +71,8 @@ public class FullHistoryMemoryStrategy implements MemoryStrategy {
             log.warn("FullHistory strategy: {} messages ~{} tokens exceed context window {} — request may fail",
                     all.size(), total, budget.contextWindow());
         }
-        return messageMapper.toMessages(ToolPairSanitizer.sanitize(all), def, session, budget);
+        return messageMapper.toMessages(ToolPairSanitizer.sanitize(all), def, session, budget,
+                llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null));
     }
 
     @Override

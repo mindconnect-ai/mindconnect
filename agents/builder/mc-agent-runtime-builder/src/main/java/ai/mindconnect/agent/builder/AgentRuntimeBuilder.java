@@ -113,8 +113,8 @@ public final class AgentRuntimeBuilder {
     private String defaultLlmConfigName;
     private String encryptionKey;
     private String toolResultSummarizer = "rule";
-    private ai.mindconnect.agent.port.out.LlmMessageMapper llmMessageMapper =
-            new ai.mindconnect.agent.service.MessageToLlmMessageMapper();
+    /** null → the default mapper, reading media parts from the runtime's file store. */
+    private ai.mindconnect.agent.port.out.LlmMessageMapper llmMessageMapper;
     private final Map<String, String> environment = new LinkedHashMap<>();
     private final List<LlmConfig> pendingLlmConfigs = new ArrayList<>();
     private final List<AgentDefinition> pendingAgentDefinitions = new ArrayList<>();
@@ -203,7 +203,11 @@ public final class AgentRuntimeBuilder {
         return this;
     }
 
-    /** How stored messages read to the model; the default renders text, tool calls, results and attachment notices. */
+    /**
+     * How stored messages read to the model; the default renders text, tool
+     * calls, results, attachment notices, and image / document parts as
+     * content blocks when the model reads them.
+     */
     public AgentRuntimeBuilder llmMessageMapper(ai.mindconnect.agent.port.out.LlmMessageMapper mapper) {
         this.llmMessageMapper = mapper;
         return this;
@@ -379,9 +383,20 @@ public final class AgentRuntimeBuilder {
                 definitionRepository, llmChat, namespace, resolveDefaultLlmConfigName(), promptRenderer);
         ToolResultSummarizer summarizer = "llm".equalsIgnoreCase(toolResultSummarizer)
                 ? new LlmToolResultSummarizer(statelessRunner) : new RuleBasedToolResultSummarizer();
+        // The file store — Postgres, or the filesystem one when the file-store
+        // module is present — feeds media parts to the mapper and, further
+        // down, the attach support. Opened once, shared by both.
+        ai.mindconnect.filestore.FileStore fileStore = sql != null && PostgresFileStore.present()
+                ? PostgresFileStore.open(sql)
+                : AttachSupport.defaultFileStoreIfPresent(environment);
+        ai.mindconnect.agent.port.out.LlmMessageMapper messageMapper = llmMessageMapper != null
+                ? llmMessageMapper
+                : new ai.mindconnect.agent.service.MessageToLlmMessageMapper(fileStore != null
+                        ? new ai.mindconnect.agent.adapter.filestore.FileStorePartContentReader(fileStore)
+                        : ai.mindconnect.agent.port.out.PartContentReader.none());
         MemoryStrategyFactory memoryStrategyFactory = new DefaultMemoryStrategyFactory(
                 conversationManager, summaryRepository, summarizer, statelessRunner,
-                tokenCounterRegistry, llmConfigRepository, llmMessageMapper);
+                tokenCounterRegistry, llmConfigRepository, messageMapper);
 
         // 5. Tools: SPI over whatever capability modules are on the classpath.
         DynamicToolActivations activations = new DynamicToolActivations(sessionRepository);
@@ -439,8 +454,6 @@ public final class AgentRuntimeBuilder {
         for (AgentDefinition definition : pendingAgentDefinitions) definitionRepository.save(definition);
         seedWorkflows(workflows);
 
-        ai.mindconnect.filestore.FileStore fileStore =
-                sql != null && PostgresFileStore.present() ? PostgresFileStore.open(sql) : null;
         AttachSupport attachSupport = AttachSupport.createIfPresent(
                 environment, activations, sessionRepository, embeddings, llmConfigRepository, workflows, fileStore);
         return new AgentRuntime(chatService, sessionService, definitionRepository,

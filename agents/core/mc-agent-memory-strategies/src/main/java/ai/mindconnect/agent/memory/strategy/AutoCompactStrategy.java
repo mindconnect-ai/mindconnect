@@ -97,7 +97,8 @@ public class AutoCompactStrategy implements MemoryStrategy {
         }
         // No budget-driven trimming, no per-message guard — auto-compact assumes the
         // window will not overflow because compact() ran when it crossed the threshold.
-        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(live), def, session, permissiveBudget(def)));
+        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(live), def, session, permissiveBudget(def),
+                llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null)));
         return result;
     }
 

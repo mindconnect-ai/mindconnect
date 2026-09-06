@@ -67,6 +67,29 @@ final class AttachSupport {
         return create(environment, activations, sessions, embeddings, llmConfigs, workflows, hostFileStore);
     }
 
+    /**
+     * The filesystem file store under the data dir when the file-store module
+     * is on the classpath, {@code null} otherwise — the builder feeds it to
+     * the message mapper before any tool support exists.
+     */
+    static ai.mindconnect.filestore.FileStore defaultFileStoreIfPresent(Map<String, String> environment) {
+        try {
+            Class.forName("ai.mindconnect.filestore.filesystem.FilesystemFileStoreBackend");
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+        return openDefaultFileStore(environment);
+    }
+
+    /** Separate method so the backend type is only linked once the guard passed. */
+    private static ai.mindconnect.filestore.FileStore openDefaultFileStore(Map<String, String> environment) {
+        return ai.mindconnect.filestore.FileStoreBackend
+                .byType(environment.getOrDefault("fileStoreBackend", "filesystem"))
+                .orElseThrow()
+                .open(Map.of("dir", environment.getOrDefault("fileStoreDir",
+                        environment.get("dataBaseDir") + "/files")));
+    }
+
     /** Separate method so optional types are only linked once the guard passed. */
     private static AttachSupport create(Map<String, String> environment,
                                         DynamicToolActivations activations,
@@ -75,11 +98,7 @@ final class AttachSupport {
                                         LlmConfigRepository llmConfigs,
                                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
                                         ai.mindconnect.filestore.FileStore hostFileStore) {
-        var fileStore = hostFileStore != null ? hostFileStore : ai.mindconnect.filestore.FileStoreBackend
-                .byType(environment.getOrDefault("fileStoreBackend", "filesystem"))
-                .orElseThrow()
-                .open(Map.of("dir", environment.getOrDefault("fileStoreDir",
-                        environment.get("dataBaseDir") + "/files")));
+        var fileStore = hostFileStore != null ? hostFileStore : openDefaultFileStore(environment);
         var env = new ai.mindconnect.agent.tool.ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {

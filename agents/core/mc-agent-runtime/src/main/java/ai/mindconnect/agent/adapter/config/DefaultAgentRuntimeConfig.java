@@ -162,6 +162,20 @@ public class DefaultAgentRuntimeConfig {
      * bean when it defines one, the runtime's default otherwise. Define a
      * bean of that type to replace the default; nothing else to configure.
      */
+    /**
+     * Where a media part gets its bytes: the host's file store when there is
+     * one, nothing otherwise — then every image and document part renders
+     * as its placeholder line.
+     */
+    @Bean
+    ai.mindconnect.agent.port.out.PartContentReader partContentReader(
+            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.filestore.FileStore> fileStore) {
+        ai.mindconnect.filestore.FileStore store = fileStore.getIfAvailable();
+        return store != null
+                ? new ai.mindconnect.agent.adapter.filestore.FileStorePartContentReader(store)
+                : ai.mindconnect.agent.port.out.PartContentReader.none();
+    }
+
     @Bean
     MemoryStrategyFactory memoryStrategyFactory(ConversationManager conversationManager,
                                                 ConversationSummaryRepository conversationSummaryRepository,
@@ -169,11 +183,13 @@ public class DefaultAgentRuntimeConfig {
                                                 AgentTaskRunner runTaskUseCase,
                                                 TokenCounters tokenCounterRegistry,
                                                 LlmConfigRepository llmConfigRepository,
+                                                ai.mindconnect.agent.port.out.PartContentReader partContentReader,
                                                 org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.port.out.LlmMessageMapper> messageMapper) {
         return new DefaultMemoryStrategyFactory(conversationManager,
                 conversationSummaryRepository, toolResultSummarizer, runTaskUseCase,
                 tokenCounterRegistry, llmConfigRepository,
-                messageMapper.getIfAvailable(ai.mindconnect.agent.service.MessageToLlmMessageMapper::new));
+                messageMapper.getIfAvailable(() ->
+                        new ai.mindconnect.agent.service.MessageToLlmMessageMapper(partContentReader)));
     }
 
     /** Session-scoped tool activations written by tool_search, read per round. */

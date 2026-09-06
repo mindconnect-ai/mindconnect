@@ -57,7 +57,7 @@ public class NoMemoryStrategy implements MemoryStrategy {
     public List<LlmMessage> buildWindow(AgentDefinition def, AgentSession session,
                                         AuthenticationInfo auth, List<Message> history) {
         return messageMapper.toMessages(ToolPairSanitizer.sanitize(episode(history)), def, session,
-                permissiveBudget(def));
+                permissiveBudget(def), llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null));
     }
 
     /** No per-message truncation — an episode is short by construction. */
