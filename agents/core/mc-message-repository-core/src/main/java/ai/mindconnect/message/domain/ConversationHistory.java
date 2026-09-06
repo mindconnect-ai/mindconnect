@@ -64,18 +64,19 @@ public final class ConversationHistory {
     }
 
     /**
-     * The history grouped into logical turns: each user CHAT opens one, and
-     * everything until the next user CHAT belongs to it. Messages before the
-     * first user CHAT (seeding, migration) are not part of any turn.
+     * The history grouped into logical turns: a user CHAT opens one, and
+     * everything until the next opening user CHAT belongs to it. A user CHAT
+     * that shares the open turn's id continues that turn instead of opening
+     * one — the runtime inserts such messages on the user's behalf within a
+     * turn (an attachment shown again at the assistant's request). Messages
+     * before the first user CHAT (seeding, migration) are not part of any turn.
      */
     public List<ChatTurn> turns() {
         List<ChatTurn> turns = new ArrayList<>();
         Message opener = null;
         List<Message> current = new ArrayList<>();
         for (Message message : messages) {
-            boolean opensTurn = message.type() == MessageType.CHAT
-                    && message.senderType() == ParticipantType.USER;
-            if (opensTurn) {
+            if (opensTurn(message, opener)) {
                 if (opener != null) turns.add(new ChatTurn(opener, current));
                 opener = message;
                 current = new ArrayList<>();
@@ -84,6 +85,36 @@ public final class ConversationHistory {
         }
         if (opener != null) turns.add(new ChatTurn(opener, current));
         return List.copyOf(turns);
+    }
+
+    /**
+     * Does this message open a turn, given the message that opened the
+     * current one ({@code null} before any)? A user CHAT does — unless it
+     * carries the current opener's turn id, then it continues that turn. A
+     * message without a turn id (written before turn ids existed) always opens.
+     */
+    public static boolean opensTurn(Message message, Message currentOpener) {
+        if (message.type() != MessageType.CHAT || message.senderType() != ParticipantType.USER) return false;
+        if (currentOpener == null || message.turnId() == null || currentOpener.turnId() == null) return true;
+        return !message.turnId().equals(currentOpener.turnId());
+    }
+
+    /**
+     * The messages of the current turn of a flat, sequence-ordered list —
+     * from the user CHAT that opened it on. The same grouping as
+     * {@link #turns()}, for callers that hold a list rather than a history.
+     * No user CHAT yet: the whole list.
+     */
+    public static List<Message> currentTurnMessages(List<Message> history) {
+        int start = -1;
+        Message opener = null;
+        for (int i = 0; i < history.size(); i++) {
+            if (opensTurn(history.get(i), opener)) {
+                opener = history.get(i);
+                start = i;
+            }
+        }
+        return start < 0 ? history : history.subList(start, history.size());
     }
 
     /** The newest turn — the one execution decisions are about. Empty before any user message. */

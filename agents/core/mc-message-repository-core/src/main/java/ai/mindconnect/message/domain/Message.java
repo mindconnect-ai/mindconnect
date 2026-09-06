@@ -33,8 +33,11 @@ public record Message(
          * <p>
          * One turn produces one user CHAT (the prompt) plus all the
          * assistant TOOL_CALL / TOOL_RESULT / CHAT messages emitted by the
-         * tool-loop until the final answer. All of them share the same
-         * {@code turnId}.
+         * tool-loop until the final answer — and, now and then, a further
+         * user CHAT the runtime inserts on the user's behalf (an attachment
+         * shown again at the assistant's request). All of them share the
+         * same {@code turnId}; that is what keeps the inserted message in
+         * the turn instead of opening one (see {@code ConversationHistory}).
          * <p>
          * {@code null} on:
          *   • messages persisted before this field existed (no backfill)

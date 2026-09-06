@@ -123,6 +123,19 @@ public class SessionFileService {
                 sessions.save(session.withoutAttachedFile(fileName)));
     }
 
+    /**
+     * A file the model may read inline is shown with the next message only;
+     * afterwards the model asks for it again through {@code view_attachment}
+     * — activated for the session, like {@code vector_search} on ingest.
+     */
+    private void activateViewer(UUID sessionId) {
+        DynamicToolActivations activations = activationsProvider.getIfAvailable();
+        if (activations != null) {
+            activations.activate(sessionId,
+                    List.of(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME));
+        }
+    }
+
     public AttachResult attach(UUID sessionId, StoredFile stored) {
         AttachedFile attached = new AttachedFile(stored.id(), stored.name(), stored.contentType(), stored.size());
         if (attached.isImage()) {
@@ -135,6 +148,7 @@ public class SessionFileService {
             }
             sessions.findById(sessionId).ifPresent(session ->
                     sessions.save(session.withAttachedFiles(List.of(attached))));
+            activateViewer(sessionId);
             return new AttachResult(stored, null, true,
                     stored.name() + " attached — it goes to the model with your next message.");
         }
@@ -193,6 +207,7 @@ public class SessionFileService {
             if (activations != null) {
                 activations.activate(sessionId, List.of("vector_search"));
             }
+            if (attached.isPdf()) activateViewer(sessionId);
             // Announce the file in the system prompt (rendered fresh each
             // round) so the model actually reaches for vector_search.
             sessions.findById(sessionId).ifPresent(session ->

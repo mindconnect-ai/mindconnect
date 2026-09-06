@@ -75,16 +75,10 @@ public class NoMemoryStrategy implements MemoryStrategy {
         return List.of();
     }
 
-    /** Everything from the last user CHAT on — the question and this turn's tool traffic. */
+    /** The current turn — the question and this turn's tool traffic; nothing before any question. */
     private List<Message> episode(List<Message> all) {
-        for (int i = all.size() - 1; i >= 0; i--) {
-            Message message = all.get(i);
-            if (message.type() == ai.mindconnect.message.domain.MessageType.CHAT
-                    && message.senderType() == ai.mindconnect.message.domain.ParticipantType.USER) {
-                return all.subList(i, all.size());
-            }
-        }
-        return List.of();
+        List<Message> turn = ai.mindconnect.message.domain.ConversationHistory.currentTurnMessages(all);
+        return turn == all ? List.of() : turn;
     }
 
     @Override

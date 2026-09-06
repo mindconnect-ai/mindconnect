@@ -87,7 +87,8 @@ public final class MessageComponent {
     }
 
     private UiList.Item chatItem(Message m, boolean isUser) {
-        String speaker = isUser ? "You" : agent.name();
+        boolean inserted = ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.insertedBy(m);
+        String speaker = inserted ? "Attachment shown again" : isUser ? "You" : agent.name();
         String time    = timeFormat.format(m.sentAt());
         String label   = speaker + "  [" + time + "]" + messageTokenSuffix(m);
         String css     = isUser ? "user-message" : "bot-message";
@@ -99,8 +100,9 @@ public final class MessageComponent {
         // Regenerate (USER messages only): delete this message + everything
         // after it, then re-run the turn (streaming) with the same text. Uses
         // the STREAM behaviour so the live tokens/task-cards flow exactly like
-        // a normal send.
-        if (isUser) {
+        // a normal send. Not for a message the runtime inserted mid-turn —
+        // there is no question to ask again.
+        if (isUser && !inserted) {
             item.action(UiAction.icon("regen-" + m.id(), "🔄")
                     .confirm("Delete the response(s) after this message and generate a new one?")
                     // Plain dispatch — the regenerated turn streams on the

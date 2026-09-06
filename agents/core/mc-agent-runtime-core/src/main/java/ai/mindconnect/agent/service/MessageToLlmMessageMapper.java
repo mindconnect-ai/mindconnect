@@ -61,6 +61,9 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
     /** Largest file sent inline; above it the placeholder says so. */
     static final long MAX_INLINE_BYTES = 20L * 1024 * 1024;
 
+    /** The tool that shows an earlier attachment again — named in the placeholder when the agent has it. */
+    static final String VIEWER_TOOL = "view_attachment";
+
     private final PartContentReader partContentReader;
 
     /** A mapper without a file store: every media part renders as its placeholder. */
@@ -95,7 +98,8 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
                     } else if (media(m).isEmpty()) {
                         result.add(LlmMessage.user(text));
                     } else {
-                        result.add(LlmMessage.user(userParts(m, text, target, inCurrentTurn(m, lastUser))));
+                        result.add(LlmMessage.user(userParts(m, text, target, inCurrentTurn(m, lastUser),
+                                viewerAvailable(def, session))));
                     }
                 }
                 case TOOL_CALL -> mapToolCall(m, result);
@@ -133,6 +137,12 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
         return AttachmentNotice.forModel(m, session);
     }
 
+    /** Can this agent, in this session, call the viewer tool — assigned, or activated by an upload? */
+    private static boolean viewerAvailable(AgentDefinition def, AgentSession session) {
+        if (session != null && session.activatedTools().contains(VIEWER_TOOL)) return true;
+        return def.tools() != null && def.tools().stream().anyMatch(t -> VIEWER_TOOL.equals(t.name()));
+    }
+
     private static List<ContentPart.Media> media(Message m) {
         if (m.parts() == null) return List.of();
         return m.parts().stream()
@@ -167,7 +177,8 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
      * otherwise. Text and placeholders are separate blocks; a gateway joins
      * them when the message ends up text-only after all.
      */
-    private List<LlmContent> userParts(Message m, String text, LlmConfig target, boolean currentTurn) {
+    private List<LlmContent> userParts(Message m, String text, LlmConfig target, boolean currentTurn,
+                                       boolean viewerAvailable) {
         List<LlmContent> parts = new ArrayList<>();
         parts.add(new LlmContent.Text(text));
         for (ContentPart.Media part : media(m)) {
@@ -178,7 +189,10 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
                         ? "this model does not read images, so it is not included"
                         : "this model does not read documents; read its content with vector_search"));
             } else if (!currentTurn) {
-                parts.add(placeholder(part, "sent in an earlier turn, not resent"));
+                parts.add(placeholder(part, viewerAvailable
+                        ? "sent in an earlier turn, not resent; call " + VIEWER_TOOL + "(\""
+                                + part.name() + "\") to see it again"
+                        : "sent in an earlier turn, not resent"));
             } else if (part.sizeBytes() > MAX_INLINE_BYTES) {
                 parts.add(placeholder(part, "too large to send inline (limit "
                         + humanSize(MAX_INLINE_BYTES) + ")"));

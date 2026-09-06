@@ -155,6 +155,21 @@ class MessageToLlmMessageMapperTest {
     }
 
     @Test
+    void thePlaceholderNamesTheViewerToolWhenTheSessionHasIt() {
+        stored("f-1", "PNG", "image/png");
+        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        List<Message> history = List.of(
+                user(1, first, List.of(new ContentPart.Text("what is this?"), PHOTO)),
+                agent(2, first, "a cat"),
+                user(3, second, ContentPart.text("and its colour?")));
+        AgentSession withViewer = session.withActivatedTools(List.of("view_attachment"));
+
+        List<LlmMessage> out = mapper.toMessages(history, def, withViewer, budget, target(LlmCapability.VISION));
+
+        assertThat(out.get(0).content()).contains("call view_attachment(\"photo.png\") to see it again");
+    }
+
+    @Test
     void aMessageInsertedWithinTheCurrentTurnStillGoesInline() {
         stored("f-1", "PNG", "image/png");
         UUID turn = UUID.randomUUID();

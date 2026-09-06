@@ -890,6 +890,8 @@ public class ChatUiController {
                 .filter(m -> m.sequenceNum() == seq)
                 .filter(m -> m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
                 .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER)
+                // a message the runtime inserted mid-turn is not a question to ask again
+                .filter(m -> !ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.insertedBy(m))
                 .map(Message::partsOrText)
                 .findFirst()
                 .orElse(null);

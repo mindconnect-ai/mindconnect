@@ -142,9 +142,12 @@ final class AttachSupport {
                 stored.id(), stored.name(), stored.contentType(), stored.size());
         if (attached.isImage()) {
             // Not text to index: the image goes to the model with the next
-            // message as an image part, or as that part's placeholder.
+            // message as an image part, or as that part's placeholder. Shown
+            // once; afterwards the model asks for it through view_attachment.
             sessions.findById(sessionId).ifPresent(session ->
                     sessions.save(session.withAttachedFiles(List.of(attached))));
+            activations.activate(sessionId,
+                    List.of(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME));
             return stored.name() + " attached — it goes to the model with the next message.";
         }
         try {
@@ -173,7 +176,9 @@ final class AttachSupport {
                         stores, store, storeName, stored.name(), text);
             }
 
-            activations.activate(sessionId, List.of("vector_search"));
+            activations.activate(sessionId, attached.isPdf()
+                    ? List.of("vector_search", ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME)
+                    : List.of("vector_search"));
             sessions.findById(sessionId).ifPresent(session ->
                     sessions.save(session.withAttachedFiles(List.of(attached))));
             return message;

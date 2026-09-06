@@ -405,6 +405,7 @@ public final class AgentRuntimeBuilder {
                 .service(AgentDefinitionRepository.class, definitionRepository)
                 .service(AgentSessionRepository.class, sessionRepository)
                 .service(MessageRepository.class, messageRepository)
+                .service(ai.mindconnect.message.port.in.ConversationManager.class, conversationManager)
                 .service(WorkspaceStore.class, workspaceStore)
                 .service(TodoListService.class, todoListService)
                 .service(ToolRegistryRef.class, registryRef)
