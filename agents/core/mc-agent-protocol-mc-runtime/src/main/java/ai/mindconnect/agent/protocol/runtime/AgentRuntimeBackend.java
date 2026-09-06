@@ -208,13 +208,15 @@ public final class AgentRuntimeBackend {
         }
 
         /**
-         * One user message in, its text out — after side effects: every
-         * {@code Document} part is resolved (FileId) or stored (Inline) and
-         * ingested into the session via the {@link FileAttacher}. The runtime
-         * answers document questions by retrieval (vector_search), not by
-         * context-stuffing — the backend detail behind the same protocol item.
+         * One user message in, the conversation's content parts out — after
+         * side effects. A {@code Document} part is resolved (FileId) or stored
+         * (Inline) and attached to the session via the {@link FileAttacher}:
+         * ingested for retrieval, and — a PDF — sent with the message as a
+         * document part by the chat facade, which announces every fresh
+         * attachment. An {@code Image} part is resolved or stored and goes
+         * with the message directly, as the image part a vision model reads.
          */
-        private String prepareInput(ResponseRequest request) {
+        private List<ai.mindconnect.message.domain.ContentPart> prepareInput(ResponseRequest request) {
             if (request.input().size() != 1
                     || !(request.input().get(0) instanceof ConversationItem.Message message)) {
                 throw new RuntimeBackendException("The runtime backend currently accepts exactly "
@@ -222,6 +224,7 @@ public final class AgentRuntimeBackend {
             }
             UUID sessionId = UUID.fromString(request.sessionId());
             StringBuilder text = new StringBuilder();
+            List<ai.mindconnect.message.domain.ContentPart> media = new java.util.ArrayList<>();
             for (ContentPart part : message.content()) {
                 switch (part) {
                     case ContentPart.Text t -> {
@@ -229,28 +232,36 @@ public final class AgentRuntimeBackend {
                         text.append(t.text());
                     }
                     case ContentPart.Document d -> attachDocument(sessionId, d);
+                    case ContentPart.Image i -> media.add(ProtocolParts.image(resolve(i.source(), "image")));
                     default -> throw new RuntimeBackendException("Content part not supported by "
                             + "the runtime backend yet: " + part.getClass().getSimpleName());
                 }
             }
-            if (text.isEmpty()) {
+            if (text.isEmpty() && media.isEmpty()) {
                 throw new RuntimeBackendException(
-                        "The runtime backend needs a text part in the user message");
+                        "The runtime backend needs a text or image part in the user message");
             }
-            return text.toString();
+            List<ai.mindconnect.message.domain.ContentPart> parts = new java.util.ArrayList<>();
+            parts.add(new ai.mindconnect.message.domain.ContentPart.Text(text.toString()));
+            parts.addAll(media);
+            return List.copyOf(parts);
         }
 
         private void attachDocument(UUID sessionId, ContentPart.Document doc) {
+            fileAttacher.attach(sessionId, resolve(doc.source(), doc.name()));
+        }
+
+        /** The stored file behind a media source: looked up (FileId) or stored now (Inline). */
+        private ai.mindconnect.filestore.StoredFile resolve(ContentPart.MediaSource source, String name) {
             requireFiles();
-            ai.mindconnect.filestore.StoredFile stored = switch (doc.source()) {
+            return switch (source) {
                 case ContentPart.MediaSource.FileId f -> fileStore.find(f.fileId())
                         .orElseThrow(() -> new RuntimeBackendException(
                                 "Unknown file id " + f.fileId() + " — upload via files() first"));
-                case ContentPart.MediaSource.Inline in -> storeInline(doc.name(), in);
+                case ContentPart.MediaSource.Inline in -> storeInline(name, in);
                 case ContentPart.MediaSource.Url u -> throw new RuntimeBackendException(
-                        "Url document sources are not supported by the runtime backend yet");
+                        "Url media sources are not supported by the runtime backend yet");
             };
-            fileAttacher.attach(sessionId, stored);
         }
 
         private ai.mindconnect.filestore.StoredFile storeInline(String name,
@@ -332,9 +343,9 @@ public final class AgentRuntimeBackend {
             String content = m.compressed() && m.compressedContent() != null
                     ? m.compressedContent() : m.content();
             ConversationItem item = switch (m.type()) {
-                case CHAT -> m.senderType() == ParticipantType.USER
-                        ? ConversationItem.Message.user(content)
-                        : ConversationItem.Message.assistant(content);
+                case CHAT -> ProtocolParts.message(m.senderType() == ParticipantType.USER
+                        ? ai.mindconnect.agent.protocol.item.Role.USER
+                        : ai.mindconnect.agent.protocol.item.Role.ASSISTANT, m);
                 case TOOL_CALL -> new ConversationItem.FunctionCall(
                         m.id().toString(), "tool_calls", Map.of("_raw", content));
                 case TOOL_RESULT -> new ConversationItem.FunctionCallOutput(m.id().toString(), content, false);

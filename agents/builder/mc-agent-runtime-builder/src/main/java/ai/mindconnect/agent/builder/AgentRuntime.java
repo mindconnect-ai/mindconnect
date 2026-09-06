@@ -110,7 +110,17 @@ public final class AgentRuntime implements AutoCloseable {
 
     /** Sends one message in an existing session and blocks for the answer. */
     public String chat(UUID sessionId, String message, Consumer<StreamEvent> events) {
-        ChatTurnHandle handle = chatService.submitChat(sessionId, message, events);
+        return chat(sessionId, ai.mindconnect.message.domain.ContentPart.text(message), events);
+    }
+
+    /**
+     * Same, for a message made of content parts — text plus the images and
+     * documents sent with it, referenced by the ids {@link #fileStore()}
+     * holds them under. A vision model sees the image with the question.
+     */
+    public String chat(UUID sessionId, java.util.List<ai.mindconnect.message.domain.ContentPart> parts,
+                       Consumer<StreamEvent> events) {
+        ChatTurnHandle handle = chatService.submitChat(sessionId, parts, events);
         try {
             return handle.result().get();
         } catch (InterruptedException e) {
