@@ -392,7 +392,8 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         }
     }
 
-    private ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
+    // package-private for testing the wire JSON without a live HTTP call
+    ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", config.model());
         root.put("stream", true);
@@ -423,6 +424,8 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                     fn.put("name", tc.name());
                     fn.put("arguments", objectMapper.writeValueAsString(tc.arguments()));
                 }
+            } else if (msg.hasMedia()) {
+                renderContentBlocks(msgNode.putArray("content"), msg);
             } else {
                 msgNode.put("content", msg.content() != null ? msg.content() : "");
             }
@@ -445,5 +448,30 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         streamOptions.put("include_usage", true);
 
         return root;
+    }
+
+    /**
+     * A user message with media as the Chat Completions content array: text
+     * blocks as {@code text}, images as a data-URL {@code image_url}, documents
+     * as a {@code file} block with inline {@code file_data}. Text-only messages
+     * never come here — they stay the plain string every endpoint understands.
+     */
+    private static void renderContentBlocks(ArrayNode content, LlmMessage msg) {
+        for (LlmContent part : msg.parts()) {
+            ObjectNode block = content.addObject();
+            switch (part) {
+                case LlmContent.Text t -> block.put("type", "text").put("text", t.text());
+                case LlmContent.Image i -> block.put("type", "image_url")
+                        .putObject("image_url").put("url", dataUrl(i.mediaType(), i.base64()));
+                case LlmContent.Document d -> block.put("type", "file")
+                        .putObject("file")
+                        .put("filename", d.name())
+                        .put("file_data", dataUrl(d.mediaType(), d.base64()));
+            }
+        }
+    }
+
+    private static String dataUrl(String mediaType, String base64) {
+        return "data:" + mediaType + ";base64," + base64;
     }
 }
