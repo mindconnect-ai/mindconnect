@@ -94,8 +94,12 @@ scenarios (see `mc-agent-simple-demo`).
 ### How the agent learns about an attachment
 
 A file attached to a chat is ingested into the session's vector store and
-`vector_search` is activated for the session. The model is told twice, in
-two different places:
+`vector_search` is activated for the session — with two exceptions that
+reach the model directly instead (see
+[images and documents](#images-and-documents-as-message-parts) below): an
+**image** is not ingested at all, a **PDF** is ingested *and* sent with the
+next message. For everything else the model is told twice, in two different
+places:
 
 - **In the user's next message.** That message records the newly attached
   files in its metadata; when the request is built, the model reads a short
@@ -113,6 +117,35 @@ message — the record is read in order, so a file attached again after a
 removal is announced again, and an attach notice names only files that are
 still attached. All of this is rendered by the `LlmMessageMapper`
 (see [Memory](./memory.md#how-messages-reach-the-model)).
+
+### Images and documents as message parts
+
+A message is made of **content parts** — its text, plus the images and
+files sent with it, referenced by the id the file store holds them under.
+An image or PDF attached to the chat becomes a part of the user's next
+message, so a model that reads it sees the picture with the question:
+
+- The model's `LlmConfig` says what it reads — `capabilities` with `VISION`
+  for images, `DOCUMENTS` for PDFs (see the
+  [LLM config reference](./llm-configs-reference.md)). A part the model
+  reads travels inline, as the provider's content block; otherwise a
+  placeholder line stands in for it — what the file is, and why it is not
+  here. A PDF a model does not read still reaches it through
+  `vector_search`, the placeholder says so.
+- Media goes with the message **in the current turn only**. A request
+  repeats the whole history, and an image repeated in every request costs
+  its tokens every time. From the next turn on the placeholder names the
+  file and the agent asks for it again with the `view_attachment` tool,
+  which inserts the image or document as a message of its own into the
+  running turn. The tool is activated for a session when an image or PDF is
+  attached; the chat shows the re-shown attachment as such.
+- The chat bubble shows the image; the REST API accepts parts in the JSON
+  chat body, the protocol bridge accepts `Image` and `Document` parts, and
+  `AgentRuntime.chat(sessionId, parts, …)` takes them in an embedding.
+
+Images are not named in the attachment notice or the system-prompt
+section — they are not indexed, and the part (or its placeholder) speaks
+for itself.
 
 ## Configuration
 

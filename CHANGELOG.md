@@ -29,13 +29,40 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `capabilities`, any of `TOOL_CALLING`, `VISION`, `DOCUMENTS`,
   `AUDIO_INPUT`. The Admin UI's chat-config form has a multiselect for it,
   the detail view shows it, the JSON (file store, Postgres, REST API,
-  bundled `initial-data` configs) carries it as a string array. It is a
-  declaration: callers ask `LlmConfig.supports(...)`, the runtime does not
-  derive its behaviour from it yet. Configs written before this field
-  existed load as declaring nothing. The bundled cloud configs
-  (`claude-*`, `openai-default`, `azure-openai-default`, `gemini-default`)
-  declare their capabilities, the local ones `TOOL_CALLING`; existing
-  installs keep their stored configs unchanged.
+  bundled `initial-data` configs) carries it as a string array. Configs
+  written before this field existed load as declaring nothing. The bundled
+  cloud configs (`claude-*`, `openai-default`, `azure-openai-default`,
+  `gemini-default`) declare their capabilities, the local ones
+  `TOOL_CALLING`; existing installs keep their stored configs unchanged.
+  `VISION` and `DOCUMENTS` decide what the next entry sends.
+- **agents:** images and PDFs reach the model. A message is made of content
+  parts — its text plus the images and files sent with it, referenced by
+  file-store id (`Message.parts`; the file store and Postgres carry them
+  without a migration, older messages read as text). An image or PDF
+  attached to a chat goes with the next user message as a part: a model
+  whose config declares `VISION` / `DOCUMENTS` gets it inline as the
+  provider's content block (OpenAI, Anthropic and Gemini gateways), any
+  other model a placeholder line saying what the file is and why it is not
+  there. Media is sent in the turn it belongs to only; afterwards the new
+  `view_attachment` tool — activated for the session on such an upload —
+  shows the file again as a message of its own. Images are no longer
+  ingested into the session's vector store (they were read as UTF-8 text);
+  the chat bubble shows the picture, the attached-files dialog says how
+  each file reaches the model. `POST /api/sessions/{id}/chat` takes a JSON
+  body `{message, parts:[{kind, fileId}]}` beside the plain-text one,
+  `GET /api/sessions/{id}/files` lists file id, media type, size and chunk
+  count per file, the protocol bridge accepts `Image` parts, and
+  `AgentRuntime.chat(sessionId, parts, …)` takes parts in an embedding.
+
+### Changed
+
+- **agents:** a session's `attachedFiles` are records — id, name, media
+  type, size — instead of bare names; sessions written before read their
+  names as files without an id. `LlmMessage` is made of content blocks
+  (`parts`), `content()` remains the text; `LlmMessageMapper.toMessages`
+  takes the target `LlmConfig` as a fifth argument, and a host's own
+  mapper implementation has to add it. A user message that carries the
+  open turn's id continues that turn instead of opening a new one.
 
 ## [0.4.0] - 2026-09-03
 

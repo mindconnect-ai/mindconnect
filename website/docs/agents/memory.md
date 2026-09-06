@@ -173,8 +173,15 @@ the default. It maps user and assistant text, tool calls and tool results,
 and renders what a message's metadata means for the model — a user message
 that announced attachments gets the attachment notice ahead of its text
 (see [Vector store](./vector-store.md#how-the-agent-learns-about-an-attachment)).
-The working-memory view in the Admin UI shows the same text and token counts
-the model receives.
+It also renders a message's media parts: an image or document travels as
+the provider's content block when the target model declares it reads that
+kind (`LlmConfig.capabilities`) and the message belongs to the current
+turn, as a placeholder line otherwise (see
+[images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts)).
+The bytes come through the `PartContentReader` port — the host's file
+store. The working-memory view in the Admin UI shows the same text and
+token counts the model receives, with each media part named on a line of
+its own.
 
 It is the read-side extension point, and deliberately the only one: there
 is no per-message-type hook, the mapper sees them all. A Spring host
