@@ -2,8 +2,10 @@ package ai.mindconnect.agent.service;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.service.prompt.AttachmentNotice;
+import ai.mindconnect.agent.service.prompt.AttachmentParts;
 import ai.mindconnect.agent.domain.StreamEvent;
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
@@ -121,8 +123,20 @@ public class AgentChatService {
      */
     public ChatTurnHandle submitChat(UUID sessionId, String userMessage,
                                      Consumer<StreamEvent> eventHandler) {
+        return submitChat(sessionId, ContentPart.text(userMessage), eventHandler);
+    }
+
+    /**
+     * Same, for a message made of content parts — text plus the images and
+     * documents the caller sends with it. Files attached to the session
+     * since the last turn ride along as parts of their own (images, PDFs)
+     * or as a notice (everything else); see {@link AttachmentParts}.
+     */
+    public ChatTurnHandle submitChat(UUID sessionId, List<ContentPart> parts,
+                                     Consumer<StreamEvent> eventHandler) {
         AgentSession session = sessionService.findSession(sessionId);
         AgentDefinition def = effectiveDefinition(session);
+        String userMessage = ContentPart.textOf(parts);
 
         boolean isFirstMessage = conversationManager
                 .loadHistory(session.conversationId(), new PageRequest(0, 1)).isEmpty();
@@ -136,7 +150,8 @@ public class AgentChatService {
         // 1. The question becomes conversation truth — BEFORE the task exists.
         //    A file attached since the last turn is recorded on this message
         //    (metadata); the model reads the notice with the question, the
-        //    text stays what the user typed.
+        //    text stays what the user typed. An image or PDF among them also
+        //    becomes a part of the message, so a model that reads it sees it.
         TokenCounter tokenCounter = memoryStrategyFactory.create(def).resolveTokenCounter(def);
         //    An attachment that was removed since is announced the same way,
         //    so the model stops looking for it. Both are read off the record;
@@ -146,7 +161,8 @@ public class AgentChatService {
         List<String> attached = AttachmentNotice.unannounced(session, history);
         List<String> detached = AttachmentNotice.unannouncedRemovals(session, history);
         AgentTurnWorker.appendUserMessage(conversationManager, session.conversationId(),
-                userMessage, turnId, tokenCounter, AttachmentNotice.metadata(attached, detached));
+                AttachmentParts.withAttachments(parts, session, attached), turnId, tokenCounter,
+                AttachmentNotice.metadata(attached, detached));
 
         // 2.+3. Listen on the turn's channel, make the turn a task — the queue
         //        is the only registry of running work, nothing is tracked here.

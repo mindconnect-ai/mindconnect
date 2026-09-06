@@ -138,6 +138,15 @@ final class AttachSupport {
      * reference later ({@code Document(FileId)} content parts).
      */
     String attachStored(UUID sessionId, ai.mindconnect.filestore.StoredFile stored) {
+        var attached = new ai.mindconnect.agent.domain.AttachedFile(
+                stored.id(), stored.name(), stored.contentType(), stored.size());
+        if (attached.isImage()) {
+            // Not text to index: the image goes to the model with the next
+            // message as an image part, or as that part's placeholder.
+            sessions.findById(sessionId).ifPresent(session ->
+                    sessions.save(session.withAttachedFiles(List.of(attached))));
+            return stored.name() + " attached — it goes to the model with the next message.";
+        }
         try {
             String storeName = "session-" + sessionId;
             var template = stores.template("chat-uploads").orElseGet(() -> {
@@ -166,7 +175,7 @@ final class AttachSupport {
 
             activations.activate(sessionId, List.of("vector_search"));
             sessions.findById(sessionId).ifPresent(session ->
-                    sessions.save(session.withAttachedFiles(List.of(stored.name()))));
+                    sessions.save(session.withAttachedFiles(List.of(attached))));
             return message;
         } catch (Exception e) {
             throw new IllegalStateException("attachFile failed: " + e.getMessage(), e);

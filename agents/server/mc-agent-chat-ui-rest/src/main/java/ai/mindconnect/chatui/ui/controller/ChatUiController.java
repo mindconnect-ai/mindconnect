@@ -569,7 +569,7 @@ public class ChatUiController {
         var body = ai.mindconnect.ui.model.UiStack.of("chat-attach-body");
         body.gap(12);
         body.child(ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent
-                .node(sessionId, sessionFiles.listAttachments(sessionId)));
+                .node(sessionId, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId)));
         body.child(ai.mindconnect.chatui.ui.page.ChatPage.attachZone(sessionId));
         var dlg = ai.mindconnect.ui.model.UiDialog.of("Attached files", null, body);
         dlg.setId("chat-dialog");
@@ -884,15 +884,17 @@ public class ChatUiController {
             return ResponseEntity.badRequest().build();
         }
 
-        // Capture the user text at `seq` before we delete it.
-        String text = sessionService.loadHistory(sessionId).stream()
+        // Capture the user message at `seq` before we delete it — its parts,
+        // so an image sent with it is sent again.
+        java.util.List<ai.mindconnect.message.domain.ContentPart> parts = sessionService.loadHistory(sessionId).stream()
                 .filter(m -> m.sequenceNum() == seq)
                 .filter(m -> m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
                 .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER)
-                .map(Message::content)
+                .map(Message::partsOrText)
                 .findFirst()
                 .orElse(null);
-        if (text == null || text.isBlank()) {
+        String text = parts == null ? null : ai.mindconnect.message.domain.ContentPart.textOf(parts);
+        if (parts == null || (text.isBlank() && parts.size() == 1)) {
             return ResponseEntity.badRequest().build();
         }
 
@@ -905,7 +907,9 @@ public class ChatUiController {
         // initialRefresh=true: push the trimmed conversation to the client
         // before streaming, so the now-deleted messages disappear from the
         // DOM instead of lingering until the end-of-turn refresh.
-        return runChatStream(sessionOpt.get(), agentOpt.get(), text, true);
+        var session = sessionOpt.get();
+        return runTurnStream(session, agentOpt.get(), text, true,
+                handler -> chatService.submitChat(session.id(), parts, handler));
     }
 
     /**

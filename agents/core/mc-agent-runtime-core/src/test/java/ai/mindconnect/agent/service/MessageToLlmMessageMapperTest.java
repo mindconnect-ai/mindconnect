@@ -208,7 +208,7 @@ class MessageToLlmMessageMapperTest {
                         List.of("notes.md")));
         AgentSession withNotes = new AgentSession(session.id(), CONVERSATION, Namespace.DEFAULT,
                 "user", AGENT, "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
-                List.of(), List.of("notes.md"));
+                List.of(), List.of(ai.mindconnect.agent.domain.AttachedFile.named("notes.md")));
 
         List<LlmMessage> out = mapper.toMessages(List.of(m), def, withNotes, budget, target());
 

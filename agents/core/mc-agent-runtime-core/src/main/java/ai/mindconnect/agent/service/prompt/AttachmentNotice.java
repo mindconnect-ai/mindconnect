@@ -57,7 +57,7 @@ public final class AttachmentNotice {
         if (session == null || session.attachedFiles().isEmpty()) return List.of();
         Set<String> announced = announced(history);
         List<String> fresh = new ArrayList<>();
-        for (String file : session.attachedFiles()) {
+        for (String file : session.attachedFileNames()) {
             if (!announced.contains(file)) fresh.add(file);
         }
         return fresh;
@@ -65,7 +65,7 @@ public final class AttachmentNotice {
 
     /** Files the model has been told about that are no longer attached — removed since the last turn. */
     public static List<String> unannouncedRemovals(AgentSession session, List<Message> history) {
-        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFiles());
+        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFileNames());
         List<String> gone = new ArrayList<>();
         for (String file : announced(history)) {
             if (!live.contains(file)) gone.add(file);
@@ -96,9 +96,12 @@ public final class AttachmentNotice {
      * what was attached, what kind of file it is, and the one instruction
      * that matters: the content is reached through {@code vector_search},
      * never through a path. Marked as a system note so the model does not
-     * take it for something the user said.
+     * take it for something the user said. Images are not named here: an
+     * image is not indexed, it travels with the message as an image part
+     * (or as that part's placeholder), which speaks for itself.
      */
-    public static String notice(List<String> files) {
+    public static String notice(List<String> attached) {
+        List<String> files = attached.stream().filter(f -> !"image".equals(kind(f))).toList();
         if (files.isEmpty()) return "";
         StringBuilder out = new StringBuilder("[System note — attached to this chat: ");
         for (int i = 0; i < files.size(); i++) {
@@ -125,12 +128,13 @@ public final class AttachmentNotice {
      * alone otherwise.
      */
     public static String forModel(Message message, AgentSession session) {
-        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFiles());
+        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFileNames());
         List<String> attached = announcedBy(message).stream().filter(live::contains).toList();
         List<String> removed = detachedBy(message).stream().filter(f -> !live.contains(f)).toList();
         StringBuilder out = new StringBuilder();
         if (!removed.isEmpty()) out.append(removalNotice(removed)).append("\n\n");
-        if (!attached.isEmpty()) out.append(notice(attached)).append("\n\n");
+        String attachNotice = notice(attached);
+        if (!attachNotice.isEmpty()) out.append(attachNotice).append("\n\n");
         return out.append(message.content()).toString();
     }
 

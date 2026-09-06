@@ -81,17 +81,31 @@ public class SessionFilesApiController {
         return ResponseEntity.ok(toResponse(sessionFiles.attach(sessionId, stored)));
     }
 
-    /** The files attached to this chat, with the number of searchable chunks each produced. */
+    /**
+     * The files attached to this chat: the file-store id, name, media type
+     * and size of each, and for an ingested file the number of searchable
+     * chunks it produced. An image is attached but not ingested — it goes to
+     * the model with the next message — so its chunk count is 0.
+     */
     @Operation(tags = "Sessions", summary = "List the files attached to a chat",
-            description = "File id \u2192 chunk count. Empty when nothing is attached or when "
-                    + "no vector store is configured.")
+            description = "One entry per attached file: fileId (file store), name, mediaType, "
+                    + "sizeBytes and chunks (searchable chunks; 0 for an image, which goes to "
+                    + "the model with the next message instead of into the vector store).")
     @GetMapping
     public ResponseEntity<List<Map<String, Object>>> listAttachments(@PathVariable UUID sessionId) {
-        var files = sessionFiles.listAttachments(sessionId).entrySet().stream()
-                .map(e -> Map.<String, Object>of(
-                        "fileId", e.getKey(),
-                        "name", java.nio.file.Path.of(e.getKey()).getFileName().toString(),
-                        "chunks", e.getValue()))
+        Map<String, Long> chunksByName = new java.util.HashMap<>();
+        sessionFiles.listAttachments(sessionId).forEach((ingestedId, chunks) ->
+                chunksByName.merge(java.nio.file.Path.of(ingestedId).getFileName().toString(), chunks, Long::sum));
+        var files = sessionFiles.attachments(sessionId).stream()
+                .map(f -> {
+                    Map<String, Object> entry = new java.util.LinkedHashMap<>();
+                    entry.put("fileId", f.id());
+                    entry.put("name", f.name());
+                    entry.put("mediaType", f.mediaType());
+                    entry.put("sizeBytes", f.sizeBytes());
+                    entry.put("chunks", chunksByName.getOrDefault(f.name(), 0L));
+                    return entry;
+                })
                 .toList();
         return ResponseEntity.ok(files);
     }
@@ -107,8 +121,8 @@ public class SessionFilesApiController {
                     + "spooled copy. The file itself stays in the file store.")
     @DeleteMapping
     public ResponseEntity<Void> detach(@PathVariable UUID sessionId,
-                                       @RequestParam("file") String fileId) {
-        sessionFiles.deleteAttachment(sessionId, fileId);
+                                       @RequestParam("file") String fileIdOrName) {
+        sessionFiles.deleteAttachment(sessionId, fileIdOrName);
         return ResponseEntity.noContent().build();
     }
 

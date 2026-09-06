@@ -57,18 +57,24 @@ public class ChatFilesUiController {
                     : UiToast.error(result.message()).title("Attach failed"));
         }
         patch.patch(UiPatch.Operation.replace("chat-attachments",
-                ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))));
+                attachmentsPanel(sessionId)));
         patch.patch(attachmentCountRefresh(sessionId));
         return patch;
     }
 
-    /** Removes a file's chunks from the session store (query param: slashes in ids). */
+    /** The attached-files panel: the session's record, with the chunks each ingested file produced. */
+    private ai.mindconnect.ui.model.UiNode attachmentsPanel(UUID sessionId) {
+        return ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(
+                sessionId, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId));
+    }
+
+    /** Detaches a file by name: its chunks leave the session store, an image leaves the record. */
     @org.springframework.web.bind.annotation.DeleteMapping
-    public UiPatch remove(@PathVariable UUID sessionId, @RequestParam("file") String fileId) {
-        sessionFiles.deleteAttachment(sessionId, fileId);
+    public UiPatch remove(@PathVariable UUID sessionId, @RequestParam("file") String fileName) {
+        sessionFiles.deleteAttachment(sessionId, fileName);
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace("chat-attachments",
-                        ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))))
+                        attachmentsPanel(sessionId)))
                 .patch(attachmentCountRefresh(sessionId))
                 .toast(UiToast.success("Removed from the conversation.").title("File removed"));
     }
@@ -83,7 +89,7 @@ public class ChatFilesUiController {
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         sessionId, agent == null ? null : agent.id(), false)
                 .withModelLabel(agent == null ? null : agent.llmConfigName())
-                .withAttachmentCount(sessionFiles.listAttachments(sessionId).size());
+                .withAttachmentCount(sessionFiles.attachments(sessionId).size());
         return form.reset();
     }
 }

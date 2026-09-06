@@ -20,7 +20,8 @@ class AttachmentNoticeTest {
     private static AgentSession session(String... attached) {
         return new AgentSession(UUID.randomUUID(), UUID.randomUUID(), Namespace.DEFAULT, "david",
                 UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
-                List.of(), List.of(attached));
+                List.of(), java.util.Arrays.stream(attached)
+                        .map(ai.mindconnect.agent.domain.AttachedFile::named).toList());
     }
 
     private static Message user(String text, Map<String, Object> metadata) {
@@ -71,6 +72,20 @@ class AttachmentNoticeTest {
         // attached again after the removal: fresh, because the record is read in order
         assertThat(AttachmentNotice.unannounced(session("a.pdf"), withRemoval)).containsExactly("a.pdf");
         assertThat(AttachmentNotice.unannouncedRemovals(session("a.pdf"), withRemoval)).isEmpty();
+    }
+
+    @Test
+    void imagesAreAnnouncedInTheMetadataButNotInTheNotice() {
+        // The image travels as a part (or its placeholder) — the notice about
+        // vector_search would only mislead. The metadata still records it, so
+        // the bookkeeping and the chat's chip see it.
+        assertThat(AttachmentNotice.notice(List.of("photo.png"))).isEmpty();
+        assertThat(AttachmentNotice.notice(List.of("photo.png", "notes.md")))
+                .contains("notes.md (Markdown)").doesNotContain("photo.png");
+
+        Message announcing = user("what is this?", attached("photo.png"));
+        assertThat(AttachmentNotice.announcedBy(announcing)).containsExactly("photo.png");
+        assertThat(AttachmentNotice.forModel(announcing, session("photo.png"))).isEqualTo("what is this?");
     }
 
     @Test
