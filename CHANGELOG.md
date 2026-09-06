@@ -23,6 +23,19 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** the admin UI has a task manager. A badge in the header shows
+  what the task queue is doing right now — `3 running · 2 waiting`, or
+  `idle` — on every page, kept current over a server-sent event stream the
+  page attaches once and keeps across navigation. A click opens the task
+  queue: the live tasks as a tree (a turn, the tool calls it dispatched, a
+  sub-agent's turn under the `run_agent` call that started it) with status,
+  owner and elapsed time, the tasks that finished last with a failure's
+  reason, and a Cancel per task. Cancel is for one's own tasks only — the
+  user whose session a task runs for — and takes the task's sub-tasks with
+  it. Endpoints under `/admin/api/tasks`.
+
 ## [0.4.0] - 2026-09-03
 
 ### Changed

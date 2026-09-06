@@ -6,7 +6,11 @@ import ai.mindconnect.ui.model.UiHeader;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiMenu;
 import ai.mindconnect.ui.model.UiMenuItem;
+import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Builds the shared admin-ui chrome as a semantic-ui {@link UiAppShell}:
@@ -24,6 +28,8 @@ public final class AdminLayout {
     private final String userName;
     private final boolean authEnabled;
     private final String versionLabel;
+    private final UiNode taskBadge;
+    private final UiPage.ActiveStream taskStream;
 
     /**
      * @param userName    display name of the current user (e.g. {@code "mc_user"})
@@ -33,9 +39,22 @@ public final class AdminLayout {
      *                     when this is not a packaged build
      */
     public AdminLayout(String userName, boolean authEnabled, String versionLabel) {
+        this(userName, authEnabled, versionLabel, null, null);
+    }
+
+    /**
+     * @param taskBadge  the task-queue badge for the header, or null when the
+     *                   host has no task monitor
+     * @param taskStream the live feed behind the badge; put on every page so
+     *                   the SPA attaches once and keeps it across navigation
+     */
+    public AdminLayout(String userName, boolean authEnabled, String versionLabel,
+                       UiNode taskBadge, UiPage.ActiveStream taskStream) {
         this.userName = userName;
         this.authEnabled = authEnabled;
         this.versionLabel = versionLabel;
+        this.taskBadge = taskBadge;
+        this.taskStream = taskStream;
     }
 
     /**
@@ -53,7 +72,20 @@ public final class AdminLayout {
         UiPage out = UiPage.of(page.getNavigate(), shell);
         out.setToasts(page.getToasts());
         out.setDialogs(page.getDialogs());
-        out.setActiveStreams(page.getActiveStreams());
+        out.setActiveStreams(withTaskStream(page.getActiveStreams()));
+        return out;
+    }
+
+    /**
+     * The page's own streams (a chat session's, say) plus the task feed. The
+     * client opens a stream only when it has none under that channel id, so
+     * naming it on every page costs nothing after the first.
+     */
+    private List<UiPage.ActiveStream> withTaskStream(List<UiPage.ActiveStream> streams) {
+        if (taskStream == null) return streams;
+        List<UiPage.ActiveStream> out = streams == null ? new ArrayList<>() : new ArrayList<>(streams);
+        boolean present = out.stream().anyMatch(s -> taskStream.getChannelId().equals(s.getChannelId()));
+        if (!present) out.add(taskStream);
         return out;
     }
 
@@ -70,6 +102,11 @@ public final class AdminLayout {
         // not identity, so it sits beside the user widget rather than in it.
         // A click opens the About dialog with build time, commit, branch and
         // the changelog section of this build.
+        // The task badge sits left of the version: what the server is DOING,
+        // beside what the server IS. A click opens the task manager.
+        if (taskBadge != null) {
+            header.extra(taskBadge);
+        }
         if (versionLabel != null) {
             header.extra(UiAction.link("about-version", versionLabel)
                     .dispatch("GET", "/admin/api/about")
