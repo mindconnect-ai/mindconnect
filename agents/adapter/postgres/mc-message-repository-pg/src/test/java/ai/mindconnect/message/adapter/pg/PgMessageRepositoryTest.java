@@ -2,6 +2,7 @@ package ai.mindconnect.message.adapter.pg;
 
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -45,6 +46,19 @@ class PgMessageRepositoryTest {
 
         assertThat(repo.findById(conversation, m.id())).contains(m);
         assertThat(repo.findById(UUID.randomUUID(), m.id())).as("scoped to the conversation").isEmpty();
+    }
+
+    @Test
+    void aMessageMadeOfPartsComesBackAsTheSameParts() {
+        Message m = Message.of(conversation, sender, ParticipantType.USER, MessageType.CHAT, List.of(
+                new ContentPart.Text("see attached"),
+                new ContentPart.Image("f-1", "photo.png", "image/png", 240_000L),
+                new ContentPart.File("f-2", "spec.pdf", "application/pdf", 1_048_576L)), 1);
+        repo.save(m);
+
+        assertThat(repo.findById(conversation, m.id())).contains(m);
+        assertThat(repo.findById(conversation, m.id())).get()
+                .extracting(Message::content).isEqualTo("see attached");
     }
 
     @Test

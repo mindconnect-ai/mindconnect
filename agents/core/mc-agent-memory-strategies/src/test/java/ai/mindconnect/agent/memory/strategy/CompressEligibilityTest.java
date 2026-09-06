@@ -241,6 +241,12 @@ class CompressEligibilityTest {
                 Integer run, Map<String, Object> metadata) {
             throw new UnsupportedOperationException();
         }
+        @Override public Message addMessageToConversation(UUID conversationId, UUID senderId,
+                ParticipantType senderType, MessageType type,
+                java.util.List<ai.mindconnect.message.domain.ContentPart> parts, UUID turnId,
+                Integer run, Map<String, Object> metadata) {
+            throw new UnsupportedOperationException();
+        }
         @Override public void updateTokenCount(UUID conversationId, UUID messageId, int tokenCount) {
             throw new UnsupportedOperationException();
         }

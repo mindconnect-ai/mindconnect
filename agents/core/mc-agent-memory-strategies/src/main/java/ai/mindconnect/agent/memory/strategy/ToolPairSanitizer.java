@@ -199,6 +199,7 @@ public final class ToolPairSanitizer {
                 Instant.now(),
                 false, null, null, null, null,
                 parentToolCall.turnId(),
-                parentToolCall.run());        // inherit turnId from parent for traceability
+                parentToolCall.run(),
+                null);        // inherit turnId from parent for traceability
     }
 }

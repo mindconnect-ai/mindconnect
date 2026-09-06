@@ -27,6 +27,12 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-common</artifactId>
         </dependency>
+        <!-- Only the annotations: ContentPart is polymorphic and names its
+             kinds itself, so every adapter's mapper reads it back correctly. -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>

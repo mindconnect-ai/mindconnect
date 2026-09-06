@@ -222,6 +222,12 @@ class ResponseReviewerChainTest {
                 Integer run, Map<String, Object> metadata) {
             throw new UnsupportedOperationException();
         }
+        @Override public Message addMessageToConversation(UUID id, UUID senderId,
+                ParticipantType senderType, MessageType type,
+                java.util.List<ai.mindconnect.message.domain.ContentPart> parts, UUID turnId,
+                Integer run, Map<String, Object> metadata) {
+            throw new UnsupportedOperationException();
+        }
         @Override public void compressMessage(UUID id, UUID messageId, String stub, Integer tokens) { }
         @Override public void updateTokenCount(UUID id, UUID messageId, int tokenCount) { }
         @Override public void updateDurationMs(UUID id, UUID messageId, long durationMs) { }

@@ -3,6 +3,7 @@ package ai.mindconnect.message.service;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
@@ -76,6 +77,50 @@ class ConversationServiceTest {
         Message msg2 = service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "msg 2", null);
 
         assertThat(msg2.sequenceNum()).isEqualTo(2);
+    }
+
+    @Test
+    void addMessage_withParts_derivesContentFromTheTextParts() {
+        Conversation conv = service.createConversation(new Namespace("test"), "topic",
+                ConversationType.USER_AGENT, List.of());
+        List<ContentPart> parts = List.of(
+                new ContentPart.Text("What is in this picture?"),
+                new ContentPart.Image("f-1", "photo.png", "image/png", 240_000L));
+
+        Message msg = service.addMessageToConversation(conv.id(), UUID.randomUUID(), ParticipantType.USER,
+                MessageType.CHAT, parts, null, 0, Map.of());
+
+        assertThat(msg.content()).isEqualTo("What is in this picture?");
+        assertThat(msg.parts()).containsExactlyElementsOf(parts);
+        assertThat(msg.partsOrText()).containsExactlyElementsOf(parts);
+        assertThat(msg.sequenceNum()).isEqualTo(1);
+        assertThat(messageRepo.store).containsExactly(msg);
+    }
+
+    @Test
+    void addMessage_withText_hasNoPartsButReadsAsOneTextPart() {
+        Conversation conv = service.createConversation(new Namespace("test"), "topic",
+                ConversationType.USER_AGENT, List.of());
+
+        Message msg = service.addMessageToConversation(conv.id(), UUID.randomUUID(), ParticipantType.USER,
+                MessageType.CHAT, "Hello!", null);
+
+        assertThat(msg.parts()).isNull();
+        assertThat(msg.partsOrText()).containsExactly(new ContentPart.Text("Hello!"));
+    }
+
+    @Test
+    void addMessage_withParts_appendsAfterExistingMessages() {
+        Conversation conv = service.createConversation(new Namespace("test"), "topic",
+                ConversationType.USER_AGENT, List.of());
+        UUID sender = UUID.randomUUID();
+        service.addMessageToConversation(conv.id(), sender, ParticipantType.USER, MessageType.CHAT, "first", null);
+
+        Message msg = service.addMessageToConversation(conv.id(), sender, ParticipantType.USER,
+                MessageType.CHAT, ContentPart.text("second"), null, null, Map.of());
+
+        assertThat(msg.sequenceNum()).isEqualTo(2);
+        assertThat(msg.content()).isEqualTo("second");
     }
 
     @Test

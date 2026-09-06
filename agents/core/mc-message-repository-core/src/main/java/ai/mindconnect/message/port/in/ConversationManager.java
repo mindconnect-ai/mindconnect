@@ -2,6 +2,7 @@ package ai.mindconnect.message.port.in;
 
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.domain.ConversationHistory;
 import ai.mindconnect.message.domain.ConversationType;
@@ -54,6 +55,15 @@ public interface ConversationManager {
      */
     Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
                                      MessageType type, String content, UUID turnId, Integer run,
+                                     java.util.Map<String, Object> metadata);
+
+    /**
+     * Same, for a message made of {@link ContentPart}s — text plus the images
+     * and files sent with it. The record's {@code content} is derived from the
+     * text parts, so the text-only readers see the message as before.
+     */
+    Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
+                                     MessageType type, List<ContentPart> parts, UUID turnId, Integer run,
                                      java.util.Map<String, Object> metadata);
 
     /**
