@@ -4,6 +4,8 @@ import ai.mindconnect.common.util.EnvVarResolver;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -52,11 +54,33 @@ public record LlmConfig(
          * vectors and have no sampling settings — temperature, output tokens,
          * thinking etc. don't apply.
          */
-        LlmConfigType type
+        LlmConfigType type,
+        /**
+         * What the model can take in and do — see {@link LlmCapability}.
+         * Declared by the admin, shown by the UI, asked by callers that want
+         * to know whether a model reads images; the runtime does not derive
+         * its control flow from it. Never {@code null}: an unset or legacy
+         * config reads as the empty set.
+         */
+        Set<LlmCapability> capabilities
 ) {
-    /** Normalises {@code null} (legacy configs, terse callers) to CHAT. */
+    /**
+     * Normalises {@code null} (legacy configs, terse callers): the type to
+     * CHAT, the capabilities to the empty set. The set is stored as an
+     * unmodifiable copy in declaration order, so JSON and UI show a stable
+     * sequence.
+     */
     public LlmConfig {
         if (type == null) type = LlmConfigType.CHAT;
+        capabilities = capabilities == null || capabilities.isEmpty()
+                ? Set.of()
+                : Collections.unmodifiableSet(EnumSet.copyOf(capabilities));
+    }
+
+    /** Convenience: does this config declare the given capability? */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean supports(LlmCapability capability) {
+        return capabilities.contains(capability);
     }
 
     /** Convenience: is this an embedding model? */
@@ -82,11 +106,12 @@ public record LlmConfig(
             @JsonProperty("delegatesTo")          String delegatesTo,
             @JsonProperty("retry")                RetryConfig retry,
             @JsonProperty("rateLimit")            RateLimitConfig rateLimit,
-            @JsonProperty("type")                 LlmConfigType type) {
+            @JsonProperty("type")                 LlmConfigType type,
+            @JsonProperty("capabilities")         Set<LlmCapability> capabilities) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
                 defaultTemperature, maxOutputTokens,
                 additionalParams != null ? additionalParams : Map.of(),
-                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type);
+                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
 
 
@@ -97,27 +122,27 @@ public record LlmConfig(
      */
     public static LlmConfig alias(String name, String delegatesTo) {
         return new LlmConfig(UUID.randomUUID(), name, null, null, null, null,
-                0.0, 0, Map.of(), null, true, delegatesTo, null, null, null);
+                0.0, 0, Map.of(), null, true, delegatesTo, null, null, null, null);
     }
 
     public static LlmConfig lmStudio(String name, String model, String baseUrl) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.LM_STUDIO,
-                model, baseUrl, "lm-studio", 0.7, 2048, Map.of(), 131_072, false, null, null, null, null);
+                model, baseUrl, "lm-studio", 0.7, 2048, Map.of(), 131_072, false, null, null, null, null, null);
     }
 
     public static LlmConfig claude(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.ANTHROPIC,
-                model, "https://api.anthropic.com", apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null);
+                model, "https://api.anthropic.com", apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig ollama(String name, String model, String baseUrl) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OLLAMA,
-                model, baseUrl, "ollama", 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, baseUrl, "ollama", 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig mistral(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.MISTRAL,
-                model, "https://api.mistral.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null);
+                model, "https://api.mistral.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     /**
@@ -126,37 +151,37 @@ public record LlmConfig(
      */
     public static LlmConfig azureOpenAi(String name, String deployment, String baseUrl, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.AZURE_OPENAI,
-                deployment, baseUrl, apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null);
+                deployment, baseUrl, apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig deepSeek(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.DEEPSEEK,
-                model, "https://api.deepseek.com", apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null);
+                model, "https://api.deepseek.com", apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig together(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.TOGETHER,
-                model, "https://api.together.xyz", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, "https://api.together.xyz", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig openRouter(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OPENROUTER,
-                model, "https://openrouter.ai/api", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, "https://openrouter.ai/api", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig perplexity(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.PERPLEXITY,
-                model, "https://api.perplexity.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null);
+                model, "https://api.perplexity.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig fireworks(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.FIREWORKS,
-                model, "https://api.fireworks.ai/inference", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, "https://api.fireworks.ai/inference", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig googleGemini(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.GOOGLE_GEMINI,
-                model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null);
+                model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
     }
 
     /** Guards against runaway / circular alias chains. */
@@ -200,12 +225,18 @@ public record LlmConfig(
 
     public LlmConfig withContextWindowTokens(Integer contextWindowTokens) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
 
     public LlmConfig withApiKey(String apiKey) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
+    }
+
+    /** Returns a copy declaring exactly the given capabilities ({@code null} clears them). */
+    public LlmConfig withCapabilities(Set<LlmCapability> capabilities) {
+        return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
 
     /**
@@ -231,7 +262,8 @@ public record LlmConfig(
                 delegatesTo,
                 retry,
                 rateLimit,
-                type);
+                type,
+                capabilities);
     }
 
     /**

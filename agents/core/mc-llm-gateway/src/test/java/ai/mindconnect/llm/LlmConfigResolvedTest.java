@@ -14,7 +14,7 @@ class LlmConfigResolvedTest {
 
     private static LlmConfig config(String model, String baseUrl, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), "test", LlmProvider.OPENAI,
-                model, baseUrl, apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, baseUrl, apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     // --- resolved() — env-var expansion only ---

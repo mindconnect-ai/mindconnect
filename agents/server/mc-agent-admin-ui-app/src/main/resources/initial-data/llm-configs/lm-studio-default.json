@@ -8,5 +8,8 @@
   "defaultTemperature": 0.7,
   "maxOutputTokens": 4096,
   "additionalParams": {},
-  "contextWindowTokens": 32768
+  "contextWindowTokens": 32768,
+  "capabilities": [
+    "TOOL_CALLING"
+  ]
 }

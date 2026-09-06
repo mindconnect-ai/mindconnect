@@ -27,7 +27,7 @@ class ThrottlingLlmGatewayTest {
     private static LlmConfig config(String name, RateLimitConfig rateLimit) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OPENAI,
                 "model", "http://x", "key", 0.7, 4096, Map.of(), null,
-                false, null, null, rateLimit, null);
+                false, null, null, rateLimit, null, null);
     }
 
     /** A delegate that records peak concurrency and blocks until released. */

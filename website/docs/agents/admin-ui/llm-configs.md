@@ -20,6 +20,9 @@ A config has a `name`, `provider`, `model`, `baseUrl`, `apiKey`,
 settings. The form also covers:
 
 - **Type** — `Chat` or `Embedding` (embedding configs power the vector store);
+- **Capabilities** (chat configs) — what the model can take in and do: tool
+  calling, vision (images), documents (PDF), audio input. This is a
+  declaration for admins and callers, not something the runtime enforces;
 - **alias mode** — *Delegates To* forwards the config to another one by name;
 - **Temperature** and **Max Output Tokens**;
 - provider-specific extra parameters, rendered from the provider catalog;

@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
+import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.ui.model.UiAction;
@@ -56,8 +57,8 @@ public final class LlmConfigFormComponent implements UiComponent {
 
     /**
      * The type-specific settings, swapped in place when the "Embedding Model"
-     * checkbox toggles. Chat configs carry the sampling/retry knobs; an
-     * embedding model only needs its input window.
+     * checkbox toggles. Chat configs carry the sampling/retry knobs and the
+     * capability declaration; an embedding model only needs its input window.
      */
     public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(boolean isEmbedding, LlmConfig config) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-type-cfg",
@@ -68,7 +69,8 @@ public final class LlmConfigFormComponent implements UiComponent {
                     .hint("Optional — the embedding model's input window, used to size chunks"));
             return group;
         }
-        group.field(UiField.number("defaultTemperature", "Temperature",
+        group.field(capabilitiesField(config))
+                .field(UiField.number("defaultTemperature", "Temperature",
                         config == null ? 0.7 : config.defaultTemperature()).asEditable())
                 .field(UiField.number("maxOutputTokens", "Max Output Tokens",
                         config == null ? 4096 : config.maxOutputTokens()).asEditable())
@@ -93,6 +95,24 @@ public final class LlmConfigFormComponent implements UiComponent {
                                 ? config.rateLimit().maxConcurrentRequests() : null).asEditable()
                         .hint("Caps in-flight LLM requests for this config (across turns, sub-agents, tool loops). Leave empty for unlimited. Use it to stay under a provider's rate limit when run_agents fans out."));
         return group;
+    }
+
+    /**
+     * The capability declaration — one option per {@link LlmCapability}, the
+     * config's current set preselected. Informative: the hint says so, so an
+     * admin does not expect ticking "Vision" to change what the runtime sends.
+     */
+    private static UiField capabilitiesField(LlmConfig config) {
+        List<UiField.Option> options = Arrays.stream(LlmCapability.values())
+                .map(c -> UiField.Option.of(c.name(), c.label()))
+                .toList();
+        List<String> current = config == null ? List.of()
+                : config.capabilities().stream().map(Enum::name).toList();
+        return UiField.multiselect("capabilities", "Capabilities", current, options)
+                .asEditable()
+                .hint("What the model can take in and do — tool calling, images, documents, "
+                        + "audio. Informative: shown here and readable by callers, not "
+                        + "enforced by the runtime.");
     }
 
     /**

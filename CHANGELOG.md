@@ -23,6 +23,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** an LLM config can declare what its model can take in and do —
+  `capabilities`, any of `TOOL_CALLING`, `VISION`, `DOCUMENTS`,
+  `AUDIO_INPUT`. The Admin UI's chat-config form has a multiselect for it,
+  the detail view shows it, the JSON (file store, Postgres, REST API,
+  bundled `initial-data` configs) carries it as a string array. It is a
+  declaration: callers ask `LlmConfig.supports(...)`, the runtime does not
+  derive its behaviour from it yet. Configs written before this field
+  existed load as declaring nothing. The bundled cloud configs
+  (`claude-*`, `openai-default`, `azure-openai-default`, `gemini-default`)
+  declare their capabilities, the local ones `TOOL_CALLING`; existing
+  installs keep their stored configs unchanged.
+
 ## [0.4.0] - 2026-09-03
 
 ### Changed

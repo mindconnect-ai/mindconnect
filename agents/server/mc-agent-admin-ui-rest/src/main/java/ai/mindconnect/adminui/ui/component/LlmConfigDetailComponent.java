@@ -33,6 +33,7 @@ public final class LlmConfigDetailComponent implements UiComponent {
                 .field(UiField.text("provider", "Provider",
                         config.provider() != null ? config.provider().name() : null))
                 .field(UiField.text("type", "Type", config.isEmbedding() ? "Embedding" : "Chat"))
+                .field(UiField.text("capabilities", "Capabilities", capabilitiesSummary(config)))
                 .field(UiField.text("model", "Model", config.model()))
                 .field(UiField.text("baseUrl", "Base URL", config.baseUrl()))
                 .field(UiField.text("apiKey", "API Key", "••••••••"))
@@ -67,6 +68,14 @@ public final class LlmConfigDetailComponent implements UiComponent {
         if (config.additionalParams() == null) return "—";
         Object v = config.additionalParams().get(key);
         return v == null || v.toString().isBlank() ? "—" : v.toString();
+    }
+
+    /** The declared capabilities by label, or "—" when the config declares none. */
+    private static String capabilitiesSummary(LlmConfig config) {
+        if (config.capabilities().isEmpty()) return "—";
+        return config.capabilities().stream()
+                .map(ai.mindconnect.llm.domain.LlmCapability::label)
+                .collect(java.util.stream.Collectors.joining(", "));
     }
 
     /** Human-readable one-liner for the retry policy, or "Off" when none is set. */

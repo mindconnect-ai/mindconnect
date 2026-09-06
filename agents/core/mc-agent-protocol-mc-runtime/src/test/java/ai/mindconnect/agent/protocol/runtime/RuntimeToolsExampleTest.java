@@ -201,6 +201,6 @@ class RuntimeToolsExampleTest {
     private static LlmConfig local(String name, String model, String apiKey, LlmConfigType type) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.LM_STUDIO, model,
                 TestModels.baseUrl(), apiKey, 0.2, 2048, Map.of(), 128_000,
-                false, null, null, null, type);
+                false, null, null, null, type, null);
     }
 }

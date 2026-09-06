@@ -37,7 +37,9 @@ class PgLlmConfigRepositoryTest {
         LlmConfig config = new LlmConfig(UUID.randomUUID(), "claude", LlmProvider.ANTHROPIC,
                 "claude-sonnet-5", "https://api.anthropic.com", "sk-secret", 0.3, 8192,
                 Map.of("top_p", 0.9, "stop", List.of("END")), 200_000, false, null, null, null,
-                LlmConfigType.CHAT);
+                LlmConfigType.CHAT,
+                java.util.Set.of(ai.mindconnect.llm.domain.LlmCapability.TOOL_CALLING,
+                        ai.mindconnect.llm.domain.LlmCapability.VISION));
         repo.save(config);
 
         assertThat(repo.findById(config.id())).contains(config);
@@ -49,7 +51,7 @@ class PgLlmConfigRepositoryTest {
         LlmConfig first = LlmConfig.lmStudio("local", "qwen", "http://localhost:1234");
         repo.save(first);
         LlmConfig renamed = LlmConfig.fromJson(first.id(), "local-qwen", first.provider(), "qwen-2",
-                first.baseUrl(), first.apiKey(), 0.1, 1024, Map.of(), null, false, null, null, null, null);
+                first.baseUrl(), first.apiKey(), 0.1, 1024, Map.of(), null, false, null, null, null, null, null);
         repo.save(renamed);
 
         assertThat(repo.findAll()).containsExactly(renamed);
