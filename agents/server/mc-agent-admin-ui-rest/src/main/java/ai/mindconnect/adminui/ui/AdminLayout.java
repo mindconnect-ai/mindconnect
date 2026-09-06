@@ -1,12 +1,16 @@
 package ai.mindconnect.adminui.ui;
 
 import ai.mindconnect.ui.model.UiAppShell;
-import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiHeader;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiMenu;
 import ai.mindconnect.ui.model.UiMenuItem;
+import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+import ai.mindconnect.ui.model.UiTrigger;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Builds the shared admin-ui chrome as a semantic-ui {@link UiAppShell}:
@@ -24,18 +28,33 @@ public final class AdminLayout {
     private final String userName;
     private final boolean authEnabled;
     private final String versionLabel;
+    private final UiNode taskBadge;
+    private final UiPage.ActiveStream taskStream;
 
     /**
      * @param userName    display name of the current user (e.g. {@code "mc_user"})
      * @param authEnabled whether Keycloak auth is on; the logout link is shown
      *                    only then (with auth off the user is a fixed dev user)
-     * @param versionLabel the build's short version for the header, or null
-     *                     when this is not a packaged build
+     * @param versionLabel the build's short version for the sidebar's foot, or
+     *                     null when this is not a packaged build
      */
     public AdminLayout(String userName, boolean authEnabled, String versionLabel) {
+        this(userName, authEnabled, versionLabel, null, null);
+    }
+
+    /**
+     * @param taskBadge  the task-queue badge for the header, or null when the
+     *                   host has no task monitor
+     * @param taskStream the live feed behind the badge; put on every page so
+     *                   the SPA attaches once and keeps it across navigation
+     */
+    public AdminLayout(String userName, boolean authEnabled, String versionLabel,
+                       UiNode taskBadge, UiPage.ActiveStream taskStream) {
         this.userName = userName;
         this.authEnabled = authEnabled;
         this.versionLabel = versionLabel;
+        this.taskBadge = taskBadge;
+        this.taskStream = taskStream;
     }
 
     /**
@@ -53,7 +72,20 @@ public final class AdminLayout {
         UiPage out = UiPage.of(page.getNavigate(), shell);
         out.setToasts(page.getToasts());
         out.setDialogs(page.getDialogs());
-        out.setActiveStreams(page.getActiveStreams());
+        out.setActiveStreams(withTaskStream(page.getActiveStreams()));
+        return out;
+    }
+
+    /**
+     * The page's own streams (a chat session's, say) plus the task feed. The
+     * client opens a stream only when it has none under that channel id, so
+     * naming it on every page costs nothing after the first.
+     */
+    private List<UiPage.ActiveStream> withTaskStream(List<UiPage.ActiveStream> streams) {
+        if (taskStream == null) return streams;
+        List<UiPage.ActiveStream> out = streams == null ? new ArrayList<>() : new ArrayList<>(streams);
+        boolean present = out.stream().anyMatch(s -> taskStream.getChannelId().equals(s.getChannelId()));
+        if (!present) out.add(taskStream);
         return out;
     }
 
@@ -66,14 +98,12 @@ public final class AdminLayout {
         // logout), so it's a plain link, not a semantic-ui action. Shown only
         // when auth is enabled — with auth off there's a fixed dev user and
         // nothing to log out of.
-        // The build's version, small and muted, right of the brand: status,
-        // not identity, so it sits beside the user widget rather than in it.
-        // A click opens the About dialog with build time, commit, branch and
-        // the changelog section of this build.
-        if (versionLabel != null) {
-            header.extra(UiAction.link("about-version", versionLabel)
-                    .dispatch("GET", "/admin/api/about")
-                    .withCssClass("sui-hint"));
+        // The task badge is the one live thing in the header: what the server
+        // is DOING right now, beside who is using it. A click opens the task
+        // manager. What the server IS — its version — lives at the foot of
+        // the sidebar (see buildMenu), where it is out of the way.
+        if (taskBadge != null) {
+            header.extra(taskBadge);
         }
         if (authEnabled) {
             header.extra(UiLink.of("logout", "/admin/logout", "Logout"));
@@ -94,6 +124,14 @@ public final class AdminLayout {
         menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
         menu.item(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));
+        // The build's version as the last entry, pushed to the bottom by the
+        // stylesheet: small and muted, an info icon in the collapsed rail. A
+        // click opens the About dialog with build time, commit, branch and
+        // the changelog section of this build.
+        if (versionLabel != null) {
+            menu.item(UiMenuItem.of("nav-version", versionLabel).icon("info")
+                    .onClick(UiTrigger.api("GET", "/admin/api/about")));
+        }
         return menu;
     }
 

@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The About dialog behind the header's version label: what build this is
+ * The About dialog behind the version label at the foot of the sidebar: what build this is
  * and what it changes. Opened and closed as patches on the body-level dialog
  * host, the same way the tool-test dialog works — the page underneath is
  * left alone.

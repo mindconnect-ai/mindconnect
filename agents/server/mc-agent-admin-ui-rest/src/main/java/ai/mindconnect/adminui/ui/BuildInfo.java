@@ -13,8 +13,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.Optional;
 
 /**
- * What this server build is, for the header's version label and the About
- * dialog behind it. Everything comes out of the jar: Spring Boot's
+ * What this server build is, for the version label at the foot of the sidebar
+ * and the About dialog behind it. Everything comes out of the jar: Spring Boot's
  * {@code META-INF/build-info.properties} (version, build time),
  * {@code git.properties} (commit, branch) and the repository's
  * {@code META-INF/CHANGELOG.md} — the admin-ui app packages all three. An IDE
@@ -46,10 +46,10 @@ public class BuildInfo {
     }
 
     /**
-     * The header label — short, because the header is: {@code v0.3.1} for a
-     * release, {@code 0.3.1-SNAPSHOT · dd8d540} for a snapshot. A branch
-     * build's branch is in the dialog; in the header it would take the room
-     * of the whole brand.
+     * The sidebar label — short, because the sidebar is: {@code v0.3.1} for
+     * a release, {@code 0.3.1-SNAPSHOT · dd8d540} for a snapshot. A branch
+     * build's branch is in the dialog; in the label it would not fit the
+     * menu's width.
      */
     public String label() {
         String version = version();
