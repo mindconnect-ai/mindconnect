@@ -50,16 +50,40 @@ public final class MessageComponent {
     /**
      * A user message that announced attachments (metadata written by the
      * runtime when the message was persisted) shows them as a line above the
-     * text — rendering only; the stored text is what the user typed.
+     * text — rendering only; the stored text is what the user typed. The
+     * media parts the message carries follow the text: an image as the
+     * picture itself, served from the chat's file endpoint; a document as
+     * its name.
      */
-    private static String withAttachmentChip(Message m) {
+    String withAttachmentChip(Message m) {
         var attached = ai.mindconnect.agent.service.prompt.AttachmentNotice.announcedBy(m);
         var removed = ai.mindconnect.agent.service.prompt.AttachmentNotice.detachedBy(m);
-        if (attached.isEmpty() && removed.isEmpty()) return m.content();
         StringBuilder out = new StringBuilder();
         if (!attached.isEmpty()) out.append("📎 *").append(String.join(", ", attached)).append("*\n\n");
         if (!removed.isEmpty()) out.append("🗑 *").append(String.join(", ", removed)).append(" removed*\n\n");
-        return out.append(m.content()).toString();
+        out.append(m.content() == null ? "" : m.content());
+        if (m.parts() != null) {
+            for (var part : m.parts()) {
+                if (part instanceof ai.mindconnect.message.domain.ContentPart.Image image) {
+                    out.append("\n\n![").append(markdownSafe(image.name())).append("](")
+                            .append(contentUrl(image.fileId())).append(")");
+                } else if (part instanceof ai.mindconnect.message.domain.ContentPart.File file) {
+                    out.append("\n\n📄 *").append(markdownSafe(file.name())).append("*");
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    /** Where the chat serves a file it holds, inline — see {@code ChatFilesUiController#content}. */
+    private String contentUrl(String fileId) {
+        return "/chat/api/sessions/" + sessionId + "/chat-files/"
+                + java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8) + "/content";
+    }
+
+    /** A file name inside markdown link syntax: brackets and parentheses would end it early. */
+    private static String markdownSafe(String name) {
+        return name == null ? "" : name.replaceAll("[\\[\\]()*_`]", "");
     }
 
     private UiList.Item chatItem(Message m, boolean isUser) {
