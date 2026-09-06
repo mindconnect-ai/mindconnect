@@ -13,6 +13,7 @@ import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTree;
 import ai.mindconnect.ui.model.UiTreeNode;
+import ai.mindconnect.ui.model.UiTrigger;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -51,17 +52,29 @@ public final class TaskMonitorComponent {
      * The header badge: an activity icon and "3 running" (or "idle"). The
      * outer stack carries the stream channel id, which is what keeps the
      * stream attached across navigation, and a class that says whether
-     * anything is going on so the stylesheet can light it up. (The link is
-     * wrapped because an action renders no class of its own.)
+     * anything is going on so the stylesheet can light it up.
+     *
+     * <p>The count is deliberately a sibling of the button, not its label.
+     * The button keeps focus after the click that opens the dialog, and the
+     * morpher leaves the children of the focused element alone (Idiomorph's
+     * {@code ignoreActiveValue}, meant for a field someone is typing in) —
+     * a count inside the button would freeze at the value it had when the
+     * dialog was opened. A span is never focused, so it always updates. The
+     * whole pill is clickable through the stack's own trigger; the button is
+     * what a keyboard reaches.
      */
     public static UiStack badge(Counts counts) {
         String label = !counts.busy() ? "idle"
                 : counts.waiting() == 0 ? counts.running() + " running"
                 : counts.running() + " running · " + counts.waiting() + " waiting";
-        UiAction link = UiAction.link(BADGE_ID + "-link", label).icon("activity")
+        UiAction open = UiAction.link(BADGE_ID + "-link", "Task queue").icon("activity")
+                .appearance(UiAction.Appearance.ICON)
                 .dispatch("GET", OPEN_URL);
-        link.setTitle("Task queue — click to open the task manager");
-        UiStack badge = UiStack.of(BADGE_ID).direction(UiStack.Direction.HORIZONTAL).child(link);
+        UiStack badge = UiStack.of(BADGE_ID).direction(UiStack.Direction.HORIZONTAL).gap(4)
+                .child(open)
+                .child(text(BADGE_ID + "-count", label, "task-monitor-count"));
+        badge.setOnClick(UiTrigger.api("GET", OPEN_URL));
+        badge.setTitle("Task queue — click to open the task manager");
         badge.withCssClass("task-monitor-badge" + (counts.busy() ? " is-busy" : ""));
         return badge;
     }

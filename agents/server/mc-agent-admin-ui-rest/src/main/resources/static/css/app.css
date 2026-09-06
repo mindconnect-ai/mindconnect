@@ -676,13 +676,16 @@ body {
     font-size: var(--sui-text-xs, 12px);
     white-space: nowrap;
 }
-.task-monitor-badge .sui-link {
+.task-monitor-badge { cursor: pointer; }
+/* The icon button is the keyboard target; visually it is just the icon. */
+.task-monitor-badge .sui-icon-btn {
+    border: none;
+    background: none;
+    padding: 0;
     color: inherit;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    line-height: 1;
 }
+.task-monitor-count { font-size: inherit; }
 .task-monitor-badge.is-busy {
     color: var(--sui-color-primary, #2563eb);
     border-color: var(--sui-color-primary, #2563eb);

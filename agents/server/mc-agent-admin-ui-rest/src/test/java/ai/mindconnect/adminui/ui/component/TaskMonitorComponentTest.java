@@ -93,15 +93,30 @@ class TaskMonitorComponentTest {
     @Test
     void badgeCountsRunningAndWaiting() throws Exception {
         String busy = json(TaskMonitorComponent.badge(board()));
-        assertThat(busy).contains("\"label\":\"2 running · 1 waiting\"");
+        assertThat(busy).contains("\"text\":\"2 running · 1 waiting\"");
         assertThat(busy).contains("is-busy");
         assertThat(busy).contains("\"id\":\"" + TaskMonitor.CHANNEL_ID + "\"");
         assertThat(busy).contains("\"url\":\"" + TaskMonitorComponent.OPEN_URL + "\"");
         assertThat(busy).contains("\"id\":\"" + TaskMonitor.CHANNEL_ID + "-link\"");
 
         String idle = json(TaskMonitorComponent.badge(new Snapshot(List.of(), List.of(), NOW)));
-        assertThat(idle).contains("\"label\":\"idle\"");
+        assertThat(idle).contains("\"text\":\"idle\"");
         assertThat(idle).doesNotContain("is-busy");
+    }
+
+    /**
+     * The count must never sit inside the button: the button keeps focus
+     * after the click that opens the dialog, and the morpher skips the
+     * children of the focused element, so a count in there would go stale.
+     */
+    @Test
+    void theCountLivesOutsideTheFocusableButton() {
+        var badge = TaskMonitorComponent.badge(board());
+        var button = (ai.mindconnect.ui.model.UiAction) badge.getChildren().get(0);
+        var count = (ai.mindconnect.ui.model.UiText) badge.getChildren().get(1);
+        assertThat(button.getLabel()).isEqualTo("Task queue");
+        assertThat(count.getText()).isEqualTo("2 running · 1 waiting");
+        assertThat(badge.getOnClick().getUrl()).isEqualTo(TaskMonitorComponent.OPEN_URL);
     }
 
     @Test
