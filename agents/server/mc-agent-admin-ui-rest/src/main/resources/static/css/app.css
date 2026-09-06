@@ -660,6 +660,28 @@ body {
 }
 .group-picker-toggle:hover { border-color: var(--sui-color-border-strong); }
 
+/* ── Sidebar foot: the build's version ─────────────────────────────────── */
+
+/* The version is the menu's last entry, pushed to the very bottom: the list
+   takes the sidebar's spare height and the entry sits on its far end. Small
+   and muted — status, not navigation; the rail shows its info icon with the
+   version as the hover tip, like any other entry. */
+.sui-menu > .sui-menu-list { flex: 1; }
+#nav-version { margin-top: auto; }
+#nav-version .sui-menu-link {
+    font-size: var(--sui-text-xs, 12px);
+    color: var(--sui-color-text-muted);
+    align-items: flex-start;
+}
+/* A snapshot's "0.4.1-SNAPSHOT · e87cc00" is wider than the menu: wrap it
+   onto a second line rather than losing the commit behind an ellipsis. */
+#nav-version .sui-menu-label {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.4;
+}
+
 /* ── Task manager: header badge + dialog ──────────────────────────────── */
 
 /* The badge is a header link whose text is the live count ("3 running").

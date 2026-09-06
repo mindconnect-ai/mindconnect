@@ -1,13 +1,13 @@
 package ai.mindconnect.adminui.ui;
 
 import ai.mindconnect.ui.model.UiAppShell;
-import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiHeader;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiMenu;
 import ai.mindconnect.ui.model.UiMenuItem;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+import ai.mindconnect.ui.model.UiTrigger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,8 +35,8 @@ public final class AdminLayout {
      * @param userName    display name of the current user (e.g. {@code "mc_user"})
      * @param authEnabled whether Keycloak auth is on; the logout link is shown
      *                    only then (with auth off the user is a fixed dev user)
-     * @param versionLabel the build's short version for the header, or null
-     *                     when this is not a packaged build
+     * @param versionLabel the build's short version for the sidebar's foot, or
+     *                     null when this is not a packaged build
      */
     public AdminLayout(String userName, boolean authEnabled, String versionLabel) {
         this(userName, authEnabled, versionLabel, null, null);
@@ -98,19 +98,12 @@ public final class AdminLayout {
         // logout), so it's a plain link, not a semantic-ui action. Shown only
         // when auth is enabled — with auth off there's a fixed dev user and
         // nothing to log out of.
-        // The build's version, small and muted, right of the brand: status,
-        // not identity, so it sits beside the user widget rather than in it.
-        // A click opens the About dialog with build time, commit, branch and
-        // the changelog section of this build.
-        // The task badge sits left of the version: what the server is DOING,
-        // beside what the server IS. A click opens the task manager.
+        // The task badge is the one live thing in the header: what the server
+        // is DOING right now, beside who is using it. A click opens the task
+        // manager. What the server IS — its version — lives at the foot of
+        // the sidebar (see buildMenu), where it is out of the way.
         if (taskBadge != null) {
             header.extra(taskBadge);
-        }
-        if (versionLabel != null) {
-            header.extra(UiAction.link("about-version", versionLabel)
-                    .dispatch("GET", "/admin/api/about")
-                    .withCssClass("sui-hint"));
         }
         if (authEnabled) {
             header.extra(UiLink.of("logout", "/admin/logout", "Logout"));
@@ -131,6 +124,14 @@ public final class AdminLayout {
         menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
         menu.item(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));
+        // The build's version as the last entry, pushed to the bottom by the
+        // stylesheet: small and muted, an info icon in the collapsed rail. A
+        // click opens the About dialog with build time, commit, branch and
+        // the changelog section of this build.
+        if (versionLabel != null) {
+            menu.item(UiMenuItem.of("nav-version", versionLabel).icon("info")
+                    .onClick(UiTrigger.api("GET", "/admin/api/about")));
+        }
         return menu;
     }
 

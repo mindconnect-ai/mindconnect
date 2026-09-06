@@ -36,6 +36,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   user whose session a task runs for — and takes the task's sub-tasks with
   it. Endpoints under `/admin/api/tasks`.
 
+### Changed
+
+- **agents:** the admin UI's version label moved from the header to the foot
+  of the sidebar (an info icon in the collapsed rail); a click still opens
+  About. The header's right side is now the task badge and the user.
+
 ## [0.4.0] - 2026-09-03
 
 ### Changed
