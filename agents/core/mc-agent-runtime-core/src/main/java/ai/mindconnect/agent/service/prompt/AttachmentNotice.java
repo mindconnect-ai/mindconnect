@@ -57,7 +57,7 @@ public final class AttachmentNotice {
         if (session == null || session.attachedFiles().isEmpty()) return List.of();
         Set<String> announced = announced(history);
         List<String> fresh = new ArrayList<>();
-        for (String file : session.attachedFiles()) {
+        for (String file : session.attachedFileNames()) {
             if (!announced.contains(file)) fresh.add(file);
         }
         return fresh;
@@ -65,7 +65,7 @@ public final class AttachmentNotice {
 
     /** Files the model has been told about that are no longer attached — removed since the last turn. */
     public static List<String> unannouncedRemovals(AgentSession session, List<Message> history) {
-        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFiles());
+        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFileNames());
         List<String> gone = new ArrayList<>();
         for (String file : announced(history)) {
             if (!live.contains(file)) gone.add(file);
@@ -96,7 +96,10 @@ public final class AttachmentNotice {
      * what was attached, what kind of file it is, and the one instruction
      * that matters: the content is reached through {@code vector_search},
      * never through a path. Marked as a system note so the model does not
-     * take it for something the user said.
+     * take it for something the user said. Callers leave images out (see
+     * {@link #forModel}): an image is not indexed, it travels with the
+     * message as an image part (or as that part's placeholder), which speaks
+     * for itself.
      */
     public static String notice(List<String> files) {
         if (files.isEmpty()) return "";
@@ -125,13 +128,32 @@ public final class AttachmentNotice {
      * alone otherwise.
      */
     public static String forModel(Message message, AgentSession session) {
-        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFiles());
-        List<String> attached = announcedBy(message).stream().filter(live::contains).toList();
+        Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFileNames());
+        // Images are announced in the metadata (the chat's chip shows them)
+        // but not in the notice — they are not indexed, the part speaks.
+        List<String> attached = announcedBy(message).stream()
+                .filter(live::contains)
+                .filter(name -> !isImage(session, name))
+                .toList();
         List<String> removed = detachedBy(message).stream().filter(f -> !live.contains(f)).toList();
         StringBuilder out = new StringBuilder();
         if (!removed.isEmpty()) out.append(removalNotice(removed)).append("\n\n");
-        if (!attached.isEmpty()) out.append(notice(attached)).append("\n\n");
+        String attachNotice = notice(attached);
+        if (!attachNotice.isEmpty()) out.append(attachNotice).append("\n\n");
         return out.append(message.content()).toString();
+    }
+
+    /**
+     * Is the attached file of that name an image — by the session's record,
+     * the one classification the attach flow and the prompt use; by the
+     * extension only for a name the session does not hold.
+     */
+    static boolean isImage(AgentSession session, String name) {
+        if (session != null) {
+            var file = session.attachedFile(name);
+            if (file.isPresent()) return file.get().isImage();
+        }
+        return "image".equals(kind(name));
     }
 
     /** A human word for the file type, from the extension — enough for the model to stop treating "x.pdf" as a path. */

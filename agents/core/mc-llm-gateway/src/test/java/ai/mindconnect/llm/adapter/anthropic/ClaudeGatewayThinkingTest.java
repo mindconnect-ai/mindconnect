@@ -33,7 +33,7 @@ class ClaudeGatewayThinkingTest {
     private LlmConfig config(Map<String, Object> additionalParams) {
         return new LlmConfig(java.util.UUID.randomUUID(), "claude", LlmProvider.ANTHROPIC,
                 "claude-opus-4-8", "https://api.anthropic.com", "sk-test",
-                0.7, 8192, additionalParams, 200_000, false, null, null, null, null);
+                0.7, 8192, additionalParams, 200_000, false, null, null, null, null, null);
     }
 
     @Test

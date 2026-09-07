@@ -39,6 +39,7 @@ Always available; no API keys required.
 | `run_agent` | Delegates a task to another agent by name — see [sub-agents](./sub-agents.md). | — |
 | `run_agents` | Fans several sub-agent calls out in parallel. | — |
 | `tool_search` | Lets the agent find and activate its *deferred* tools on demand. | The agent's `toolSearch` config |
+| `view_attachment` | Shows an attached image or PDF to the model again — as a message of its own in the running turn, since media goes with a message in its own turn only. Activated for a session when an image or PDF is attached; see [images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts). | — |
 
 The file tools resolve paths against a **base directory**
 (`mindconnect.tools.base-dir`). It defaults to the **user home** — in the Admin

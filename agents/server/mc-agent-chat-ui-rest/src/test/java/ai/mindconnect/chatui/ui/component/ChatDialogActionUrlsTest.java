@@ -59,9 +59,14 @@ class ChatDialogActionUrlsTest {
 
     @Test
     void removingAnAttachmentKeepsTheRowPlaceholder() throws Exception {
-        String out = json(ChatAttachmentsComponent.node(SESSION, Map.of("a.pdf", 3L)));
+        String out = json(ChatAttachmentsComponent.node(SESSION,
+                List.of(new ai.mindconnect.agent.domain.AttachedFile("f-1", "a.pdf", "application/pdf", 10),
+                        new ai.mindconnect.agent.domain.AttachedFile("f-2", "photo.png", "image/png", 20)),
+                Map.of("a.pdf", 3L)));
 
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION + "/chat-files?file={id}\"");
         assertThat(out).doesNotContain("%7Bid%7D");
+        assertThat(out).contains("document with the next message · 3 searchable chunks");
+        assertThat(out).contains("image with the next message");
     }
 }

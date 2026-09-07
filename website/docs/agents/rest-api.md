@@ -43,6 +43,23 @@ curl -N -X POST http://localhost:8080/api/sessions/$SESSION/chat \
      -H 'Content-Type: text/plain' -d 'Which of our tools can read files?'
 ```
 
+To send an image or a document with the message, upload it first
+(`POST /api/files`, multipart `file`) and reference it by id in a JSON body
+— `kind` is `image` or `file`; the file's name, type and size come from the
+store:
+
+```bash
+curl -N -X POST http://localhost:8080/api/sessions/$SESSION/chat \
+     -H 'Content-Type: application/json' \
+     -d '{"message": "What is in this picture?",
+          "parts": [{"kind": "image", "fileId": "'$FILE_ID'"}]}'
+```
+
+A vision model sees the picture with the question; a model that does not
+read images gets a placeholder line instead (see
+[images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts)).
+An unknown `fileId` or `kind` is a 400.
+
 Each event is one JSON frame with a `type`:
 
 | type | carries |
@@ -147,4 +164,9 @@ See [working memory](./memory.md) for what the strategies do.
 
 The same server exposes LLM configurations, the file store, session
 attachments and the vector stores under `/api` as well. Those follow plain
-CRUD shapes and are best read in the Swagger UI.
+CRUD shapes and are best read in the Swagger UI. One shape worth knowing:
+`GET /api/sessions/{id}/files` lists the attached files with `fileId`,
+`name`, `mediaType`, `sizeBytes` and `chunks` — the searchable chunks an
+ingested file produced, 0 for an image, which goes to the model with the
+next message instead. `DELETE …/files?file=` takes the file's name or its
+ingested id.

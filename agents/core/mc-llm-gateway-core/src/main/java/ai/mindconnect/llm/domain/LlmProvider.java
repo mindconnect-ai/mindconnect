@@ -1,6 +1,9 @@
 package ai.mindconnect.llm.domain;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Supported providers. Each constant also declares the {@link AdditionalParamSpec}s
@@ -9,11 +12,11 @@ import java.util.List;
  * providers endpoint of the REST API.
  */
 public enum LlmProvider {
-    LM_STUDIO,
-    OPENAI,
-    AZURE_OPENAI,
-    GROQ,
-    ANTHROPIC(List.of(
+    LM_STUDIO(Set.of(LlmCapability.TOOL_CALLING)),
+    OPENAI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS)),
+    AZURE_OPENAI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
+    GROQ(Set.of(LlmCapability.TOOL_CALLING)),
+    ANTHROPIC(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS), List.of(
             AdditionalParamSpec.select("thinking", "Thinking",
                     List.of("adaptive", "disabled"),
                     "Anthropic adaptive thinking. 'adaptive' enables reasoning + interleaved "
@@ -24,23 +27,40 @@ public enum LlmProvider {
                     "Reasoning depth / token spend. Only applies when thinking is set. "
                             + "Leave at 'default' to omit.",
                     LlmConfigType.CHAT))),
-    OLLAMA,
-    MISTRAL,
-    DEEPSEEK,
-    TOGETHER,
-    OPENROUTER,
-    PERPLEXITY,
-    FIREWORKS,
-    GOOGLE_GEMINI;
+    OLLAMA(Set.of(LlmCapability.TOOL_CALLING)),
+    MISTRAL(Set.of(LlmCapability.TOOL_CALLING)),
+    DEEPSEEK(Set.of(LlmCapability.TOOL_CALLING)),
+    TOGETHER(Set.of(LlmCapability.TOOL_CALLING)),
+    OPENROUTER(Set.of(LlmCapability.TOOL_CALLING)),
+    PERPLEXITY(Set.of(LlmCapability.TOOL_CALLING)),
+    FIREWORKS(Set.of(LlmCapability.TOOL_CALLING)),
+    GOOGLE_GEMINI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS,
+            LlmCapability.AUDIO_INPUT));
 
+    private final Set<LlmCapability> defaultCapabilities;
     private final List<AdditionalParamSpec> additionalParams;
 
-    LlmProvider() {
-        this(List.of());
+    LlmProvider(Set<LlmCapability> defaultCapabilities) {
+        this(defaultCapabilities, List.of());
     }
 
-    LlmProvider(List<AdditionalParamSpec> additionalParams) {
+    LlmProvider(Set<LlmCapability> defaultCapabilities, List<AdditionalParamSpec> additionalParams) {
+        this.defaultCapabilities = defaultCapabilities.isEmpty() ? Set.of()
+                : Collections.unmodifiableSet(EnumSet.copyOf(defaultCapabilities));
         this.additionalParams = additionalParams;
+    }
+
+    /**
+     * What a config of this provider is taken to read and do when it declares
+     * nothing itself ({@link LlmConfig#capabilities()} is {@code null}): the
+     * provider's current mainstream models. Cloud providers whose models all
+     * read images and PDFs get {@code VISION} and {@code DOCUMENTS}; hosts of
+     * arbitrary models (local servers, routers) only {@code TOOL_CALLING}, since
+     * what runs there is anyone's guess — declare it on the config. A declared
+     * set, empty included, always wins over this default.
+     */
+    public Set<LlmCapability> defaultCapabilities() {
+        return defaultCapabilities;
     }
 
     /** The additional-parameter fields this provider's gateway understands. */

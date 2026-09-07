@@ -33,6 +33,7 @@ public final class LlmConfigDetailComponent implements UiComponent {
                 .field(UiField.text("provider", "Provider",
                         config.provider() != null ? config.provider().name() : null))
                 .field(UiField.text("type", "Type", config.isEmbedding() ? "Embedding" : "Chat"))
+                .field(UiField.text("capabilities", "Capabilities", capabilitiesSummary(config)))
                 .field(UiField.text("model", "Model", config.model()))
                 .field(UiField.text("baseUrl", "Base URL", config.baseUrl()))
                 .field(UiField.text("apiKey", "API Key", "••••••••"))
@@ -67,6 +68,20 @@ public final class LlmConfigDetailComponent implements UiComponent {
         if (config.additionalParams() == null) return "—";
         Object v = config.additionalParams().get(key);
         return v == null || v.toString().isBlank() ? "—" : v.toString();
+    }
+
+    /**
+     * The effective capabilities by label — the declared ones, or the
+     * provider's default marked as such; "none" for a config that declared
+     * the empty set, "—" when nothing applies (an alias).
+     */
+    private static String capabilitiesSummary(LlmConfig config) {
+        var effective = config.effectiveCapabilities();
+        if (effective.isEmpty()) return config.declaresCapabilities() ? "none (declared)" : "—";
+        String labels = effective.stream()
+                .map(ai.mindconnect.llm.domain.LlmCapability::label)
+                .collect(java.util.stream.Collectors.joining(", "));
+        return config.declaresCapabilities() ? labels : labels + " (" + config.provider() + " default)";
     }
 
     /** Human-readable one-liner for the retry policy, or "Off" when none is set. */

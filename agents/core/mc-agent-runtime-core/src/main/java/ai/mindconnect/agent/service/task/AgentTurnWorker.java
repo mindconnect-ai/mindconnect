@@ -168,6 +168,24 @@ public final class AgentTurnWorker implements TaskWorker {
         return persisted;
     }
 
+    /**
+     * Same, for a message made of content parts — the text plus the images
+     * and documents sent with it. The token count is the text's; what a
+     * media part costs is the provider's business.
+     */
+    public static Message appendUserMessage(ConversationManager conversationManager,
+                                            UUID conversationId,
+                                            java.util.List<ai.mindconnect.message.domain.ContentPart> parts,
+                                            UUID turnId, TokenCounter tokenCounter,
+                                            Map<String, Object> metadata) {
+        Message persisted = conversationManager.addMessageToConversation(
+                conversationId, UUID.randomUUID() /* user sender — see follow-up task */,
+                ParticipantType.USER, MessageType.CHAT, parts, turnId, 0, metadata);
+        conversationManager.updateTokenCount(conversationId, persisted.id(),
+                tokenCounter.countText(persisted.content()));
+        return persisted;
+    }
+
     // ── the turn ────────────────────────────────────────────────────────────
 
     @Override

@@ -43,7 +43,7 @@ class ToolPairSanitizerThinkingTest {
 
     private Message msg(int seq, MessageType type, ParticipantType sender, String content) {
         return new Message(UUID.randomUUID(), CONV, AGENT, sender, null, type, content,
-                Map.of(), seq, Instant.now(), false, null, null, null, null, null, null);
+                Map.of(), seq, Instant.now(), false, null, null, null, null, null, null, null);
     }
 
     @Test

@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.gemini;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.TraceRedaction;
 import ai.mindconnect.llm.domain.*;
 import ai.mindconnect.llm.port.in.LlmCallListener;
 import ai.mindconnect.llm.port.out.LlmGateway;
@@ -85,7 +86,7 @@ public class GeminiGateway implements LlmGateway {
         String body;
         try {
             ObjectNode requestNode = buildRequestNode(config, request);
-            try { prettyRequestJson = prettyWriter.writeValueAsString(requestNode); } catch (Exception ignored) {}
+            try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
             logWireRequest(requestNode);
             body = objectMapper.writeValueAsString(requestNode);
         } catch (IOException e) {
@@ -323,7 +324,7 @@ public class GeminiGateway implements LlmGateway {
     private void logWireRequest(ObjectNode requestNode) {
         if (!wire.isDebugEnabled()) return;
         try {
-            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(requestNode));
+            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)));
         } catch (Exception e) {
             wire.debug("→ stream request: <serialise failed: {}>", e.getMessage());
         }
@@ -341,7 +342,8 @@ public class GeminiGateway implements LlmGateway {
      *   <li>Tool definitions use {@code functionDeclarations} under a {@code tools} wrapper.</li>
      * </ul>
      */
-    private ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
+    // package-private for testing the wire JSON without a live HTTP call
+    ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
         ObjectNode root = objectMapper.createObjectNode();
 
         // Generation config
@@ -389,6 +391,19 @@ public class GeminiGateway implements LlmGateway {
                     funcCall.put("name", tc.name());
                     funcCall.set("args", objectMapper.valueToTree(tc.arguments()));
                 }
+            } else if (msg.hasMedia()) {
+                // Gemini is parts-shaped already: text parts as {text}, media
+                // as {inline_data} with the base64 payload.
+                turn.put("role", msg.role() == MessageRole.ASSISTANT ? "model" : "user");
+                ArrayNode parts = turn.putArray("parts");
+                for (LlmContent part : msg.parts()) {
+                    ObjectNode node = parts.addObject();
+                    switch (part) {
+                        case LlmContent.Text t -> node.put("text", t.text());
+                        case LlmContent.Image i -> inlineData(node, i.mediaType(), i.base64());
+                        case LlmContent.Document d -> inlineData(node, d.mediaType(), d.base64());
+                    }
+                }
             } else {
                 turn.put("role", msg.role() == MessageRole.ASSISTANT ? "model" : "user");
                 ArrayNode parts = turn.putArray("parts");
@@ -409,5 +424,12 @@ public class GeminiGateway implements LlmGateway {
         }
 
         return root;
+    }
+
+    /** An {@code inline_data} part: the media's type and base64 payload. */
+    private static void inlineData(ObjectNode part, String mediaType, String base64) {
+        ObjectNode data = part.putObject("inline_data");
+        data.put("mime_type", mediaType);
+        data.put("data", base64);
     }
 }

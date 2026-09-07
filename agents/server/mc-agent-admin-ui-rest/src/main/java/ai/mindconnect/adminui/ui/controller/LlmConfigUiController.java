@@ -9,6 +9,7 @@ import ai.mindconnect.adminui.ui.component.LlmConfigTestComponent;
 import ai.mindconnect.adminui.ui.page.LlmConfigDetailPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigFormPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigListPage;
+import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
@@ -190,7 +191,8 @@ public class LlmConfigUiController {
                 isAlias ? body.str("delegatesTo") : null,
                 retryFrom(body),
                 rateLimitFrom(body),
-                typeFrom(body, LlmConfigType.CHAT));
+                typeFrom(body, LlmConfigType.CHAT),
+                capabilitiesFrom(body));
         repository.save(config);
         return list();
     }
@@ -223,7 +225,9 @@ public class LlmConfigUiController {
                             raw.containsKey("maxConcurrentRequests")
                                     ? rateLimitFrom(body) : existing.rateLimit(),
                             raw.containsKey("type")
-                                    ? typeFrom(body, existing.type()) : existing.type());
+                                    ? typeFrom(body, existing.type()) : existing.type(),
+                            raw.containsKey("capabilities")
+                                    ? capabilitiesFrom(body) : existing.capabilities());
                     repository.save(updated);
                     return ResponseEntity.ok(list());
                 })
@@ -340,6 +344,22 @@ public class LlmConfigUiController {
         if (v == null) return;            // field absent from form → leave untouched
         if (v.isBlank()) params.remove(key);
         else params.put(key, v);
+    }
+
+    /**
+     * The capability multiselect as a set — unknown values (a stale form, a
+     * renamed constant) are dropped rather than failing the save.
+     */
+    private static java.util.Set<LlmCapability> capabilitiesFrom(FormBody body) {
+        java.util.Set<LlmCapability> capabilities = java.util.EnumSet.noneOf(LlmCapability.class);
+        for (String raw : body.strList("capabilities")) {
+            try {
+                capabilities.add(LlmCapability.valueOf(raw.trim()));
+            } catch (IllegalArgumentException ignored) {
+                // not a capability we know — leave it out
+            }
+        }
+        return capabilities;
     }
 
     /**

@@ -3,6 +3,7 @@ package ai.mindconnect.message.service;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.common.Namespace;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
@@ -51,10 +52,25 @@ public class ConversationService implements ConversationManager {
     public Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
                                             MessageType type, String content, UUID turnId, Integer run,
                                             java.util.Map<String, Object> metadata) {
+        return append(conversationId, seq -> Message.of(conversationId, senderId, senderType, type, content, seq),
+                turnId, run, metadata);
+    }
+
+    @Override
+    public Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
+                                            MessageType type, List<ContentPart> parts, UUID turnId, Integer run,
+                                            java.util.Map<String, Object> metadata) {
+        return append(conversationId, seq -> Message.of(conversationId, senderId, senderType, type, parts, seq),
+                turnId, run, metadata);
+    }
+
+    /** The shared tail: the conversation must exist, the sequence is the next free one. */
+    private Message append(UUID conversationId, java.util.function.IntFunction<Message> create,
+                           UUID turnId, Integer run, java.util.Map<String, Object> metadata) {
         conversationRepository.findById(conversationId)
                 .orElseThrow(() -> DomainException.notFound("Conversation", conversationId.toString()));
         int seq = messageRepository.countByConversationId(conversationId) + 1;
-        Message message = Message.of(conversationId, senderId, senderType, type, content, seq)
+        Message message = create.apply(seq)
                 .withTurnId(turnId)
                 .withMetadata(metadata);
         if (run != null) message = message.withRun(run);

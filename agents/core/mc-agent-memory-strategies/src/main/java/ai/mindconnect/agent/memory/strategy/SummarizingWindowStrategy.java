@@ -112,7 +112,8 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
                 result.add(LlmMessage.user(summaryUserMsg));
             }
         }
-        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(windowed), def, session, budget));
+        result.addAll(messageMapper.toMessages(ToolPairSanitizer.sanitize(windowed), def, session, budget,
+                llmConfigRepository.findResolvedByName(def.llmConfigName()).orElse(null)));
         return result;
     }
 

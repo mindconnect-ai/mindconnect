@@ -1,5 +1,7 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.domain.AttachedFile;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.filestore.FileStore;
@@ -68,7 +70,16 @@ public class SessionFileService {
         this.spoolBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
     }
 
-    /** The session's attached files: spooled file id → chunk count. Empty when none. */
+    /**
+     * The files attached to the session, in attach order — the session's own
+     * record, images included. {@link #listAttachments} adds the searchable
+     * chunks each ingested file produced.
+     */
+    public List<AttachedFile> attachments(UUID sessionId) {
+        return sessions.findById(sessionId).map(AgentSession::attachedFiles).orElse(List.of());
+    }
+
+    /** The session's ingested files: spooled file id → chunk count. Empty when none. */
     public Map<String, Long> listAttachments(UUID sessionId) {
         VectorStores stores = storesProvider.getIfAvailable();
         if (stores == null) return Map.of();
@@ -83,25 +94,64 @@ public class SessionFileService {
         return Map.of();
     }
 
-    public void deleteAttachment(UUID sessionId, String fileId) {
+    /**
+     * Detaches a file from the chat, named by its file name or by the id its
+     * chunks were ingested under (the spooled path — what {@link #listAttachments}
+     * keys by). Its chunks leave the session's vector store and the spooled
+     * copy goes with them; an image, never ingested, simply leaves the
+     * session's record. The original in the file store is untouched.
+     */
+    public void deleteAttachment(UUID sessionId, String fileIdOrName) {
+        String fileName = Path.of(fileIdOrName).getFileName().toString();
         VectorStores stores = storesProvider.getIfAvailable();
-        if (stores == null) throw new NotConfiguredException("Vector stores");
-        String storeName = "session-" + sessionId;
-        stores.openWith(stores.settingsFor(storeName)).deleteFile(fileId);
-        Path spooled = spoolBase.resolve(fileId).normalize();
-        if (spooled.startsWith(spoolBase)) {
-            try {
-                Files.deleteIfExists(spooled);
-            } catch (java.io.IOException ignored) {
-                // The searchable chunks are gone; a stale spool file is harmless.
+        if (stores != null) {
+            String storeName = "session-" + sessionId;
+            for (String ingestedId : listAttachments(sessionId).keySet()) {
+                if (!Path.of(ingestedId).getFileName().toString().equals(fileName)) continue;
+                stores.openWith(stores.settingsFor(storeName)).deleteFile(ingestedId);
+                Path spooled = spoolBase.resolve(ingestedId).normalize();
+                if (spooled.startsWith(spoolBase)) {
+                    try {
+                        Files.deleteIfExists(spooled);
+                    } catch (java.io.IOException ignored) {
+                        // The searchable chunks are gone; a stale spool file is harmless.
+                    }
+                }
             }
         }
-        String fileName = Path.of(fileId).getFileName().toString();
         sessions.findById(sessionId).ifPresent(session ->
                 sessions.save(session.withoutAttachedFile(fileName)));
     }
 
+    /**
+     * A file the model may read inline is shown with the next message only;
+     * afterwards the model asks for it again through {@code view_attachment}
+     * — activated for the session, like {@code vector_search} on ingest.
+     */
+    private void activateViewer(UUID sessionId) {
+        DynamicToolActivations activations = activationsProvider.getIfAvailable();
+        if (activations != null) {
+            activations.activate(sessionId,
+                    List.of(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME));
+        }
+    }
+
     public AttachResult attach(UUID sessionId, StoredFile stored) {
+        AttachedFile attached = new AttachedFile(stored.id(), stored.name(), stored.contentType(), stored.size());
+        if (attached.isImage()) {
+            // An image is not text to index: it goes to the model with the
+            // next message as an image part — or as that part's placeholder
+            // when the model does not read images. Recorded on the session,
+            // nothing else to do.
+            if (sessions.findById(sessionId).isEmpty()) {
+                return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
+            }
+            sessions.findById(sessionId).ifPresent(session ->
+                    sessions.save(session.withAttachedFiles(List.of(attached))));
+            activateViewer(sessionId);
+            return new AttachResult(stored, null, true,
+                    stored.name() + " attached — it goes to the model with your next message.");
+        }
         VectorStores stores = storesProvider.getIfAvailable();
         if (stores == null) {
             return new AttachResult(stored, null, false,
@@ -157,10 +207,11 @@ public class SessionFileService {
             if (activations != null) {
                 activations.activate(sessionId, List.of("vector_search"));
             }
+            if (attached.isPdf()) activateViewer(sessionId);
             // Announce the file in the system prompt (rendered fresh each
             // round) so the model actually reaches for vector_search.
             sessions.findById(sessionId).ifPresent(session ->
-                    sessions.save(session.withAttachedFiles(List.of(stored.name()))));
+                    sessions.save(session.withAttachedFiles(List.of(attached))));
             return new AttachResult(stored, storeName, true,
                     stored.name() + " attached — the agent can now search it.");
         } catch (Exception e) {

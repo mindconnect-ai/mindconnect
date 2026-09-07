@@ -3,21 +3,30 @@ package ai.mindconnect.agent.service;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.port.out.PartContentReader;
 import ai.mindconnect.agent.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.service.ContextTokenBudget;
+import ai.mindconnect.llm.domain.LlmCapability;
+import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmContent;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.ThinkingBlock;
 import ai.mindconnect.llm.domain.ToolCall;
+import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
+import ai.mindconnect.message.domain.ParticipantType;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Translates stored {@link Message} domain records into {@link LlmMessage} objects
@@ -27,11 +36,20 @@ import java.util.Map;
  * <ul>
  *   <li>Structural mapping: CHAT → user/assistant, TOOL_CALL → assistantWithToolCalls,
  *       TOOL_RESULT → tool (using compressed stub if available)</li>
- *   <li>Per-message token guard: truncates any message whose effective content exceeds
+ *   <li>Media: an image or document part of a user message travels as a
+ *       content block when the target model declares it reads that kind
+ *       ({@link LlmConfig#capabilities()}) and the message belongs to the
+ *       current turn; otherwise a placeholder line stands in for it — see
+ *       {@link #placeholder}. Bytes come from the {@link PartContentReader}.</li>
+ *   <li>Per-message token guard: truncates any message whose effective text exceeds
  *       {@link ContextTokenBudget#maxMessageTokens()}</li>
  * </ul>
  * <p>
- * No repository access, no summarization, no window logic — pure translation.
+ * Media is sent in the current turn only. A request repeats the whole
+ * history, and an image repeated in every request costs its tokens every
+ * time; once the turn that brought it is over, its placeholder names it and
+ * the model can ask for it again. No repository access, no summarization,
+ * no window logic — pure translation.
  */
 public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.LlmMessageMapper {
 
@@ -40,22 +58,49 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
     private static final String TRUNCATION_MARKER =
             "\n[... truncated — content exceeded per-message token limit]";
 
+    /** Largest file sent inline; above it the placeholder says so. */
+    static final long MAX_INLINE_BYTES = 20L * 1024 * 1024;
+
+    /** The tool that shows an earlier attachment again — named in the placeholder when the agent has it. */
+    static final String VIEWER_TOOL = "view_attachment";
+
+    private final PartContentReader partContentReader;
+
+    /** A mapper without a file store: every media part renders as its placeholder. */
+    public MessageToLlmMessageMapper() {
+        this(PartContentReader.none());
+    }
+
+    public MessageToLlmMessageMapper(PartContentReader partContentReader) {
+        this.partContentReader = Objects.requireNonNull(partContentReader, "partContentReader");
+    }
+
     /**
      * Maps a list of stored messages to LLM-ready messages, enforcing the per-message
-     * token limit from the supplied budget.
+     * token limit from the supplied budget and rendering media by what {@code target}
+     * declares it reads.
      */
     @Override
     public List<LlmMessage> toMessages(List<Message> messages,
                                        AgentDefinition def,
                                        AgentSession session,
-                                       ContextTokenBudget budget) {
+                                       ContextTokenBudget budget,
+                                       LlmConfig target) {
+        Message lastUser = lastUserChat(messages);
         List<LlmMessage> result = new ArrayList<>();
         for (Message m : messages) {
             switch (m.type()) {
                 case CHAT -> {
                     boolean assistant = m.senderId().equals(def.id());
-                    String content = guard(modelText(m, def, session), budget, m.sequenceNum(), "CHAT");
-                    result.add(assistant ? LlmMessage.assistant(content) : LlmMessage.user(content));
+                    String text = guard(textForModel(m, def, session), budget, m.sequenceNum(), "CHAT");
+                    if (assistant) {
+                        result.add(LlmMessage.assistant(text));
+                    } else if (media(m).isEmpty()) {
+                        result.add(LlmMessage.user(text));
+                    } else {
+                        result.add(LlmMessage.user(userParts(m, text, target, inCurrentTurn(m, lastUser),
+                                viewerAvailable(def, session))));
+                    }
                 }
                 case TOOL_CALL -> mapToolCall(m, result);
                 case TOOL_RESULT -> mapToolResult(m, result, budget);
@@ -69,15 +114,135 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
      * A user message that announced attachments (metadata) gets the notice
      * ahead of its text — the stored text stays what the user typed. Only
      * files still attached are named: a removed one is gone from the store,
-     * so it must be gone from the notice too. Assistant text is as stored.
+     * so it must be gone from the notice too. A media part stands in as its
+     * one-line descriptor. Assistant text is as stored.
      */
     @Override
     public String modelText(Message m, AgentDefinition def, AgentSession session) {
+        String text = textForModel(m, def, session);
+        List<ContentPart.Media> media = media(m);
+        if (media.isEmpty()) return text;
+        StringBuilder out = new StringBuilder(text);
+        for (ContentPart.Media part : media) {
+            out.append('\n').append('[').append(describe(part)).append(']');
+        }
+        return out.toString();
+    }
+
+    // ── private helpers ───────────────────────────────────────────────────────
+
+    /** The text of the message as the model reads it — notices ahead of a user's text. */
+    private static String textForModel(Message m, AgentDefinition def, AgentSession session) {
         if (m.type() != MessageType.CHAT || m.senderId().equals(def.id())) return m.content();
         return AttachmentNotice.forModel(m, session);
     }
 
-    // ── private helpers ───────────────────────────────────────────────────────
+    /** Can this agent, in this session, call the viewer tool — assigned, or activated by an upload? */
+    private static boolean viewerAvailable(AgentDefinition def, AgentSession session) {
+        if (session != null && session.activatedTools().contains(VIEWER_TOOL)) return true;
+        return def.tools() != null && def.tools().stream().anyMatch(t -> VIEWER_TOOL.equals(t.name()));
+    }
+
+    private static List<ContentPart.Media> media(Message m) {
+        if (m.parts() == null) return List.of();
+        return m.parts().stream()
+                .filter(ContentPart.Media.class::isInstance)
+                .map(ContentPart.Media.class::cast)
+                .toList();
+    }
+
+    private static Message lastUserChat(List<Message> messages) {
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            Message m = messages.get(i);
+            if (m.type() == MessageType.CHAT && m.senderType() == ParticipantType.USER) return m;
+        }
+        return null;
+    }
+
+    /**
+     * The current turn is the one the last user message opened: that message
+     * itself, and every message sharing its turn id (a message the runtime
+     * inserted on the user's behalf within the turn, say). A legacy message
+     * without a turn id is current only when it is the last user message.
+     */
+    private static boolean inCurrentTurn(Message m, Message lastUser) {
+        if (lastUser == null) return false;
+        if (m.id().equals(lastUser.id())) return true;
+        return m.turnId() != null && m.turnId().equals(lastUser.turnId());
+    }
+
+    /**
+     * The user's text first, then each media part — inline when the model
+     * reads it and it belongs to the current turn, a placeholder line
+     * otherwise. Text and placeholders are separate blocks; a gateway joins
+     * them when the message ends up text-only after all.
+     */
+    private List<LlmContent> userParts(Message m, String text, LlmConfig target, boolean currentTurn,
+                                       boolean viewerAvailable) {
+        List<LlmContent> parts = new ArrayList<>();
+        parts.add(new LlmContent.Text(text));
+        for (ContentPart.Media part : media(m)) {
+            LlmCapability needed = part instanceof ContentPart.Image
+                    ? LlmCapability.VISION : LlmCapability.DOCUMENTS;
+            if (target == null || !target.supports(needed)) {
+                parts.add(placeholder(part, part instanceof ContentPart.Image
+                        ? "this model does not read images, so it is not included"
+                        : "this model does not read documents; read its content with vector_search"));
+            } else if (!currentTurn) {
+                parts.add(placeholder(part, viewerAvailable
+                        ? "sent in an earlier turn, not resent; call " + VIEWER_TOOL + "(\""
+                                + part.name() + "\") to see it again"
+                        : "sent in an earlier turn, not resent"));
+            } else if (part.sizeBytes() > MAX_INLINE_BYTES) {
+                parts.add(placeholder(part, "too large to send inline (limit "
+                        + humanSize(MAX_INLINE_BYTES) + ")"));
+            } else {
+                LlmContent inline = inline(part);
+                parts.add(inline != null ? inline : placeholder(part, "no longer available"));
+            }
+        }
+        return parts;
+    }
+
+    /** The media as a content block, or null when the store no longer has it. */
+    private LlmContent inline(ContentPart.Media part) {
+        PartContentReader.Content content = partContentReader.read(part.fileId()).orElse(null);
+        if (content == null || content.bytes() == null) {
+            log.warn("Media part {} ({}) is not readable — sending a placeholder", part.fileId(), part.name());
+            return null;
+        }
+        String base64 = Base64.getEncoder().encodeToString(content.bytes());
+        String mediaType = part.mediaType() != null ? part.mediaType() : content.mediaType();
+        return part instanceof ContentPart.Image
+                ? new LlmContent.Image(base64, mediaType)
+                : new LlmContent.Document(base64, mediaType, part.name());
+    }
+
+    /**
+     * What stands in for a media part the model does not get: what it is
+     * and why it is not here, marked as a system note so the model does not
+     * take it for something the user typed.
+     */
+    static LlmContent.Text placeholder(ContentPart.Media part, String reason) {
+        return new LlmContent.Text("[System note — " + describe(part) + " — " + reason + ".]");
+    }
+
+    /** "image attached: photo.png (image/png, 240 KB)" — the same line the working-memory view shows. */
+    static String describe(ContentPart.Media part) {
+        String kind = part instanceof ContentPart.Image ? "image" : "document";
+        StringBuilder out = new StringBuilder(kind).append(" attached: ").append(part.name());
+        List<String> details = new ArrayList<>();
+        if (part.mediaType() != null) details.add(part.mediaType());
+        if (part.sizeBytes() > 0) details.add(humanSize(part.sizeBytes()));
+        if (!details.isEmpty()) out.append(" (").append(String.join(", ", details)).append(')');
+        return out.toString();
+    }
+
+    static String humanSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return (bytes + 512) / 1024 + " KB";
+        return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024.0));
+    }
 
     private void mapToolCall(Message m, List<LlmMessage> result) {
         try {

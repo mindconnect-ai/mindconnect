@@ -50,11 +50,14 @@ public record AgentSession(
          */
         java.util.List<String> activatedTools,
         /**
-         * Names of files attached to this conversation (chat uploads). The
-         * system-prompt renderer announces them to the LLM together with the
-         * hint to use vector_search; maintained by the session file service.
+         * The files attached to this conversation (chat uploads) — see
+         * {@link AttachedFile}. The system-prompt renderer announces them to
+         * the LLM, the chat facade sends images and PDFs with the next user
+         * message as content parts; maintained by the session file service.
+         * Sessions written before the record existed hold bare names, read
+         * as files without an id.
          */
-        java.util.List<String> attachedFiles,
+        java.util.List<AttachedFile> attachedFiles,
         /**
          * Tool NAMES the user approved for the rest of this session ("allow
          * for this session" on an approval card). Deliberately session
@@ -109,7 +112,7 @@ public record AgentSession(
                         UUID conversationId, String title, SessionStatus status,
                         Instant startedAt, Instant completedAt, UUID parentSessionId,
                         UUID parentTurnId, String parentToolCallId,
-                        java.util.List<String> activatedTools, java.util.List<String> attachedFiles) {
+                        java.util.List<String> activatedTools, java.util.List<AttachedFile> attachedFiles) {
         this(id, agentDefinitionId, namespace, userId, conversationId, title, status,
                 startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
                 activatedTools, attachedFiles, java.util.Set.of(), java.util.List.of());
@@ -133,21 +136,36 @@ public record AgentSession(
                 parentToolCallId, java.util.List.copyOf(merged), attachedFiles, approvedTools, sessionAgents);
     }
 
-    /** This session plus attached file names (deduplicated, order kept). */
-    public AgentSession withAttachedFiles(java.util.Collection<String> names) {
-        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(attachedFiles);
-        merged.addAll(names);
+    /**
+     * This session plus attached files. One entry per name, order kept: a
+     * file attached again under the same name replaces the earlier entry —
+     * the newer upload is the one the next message sends.
+     */
+    public AgentSession withAttachedFiles(java.util.Collection<AttachedFile> files) {
+        java.util.LinkedHashMap<String, AttachedFile> merged = new java.util.LinkedHashMap<>();
+        for (AttachedFile f : attachedFiles) merged.put(f.name(), f);
+        for (AttachedFile f : files) merged.put(f.name(), f);
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, java.util.List.copyOf(merged), approvedTools, sessionAgents);
+                parentToolCallId, activatedTools, java.util.List.copyOf(merged.values()), approvedTools, sessionAgents);
     }
 
-    /** This session without the given attached file name. */
+    /** This session without the attached file of the given name. */
     public AgentSession withoutAttachedFile(String name) {
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, activatedTools,
-                attachedFiles.stream().filter(f -> !f.equals(name)).toList(), approvedTools, sessionAgents);
+                attachedFiles.stream().filter(f -> !f.name().equals(name)).toList(), approvedTools, sessionAgents);
+    }
+
+    /** The attached files' names, in attach order — what the notices and the prompt speak of. */
+    public java.util.List<String> attachedFileNames() {
+        return attachedFiles.stream().map(AttachedFile::name).toList();
+    }
+
+    /** The attached file of that name, if any. */
+    public java.util.Optional<AttachedFile> attachedFile(String name) {
+        return attachedFiles.stream().filter(f -> f.name().equals(name)).findFirst();
     }
 
     /** Jackson deserialisation — unknown legacy fields (compressionWatermark, lastCompressedAt) are silently ignored. */
@@ -166,7 +184,7 @@ public record AgentSession(
             @JsonProperty("parentTurnId")      UUID parentTurnId,
             @JsonProperty("parentToolCallId")  String parentToolCallId,
             @JsonProperty("activatedTools")    java.util.List<String> activatedTools,
-            @JsonProperty("attachedFiles")     java.util.List<String> attachedFiles,
+            @JsonProperty("attachedFiles")     java.util.List<AttachedFile> attachedFiles,
             @JsonProperty("approvedTools")     java.util.Set<String> approvedTools,
             @JsonProperty("sessionAgents")     java.util.List<ai.mindconnect.agent.domain.session.SessionAgent> sessionAgents) {
         return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,

@@ -31,15 +31,58 @@ public class ChatFilesUiController {
     private final FileStore fileStore;
     private final SessionFileService sessionFiles;
     private final ai.mindconnect.agent.port.out.AgentSessionRepository sessions;
+    private final ai.mindconnect.agent.service.AgentSessionService sessionService;
     private final ai.mindconnect.agent.service.SessionAgentResolver agentResolver;
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  ai.mindconnect.agent.port.out.AgentSessionRepository sessions,
+                                 ai.mindconnect.agent.service.AgentSessionService sessionService,
                                  ai.mindconnect.agent.port.out.AgentDefinitionRepository agents) {
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
         this.sessions = sessions;
+        this.sessionService = sessionService;
         this.agentResolver = new ai.mindconnect.agent.service.SessionAgentResolver(agents);
+    }
+
+    /**
+     * The bytes of a file this chat holds — for the image a message bubble
+     * shows inline. Served only for a file the session references: one of
+     * its attachments, or a part of one of its messages; any other id is
+     * not found, whether or not the store has it.
+     */
+    @org.springframework.web.bind.annotation.GetMapping("/{fileId}/content")
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.InputStreamResource> content(
+            @PathVariable UUID sessionId, @PathVariable String fileId) throws IOException {
+        if (!referencedBySession(sessionId, fileId)) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        StoredFile file = fileStore.find(fileId).orElse(null);
+        if (file == null) return org.springframework.http.ResponseEntity.notFound().build();
+        MediaType type = MediaType.APPLICATION_OCTET_STREAM;
+        try {
+            if (file.contentType() != null) type = MediaType.parseMediaType(file.contentType());
+        } catch (org.springframework.http.InvalidMediaTypeException ignored) {
+            // an odd content type from the upload — served as bytes
+        }
+        return org.springframework.http.ResponseEntity.ok()
+                .contentType(type)
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + file.name().replace("\"", "") + "\"")
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "private, max-age=3600")
+                .body(new org.springframework.core.io.InputStreamResource(fileStore.content(fileId)));
+    }
+
+    /** Does the session hold this file — as an attachment, or as a part of one of its messages? */
+    private boolean referencedBySession(UUID sessionId, String fileId) {
+        var session = sessions.findById(sessionId).orElse(null);
+        if (session == null) return false;
+        if (session.attachedFiles().stream().anyMatch(f -> fileId.equals(f.id()))) return true;
+        return sessionService.loadHistory(sessionId).stream()
+                .filter(m -> m.parts() != null)
+                .flatMap(m -> m.parts().stream())
+                .anyMatch(part -> part instanceof ai.mindconnect.message.domain.ContentPart.Media media
+                        && fileId.equals(media.fileId()));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -57,18 +100,24 @@ public class ChatFilesUiController {
                     : UiToast.error(result.message()).title("Attach failed"));
         }
         patch.patch(UiPatch.Operation.replace("chat-attachments",
-                ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))));
+                attachmentsPanel(sessionId)));
         patch.patch(attachmentCountRefresh(sessionId));
         return patch;
     }
 
-    /** Removes a file's chunks from the session store (query param: slashes in ids). */
+    /** The attached-files panel: the session's record, with the chunks each ingested file produced. */
+    private ai.mindconnect.ui.model.UiNode attachmentsPanel(UUID sessionId) {
+        return ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(
+                sessionId, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId));
+    }
+
+    /** Detaches a file by name: its chunks leave the session store, an image leaves the record. */
     @org.springframework.web.bind.annotation.DeleteMapping
-    public UiPatch remove(@PathVariable UUID sessionId, @RequestParam("file") String fileId) {
-        sessionFiles.deleteAttachment(sessionId, fileId);
+    public UiPatch remove(@PathVariable UUID sessionId, @RequestParam("file") String fileName) {
+        sessionFiles.deleteAttachment(sessionId, fileName);
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace("chat-attachments",
-                        ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, sessionFiles.listAttachments(sessionId))))
+                        attachmentsPanel(sessionId)))
                 .patch(attachmentCountRefresh(sessionId))
                 .toast(UiToast.success("Removed from the conversation.").title("File removed"));
     }
@@ -83,7 +132,7 @@ public class ChatFilesUiController {
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         sessionId, agent == null ? null : agent.id(), false)
                 .withModelLabel(agent == null ? null : agent.llmConfigName())
-                .withAttachmentCount(sessionFiles.listAttachments(sessionId).size());
+                .withAttachmentCount(sessionFiles.attachments(sessionId).size());
         return form.reset();
     }
 }

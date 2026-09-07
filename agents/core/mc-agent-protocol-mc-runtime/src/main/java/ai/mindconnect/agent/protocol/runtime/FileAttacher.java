@@ -3,11 +3,13 @@ package ai.mindconnect.agent.protocol.runtime;
 import java.util.UUID;
 
 /**
- * Ingests an already-stored file into a session's context — in the Mindconnect
- * runtime typically: chunk + embed into the session's vector store and
- * activate the {@code vector_search} tool. Supplied by the composition root
- * (e.g. {@code AgentRuntime::attachStored} from the builder); the backend
- * itself neither knows nor cares how "attaching" works.
+ * Attaches an already-stored file to a session — in the Mindconnect runtime:
+ * record it on the session, and for a document chunk + embed it into the
+ * session's vector store and activate {@code vector_search}; an image is
+ * recorded only, with {@code view_attachment} activated so the model can ask
+ * for it again. Supplied by the composition root (e.g.
+ * {@code AgentRuntime::attachStored} from the builder); the backend itself
+ * neither knows nor cares how "attaching" works.
  *
  * <p>This is the backend-detail seam of concept 9's file story: OpenAI stuffs
  * the referenced document into context, the runtime ingests it for retrieval —
@@ -15,6 +17,6 @@ import java.util.UUID;
  */
 public interface FileAttacher {
 
-    /** Ingests {@code file} for {@code sessionId}; returns a human-readable status. */
+    /** Attaches {@code file} to {@code sessionId}; returns a human-readable status. */
     String attach(UUID sessionId, ai.mindconnect.filestore.StoredFile file);
 }

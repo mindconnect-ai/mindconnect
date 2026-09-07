@@ -50,19 +50,59 @@ public final class MessageComponent {
     /**
      * A user message that announced attachments (metadata written by the
      * runtime when the message was persisted) shows them as a line above the
-     * text — rendering only; the stored text is what the user typed.
+     * text — rendering only; the stored text is what the user typed. The
+     * media parts the message carries follow the text: an image as the
+     * picture itself, served from the chat's file endpoint; a document as
+     * its name.
      */
-    private static String withAttachmentChip(Message m) {
+    String withAttachmentChip(Message m) {
         var attached = ai.mindconnect.agent.service.prompt.AttachmentNotice.announcedBy(m);
         var removed = ai.mindconnect.agent.service.prompt.AttachmentNotice.detachedBy(m);
-        if (attached.isEmpty() && removed.isEmpty()) return m.content();
         StringBuilder out = new StringBuilder();
-        if (!attached.isEmpty()) out.append("📎 *").append(String.join(", ", attached)).append("*\n\n");
-        if (!removed.isEmpty()) out.append("🗑 *").append(String.join(", ", removed)).append(" removed*\n\n");
-        return out.append(m.content()).toString();
+        if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(String.join(", ", attached)).append("*\n\n");
+        if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(String.join(", ", removed)).append(" removed*\n\n");
+        out.append(m.content() == null ? "" : m.content());
+        if (m.parts() != null) {
+            for (var part : m.parts()) {
+                if (part instanceof ai.mindconnect.message.domain.ContentPart.Image image) {
+                    // A linked image: the thumbnail (sized by the chat's CSS)
+                    // opens the original in a new tab — the markdown renderer
+                    // gives every link target="_blank".
+                    String url = contentUrl(image.fileId());
+                    out.append("\n\n[![").append(markdownSafe(image.name())).append("](")
+                            .append(url).append(")](").append(url).append(")");
+                } else if (part instanceof ai.mindconnect.message.domain.ContentPart.File file) {
+                    out.append("\n\n").append(icon("file-text")).append(" *").append(markdownSafe(file.name())).append("*");
+                }
+            }
+        }
+        return out.toString();
+    }
+
+    /** Where the chat serves a file it holds, inline — see {@code ChatFilesUiController#content}. */
+    private String contentUrl(String fileId) {
+        return "/chat/api/sessions/" + sessionId + "/chat-files/"
+                + java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8) + "/content";
+    }
+
+    /**
+     * A sprite icon inside markdown — the same {@code <svg><use>} the framework's
+     * icon renderer emits, so it sizes and colours with the surrounding text.
+     * Markdown passes inline HTML through; the name is a sprite id, never user input.
+     */
+    private static String icon(String name) {
+        return "<svg class=\"sui-icon\" aria-hidden=\"true\"><use href=\"/sui/icons.svg#" + name + "\"></use></svg>";
+    }
+
+    /** A file name inside markdown link syntax: brackets and parentheses would end it early. */
+    private static String markdownSafe(String name) {
+        return name == null ? "" : name.replaceAll("[\\[\\]()*_`]", "");
     }
 
     private UiList.Item chatItem(Message m, boolean isUser) {
+        if (ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.insertedBy(m)) {
+            return reshownItem(m);
+        }
         String speaker = isUser ? "You" : agent.name();
         String time    = timeFormat.format(m.sentAt());
         String label   = speaker + "  [" + time + "]" + messageTokenSuffix(m);
@@ -77,7 +117,7 @@ public final class MessageComponent {
         // the STREAM behaviour so the live tokens/task-cards flow exactly like
         // a normal send.
         if (isUser) {
-            item.action(UiAction.icon("regen-" + m.id(), "🔄")
+            item.action(UiAction.icon("regen-" + m.id(), "Regenerate").icon("refresh-cw")
                     .confirm("Delete the response(s) after this message and generate a new one?")
                     // Plain dispatch — the regenerated turn streams on the
                     // session's stream like any other.
@@ -87,13 +127,28 @@ public final class MessageComponent {
         // Delete-from-here: remove this message and every message after it.
         // toSeq = MAX_VALUE → the range delete runs to the end of the
         // conversation. Sub-agent sessions are not cleaned up.
-        item.action(UiAction.icon("delete-" + m.id(), "🗑")
+        item.action(UiAction.icon("delete-" + m.id(), "Delete from here").icon("trash-2")
                 .style(UiAction.Style.DANGER)
                 .confirm("Delete this message and all following messages?")
                 .onClick(trigger(on(ChatUiController.class)
                         .deleteMessages(sessionId, seq, Integer.MAX_VALUE, null))));
         return item;
     }
+    /**
+     * A message the runtime inserted on the user's behalf — an attachment
+     * shown to the assistant again at its request — is not the user's, and
+     * the picture is already in the bubble it came with: one muted line
+     * naming the file, no thumbnail, no actions.
+     */
+    private UiList.Item reshownItem(Message m) {
+        Object name = m.metadata() == null ? null
+                : m.metadata().get(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.ATTACHMENT);
+        String line = icon("repeat") + " *" + markdownSafe(name == null ? "attachment" : name.toString())
+                + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
+        return UiList.Item.of(m.id().toString(), "")
+                .content(UiMarkdown.of("msg-" + m.id(), line).withCssClass("reshown-message"));
+    }
+
     /** " · 42 tok" for a single message; empty when not counted. */
     private String messageTokenSuffix(Message m) {
         Integer t = m.tokenCount();

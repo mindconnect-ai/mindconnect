@@ -67,17 +67,13 @@ public record ToolCalls(List<Call> calls) {
     }
 
     /**
-     * The current episode: everything from the last user CHAT message on
-     * (inclusive). No user message yet — the whole list is the episode.
+     * The current episode: the current turn's messages, from the user CHAT
+     * that opened it on (inclusive) — a user message the runtime inserted
+     * within the turn does not start a new one. No user message yet — the
+     * whole list is the episode.
      */
     public static List<Message> episode(List<Message> history) {
-        for (int i = history.size() - 1; i >= 0; i--) {
-            Message message = history.get(i);
-            if (message.type() == MessageType.CHAT && message.senderType() == ParticipantType.USER) {
-                return history.subList(i, history.size());
-            }
-        }
-        return history;
+        return ai.mindconnect.message.domain.ConversationHistory.currentTurnMessages(history);
     }
 
     public static ToolCalls of(List<Message> episode) {

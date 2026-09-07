@@ -4,6 +4,8 @@ import ai.mindconnect.common.util.EnvVarResolver;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -52,11 +54,54 @@ public record LlmConfig(
          * vectors and have no sampling settings — temperature, output tokens,
          * thinking etc. don't apply.
          */
-        LlmConfigType type
+        LlmConfigType type,
+        /**
+         * What the model can take in and do — see {@link LlmCapability}. The
+         * runtime reads it: {@code VISION} and {@code DOCUMENTS} decide whether
+         * an image or PDF sent with a message reaches the model as content or
+         * as a placeholder line. {@code null} means <em>not declared</em> — a
+         * config written before the field existed, or one that leaves the
+         * decision to the provider — and then {@link LlmProvider#defaultCapabilities()}
+         * applies; see {@link #effectiveCapabilities()}. A declared set, the
+         * empty set included, always wins over that default.
+         */
+        Set<LlmCapability> capabilities
 ) {
-    /** Normalises {@code null} (legacy configs, terse callers) to CHAT. */
+    /**
+     * Normalises the type ({@code null} reads as CHAT) and keeps a declared
+     * capability set as an unmodifiable copy in declaration order, so JSON
+     * and UI show a stable sequence. {@code null} stays {@code null}: not
+     * declared is a state of its own.
+     */
     public LlmConfig {
         if (type == null) type = LlmConfigType.CHAT;
+        if (capabilities != null) {
+            capabilities = capabilities.isEmpty() ? Set.of()
+                    : Collections.unmodifiableSet(EnumSet.copyOf(capabilities));
+        }
+    }
+
+    /** Has this config declared its capabilities itself, rather than leaving them to the provider? */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean declaresCapabilities() {
+        return capabilities != null;
+    }
+
+    /**
+     * The capabilities that hold for this config: the declared set when there
+     * is one, else the provider's default, else (no provider — an alias)
+     * nothing. What the runtime asks through {@link #supports}.
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public Set<LlmCapability> effectiveCapabilities() {
+        if (capabilities != null) return capabilities;
+        return provider != null ? provider.defaultCapabilities() : Set.of();
+    }
+
+    /** Does this config — declared or by its provider's default — have the given capability? */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean supports(LlmCapability capability) {
+        return effectiveCapabilities().contains(capability);
     }
 
     /** Convenience: is this an embedding model? */
@@ -82,11 +127,12 @@ public record LlmConfig(
             @JsonProperty("delegatesTo")          String delegatesTo,
             @JsonProperty("retry")                RetryConfig retry,
             @JsonProperty("rateLimit")            RateLimitConfig rateLimit,
-            @JsonProperty("type")                 LlmConfigType type) {
+            @JsonProperty("type")                 LlmConfigType type,
+            @JsonProperty("capabilities")         Set<LlmCapability> capabilities) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
                 defaultTemperature, maxOutputTokens,
                 additionalParams != null ? additionalParams : Map.of(),
-                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type);
+                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
 
 
@@ -97,27 +143,27 @@ public record LlmConfig(
      */
     public static LlmConfig alias(String name, String delegatesTo) {
         return new LlmConfig(UUID.randomUUID(), name, null, null, null, null,
-                0.0, 0, Map.of(), null, true, delegatesTo, null, null, null);
+                0.0, 0, Map.of(), null, true, delegatesTo, null, null, null, null);
     }
 
     public static LlmConfig lmStudio(String name, String model, String baseUrl) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.LM_STUDIO,
-                model, baseUrl, "lm-studio", 0.7, 2048, Map.of(), 131_072, false, null, null, null, null);
+                model, baseUrl, "lm-studio", 0.7, 2048, Map.of(), 131_072, false, null, null, null, null, null);
     }
 
     public static LlmConfig claude(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.ANTHROPIC,
-                model, "https://api.anthropic.com", apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null);
+                model, "https://api.anthropic.com", apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig ollama(String name, String model, String baseUrl) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OLLAMA,
-                model, baseUrl, "ollama", 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, baseUrl, "ollama", 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig mistral(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.MISTRAL,
-                model, "https://api.mistral.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null);
+                model, "https://api.mistral.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     /**
@@ -126,37 +172,37 @@ public record LlmConfig(
      */
     public static LlmConfig azureOpenAi(String name, String deployment, String baseUrl, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.AZURE_OPENAI,
-                deployment, baseUrl, apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null);
+                deployment, baseUrl, apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig deepSeek(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.DEEPSEEK,
-                model, "https://api.deepseek.com", apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null);
+                model, "https://api.deepseek.com", apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig together(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.TOGETHER,
-                model, "https://api.together.xyz", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, "https://api.together.xyz", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig openRouter(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OPENROUTER,
-                model, "https://openrouter.ai/api", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, "https://openrouter.ai/api", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig perplexity(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.PERPLEXITY,
-                model, "https://api.perplexity.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null);
+                model, "https://api.perplexity.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig fireworks(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.FIREWORKS,
-                model, "https://api.fireworks.ai/inference", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null);
+                model, "https://api.fireworks.ai/inference", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig googleGemini(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.GOOGLE_GEMINI,
-                model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null);
+                model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
     }
 
     /** Guards against runaway / circular alias chains. */
@@ -200,12 +246,18 @@ public record LlmConfig(
 
     public LlmConfig withContextWindowTokens(Integer contextWindowTokens) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
 
     public LlmConfig withApiKey(String apiKey) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
+    }
+
+    /** Returns a copy declaring exactly the given capabilities ({@code null}: not declared, the provider's default applies). */
+    public LlmConfig withCapabilities(Set<LlmCapability> capabilities) {
+        return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
 
     /**
@@ -231,7 +283,8 @@ public record LlmConfig(
                 delegatesTo,
                 retry,
                 rateLimit,
-                type);
+                type,
+                capabilities);
     }
 
     /**

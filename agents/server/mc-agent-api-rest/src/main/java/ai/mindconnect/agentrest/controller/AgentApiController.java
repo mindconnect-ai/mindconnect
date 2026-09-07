@@ -48,17 +48,26 @@ public class AgentApiController {
     private final AgentRegistryService registryService;
     private final AgentSessionService sessionService;
     private final AgentChatService chatService;
+    private final ai.mindconnect.filestore.FileStore fileStore;
     private final ObjectMapper compactMapper;
 
     public AgentApiController(AgentRegistryService registryService,
                             AgentSessionService sessionService,
                             AgentChatService chatService,
+                            ai.mindconnect.filestore.FileStore fileStore,
                             ObjectMapper objectMapper) {
         this.registryService = registryService;
         this.sessionService = sessionService;
         this.chatService = chatService;
+        this.fileStore = fileStore;
         this.compactMapper = objectMapper.copy().disable(
                 com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
+    }
+
+    /** A request that names an unknown file or part kind is the caller's mistake: 400, not 500. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String, String>> badRequest(IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body(Map.of("error", e.getMessage() == null ? "bad request" : e.getMessage()));
     }
 
     // ── Agent CRUD ──────────────────────────────────────────────────────────
@@ -189,10 +198,66 @@ public class AgentApiController {
     public SseEmitter streaming(@PathVariable UUID sessionId, @RequestBody String message) {
         log.info("POST /api/sessions/{}/chat message=\"{}\"", sessionId,
                 message.length() > 80 ? message.substring(0, 80) + "…" : message);
+        return streamTurn(sessionId, ai.mindconnect.message.domain.ContentPart.text(message));
+    }
 
+    /**
+     * The JSON twin: the text plus files sent with it — uploaded beforehand
+     * through {@code POST /api/files}, referenced by id. An image goes to the
+     * model as an image part (a vision model sees it with the question), a
+     * file as a document part; what a model does not read stands in as a
+     * placeholder line.
+     */
+    @Operation(tags = "Sessions", summary = "Send a chat message with files (SSE stream)",
+            description = "JSON body {message, parts:[{kind:image|file, fileId}]}. The files were "
+                    + "uploaded through POST /api/files; the message carries them as content "
+                    + "parts — an image is sent to a vision model as the picture, a PDF to a "
+                    + "document-reading model as the document. Streams the turn as Server-Sent "
+                    + "Events like the plain-text variant.")
+    @PostMapping(value = "/sessions/{sessionId}/chat", consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamingWithParts(@PathVariable UUID sessionId,
+                                         @RequestBody ai.mindconnect.agentrest.dto.ChatRequest request) {
+        String message = request.message() == null ? "" : request.message();
+        log.info("POST /api/sessions/{}/chat (json) message=\"{}\" parts={}", sessionId,
+                message.length() > 80 ? message.substring(0, 80) + "…" : message,
+                request.parts() == null ? 0 : request.parts().size());
+        List<ai.mindconnect.message.domain.ContentPart> parts = new java.util.ArrayList<>();
+        parts.add(new ai.mindconnect.message.domain.ContentPart.Text(message));
+        for (var part : request.parts() == null ? List.<ai.mindconnect.agentrest.dto.ChatRequest.Part>of()
+                : request.parts()) {
+            parts.add(toPart(part));
+        }
+        if (message.isBlank() && parts.size() == 1) {
+            throw new IllegalArgumentException("A chat message needs text or at least one part");
+        }
+        return streamTurn(sessionId, parts);
+    }
+
+    /** A requested part as a domain part — the file's name, type and size from the store. */
+    private ai.mindconnect.message.domain.ContentPart toPart(ai.mindconnect.agentrest.dto.ChatRequest.Part part) {
+        if (part.fileId() == null || part.fileId().isBlank()) {
+            throw new IllegalArgumentException("A part needs a fileId — upload via POST /api/files first");
+        }
+        ai.mindconnect.filestore.StoredFile stored = fileStore.find(part.fileId()).orElseThrow(() ->
+                new IllegalArgumentException("Unknown fileId '" + part.fileId()
+                        + "' — upload via POST /api/files first"));
+        String kind = part.kind() == null ? "" : part.kind().toLowerCase(java.util.Locale.ROOT);
+        return switch (kind) {
+            case "image" -> new ai.mindconnect.message.domain.ContentPart.Image(
+                    stored.id(), stored.name(), stored.contentType(), stored.size());
+            case "file", "document" -> new ai.mindconnect.message.domain.ContentPart.File(
+                    stored.id(), stored.name(), stored.contentType(), stored.size());
+            default -> throw new IllegalArgumentException(
+                    "Unknown part kind '" + part.kind() + "' — use image or file");
+        };
+    }
+
+    /** Starts the turn and streams it as Server-Sent Events until it ends. */
+    private SseEmitter streamTurn(UUID sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
         SseEmitter emitter = new SseEmitter(120_000L);
 
-        ChatTurnHandle turn = chatService.submitChat(sessionId, message, event -> {
+        ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> {
             try {
                 emitter.send(SseEmitter.event().data(
                         compactMapper.writeValueAsString(StreamEventFrame.from(event)),

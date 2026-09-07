@@ -23,6 +23,69 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** an LLM config can declare what its model can take in and do —
+  `capabilities`, any of `TOOL_CALLING`, `VISION`, `DOCUMENTS`,
+  `AUDIO_INPUT`. The Admin UI's chat-config form has a multiselect for it,
+  the detail view shows it, the JSON (file store, Postgres, REST API,
+  bundled `initial-data` configs) carries it as a string array. Configs
+  written before this field existed load as declaring nothing. The bundled
+  cloud configs (`claude-*`, `openai-default`, `azure-openai-default`,
+  `gemini-default`) declare their capabilities, the local ones
+  `TOOL_CALLING`. A config that declares nothing — every config written
+  before the field existed — takes its provider's default: Anthropic and
+  OpenAI read images and PDFs, Gemini also audio, Azure OpenAI images, local
+  servers and routers tool calling only; a declared set, empty included,
+  wins. `VISION` and `DOCUMENTS` decide what the next entry sends.
+- **agents:** images and PDFs reach the model. A message is made of content
+  parts — its text plus the images and files sent with it, referenced by
+  file-store id (`Message.parts`; the file store and Postgres carry them
+  without a migration, older messages read as text). An image or PDF
+  attached to a chat goes with the next user message as a part: a model
+  whose config declares `VISION` / `DOCUMENTS` gets it inline as the
+  provider's content block (OpenAI, Anthropic and Gemini gateways), any
+  other model a placeholder line saying what the file is and why it is not
+  there. Media is sent in the turn it belongs to only; afterwards the new
+  `view_attachment` tool — activated for the session on such an upload —
+  shows the file again as a message of its own. Images are no longer
+  ingested into the session's vector store (they were read as UTF-8 text);
+  the chat bubble shows the picture, the attached-files dialog says how
+  each file reaches the model. `POST /api/sessions/{id}/chat` takes a JSON
+  body `{message, parts:[{kind, fileId}]}` beside the plain-text one,
+  `GET /api/sessions/{id}/files` lists file id, media type, size and chunk
+  count per file, the protocol bridge accepts `Image` parts, and
+  `AgentRuntime.chat(sessionId, parts, …)` takes parts in an embedding.
+
+### Changed
+
+- **agents:** a session's `attachedFiles` are records — id, name, media
+  type, size — instead of bare names; sessions written before read their
+  names as files without an id. `LlmMessage` is made of content blocks
+  (`parts`), `content()` remains the text; `LlmMessageMapper.toMessages`
+  takes the target `LlmConfig` as a fifth argument, and a host's own
+  mapper implementation has to add it. A user message that carries the
+  open turn's id continues that turn instead of opening a new one.
+  `DELETE /api/sessions/{id}/files?file=` takes the file's name or its
+  ingested id, and no longer fails without a vector store.
+- **agents:** the request body an LLM call trace records (`LlmCallEvent.requestJson`,
+  the Admin UI's trace view) no longer carries inline media: an image's or
+  PDF's base64 payload is replaced by a note with its media type and length,
+  so the trace store does not grow by the size of every attachment on every
+  turn. The wire request is unchanged.
+- **agents:** the working-memory token budget counts media. An image is
+  taken as 1,600 tokens, a document as one token per 100 bytes (at least
+  1,000); before, a message's images and PDFs counted as nothing and a
+  window could exceed the model's context.
+- **agents:** a config that declares `DOCUMENTS` on a server without
+  OpenAI's `file` content block (LM Studio, Ollama, Groq, Mistral, …) gets
+  the document as a text note instead of a 400 from the endpoint; images
+  reach every OpenAI-compatible endpoint as before.
+- **agents:** an image sent through the protocol bridge
+  (`ContentPart.Image` on `AgentRuntimeBackend`) is recorded on the session
+  like an upload, so `view_attachment` is activated and the model can ask
+  for the picture again in a later turn.
+
 ## [0.4.1] - 2026-09-06
 
 ### Added

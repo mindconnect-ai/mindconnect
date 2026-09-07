@@ -9,6 +9,11 @@
   "maxOutputTokens": 8192,
   "additionalParams": {},
   "contextWindowTokens": 200000,
+  "capabilities": [
+    "TOOL_CALLING",
+    "VISION",
+    "DOCUMENTS"
+  ],
   "retry": {
     "enabled": true,
     "maxAttempts": 5,

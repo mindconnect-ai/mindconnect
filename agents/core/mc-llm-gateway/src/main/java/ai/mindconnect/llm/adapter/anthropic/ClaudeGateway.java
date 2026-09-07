@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.anthropic;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.TraceRedaction;
 import ai.mindconnect.llm.domain.*;
 import ai.mindconnect.llm.port.in.LlmCallListener;
 import ai.mindconnect.llm.port.out.LlmGateway;
@@ -82,7 +83,7 @@ public class ClaudeGateway implements LlmGateway {
         String body;
         try {
             ObjectNode requestNode = buildRequestNode(config, request);
-            try { prettyRequestJson = prettyWriter.writeValueAsString(requestNode); } catch (Exception ignored) {}
+            try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
             logWireRequest(requestNode);
             body = objectMapper.writeValueAsString(requestNode);
         } catch (IOException e) {
@@ -371,7 +372,7 @@ public class ClaudeGateway implements LlmGateway {
     private void logWireRequest(ObjectNode requestNode) {
         if (!wire.isDebugEnabled()) return;
         try {
-            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(requestNode));
+            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)));
         } catch (Exception e) {
             wire.debug("→ stream request: <serialise failed: {}>", e.getMessage());
         }
@@ -472,6 +473,27 @@ public class ClaudeGateway implements LlmGateway {
                     block.put("name", tc.name());
                     block.set("input", objectMapper.valueToTree(tc.arguments()));
                 }
+            } else if (msg.hasMedia()) {
+                // A user message with images / documents — content blocks,
+                // media inline as base64.
+                ObjectNode msgNode = messages.addObject();
+                msgNode.put("role", msg.role().name().toLowerCase());
+                ArrayNode content = msgNode.putArray("content");
+                for (LlmContent part : msg.parts()) {
+                    ObjectNode block = content.addObject();
+                    switch (part) {
+                        case LlmContent.Text t -> block.put("type", "text").put("text", t.text());
+                        case LlmContent.Image i -> {
+                            block.put("type", "image");
+                            base64Source(block, i.mediaType(), i.base64());
+                        }
+                        case LlmContent.Document d -> {
+                            block.put("type", "document");
+                            base64Source(block, d.mediaType(), d.base64());
+                            if (d.name() != null) block.put("title", d.name());
+                        }
+                    }
+                }
             } else {
                 ObjectNode msgNode = messages.addObject();
                 msgNode.put("role", msg.role().name().toLowerCase());
@@ -490,5 +512,13 @@ public class ClaudeGateway implements LlmGateway {
         }
 
         return root;
+    }
+
+    /** The {@code source} of an image or document block: inline base64. */
+    private static void base64Source(ObjectNode block, String mediaType, String base64) {
+        ObjectNode source = block.putObject("source");
+        source.put("type", "base64");
+        source.put("media_type", mediaType);
+        source.put("data", base64);
     }
 }

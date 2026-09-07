@@ -67,6 +67,29 @@ final class AttachSupport {
         return create(environment, activations, sessions, embeddings, llmConfigs, workflows, hostFileStore);
     }
 
+    /**
+     * The filesystem file store under the data dir when the file-store module
+     * is on the classpath, {@code null} otherwise — the builder feeds it to
+     * the message mapper before any tool support exists.
+     */
+    static ai.mindconnect.filestore.FileStore defaultFileStoreIfPresent(Map<String, String> environment) {
+        try {
+            Class.forName("ai.mindconnect.filestore.filesystem.FilesystemFileStoreBackend");
+        } catch (ClassNotFoundException e) {
+            return null;
+        }
+        return openDefaultFileStore(environment);
+    }
+
+    /** Separate method so the backend type is only linked once the guard passed. */
+    private static ai.mindconnect.filestore.FileStore openDefaultFileStore(Map<String, String> environment) {
+        return ai.mindconnect.filestore.FileStoreBackend
+                .byType(environment.getOrDefault("fileStoreBackend", "filesystem"))
+                .orElseThrow()
+                .open(Map.of("dir", environment.getOrDefault("fileStoreDir",
+                        environment.get("dataBaseDir") + "/files")));
+    }
+
     /** Separate method so optional types are only linked once the guard passed. */
     private static AttachSupport create(Map<String, String> environment,
                                         DynamicToolActivations activations,
@@ -75,11 +98,7 @@ final class AttachSupport {
                                         LlmConfigRepository llmConfigs,
                                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
                                         ai.mindconnect.filestore.FileStore hostFileStore) {
-        var fileStore = hostFileStore != null ? hostFileStore : ai.mindconnect.filestore.FileStoreBackend
-                .byType(environment.getOrDefault("fileStoreBackend", "filesystem"))
-                .orElseThrow()
-                .open(Map.of("dir", environment.getOrDefault("fileStoreDir",
-                        environment.get("dataBaseDir") + "/files")));
+        var fileStore = hostFileStore != null ? hostFileStore : openDefaultFileStore(environment);
         var env = new ai.mindconnect.agent.tool.ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
@@ -119,6 +138,18 @@ final class AttachSupport {
      * reference later ({@code Document(FileId)} content parts).
      */
     String attachStored(UUID sessionId, ai.mindconnect.filestore.StoredFile stored) {
+        var attached = new ai.mindconnect.agent.domain.AttachedFile(
+                stored.id(), stored.name(), stored.contentType(), stored.size());
+        if (attached.isImage()) {
+            // Not text to index: the image goes to the model with the next
+            // message as an image part, or as that part's placeholder. Shown
+            // once; afterwards the model asks for it through view_attachment.
+            sessions.findById(sessionId).ifPresent(session ->
+                    sessions.save(session.withAttachedFiles(List.of(attached))));
+            activations.activate(sessionId,
+                    List.of(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME));
+            return stored.name() + " attached — it goes to the model with the next message.";
+        }
         try {
             String storeName = "session-" + sessionId;
             var template = stores.template("chat-uploads").orElseGet(() -> {
@@ -145,9 +176,11 @@ final class AttachSupport {
                         stores, store, storeName, stored.name(), text);
             }
 
-            activations.activate(sessionId, List.of("vector_search"));
+            activations.activate(sessionId, attached.isPdf()
+                    ? List.of("vector_search", ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME)
+                    : List.of("vector_search"));
             sessions.findById(sessionId).ifPresent(session ->
-                    sessions.save(session.withAttachedFiles(List.of(stored.name()))));
+                    sessions.save(session.withAttachedFiles(List.of(attached))));
             return message;
         } catch (Exception e) {
             throw new IllegalStateException("attachFile failed: " + e.getMessage(), e);

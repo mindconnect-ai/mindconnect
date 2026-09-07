@@ -48,6 +48,7 @@ no API key required — as long as LM Studio is serving a model on
   "baseUrl": "https://api.anthropic.com",
   "apiKey": "${ANTHROPIC_API_KEY}",
   "contextWindowTokens": 200000,
+  "capabilities": ["TOOL_CALLING", "VISION", "DOCUMENTS"],
   "additionalParams": {
     "thinking": "adaptive",
     "effort": "high"
@@ -69,6 +70,7 @@ no API key required — as long as LM Studio is serving a model on
 | `baseUrl` | API endpoint (override for proxies / local servers) |
 | `apiKey` | API key, usually injected from an env var |
 | `contextWindowTokens` | Token budget used to size the working-memory window |
+| `capabilities` | What the model reads and does — `TOOL_CALLING`, `VISION`, `DOCUMENTS`, `AUDIO_INPUT`. Vision and documents decide whether an image or PDF reaches the model as content or as a placeholder. Omitted: the provider's default applies |
 | `additionalParams` | Provider-specific options (e.g. Anthropic `thinking` / `effort`) |
 | `rateLimit` | Optional — cap concurrent requests |
 | `retry` | Optional — automatic retry with backoff |

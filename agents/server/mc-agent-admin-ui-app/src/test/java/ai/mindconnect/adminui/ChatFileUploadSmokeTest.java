@@ -137,7 +137,7 @@ class ChatFileUploadSmokeTest {
         assertThat(attachments.values().iterator().next()).isGreaterThan(0L);
 
         AgentSession reloaded = sessions.findById(session.id()).orElseThrow();
-        assertThat(reloaded.attachedFiles())
+        assertThat(reloaded.attachedFileNames())
                 .as("the system prompt announces the file")
                 .contains("soup-notes.md");
     }

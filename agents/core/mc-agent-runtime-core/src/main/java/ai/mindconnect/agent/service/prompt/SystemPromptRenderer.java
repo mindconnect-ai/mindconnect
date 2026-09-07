@@ -33,12 +33,19 @@ public final class SystemPromptRenderer {
      * a removed file disappears from the prompt with it.
      */
     static String attachedFilesSection(AgentSession session) {
-        if (session == null || session.attachedFiles().isEmpty()) {
+        if (session == null) return "";
+        // Images are not indexed — they travel with the message as image
+        // parts (or their placeholders) and have no business in this list.
+        java.util.List<String> searchable = session.attachedFiles().stream()
+                .filter(f -> !f.isImage())
+                .map(ai.mindconnect.agent.domain.AttachedFile::name)
+                .toList();
+        if (searchable.isEmpty()) {
             return "";
         }
         StringBuilder out = new StringBuilder("\n\n## Attached files\n"
                 + "The user attached these files to this conversation:\n");
-        for (String file : session.attachedFiles()) {
+        for (String file : searchable) {
             out.append("- ").append(file).append(" (").append(AttachmentNotice.kind(file)).append(")\n");
         }
         return out.append("Their content is indexed for semantic search. To answer anything about them, "

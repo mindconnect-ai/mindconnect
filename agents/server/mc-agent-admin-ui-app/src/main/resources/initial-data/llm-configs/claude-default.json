@@ -12,6 +12,11 @@
     "effort": "high"
   },
   "contextWindowTokens": 200000,
+  "capabilities": [
+    "TOOL_CALLING",
+    "VISION",
+    "DOCUMENTS"
+  ],
   "rateLimit": {
     "maxConcurrentRequests": 3
   },

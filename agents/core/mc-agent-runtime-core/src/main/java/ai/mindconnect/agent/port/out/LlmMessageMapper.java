@@ -3,6 +3,7 @@ package ai.mindconnect.agent.port.out;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.service.ContextTokenBudget;
+import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.message.domain.Message;
 
@@ -28,15 +29,20 @@ public interface LlmMessageMapper {
      * Maps a list of stored messages to LLM-ready messages, within the
      * per-message token limit of {@code budget}. The session is the live
      * state a record may have to be read against — what is attached to the
-     * chat <em>now</em>, not what was when the message was written.
+     * chat <em>now</em>, not what was when the message was written. The
+     * target is the model the messages go to: what it declares it can read
+     * ({@link LlmConfig#capabilities()}) decides whether an image or document
+     * part travels as content or as a placeholder line. {@code null} when the
+     * agent's config is unknown — then nothing travels as media.
      */
     List<LlmMessage> toMessages(List<Message> messages, AgentDefinition def, AgentSession session,
-                                ContextTokenBudget budget);
+                                ContextTokenBudget budget, LlmConfig target);
 
     /**
      * The text the model reads for one stored message — what {@link #toMessages}
-     * would put in its content. For the working-memory view, so the admin
-     * sees the same text and the same token count as the model.
+     * would put in its content, with a media part standing in as a one-line
+     * descriptor. For the working-memory view, so the admin sees the same
+     * text and the same token count as the model.
      */
     default String modelText(Message message, AgentDefinition def, AgentSession session) {
         return message.content();
