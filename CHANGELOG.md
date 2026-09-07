@@ -83,6 +83,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   OpenAI's `file` content block (LM Studio, Ollama, Groq, Mistral, …) gets
   the document as a text note instead of a 400 from the endpoint; images
   reach every OpenAI-compatible endpoint as before.
+- **agents:** the Admin UI and the agent server take uploads of 25 MB per
+  file and 100 MB per request (`MC_UPLOAD_MAX_FILE_SIZE`,
+  `MC_UPLOAD_MAX_REQUEST_SIZE`). Before, Spring's defaults applied — 1 MB
+  per file, 10 MB per request — and a phone photo, or a few files attached
+  at once, was answered with HTTP 413.
 - **agents:** a `.jpg` uploaded from Windows reaches the model. The browser
   there reports the file as `image/jpg` or `image/pjpeg`, which Anthropic and
   OpenAI reject; the media type is folded onto `image/jpeg` (likewise

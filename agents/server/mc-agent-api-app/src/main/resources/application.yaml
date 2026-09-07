@@ -1,6 +1,14 @@
 spring:
   application:
     name: mc-agent-api-app
+  servlet:
+    multipart:
+      # File uploads (POST /api/files, /api/sessions/{id}/files). Spring's
+      # defaults (1MB per file, 10MB per request) answer a phone photo, or
+      # three of them, with HTTP 413. The runtime sends a file inline to the
+      # model up to 20MB.
+      max-file-size: ${MC_UPLOAD_MAX_FILE_SIZE:25MB}
+      max-request-size: ${MC_UPLOAD_MAX_REQUEST_SIZE:100MB}
 
 server:
   port: 8080
