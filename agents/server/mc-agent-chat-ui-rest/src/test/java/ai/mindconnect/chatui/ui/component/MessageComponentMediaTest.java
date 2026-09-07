@@ -33,7 +33,8 @@ class MessageComponentMediaTest {
         assertThat(body).startsWith("what is this?");
         String url = "/chat/api/sessions/" + SESSION + "/chat-files/f-1/content";
         assertThat(body).contains("[![my photo.png](" + url + ")](" + url + ")");
-        assertThat(body).contains("📄 *spec.pdf*");
+        assertThat(body).contains("icons.svg#file-text").contains("*spec.pdf*");
+        assertThat(body).doesNotContain("📄");
     }
 
     @Test
@@ -48,7 +49,7 @@ class MessageComponentMediaTest {
 
         String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(component(m).item());
 
-        assertThat(json).contains("shown to the assistant again").contains("reshown-message");
+        assertThat(json).contains("shown to the assistant again").contains("reshown-message").contains("icons.svg#repeat");
         assertThat(json).doesNotContain("chat-files/f-1/content").doesNotContain("regen-").doesNotContain("delete-");
     }
 

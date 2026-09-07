@@ -59,8 +59,8 @@ public final class MessageComponent {
         var attached = ai.mindconnect.agent.service.prompt.AttachmentNotice.announcedBy(m);
         var removed = ai.mindconnect.agent.service.prompt.AttachmentNotice.detachedBy(m);
         StringBuilder out = new StringBuilder();
-        if (!attached.isEmpty()) out.append("📎 *").append(String.join(", ", attached)).append("*\n\n");
-        if (!removed.isEmpty()) out.append("🗑 *").append(String.join(", ", removed)).append(" removed*\n\n");
+        if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(String.join(", ", attached)).append("*\n\n");
+        if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(String.join(", ", removed)).append(" removed*\n\n");
         out.append(m.content() == null ? "" : m.content());
         if (m.parts() != null) {
             for (var part : m.parts()) {
@@ -72,7 +72,7 @@ public final class MessageComponent {
                     out.append("\n\n[![").append(markdownSafe(image.name())).append("](")
                             .append(url).append(")](").append(url).append(")");
                 } else if (part instanceof ai.mindconnect.message.domain.ContentPart.File file) {
-                    out.append("\n\n📄 *").append(markdownSafe(file.name())).append("*");
+                    out.append("\n\n").append(icon("file-text")).append(" *").append(markdownSafe(file.name())).append("*");
                 }
             }
         }
@@ -83,6 +83,15 @@ public final class MessageComponent {
     private String contentUrl(String fileId) {
         return "/chat/api/sessions/" + sessionId + "/chat-files/"
                 + java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8) + "/content";
+    }
+
+    /**
+     * A sprite icon inside markdown — the same {@code <svg><use>} the framework's
+     * icon renderer emits, so it sizes and colours with the surrounding text.
+     * Markdown passes inline HTML through; the name is a sprite id, never user input.
+     */
+    private static String icon(String name) {
+        return "<svg class=\"sui-icon\" aria-hidden=\"true\"><use href=\"/sui/icons.svg#" + name + "\"></use></svg>";
     }
 
     /** A file name inside markdown link syntax: brackets and parentheses would end it early. */
@@ -108,7 +117,7 @@ public final class MessageComponent {
         // the STREAM behaviour so the live tokens/task-cards flow exactly like
         // a normal send.
         if (isUser) {
-            item.action(UiAction.icon("regen-" + m.id(), "🔄")
+            item.action(UiAction.icon("regen-" + m.id(), "Regenerate").icon("refresh-cw")
                     .confirm("Delete the response(s) after this message and generate a new one?")
                     // Plain dispatch — the regenerated turn streams on the
                     // session's stream like any other.
@@ -118,7 +127,7 @@ public final class MessageComponent {
         // Delete-from-here: remove this message and every message after it.
         // toSeq = MAX_VALUE → the range delete runs to the end of the
         // conversation. Sub-agent sessions are not cleaned up.
-        item.action(UiAction.icon("delete-" + m.id(), "🗑")
+        item.action(UiAction.icon("delete-" + m.id(), "Delete from here").icon("trash-2")
                 .style(UiAction.Style.DANGER)
                 .confirm("Delete this message and all following messages?")
                 .onClick(trigger(on(ChatUiController.class)
@@ -134,7 +143,7 @@ public final class MessageComponent {
     private UiList.Item reshownItem(Message m) {
         Object name = m.metadata() == null ? null
                 : m.metadata().get(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.ATTACHMENT);
-        String line = "🔁 *" + markdownSafe(name == null ? "attachment" : name.toString())
+        String line = icon("repeat") + " *" + markdownSafe(name == null ? "attachment" : name.toString())
                 + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
         return UiList.Item.of(m.id().toString(), "")
                 .content(UiMarkdown.of("msg-" + m.id(), line).withCssClass("reshown-message"));
