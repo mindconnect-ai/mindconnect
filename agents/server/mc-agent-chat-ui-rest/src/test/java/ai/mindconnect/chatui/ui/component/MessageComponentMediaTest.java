@@ -31,7 +31,8 @@ class MessageComponentMediaTest {
         String body = component(m).withAttachmentChip(m);
 
         assertThat(body).startsWith("what is this?");
-        assertThat(body).contains("![my photo.png](/chat/api/sessions/" + SESSION + "/chat-files/f-1/content)");
+        String url = "/chat/api/sessions/" + SESSION + "/chat-files/f-1/content";
+        assertThat(body).contains("[![my photo.png](" + url + ")](" + url + ")");
         assertThat(body).contains("📄 *spec.pdf*");
     }
 

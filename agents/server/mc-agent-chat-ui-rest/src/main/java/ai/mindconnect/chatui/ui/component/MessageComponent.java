@@ -65,8 +65,12 @@ public final class MessageComponent {
         if (m.parts() != null) {
             for (var part : m.parts()) {
                 if (part instanceof ai.mindconnect.message.domain.ContentPart.Image image) {
-                    out.append("\n\n![").append(markdownSafe(image.name())).append("](")
-                            .append(contentUrl(image.fileId())).append(")");
+                    // A linked image: the thumbnail (sized by the chat's CSS)
+                    // opens the original in a new tab — the markdown renderer
+                    // gives every link target="_blank".
+                    String url = contentUrl(image.fileId());
+                    out.append("\n\n[![").append(markdownSafe(image.name())).append("](")
+                            .append(url).append(")](").append(url).append(")");
                 } else if (part instanceof ai.mindconnect.message.domain.ContentPart.File file) {
                     out.append("\n\n📄 *").append(markdownSafe(file.name())).append("*");
                 }

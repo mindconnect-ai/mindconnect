@@ -521,6 +521,26 @@
     border-radius: 0;
 }
 
+/* An image a message carries: a thumbnail in the bubble, the original one
+   click away (the link opens in a new tab). Capped in both directions so a
+   phone screenshot does not fill the conversation. */
+.user-message img,
+.bot-message img {
+    display: block;
+    max-width: min(100%, 320px);
+    max-height: 240px;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    cursor: zoom-in;
+}
+
+.user-message a:has(> img),
+.bot-message a:has(> img) {
+    display: inline-block;
+    line-height: 0;
+}
+
 /* The error variant is the one bot message that still needs a surface. */
 .bot-message.error-message {
     background: var(--sui-color-danger-bg);
