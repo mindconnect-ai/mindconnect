@@ -126,7 +126,8 @@ An image or PDF attached to the chat becomes a part of the user's next
 message, so a model that reads it sees the picture with the question:
 
 - The model's `LlmConfig` says what it reads — `capabilities` with `VISION`
-  for images, `DOCUMENTS` for PDFs (see the
+  for images, `DOCUMENTS` for PDFs, or the provider's default when the config
+  declares nothing (see the
   [LLM config reference](./llm-configs-reference.md)). A part the model
   reads travels inline, as the provider's content block; otherwise a
   placeholder line stands in for it — what the file is, and why it is not

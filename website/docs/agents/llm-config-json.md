@@ -66,7 +66,7 @@ A minimal local config (no key needed):
 | `baseUrl` | string | API endpoint (override for proxies / local servers). |
 | `apiKey` | string | API key — almost always an env-var placeholder like `${ANTHROPIC_API_KEY}`. Literal keys are stored encrypted in the Admin UI (the CLI stores them as-is — use placeholders there). |
 | `type` | enum? | `CHAT` (default) or `EMBEDDING` — embedding configs power the vector store. |
-| `capabilities` | string[]? | What the model can take in and do: any of `TOOL_CALLING`, `VISION` (images), `DOCUMENTS` (PDF), `AUDIO_INPUT`. Informative — declared here, shown in the Admin UI, readable by callers via `LlmConfig.supports(...)`; the runtime does not derive its behaviour from it. Omitted means none declared. Chat configs only. |
+| `capabilities` | string[]? | What the model reads and does: any of `TOOL_CALLING`, `VISION` (images), `DOCUMENTS` (PDF), `AUDIO_INPUT`. `VISION` and `DOCUMENTS` decide whether an image or PDF sent with a message reaches the model as content or as a placeholder line. **Omitted means not declared** — the provider's default applies (Anthropic and OpenAI: tool calling, vision, documents; Gemini: those plus audio; Azure OpenAI: tool calling, vision; local servers and routers: tool calling only). A declared list, `[]` included, always wins over that default. Chat configs only. |
 | `defaultTemperature` | number | Sampling temperature (e.g. `0.7`). |
 | `maxOutputTokens` | int | Max tokens the model may generate per response. |
 | `contextWindowTokens` | int | Token budget used to size the working-memory window. |

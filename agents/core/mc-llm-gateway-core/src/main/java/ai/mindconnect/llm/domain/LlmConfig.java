@@ -56,31 +56,52 @@ public record LlmConfig(
          */
         LlmConfigType type,
         /**
-         * What the model can take in and do — see {@link LlmCapability}.
-         * Declared by the admin, shown by the UI, asked by callers that want
-         * to know whether a model reads images; the runtime does not derive
-         * its control flow from it. Never {@code null}: an unset or legacy
-         * config reads as the empty set.
+         * What the model can take in and do — see {@link LlmCapability}. The
+         * runtime reads it: {@code VISION} and {@code DOCUMENTS} decide whether
+         * an image or PDF sent with a message reaches the model as content or
+         * as a placeholder line. {@code null} means <em>not declared</em> — a
+         * config written before the field existed, or one that leaves the
+         * decision to the provider — and then {@link LlmProvider#defaultCapabilities()}
+         * applies; see {@link #effectiveCapabilities()}. A declared set, the
+         * empty set included, always wins over that default.
          */
         Set<LlmCapability> capabilities
 ) {
     /**
-     * Normalises {@code null} (legacy configs, terse callers): the type to
-     * CHAT, the capabilities to the empty set. The set is stored as an
-     * unmodifiable copy in declaration order, so JSON and UI show a stable
-     * sequence.
+     * Normalises the type ({@code null} reads as CHAT) and keeps a declared
+     * capability set as an unmodifiable copy in declaration order, so JSON
+     * and UI show a stable sequence. {@code null} stays {@code null}: not
+     * declared is a state of its own.
      */
     public LlmConfig {
         if (type == null) type = LlmConfigType.CHAT;
-        capabilities = capabilities == null || capabilities.isEmpty()
-                ? Set.of()
-                : Collections.unmodifiableSet(EnumSet.copyOf(capabilities));
+        if (capabilities != null) {
+            capabilities = capabilities.isEmpty() ? Set.of()
+                    : Collections.unmodifiableSet(EnumSet.copyOf(capabilities));
+        }
     }
 
-    /** Convenience: does this config declare the given capability? */
+    /** Has this config declared its capabilities itself, rather than leaving them to the provider? */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean declaresCapabilities() {
+        return capabilities != null;
+    }
+
+    /**
+     * The capabilities that hold for this config: the declared set when there
+     * is one, else the provider's default, else (no provider — an alias)
+     * nothing. What the runtime asks through {@link #supports}.
+     */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public Set<LlmCapability> effectiveCapabilities() {
+        if (capabilities != null) return capabilities;
+        return provider != null ? provider.defaultCapabilities() : Set.of();
+    }
+
+    /** Does this config — declared or by its provider's default — have the given capability? */
     @com.fasterxml.jackson.annotation.JsonIgnore
     public boolean supports(LlmCapability capability) {
-        return capabilities.contains(capability);
+        return effectiveCapabilities().contains(capability);
     }
 
     /** Convenience: is this an embedding model? */
@@ -233,7 +254,7 @@ public record LlmConfig(
                 defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
 
-    /** Returns a copy declaring exactly the given capabilities ({@code null} clears them). */
+    /** Returns a copy declaring exactly the given capabilities ({@code null}: not declared, the provider's default applies). */
     public LlmConfig withCapabilities(Set<LlmCapability> capabilities) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
                 defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);

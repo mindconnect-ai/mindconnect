@@ -33,8 +33,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   written before this field existed load as declaring nothing. The bundled
   cloud configs (`claude-*`, `openai-default`, `azure-openai-default`,
   `gemini-default`) declare their capabilities, the local ones
-  `TOOL_CALLING`; existing installs keep their stored configs unchanged.
-  `VISION` and `DOCUMENTS` decide what the next entry sends.
+  `TOOL_CALLING`. A config that declares nothing — every config written
+  before the field existed — takes its provider's default: Anthropic and
+  OpenAI read images and PDFs, Gemini also audio, Azure OpenAI images, local
+  servers and routers tool calling only; a declared set, empty included,
+  wins. `VISION` and `DOCUMENTS` decide what the next entry sends.
 - **agents:** images and PDFs reach the model. A message is made of content
   parts — its text plus the images and files sent with it, referenced by
   file-store id (`Message.parts`; the file store and Postgres carry them
@@ -63,6 +66,8 @@ fresh empty one, so nothing has to be moved by hand at release time.
   takes the target `LlmConfig` as a fifth argument, and a host's own
   mapper implementation has to add it. A user message that carries the
   open turn's id continues that turn instead of opening a new one.
+  `DELETE /api/sessions/{id}/files?file=` takes the file's name or its
+  ingested id, and no longer fails without a vector store.
 
 ## [0.4.0] - 2026-09-03
 

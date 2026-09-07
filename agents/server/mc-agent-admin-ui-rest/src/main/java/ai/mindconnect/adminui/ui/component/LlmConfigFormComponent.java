@@ -99,20 +99,25 @@ public final class LlmConfigFormComponent implements UiComponent {
 
     /**
      * The capability declaration — one option per {@link LlmCapability}, the
-     * config's current set preselected. Informative: the hint says so, so an
-     * admin does not expect ticking "Vision" to change what the runtime sends.
+     * config's effective set preselected: what it declares, or its provider's
+     * default when it declares nothing. Saving the form pins that set on the
+     * config; the hint says what Vision and Documents do, so an admin knows
+     * that unticking Vision turns images into placeholders.
      */
     private static UiField capabilitiesField(LlmConfig config) {
         List<UiField.Option> options = Arrays.stream(LlmCapability.values())
                 .map(c -> UiField.Option.of(c.name(), c.label()))
                 .toList();
         List<String> current = config == null ? List.of()
-                : config.capabilities().stream().map(Enum::name).toList();
+                : config.effectiveCapabilities().stream().map(Enum::name).toList();
+        String origin = config == null || config.declaresCapabilities() ? ""
+                : " Not declared yet — the preselection is the " + config.provider() + " default; "
+                        + "saving pins it.";
         return UiField.multiselect("capabilities", "Capabilities", current, options)
                 .asEditable()
-                .hint("What the model can take in and do — tool calling, images, documents, "
-                        + "audio. Informative: shown here and readable by callers, not "
-                        + "enforced by the runtime.");
+                .hint("What the model reads and does. Vision: images sent with a message reach "
+                        + "the model as pictures, otherwise as a placeholder line. Documents: the "
+                        + "same for PDFs. Tool calling and audio are declarative for now." + origin);
     }
 
     /**

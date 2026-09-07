@@ -1,12 +1,14 @@
 package ai.mindconnect.llm.domain;
 
 /**
- * What a chat model can take in and do, as declared on its {@link LlmConfig}.
- * The set is <em>informative</em>: the admin states it, the UI shows it, and a
- * caller that wants to know whether a model reads images asks the config
- * instead of guessing from the model id. Nothing in the runtime derives its
- * control flow from it yet — a config that leaves the set empty still runs
- * exactly as before.
+ * What a chat model can take in and do, as declared on its {@link LlmConfig}
+ * or, when the config declares nothing, taken from its provider's default
+ * ({@link LlmProvider#defaultCapabilities()}). {@link #VISION} and
+ * {@link #DOCUMENTS} steer the runtime: the message mapper sends an image or
+ * PDF to the model as content when the config has the capability, and as a
+ * placeholder line when it does not. {@link #TOOL_CALLING} and
+ * {@link #AUDIO_INPUT} are declarative for now — shown, readable through
+ * {@link LlmConfig#supports}, not yet acted on.
  *
  * <p>Only meaningful for {@link LlmConfigType#CHAT} configs; embedding models
  * have no input modalities to declare.

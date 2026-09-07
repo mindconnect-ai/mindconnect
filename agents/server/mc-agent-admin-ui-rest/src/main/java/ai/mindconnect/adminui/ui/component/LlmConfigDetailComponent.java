@@ -70,12 +70,18 @@ public final class LlmConfigDetailComponent implements UiComponent {
         return v == null || v.toString().isBlank() ? "—" : v.toString();
     }
 
-    /** The declared capabilities by label, or "—" when the config declares none. */
+    /**
+     * The effective capabilities by label — the declared ones, or the
+     * provider's default marked as such; "none" for a config that declared
+     * the empty set, "—" when nothing applies (an alias).
+     */
     private static String capabilitiesSummary(LlmConfig config) {
-        if (config.capabilities().isEmpty()) return "—";
-        return config.capabilities().stream()
+        var effective = config.effectiveCapabilities();
+        if (effective.isEmpty()) return config.declaresCapabilities() ? "none (declared)" : "—";
+        String labels = effective.stream()
                 .map(ai.mindconnect.llm.domain.LlmCapability::label)
                 .collect(java.util.stream.Collectors.joining(", "));
+        return config.declaresCapabilities() ? labels : labels + " (" + config.provider() + " default)";
     }
 
     /** Human-readable one-liner for the retry policy, or "Off" when none is set. */
