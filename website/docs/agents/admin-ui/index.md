@@ -114,6 +114,32 @@ The navigation has seven top-level entries:
 | **[Migrations](./migrations.md)** | Review and apply changes to the bundled seed data (agents, LLM configs, workflows). |
 | **API** | Embedded Swagger UI for the REST API under `/api/**`. |
 
+## The task manager
+
+The header carries a small badge that says what the task queue is doing right
+now — `3 running · 2 waiting`, or `idle`. It is live: the page attaches to a
+server-sent event stream (`/admin/api/tasks/sse`) once, and the stream stays
+attached while you navigate, so the count is current on every page without
+polling.
+
+A click on the badge opens the task queue, the admin UI's Task Manager:
+
+- **Running now** — the live tasks as a tree, the way the queue links them:
+  a chat turn, under it the tool calls it dispatched, and under a `run_agent`
+  call the sub-agent's turn. Every row shows the agent or tool, what it is
+  doing (session title, round), the status (`running`, `queued`, `suspended`
+  while a turn waits on its sub-tasks, `cancelling`), the user it belongs to
+  and how long it has been at it.
+- **Finished recently** — the last tasks that completed, failed or were
+  cancelled; a failed one opens to show the reason.
+- **Cancel** — the ban icon on a row. Cancel is cooperative (a running task
+  stops at its next checkpoint) and cascades: cancelling a turn takes its
+  tool calls and sub-agents with it. It is offered for **your own tasks
+  only** — the tasks whose session belongs to the signed-in user; other
+  users' tasks are visible but not cancellable.
+
+The dialog updates itself over the same stream while it is open.
+
 ## Related
 
 - [Environment variables](../environment-variables.md) — every variable you can
