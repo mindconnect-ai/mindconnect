@@ -79,13 +79,22 @@ class AttachmentNoticeTest {
         // The image travels as a part (or its placeholder) — the notice about
         // vector_search would only mislead. The metadata still records it, so
         // the bookkeeping and the chat's chip see it.
-        assertThat(AttachmentNotice.notice(List.of("photo.png"))).isEmpty();
-        assertThat(AttachmentNotice.notice(List.of("photo.png", "notes.md")))
-                .contains("notes.md (Markdown)").doesNotContain("photo.png");
-
         Message announcing = user("what is this?", attached("photo.png"));
         assertThat(AttachmentNotice.announcedBy(announcing)).containsExactly("photo.png");
         assertThat(AttachmentNotice.forModel(announcing, session("photo.png"))).isEqualTo("what is this?");
+
+        Message both = user("read both", attached("photo.png", "notes.md"));
+        assertThat(AttachmentNotice.forModel(both, session("photo.png", "notes.md")))
+                .contains("notes.md (Markdown)").doesNotContain("photo.png");
+
+        // The session's record decides, not the extension: an image uploaded
+        // under a name without one is still an image, a generic content type
+        // does not make a .png a document.
+        AgentSession odd = new AgentSession(UUID.randomUUID(), UUID.randomUUID(), Namespace.DEFAULT, "david",
+                UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
+                List.of(), List.of(new ai.mindconnect.agent.domain.AttachedFile("f-1", "scan", "image/jpeg", 1),
+                        new ai.mindconnect.agent.domain.AttachedFile("f-2", "photo.png", "application/octet-stream", 1)));
+        assertThat(AttachmentNotice.forModel(user("?", attached("scan", "photo.png")), odd)).isEqualTo("?");
     }
 
     @Test

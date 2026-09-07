@@ -96,12 +96,12 @@ public final class AttachmentNotice {
      * what was attached, what kind of file it is, and the one instruction
      * that matters: the content is reached through {@code vector_search},
      * never through a path. Marked as a system note so the model does not
-     * take it for something the user said. Images are not named here: an
-     * image is not indexed, it travels with the message as an image part
-     * (or as that part's placeholder), which speaks for itself.
+     * take it for something the user said. Callers leave images out (see
+     * {@link #forModel}): an image is not indexed, it travels with the
+     * message as an image part (or as that part's placeholder), which speaks
+     * for itself.
      */
-    public static String notice(List<String> attached) {
-        List<String> files = attached.stream().filter(f -> !"image".equals(kind(f))).toList();
+    public static String notice(List<String> files) {
         if (files.isEmpty()) return "";
         StringBuilder out = new StringBuilder("[System note — attached to this chat: ");
         for (int i = 0; i < files.size(); i++) {
@@ -129,13 +129,31 @@ public final class AttachmentNotice {
      */
     public static String forModel(Message message, AgentSession session) {
         Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFileNames());
-        List<String> attached = announcedBy(message).stream().filter(live::contains).toList();
+        // Images are announced in the metadata (the chat's chip shows them)
+        // but not in the notice — they are not indexed, the part speaks.
+        List<String> attached = announcedBy(message).stream()
+                .filter(live::contains)
+                .filter(name -> !isImage(session, name))
+                .toList();
         List<String> removed = detachedBy(message).stream().filter(f -> !live.contains(f)).toList();
         StringBuilder out = new StringBuilder();
         if (!removed.isEmpty()) out.append(removalNotice(removed)).append("\n\n");
         String attachNotice = notice(attached);
         if (!attachNotice.isEmpty()) out.append(attachNotice).append("\n\n");
         return out.append(message.content()).toString();
+    }
+
+    /**
+     * Is the attached file of that name an image — by the session's record,
+     * the one classification the attach flow and the prompt use; by the
+     * extension only for a name the session does not hold.
+     */
+    static boolean isImage(AgentSession session, String name) {
+        if (session != null) {
+            var file = session.attachedFile(name);
+            if (file.isPresent()) return file.get().isImage();
+        }
+        return "image".equals(kind(name));
     }
 
     /** A human word for the file type, from the extension — enough for the model to stop treating "x.pdf" as a path. */

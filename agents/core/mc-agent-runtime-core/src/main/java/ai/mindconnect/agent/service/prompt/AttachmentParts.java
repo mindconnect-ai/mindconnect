@@ -42,7 +42,7 @@ public final class AttachmentParts {
     /** The content part for an attached file the model may read inline. */
     public static ContentPart part(AttachedFile file) {
         return file.isImage()
-                ? new ContentPart.Image(file.id(), file.name(), file.mediaType(), file.sizeBytes())
-                : new ContentPart.File(file.id(), file.name(), file.mediaType(), file.sizeBytes());
+                ? new ContentPart.Image(file.id(), file.name(), file.effectiveMediaType(), file.sizeBytes())
+                : new ContentPart.File(file.id(), file.name(), file.effectiveMediaType(), file.sizeBytes());
     }
 }

@@ -28,6 +28,20 @@ class AttachedFileTest {
     }
 
     @Test
+    void aGenericContentTypeFallsBackToTheExtension() {
+        // curl and some drag-and-drop sources send application/octet-stream for anything
+        AttachedFile png = new AttachedFile("f", "photo.png", "application/octet-stream", 1);
+        assertThat(png.isImage()).isTrue();
+        assertThat(png.effectiveMediaType()).isEqualTo("image/png");
+        AttachedFile pdf = new AttachedFile("f", "spec.pdf", "", 1);
+        assertThat(pdf.isPdf()).isTrue();
+        assertThat(pdf.effectiveMediaType()).isEqualTo("application/pdf");
+        assertThat(AttachedFile.named("scan.jpeg").effectiveMediaType()).isEqualTo("image/jpeg");
+        assertThat(new AttachedFile("f", "notes.md", null, 1).effectiveMediaType()).isNull();
+        assertThat(new AttachedFile("f", "photo.bin", "image/webp", 1).effectiveMediaType()).isEqualTo("image/webp");
+    }
+
+    @Test
     void onlyAFileWithAnIdAndAReadableKindIsSendableAsAPart() {
         assertThat(new AttachedFile("f", "photo.png", "image/png", 1).sendableAsPart()).isTrue();
         assertThat(new AttachedFile("f", "spec.pdf", "application/pdf", 1).sendableAsPart()).isTrue();

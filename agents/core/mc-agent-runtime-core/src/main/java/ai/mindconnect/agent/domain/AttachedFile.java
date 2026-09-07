@@ -40,10 +40,14 @@ public record AttachedFile(
         return new AttachedFile(null, name, null, 0);
     }
 
-    /** Is this an image — by media type, or by extension when the upload recorded none? */
+    /**
+     * Is this an image — by media type, or by extension when the upload
+     * recorded none or only the generic {@code application/octet-stream}
+     * (what curl and some drag-and-drop sources send for anything)?
+     */
     @JsonIgnore
     public boolean isImage() {
-        if (mediaType != null) return mediaType.toLowerCase(Locale.ROOT).startsWith("image/");
+        if (hasSpecificMediaType()) return mediaType.toLowerCase(Locale.ROOT).startsWith("image/");
         String ext = extension();
         return ext.equals("png") || ext.equals("jpg") || ext.equals("jpeg")
                 || ext.equals("gif") || ext.equals("webp");
@@ -52,8 +56,31 @@ public record AttachedFile(
     /** Is this a PDF — the one document kind the vision-capable providers read inline? */
     @JsonIgnore
     public boolean isPdf() {
-        if (mediaType != null) return mediaType.equalsIgnoreCase("application/pdf");
+        if (hasSpecificMediaType()) return mediaType.equalsIgnoreCase("application/pdf");
         return extension().equals("pdf");
+    }
+
+    /**
+     * The media type to send the file with: the recorded one when it says
+     * something, else the one the extension implies ({@code null} when
+     * neither does). What a message part and the gateway carry.
+     */
+    @JsonIgnore
+    public String effectiveMediaType() {
+        if (hasSpecificMediaType()) return mediaType;
+        return switch (extension()) {
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "pdf" -> "application/pdf";
+            default -> mediaType;
+        };
+    }
+
+    private boolean hasSpecificMediaType() {
+        return mediaType != null && !mediaType.isBlank()
+                && !mediaType.equalsIgnoreCase("application/octet-stream");
     }
 
     /** Can this file travel as a message part at all — it has an id, and a kind a model may read. */
