@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.TraceRedaction;
 import ai.mindconnect.llm.domain.*;
 import ai.mindconnect.llm.port.in.LlmCallListener;
 import ai.mindconnect.llm.port.out.LlmGateway;
@@ -20,9 +21,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 
@@ -85,7 +88,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         String body;
         try {
             requestNode = buildRequestNode(config, request);
-            try { prettyRequestJson = prettyWriter.writeValueAsString(requestNode); } catch (Exception ignored) {}
+            try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
             logWireRequest(requestNode);
             body = objectMapper.writeValueAsString(requestNode);
         } catch (IOException e) {
@@ -386,7 +389,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
     private void logWireRequest(ObjectNode requestNode) {
         if (!wire.isDebugEnabled()) return;
         try {
-            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(requestNode));
+            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)));
         } catch (Exception e) {
             wire.debug("→ stream request: <serialise failed: {}>", e.getMessage());
         }
@@ -425,7 +428,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                     fn.put("arguments", objectMapper.writeValueAsString(tc.arguments()));
                 }
             } else if (msg.hasMedia()) {
-                renderContentBlocks(msgNode.putArray("content"), msg);
+                renderContentBlocks(msgNode.putArray("content"), msg, config);
             } else {
                 msgNode.put("content", msg.content() != null ? msg.content() : "");
             }
@@ -451,22 +454,38 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
     }
 
     /**
+     * The endpoints that take a {@code file} content block. It is OpenAI's
+     * own extension of Chat Completions — OpenRouter mirrors it, Azure serves
+     * OpenAI's models; every other compatible server (LM Studio, Ollama,
+     * Groq, Mistral, …) rejects the request with a 400 for an unknown type.
+     */
+    private static final Set<LlmProvider> FILE_BLOCK_PROVIDERS =
+            EnumSet.of(LlmProvider.OPENAI, LlmProvider.AZURE_OPENAI, LlmProvider.OPENROUTER);
+
+    /**
      * A user message with media as the Chat Completions content array: text
      * blocks as {@code text}, images as a data-URL {@code image_url}, documents
-     * as a {@code file} block with inline {@code file_data}. Text-only messages
-     * never come here — they stay the plain string every endpoint understands.
+     * as a {@code file} block with inline {@code file_data} — where the
+     * endpoint takes one; elsewhere a document becomes a text block that
+     * says what it is, so a config that declares {@code DOCUMENTS} on such a
+     * server still gets an answer instead of a 400. Text-only messages never
+     * come here — they stay the plain string every endpoint understands.
      */
-    private static void renderContentBlocks(ArrayNode content, LlmMessage msg) {
+    private static void renderContentBlocks(ArrayNode content, LlmMessage msg, LlmConfig config) {
+        boolean fileBlocks = config.provider() != null && FILE_BLOCK_PROVIDERS.contains(config.provider());
         for (LlmContent part : msg.parts()) {
             ObjectNode block = content.addObject();
             switch (part) {
                 case LlmContent.Text t -> block.put("type", "text").put("text", t.text());
                 case LlmContent.Image i -> block.put("type", "image_url")
                         .putObject("image_url").put("url", dataUrl(i.mediaType(), i.base64()));
-                case LlmContent.Document d -> block.put("type", "file")
+                case LlmContent.Document d when fileBlocks -> block.put("type", "file")
                         .putObject("file")
                         .put("filename", d.name())
                         .put("file_data", dataUrl(d.mediaType(), d.base64()));
+                case LlmContent.Document d -> block.put("type", "text").put("text",
+                        "[System note — document attached: " + d.name() + " (" + d.mediaType()
+                                + ") — this endpoint takes no file blocks, so its content is not here.]");
             }
         }
     }

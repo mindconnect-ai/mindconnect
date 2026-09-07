@@ -213,8 +213,11 @@ public final class AgentRuntimeBackend {
          * (Inline) and attached to the session via the {@link FileAttacher}:
          * ingested for retrieval, and — a PDF — sent with the message as a
          * document part by the chat facade, which announces every fresh
-         * attachment. An {@code Image} part is resolved or stored and goes
-         * with the message directly, as the image part a vision model reads.
+         * attachment. An {@code Image} part is resolved or stored, attached
+         * the same way — the session records it and {@code view_attachment}
+         * is activated, so the model can ask for it again in a later turn —
+         * and goes with the message directly, as the image part a vision
+         * model reads; the facade does not add it a second time.
          */
         private List<ai.mindconnect.message.domain.ContentPart> prepareInput(ResponseRequest request) {
             if (request.input().size() != 1
@@ -232,7 +235,7 @@ public final class AgentRuntimeBackend {
                         text.append(t.text());
                     }
                     case ContentPart.Document d -> attachDocument(sessionId, d);
-                    case ContentPart.Image i -> media.add(ProtocolParts.image(resolve(i.source(), "image")));
+                    case ContentPart.Image i -> media.add(ProtocolParts.image(attachImage(sessionId, i)));
                     default -> throw new RuntimeBackendException("Content part not supported by "
                             + "the runtime backend yet: " + part.getClass().getSimpleName());
                 }
@@ -249,6 +252,25 @@ public final class AgentRuntimeBackend {
 
         private void attachDocument(UUID sessionId, ContentPart.Document doc) {
             fileAttacher.attach(sessionId, resolve(doc.source(), doc.name()));
+        }
+
+        /** The stored image, attached to the session (recorded, viewer activated — never ingested). */
+        private ai.mindconnect.filestore.StoredFile attachImage(UUID sessionId, ContentPart.Image image) {
+            var stored = resolve(image.source(), inlineImageName(image.source()));
+            fileAttacher.attach(sessionId, stored);
+            return stored;
+        }
+
+        /**
+         * A name for an inline image — the session records attachments by
+         * name, so two pictures in one conversation must not share one.
+         */
+        private static String inlineImageName(ContentPart.MediaSource source) {
+            String extension = source instanceof ContentPart.MediaSource.Inline in
+                    && in.mediaType() != null && in.mediaType().startsWith("image/")
+                    ? "." + in.mediaType().substring("image/".length()).replace("jpeg", "jpg")
+                    : "";
+            return "image-" + UUID.randomUUID().toString().substring(0, 8) + extension;
         }
 
         /** The stored file behind a media source: looked up (FileId) or stored now (Inline). */

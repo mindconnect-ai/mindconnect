@@ -68,6 +68,23 @@ fresh empty one, so nothing has to be moved by hand at release time.
   open turn's id continues that turn instead of opening a new one.
   `DELETE /api/sessions/{id}/files?file=` takes the file's name or its
   ingested id, and no longer fails without a vector store.
+- **agents:** the request body an LLM call trace records (`LlmCallEvent.requestJson`,
+  the Admin UI's trace view) no longer carries inline media: an image's or
+  PDF's base64 payload is replaced by a note with its media type and length,
+  so the trace store does not grow by the size of every attachment on every
+  turn. The wire request is unchanged.
+- **agents:** the working-memory token budget counts media. An image is
+  taken as 1,600 tokens, a document as one token per 100 bytes (at least
+  1,000); before, a message's images and PDFs counted as nothing and a
+  window could exceed the model's context.
+- **agents:** a config that declares `DOCUMENTS` on a server without
+  OpenAI's `file` content block (LM Studio, Ollama, Groq, Mistral, …) gets
+  the document as a text note instead of a 400 from the endpoint; images
+  reach every OpenAI-compatible endpoint as before.
+- **agents:** an image sent through the protocol bridge
+  (`ContentPart.Image` on `AgentRuntimeBackend`) is recorded on the session
+  like an upload, so `view_attachment` is activated and the model can ask
+  for the picture again in a later turn.
 
 ## [0.4.1] - 2026-09-06
 

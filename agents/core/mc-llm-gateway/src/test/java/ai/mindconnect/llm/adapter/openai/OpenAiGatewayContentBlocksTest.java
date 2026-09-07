@@ -66,4 +66,26 @@ class OpenAiGatewayContentBlocksTest {
         assertThat(content.get(2).path("file").path("file_data").asText())
                 .isEqualTo("data:application/pdf;base64,UERG");
     }
+
+    @Test
+    void aServerWithoutFileBlocksGetsTheDocumentAsANote() throws Exception {
+        // LM Studio, Ollama, Groq, … answer an unknown content type with a 400.
+        LlmConfig local = new LlmConfig(java.util.UUID.randomUUID(), "local", LlmProvider.LM_STUDIO,
+                "some-vision-model", "http://localhost:1234", "lm-studio", 0.7, 4096, Map.of(), 128_000,
+                false, null, null, null, null, null);
+        LlmMessage user = LlmMessage.user(List.of(
+                new LlmContent.Text("summarise"),
+                new LlmContent.Image("QUJD", "image/png"),
+                new LlmContent.Document("UERG", "application/pdf", "spec.pdf")));
+
+        JsonNode content = gateway.buildRequestNode(local.resolved(encryption),
+                LlmRequest.streaming("local", List.of(user))).path("messages").path(0).path("content");
+
+        assertThat(content).hasSize(3);
+        assertThat(content.get(1).path("type").asText()).as("images are universal").isEqualTo("image_url");
+        assertThat(content.get(2).path("type").asText()).isEqualTo("text");
+        assertThat(content.get(2).path("text").asText())
+                .contains("document attached: spec.pdf (application/pdf)")
+                .contains("takes no file blocks");
+    }
 }

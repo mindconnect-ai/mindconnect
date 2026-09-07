@@ -24,9 +24,18 @@ The same caller code as the OpenAI example works here — upload via
 design: OpenAI stuffs the document into context; the runtime ingests it into
 the session's vector store (chunk + embed via the attach pipeline) and the
 agent retrieves with `vector_search` — visible as a normal tool-call item
-pair. Wiring is two small ports (`FileStore` + `FileAttacher`), supplied by
-the builder: `withFiles(runtime.fileStore(), runtime::attachStored)`.
+pair. A PDF additionally goes with the message as a document part when the
+agent's LLM config declares the `DOCUMENTS` capability. Wiring is two small
+ports (`FileStore` + `FileAttacher`), supplied by the builder:
+`withFiles(runtime.fileStore(), runtime::attachStored)`.
 Live example: `RuntimeFileQaExampleTest`.
+
+An `Image` part (`FileId` or `Inline`) is never ingested: it is recorded on
+the session and goes with the message as an image part, which a config with
+the `VISION` capability receives as the provider's image block and any other
+config as a placeholder line. The image is sent in its own turn only; in
+later turns the model asks for it again through the `view_attachment` tool,
+activated for the session on attach.
 
 ## Web search & code execution (parity examples)
 
@@ -60,7 +69,8 @@ web search, a running container binary for code execution).
 ## v1 limitations (each one is a concept-doc pointer)
 
 - `clientTools` rejected — the runtime has no per-request tools yet (K7).
-- `Document` sources: `FileId` and `Inline` work; `Url` not yet.
+- `Document` and `Image` sources: `FileId` and `Inline` work; `Url` not yet.
+  `Audio` parts are rejected.
 - No `INCOMPLETE`/approvals — needs the item-native turn state (K5/K7).
 - Sub-agent turns are not addressable child responses; `AgentCall.childResponseId`
   carries the sub-session id, child streams are folded into the parent (K8).

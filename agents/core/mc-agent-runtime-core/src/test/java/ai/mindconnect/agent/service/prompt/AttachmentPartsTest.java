@@ -47,6 +47,20 @@ class AttachmentPartsTest {
     }
 
     @Test
+    void aFileTheCallerAlreadySendsIsNotAddedAgain() {
+        // The REST body and the protocol bridge reference the upload by id.
+        List<ContentPart> parts = AttachmentParts.withAttachments(
+                List.of(new ContentPart.Text("look"),
+                        new ContentPart.Image("f-1", "photo.png", "image/png", 240)),
+                session(PHOTO, SPEC), List.of("photo.png", "spec.pdf"));
+
+        assertThat(parts).containsExactly(
+                new ContentPart.Text("look"),
+                new ContentPart.Image("f-1", "photo.png", "image/png", 240),
+                new ContentPart.File("f-2", "spec.pdf", "application/pdf", 1024));
+    }
+
+    @Test
     void nothingFreshOrNoSessionLeavesThePartsAlone() {
         List<ContentPart> text = ContentPart.text("look");
         assertThat(AttachmentParts.withAttachments(text, session(PHOTO), List.of())).isSameAs(text);

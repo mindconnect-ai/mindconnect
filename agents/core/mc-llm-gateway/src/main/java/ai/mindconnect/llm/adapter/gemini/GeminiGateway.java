@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.gemini;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.TraceRedaction;
 import ai.mindconnect.llm.domain.*;
 import ai.mindconnect.llm.port.in.LlmCallListener;
 import ai.mindconnect.llm.port.out.LlmGateway;
@@ -85,7 +86,7 @@ public class GeminiGateway implements LlmGateway {
         String body;
         try {
             ObjectNode requestNode = buildRequestNode(config, request);
-            try { prettyRequestJson = prettyWriter.writeValueAsString(requestNode); } catch (Exception ignored) {}
+            try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
             logWireRequest(requestNode);
             body = objectMapper.writeValueAsString(requestNode);
         } catch (IOException e) {
@@ -323,7 +324,7 @@ public class GeminiGateway implements LlmGateway {
     private void logWireRequest(ObjectNode requestNode) {
         if (!wire.isDebugEnabled()) return;
         try {
-            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(requestNode));
+            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)));
         } catch (Exception e) {
             wire.debug("→ stream request: <serialise failed: {}>", e.getMessage());
         }

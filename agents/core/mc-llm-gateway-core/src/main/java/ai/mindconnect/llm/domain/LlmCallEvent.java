@@ -37,7 +37,12 @@ public record LlmCallEvent(
         int completionTokens,
         /** Provider-reported finish reason ({@code stop}, {@code tool_calls}, …) or {@code null}. */
         String finishReason,
-        /** Verbatim request body the adapter sent. Provider-specific JSON. */
+        /**
+         * The request body the adapter sent, provider-specific JSON — with
+         * one edit: an inline media payload (an image or PDF as base64) is
+         * replaced by a note naming its media type and length, so a trace
+         * does not grow by the size of every attachment.
+         */
         String requestJson,
         /**
          * Verbatim SSE event blocks the provider streamed back, in arrival

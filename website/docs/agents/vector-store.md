@@ -132,7 +132,16 @@ message, so a model that reads it sees the picture with the question:
   reads travels inline, as the provider's content block; otherwise a
   placeholder line stands in for it — what the file is, and why it is not
   here. A PDF a model does not read still reaches it through
-  `vector_search`, the placeholder says so.
+  `vector_search`, the placeholder says so. One caveat on OpenAI-compatible
+  servers: the `file` content block is OpenAI's own (OpenRouter and Azure
+  take it too); on LM Studio, Ollama, Groq, Mistral and the like a config
+  that declares `DOCUMENTS` gets the document as a text note, images as
+  usual.
+- The working-memory budget counts media at an estimate — 1,600 tokens per
+  image, one token per 100 bytes of a document, at least 1,000 — since
+  there is no text to count. The LLM call trace records the request with
+  the base64 payloads replaced by a note (media type and length), so the
+  trace store does not grow by the size of every attachment.
 - Media goes with the message **in the current turn only**. A request
   repeats the whole history, and an image repeated in every request costs
   its tokens every time. From the next turn on the placeholder names the
