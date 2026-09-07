@@ -541,6 +541,14 @@
     line-height: 0;
 }
 
+/* An attachment the assistant asked to see again: one muted line, no
+   surface — the picture is already in the bubble it came with. */
+.reshown-message {
+    color: var(--sui-color-text-muted, var(--sui-color-text-body));
+    font-size: .85em;
+    padding: .15rem 0;
+}
+
 /* The error variant is the one bot message that still needs a surface. */
 .bot-message.error-message {
     background: var(--sui-color-danger-bg);

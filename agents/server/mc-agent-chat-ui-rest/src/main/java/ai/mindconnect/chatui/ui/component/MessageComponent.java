@@ -91,8 +91,10 @@ public final class MessageComponent {
     }
 
     private UiList.Item chatItem(Message m, boolean isUser) {
-        boolean inserted = ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.insertedBy(m);
-        String speaker = inserted ? "Attachment shown again" : isUser ? "You" : agent.name();
+        if (ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.insertedBy(m)) {
+            return reshownItem(m);
+        }
+        String speaker = isUser ? "You" : agent.name();
         String time    = timeFormat.format(m.sentAt());
         String label   = speaker + "  [" + time + "]" + messageTokenSuffix(m);
         String css     = isUser ? "user-message" : "bot-message";
@@ -104,9 +106,8 @@ public final class MessageComponent {
         // Regenerate (USER messages only): delete this message + everything
         // after it, then re-run the turn (streaming) with the same text. Uses
         // the STREAM behaviour so the live tokens/task-cards flow exactly like
-        // a normal send. Not for a message the runtime inserted mid-turn —
-        // there is no question to ask again.
-        if (isUser && !inserted) {
+        // a normal send.
+        if (isUser) {
             item.action(UiAction.icon("regen-" + m.id(), "🔄")
                     .confirm("Delete the response(s) after this message and generate a new one?")
                     // Plain dispatch — the regenerated turn streams on the
@@ -124,6 +125,21 @@ public final class MessageComponent {
                         .deleteMessages(sessionId, seq, Integer.MAX_VALUE, null))));
         return item;
     }
+    /**
+     * A message the runtime inserted on the user's behalf — an attachment
+     * shown to the assistant again at its request — is not the user's, and
+     * the picture is already in the bubble it came with: one muted line
+     * naming the file, no thumbnail, no actions.
+     */
+    private UiList.Item reshownItem(Message m) {
+        Object name = m.metadata() == null ? null
+                : m.metadata().get(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.ATTACHMENT);
+        String line = "🔁 *" + markdownSafe(name == null ? "attachment" : name.toString())
+                + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
+        return UiList.Item.of(m.id().toString(), "")
+                .content(UiMarkdown.of("msg-" + m.id(), line).withCssClass("reshown-message"));
+    }
+
     /** " · 42 tok" for a single message; empty when not counted. */
     private String messageTokenSuffix(Message m) {
         Integer t = m.tokenCount();

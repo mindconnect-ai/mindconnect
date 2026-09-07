@@ -37,6 +37,22 @@ class MessageComponentMediaTest {
     }
 
     @Test
+    void anAttachmentShownAgainIsOneMutedLineWithoutThumbnailOrActions() throws Exception {
+        Message m = Message.of(UUID.randomUUID(), UUID.randomUUID(), ParticipantType.USER, MessageType.CHAT,
+                List.of(new ContentPart.Text("[photo.png — image shown again at the assistant's request]"),
+                        new ContentPart.Image("f-1", "photo.png", "image/png", 3)), 2)
+                .withMetadata(java.util.Map.of(
+                        ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.INSERTED_BY,
+                        ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME,
+                        ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.ATTACHMENT, "photo.png"));
+
+        String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(component(m).item());
+
+        assertThat(json).contains("shown to the assistant again").contains("reshown-message");
+        assertThat(json).doesNotContain("chat-files/f-1/content").doesNotContain("regen-").doesNotContain("delete-");
+    }
+
+    @Test
     void aTextMessageIsItsTextAlone() {
         Message m = Message.of(UUID.randomUUID(), UUID.randomUUID(), ParticipantType.USER, MessageType.CHAT,
                 "hello", 1);
