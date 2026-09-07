@@ -1,5 +1,10 @@
 server:
   port: 9090
+  tomcat:
+    # How much of a rejected upload Tomcat still reads before answering.
+    # Below the request limit the browser sees the "upload too large" toast;
+    # a bigger body has its connection closed and shows as a network error.
+    max-swallow-size: ${MC_UPLOAD_MAX_REQUEST_SIZE:100MB}
 
 logging:
   pattern:

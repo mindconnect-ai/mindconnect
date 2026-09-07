@@ -23,6 +23,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **agents:** the Admin UI and the agent server take uploads of 25 MB per
+  file and 100 MB per request (`MC_UPLOAD_MAX_FILE_SIZE`,
+  `MC_UPLOAD_MAX_REQUEST_SIZE`). Before, Spring's defaults applied — 1 MB
+  per file, 10 MB per request — and a phone photo, or a few files attached
+  at once, was answered with HTTP 413. An upload above the limits now says
+  so: the chat and the vector-store upload show a toast naming both limits
+  in place of the client's "The request failed (HTTP 413)", the REST API
+  answers 413 with a JSON body (`error`, `maxFileSize`, `maxRequestSize`).
+- **agents:** a `.jpg` uploaded from Windows reaches the model. The browser
+  there reports the file as `image/jpg` or `image/pjpeg`, which Anthropic and
+  OpenAI reject; the media type is folded onto `image/jpeg` (likewise
+  `image/x-png`, `application/x-pdf`, and a trailing charset parameter)
+  before it goes into a message part or a content block.
+
 ## [0.5.0] - 2026-09-07
 
 ### Added
@@ -83,16 +99,6 @@ fresh empty one, so nothing has to be moved by hand at release time.
   OpenAI's `file` content block (LM Studio, Ollama, Groq, Mistral, …) gets
   the document as a text note instead of a 400 from the endpoint; images
   reach every OpenAI-compatible endpoint as before.
-- **agents:** the Admin UI and the agent server take uploads of 25 MB per
-  file and 100 MB per request (`MC_UPLOAD_MAX_FILE_SIZE`,
-  `MC_UPLOAD_MAX_REQUEST_SIZE`). Before, Spring's defaults applied — 1 MB
-  per file, 10 MB per request — and a phone photo, or a few files attached
-  at once, was answered with HTTP 413.
-- **agents:** a `.jpg` uploaded from Windows reaches the model. The browser
-  there reports the file as `image/jpg` or `image/pjpeg`, which Anthropic and
-  OpenAI reject; the media type is folded onto `image/jpeg` (likewise
-  `image/x-png`, `application/x-pdf`, and a trailing charset parameter)
-  before it goes into a message part or a content block.
 - **agents:** an image sent through the protocol bridge
   (`ContentPart.Image` on `AgentRuntimeBackend`) is recorded on the session
   like an upload, so `view_attachment` is activated and the model can ask

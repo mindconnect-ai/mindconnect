@@ -12,6 +12,11 @@ spring:
 
 server:
   port: 8080
+  tomcat:
+    # How much of a rejected upload Tomcat still reads before answering.
+    # Below the request limit the client gets the 413 with its body; a
+    # bigger body has its connection closed.
+    max-swallow-size: ${MC_UPLOAD_MAX_REQUEST_SIZE:100MB}
 
 mindconnect:
   # Where everything is stored: "file" under data.base-dir (default), or
