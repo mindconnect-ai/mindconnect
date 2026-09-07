@@ -3,6 +3,7 @@ package ai.mindconnect.agent.service;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.domain.MediaTypes;
 import ai.mindconnect.agent.port.out.PartContentReader;
 import ai.mindconnect.agent.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.service.ContextTokenBudget;
@@ -212,7 +213,8 @@ public class MessageToLlmMessageMapper implements ai.mindconnect.agent.port.out.
             return null;
         }
         String base64 = Base64.getEncoder().encodeToString(content.bytes());
-        String mediaType = part.mediaType() != null ? part.mediaType() : content.mediaType();
+        String mediaType = MediaTypes.normalize(
+                part.mediaType() != null ? part.mediaType() : content.mediaType());
         return part instanceof ContentPart.Image
                 ? new LlmContent.Image(base64, mediaType)
                 : new LlmContent.Document(base64, mediaType, part.name());

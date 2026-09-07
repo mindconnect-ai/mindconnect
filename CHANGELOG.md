@@ -83,6 +83,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   OpenAI's `file` content block (LM Studio, Ollama, Groq, Mistral, …) gets
   the document as a text note instead of a 400 from the endpoint; images
   reach every OpenAI-compatible endpoint as before.
+- **agents:** a `.jpg` uploaded from Windows reaches the model. The browser
+  there reports the file as `image/jpg` or `image/pjpeg`, which Anthropic and
+  OpenAI reject; the media type is folded onto `image/jpeg` (likewise
+  `image/x-png`, `application/x-pdf`, and a trailing charset parameter)
+  before it goes into a message part or a content block.
 - **agents:** an image sent through the protocol bridge
   (`ContentPart.Image` on `AgentRuntimeBackend`) is recorded on the session
   like an upload, so `view_attachment` is activated and the model can ask

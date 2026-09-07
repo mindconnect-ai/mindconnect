@@ -67,7 +67,7 @@ public record AttachedFile(
      */
     @JsonIgnore
     public String effectiveMediaType() {
-        if (hasSpecificMediaType()) return mediaType;
+        if (hasSpecificMediaType()) return MediaTypes.normalize(mediaType);
         return switch (extension()) {
             case "png" -> "image/png";
             case "jpg", "jpeg" -> "image/jpeg";
