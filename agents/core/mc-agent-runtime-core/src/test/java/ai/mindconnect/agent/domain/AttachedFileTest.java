@@ -42,6 +42,15 @@ class AttachedFileTest {
     }
 
     @Test
+    void aWindowsJpgUploadIsSentAsImageJpeg() {
+        // Windows reports .jpg as image/jpg or image/pjpeg; the providers take image/jpeg only.
+        AttachedFile jpg = new AttachedFile("f", "IMG_0001.jpg", "image/jpg", 1);
+        assertThat(jpg.isImage()).isTrue();
+        assertThat(jpg.effectiveMediaType()).isEqualTo("image/jpeg");
+        assertThat(new AttachedFile("f", "scan.jpg", "image/pjpeg", 1).effectiveMediaType()).isEqualTo("image/jpeg");
+    }
+
+    @Test
     void onlyAFileWithAnIdAndAReadableKindIsSendableAsAPart() {
         assertThat(new AttachedFile("f", "photo.png", "image/png", 1).sendableAsPart()).isTrue();
         assertThat(new AttachedFile("f", "spec.pdf", "application/pdf", 1).sendableAsPart()).isTrue();

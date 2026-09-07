@@ -1,5 +1,10 @@
 server:
   port: 9090
+  tomcat:
+    # How much of a rejected upload Tomcat still reads before answering.
+    # Below the request limit the browser sees the "upload too large" toast;
+    # a bigger body has its connection closed and shows as a network error.
+    max-swallow-size: ${MC_UPLOAD_MAX_REQUEST_SIZE:100MB}
 
 logging:
   pattern:
@@ -53,6 +58,13 @@ spring:
   web:
     resources:
       static-locations: classpath:/static/
+  servlet:
+    multipart:
+      # Chat and vector-store uploads. Spring's defaults (1MB per file, 10MB
+      # per request) answer a phone photo, or three of them, with HTTP 413.
+      # The runtime sends a file inline to the model up to 20MB.
+      max-file-size: ${MC_UPLOAD_MAX_FILE_SIZE:25MB}
+      max-request-size: ${MC_UPLOAD_MAX_REQUEST_SIZE:100MB}
 
 springdoc:
   # The admin shell's API section embeds this Swagger UI. Scope it to the

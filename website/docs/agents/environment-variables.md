@@ -25,6 +25,7 @@ export TAVILY_API_KEY=tvly-...
 | `MC_PERSISTENCE` | `file` | `file` keeps everything under `mindconnect.data.base-dir`; `postgres` keeps it in the database — see [Persistence](./persistence.md#postgres). Since 0.3.0. |
 | `MC_POSTGRES_URL` | `jdbc:postgresql://localhost:5432/mindconnect` | JDBC URL, used with `MC_PERSISTENCE=postgres`. Tables are created on start. |
 | `MC_POSTGRES_USER` / `MC_POSTGRES_PASSWORD` | _(empty)_ | Database credentials. |
+| `MC_UPLOAD_MAX_FILE_SIZE` / `MC_UPLOAD_MAX_REQUEST_SIZE` | `25MB` / `100MB` | Upload limits — one file, and all files of one upload request (the chat's attach dialog sends every selected file in one request). Bound to `spring.servlet.multipart.max-file-size` / `max-request-size`; an upload above either is answered with HTTP 413. The runtime sends a file inline to the model up to 20MB. |
 
 ## Runtime configuration (Spring properties)
 
