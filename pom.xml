@@ -18,9 +18,9 @@
              is free, so it carries the branch suffix: -Dsha1=-feature-x. On a branch,
              ./after-branch-creation.sh writes all three into the git-ignored
              .mvn/maven.config (IntelliJ needs all or none - see the script). -->
-        <revision>0.4.2</revision>
+        <revision>0.5.0</revision>
         <sha1></sha1>
-        <changelist>-SNAPSHOT</changelist>
+        <changelist></changelist>
         <!-- The root aggregator itself is never published. -->
         <maven.deploy.skip>true</maven.deploy.skip>
     </properties>
