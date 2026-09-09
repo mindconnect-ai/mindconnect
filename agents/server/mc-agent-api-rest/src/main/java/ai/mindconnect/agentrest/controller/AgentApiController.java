@@ -16,6 +16,7 @@ import ai.mindconnect.agentrest.dto.CreateAgentRequest;
 import ai.mindconnect.agentrest.dto.StartSessionRequest;
 import ai.mindconnect.agentrest.dto.AttachedFrame;
 import ai.mindconnect.agentrest.dto.SessionStreamFrame;
+import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agentrest.dto.StreamEventFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
 import ai.mindconnect.common.Namespace;
@@ -49,17 +50,20 @@ public class AgentApiController {
     private final AgentSessionService sessionService;
     private final AgentChatService chatService;
     private final ai.mindconnect.filestore.FileStore fileStore;
+    private final ai.mindconnect.agent.service.stream.UserChannels userChannels;
     private final ObjectMapper compactMapper;
 
     public AgentApiController(AgentRegistryService registryService,
                             AgentSessionService sessionService,
                             AgentChatService chatService,
                             ai.mindconnect.filestore.FileStore fileStore,
+                            ai.mindconnect.agent.service.stream.UserChannels userChannels,
                             ObjectMapper objectMapper) {
         this.registryService = registryService;
         this.sessionService = sessionService;
         this.chatService = chatService;
         this.fileStore = fileStore;
+        this.userChannels = userChannels;
         this.compactMapper = objectMapper.copy().disable(
                 com.fasterxml.jackson.databind.SerializationFeature.INDENT_OUTPUT);
     }
@@ -288,6 +292,52 @@ public class AgentApiController {
             }
         });
 
+        return emitter;
+    }
+
+    @Operation(tags = "Sessions", summary = "Attach to a user's event stream",
+            description = "The coarse feed across all of a user's sessions: session_started, "
+                    + "session_titled, turn_started, turn_finished, approval_requested and "
+                    + "approval_answered — what a session list or a notification needs, "
+                    + "without attaching to any session. Same reconnect story as the session "
+                    + "stream: the first frame is {type:'attached'} with the buffer bounds, "
+                    + "then every buffered event after afterSeq replays and the stream "
+                    + "continues live; each frame carries seq, the cursor for the next "
+                    + "reconnect. The tokens of a turn are not here — attach to the session's "
+                    + "own stream for those.")
+    @GetMapping(value = "/users/{userId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter userStream(@PathVariable String userId,
+                                 @RequestParam(defaultValue = "0") long afterSeq) {
+        log.info("GET /api/users/{}/stream afterSeq={}", userId, afterSeq);
+        SseEmitter emitter = new SseEmitter(120_000L);
+
+        var attachedSent = new java.util.concurrent.CountDownLatch(1);
+        ai.mindconnect.channel.Subscription subscription = userChannels.subscribe(userId, afterSeq, event -> {
+            try {
+                attachedSent.await();
+                emitter.send(SseEmitter.event().data(
+                        compactMapper.writeValueAsString(
+                                UserEventFrame.of(event.seq(), event.value())),
+                        MediaType.APPLICATION_JSON));
+            } catch (Exception e) {
+                emitter.completeWithError(e);
+            }
+        });
+        try {
+            emitter.send(SseEmitter.event().data(
+                    compactMapper.writeValueAsString(UserEventFrame.Attached.of(
+                            userChannels.earliestBufferedSeq(userId), userChannels.lastSeq(userId))),
+                    MediaType.APPLICATION_JSON));
+        } catch (Exception e) {
+            subscription.close();
+            emitter.completeWithError(e);
+            return emitter;
+        } finally {
+            attachedSent.countDown();
+        }
+        emitter.onCompletion(subscription::close);
+        emitter.onTimeout(subscription::close);
+        emitter.onError(error -> subscription.close());
         return emitter;
     }
 

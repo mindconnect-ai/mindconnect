@@ -35,14 +35,13 @@ import java.util.Map;
  */
 public final class TaskMonitorComponent {
 
-    /** The badge's DOM id — equal to the stream channel id, see {@link TaskMonitor#CHANNEL_ID}. */
+    /** The badge's DOM id — the live patch's target, see {@link TaskMonitor#CHANNEL_ID}. */
     public static final String BADGE_ID = TaskMonitor.CHANNEL_ID;
     public static final String DIALOG_ID = "task-monitor-dialog";
     public static final String BODY_ID = "task-monitor-body";
 
     public static final String OPEN_URL = "/admin/api/tasks";
     public static final String CLOSE_URL = "/admin/api/tasks/close";
-    public static final String STREAM_URL = "/admin/api/tasks/sse";
 
     private TaskMonitorComponent() { }
 
@@ -50,9 +49,8 @@ public final class TaskMonitorComponent {
 
     /**
      * The header badge: an activity icon and "3 running" (or "idle"). The
-     * outer stack carries the stream channel id, which is what keeps the
-     * stream attached across navigation, and a class that says whether
-     * anything is going on so the stylesheet can light it up.
+     * outer stack carries the id the live patch replaces, and a class that
+     * says whether anything is going on so the stylesheet can light it up.
      *
      * <p>The count is deliberately a sibling of the button, not its label.
      * The button keeps focus after the click that opens the dialog, and the
@@ -96,7 +94,7 @@ public final class TaskMonitorComponent {
         return body;
     }
 
-    /** One stream frame: badge on every page, dialog body when it is open. */
+    /** One {@code patch} frame of the user stream: badge on every page, dialog body when it is open. */
     public static UiPatch livePatch(Snapshot snapshot, String userId) {
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace(BADGE_ID, badge(snapshot)))

@@ -25,6 +25,34 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** the user stream. `GET /api/users/{userId}/stream` is the coarse
+  feed across all of a user's sessions — `session_started`,
+  `session_titled`, `turn_started`, `turn_finished`, `approval_requested`
+  and `approval_answered` — for a session list, a badge or a notification,
+  without attaching to any session. Same reconnect story as the session
+  stream: an `attached` frame first, then replay after `afterSeq`, then
+  live. In the admin UI the header's task badge now rides on this stream
+  (`/admin/api/stream`) instead of one of its own, and the chat's history
+  shows which conversations are `running` or `need input` — in every tab,
+  whichever one sent the message.
+
+### Fixed
+
+- **agents:** the admin UI could stop responding once a browser profile held
+  six server-sent event streams to the server — every request stalled in
+  the browser, which looked like a server hang. Two things fed it: the
+  session and task streams did not commit their response until the first
+  event (on a quiet session, the next heartbeat), so for up to 25 s the SPA
+  did not know it held a connection and a second page render opened a
+  second one; and the task badge held a stream per tab beside the chat's.
+  A stream is now committed the moment it attaches, and the badge shares
+  the user stream. The client-side part — a stream is closed when its page
+  is left, a reconnect registers before its request rather than after — is
+  semantic-ui 0.3.1, which this release depends on. The tabs also watch the
+  budget themselves: each one counts the streams it holds, they tell each
+  other, and a notice appears in every tab once the browser is within one
+  connection of that limit, naming the count and the number of tabs.
+
 - **agents:** the Responses API takes images and files. A user message's
   `content` may carry `input_image` (`image_url` as an http(s) or `data:`
   URL, or `file_id`) and `input_file` (`file_data` with `filename`,

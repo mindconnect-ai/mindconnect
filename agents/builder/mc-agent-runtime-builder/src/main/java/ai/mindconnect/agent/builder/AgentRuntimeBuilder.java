@@ -428,9 +428,11 @@ public final class AgentRuntimeBuilder {
                 : sql != null ? new ai.mindconnect.agent.adapter.pg.PgLlmCallTraceRepository(sql).initSchema()
                 : new ai.mindconnect.agent.adapter.file.FileLlmCallTraceRepository(dataDir);
         var approvalStore = new ai.mindconnect.agent.service.approval.ToolApprovalStore();
+        var userChannels = new ai.mindconnect.agent.service.stream.UserChannels();
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
-                workingMemoryRepository, summaryRepository, todoListRepository, approvalStore);
+                workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
+                userChannels);
         var sessionChannels = new ai.mindconnect.agent.service.stream.SessionChannels();
         var turnWorker = new ai.mindconnect.agent.service.task.AgentTurnWorker(
                 conversationManager, definitionRepository, sessionService,
@@ -440,7 +442,7 @@ public final class AgentRuntimeBuilder {
         var toolWorker = new ai.mindconnect.agent.service.task.ToolCallWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, toolRegistry, activations, toolExecutor, sessionChannels,
-                approvalStore);
+                approvalStore, userChannels);
         var taskQueue = new ai.mindconnect.taskqueue.local.LocalTaskQueue(
                 new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
         toolWorker.attach(taskQueue);
@@ -448,7 +450,7 @@ public final class AgentRuntimeBuilder {
         taskQueue.register(ai.mindconnect.agent.service.task.ToolCallWorker.TYPE, toolWorker);
         AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
                 conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                statelessRunner, sessionChannels, taskQueue, approvalStore, turnExecutor);
+                statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor);
 
         // 7. Seed configs, agents, workflows.
         for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);

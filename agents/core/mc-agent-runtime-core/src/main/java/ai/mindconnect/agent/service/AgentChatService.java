@@ -19,6 +19,7 @@ import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.service.approval.ToolApproval;
 import ai.mindconnect.agent.service.approval.ToolApprovalStore;
 import ai.mindconnect.agent.service.stream.SessionChannels;
+import ai.mindconnect.agent.service.stream.UserEvent;
 import ai.mindconnect.agent.service.stream.SessionEvent;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.Subscription;
@@ -76,6 +77,7 @@ public class AgentChatService {
     private final PromptRenderer promptRenderer;
     private final AgentTaskRunner agentTaskRunner;
     private final SessionChannels sessionChannels;
+    private final ai.mindconnect.agent.service.stream.UserChannels userChannels;
     private final TaskQueue queue;
     private final ToolApprovalStore approvalStore;
     private final ExecutorService turnExecutor;
@@ -88,6 +90,7 @@ public class AgentChatService {
                             PromptRenderer promptRenderer,
                             AgentTaskRunner agentTaskRunner,
                             SessionChannels sessionChannels,
+                            ai.mindconnect.agent.service.stream.UserChannels userChannels,
                             TaskQueue queue,
                             ToolApprovalStore approvalStore,
                             ExecutorService turnExecutor) {
@@ -99,6 +102,7 @@ public class AgentChatService {
         this.promptRenderer = promptRenderer;
         this.agentTaskRunner = agentTaskRunner;
         this.sessionChannels = sessionChannels;
+        this.userChannels = userChannels;
         this.queue = queue;
         this.approvalStore = approvalStore;
         this.turnExecutor = turnExecutor;
@@ -166,7 +170,7 @@ public class AgentChatService {
 
         // 2.+3. Listen on the turn's channel, make the turn a task — the queue
         //        is the only registry of running work, nothing is tracked here.
-        return startTurn(sessionId, turnId, 0, eventHandler, response -> {
+        return startTurn(session, turnId, 0, eventHandler, response -> {
             generateTitleIfNeeded(session, isFirstMessage, userMessage, response);
             return response;
         });
@@ -177,17 +181,48 @@ public class AgentChatService {
      * channel, submit the {@code agent.turn} task, wrap the queue's await in
      * the handle's future. Channel cleanup is graceful — the queued tail
      * (Done included) is delivered before detaching.
+     *
+     * <p>The user's stream hears the turn begin and end here — the one place
+     * every top-level turn passes through, whichever client submitted it.
      */
-    private ChatTurnHandle startTurn(UUID sessionId, UUID turnId, int run,
+    private ChatTurnHandle startTurn(AgentSession session, UUID turnId, int run,
                                      Consumer<StreamEvent> eventHandler,
                                      java.util.function.UnaryOperator<String> afterCompletion) {
+        UUID sessionId = session.id();
         var subscription = sessionChannels.subscribeTurn(sessionId, turnId, eventHandler);
         String taskId = queue.submit(AgentTurnWorker.submission(turnId, run, sessionId, 0, null));
+        userChannels.publish(session.userId(), new UserEvent.TurnStarted(sessionId, turnId));
         CompletableFuture<String> future = CompletableFuture
                 .supplyAsync(() -> awaitResult(taskId), turnExecutor)
-                .whenComplete((response, error) -> subscription.close())
+                .whenComplete((response, error) -> {
+                    subscription.close();
+                    userChannels.publish(session.userId(),
+                            new UserEvent.TurnFinished(sessionId, turnId, outcomeOf(error)));
+                })
                 .thenApply(afterCompletion);
         return new LocalChatTurnHandle(turnId, sessionId, future, () -> cancelChat(sessionId));
+    }
+
+    /** How the turn ended, read off the await's failure — or its absence. */
+    private static UserEvent.TurnOutcome outcomeOf(Throwable error) {
+        if (error == null) return UserEvent.TurnOutcome.COMPLETED;
+        Throwable cause = error instanceof java.util.concurrent.CompletionException && error.getCause() != null
+                ? error.getCause() : error;
+        return cause instanceof CancellationException
+                ? UserEvent.TurnOutcome.CANCELLED : UserEvent.TurnOutcome.FAILED;
+    }
+
+    /**
+     * Announces {@code event} on the stream of the user who owns
+     * {@code sessionId}. Best-effort: a session that cannot be read is not
+     * announced, and the operation that raised the event is not affected.
+     */
+    private void announce(UUID sessionId, UserEvent event) {
+        try {
+            userChannels.publish(sessionService.findSession(sessionId).userId(), event);
+        } catch (RuntimeException e) {
+            log.debug("User event {} for session {} not announced: {}", event, sessionId, e.toString());
+        }
     }
 
     /**
@@ -251,6 +286,7 @@ public class AgentChatService {
         }
         log.info("Approval answer for call {} ({}, scope {}) delivered to task {}",
                 callId, approved ? "granted" : "denied", scope, open.toolTaskId());
+        announce(rootSessionId, new UserEvent.ApprovalAnswered(rootSessionId, callId, approved));
         return true;
     }
 
@@ -389,6 +425,7 @@ public class AgentChatService {
             title = userMessage;
         }
         sessionService.updateTitle(session.id(), title);
+        userChannels.publish(session.userId(), new UserEvent.SessionTitled(session.id(), title));
     }
 
     // ── Memory ─────────────────────────────────────────────────────────────

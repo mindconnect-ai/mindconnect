@@ -39,6 +39,8 @@ public final class ChatShellComponent implements UiComponent {
     private final String agentName;
     private final UiNode content;
     private final java.util.Map<UUID, String> agentIcons;
+    private java.util.Set<UUID> running = java.util.Set.of();
+    private java.util.Set<UUID> waiting = java.util.Set.of();
 
     public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
                               String agentName, UiNode content) {
@@ -61,6 +63,24 @@ public final class ChatShellComponent implements UiComponent {
         this.content = content;
         this.agentIcons = agentIcons == null ? java.util.Map.of() : agentIcons;
     }
+
+    /**
+     * Which conversations are busy right now, so their rows say so instead
+     * of showing their age: {@code running} has a turn in flight,
+     * {@code waiting} has a tool stopped at the approval gate. The server
+     * renders the current state; the user stream keeps it current after
+     * that (see chat-ui.js).
+     */
+    public ChatShellComponent withActivity(java.util.Set<UUID> running, java.util.Set<UUID> waiting) {
+        this.running = running == null ? java.util.Set.of() : running;
+        this.waiting = waiting == null ? java.util.Set.of() : waiting;
+        return this;
+    }
+
+    /** The row badge of a chat that waits for an answer — the words chat-ui.js keys off. */
+    public static final String BADGE_NEEDS_INPUT = "needs input";
+    /** The row badge of a chat with a turn in flight. */
+    public static final String BADGE_RUNNING = "running";
 
     @Override
     public String id() {
@@ -104,9 +124,12 @@ public final class ChatShellComponent implements UiComponent {
         UUID activeId = active == null ? null : active.id();
         for (AgentSessionHeader s : sessions) {
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
+            String badge = waiting.contains(s.id()) ? BADGE_NEEDS_INPUT
+                    : running.contains(s.id()) ? BADGE_RUNNING
+                    : ago(s.startedAt());
             menu.item(UiMenuItem.link("chat-" + s.id(), label, "/chat/sessions/" + s.id())
                     .icon(iconFor(s))
-                    .badge(ago(s.startedAt()))
+                    .badge(badge)
                     .selected(s.id().equals(activeId)));
         }
         return menu;

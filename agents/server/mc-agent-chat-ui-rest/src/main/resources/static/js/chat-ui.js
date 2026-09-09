@@ -93,6 +93,68 @@
         head.appendChild(button);
     }
 
+    /* ── What the rows say about their chats ──────────────────────────────
+     * The server renders a busy chat's row with "running" or "needs input"
+     * in place of its age (see ChatShellComponent); the user stream carries
+     * the changes after that. The menu renderer has no slot for a class on
+     * the row, so the state is read off the badge and turned into one here
+     * — that is what the stylesheet colours.
+     */
+    const BADGE_RUNNING = "running";
+    const BADGE_NEEDS_INPUT = "needs input";
+
+    function markRow(row) {
+        const badge = row.querySelector(".sui-menu-badge");
+        const text = badge ? badge.textContent.trim() : "";
+        row.classList.toggle("is-running", text === BADGE_RUNNING);
+        row.classList.toggle("needs-input", text === BADGE_NEEDS_INPUT);
+    }
+
+    function setBadge(row, text) {
+        let badge = row.querySelector(".sui-menu-badge");
+        if (!badge) {
+            badge = document.createElement("span");
+            badge.className = "sui-menu-badge";
+            const link = row.querySelector(".sui-menu-link");
+            (link || row).appendChild(badge);
+        }
+        badge.textContent = text;
+        markRow(row);
+    }
+
+    /** One event of the user's stream, applied to the row it concerns. */
+    function applyUserEvent(event) {
+        if (!event || !event.sessionId) return;
+        const row = document.getElementById("chat-" + event.sessionId);
+        if (!row) return;
+        switch (event.type) {
+            case "turn_started":
+                setBadge(row, BADGE_RUNNING);
+                break;
+            case "approval_requested":
+                setBadge(row, BADGE_NEEDS_INPUT);
+                break;
+            case "approval_answered":
+                // The turn goes on; the card is gone.
+                if (row.classList.contains("needs-input")) setBadge(row, BADGE_RUNNING);
+                break;
+            case "turn_finished":
+                setBadge(row, "now");
+                break;
+            case "session_titled": {
+                const label = row.querySelector(".sui-menu-label");
+                if (label && event.title) label.textContent = event.title;
+                const tip = row.querySelector(".sui-menu-tip");
+                if (tip && event.title) tip.textContent = event.title;
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    document.addEventListener("mc-user-event", (e) => applyUserEvent(e.detail));
+
     /** Gives every history row its menu; runs again after each patch. */
     function decorateRows() {
         const menu = document.getElementById(MENU_ID);
@@ -100,6 +162,7 @@
         menu.querySelectorAll("li.sui-menu-item").forEach((row) => {
             const id = (row.dataset.id || "");
             if (!id.startsWith("chat-") || id === "chat-new") return;
+            markRow(row);
             if (row.querySelector(".chat-row-menu")) return;
             row.classList.add("chat-row");
             row.appendChild(buildRowMenu(id.slice("chat-".length)));

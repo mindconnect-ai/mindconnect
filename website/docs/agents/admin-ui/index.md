@@ -117,10 +117,26 @@ The navigation has seven top-level entries:
 ## The task manager
 
 The header carries a small badge that says what the task queue is doing right
-now — `3 running · 2 waiting`, or `idle`. It is live: the page attaches to a
-server-sent event stream (`/admin/api/tasks/sse`) once, and the stream stays
-attached while you navigate, so the count is current on every page without
-polling.
+now — `3 running · 2 waiting`, or `idle`. It is live: the page attaches to the
+user's own server-sent event stream (`/admin/api/stream`) once, and the stream
+stays attached while you navigate, so the count is current on every page
+without polling.
+
+The same stream carries what happens in your sessions while you are not
+looking at them: a turn started or finished, a tool waiting for your answer, a
+chat that got its title. The chat's history reflects it — a conversation with
+a turn in flight says `running` where its age would be, one with an approval
+card open says `needs input` — and it does so in every tab, whichever one
+sent the message.
+
+One thing to know about tabs: over HTTP/1.1 a browser keeps at most six
+connections open per site, and every stream the app holds is one of them —
+the user stream on every page, plus the session stream on a chat. A few chats
+in a few tabs reach that limit, and from then on every request queues behind
+the streams and pages stop loading. The tabs count their streams together and
+warn you once the sum comes within one of the limit; close the tabs you no
+longer need and the notice goes away. Served over HTTP/2 there is no such
+limit and no notice.
 
 A click on the badge opens the task queue, the admin UI's Task Manager:
 

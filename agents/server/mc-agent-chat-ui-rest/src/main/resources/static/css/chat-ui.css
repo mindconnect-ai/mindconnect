@@ -310,6 +310,17 @@
     opacity: 1;
 }
 
+/* A chat that is busy says so where its age would be (chat-ui.js keeps the
+   class in step with the badge as the user stream reports changes). */
+#chat-menu li.sui-menu-item.is-running .sui-menu-badge {
+    color: var(--sui-accent, #2563eb);
+    font-weight: 600;
+}
+#chat-menu li.sui-menu-item.needs-input .sui-menu-badge {
+    color: var(--sui-warning, #b45309);
+    font-weight: 600;
+}
+
 /* The row's own badge steps aside so the two never overlap. */
 #chat-menu li.sui-menu-item:hover .sui-menu-badge,
 #chat-menu li.sui-menu-item:focus-within .sui-menu-badge {

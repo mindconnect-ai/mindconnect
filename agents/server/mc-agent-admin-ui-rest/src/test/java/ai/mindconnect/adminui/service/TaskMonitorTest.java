@@ -15,11 +15,9 @@ import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -35,9 +33,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * The monitor against a real {@link LocalTaskQueue}: a task that runs for
  * someone shows up under their name, only they may cancel it, and the
- * cancel reaches the worker. The stream side is exercised through a
- * capturing emitter — a transition on the queue ends as one patch frame on
- * every attached connection.
+ * cancel reaches the worker. A transition on the queue ends as one snapshot
+ * for every subscriber; the wire side of that is {@link UserStreamTest}'s.
  */
 class TaskMonitorTest {
 
@@ -76,7 +73,7 @@ class TaskMonitorTest {
                 "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
                 null, null, null, null, null, null, null));
 
-        monitor = new TaskMonitor(queue, sessions, definitions, new ObjectMapper());
+        monitor = new TaskMonitor(queue, sessions, definitions);
     }
 
     @AfterEach
@@ -125,33 +122,21 @@ class TaskMonitorTest {
     }
 
     @Test
-    void aTransitionBecomesOnePatchFrameOnEveryAttachedStream() throws Exception {
-        var frames = new CopyOnWriteArrayList<String>();
+    void aTransitionBecomesOneSnapshotForEverySubscriber() throws Exception {
+        var snapshots = new CopyOnWriteArrayList<Snapshot>();
         var arrived = new CountDownLatch(1);
-        SseEmitter emitter = new SseEmitter(0L) {
-            @Override
-            public void send(SseEventBuilder builder) {
-                // The builder's data parts are the JSON; join them into one frame.
-                frames.add(builder.build().stream()
-                        .map(part -> String.valueOf(part.getData()))
-                        .collect(java.util.stream.Collectors.joining()));
-                arrived.countDown();
-            }
-        };
-        monitor.attach(emitter, "alice");
+        var subscription = monitor.subscribe(event -> {
+            snapshots.add(event.value());
+            arrived.countDown();
+        });
 
         String id = submitTurn();
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(arrived.await(5, TimeUnit.SECONDS))
-                .as("the submit/start burst is debounced into a frame")
+                .as("the submit/start burst is debounced into a snapshot")
                 .isTrue();
 
-        String frame = frames.get(0);
-        assertThat(frame).contains("\"targetId\":\"" + TaskMonitor.CHANNEL_ID + "\"");
-        assertThat(frame).contains("task-" + id);
-        // rendered for alice: her task carries its Cancel
-        assertThat(frame).contains("/admin/api/tasks/" + id + "/cancel");
-
-        monitor.detach(emitter);
+        assertThat(snapshots.get(0).active()).extracting(TaskView::id).containsExactly(id);
+        subscription.close();
     }
 }

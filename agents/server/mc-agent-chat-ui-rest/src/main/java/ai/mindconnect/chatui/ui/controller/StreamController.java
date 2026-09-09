@@ -112,6 +112,20 @@ public class StreamController {
         // outlives them. Idle time is covered by the heartbeat.
         var emitter = new SseEmitter(0L);
 
+        // Commit the response before anything else. Spring writes the headers
+        // of an SseEmitter with its first event, and on a quiet session that
+        // is the next heartbeat — up to 25 s in which the browser's fetch()
+        // has not resolved and the SPA does not yet know it holds this
+        // connection. A second page render inside that window opened a
+        // second stream to the same session, and the first one leaked. A
+        // comment is invisible to every handler and closes the window.
+        try {
+            emitter.send(SseEmitter.event().comment("attached"));
+        } catch (java.io.IOException e) {
+            emitter.completeWithError(e);
+            return ResponseEntity.ok().body(emitter);
+        }
+
         // A client that arrives mid-turn has no streaming bubble in its DOM,
         // so every cumulative token REPLACE would land nowhere. The catch-up
         // frames create it and fill it with the reply so far.

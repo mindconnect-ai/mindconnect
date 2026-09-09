@@ -80,6 +80,7 @@ public final class ToolCallWorker implements TaskWorker {
     private final DynamicToolActivations dynamicToolActivations;
     private final ToolExecutor toolExecutor;
     private final SessionChannels sessionChannels;
+    private final ai.mindconnect.agent.service.stream.UserChannels userChannels;
     private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
     private final SubAgentCalls subAgents;
 
@@ -91,7 +92,8 @@ public final class ToolCallWorker implements TaskWorker {
                           DynamicToolActivations dynamicToolActivations,
                           ToolExecutor toolExecutor,
                           SessionChannels sessionChannels,
-                          ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
+                          ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
+                          ai.mindconnect.agent.service.stream.UserChannels userChannels) {
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
         this.sessionService = sessionService;
@@ -101,6 +103,7 @@ public final class ToolCallWorker implements TaskWorker {
         this.toolExecutor = toolExecutor;
         this.sessionChannels = sessionChannels;
         this.approvalStore = approvalStore;
+        this.userChannels = userChannels;
         this.subAgents = new SubAgentCalls(conversationManager, definitionRepository,
                 sessionService, memoryStrategyFactory, sessionChannels);
     }
@@ -276,6 +279,10 @@ public final class ToolCallWorker implements TaskWorker {
             log.info("Tool '{}' (call {}) waits at the approval gate — card registered for root session {}",
                     toolName, callId, root.id());
             publishApprovalCard(root, entry, arguments);
+            // The user's own stream too, so a client that is not looking at
+            // this chat — a session list, another tab — learns someone waits.
+            userChannels.publish(root.userId(), new ai.mindconnect.agent.service.stream.UserEvent
+                    .ApprovalRequested(root.id(), callId, toolName));
         }
         return Gate.WAIT;
     }
