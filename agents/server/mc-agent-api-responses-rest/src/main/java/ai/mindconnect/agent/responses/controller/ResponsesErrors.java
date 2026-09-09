@@ -42,6 +42,18 @@ public class ResponsesErrors {
     }
 
     /**
+     * The runtime backend refusing the request — an unknown file id, a part
+     * it cannot take, a session it cannot find. The client sent it, the
+     * client can fix it.
+     */
+    @ExceptionHandler(ai.mindconnect.agent.protocol.runtime.RuntimeBackendException.class)
+    public ResponseEntity<Map<String, Object>> backendRefused(
+            ai.mindconnect.agent.protocol.runtime.RuntimeBackendException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(error("invalid_request_error", e.getMessage(), null));
+    }
+
+    /**
      * Anything else. The message is passed on rather than hidden: this API
      * is reached by developers pointing a client at their own server, and a
      * generic "internal error" would cost them the one clue they have.

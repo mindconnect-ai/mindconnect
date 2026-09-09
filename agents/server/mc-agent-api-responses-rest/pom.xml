@@ -41,6 +41,18 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-message-repository-core</artifactId>
         </dependency>
+        <!-- File support: an uploaded or inline file goes to the host's file
+             store and is attached to the session the way a chat upload is. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-store-core</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-api-rest</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
