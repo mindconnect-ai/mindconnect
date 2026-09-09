@@ -14,6 +14,7 @@ import ai.mindconnect.ui.model.UiSection;
 import ai.mindconnect.ui.model.UiSectionEntry;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTable;
+import ai.mindconnect.ui.model.UiToast;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTrigger;
 import ai.mindconnect.vectorstore.VectorStore;
@@ -266,45 +267,59 @@ public class VectorStoreUiController {
 
     @GetMapping("/templates/new")
     public UiPage newTemplate() {
-        return templateForm(null);
+        return templateForm(null, false);
     }
 
+    /**
+     * The built-in template is not a file but the {@code mindconnect.vector-store.*}
+     * properties, so editing it opens its values as an unnamed copy: name the
+     * copy and it becomes a template of its own.
+     */
     @GetMapping("/templates/{name}/edit")
     public UiPage editTemplate(@PathVariable String name) {
-        return templateForm(stores.registry().template(name).orElse(null));
+        if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
+            return templateForm(stores.template(name).orElse(null), true);
+        }
+        return templateForm(stores.registry().template(name).orElse(null), false);
     }
 
-    private UiPage templateForm(VectorStoreTemplate t) {
-        boolean isNew = t == null;
+    private static final String BUILT_IN_NOTE = "'" + VectorStores.DEFAULT_TEMPLATE
+            + "' is the built-in template: it follows the mindconnect.vector-store.* properties "
+            + "(embedding config: mindconnect.vector-store.embedding-config) and cannot be changed here.";
+
+    private UiPage templateForm(VectorStoreTemplate t, boolean builtIn) {
+        boolean isNew = t == null || builtIn;
         List<UiField.Option> backends = List.of(
                 UiField.Option.of("memory", "memory"), UiField.Option.of("pgvector", "pgvector"));
         List<UiField.Option> embeddingOptions = llmConfigs.findAll().stream()
                 .map(c -> UiField.Option.of(c.name(), c.name())).toList();
-        UiForm form = UiForm.of("vs-template-form", isNew ? "New Template" : "Edit Template: " + t.name())
+        UiForm form = UiForm.of("vs-template-form", builtIn ? "Built-in Template: " + t.name()
+                        : isNew ? "New Template" : "Edit Template: " + t.name())
                 .field(UiField.text("name", "Name", isNew ? null : t.name()).asEditable()
-                        .hint("Unique template name, e.g. knowledge or chat-uploads"))
-                .field(UiField.select("backend", "Backend", isNew ? "memory" : t.backend(), backends)
+                        .hint(builtIn ? BUILT_IN_NOTE + " Give this copy a name to save it as a template of your own."
+                                : "Unique template name, e.g. knowledge or chat-uploads"))
+                .field(UiField.select("backend", "Backend", t == null ? "memory" : t.backend(), backends)
                         .asEditable()
                         // Switching the backend swaps the backend-config group below.
                         .onChange(ai.mindconnect.ui.model.UiTrigger.api("POST",
                                 BASE + "/templates/backend-fields", "vs-template-form")))
                 .field(UiField.select("embeddingConfig", "Embedding Config",
-                        isNew ? "embeddings" : t.embeddingConfig(), embeddingOptions)
+                        t == null ? "embeddings" : t.embeddingConfig(), embeddingOptions)
                         .asEditable()
                         .hint("LlmConfig naming the embedding model — fixed per store at creation; "
                                 + "changing it later never affects existing stores"))
                 .field(UiField.text("ingestionWorkflow", "Ingestion Workflow",
-                        isNew ? "file-ingestion" : t.ingestionWorkflow()).asEditable()
+                        t == null ? "file-ingestion" : t.ingestionWorkflow()).asEditable()
                         .hint("Workflow started by 'Ingest file…' on stores of this template"))
                 .field(UiField.text("description", "Description",
-                        isNew ? null : t.metadata().get("description")).asEditable());
-        form.content(backendConfigGroup(isNew ? "memory" : t.backend(),
-                isNew ? Map.of() : t.backendConfig()));
-        form.action(UiAction.primary("save", "Save").icon("save")
+                        t == null || builtIn ? null : t.metadata().get("description")).asEditable());
+        form.content(backendConfigGroup(t == null ? "memory" : t.backend(),
+                t == null ? Map.of() : t.backendConfig()));
+        form.action(UiAction.primary("save", builtIn ? "Save as new template" : "Save").icon("save")
                         .dispatch("POST", "/admin/vector-stores/templates", "vs-template-form"))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel").dispatch("GET", "/admin/vector-stores"))
                 .link(UiLink.of("back", BASE, "← Back to Vector Stores"));
-        return UiPage.of(BASE + (isNew ? "/templates/new" : "/templates/" + t.name() + "/edit"), form);
+        return UiPage.of(BASE + (t == null ? "/templates/new" : "/templates/" + t.name() + "/edit"), form);
     }
 
     /** The backend-specific settings, swapped in place when the dropdown changes. */
@@ -342,8 +357,9 @@ public class VectorStoreUiController {
     public UiPage saveTemplate(@RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         String name = body.str("name");
-        if (name == null || name.isBlank() || VectorStores.DEFAULT_TEMPLATE.equals(name)) {
-            return list("templates");
+        String refusal = saveRefusal(name);
+        if (refusal != null) {
+            return list("templates").toast(UiToast.error(refusal));
         }
         Map<String, String> backendConfig = new LinkedHashMap<>();
         putIfPresent(backendConfig, "url", body.str("url"));
@@ -357,11 +373,25 @@ public class VectorStoreUiController {
                 backendConfig,
                 body.str("embeddingConfig") == null ? "embeddings" : body.str("embeddingConfig"),
                 body.str("ingestionWorkflow"), metadata));
-        return list("templates");
+        return list("templates").toast(UiToast.success("Template '" + name.trim() + "' saved."));
+    }
+
+    /** Why a template of this name cannot be saved — {@code null} when it can. */
+    static String saveRefusal(String name) {
+        if (name == null || name.isBlank()) {
+            return "The template needs a name — nothing was saved.";
+        }
+        if (VectorStores.DEFAULT_TEMPLATE.equals(name.trim())) {
+            return BUILT_IN_NOTE + " Save the copy under another name — nothing was saved.";
+        }
+        return null;
     }
 
     @DeleteMapping("/templates/{name}")
     public UiPage deleteTemplate(@PathVariable String name) {
+        if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
+            return list("templates").toast(UiToast.error(BUILT_IN_NOTE));
+        }
         stores.registry().deleteTemplate(name);
         return list("templates");
     }

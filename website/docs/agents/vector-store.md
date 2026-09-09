@@ -60,10 +60,19 @@ Embedding happens **inside the tools** through the gateway's `LlmEmbeddings`
 port. It needs an [LLM config](./llm-config-json.md) of `type: EMBEDDING` —
 by default one named **`embeddings`** (`mindconnect.vector-store.embedding-config`).
 
-:::warning No embedding config is bundled
-None of the bundled LLM configs is an embedding config, so the knowledge tools
-report themselves unavailable until you create one (e.g. an OpenAI
-`text-embedding-3-small` config named `embeddings`).
+:::info Two embedding configs are bundled
+`embeddings` points at a local LM Studio server (`text-embedding-nomic-embed-text-v1.5`
+at `http://localhost:1234`), `openai-embeddings` at OpenAI's
+`text-embedding-3-small` with `OPENAI_API_KEY`. Stores are created with the
+`embeddings` config; to use OpenAI instead, pick `openai-embeddings` in the
+store template (Admin UI → Vector Stores → the `chat-uploads` template) or set
+`mindconnect.vector-store.embedding-config`.
+
+There is no dimension to configure: a store takes the dimension of the first
+vectors written to it and rejects others afterwards. Switching a template's
+embedding config therefore only affects stores created from then on — a store
+filled with 768-dimensional nomic vectors will not accept 1536-dimensional
+OpenAI ones, so delete and re-ingest it when you switch.
 :::
 
 ## The knowledge tools

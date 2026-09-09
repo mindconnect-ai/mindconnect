@@ -29,6 +29,8 @@ resolve from environment variables), see
 | `gemini-default` | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
 | `lm-studio-default` | LM Studio (local) | `openai/gpt-oss-120b` | none — local server at `http://localhost:1234` |
 | `agent-default` | LM Studio (local) | `openai/gpt-oss-120b` | none — the default most agents use |
+| `embeddings` | LM Studio (local), `EMBEDDING` | `text-embedding-nomic-embed-text-v1.5` | none — `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` to override |
+| `openai-embeddings` | OpenAI, `EMBEDDING` | `text-embedding-3-small` | `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL` |
 
 :::info `agent-default` is the default
 Most bundled agents reference **`agent-default`**, which points at a local

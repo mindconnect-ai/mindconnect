@@ -23,6 +23,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** a bundled `openai-embeddings` LLM config — OpenAI's
+  `text-embedding-3-small` (override with `OPENAI_EMBEDDING_MODEL`) with
+  `OPENAI_API_KEY`, for vector stores and file ingestion when no local
+  embedding server is running. Choose it in a store template or via
+  `mindconnect.vector-store.embedding-config`; the local `embeddings` config
+  stays the default.
+
 ### Fixed
 
 - **agents:** two messages appended at the same moment no longer claim the
@@ -43,6 +52,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   agent went on answering it, because the runtime had always read the
   conversation entire. The history now comes back entire too, in the chat,
   the admin UI's chat, the attached-files list and regenerate.
+
+- **agents:** editing the built-in `default` vector-store template in the Admin
+  UI no longer pretends to save. The built-in template is the
+  `mindconnect.vector-store.*` properties; its edit form now says so and saves
+  the values as a copy under a name of your own, and saving or deleting it
+  under its own name reports why nothing happened instead of staying silent.
 
 ## [0.5.2] - 2026-09-09
 
