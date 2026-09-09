@@ -53,6 +53,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   conversation entire. The history now comes back entire too, in the chat,
   the admin UI's chat, the attached-files list and regenerate.
 
+- **agents:** editing the built-in `default` vector-store template in the Admin
+  UI no longer pretends to save. The built-in template is the
+  `mindconnect.vector-store.*` properties; its edit form now says so and saves
+  the values as a copy under a name of your own, and saving or deleting it
+  under its own name reports why nothing happened instead of staying silent.
+
 ## [0.5.2] - 2026-09-09
 
 ### Added
