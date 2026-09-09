@@ -23,6 +23,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **agents:** a chat longer than 200 messages no longer hides its newest
+  ones. A session's history was loaded as the *first* 200 messages, so once
+  a conversation passed that the chat kept showing its opening and silently
+  dropped everything after it, the message just sent included. It looked
+  like the message disappearing and the view jumping back a turn, while the
+  agent went on answering it, because the runtime had always read the
+  conversation entire. The history now comes back entire too, in the chat,
+  the admin UI's chat, the attached-files list and regenerate.
+
 ## [0.5.2] - 2026-09-09
 
 ### Added
