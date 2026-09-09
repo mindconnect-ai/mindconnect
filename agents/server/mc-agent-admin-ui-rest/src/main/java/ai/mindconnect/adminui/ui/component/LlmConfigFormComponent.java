@@ -106,27 +106,38 @@ public final class LlmConfigFormComponent implements UiComponent {
     }
 
     /**
-     * The type-specific settings, swapped in place when the "Embedding Model"
-     * checkbox toggles. Chat configs carry the sampling/retry knobs and the
-     * capability declaration; an embedding model only needs its input window.
+     * The type-specific settings, swapped in place when the type select
+     * changes. Chat configs carry the sampling/retry knobs and the capability
+     * declaration; an embedding model only needs its input window; a
+     * speech-to-text model needs neither — its knobs are the provider
+     * parameters below.
      */
-    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(boolean isEmbedding, LlmConfig config) {
-        return typeGroup(isEmbedding, config, null);
+    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(LlmConfigType type, LlmConfig config) {
+        return typeGroup(type, config, null);
     }
 
     /**
      * @param prefill values picked up from LM Studio for the model just
      *                chosen, or {@code null} to show the config's own
      */
-    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(boolean isEmbedding, LlmConfig config,
+    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(LlmConfigType type, LlmConfig config,
                                                                  LmStudioPrefill prefill) {
-        var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-type-cfg",
-                isEmbedding ? "Embedding settings" : "Chat settings");
+        var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-type-cfg", switch (type) {
+            case EMBEDDING -> "Embedding settings";
+            case SPEECH_TO_TEXT -> "Speech-to-text settings";
+            case CHAT -> "Chat settings";
+        });
         Integer contextWindow = prefill != null && prefill.contextWindowTokens() != null
                 ? prefill.contextWindowTokens()
                 : config == null ? null : config.contextWindowTokens();
         String contextHint = prefill != null && prefill.hint() != null ? prefill.hint() : null;
-        if (isEmbedding) {
+        if (type == LlmConfigType.SPEECH_TO_TEXT) {
+            // Nothing of its own: language, prompt and response format are
+            // provider parameters and render in the group below.
+            return group.hint("A transcription call has no sampling settings. Language, prompt "
+                    + "and response format are provider parameters, in the group below.");
+        }
+        if (type == LlmConfigType.EMBEDDING) {
             group.field(UiField.number("contextWindowTokens", "Max Input Tokens", contextWindow).asEditable()
                     .hint(contextHint != null ? contextHint
                             : "Optional — the embedding model's input window, used to size chunks"));
@@ -268,8 +279,7 @@ public final class LlmConfigFormComponent implements UiComponent {
         if (isLmStudio && (baseUrl == null || baseUrl.isBlank())) {
             baseUrl = LmStudioModelCatalog.DEFAULT_BASE_URL;
         }
-        LlmConfigType configType = LlmConfigType.EMBEDDING.name().equals(type)
-                ? LlmConfigType.EMBEDDING : LlmConfigType.CHAT;
+        LlmConfigType configType = parseType(type);
         // A new config starts with no provider: the picker must not appear for
         // a provider nobody chose, so the first option is a blank the admin
         // has to move off before saving.
@@ -281,12 +291,15 @@ public final class LlmConfigFormComponent implements UiComponent {
         String swapUrl = "/admin/api/llm-configs/field-groups?form=" + formId
                 + (configId == null ? "" : "&id=" + configId);
         group.field(UiField.select("type", "Type",
-                        type == null ? ai.mindconnect.llm.domain.LlmConfigType.CHAT.name() : type,
+                        type == null ? LlmConfigType.CHAT.name() : type,
                         List.of(UiField.Option.of("CHAT", "Chat"),
-                                UiField.Option.of("EMBEDDING", "Embedding")))
+                                UiField.Option.of("EMBEDDING", "Embedding"),
+                                UiField.Option.of("SPEECH_TO_TEXT", "Speech to text")))
                         .asEditable()
                         .hint("Embedding models turn text into vectors (vector stores / semantic "
-                                + "search); no sampling settings, Test embeds the text instead of chatting.")
+                                + "search); speech-to-text models turn a recording into text. "
+                                + "Neither has sampling settings, and Test does the matching thing "
+                                + "instead of chatting.")
                         // Switching swaps the type-specific settings group below.
                         .onChange(UiTrigger.api("POST", swapUrl, formId)))
                 .field(UiField.select("provider", "Provider", provider == null ? "" : provider, providerOptions)
@@ -323,7 +336,9 @@ public final class LlmConfigFormComponent implements UiComponent {
         if (lmStudio == null) {
             return UiField.text("model", "Model", model)
                     .asEditable()
-                    .hint("e.g. gpt-4o, gpt-5, claude-sonnet-4-6");
+                    .hint(type == LlmConfigType.SPEECH_TO_TEXT
+                            ? "e.g. whisper-1, gpt-4o-transcribe, gpt-4o-mini-transcribe"
+                            : "e.g. gpt-4o, gpt-5, claude-sonnet-4-6");
         }
         if (!lmStudio.available()) {
             return UiField.text("model", "Model", model)
@@ -344,7 +359,11 @@ public final class LlmConfigFormComponent implements UiComponent {
         if (hasModel && !listed) {
             options.add(UiField.Option.of(model, model + " (not installed in LM Studio)"));
         }
-        String what = type == LlmConfigType.EMBEDDING ? "embedding" : "chat";
+        String what = switch (type) {
+            case EMBEDDING -> "embedding";
+            case SPEECH_TO_TEXT -> "speech-to-text";
+            case CHAT -> "chat";
+        };
         String hint = options.size() == 1
                 ? "LM Studio at " + lmStudio.baseUrl() + " lists no " + what + " models."
                 : "Installed in LM Studio at " + lmStudio.baseUrl()
@@ -354,6 +373,16 @@ public final class LlmConfigFormComponent implements UiComponent {
                 .hint(hint)
                 // The pick decides the context window: re-render with reason=model.
                 .onChange(UiTrigger.api("POST", swapUrl + "&reason=model", formId));
+    }
+
+    /** The form's type value as an enum; anything unknown reads as chat. */
+    private static LlmConfigType parseType(String type) {
+        if (type == null || type.isBlank()) return LlmConfigType.CHAT;
+        try {
+            return LlmConfigType.valueOf(type);
+        } catch (IllegalArgumentException e) {
+            return LlmConfigType.CHAT;
+        }
     }
 
     /** Marks the group hidden in alias mode — fields stay in the DOM. */
@@ -407,7 +436,8 @@ public final class LlmConfigFormComponent implements UiComponent {
                         isNew ? null : config.baseUrl(),
                         isNew ? null : config.apiKey(),
                         id(), configId, lmStudio))
-                .content(withHiddenIf(isAlias, typeGroup(!isNew && config.isEmbedding(), config)))
+                .content(withHiddenIf(isAlias,
+                        typeGroup(isNew ? LlmConfigType.CHAT : config.type(), config)))
                 .content(withHiddenIf(isAlias, providerParamsGroup(
                         isNew ? null : config.provider(),
                         isNew ? ai.mindconnect.llm.domain.LlmConfigType.CHAT : config.type(),

@@ -62,11 +62,17 @@ public record LmStudioModel(
         return loadedContextLength != null ? loadedContextLength : maxContextLength;
     }
 
-    /** Whether this model fits a config of the given type. */
+    /**
+     * Whether this model fits a config of the given type. LM Studio serves no
+     * transcription models — it reports only LLM, VLM and embedding kinds — so
+     * a speech-to-text config finds nothing here and points elsewhere.
+     */
     public boolean appliesTo(LlmConfigType type) {
-        return type == LlmConfigType.EMBEDDING
-                ? kind == Kind.EMBEDDING
-                : kind == Kind.LLM || kind == Kind.VLM;
+        return switch (type) {
+            case EMBEDDING -> kind == Kind.EMBEDDING;
+            case SPEECH_TO_TEXT -> false;
+            case CHAT -> kind == Kind.LLM || kind == Kind.VLM;
+        };
     }
 
     /** The capabilities LM Studio's metadata vouches for. */

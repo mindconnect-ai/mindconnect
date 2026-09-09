@@ -901,3 +901,24 @@
     font-weight: 500;
     white-space: nowrap;
 }
+
+/* ── Dictation ────────────────────────────────────────────────────────────
+   While the microphone is open the composer's mic button says so in colour —
+   an icon-only button has no label to change — and the textarea's placeholder
+   counts the seconds. Both end when the transcript patches the field back. */
+.chat-record-btn.is-recording,
+.sui-btn.is-recording {
+    color: var(--sui-color-danger, #d33);
+    border-color: var(--sui-color-danger, #d33);
+    animation: mc-recording-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes mc-recording-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.55; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .chat-record-btn.is-recording,
+    .sui-btn.is-recording { animation: none; }
+}

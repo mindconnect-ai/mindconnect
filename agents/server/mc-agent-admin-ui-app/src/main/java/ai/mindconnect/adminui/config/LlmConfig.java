@@ -35,6 +35,21 @@ public class LlmConfig {
         return new ai.mindconnect.llm.adapter.openai.OpenAiEmbeddingsGateway(okHttpClient, objectMapper, encryptionHelper);
     }
 
+    /** Speech-to-text over the OpenAI-compatible transcription endpoint (Whisper, Groq, local servers). */
+    @Bean
+    ai.mindconnect.llm.port.out.TranscriptionGateway transcriptionGateway(
+            OkHttpClient okHttpClient, ObjectMapper objectMapper, EncryptionHelper encryptionHelper) {
+        return new ai.mindconnect.llm.adapter.openai.OpenAiTranscriptionGateway(okHttpClient, objectMapper, encryptionHelper);
+    }
+
+    /** Transcription by config name, aliases followed — the audio counterpart of the chat routing. */
+    @Bean
+    ai.mindconnect.llm.port.in.LlmTranscription llmTranscription(
+            ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
+            ai.mindconnect.llm.port.out.TranscriptionGateway transcriptionGateway) {
+        return new ai.mindconnect.llm.service.RoutingLlmTranscriptionService(llmConfigRepository, transcriptionGateway);
+    }
+
     @Bean
     ClaudeGateway claudeGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper,
                                  EncryptionHelper encryptionHelper) {

@@ -128,21 +128,32 @@ public final class ChatFormComponent implements UiComponent {
 
     // ── Internal builders ──────────────────────────────────────────────────
 
+    /**
+     * The composer's textarea. Built here so anything that refills it —
+     * dictation puts the transcript in — patches in the same field rather
+     * than a lookalike: same id, same placeholder, same Enter-sends.
+     *
+     * @param value what the field starts with; {@code null} for empty
+     */
+    public static UiField messageField(String value) {
+        return UiField.textarea("message", "Message", value)
+                .asEditable().asRequired()
+                // The label stays for the accessible name; the placeholder is
+                // what the composer shows, so the field reads as an invitation
+                // rather than as a labelled form control.
+                .placeholder("Ask anything \u2026")
+                // Chat-style commit: Enter sends, Shift+Enter newline.
+                .submitOnEnter();
+    }
+
     private UiForm idleForm() {
         UiForm form = UiForm.of(id(), null)
-                .field(UiField.textarea("message", "Message", null)
-                        .asEditable().asRequired()
-                        // The label stays for the accessible name; the
-                        // placeholder is what the composer shows, so the
-                        // field reads as an invitation rather than as a
-                        // labelled form control.
-                        .placeholder("Ask anything \u2026")
-                        // Chat-style commit: Enter sends, Shift+Enter newline.
-                        .submitOnEnter())
+                .field(messageField(null))
                 // "+" opens the attach dialog (drop-zone lives there, not on
                 // the page); the paper plane sends. Labels become the
                 // accessible names, the sprite tokens the glyphs.
                 .action(attachAction())
+                .action(recordAction())
                 // Model and tools sit on the composer, where you notice them
                 // while typing — not in a settings page you have to go find.
                 .action(UiAction.secondary("model", modelLabel).icon("ai")
@@ -156,6 +167,27 @@ public final class ChatFormComponent implements UiComponent {
                         // reads.
                         .onClick(trigger(on(ChatUiController.class).chatStream(sessionId, null), id())));
         return form.<UiForm>withCssClass("chat-form");
+    }
+
+    /**
+     * The microphone. Its trigger runs in the browser — the handler
+     * registered in {@code audio-recorder.js} records, posts the recording to
+     * the session's transcribe endpoint and applies the patch that comes
+     * back, which is this same field with the transcript in it. The form id
+     * travels as the payload so the recording carries whatever was already
+     * typed, and so the handler knows which textarea to talk to while it
+     * records.
+     *
+     * <p>A browser with no microphone, or one that was denied it, says so in
+     * the composer's placeholder and nothing else happens; typing is
+     * untouched either way.
+     */
+    private UiAction recordAction() {
+        var trigger = ai.mindconnect.ui.model.UiTrigger.invoke("mc-record-audio", id());
+        trigger.setUrl("/chat/api/sessions/" + sessionId + "/voice/transcribe");
+        return UiAction.icon("record", "Dictate").icon("mic")
+                .onClick(trigger)
+                .<UiAction>withCssClass("chat-record-btn");
     }
 
     /**

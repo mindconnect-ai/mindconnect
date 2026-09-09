@@ -4,7 +4,10 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
+import ai.mindconnect.llm.domain.TranscriptionRequest;
+import ai.mindconnect.llm.domain.TranscriptionResult;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
+import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.slf4j.Logger;
@@ -31,11 +34,14 @@ public class LlmConfigTestService {
 
     private final RoutingLlmChatService chatService;
     private final ObjectProvider<LlmEmbeddings> embeddingsProvider;
+    private final ObjectProvider<LlmTranscription> transcriptionProvider;
 
     public LlmConfigTestService(RoutingLlmChatService chatService,
-                                ObjectProvider<LlmEmbeddings> embeddingsProvider) {
+                                ObjectProvider<LlmEmbeddings> embeddingsProvider,
+                                ObjectProvider<LlmTranscription> transcriptionProvider) {
         this.chatService = chatService;
         this.embeddingsProvider = embeddingsProvider;
+        this.transcriptionProvider = transcriptionProvider;
     }
 
     /**
@@ -50,6 +56,10 @@ public class LlmConfigTestService {
         }
         if (config.isEmbedding()) {
             return testEmbedding(config, message);
+        }
+        if (config.isSpeechToText()) {
+            // Nothing to send as text — this type is tested with a recording.
+            return Result.error("A speech-to-text config is tested by uploading a recording", 0);
         }
         long t0 = System.currentTimeMillis();
         LlmRequest req = LlmRequest.streaming(config.name(), List.of(LlmMessage.user(message)));
@@ -112,6 +122,54 @@ public class LlmConfigTestService {
             log.warn("Embedding test '{}' failed after {} ms: {}", config.name(), durMs, detail, e);
             return Result.error(detail, durMs);
         }
+    }
+
+    /**
+     * Speech-to-text configs: the uploaded recording is transcribed and the
+     * result shows the transcript, so an admin hears back whether endpoint,
+     * model and key line up. A recording is what this test needs — there is
+     * no text to send.
+     *
+     * @param filename    the upload's name; its extension tells the provider
+     *                    which container the bytes are in
+     * @param contentType the upload's media type, or {@code null}
+     */
+    public Result testTranscription(LlmConfig config, byte[] audio, String filename, String contentType) {
+        long t0 = System.currentTimeMillis();
+        LlmTranscription transcription = transcriptionProvider.getIfAvailable();
+        if (transcription == null) {
+            return Result.error("No transcription gateway configured in this application", 0);
+        }
+        if (audio == null || audio.length == 0) {
+            return Result.error("The upload was empty", 0);
+        }
+        try {
+            // By name, like the chat test — so the test follows an alias exactly
+            // as production traffic does.
+            TranscriptionResult result = transcription.transcribe(config.name(),
+                    TranscriptionRequest.of(audio, filename, contentType));
+            long durMs = System.currentTimeMillis() - t0;
+            log.info("Transcription test '{}' OK in {} ms ({} characters)",
+                    config.name(), durMs, result.text().length());
+            String text = result.text().isBlank() ? "(silence — the model heard nothing)" : result.text();
+            return Result.ok(text, result.inputTokens(), result.outputTokens(), durMs,
+                    describeAudio(filename, result));
+        } catch (Exception e) {
+            long durMs = System.currentTimeMillis() - t0;
+            String detail = describeCause(e);
+            log.warn("Transcription test '{}' failed after {} ms: {}", config.name(), durMs, detail, e);
+            return Result.error(detail, durMs);
+        }
+    }
+
+    /** The meta line of a transcription test: file, detected language, length. */
+    private static String describeAudio(String filename, TranscriptionResult result) {
+        StringBuilder sb = new StringBuilder(filename);
+        if (result.language() != null) sb.append(" · ").append(result.language());
+        if (result.durationSeconds() != null) {
+            sb.append(String.format(java.util.Locale.ROOT, " · %.1f s", result.durationSeconds()));
+        }
+        return sb.toString();
     }
 
     /**

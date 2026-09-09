@@ -40,6 +40,35 @@ fresh empty one, so nothing has to be moved by hand at release time.
   switches exhaustively over `StreamEvent`, needs the extra argument and the
   extra arm. `StreamEvent.Done` is unchanged.
 
+- **agents:** speech to text — a Whisper model as a normal LLM config, and a
+  microphone in the chat. A config's type can now be `SPEECH_TO_TEXT` next to
+  `CHAT` and `EMBEDDING`, with the same provider, key, encryption and admin
+  form as every other model. `LlmTranscription` is the port callers use: they
+  name a config and get a transcript, so an alias is followed exactly as it is
+  for a chat model — point `speech-to-text` at whichever config should serve
+  and swap it later without touching a caller. Behind it,
+  `OpenAiTranscriptionGateway` calls the OpenAI-compatible
+  `/v1/audio/transcriptions` endpoint, so OpenAI, Groq and a local Whisper
+  server all work by pointing the base URL at them; language, prompt and
+  response format are provider parameters on the config, and the LM Studio
+  model picker says it serves no transcription models rather than offering
+  chat ones.
+
+  In the chat, the composer's new microphone records in the browser and puts
+  the transcript into the input, after anything already typed — nothing is
+  sent without the person who spoke it pressing Send. Dictating while a turn
+  is still streaming brings the words back as a sticky toast, since there is
+  no input to fill at that moment. The admin UI tests a
+  speech config the same way: drop an audio file into the test dialog, or
+  press **Record**, speak and press **Stop**. Both need a microphone and a
+  secure context (`localhost` or HTTPS); where the browser refuses, uploading
+  a file still works.
+
+  A new installation is seeded with a `speech-to-text` config (`whisper-1`
+  behind `${OPENAI_API_KEY}`, overridable through `SPEECH_TO_TEXT_MODEL` and
+  `SPEECH_TO_TEXT_BASE_URL`); an existing one gets it on the next start, since
+  seeding checks each entry by id.
+
 ### Fixed
 
 - **agents:** the Responses API reports what a turn cost. `usage` on
