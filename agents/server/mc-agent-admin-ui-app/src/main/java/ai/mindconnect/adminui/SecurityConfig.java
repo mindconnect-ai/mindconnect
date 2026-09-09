@@ -24,6 +24,7 @@ import org.springframework.security.oauth2.core.oidc.StandardClaimNames;
 import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.DelegatingAuthenticationEntryPoint;
@@ -95,6 +96,9 @@ public class SecurityConfig {
         htmlOnlyRequestCache.setRequestMatcher(htmlAcceptMatcher());
 
         http
+            // Cross-origin calls to the REST endpoints, as CorsConfig in
+            // mc-agent-api-rest allows them; a preflight passes without a login.
+            .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/index.html", "/favicon.ico",
                                  "/js/**", "/css/**",
@@ -154,6 +158,7 @@ public class SecurityConfig {
             HttpSecurity http,
             @Value("${mindconnect.auth.dev-user:mc_user}") String devUser) throws Exception {
         http
+            .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
             // No Keycloak in this mode, but the rest of the app still expects an

@@ -43,6 +43,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.code-exec.*` | — | Sandbox limits for `code_execute`: `runtime`, `network`, `languages`, `memory`, `cpus`, `timeout-seconds`, `idle-seconds`. |
 | `mindconnect.vector-store.*` | — | Vector-store backend: `backend`, `dir`, `url`, `user`, `password`, `embedding-config` (default `embeddings`). |
 | `mindconnect.file-store.*` | — | File-store backend: `backend`, `dir`. |
+| `mindconnect.cors.allowed-origins` | `*` | Origins that may call the REST endpoints from a browser (`/api`, `/chat/api`, `/v1`), comma-separated. `*` lets every origin call without credentials; a list of origins may also send the session cookie. Both server apps. |
 | `mindconnect.workflow-admin.dir` | `data/workflows` | Where the workflow admin stores workflows. |
 | `mindconnect.agent.trace.max-per-session` | `50` | LLM call-trace retention per session. |
 

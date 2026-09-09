@@ -25,6 +25,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** the REST endpoints of both server apps — `/api`, `/chat/api`
+  and `/v1` — answer cross-origin calls from a browser. Every origin may
+  call by default; `mindconnect.cors.allowed-origins` narrows it to a list,
+  and a listed origin may also send the session cookie along.
+
 - **An OpenAI Responses client can talk to a Mindconnect agent unchanged.**
   The new `mc-agent-api-responses-rest` serves `/v1/responses` — create,
   retrieve, cancel, and the SSE stream — in OpenAI's own wire format, so
