@@ -9,6 +9,8 @@ import ai.mindconnect.adminui.ui.component.LlmConfigTestComponent;
 import ai.mindconnect.adminui.ui.page.LlmConfigDetailPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigFormPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigListPage;
+import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
+import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigType;
@@ -20,6 +22,8 @@ import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.OkHttpClient;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,16 +36,36 @@ public class LlmConfigUiController {
 
     private static final String MASKED_KEY = "••••••••";
 
+    /**
+     * What an LM Studio config stores as its key. LM Studio takes no key, the
+     * form has no field for one, and the OpenAI-compatible gateway still sends
+     * a bearer header — so it sends this, as the bundled configs always have.
+     */
+    static final String LM_STUDIO_KEY = "lm-studio";
+
     private final LlmConfigRepository repository;
     private final LlmConfigTestService testService;
     private final EncryptionHelper encryption;
+    private final LmStudioModelCatalog lmStudio;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public LlmConfigUiController(LlmConfigRepository repository,
                                     LlmConfigTestService testService,
-                                    EncryptionHelper encryption) {
+                                    EncryptionHelper encryption,
+                                    OkHttpClient httpClient,
+                                    ObjectMapper objectMapper) {
+        this(repository, testService, encryption, new LmStudioModelCatalog(httpClient, objectMapper));
+    }
+
+    /** For tests: a catalog that answers without an LM Studio. */
+    LlmConfigUiController(LlmConfigRepository repository,
+                          LlmConfigTestService testService,
+                          EncryptionHelper encryption,
+                          LmStudioModelCatalog lmStudio) {
         this.repository = repository;
         this.testService = testService;
         this.encryption = encryption;
+        this.lmStudio = lmStudio;
     }
 
     /**
@@ -71,15 +95,23 @@ public class LlmConfigUiController {
     }
 
     /**
-     * isAlias, type or provider switched: re-render every dependent group.
-     * Alias mode collapses the form to the delegation target; provider mode
-     * shows the base fields plus the type- and provider-specific groups.
-     * Values the admin already typed ride along in the submitted form body
-     * and win over the stored config, so toggling never loses input.
+     * isAlias, type, provider, base URL or model switched: re-render every
+     * dependent group. Alias mode collapses the form to the delegation target;
+     * provider mode shows the base fields plus the type- and provider-specific
+     * groups. Values the admin already typed ride along in the submitted form
+     * body and win over the stored config, so toggling never loses input.
+     *
+     * <p>With LM Studio as the provider the base URL is asked for its models
+     * (so the model field becomes a dropdown), and when the trigger was the
+     * model pick itself ({@code reason=model}) — or the context window is
+     * still empty — the picked model's context length and capabilities are
+     * written into the settings group. A pick also names a config that has
+     * no name yet, after the model.
      */
     @PostMapping("/field-groups")
     public UiPatch fieldGroups(@RequestParam("form") String formId,
                                @RequestParam(value = "id", required = false) UUID id,
+                               @RequestParam(value = "reason", required = false) String reason,
                                @RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         LlmConfig config = id == null ? null : repository.findById(id).orElse(null);
@@ -88,7 +120,30 @@ public class LlmConfigUiController {
         LlmConfigType type = typeFrom(body, config != null ? config.type() : LlmConfigType.CHAT);
         LlmProvider provider = providerFrom(body);
         if (provider == null && config != null) provider = config.provider();
-        return UiPatch.of()
+        String model = or(body.str("model"), config == null ? null : config.model());
+        String baseUrl = or(body.str("baseUrl"), config == null ? null : config.baseUrl());
+
+        LmStudioModelCatalog.Catalog catalog = null;
+        LlmConfigFormComponent.LmStudioPrefill prefill = null;
+        String suggestedName = null;
+        if (!isAlias && provider == LlmProvider.LM_STUDIO) {
+            catalog = lmStudio.fetch(baseUrl);
+            LmStudioModel picked = catalog.find(model);
+            boolean modelPicked = "model".equals(reason);
+            boolean contextEmpty = body.numOrNull("contextWindowTokens") == null;
+            if (picked != null && (modelPicked || contextEmpty)) {
+                prefill = LlmConfigFormComponent.LmStudioPrefill.of(picked);
+            }
+            String name = body.str("name");
+            if (modelPicked && picked != null && (name == null || name.isBlank())) {
+                suggestedName = LlmConfigFormComponent.suggestedName(picked.id());
+            }
+        }
+        UiPatch patch = UiPatch.of();
+        if (suggestedName != null) {
+            patch.patch(UiPatch.Operation.replace("name", LlmConfigFormComponent.nameField(suggestedName)));
+        }
+        return patch
                 .patch(UiPatch.Operation.replace("llm-alias-cfg",
                         LlmConfigFormComponent.aliasGroup(isAlias,
                                 or(body.str("delegatesTo"), config == null ? null : config.delegatesTo()),
@@ -97,13 +152,13 @@ public class LlmConfigUiController {
                         LlmConfigFormComponent.baseGroup(isAlias,
                                 type.name(),
                                 provider == null ? null : provider.name(),
-                                or(body.str("model"), config == null ? null : config.model()),
-                                or(body.str("baseUrl"), config == null ? null : config.baseUrl()),
+                                model,
+                                baseUrl,
                                 or(body.str("apiKey"), config == null ? null : config.apiKey()),
-                                formId, id)))
+                                formId, id, catalog)))
                 .patch(UiPatch.Operation.replace("llm-type-cfg",
                         LlmConfigFormComponent.withHiddenIf(isAlias,
-                                LlmConfigFormComponent.typeGroup(type == LlmConfigType.EMBEDDING, config))))
+                                LlmConfigFormComponent.typeGroup(type == LlmConfigType.EMBEDDING, config, prefill))))
                 .patch(UiPatch.Operation.replace("llm-provider-params",
                         LlmConfigFormComponent.withHiddenIf(isAlias,
                                 LlmConfigFormComponent.providerParamsGroup(provider, type, config))));
@@ -112,6 +167,42 @@ public class LlmConfigUiController {
     /** First non-null value — form input wins over the stored config. */
     private static String or(String formValue, String stored) {
         return formValue != null ? formValue : stored;
+    }
+
+    /**
+     * The key to store for a new config: what the form sent, except for LM
+     * Studio, whose form has no key field — there it is {@link #LM_STUDIO_KEY}.
+     */
+    static String apiKeyFor(LlmProvider provider, String apiKey) {
+        if (provider == LlmProvider.LM_STUDIO && (apiKey == null || apiKey.isBlank())) {
+            return LM_STUDIO_KEY;
+        }
+        return apiKey;
+    }
+
+    /**
+     * The key to store on update: the form's key, or the existing one when the
+     * form sent the mask. For LM Studio the form has no key field: a config
+     * that was LM Studio before keeps its key (a placeholder, say), one that
+     * was just switched to LM Studio must not carry its old provider's secret
+     * to a local server and gets {@link #LM_STUDIO_KEY}.
+     */
+    static String apiKeyForUpdate(LlmConfig existing, LlmProvider provider, String formKey) {
+        if (provider == LlmProvider.LM_STUDIO) {
+            boolean wasLmStudio = existing.provider() == LlmProvider.LM_STUDIO;
+            String kept = wasLmStudio ? existing.apiKey() : null;
+            return apiKeyFor(provider, kept);
+        }
+        return MASKED_KEY.equals(formKey) ? existing.apiKey() : formKey;
+    }
+
+    /** The form's provider, which a non-alias config must have. */
+    private static LlmProvider requiredProvider(FormBody body) {
+        String raw = body.str("provider");
+        if (raw == null || raw.isBlank()) {
+            throw new IllegalArgumentException("Provider is required — pick one before saving");
+        }
+        return LlmProvider.valueOf(raw);
     }
 
     /** The form's provider select, tolerant of missing/unknown values. */
@@ -160,11 +251,19 @@ public class LlmConfigUiController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /** The edit form; for an LM Studio config with its server's model list. */
     @GetMapping("/{id}/edit")
     public ResponseEntity<UiPage> editForm(@PathVariable UUID id) {
         return repository.findById(id)
-                .map(c -> ResponseEntity.ok(new LlmConfigFormPage(c, repository.findAll()).render()))
+                .map(c -> ResponseEntity.ok(new LlmConfigFormPage(c, repository.findAll(),
+                        lmStudioCatalogFor(c)).render()))
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** The LM Studio catalog for an LM Studio config, {@code null} for any other. */
+    private LmStudioModelCatalog.Catalog lmStudioCatalogFor(LlmConfig config) {
+        if (config.isAlias() || config.provider() != LlmProvider.LM_STUDIO) return null;
+        return lmStudio.fetch(config.baseUrl());
     }
 
     @PostMapping
@@ -173,7 +272,7 @@ public class LlmConfigUiController {
         boolean isAlias = body.bool("isAlias", false);
         // Hidden fields still submit (by design) — an alias must not absorb
         // the invisible provider fields, and vice versa.
-        LlmProvider provider = isAlias ? null : LlmProvider.valueOf(body.str("provider"));
+        LlmProvider provider = isAlias ? null : requiredProvider(body);
         var config = new LlmConfig(
                 UUID.randomUUID(),
                 body.str("name"),
@@ -182,7 +281,7 @@ public class LlmConfigUiController {
                 isAlias ? null : body.str("baseUrl"),
                 // Defensive: the form pre-fills the masked sentinel for existing
                 // keys; never persist the bullets themselves as an API key.
-                isAlias || MASKED_KEY.equals(body.str("apiKey")) ? null : body.str("apiKey"),
+                isAlias ? null : apiKeyFor(provider, MASKED_KEY.equals(body.str("apiKey")) ? null : body.str("apiKey")),
                 body.dbl("defaultTemperature", 0.7),
                 body.num("maxOutputTokens", 4096),
                 additionalParamsFrom(body, Map.of(), provider),
@@ -203,18 +302,15 @@ public class LlmConfigUiController {
         var body = new FormBody(raw);
         return repository.findById(id)
                 .map(existing -> {
-                    String apiKey = MASKED_KEY.equals(body.str("apiKey"))
-                            ? existing.apiKey()
-                            : body.str("apiKey");
                     boolean isAlias = body.bool("isAlias", existing.isAlias());
-                    LlmProvider provider = isAlias ? null : LlmProvider.valueOf(body.str("provider"));
+                    LlmProvider provider = isAlias ? null : requiredProvider(body);
                     var updated = new LlmConfig(
                             existing.id(),
                             body.str("name"),
                             provider,
                             isAlias ? null : body.str("model"),
                             isAlias ? null : body.str("baseUrl"),
-                            isAlias ? null : apiKey,
+                            isAlias ? null : apiKeyForUpdate(existing, provider, body.str("apiKey")),
                             body.dbl("defaultTemperature", existing.defaultTemperature()),
                             body.num("maxOutputTokens", existing.maxOutputTokens()),
                             additionalParamsFrom(body, existing.additionalParams(), provider),

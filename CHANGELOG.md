@@ -23,6 +23,25 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** the Admin UI's LLM-config form reads the models installed in
+  LM Studio. Switch the provider to LM Studio and the model field becomes a
+  dropdown of what the server at the base URL has (chat models for a chat
+  config, embedding models for an embedding config, each with its context
+  length and load state); picking one fills in the context window — the
+  length the model is loaded with, or its maximum when it is not loaded —
+  and preselects the capabilities LM Studio reports (tool use, vision).
+  A pick also names a config that has no name yet after the model
+  (`openai/gpt-oss-120b` → `gpt-oss-120b`). Changing the base URL reloads
+  the list; when LM Studio does not answer the field stays a text field and
+  says why. LM Studio configs no longer show an API-key field — a local LM
+  Studio takes no key. A new config now starts with no provider selected
+  (the field is required) instead of the first one in the list. The list comes
+  from LM Studio's native REST API (`/api/v0/models`, falling back to
+  `/api/v1/models`); `LmStudioModelCatalog` in `mc-llm-gateway` is the
+  client, usable on its own.
+
 ## [0.5.1] - 2026-09-07
 
 ### Fixed
