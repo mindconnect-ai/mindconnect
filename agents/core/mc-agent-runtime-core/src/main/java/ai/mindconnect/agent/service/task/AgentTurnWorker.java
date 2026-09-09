@@ -19,6 +19,7 @@ import ai.mindconnect.agent.service.round.AgentRound;
 import ai.mindconnect.agent.service.round.LlmAnswer;
 import ai.mindconnect.agent.service.round.TurnMessage;
 import ai.mindconnect.agent.service.round.TurnOutcome;
+import ai.mindconnect.agent.service.round.Usage;
 import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.agent.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -265,8 +266,13 @@ public final class AgentTurnWorker implements TaskWorker {
 
         int roundsSoFar = roundsSoFar(ctx);
         TurnOutcome outcome = loop.run(turnId.toString(), conversationId, session.id(),
-                cancellation, roundsSoFar);
-        ctx.updateState(Map.of("rounds", outcome.rounds(), "status", outcome.status().name()));
+                cancellation, roundsSoFar, usageSoFar(ctx));
+        // The usage rides in the task state for the same reason the round count
+        // does: a turn that suspends on a tool resumes as a fresh execution,
+        // and what the earlier legs spent lives nowhere else.
+        ctx.updateState(Map.of("rounds", outcome.rounds(), "status", outcome.status().name(),
+                "inputTokens", outcome.usage().inputTokens(),
+                "outputTokens", outcome.usage().outputTokens()));
 
         if (outcome.waitsForTools()) {
             // The whole point of step 5: give the thread back. The tool tasks'
@@ -299,7 +305,8 @@ public final class AgentTurnWorker implements TaskWorker {
                     cancellation, reviewer);
         }
 
-        stream.accept(new StreamEvent.Done());
+        stream.accept(new StreamEvent.Done(
+                outcome.usage().inputTokens(), outcome.usage().outputTokens()));
         afterTurn(memoryStrategy, def, session, auth);
         saveWorkingMemorySnapshot(memoryStrategy, def, session, auth);
         return TaskOutcome.done(finalText);
@@ -352,6 +359,16 @@ public final class AgentTurnWorker implements TaskWorker {
     private static int roundsSoFar(TaskContext ctx) {
         Object rounds = ctx.state().get("rounds");
         return rounds instanceof Number n ? n.intValue() : 0;
+    }
+
+    /** What earlier executions of this turn already spent; zero on the first. */
+    private static Usage usageSoFar(TaskContext ctx) {
+        return new Usage(longState(ctx, "inputTokens"), longState(ctx, "outputTokens"));
+    }
+
+    private static long longState(TaskContext ctx, String key) {
+        Object value = ctx.state().get(key);
+        return value instanceof Number n ? n.longValue() : 0L;
     }
 
     private static UUID uuid(TaskContext ctx, String key) {

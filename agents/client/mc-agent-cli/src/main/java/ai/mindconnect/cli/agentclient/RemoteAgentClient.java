@@ -199,7 +199,10 @@ public class RemoteAgentClient implements AgentClient {
                 }
                 yield new StreamEvent.ResponseRevised(finalText, reason, blocked);
             }
-            case "done" -> new StreamEvent.Done();
+            // A server too old to send the counts leaves them missing, which
+            // reads as untracked rather than as a measured zero.
+            case "done" -> new StreamEvent.Done(
+                    node.path("inputTokens").asLong(0), node.path("outputTokens").asLong(0));
             case "sub_agent_started" -> {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");

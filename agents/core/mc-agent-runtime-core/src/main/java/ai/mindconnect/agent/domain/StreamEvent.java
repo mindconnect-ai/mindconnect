@@ -55,7 +55,24 @@ public sealed interface StreamEvent
      */
     record ResponseRevised(String finalText, String reason, boolean blocked) implements StreamEvent {}
 
-    record Done() implements StreamEvent {}
+    /**
+     * The turn is over, and this is what it cost. The counts are the turn's
+     * own total over all its model rounds — including the rounds of earlier
+     * executions, when the turn suspended on a tool call and resumed.
+     *
+     * <p>Sub-agent turns account separately, on their own channel; a tree
+     * total is the reader's sum.
+     *
+     * @param inputTokens  prompt tokens as the providers reported them, summed
+     * @param outputTokens completion tokens as the providers reported them, summed
+     */
+    record Done(long inputTokens, long outputTokens) implements StreamEvent {
+
+        /** A turn that ended without an accounted model round. */
+        public static Done untracked() {
+            return new Done(0, 0);
+        }
+    }
 
     /**
      * A tool call needs a human — pushed on the ROOT turn's channel so the

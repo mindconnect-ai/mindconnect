@@ -56,6 +56,8 @@ public final class ResponseAssembler {
     private final Map<String, Object> metadata = new HashMap<>();
     private long seq = 0;
     private int itemCounter = 0;
+    /** What the turn reported it cost; stays ZERO until its Done arrives. */
+    private Usage usage = Usage.ZERO;
     private ResponseStatus status = ResponseStatus.IN_PROGRESS;
     private ResponseError error;
     private Instant completedAt;
@@ -88,7 +90,7 @@ public final class ResponseAssembler {
                 textBuffer.setLength(0);
                 textBuffer.append(t.finalText());
             }
-            case StreamEvent.Done t -> onDone();
+            case StreamEvent.Done t -> onDone(new Usage(t.inputTokens(), t.outputTokens()));
             // folded away: nested sub-agent streams, status-only events
             case StreamEvent.SubAgentEvent t -> { }
             case StreamEvent.AskingLlm t -> { }
@@ -129,17 +131,22 @@ public final class ResponseAssembler {
     public synchronized Response snapshot() {
         return new Response(responseId, conversationId, sessionId, agentName,
                 status, null, null, null, List.copyOf(items),
-                Usage.ZERO, error, Map.copyOf(metadata), createdAt, completedAt);
+                usage, error, Map.copyOf(metadata), createdAt, completedAt);
     }
 
     public Subscription subscribe(long afterSeq, Consumer<ResponseEvent> consumer) {
-        List<ResponseEvent> replay;
         SubscriberSlot slot = new SubscriberSlot(consumer);
+        // Backlog and registration under one lock, and the backlog delivered
+        // while still holding it. Handing the replay out afterwards would let
+        // a concurrently emitted event overtake it: the reader would see a
+        // later delta before an earlier one, and — when the overtaking event
+        // is the terminal one — close the stream on a backlog never written.
+        // emit() delivers under this same lock, so this is the order the
+        // reader sees, not merely the order the events were made in.
         synchronized (this) {
-            replay = events.stream().filter(e -> e.seq() > afterSeq).toList();
+            events.stream().filter(e -> e.seq() > afterSeq).forEach(consumer);
             subscribers.add(slot);
         }
-        replay.forEach(consumer);
         return () -> subscribers.remove(slot);
     }
 
@@ -184,11 +191,12 @@ public final class ResponseAssembler {
                 text == null ? "" : text, failed));
     }
 
-    private void onDone() {
+    private void onDone(Usage turnUsage) {
         flushText();
         status = ResponseStatus.COMPLETED;
         completedAt = Instant.now();
-        emit(new ResponseEvent.Completed(responseId, ++seq, Usage.ZERO));
+        usage = turnUsage;
+        emit(new ResponseEvent.Completed(responseId, ++seq, usage));
     }
 
     /** Finalizes the pending assistant text as a message item. */

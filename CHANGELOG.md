@@ -34,6 +34,37 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** the Responses API reports what a turn cost. `usage` on
+  `/v1/responses` was always zero: the runtime summed the providers' token
+  counts per round but dropped them at the turn boundary, so every response
+  claimed nought input and nought output tokens. The counts now ride with the
+  turn — across a suspend on a tool call and back — and reach the response
+  object and the `response.completed` frame. The same counts ride the
+  `mc-agent-api-rest` session stream: its `done` frame gains `inputTokens`
+  and `outputTokens`, which a client reads as untracked when talking to an
+  older server. Neither number was reachable over that API before — the
+  `/memory` endpoint's `totalTokens` sizes the next prompt's context window,
+  which is not what a turn spent, and the per-call traces that do record it
+  are rendered only in the admin UI.
+
+- **agents:** the Responses API stream announces and closes its content
+  parts. It sent `output_item.added`, the text deltas and `output_item.done`,
+  but none of `content_part.added`, `output_text.done` or `content_part.done`
+  — so a client had nothing telling it that the deltas and the text in the
+  finished item are one content part, and one that assumed otherwise rendered
+  the answer twice. A tool call now also gets the
+  `function_call_arguments.done` a client may wait for before dispatching, an
+  item opens `in_progress` and empty rather than already complete, and
+  `sequence_number` counts the frames actually written, so it no longer skips
+  the numbers of protocol events this layer does not send.
+
+- **agents:** a Responses API stream can no longer start out of order. A
+  subscriber was registered while the backlog it had yet to receive was
+  handed over outside the lock, so an event emitted in between overtook it: a
+  reader could see a later delta before an earlier one, and a terminal event
+  that won the race closed the stream on a backlog never written. The backlog
+  is now delivered under the same lock that registers the subscriber.
+
 - **agents:** two messages appended at the same moment no longer claim the
   same place in a conversation. The sequence number was read and written in
   two steps, so a turn finishing several tool calls together could hand the

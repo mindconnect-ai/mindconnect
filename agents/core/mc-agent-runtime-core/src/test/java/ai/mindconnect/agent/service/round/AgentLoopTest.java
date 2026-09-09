@@ -121,7 +121,7 @@ class AgentLoopTest {
         }
 
         TurnOutcome run(UUID conversationId, UUID sessionId) {
-            return loop.run("req1", conversationId, sessionId, new Cancellation(), 0);
+            return loop.run("req1", conversationId, sessionId, new Cancellation(), 0, Usage.ZERO);
         }
     }
 
@@ -182,7 +182,7 @@ class AgentLoopTest {
         f.executor.finishes("c1", "late result");
         f.llm.answer(TurnMessage.assistant("done"));
 
-        TurnOutcome outcome = f.loop.run("req1", conversationId, sessionId, new Cancellation(), 1);
+        TurnOutcome outcome = f.loop.run("req1", conversationId, sessionId, new Cancellation(), 1, Usage.ZERO);
 
         assertThat(outcome.status()).isEqualTo(TurnOutcome.Status.COMPLETED);
         assertThat(f.executor.executed).containsExactly("c1");     // dispatched ONCE
@@ -201,7 +201,7 @@ class AgentLoopTest {
         // roundsSoFar = 1 (an earlier attempt already turned once): the cap of
         // 2 is hit after ONE more model round — the history knows the calls,
         // only the count must come from outside.
-        TurnOutcome outcome = tightLoop.run("req1", conversationId, sessionId, new Cancellation(), 1);
+        TurnOutcome outcome = tightLoop.run("req1", conversationId, sessionId, new Cancellation(), 1, Usage.ZERO);
 
         assertThat(outcome.status()).isEqualTo(TurnOutcome.Status.INCOMPLETE);
         assertThat(outcome.incompleteReason()).isEqualTo(TurnOutcome.IncompleteReason.MAX_ROUNDS);
@@ -214,7 +214,7 @@ class AgentLoopTest {
         Cancellation cancellation = new Cancellation();
         cancellation.cancel();
 
-        TurnOutcome outcome = f.loop.run("req1", conversationId, sessionId, cancellation, 0);
+        TurnOutcome outcome = f.loop.run("req1", conversationId, sessionId, cancellation, 0, Usage.ZERO);
 
         assertThat(outcome.status()).isEqualTo(TurnOutcome.Status.CANCELLED);
         assertThat(f.llm.calls).isZero();
@@ -265,7 +265,7 @@ class AgentLoopTest {
         AgentLoop loop = new AgentLoop(new AgentRound(f.llm, s -> List.of(), f.executor),
                 f.log, 10, m -> { }, List.of(advisor));
 
-        TurnOutcome outcome = loop.run("req1", conversationId, sessionId, new Cancellation(), 0);
+        TurnOutcome outcome = loop.run("req1", conversationId, sessionId, new Cancellation(), 0, Usage.ZERO);
 
         assertThat(outcome.text()).isEqualTo("polite: model draft");
         Message persisted = f.log.messages.get(f.log.messages.size() - 1);
@@ -293,7 +293,7 @@ class AgentLoopTest {
         AgentLoop loop = new AgentLoop(new AgentRound(f.llm, s -> List.of(), f.executor),
                 f.log, 10, m -> { }, List.of(reviewer));
 
-        TurnOutcome outcome = loop.run("req1", conversationId, sessionId, new Cancellation(), 0);
+        TurnOutcome outcome = loop.run("req1", conversationId, sessionId, new Cancellation(), 0, Usage.ZERO);
 
         assertThat(outcome.text()).isEqualTo("reviewed");
         Message persisted = f.log.messages.get(f.log.messages.size() - 1);
@@ -314,7 +314,7 @@ class AgentLoopTest {
         AgentLoop loop = new AgentLoop(new AgentRound(f.llm, s -> List.of(), f.executor),
                 f.log, 10, m -> { }, List.of(observer));
 
-        loop.run("req1", conversationId, sessionId, new Cancellation(), 0);
+        loop.run("req1", conversationId, sessionId, new Cancellation(), 0, Usage.ZERO);
 
         // one call per round, each with exactly that round's durable increment
         assertThat(rounds).containsExactly(
@@ -336,7 +336,7 @@ class AgentLoopTest {
         AgentLoop loop = new AgentLoop(new AgentRound(f.llm, s -> List.of(), f.executor),
                 f.log, 10, m -> { }, List.of(broken));
 
-        assertThat(loop.run("req1", conversationId, sessionId, new Cancellation(), 0).status())
+        assertThat(loop.run("req1", conversationId, sessionId, new Cancellation(), 0, Usage.ZERO).status())
                 .isEqualTo(TurnOutcome.Status.COMPLETED);
     }
 

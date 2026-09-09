@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -28,7 +29,7 @@ class ResponseAssemblerTest {
         assembler.accept(new StreamEvent.ToolCallResult("web_search", "3 results", 42));
         assembler.accept(new StreamEvent.Token("It is "));
         assembler.accept(new StreamEvent.Token("sunny."));
-        assembler.accept(new StreamEvent.Done());
+        assembler.accept(StreamEvent.Done.untracked());
 
         Response r = assembler.snapshot();
 
@@ -51,7 +52,7 @@ class ResponseAssemblerTest {
         assembler.accept(new StreamEvent.SubAgentStarted(taskId, "researcher", 1, subSession, "find X"));
         assembler.accept(new StreamEvent.SubAgentDone(taskId, "researcher", subSession, "X found"));
         assembler.accept(new StreamEvent.Token("done"));
-        assembler.accept(new StreamEvent.Done());
+        assembler.accept(StreamEvent.Done.untracked());
 
         List<ConversationItem> items = assembler.snapshot().output().stream().map(ConversationItemRecord::item).toList();
 
@@ -67,7 +68,7 @@ class ResponseAssemblerTest {
     void reviewerRevisionReplacesStreamedText() {
         assembler.accept(new StreamEvent.Token("draft answer"));
         assembler.accept(new StreamEvent.ResponseRevised("reviewed answer", "tone", false));
-        assembler.accept(new StreamEvent.Done());
+        assembler.accept(StreamEvent.Done.untracked());
 
         assertThat(assembler.snapshot().outputText()).isEqualTo("reviewed answer");
     }
@@ -78,7 +79,7 @@ class ResponseAssemblerTest {
         assembler.accept(new StreamEvent.Token("Hi"));
 
         assembler.subscribe(0, live::add);              // replay: Created, InProgress, ItemAdded, Delta
-        assembler.accept(new StreamEvent.Done());       // live: ItemDone, Completed
+        assembler.accept(StreamEvent.Done.untracked());       // live: ItemDone, Completed
 
         assertThat(live).hasSize(6);
         assertThat(live.get(0)).isInstanceOf(ResponseEvent.Created.class);
@@ -87,6 +88,56 @@ class ResponseAssemblerTest {
         // seq is strictly increasing across replay and live
         for (int i = 1; i < live.size(); i++) {
             assertThat(live.get(i).seq()).isGreaterThan(live.get(i - 1).seq());
+        }
+    }
+
+    @Test
+    void tokenCountsFromTheTurnReachTheResponse() {
+        assembler.accept(new StreamEvent.Token("hi"));
+        assembler.accept(new StreamEvent.Done(1200, 340));
+
+        Response r = assembler.snapshot();
+        assertThat(r.usage().inputTokens()).isEqualTo(1200);
+        assertThat(r.usage().outputTokens()).isEqualTo(340);
+        assertThat(r.usage().totalTokens()).isEqualTo(1540);
+    }
+
+    /**
+     * The backlog must be written before any live event, or a reader sees a
+     * later delta ahead of an earlier one — and a terminal event that wins
+     * the race closes the stream on a backlog never written.
+     */
+    @Test
+    void liveEventsNeverOvertakeTheReplayedBacklog() throws Exception {
+        for (int run = 0; run < 50; run++) {
+            ResponseAssembler a = new ResponseAssembler("resp_" + run, "conv", "sess", "agent");
+            for (int i = 0; i < 200; i++) {
+                a.accept(new StreamEvent.Token("t" + i));
+            }
+
+            List<Long> seen = new ArrayList<>();
+            CountDownLatch go = new CountDownLatch(1);
+            Thread producer = new Thread(() -> {
+                try {
+                    go.await();
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                for (int i = 0; i < 50; i++) {
+                    a.accept(new StreamEvent.Token("late" + i));
+                }
+            });
+            producer.start();
+            go.countDown();
+            a.subscribe(0, e -> {
+                synchronized (seen) {
+                    seen.add(e.seq());
+                }
+            });
+            producer.join();
+
+            assertThat(seen).isSorted();
+            assertThat(seen).doesNotHaveDuplicates();
         }
     }
 
