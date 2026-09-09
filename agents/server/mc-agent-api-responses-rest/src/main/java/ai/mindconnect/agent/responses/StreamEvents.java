@@ -7,7 +7,9 @@ import ai.mindconnect.agent.responses.wire.ResponseDto;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -70,6 +72,9 @@ public final class StreamEvents {
     /** Item id → its position in {@code output}, in the order added. */
     private final Map<String, Integer> indices = new LinkedHashMap<>();
 
+    /** Item ids already announced with {@code output_item.added}. */
+    private final Set<String> announced = new HashSet<>();
+
     /** Frames actually written, which is what {@code sequence_number} counts. */
     private long seq = 0;
 
@@ -127,6 +132,7 @@ public final class StreamEvents {
             return List.of();
         }
         int index = indexOf(entry.id());
+        announced.add(entry.id());
         List<Frame> frames = new ArrayList<>();
         frames.add(itemFrame("response.output_item.added", index, opening(item)));
         if (carriesText(item)) {
@@ -150,8 +156,18 @@ public final class StreamEvents {
         if (item == null) {
             return List.of();
         }
-        int index = indexOf(entry.id());
         List<Frame> frames = new ArrayList<>();
+        if (!announced.contains(entry.id())) {
+            // The item closes without ever having opened. The runtime does
+            // this for text it never streamed — a reviewer's replacement
+            // answer, say, which reaches the assembler as finished text with
+            // no tokens before it. Closing a content part the reader was
+            // never told about is worse than a redundant announcement: a
+            // client resolves these frames against response.output[index]
+            // and the official SDK aborts the stream on the missing entry.
+            frames.addAll(itemAdded(entry));
+        }
+        int index = indexOf(entry.id());
         if (carriesText(item)) {
             String text = textOf(item);
             Map<String, Object> textDone = base("response.output_text.done");

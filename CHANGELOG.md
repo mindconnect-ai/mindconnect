@@ -32,6 +32,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `mindconnect.vector-store.embedding-config`; the local `embeddings` config
   stays the default.
 
+### Changed
+
+- **agents:** `AgentLoop.run` takes the tokens spent by earlier attempts as a
+  further argument, and `StreamEvent` has a new `TurnUsage` variant. Code
+  embedding `mc-agent-runtime-core` that calls `run` directly, or that
+  switches exhaustively over `StreamEvent`, needs the extra argument and the
+  extra arm. `StreamEvent.Done` is unchanged.
+
 ### Fixed
 
 - **agents:** the Responses API reports what a turn cost. `usage` on
@@ -39,13 +47,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
   counts per round but dropped them at the turn boundary, so every response
   claimed nought input and nought output tokens. The counts now ride with the
   turn — across a suspend on a tool call and back — and reach the response
-  object and the `response.completed` frame. The same counts ride the
-  `mc-agent-api-rest` session stream: its `done` frame gains `inputTokens`
-  and `outputTokens`, which a client reads as untracked when talking to an
-  older server. Neither number was reachable over that API before — the
-  `/memory` endpoint's `totalTokens` sizes the next prompt's context window,
-  which is not what a turn spent, and the per-call traces that do record it
-  are rendered only in the admin UI.
+  object and the `response.completed` frame. They arrive with the new
+  `StreamEvent.TurnUsage`, sent whenever the loop hands back control, so a
+  turn that fails or is cancelled reports what it burned instead of zero,
+  and the extra model call that answers after the round cap is counted too.
+  The same numbers ride the `mc-agent-api-rest` session stream as a
+  `turn_usage` frame; a client talking to an older server sees none, which
+  reads as untracked rather than as a measured zero. Nothing on that API
+  carried a turn's cost before — the `/memory` endpoint's `totalTokens`
+  sizes the next prompt's context window, which is not what a turn spent,
+  and the per-call traces that do record it are rendered only in the admin
+  UI.
 
 - **agents:** the Responses API stream announces and closes its content
   parts. It sent `output_item.added`, the text deltas and `output_item.done`,
@@ -57,6 +69,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
   item opens `in_progress` and empty rather than already complete, and
   `sequence_number` counts the frames actually written, so it no longer skips
   the numbers of protocol events this layer does not send.
+
+- **agents:** a Responses API stream no longer closes a content part it
+  never opened. When text reaches the runtime finished rather than as tokens
+  — a reviewer's replacement answer — the item was closed without ever being
+  announced, and a client resolving those frames against
+  `response.output[output_index]` aborted the stream on the missing entry
+  (the official OpenAI SDK raises `IndexError`). Such an item is now
+  announced before it closes.
 
 - **agents:** a Responses API stream can no longer start out of order. A
   subscriber was registered while the backlog it had yet to receive was

@@ -95,12 +95,49 @@ class StreamEventsTest {
         ConversationItemRecord call = new ConversationItemRecord("call_1", 1,
                 new ConversationItem.FunctionCall("call_1", "web_search", Map.of("q", "lisbon")));
 
-        List<StreamEvents.Frame> frames = stream(new ResponseEvent.OutputItemDone("resp_1", 2, call));
+        List<StreamEvents.Frame> frames = stream(
+                new ResponseEvent.OutputItemAdded("resp_1", 1, call),
+                new ResponseEvent.OutputItemDone("resp_1", 2, call));
 
         assertThat(frames).extracting(StreamEvents.Frame::event).containsExactly(
+                "response.output_item.added",
                 "response.function_call_arguments.done",
                 "response.output_item.done");
-        assertThat(frames.get(0).data().get("arguments").toString()).contains("lisbon");
+        assertThat(frames.get(1).data().get("arguments").toString()).contains("lisbon");
+    }
+
+    /**
+     * The runtime closes an item it never opened when text reaches it
+     * finished rather than as tokens — a reviewer's replacement answer. The
+     * frames must still announce it: a reader resolves them against
+     * {@code response.output[output_index]}, and the official SDK aborts the
+     * whole stream on the entry that was never added.
+     */
+    @Test
+    void anItemThatClosesWithoutOpeningIsAnnouncedFirst() {
+        List<StreamEvents.Frame> frames = stream(
+                new ResponseEvent.OutputItemDone("resp_1", 3, message("msg_1", "reviewed answer")));
+
+        assertThat(frames).extracting(StreamEvents.Frame::event).containsExactly(
+                "response.output_item.added",
+                "response.content_part.added",
+                "response.output_text.done",
+                "response.content_part.done",
+                "response.output_item.done");
+        assertThat(frames).allSatisfy(f -> assertThat(f.data()).containsEntry("output_index", 0));
+        assertThat(part(frames.get(1)).text()).isEmpty();
+        assertThat(frames.get(2).data()).containsEntry("text", "reviewed answer");
+    }
+
+    /** An item announced once is not announced again when it closes. */
+    @Test
+    void anItemThatOpenedNormallyIsNotAnnouncedTwice() {
+        List<StreamEvents.Frame> frames = stream(
+                new ResponseEvent.OutputItemAdded("resp_1", 1, message("msg_1", "")),
+                new ResponseEvent.OutputItemDone("resp_1", 2, message("msg_1", "hi")));
+
+        assertThat(frames).extracting(StreamEvents.Frame::event)
+                .filteredOn("response.output_item.added"::equals).hasSize(1);
     }
 
     /** Items are numbered by the order they are added, deltas cite their own. */

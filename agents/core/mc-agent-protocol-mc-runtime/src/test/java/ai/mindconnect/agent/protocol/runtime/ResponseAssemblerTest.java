@@ -29,7 +29,7 @@ class ResponseAssemblerTest {
         assembler.accept(new StreamEvent.ToolCallResult("web_search", "3 results", 42));
         assembler.accept(new StreamEvent.Token("It is "));
         assembler.accept(new StreamEvent.Token("sunny."));
-        assembler.accept(StreamEvent.Done.untracked());
+        assembler.accept(new StreamEvent.Done());
 
         Response r = assembler.snapshot();
 
@@ -52,7 +52,7 @@ class ResponseAssemblerTest {
         assembler.accept(new StreamEvent.SubAgentStarted(taskId, "researcher", 1, subSession, "find X"));
         assembler.accept(new StreamEvent.SubAgentDone(taskId, "researcher", subSession, "X found"));
         assembler.accept(new StreamEvent.Token("done"));
-        assembler.accept(StreamEvent.Done.untracked());
+        assembler.accept(new StreamEvent.Done());
 
         List<ConversationItem> items = assembler.snapshot().output().stream().map(ConversationItemRecord::item).toList();
 
@@ -68,7 +68,7 @@ class ResponseAssemblerTest {
     void reviewerRevisionReplacesStreamedText() {
         assembler.accept(new StreamEvent.Token("draft answer"));
         assembler.accept(new StreamEvent.ResponseRevised("reviewed answer", "tone", false));
-        assembler.accept(StreamEvent.Done.untracked());
+        assembler.accept(new StreamEvent.Done());
 
         assertThat(assembler.snapshot().outputText()).isEqualTo("reviewed answer");
     }
@@ -79,7 +79,7 @@ class ResponseAssemblerTest {
         assembler.accept(new StreamEvent.Token("Hi"));
 
         assembler.subscribe(0, live::add);              // replay: Created, InProgress, ItemAdded, Delta
-        assembler.accept(StreamEvent.Done.untracked());       // live: ItemDone, Completed
+        assembler.accept(new StreamEvent.Done());       // live: ItemDone, Completed
 
         assertThat(live).hasSize(6);
         assertThat(live.get(0)).isInstanceOf(ResponseEvent.Created.class);
@@ -94,12 +94,37 @@ class ResponseAssemblerTest {
     @Test
     void tokenCountsFromTheTurnReachTheResponse() {
         assembler.accept(new StreamEvent.Token("hi"));
-        assembler.accept(new StreamEvent.Done(1200, 340));
+        assembler.accept(new StreamEvent.TurnUsage(1200, 340));
+        assembler.accept(new StreamEvent.Done());
 
         Response r = assembler.snapshot();
         assertThat(r.usage().inputTokens()).isEqualTo(1200);
         assertThat(r.usage().outputTokens()).isEqualTo(340);
         assertThat(r.usage().totalTokens()).isEqualTo(1540);
+    }
+
+    /**
+     * A turn that dies has still been billed. The counts arrive with
+     * TurnUsage before the loop hands back, so they survive a failure and a
+     * cancellation — the two cases a cost investigation actually looks at.
+     */
+    @Test
+    void tokenCountsSurviveAFailedTurn() {
+        assembler.accept(new StreamEvent.TurnUsage(900, 120));
+        assembler.accept(new StreamEvent.Token("partial"));
+        assembler.fail("LLM unavailable");
+
+        Response r = assembler.snapshot();
+        assertThat(r.status()).isEqualTo(ResponseStatus.FAILED);
+        assertThat(r.usage().totalTokens()).isEqualTo(1020);
+    }
+
+    @Test
+    void tokenCountsSurviveACancelledTurn() {
+        assembler.accept(new StreamEvent.TurnUsage(500, 40));
+        assembler.cancelled();
+
+        assertThat(assembler.snapshot().usage().totalTokens()).isEqualTo(540);
     }
 
     /**

@@ -16,7 +16,7 @@ public record StreamEventFrame(String type, String text, String toolName,
                                 Long inputTokens, Long outputTokens) {
 
     /**
-     * Every frame but {@code done}, which is the only one that accounts for
+     * Every frame but {@code turn_usage}, the only one that accounts for
      * tokens. Spares the other fifteen arms two trailing nulls apiece.
      */
     public StreamEventFrame(String type, String text, String toolName,
@@ -72,11 +72,15 @@ public record StreamEventFrame(String type, String text, String toolName,
                     new StreamEventFrame("response_revised", null, null, null, null, null,
                             null, null, rr.finalText(), rr.reason(), rr.blocked(),
                             null, null, null, null, null, null);
+            case StreamEvent.TurnUsage u ->
+                    new StreamEventFrame("turn_usage", null, null, null, null, null,
+                            null, null, null, null, null,
+                            null, null, null, null, null, null,
+                            u.inputTokens(), u.outputTokens());
             case StreamEvent.Done d ->
                     new StreamEventFrame("done", null, null, null, null, null,
                             null, null, null, null, null,
-                            null, null, null, null, null, null,
-                            d.inputTokens(), d.outputTokens());
+                            null, null, null, null, null, null);
             case StreamEvent.SubAgentStarted s ->
                     new StreamEventFrame("sub_agent_started", s.input(), null, null, null, null,
                             null, null, null, null, null,

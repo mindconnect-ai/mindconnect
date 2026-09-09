@@ -56,13 +56,35 @@ public final class ResponseAssembler {
     private final Map<String, Object> metadata = new HashMap<>();
     private long seq = 0;
     private int itemCounter = 0;
-    /** What the turn reported it cost; stays ZERO until its Done arrives. */
+    /**
+     * What the turn last reported it cost. Recorded from TurnUsage rather
+     * than from the terminal event, so a response that fails or is cancelled
+     * still carries the tokens it burned before it died.
+     */
     private Usage usage = Usage.ZERO;
     private ResponseStatus status = ResponseStatus.IN_PROGRESS;
     private ResponseError error;
     private Instant completedAt;
 
-    private record SubscriberSlot(Consumer<ResponseEvent> consumer) { }
+    /**
+     * One subscriber. Until its backlog has been handed over, live events
+     * queue here instead of going straight out — that is what keeps a reader
+     * from seeing a later event before an earlier one without holding the
+     * assembler's lock across the subscriber's I/O.
+     */
+    private static final class SubscriberSlot {
+        private final Consumer<ResponseEvent> consumer;
+        private final Deque<ResponseEvent> queued = new ArrayDeque<>();
+        private boolean caughtUp;
+
+        SubscriberSlot(Consumer<ResponseEvent> consumer) {
+            this.consumer = consumer;
+        }
+
+        Consumer<ResponseEvent> consumer() {
+            return consumer;
+        }
+    }
 
     public ResponseAssembler(String responseId, String conversationId,
                              String sessionId, String agentName) {
@@ -90,7 +112,8 @@ public final class ResponseAssembler {
                 textBuffer.setLength(0);
                 textBuffer.append(t.finalText());
             }
-            case StreamEvent.Done t -> onDone(new Usage(t.inputTokens(), t.outputTokens()));
+            case StreamEvent.TurnUsage t -> usage = new Usage(t.inputTokens(), t.outputTokens());
+            case StreamEvent.Done t -> onDone();
             // folded away: nested sub-agent streams, status-only events
             case StreamEvent.SubAgentEvent t -> { }
             case StreamEvent.AskingLlm t -> { }
@@ -136,18 +159,39 @@ public final class ResponseAssembler {
 
     public Subscription subscribe(long afterSeq, Consumer<ResponseEvent> consumer) {
         SubscriberSlot slot = new SubscriberSlot(consumer);
-        // Backlog and registration under one lock, and the backlog delivered
-        // while still holding it. Handing the replay out afterwards would let
-        // a concurrently emitted event overtake it: the reader would see a
-        // later delta before an earlier one, and — when the overtaking event
-        // is the terminal one — close the stream on a backlog never written.
-        // emit() delivers under this same lock, so this is the order the
-        // reader sees, not merely the order the events were made in.
+        List<ResponseEvent> backlog;
         synchronized (this) {
-            events.stream().filter(e -> e.seq() > afterSeq).forEach(consumer);
-            subscribers.add(slot);
+            backlog = events.stream().filter(e -> e.seq() > afterSeq).toList();
+            subscribers.add(slot);          // not caught up yet: emit() queues
         }
-        return () -> subscribers.remove(slot);
+        try {
+            backlog.forEach(consumer);
+
+            // Drain what arrived while the backlog was going out, and only
+            // call the subscriber caught up once its queue is empty under the
+            // lock — otherwise an event slipping in during the last drain
+            // would jump ahead of the ones still queued. The subscriber's I/O
+            // stays outside the lock throughout, so a slow reader cannot
+            // stall the turn that is producing the events.
+            while (true) {
+                List<ResponseEvent> pending;
+                synchronized (this) {
+                    if (slot.queued.isEmpty()) {
+                        slot.caughtUp = true;
+                        return () -> subscribers.remove(slot);
+                    }
+                    pending = List.copyOf(slot.queued);
+                    slot.queued.clear();
+                }
+                pending.forEach(consumer);
+            }
+        } catch (RuntimeException e) {
+            // A subscriber that dies mid-backlog would otherwise stay
+            // registered and never caught up, queueing the rest of the run
+            // into a list nobody drains.
+            subscribers.remove(slot);
+            throw e;
+        }
     }
 
     // ── internals ───────────────────────────────────────────────────────────
@@ -191,11 +235,10 @@ public final class ResponseAssembler {
                 text == null ? "" : text, failed));
     }
 
-    private void onDone(Usage turnUsage) {
+    private void onDone() {
         flushText();
         status = ResponseStatus.COMPLETED;
         completedAt = Instant.now();
-        usage = turnUsage;
         emit(new ResponseEvent.Completed(responseId, ++seq, usage));
     }
 
@@ -225,6 +268,11 @@ public final class ResponseAssembler {
     private void emit(ResponseEvent event) {
         events.add(event);
         for (SubscriberSlot slot : subscribers) {
+            if (!slot.caughtUp) {
+                // Still receiving its backlog — queue, so it arrives after.
+                slot.queued.addLast(event);
+                continue;
+            }
             try {
                 slot.consumer().accept(event);
             } catch (RuntimeException ignored) {
