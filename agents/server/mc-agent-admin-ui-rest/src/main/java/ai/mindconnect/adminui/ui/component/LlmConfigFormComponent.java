@@ -1,8 +1,11 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
+import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
+import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
@@ -10,27 +13,74 @@ import ai.mindconnect.ui.model.UiTrigger;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiLink;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Edit form for an LLM configuration. Same component for both "new"
  * (null config) and "edit" (existing config) modes — the differences
  * are confined to factory-derived defaults, form id, and the submit
  * target (POST vs PUT).
+ *
+ * <p>For the LM Studio provider the model field is a dropdown of what the
+ * LM Studio instance at the base URL has installed, read from its REST API;
+ * picking a model fills the context window and the capabilities from what
+ * LM Studio reports. Every other provider keeps the free-text model field.
  */
 public final class LlmConfigFormComponent implements UiComponent {
 
     private final LlmConfig config;
     private final List<LlmConfig> allConfigs;
+    private final LmStudioModelCatalog.Catalog lmStudio;
 
     /**
      * @param config     the config being edited, or {@code null} for the "new config" form
      * @param allConfigs all stored configs — used to populate the "Delegates To" dropdown
      */
     public LlmConfigFormComponent(LlmConfig config, List<LlmConfig> allConfigs) {
+        this(config, allConfigs, null);
+    }
+
+    /**
+     * @param lmStudio the LM Studio catalog for the config's base URL — only
+     *                 for a config whose provider is LM Studio, {@code null}
+     *                 otherwise (the model stays a text field)
+     */
+    public LlmConfigFormComponent(LlmConfig config, List<LlmConfig> allConfigs,
+                                  LmStudioModelCatalog.Catalog lmStudio) {
         this.config = config;
         this.allConfigs = allConfigs;
+        this.lmStudio = lmStudio;
+    }
+
+    /**
+     * What the form fills in after a model was picked from LM Studio's
+     * catalog: the context length LM Studio reports for it and the
+     * capabilities its metadata vouches for, plus the hint that says where
+     * the number came from. {@code null} means "nothing to prefill — show
+     * what the config has".
+     */
+    public record LmStudioPrefill(Integer contextWindowTokens, Set<LlmCapability> capabilities, String hint) {
+
+        public static LmStudioPrefill of(LmStudioModel model) {
+            Integer ctx = model.effectiveContextLength();
+            String hint;
+            if (ctx == null) {
+                hint = null;
+            } else if (model.loaded()) {
+                hint = "From LM Studio: the model is loaded with " + ctx + " tokens";
+                if (model.maxContextLength() != null && !model.maxContextLength().equals(ctx)) {
+                    hint += " (it takes up to " + model.maxContextLength() + ")";
+                }
+                hint += ".";
+            } else {
+                hint = "From LM Studio: the model's maximum, " + ctx + " tokens. It is not loaded "
+                        + "right now — LM Studio may load it with a smaller context; lower this if so.";
+            }
+            return new LmStudioPrefill(ctx, model.capabilities(), hint);
+        }
     }
 
     @Override
@@ -61,22 +111,34 @@ public final class LlmConfigFormComponent implements UiComponent {
      * capability declaration; an embedding model only needs its input window.
      */
     public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(boolean isEmbedding, LlmConfig config) {
+        return typeGroup(isEmbedding, config, null);
+    }
+
+    /**
+     * @param prefill values picked up from LM Studio for the model just
+     *                chosen, or {@code null} to show the config's own
+     */
+    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(boolean isEmbedding, LlmConfig config,
+                                                                 LmStudioPrefill prefill) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-type-cfg",
                 isEmbedding ? "Embedding settings" : "Chat settings");
+        Integer contextWindow = prefill != null && prefill.contextWindowTokens() != null
+                ? prefill.contextWindowTokens()
+                : config == null ? null : config.contextWindowTokens();
+        String contextHint = prefill != null && prefill.hint() != null ? prefill.hint() : null;
         if (isEmbedding) {
-            group.field(UiField.number("contextWindowTokens", "Max Input Tokens",
-                    config == null ? null : config.contextWindowTokens()).asEditable()
-                    .hint("Optional — the embedding model's input window, used to size chunks"));
+            group.field(UiField.number("contextWindowTokens", "Max Input Tokens", contextWindow).asEditable()
+                    .hint(contextHint != null ? contextHint
+                            : "Optional — the embedding model's input window, used to size chunks"));
             return group;
         }
-        group.field(capabilitiesField(config))
+        group.field(capabilitiesField(config, prefill == null ? null : prefill.capabilities()))
                 .field(UiField.number("defaultTemperature", "Temperature",
                         config == null ? 0.7 : config.defaultTemperature()).asEditable())
                 .field(UiField.number("maxOutputTokens", "Max Output Tokens",
                         config == null ? 4096 : config.maxOutputTokens()).asEditable())
-                .field(UiField.number("contextWindowTokens", "Context Window Tokens",
-                        config == null ? null : config.contextWindowTokens()).asEditable()
-                        .hint("Optional — used for token budget calculations"))
+                .field(UiField.number("contextWindowTokens", "Context Window Tokens", contextWindow).asEditable()
+                        .hint(contextHint != null ? contextHint : "Optional — used for token budget calculations"))
                 .field(UiField.bool("retryEnabled", "Retry on rate limit (429/529)",
                         config != null && config.retry() != null && config.retry().enabled())
                         .asEditable()
@@ -102,17 +164,25 @@ public final class LlmConfigFormComponent implements UiComponent {
      * config's effective set preselected: what it declares, or its provider's
      * default when it declares nothing. Saving the form pins that set on the
      * config; the hint says what Vision and Documents do, so an admin knows
-     * that unticking Vision turns images into placeholders.
+     * that unticking Vision turns images into placeholders. A set picked up
+     * from LM Studio's model metadata wins over both.
      */
-    private static UiField capabilitiesField(LlmConfig config) {
+    private static UiField capabilitiesField(LlmConfig config, Set<LlmCapability> fromLmStudio) {
         List<UiField.Option> options = Arrays.stream(LlmCapability.values())
                 .map(c -> UiField.Option.of(c.name(), c.label()))
                 .toList();
-        List<String> current = config == null ? List.of()
-                : config.effectiveCapabilities().stream().map(Enum::name).toList();
-        String origin = config == null || config.declaresCapabilities() ? ""
-                : " Not declared yet — the preselection is the " + config.provider() + " default; "
-                        + "saving pins it.";
+        List<String> current;
+        String origin;
+        if (fromLmStudio != null) {
+            current = fromLmStudio.stream().map(Enum::name).toList();
+            origin = " Preselected from what LM Studio reports for the model; saving pins it.";
+        } else {
+            current = config == null ? List.of()
+                    : config.effectiveCapabilities().stream().map(Enum::name).toList();
+            origin = config == null || config.declaresCapabilities() ? ""
+                    : " Not declared yet — the preselection is the " + config.provider() + " default; "
+                            + "saving pins it.";
+        }
         return UiField.multiselect("capabilities", "Capabilities", current, options)
                 .asEditable()
                 .hint("What the model reads and does. Vision: images sent with a message reach "
@@ -177,15 +247,37 @@ public final class LlmConfigFormComponent implements UiComponent {
      * hidden entirely in alias mode. Values come from the submitted form when
      * the swap is triggered by a toggle (so typed input survives), from the
      * stored config on first render.
+     *
+     * <p>LM Studio is the one provider whose server can be asked what it
+     * offers, so its base group differs: the model is a dropdown of the
+     * installed models (a text field with a hint when LM Studio does not
+     * answer), the base URL defaults to LM Studio's port and reloads the list
+     * when changed, and there is no API-key field — a local LM Studio takes
+     * no key.
+     *
+     * @param lmStudio the catalog read from the base URL when the provider is
+     *                 LM Studio; {@code null} for every other provider
      */
     public static ai.mindconnect.ui.model.UiFieldGroup baseGroup(
             boolean isAlias, String type, String provider, String model, String baseUrl,
-            String apiKey, String formId, java.util.UUID configId) {
+            String apiKey, String formId, java.util.UUID configId,
+            LmStudioModelCatalog.Catalog lmStudio) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-base-cfg", null);
         if (isAlias) group.hidden();
-        List<UiField.Option> providerOptions = Arrays.stream(LlmProvider.values())
+        boolean isLmStudio = LlmProvider.LM_STUDIO.name().equals(provider);
+        if (isLmStudio && (baseUrl == null || baseUrl.isBlank())) {
+            baseUrl = LmStudioModelCatalog.DEFAULT_BASE_URL;
+        }
+        LlmConfigType configType = LlmConfigType.EMBEDDING.name().equals(type)
+                ? LlmConfigType.EMBEDDING : LlmConfigType.CHAT;
+        // A new config starts with no provider: the picker must not appear for
+        // a provider nobody chose, so the first option is a blank the admin
+        // has to move off before saving.
+        List<UiField.Option> providerOptions = new ArrayList<>();
+        if (provider == null) providerOptions.add(UiField.Option.of("", "— pick a provider —"));
+        Arrays.stream(LlmProvider.values())
                 .map(p -> UiField.Option.of(p.name(), p.name()))
-                .toList();
+                .forEach(providerOptions::add);
         String swapUrl = "/admin/api/llm-configs/field-groups?form=" + formId
                 + (configId == null ? "" : "&id=" + configId);
         group.field(UiField.select("type", "Type",
@@ -197,24 +289,98 @@ public final class LlmConfigFormComponent implements UiComponent {
                                 + "search); no sampling settings, Test embeds the text instead of chatting.")
                         // Switching swaps the type-specific settings group below.
                         .onChange(UiTrigger.api("POST", swapUrl, formId)))
-                .field(UiField.select("provider", "Provider", provider, providerOptions)
-                        .asEditable()
+                .field(UiField.select("provider", "Provider", provider == null ? "" : provider, providerOptions)
+                        .asEditable().asRequired()
                         // Switching re-renders the provider-parameter group below.
                         .onChange(UiTrigger.api("POST", swapUrl, formId)))
-                .field(UiField.text("model", "Model", model)
-                        .asEditable()
-                        .hint("e.g. gpt-4o, gpt-5, claude-sonnet-4-6"))
-                .field(UiField.text("baseUrl", "Base URL", baseUrl)
-                        .asEditable()
-                        .hint("Leave empty to use provider default"))
-                .field(apiKeyField(apiKey, formId));
+                .field(modelField(model, isLmStudio ? lmStudio : null, configType, swapUrl, formId));
+        if (isLmStudio) {
+            group.field(UiField.text("baseUrl", "Base URL", baseUrl)
+                    .asEditable()
+                    .hint("The LM Studio server. Its models are read from " + baseUrl
+                            + "/api/v0/models — change the URL to reload the list.")
+                    // A different server has different models.
+                    .onChange(UiTrigger.api("POST", swapUrl, formId)));
+        } else {
+            group.field(UiField.text("baseUrl", "Base URL", baseUrl)
+                            .asEditable()
+                            .hint("Leave empty to use provider default"))
+                    .field(apiKeyField(apiKey, formId));
+        }
         return group;
+    }
+
+    /**
+     * The model field. A text field for every provider but LM Studio; for LM
+     * Studio a dropdown of the models its server lists for this config type
+     * (chat models for a chat config, embedding models for an embedding
+     * config). A stored model the server no longer has stays selectable, so
+     * opening the form never silently drops it. When the server does not
+     * answer, the text field returns with the reason as its hint.
+     */
+    static UiField modelField(String model, LmStudioModelCatalog.Catalog lmStudio, LlmConfigType type,
+                              String swapUrl, String formId) {
+        if (lmStudio == null) {
+            return UiField.text("model", "Model", model)
+                    .asEditable()
+                    .hint("e.g. gpt-4o, gpt-5, claude-sonnet-4-6");
+        }
+        if (!lmStudio.available()) {
+            return UiField.text("model", "Model", model)
+                    .asEditable()
+                    .hint("LM Studio at " + lmStudio.baseUrl() + " did not answer (" + lmStudio.error()
+                            + "). Type the model id, or start LM Studio and re-enter the Base URL "
+                            + "to load the list.");
+        }
+        List<UiField.Option> options = new ArrayList<>();
+        options.add(UiField.Option.of("", "— pick a model —"));
+        boolean listed = false;
+        for (LmStudioModel m : lmStudio.models()) {
+            if (!m.appliesTo(type)) continue;
+            options.add(UiField.Option.of(m.id(), m.label()));
+            listed |= m.id().equals(model);
+        }
+        boolean hasModel = model != null && !model.isBlank();
+        if (hasModel && !listed) {
+            options.add(UiField.Option.of(model, model + " (not installed in LM Studio)"));
+        }
+        String what = type == LlmConfigType.EMBEDDING ? "embedding" : "chat";
+        String hint = options.size() == 1
+                ? "LM Studio at " + lmStudio.baseUrl() + " lists no " + what + " models."
+                : "Installed in LM Studio at " + lmStudio.baseUrl()
+                        + ". Picking a model fills in its context window below.";
+        return UiField.select("model", "Model", hasModel ? model : "", options)
+                .asEditable()
+                .hint(hint)
+                // The pick decides the context window: re-render with reason=model.
+                .onChange(UiTrigger.api("POST", swapUrl + "&reason=model", formId));
     }
 
     /** Marks the group hidden in alias mode — fields stay in the DOM. */
     public static ai.mindconnect.ui.model.UiFieldGroup withHiddenIf(
             boolean hide, ai.mindconnect.ui.model.UiFieldGroup group) {
         return hide ? group.<ai.mindconnect.ui.model.UiFieldGroup>hidden() : group;
+    }
+
+    /**
+     * The name field — also rebuilt by the field-groups patch when a model
+     * picked from LM Studio names a config that has no name yet.
+     */
+    public static UiField nameField(String name) {
+        return UiField.text("name", "Name", name).asEditable().asRequired();
+    }
+
+    /**
+     * A config name suggested by a model id: the last path segment, so
+     * {@code openai/gpt-oss-120b} becomes {@code gpt-oss-120b} — config names
+     * travel in URLs and agent definitions, where a slash would get in the way.
+     */
+    public static String suggestedName(String modelId) {
+        if (modelId == null || modelId.isBlank()) return null;
+        String id = modelId.trim();
+        int slash = id.lastIndexOf('/');
+        String name = slash >= 0 && slash < id.length() - 1 ? id.substring(slash + 1) : id;
+        return name.isBlank() ? null : name;
     }
 
     @Override
@@ -224,8 +390,7 @@ public final class LlmConfigFormComponent implements UiComponent {
         java.util.UUID configId = isNew ? null : config.id();
 
         return UiForm.of(id(), isNew ? "New LLM Config" : "Edit LLM Config: " + config.name())
-                .field(UiField.text("name", "Name", isNew ? null : config.name())
-                        .asEditable().asRequired())
+                .field(nameField(isNew ? null : config.name()))
                 .field(UiField.bool("isAlias", "Is Alias", isAlias)
                         .asEditable()
                         .hint("If set, this config just points at another config by name — handy for a swappable 'default'")
@@ -241,7 +406,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                         isNew ? null : config.model(),
                         isNew ? null : config.baseUrl(),
                         isNew ? null : config.apiKey(),
-                        id(), configId))
+                        id(), configId, lmStudio))
                 .content(withHiddenIf(isAlias, typeGroup(!isNew && config.isEmbedding(), config)))
                 .content(withHiddenIf(isAlias, providerParamsGroup(
                         isNew ? null : config.provider(),

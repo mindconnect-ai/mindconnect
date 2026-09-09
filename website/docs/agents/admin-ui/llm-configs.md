@@ -31,6 +31,35 @@ settings. The form also covers:
 - provider-specific extra parameters, rendered from the provider catalog;
 - an **Encrypt** button next to the API-key field for literal keys.
 
+## LM Studio: pick a model instead of typing it {#lm-studio}
+
+A new config starts with no provider selected; the field is required. With
+**LM Studio** as the provider the form asks the server at the base URL
+what it has installed, and the model field becomes a dropdown:
+
+- the list comes from LM Studio's native REST API (`GET {baseUrl}/api/v0/models`,
+  falling back to `/api/v1/models` on newer versions) and is filtered by the
+  config's type — chat models (`llm`, `vlm`) for a chat config, embedding
+  models for an embedding config;
+- each entry shows the model's context length and whether it is loaded, e.g.
+  `openai/gpt-oss-120b · 32k loaded (max 128k) · tools`;
+- picking a model fills in **Context Window Tokens** with the length the model
+  is *loaded* with (that is the limit requests hit), or its maximum when it is
+  not loaded yet — LM Studio may then load it with a smaller context, so check
+  the value after the first call. The **Capabilities** preselection follows
+  what LM Studio reports (tool use, vision). Both stay editable;
+- a config that has no name yet is named after the picked model — the last
+  path segment, so `openai/gpt-oss-120b` becomes `gpt-oss-120b`;
+- the base URL defaults to `http://localhost:1234`; changing it reloads the
+  list, so a second LM Studio on another machine works the same way;
+- a model the config names but the server no longer has stays selectable,
+  marked *not installed in LM Studio*;
+- there is no API-key field — a local LM Studio takes no key.
+
+When LM Studio is not running (or the URL points elsewhere) the model field
+stays a text field and its hint says what went wrong; type the model id as
+before, or start LM Studio and re-enter the base URL to load the list.
+
 ## Testing a config
 
 Each config's detail view has a **Test** button. It opens a dialog where you
