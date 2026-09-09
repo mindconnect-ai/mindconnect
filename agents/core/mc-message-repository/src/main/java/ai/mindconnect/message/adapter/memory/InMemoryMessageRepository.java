@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.IntFunction;
 
 /** In-memory {@link MessageRepository} — process-lifetime storage, no persistence. */
 public class InMemoryMessageRepository implements MessageRepository {
@@ -44,9 +45,18 @@ public class InMemoryMessageRepository implements MessageRepository {
                 .findFirst();
     }
 
+    /**
+     * One appender at a time, so two of them cannot read the same highest
+     * number. The list itself is thread-safe; handing out a number is not,
+     * and that is what needs guarding.
+     */
     @Override
-    public int countByConversationId(UUID conversationId) {
-        return (int) store.stream().filter(m -> m.conversationId().equals(conversationId)).count();
+    public synchronized Message append(UUID conversationId, IntFunction<Message> create) {
+        int next = store.stream()
+                .filter(m -> m.conversationId().equals(conversationId))
+                .mapToInt(Message::sequenceNum)
+                .max().orElse(0) + 1;
+        return save(create.apply(next));
     }
 
     @Override

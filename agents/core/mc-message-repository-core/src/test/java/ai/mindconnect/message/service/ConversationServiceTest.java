@@ -197,8 +197,12 @@ class ConversationServiceTest {
         }
 
         @Override
-        public int countByConversationId(UUID id) {
-            return (int) store.stream().filter(m -> m.conversationId().equals(id)).count();
+        public synchronized Message append(UUID id, java.util.function.IntFunction<Message> create) {
+            int next = store.stream()
+                    .filter(m -> m.conversationId().equals(id))
+                    .mapToInt(Message::sequenceNum)
+                    .max().orElse(0) + 1;
+            return save(create.apply(next));
         }
 
         @Override

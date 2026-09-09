@@ -25,6 +25,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** two messages appended at the same moment no longer claim the
+  same place in a conversation. The sequence number was read and written in
+  two steps, so a turn finishing several tool calls together could hand the
+  same number to two messages and skip the next, which throws off anything
+  cutting by it: delete-from-here, regenerate, and the tool cards a turn is
+  folded into. Handing out the number is now the store's own doing, in one
+  step: Postgres reserves it in a counter row, the file and in-memory stores
+  take a lock per conversation. `MessageRepository` gains `append` and loses
+  `countByConversationId`, whose only caller this was.
+
 - **agents:** a chat longer than 200 messages no longer hides its newest
   ones. A session's history was loaded as the *first* 200 messages, so once
   a conversation passed that the chat kept showing its opening and silently

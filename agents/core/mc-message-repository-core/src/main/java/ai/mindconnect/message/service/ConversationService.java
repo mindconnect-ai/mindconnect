@@ -64,17 +64,20 @@ public class ConversationService implements ConversationManager {
                 turnId, run, metadata);
     }
 
-    /** The shared tail: the conversation must exist, the sequence is the next free one. */
+    /**
+     * The shared tail: the conversation must exist, and the store hands out
+     * the sequence number as it writes. Counting the messages here and
+     * writing afterwards is what used to give two messages the same number
+     * whenever a turn appended twice at once.
+     */
     private Message append(UUID conversationId, java.util.function.IntFunction<Message> create,
                            UUID turnId, Integer run, java.util.Map<String, Object> metadata) {
         conversationRepository.findById(conversationId)
                 .orElseThrow(() -> DomainException.notFound("Conversation", conversationId.toString()));
-        int seq = messageRepository.countByConversationId(conversationId) + 1;
-        Message message = create.apply(seq)
-                .withTurnId(turnId)
-                .withMetadata(metadata);
-        if (run != null) message = message.withRun(run);
-        return messageRepository.save(message);
+        return messageRepository.append(conversationId, seq -> {
+            Message message = create.apply(seq).withTurnId(turnId).withMetadata(metadata);
+            return run != null ? message.withRun(run) : message;
+        });
     }
 
     @Override
