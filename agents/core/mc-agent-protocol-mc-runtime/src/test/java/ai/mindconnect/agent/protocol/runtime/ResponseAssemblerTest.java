@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -87,6 +88,81 @@ class ResponseAssemblerTest {
         // seq is strictly increasing across replay and live
         for (int i = 1; i < live.size(); i++) {
             assertThat(live.get(i).seq()).isGreaterThan(live.get(i - 1).seq());
+        }
+    }
+
+    @Test
+    void tokenCountsFromTheTurnReachTheResponse() {
+        assembler.accept(new StreamEvent.Token("hi"));
+        assembler.accept(new StreamEvent.TurnUsage(1200, 340));
+        assembler.accept(new StreamEvent.Done());
+
+        Response r = assembler.snapshot();
+        assertThat(r.usage().inputTokens()).isEqualTo(1200);
+        assertThat(r.usage().outputTokens()).isEqualTo(340);
+        assertThat(r.usage().totalTokens()).isEqualTo(1540);
+    }
+
+    /**
+     * A turn that dies has still been billed. The counts arrive with
+     * TurnUsage before the loop hands back, so they survive a failure and a
+     * cancellation — the two cases a cost investigation actually looks at.
+     */
+    @Test
+    void tokenCountsSurviveAFailedTurn() {
+        assembler.accept(new StreamEvent.TurnUsage(900, 120));
+        assembler.accept(new StreamEvent.Token("partial"));
+        assembler.fail("LLM unavailable");
+
+        Response r = assembler.snapshot();
+        assertThat(r.status()).isEqualTo(ResponseStatus.FAILED);
+        assertThat(r.usage().totalTokens()).isEqualTo(1020);
+    }
+
+    @Test
+    void tokenCountsSurviveACancelledTurn() {
+        assembler.accept(new StreamEvent.TurnUsage(500, 40));
+        assembler.cancelled();
+
+        assertThat(assembler.snapshot().usage().totalTokens()).isEqualTo(540);
+    }
+
+    /**
+     * The backlog must be written before any live event, or a reader sees a
+     * later delta ahead of an earlier one — and a terminal event that wins
+     * the race closes the stream on a backlog never written.
+     */
+    @Test
+    void liveEventsNeverOvertakeTheReplayedBacklog() throws Exception {
+        for (int run = 0; run < 50; run++) {
+            ResponseAssembler a = new ResponseAssembler("resp_" + run, "conv", "sess", "agent");
+            for (int i = 0; i < 200; i++) {
+                a.accept(new StreamEvent.Token("t" + i));
+            }
+
+            List<Long> seen = new ArrayList<>();
+            CountDownLatch go = new CountDownLatch(1);
+            Thread producer = new Thread(() -> {
+                try {
+                    go.await();
+                } catch (InterruptedException ignored) {
+                    Thread.currentThread().interrupt();
+                }
+                for (int i = 0; i < 50; i++) {
+                    a.accept(new StreamEvent.Token("late" + i));
+                }
+            });
+            producer.start();
+            go.countDown();
+            a.subscribe(0, e -> {
+                synchronized (seen) {
+                    seen.add(e.seq());
+                }
+            });
+            producer.join();
+
+            assertThat(seen).isSorted();
+            assertThat(seen).doesNotHaveDuplicates();
         }
     }
 

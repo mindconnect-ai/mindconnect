@@ -7,7 +7,7 @@ public sealed interface StreamEvent
         permits StreamEvent.Token, StreamEvent.ToolCallStarted, StreamEvent.ToolCallResult,
                 StreamEvent.ToolCallFailed,
                 StreamEvent.AskingLlm, StreamEvent.Reviewing, StreamEvent.ReviewerDecision,
-                StreamEvent.ResponseRevised, StreamEvent.Done,
+                StreamEvent.ResponseRevised, StreamEvent.TurnUsage, StreamEvent.Done,
                 StreamEvent.SubAgentStarted, StreamEvent.SubAgentEvent,
                 StreamEvent.SubAgentDone, StreamEvent.SubAgentError,
                 StreamEvent.ApprovalRequested {
@@ -54,6 +54,23 @@ public sealed interface StreamEvent
      * instead. Always preceded by a {@link ReviewerDecision} for the same reviewer.
      */
     record ResponseRevised(String finalText, String reason, boolean blocked) implements StreamEvent {}
+
+    /**
+     * What the turn has cost so far: its own total over every model round,
+     * including the rounds of earlier executions when it suspended on a tool
+     * call and resumed. Sent whenever the loop hands back control, so it
+     * arrives on the paths that never reach {@link Done} too — a cancelled
+     * turn, or one still waiting for its tools. A later event supersedes an
+     * earlier one; the last before the turn ends is its final bill.
+     *
+     * <p>Separate from {@link Done} on purpose: a turn can end without
+     * completing, and the cost is worth reporting exactly then. Sub-agent
+     * turns account on their own channel; a tree total is the reader's sum.
+     *
+     * @param inputTokens  prompt tokens as the providers reported them, summed
+     * @param outputTokens completion tokens as the providers reported them, summed
+     */
+    record TurnUsage(long inputTokens, long outputTokens) implements StreamEvent {}
 
     record Done() implements StreamEvent {}
 

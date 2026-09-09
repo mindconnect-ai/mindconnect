@@ -83,12 +83,15 @@ public final class AgentLoop {
      * @param roundsSoFar  the model rounds of earlier attempts. Without it the
      *                     round brake restarts after every wait — the history
      *                     is in the conversation, the count is not.
+     * @param usageSoFar   the tokens those earlier attempts already cost, for
+     *                     the same reason: a turn that waited for a tool would
+     *                     otherwise report only what its last leg spent.
      */
     public TurnOutcome run(String requestId, UUID conversationId, UUID sessionId,
-                           Cancellation cancellation, int roundsSoFar) {
+                           Cancellation cancellation, int roundsSoFar, Usage usageSoFar) {
         List<Message> history = new ArrayList<>(messages.load(conversationId));
 
-        Usage total = Usage.ZERO;
+        Usage total = usageSoFar == null ? Usage.ZERO : usageSoFar;
         int modelRounds = roundsSoFar;
 
         while (true) {

@@ -101,17 +101,17 @@ public class ResponsesController {
                     // announce "completed" while carrying the queued object.
                     backend.responses().get(created.id())
                             .ifPresent(r -> current.set(mapper.toDto(r, request.model())));
-                    StreamEvents.Frame frame = events.frameFor(event);
-                    if (frame == null) {
-                        return;
-                    }
-                    try {
-                        emitter.send(SseEmitter.event().name(frame.event()).data(frame.data()));
-                    } catch (Exception e) {
-                        // The client hung up. Nothing to recover: the run
-                        // continues and its result stays retrievable by id.
-                        log.debug("Responses stream {} dropped: {}", created.id(), e.toString());
-                        return;
+                    // One protocol event can be several frames — an item that
+                    // opens or closes brings its content part with it.
+                    for (StreamEvents.Frame frame : events.framesFor(event)) {
+                        try {
+                            emitter.send(SseEmitter.event().name(frame.event()).data(frame.data()));
+                        } catch (Exception e) {
+                            // The client hung up. Nothing to recover: the run
+                            // continues and its result stays retrievable by id.
+                            log.debug("Responses stream {} dropped: {}", created.id(), e.toString());
+                            return;
+                        }
                     }
                     if (StreamEvents.isTerminal(event)) {
                         // The run is over, so the stream is too. A client

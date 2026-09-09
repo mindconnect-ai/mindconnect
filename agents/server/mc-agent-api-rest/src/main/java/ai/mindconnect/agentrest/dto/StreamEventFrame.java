@@ -11,13 +11,31 @@ public record StreamEventFrame(String type, String text, String toolName,
                                 String finalText, String reason, Boolean blocked,
                                 String taskId, String agentName, Integer depth,
                                 String error, String subSessionId,
-                                StreamEventFrame inner) {
+                                StreamEventFrame inner,
+                                // done
+                                Long inputTokens, Long outputTokens) {
+
+    /**
+     * Every frame but {@code turn_usage}, the only one that accounts for
+     * tokens. Spares the other fifteen arms two trailing nulls apiece.
+     */
+    public StreamEventFrame(String type, String text, String toolName,
+                     Map<String, Object> arguments, String result, Long durationMs,
+                     String reviewerName, String verdict,
+                     String finalText, String reason, Boolean blocked,
+                     String taskId, String agentName, Integer depth,
+                     String error, String subSessionId,
+                     StreamEventFrame inner) {
+        this(type, text, toolName, arguments, result, durationMs, reviewerName, verdict,
+                finalText, reason, blocked, taskId, agentName, depth, error, subSessionId,
+                inner, null, null);
+    }
 
     /** Copy with {@code text} set — lets a mapping arm reuse the generic field. */
     private StreamEventFrame withText(String text) {
         return new StreamEventFrame(type, text, toolName, arguments, result, durationMs,
                 reviewerName, verdict, finalText, reason, blocked, taskId, agentName, depth,
-                error, subSessionId, inner);
+                error, subSessionId, inner, inputTokens, outputTokens);
     }
 
     public static StreamEventFrame from(StreamEvent event) {
@@ -54,6 +72,11 @@ public record StreamEventFrame(String type, String text, String toolName,
                     new StreamEventFrame("response_revised", null, null, null, null, null,
                             null, null, rr.finalText(), rr.reason(), rr.blocked(),
                             null, null, null, null, null, null);
+            case StreamEvent.TurnUsage u ->
+                    new StreamEventFrame("turn_usage", null, null, null, null, null,
+                            null, null, null, null, null,
+                            null, null, null, null, null, null,
+                            u.inputTokens(), u.outputTokens());
             case StreamEvent.Done d ->
                     new StreamEventFrame("done", null, null, null, null, null,
                             null, null, null, null, null,

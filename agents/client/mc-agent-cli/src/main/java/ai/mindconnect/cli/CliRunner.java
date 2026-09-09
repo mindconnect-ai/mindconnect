@@ -561,6 +561,10 @@ public class CliRunner implements CommandLineRunner {
                             if (rev.finalText().charAt(i) == '\n') streamedLines[0]++;
                         }
                     }
+                    // The turn's token counts. Nothing is printed for them:
+                    // the REPL has no per-turn footer, and adding one changes
+                    // every answer's shape. /memory remains the place to look.
+                    case StreamEvent.TurnUsage u -> { }
                     case StreamEvent.Done d -> {
                         if (inStatus[0]) {
                             System.out.print("\r\033[K");

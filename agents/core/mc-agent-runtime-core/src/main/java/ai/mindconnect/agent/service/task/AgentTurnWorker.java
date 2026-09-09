@@ -19,6 +19,7 @@ import ai.mindconnect.agent.service.round.AgentRound;
 import ai.mindconnect.agent.service.round.LlmAnswer;
 import ai.mindconnect.agent.service.round.TurnMessage;
 import ai.mindconnect.agent.service.round.TurnOutcome;
+import ai.mindconnect.agent.service.round.Usage;
 import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.agent.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -265,8 +266,16 @@ public final class AgentTurnWorker implements TaskWorker {
 
         int roundsSoFar = roundsSoFar(ctx);
         TurnOutcome outcome = loop.run(turnId.toString(), conversationId, session.id(),
-                cancellation, roundsSoFar);
-        ctx.updateState(Map.of("rounds", outcome.rounds(), "status", outcome.status().name()));
+                cancellation, roundsSoFar, usageSoFar(ctx));
+        // The usage rides in the task state for the same reason the round count
+        // does: a turn that suspends on a tool resumes as a fresh execution,
+        // and what the earlier legs spent lives nowhere else.
+        Usage spent = outcome.usage();
+        recordUsage(ctx, outcome, spent);
+        // Reported here rather than only with Done: a turn that is cancelled,
+        // or that suspends on a tool, never reaches Done, and its cost is
+        // worth knowing exactly then.
+        stream.accept(new StreamEvent.TurnUsage(spent.inputTokens(), spent.outputTokens()));
 
         if (outcome.waitsForTools()) {
             // The whole point of step 5: give the thread back. The tool tasks'
@@ -295,8 +304,14 @@ public final class AgentTurnWorker implements TaskWorker {
                 && outcome.incompleteReason() == TurnOutcome.IncompleteReason.MAX_ROUNDS) {
             // The old loop's last-round rule, kept: out of rounds means "answer
             // now, without tools" — not "end with no answer at all".
-            finalText = forceFinalAnswer(llm, messageLog, turnId, conversationId, session,
-                    cancellation, reviewer);
+            ForcedAnswer forced = forceFinalAnswer(llm, messageLog, turnId, conversationId,
+                    session, cancellation, reviewer);
+            finalText = forced.text();
+            // That was a real model call. Leaving it out would make the turn
+            // that needed it look cheaper than the ones that did not.
+            spent = spent.plus(forced.usage());
+            recordUsage(ctx, outcome, spent);
+            stream.accept(new StreamEvent.TurnUsage(spent.inputTokens(), spent.outputTokens()));
         }
 
         stream.accept(new StreamEvent.Done());
@@ -308,9 +323,12 @@ public final class AgentTurnWorker implements TaskWorker {
     // ── post-loop pieces ────────────────────────────────────────────────────
 
     /** Out of rounds: one last model call without tools — answer now, reviewed like any answer. */
-    private String forceFinalAnswer(LlmChatProvider llm, ConversationMessageLog messageLog,
-                                    UUID turnId, UUID conversationId, AgentSession session,
-                                    Cancellation cancellation, ReviewerAdvisor reviewer) {
+    /** The forced answer and what that extra model call cost. */
+    private record ForcedAnswer(String text, Usage usage) { }
+
+    private ForcedAnswer forceFinalAnswer(LlmChatProvider llm, ConversationMessageLog messageLog,
+                                          UUID turnId, UUID conversationId, AgentSession session,
+                                          Cancellation cancellation, ReviewerAdvisor reviewer) {
         try {
             LlmAnswer answer = llm.ask(turnId.toString(), session.id(),
                     messageLog.load(conversationId), List.of(), cancellation);
@@ -320,11 +338,24 @@ public final class AgentTurnWorker implements TaskWorker {
                     .findFirst().orElse("");
             String reviewed = reviewer.review(text);
             messageLog.append(conversationId, TurnMessage.assistant(reviewed));
-            return reviewed;
+            return new ForcedAnswer(reviewed, answer.usage());
         } catch (RuntimeException e) {
             log.warn("Forced final answer after MAX_ROUNDS failed: {}", e.getMessage());
-            return "";
+            // The call may still have been billed, but nothing here knows how
+            // much; claiming zero is the only honest option left.
+            return new ForcedAnswer("", Usage.ZERO);
         }
+    }
+
+    /**
+     * The running total in the task state, for the same reason the round count
+     * is there: a turn that suspends on a tool resumes as a fresh execution,
+     * and what the earlier legs spent lives nowhere else.
+     */
+    private static void recordUsage(TaskContext ctx, TurnOutcome outcome, Usage spent) {
+        ctx.updateState(Map.of("rounds", outcome.rounds(), "status", outcome.status().name(),
+                "inputTokens", spent.inputTokens(),
+                "outputTokens", spent.outputTokens()));
     }
 
     private void afterTurn(MemoryStrategy memoryStrategy, AgentDefinition def,
@@ -352,6 +383,16 @@ public final class AgentTurnWorker implements TaskWorker {
     private static int roundsSoFar(TaskContext ctx) {
         Object rounds = ctx.state().get("rounds");
         return rounds instanceof Number n ? n.intValue() : 0;
+    }
+
+    /** What earlier executions of this turn already spent; zero on the first. */
+    private static Usage usageSoFar(TaskContext ctx) {
+        return new Usage(longState(ctx, "inputTokens"), longState(ctx, "outputTokens"));
+    }
+
+    private static long longState(TaskContext ctx, String key) {
+        Object value = ctx.state().get(key);
+        return value instanceof Number n ? n.longValue() : 0L;
     }
 
     private static UUID uuid(TaskContext ctx, String key) {
