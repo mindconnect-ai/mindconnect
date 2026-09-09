@@ -136,7 +136,9 @@ in a few tabs reach that limit, and from then on every request queues behind
 the streams and pages stop loading. The tabs count their streams together and
 warn you once the sum comes within one of the limit; close the tabs you no
 longer need and the notice goes away. Served over HTTP/2 there is no such
-limit and no notice.
+limit and no notice. To see what one tab holds, type `console.table(mc.streams())`
+into the browser console: a chat page lists `user-stream` and one
+`msg-list-…`, any other page only `user-stream`.
 
 A click on the badge opens the task queue, the admin UI's Task Manager:
 

@@ -72,6 +72,19 @@ bus.setFetcher(bffFetch)
 // site. The tabs count each other and warn before the seventh stalls them all.
 watchConnectionBudget(bus);
 
+// Console hook. `mc.streams()` lists the server-sent streams this tab holds
+// (a chat page should show `user-stream` and one `msg-list-…`, nothing
+// else); `mc.bus` is the event bus itself. The bus lives in this module's
+// scope, so without this nothing of it is reachable from DevTools.
+let heldStreams = [];
+bus.onStreamStateChange((list) => { heldStreams = list; });
+window.mc = {
+    bus,
+    streams: () => heldStreams.map((h) => ({
+        channel: h.channelId, state: h.state, attached: h.pageAttached, buffered: h.bufferedEvents.length,
+    })),
+};
+
 // ── "Connection lost" notice ─────────────────────────────────────────────────
 
 /**
