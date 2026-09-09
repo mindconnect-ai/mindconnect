@@ -18,6 +18,7 @@ import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.service.AgentChatService;
 import ai.mindconnect.agent.service.stream.SessionChannels;
+import ai.mindconnect.agent.service.stream.UserChannels;
 import ai.mindconnect.agent.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.service.task.ToolCallWorker;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
@@ -330,10 +331,11 @@ public class DefaultAgentRuntimeConfig {
                                              WorkingMemoryRepository workingMemoryRepository,
                                              ConversationSummaryRepository conversationSummaryRepository,
                                              TodoListRepository todoListRepository,
-                                             ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
+                                             ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
+                                             UserChannels userChannels) {
         return new AgentSessionService(definitionRepository, sessionRepository,
                 conversationManager, workingMemoryRepository, conversationSummaryRepository,
-                todoListRepository, approvalStore);
+                todoListRepository, approvalStore, userChannels);
     }
 
     /**
@@ -388,10 +390,11 @@ public class DefaultAgentRuntimeConfig {
                                   DynamicToolActivations dynamicToolActivations,
                                   ToolExecutor toolExecutor,
                                   SessionChannels sessionChannels,
-                                  ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
+                                  ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
+                                  UserChannels userChannels) {
         return new ToolCallWorker(conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, toolRegistry, dynamicToolActivations, toolExecutor,
-                sessionChannels, approvalStore);
+                sessionChannels, approvalStore, userChannels);
     }
 
     @Bean
@@ -403,12 +406,13 @@ public class DefaultAgentRuntimeConfig {
                                        PromptRenderer promptRenderer,
                                        AgentTaskRunner agentTaskRunner,
                                        SessionChannels sessionChannels,
+                                       UserChannels userChannels,
                                        LocalTaskQueue taskQueue,
                                        ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
                                        ExecutorService turnExecutor) {
         return new AgentChatService(sessionService, definitionRepository, conversationManager,
                 memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                agentTaskRunner, sessionChannels, taskQueue, approvalStore, turnExecutor);
+                agentTaskRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor);
     }
 
     /**
@@ -419,5 +423,16 @@ public class DefaultAgentRuntimeConfig {
     @Bean
     public SessionChannels sessionChannels() {
         return new SessionChannels();
+    }
+
+    /**
+     * The users' streams — the coarse feed (session opened, turn started
+     * and finished, approval pending) a client keeps attached while it is
+     * not looking at any particular session. A bean of its own for the same
+     * reason as the session channels: SSE adapters subscribe by user id.
+     */
+    @Bean
+    public UserChannels userChannels() {
+        return new UserChannels();
     }
 }

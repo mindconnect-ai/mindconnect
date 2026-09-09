@@ -1,6 +1,5 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
@@ -14,13 +13,10 @@ import ai.mindconnect.taskqueue.TaskListener;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
-import ai.mindconnect.ui.model.UiPatch;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,12 +26,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 /**
  * The task manager behind the header's task badge: what the task queue is
@@ -47,12 +43,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *   <li><b>Observation.</b> A {@link TaskListener} on the queue. Every
  *       transition marks the view dirty; a short debounce turns a burst of
  *       events (a turn dispatching five tool calls) into one snapshot.</li>
- *   <li><b>Delivery.</b> Snapshots go onto a {@link Channel}, and every
- *       browser tab that opened the {@code /sse} endpoint is a subscriber
- *       with its own bounded queue — a slow tab never slows the queue, and
- *       the listener callback itself only flips a flag. Each subscriber is
- *       rendered for <em>its</em> user, because whether a Cancel button
- *       appears depends on who is looking.</li>
+ *   <li><b>Delivery.</b> Snapshots go onto a {@link Channel}; every
+ *       browser tab is a subscriber with its own bounded queue — a slow tab
+ *       never slows the queue, and the listener callback itself only flips
+ *       a flag. The wire side — the SSE connection, rendering each snapshot
+ *       for the user who is looking — is {@link UserStream}'s: the board
+ *       shares the user's stream instead of holding a connection of its
+ *       own.</li>
  *   <li><b>Ownership.</b> A task belongs to whoever owns the session it runs
  *       for ({@code payload.sessionId} → {@link AgentSession#userId()}); a
  *       sub-agent's session inherits its parent's user, so a whole task tree
@@ -64,18 +61,11 @@ public class TaskMonitor implements TaskListener {
 
     private static final Logger log = LoggerFactory.getLogger(TaskMonitor.class);
 
-    /**
-     * Stream channel id AND the DOM id of the header badge. The SPA keeps a
-     * stream attached only while an element with the channel's id is
-     * mounted; the badge is on every admin page, so the stream survives
-     * navigation and is never opened twice.
-     */
+    /** The board's channel in the registry — and the DOM id of the header badge. */
     public static final String CHANNEL_ID = "task-monitor";
 
     /** Events within this window collapse into one snapshot. */
     static final long DEBOUNCE_MS = 250;
-    /** SSE comment keeping idle connections alive through proxies. */
-    private static final long HEARTBEAT_SECONDS = 20;
     /** Finished tasks shown under the live ones — a glance at what just happened. */
     static final int RECENT_LIMIT = 15;
     private static final int QUERY_LIMIT = 1000;
@@ -115,10 +105,8 @@ public class TaskMonitor implements TaskListener {
     private final LocalTaskQueue queue;
     private final AgentSessionRepository sessions;
     private final AgentDefinitionRepository definitions;
-    private final ObjectMapper objectMapper;
 
     private final Channel<Snapshot> channel = new ChannelRegistry().channel(CHANNEL_ID);
-    private final Map<SseEmitter, Subscription> subscriptions = new ConcurrentHashMap<>();
     private final AtomicBoolean pending = new AtomicBoolean();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "task-monitor");
@@ -128,27 +116,15 @@ public class TaskMonitor implements TaskListener {
 
     public TaskMonitor(LocalTaskQueue queue,
                        AgentSessionRepository sessions,
-                       AgentDefinitionRepository definitions,
-                       ObjectMapper objectMapper) {
+                       AgentDefinitionRepository definitions) {
         this.queue = queue;
         this.sessions = sessions;
         this.definitions = definitions;
-        this.objectMapper = objectMapper;
         queue.addListener(this);
-        scheduler.scheduleWithFixedDelay(this::heartbeat, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
     }
 
     @PreDestroy
     void shutdown() {
-        for (var entry : subscriptions.entrySet()) {
-            entry.getValue().close();
-            try {
-                entry.getKey().complete();
-            } catch (Exception ignore) {
-                // already gone
-            }
-        }
-        subscriptions.clear();
         scheduler.shutdownNow();
     }
 
@@ -311,45 +287,11 @@ public class TaskMonitor implements TaskListener {
     // ── delivery ────────────────────────────────────────────────────────────
 
     /**
-     * Subscribes a browser tab, live only: the page that opened the stream
-     * already shows the current board, so there is nothing to replay. Every
-     * snapshot from here on is rendered for {@code userId} and written as
-     * one {@code patch} frame.
+     * Every snapshot from now on, live only: whoever subscribes already
+     * shows the current board, so there is nothing to replay. The event's
+     * {@code seq} is the board's own sequence.
      */
-    public void attach(SseEmitter emitter, String userId) {
-        Subscription subscription = channel.subscribe(channel.lastSeq(),
-                event -> send(emitter, event.seq(), event.value(), userId));
-        Subscription previous = subscriptions.put(emitter, subscription);
-        if (previous != null) previous.close();
-    }
-
-    public void detach(SseEmitter emitter) {
-        Subscription subscription = subscriptions.remove(emitter);
-        if (subscription != null) subscription.close();
-    }
-
-    private void send(SseEmitter emitter, long seq, Snapshot snapshot, String userId) {
-        try {
-            UiPatch patch = TaskMonitorComponent.livePatch(snapshot, userId);
-            emitter.send(SseEmitter.event()
-                    .id(Long.toString(seq))
-                    .name("patch")
-                    .data(objectMapper.writeValueAsString(patch)));
-        } catch (Exception e) {
-            // The client went away, or the socket is broken. The heartbeat
-            // reaps it; the channel must not see the exception.
-            detach(emitter);
-        }
-    }
-
-    /** Keeps idle connections open and notices the ones that are gone. */
-    private void heartbeat() {
-        for (SseEmitter emitter : subscriptions.keySet()) {
-            try {
-                emitter.send(SseEmitter.event().comment("hb"));
-            } catch (Exception e) {
-                detach(emitter);
-            }
-        }
+    public Subscription subscribe(Consumer<Channel.Event<Snapshot>> consumer) {
+        return channel.subscribe(channel.lastSeq(), consumer);
     }
 }

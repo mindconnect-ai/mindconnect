@@ -7,6 +7,7 @@ import ai.mindconnect.ui.model.UiMenu;
 import ai.mindconnect.ui.model.UiMenuItem;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTrigger;
 
 import java.util.ArrayList;
@@ -45,8 +46,9 @@ public final class AdminLayout {
     /**
      * @param taskBadge  the task-queue badge for the header, or null when the
      *                   host has no task monitor
-     * @param taskStream the live feed behind the badge; put on every page so
-     *                   the SPA attaches once and keeps it across navigation
+     * @param taskStream the user's live feed — the badge's patches and the
+     *                   session events; put on every page so the SPA attaches
+     *                   once and keeps it across navigation
      */
     public AdminLayout(String userName, boolean authEnabled, String versionLabel,
                        UiNode taskBadge, UiPage.ActiveStream taskStream) {
@@ -102,7 +104,16 @@ public final class AdminLayout {
         // is DOING right now, beside who is using it. A click opens the task
         // manager. What the server IS — its version — lives at the foot of
         // the sidebar (see buildMenu), where it is out of the way.
-        if (taskBadge != null) {
+        if (taskStream != null) {
+            // The element the SPA looks for to keep the user's stream
+            // attached across navigation: its id is the stream's channel
+            // id, and it is here on every page, badge or no badge.
+            UiStack live = UiStack.of(taskStream.getChannelId())
+                    .direction(UiStack.Direction.HORIZONTAL).gap(0);
+            live.withCssClass("user-stream-anchor");
+            if (taskBadge != null) live.child(taskBadge);
+            header.extra(live);
+        } else if (taskBadge != null) {
             header.extra(taskBadge);
         }
         if (authEnabled) {

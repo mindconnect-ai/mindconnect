@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui;
 
 import ai.mindconnect.adminui.service.TaskMonitor;
+import ai.mindconnect.adminui.service.UserStream;
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
 import ai.mindconnect.ui.model.UiPage;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,15 +36,16 @@ public class AdminLayoutFactory {
         this.taskMonitor = taskMonitor.orElse(null);
     }
 
-    /** Layout for the user currently in the {@link SecurityContextHolder}. */
+    /**
+     * Layout for the user currently in the {@link SecurityContextHolder}.
+     * Every page names the user's stream, badge or no badge: the stream
+     * carries the session events even where there is no task queue to show.
+     */
     public AdminLayout current() {
-        if (taskMonitor == null) {
-            return new AdminLayout(currentUserName(), authEnabled, buildInfo.label());
-        }
         return new AdminLayout(currentUserName(), authEnabled, buildInfo.label(),
-                TaskMonitorComponent.badge(taskMonitor.counts()),
-                UiPage.ActiveStream.of(TaskMonitor.CHANNEL_ID, TaskMonitorComponent.STREAM_URL,
-                        "Task queue", "/admin/agents"));
+                taskMonitor == null ? null : TaskMonitorComponent.badge(taskMonitor.counts()),
+                UiPage.ActiveStream.of(UserStream.CHANNEL_ID, UserStream.STREAM_URL,
+                        "Live updates", "/admin/agents"));
     }
 
     private String currentUserName() {

@@ -8,6 +8,7 @@ import { bffFetch }                            from "/sui/bff.js";
 import { install as installJsonViewer } from "/sui-ext/jsonviewer/extension.js";
 import { install as installMarkdown }   from "/sui-ext/markdown/extension.js";
 import { install as installDiagram }    from "/sui-ext/diagram/extension.js";
+import { watchConnectionBudget }        from "/js/connection-budget.js";
 
 // ── Renderer + extensions ────────────────────────────────────────────────────
 
@@ -54,9 +55,35 @@ bus.setFetcher(bffFetch)
    .setOnUnauthenticated(handle401)
    // App-defined SSE event: chat errors come over the same stream as patches.
    .onStreamEvent("error", (msg) => showStreamError(msg))
+   // The user's own feed, on every page: a session opened or titled, a turn
+   // started or finished, a tool waiting for an answer. The bus only carries
+   // it; the chat's history (chat-ui.js) is what reacts, so it is re-raised
+   // as a DOM event for whoever owns the elements it concerns.
+   .onStreamEvent("user", (data) => {
+       let event;
+       try { event = JSON.parse(data); } catch { return; }
+       document.dispatchEvent(new CustomEvent("mc-user-event", { detail: event }));
+   })
    // The framework tells us when a stream's state changes; what to do about
    // a lost one is our call.
    .onStreamStateChange(noticeLostStream);
+
+// Too many tabs: each holds a stream or two, and a browser allows six per
+// site. The tabs count each other and warn before the seventh stalls them all.
+watchConnectionBudget(bus);
+
+// Console hook. `mc.streams()` lists the server-sent streams this tab holds
+// (a chat page should show `user-stream` and one `msg-list-…`, nothing
+// else); `mc.bus` is the event bus itself. The bus lives in this module's
+// scope, so without this nothing of it is reachable from DevTools.
+let heldStreams = [];
+bus.onStreamStateChange((list) => { heldStreams = list; });
+window.mc = {
+    bus,
+    streams: () => heldStreams.map((h) => ({
+        channel: h.channelId, state: h.state, attached: h.pageAttached, buffered: h.bufferedEvents.length,
+    })),
+};
 
 // ── "Connection lost" notice ─────────────────────────────────────────────────
 

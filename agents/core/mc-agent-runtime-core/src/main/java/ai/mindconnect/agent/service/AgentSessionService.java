@@ -41,6 +41,7 @@ public class AgentSessionService {
     private final ConversationSummaryRepository summaryRepository;
     private final TodoListRepository todoListRepository;
     private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
+    private final ai.mindconnect.agent.service.stream.UserChannels userChannels;
 
     public AgentSessionService(AgentDefinitionRepository definitionRepository,
                                 AgentSessionRepository sessionRepository,
@@ -48,7 +49,8 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 TodoListRepository todoListRepository,
-                                ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
+                                ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
+                                ai.mindconnect.agent.service.stream.UserChannels userChannels) {
         this.definitionRepository = definitionRepository;
         this.sessionRepository = sessionRepository;
         this.conversationManager = conversationManager;
@@ -56,6 +58,7 @@ public class AgentSessionService {
         this.summaryRepository = summaryRepository;
         this.todoListRepository = todoListRepository;
         this.approvalStore = approvalStore;
+        this.userChannels = userChannels;
     }
 
     /**
@@ -105,7 +108,14 @@ public class AgentSessionService {
 
         AgentSession session = AgentSession.startSubAgent(agentDefinitionId, namespace, userId,
                 conversation.id(), parentSessionId, parentTurnId, parentToolCallId);
-        return sessionRepository.save(session);
+        AgentSession saved = sessionRepository.save(session);
+        // A sub-agent's session is the parent turn's business, not news for
+        // the user's session list.
+        if (parentSessionId == null) {
+            userChannels.publish(userId, new ai.mindconnect.agent.service.stream.UserEvent
+                    .SessionStarted(saved.id(), agentDefinitionId));
+        }
+        return saved;
     }
 
     /**
@@ -131,7 +141,10 @@ public class AgentSessionService {
         AgentSession session = AgentSession
                 .start(agent.id(), namespace, userId, conversation.id())
                 .withSessionAgents(List.of(agent));
-        return sessionRepository.save(session);
+        AgentSession saved = sessionRepository.save(session);
+        userChannels.publish(userId, new ai.mindconnect.agent.service.stream.UserEvent
+                .SessionStarted(saved.id(), agent.id()));
+        return saved;
     }
 
     /**

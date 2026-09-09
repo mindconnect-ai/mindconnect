@@ -339,7 +339,9 @@ public class ChatUiController {
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
-                sessions, session, agent.name(), chat.renderContent(), agentIcons()).render();
+                sessions, session, agent.name(), chat.renderContent(), agentIcons())
+                .withActivity(runningSessions(sessions), waitingSessions(sessions))
+                .render();
         var page = UiPage.of("/chat/sessions/" + session.id(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.
         if (!chat.activeStreams().isEmpty()) {
@@ -637,6 +639,24 @@ public class ChatUiController {
                         "/chat/sessions/" + session.id(),
                         returnLabel)));
         return page;
+    }
+
+    /** The sessions with a turn in flight — the stream registry is the truth, as for the Stop button. */
+    private java.util.Set<UUID> runningSessions(List<? extends ai.mindconnect.agent.domain.view.AgentSessionHeader> sessions) {
+        java.util.Set<UUID> running = new java.util.HashSet<>();
+        for (var s : sessions) {
+            if (activeStreams.findHandle("msg-list-" + s.id()).isPresent()) running.add(s.id());
+        }
+        return running;
+    }
+
+    /** The sessions with a tool stopped at the approval gate — the store is the truth, as for the cards. */
+    private java.util.Set<UUID> waitingSessions(List<? extends ai.mindconnect.agent.domain.view.AgentSessionHeader> sessions) {
+        java.util.Set<UUID> waiting = new java.util.HashSet<>();
+        for (var s : sessions) {
+            if (!approvalStore.openForRoot(s.id()).isEmpty()) waiting.add(s.id());
+        }
+        return waiting;
     }
 
     /**

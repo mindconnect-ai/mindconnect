@@ -160,6 +160,38 @@ session's, so it spans turns; it stays open across them until you disconnect
 or the emitter times out. Reattaching with the last seen `seq` is the intended
 loop, not an error path.
 
+## The user stream
+
+A session's stream tells you everything about one session, and nothing about
+the others. A client that shows a list of sessions — or wants to notify
+someone that an agent is waiting for them — needs the opposite: little about
+every session, without attaching to any of them. That is the user stream:
+
+```bash
+curl -N "http://localhost:8080/api/users/$USER/stream?afterSeq=0"
+```
+
+The first frame is the `attached` frame with the buffer bounds
+(`firstBufferedSeq`, `latestSeq`); then the buffered events after `afterSeq`
+replay and the stream continues live. Every frame is one JSON object with a
+`seq` and a `type`, and the `sessionId` it is about:
+
+| type | carries |
+|---|---|
+| `session_started` | `agentDefinitionId` — a top-level session was opened (sub-agent sessions do not announce themselves) |
+| `session_titled` | `title` — the session got its generated title after the first exchange |
+| `turn_started` | `turnId` |
+| `turn_finished` | `turnId`, `outcome` — `completed`, `failed` or `cancelled` |
+| `approval_requested` | `callId`, `toolName` — a tool waits for a human; `sessionId` is the **root** session whose chat shows the card, even when a sub-agent asked |
+| `approval_answered` | `callId`, `approved` — the question was answered, from whichever client |
+
+The tokens of a turn are not here. A client that sees `turn_started` for a
+session it is showing attaches to that session's stream for the rest; one
+that is not showing it updates a badge. The reconnect rules are the session
+stream's: remember `seq`, check `firstBufferedSeq` for a gap (the truth to
+reload from is `GET /api/sessions` and `GET /api/sessions/{id}/approvals`),
+and reattach with the last seen `seq` when the connection drops.
+
 ## Approvals
 
 A tool marked "needs approval" suspends its task and the turn stops, waiting
