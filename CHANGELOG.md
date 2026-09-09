@@ -25,6 +25,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** the Responses API takes images and files. A user message's
+  `content` may carry `input_image` (`image_url` as an http(s) or `data:`
+  URL, or `file_id`) and `input_file` (`file_data` with `filename`,
+  `file_url`, or `file_id`) parts beside `input_text`, as OpenAI defines
+  them; `POST /v1/files` uploads a file once for `file_id`, `GET
+  /v1/files/{id}` and `/content` read it back. A part lands in the file
+  store and on the session like a chat upload — an image or PDF goes to
+  the model with the message, another document is ingested for
+  `vector_search`. Before, a non-text part was dropped without a word and
+  the model answered a question about a file it never saw; now a part the
+  server cannot take is refused with a 400.
+
 - **agents:** the REST endpoints of both server apps — `/api`, `/chat/api`
   and `/v1` — answer cross-origin calls from a browser. Every origin may
   call by default; `mindconnect.cors.allowed-origins` narrows it to a list,

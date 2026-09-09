@@ -45,6 +45,17 @@ separate process).
 | `POST /v1/responses` | create a response — body as OpenAI defines it: `model`, `input`, `instructions`, `previous_response_id`, `stream`; with `stream: true` (in the body, where the SDKs put it) the answer is the SSE event stream |
 | `GET /v1/responses/{id}` | retrieve a response |
 | `POST /v1/responses/{id}/cancel` | cancel one still running |
+| `POST /v1/files` | upload a file (multipart `file`, `purpose`) and get its `file_id` for `input_file` / `input_image` parts |
+| `GET /v1/files/{id}`, `GET /v1/files/{id}/content` | the file object, and its bytes |
+
+A user message's `content` may be a string or a list of parts, as OpenAI
+defines them: `input_text` (`text`), `input_image` (`image_url` as an
+http(s) or `data:` URL, or `file_id`; optional `detail`) and `input_file`
+(`file_data` as a `data:` URL with `filename`, `file_url`, or `file_id`). A
+URL is fetched by the server. An image or PDF goes to the model with the
+message when its config declares the capability; any other document is
+ingested into the session's store and reached through `vector_search`. A part
+of another type is refused with a 400 rather than dropped.
 
 Two words mean something else here than at OpenAI. The client's **model**
 is an agent or an LLM config: `model: "web-researcher"` has that agent
@@ -56,7 +67,9 @@ session, so `previous_response_id` continues the session that response was
 made in.
 
 Not supported: client-side function tools — this runtime executes tools
-inside the turn instead of handing them back to the caller — and skills.
+inside the turn instead of handing them back to the caller — skills, and
+messages with a role other than `user` in `input` (the session keeps the
+earlier turns; continue with `previous_response_id`).
 
 A browser app on another origin may call this API, like every REST endpoint
 here: `mindconnect.cors.allowed-origins` (default `*`) says which origins.

@@ -63,7 +63,15 @@ public final class ResponsesMapper {
         // A message is the default: the array form of the simple case omits
         // "type" entirely and carries only role + content.
         if (type == null || "message".equals(type)) {
-            return ConversationItem.Message.user(contentText(node.get("content")));
+            String role = text(node, "role");
+            if (role != null && !role.equalsIgnoreCase("user")) {
+                throw new IllegalArgumentException("Only user messages are accepted as input here; the "
+                        + "conversation keeps the earlier turns — continue it with previous_response_id");
+            }
+            // Text, images and files, as OpenAI defines the parts; the
+            // runtime attaches a file to the session and sends an image
+            // with the message, so the model sees what the client sent.
+            return new ConversationItem.Message(ai.mindconnect.agent.protocol.item.Role.USER, InputParts.parse(node.get("content")));
         }
         if ("function_call_output".equals(type)) {
             return new ConversationItem.FunctionCallOutput(
@@ -73,26 +81,6 @@ public final class ResponsesMapper {
         // Silently dropping it would produce an answer to a question the
         // client did not ask.
         throw new IllegalArgumentException("Input items of type '" + type + "' are not supported");
-    }
-
-    /** Content is a string in the simple form and a list of parts otherwise. */
-    private String contentText(JsonNode content) {
-        if (content == null || content.isNull()) {
-            return "";
-        }
-        if (content.isTextual()) {
-            return content.asText();
-        }
-        StringBuilder text = new StringBuilder();
-        if (content.isArray()) {
-            for (JsonNode part : content) {
-                String t = text(part, "text");
-                if (t != null) {
-                    text.append(t);
-                }
-            }
-        }
-        return text.toString();
     }
 
     // ── Response ────────────────────────────────────────────────────────────

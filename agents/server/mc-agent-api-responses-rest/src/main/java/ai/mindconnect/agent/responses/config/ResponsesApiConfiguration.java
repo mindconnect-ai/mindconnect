@@ -41,13 +41,34 @@ public class ResponsesApiConfiguration {
     @Value("${mindconnect.responses.user-id:mc_user}")
     private String userId;
 
+    /**
+     * The backend, with file support when the host has a file store and the
+     * chat's attach service: an {@code input_file} or {@code input_image}
+     * part lands in the store and on the session the way a chat upload
+     * does — a document is ingested for {@code vector_search}, an image or
+     * PDF goes to the model with the message.
+     */
     @Bean
     @ConditionalOnMissingBean
     public AgentRuntimeBackend responsesRuntimeBackend(AgentChatService chat,
                                                        AgentSessionService sessions,
                                                        AgentDefinitionRepository agents,
-                                                       ConversationManager conversations) {
-        return new AgentRuntimeBackend(chat, sessions, agents, conversations, userId);
+                                                       ConversationManager conversations,
+                                                       org.springframework.beans.factory.ObjectProvider<ai.mindconnect.filestore.FileStore> fileStore,
+                                                       org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agentrest.service.SessionFileService> sessionFiles) {
+        var backend = new AgentRuntimeBackend(chat, sessions, agents, conversations, userId);
+        var store = fileStore.getIfAvailable();
+        var attach = sessionFiles.getIfAvailable();
+        if (store != null && attach != null) {
+            backend.withFiles(store, (sessionId, stored) -> {
+                var result = attach.attach(sessionId, stored);
+                if (!result.success()) {
+                    throw new IllegalArgumentException(result.message());
+                }
+                return result.message();
+            });
+        }
+        return backend;
     }
 
     @Bean
