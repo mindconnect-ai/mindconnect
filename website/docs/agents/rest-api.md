@@ -233,6 +233,63 @@ loading the open approvals is the right order for a client.
 
 See [working memory](./memory.md) for what the strategies do.
 
+## Transcription
+
+Turning a recording into text is a job, not an answer: the audio is stored,
+a task is queued, and the caller gets an id. A long recording outlasts a
+comfortable request, providers fail now and then, and the queue behind this
+already retries and survives a restart — the same reason transcription
+services hand out job ids rather than holding the connection.
+
+```bash
+curl -X POST http://localhost:9090/api/transcriptions \
+  -F "file=@speech.webm" -F "language=en"
+```
+
+The answer is `202` with everything needed to follow the job:
+
+```json
+{
+  "id": "task_774c0642-…",
+  "status": "queued",
+  "resultUrl": "/api/transcriptions/task_774c0642-…",
+  "eventsUrl": "/api/transcriptions/task_774c0642-…/events",
+  "channelId": "transcription-task_774c0642-…",
+  "fileId": "file-cbec6f35da40…",
+  "fileUrl": "/api/files/file-cbec6f35da40…"
+}
+```
+
+- **`model`** names an LLM config of type `SPEECH_TO_TEXT`. An alias of that
+  name is followed, so an operator decides what serves. Omitted, the config
+  named `speech-to-text` does.
+- **`language`** and **`prompt`** are optional: the ISO-639-1 code of what is
+  spoken, and context that steers the spelling of names.
+
+**Polling.** `GET /api/transcriptions/{id}` answers with the status and, once
+it is done, the transcript plus the detected language and the recording's
+length. `?wait=30` holds the request until the job ends or the seconds run
+out, for a caller who wants the synchronous feel without a polling loop (60
+seconds is the cap).
+
+**Streaming.** `GET /api/transcriptions/{id}/events` is Server-Sent Events
+from the job's channel: `queued`, `running`, then `completed` carrying the
+transcript, or `failed` with the reason. The stream opens with the job's
+state as it is now, so attaching late tells you what you missed instead of
+leaving you waiting, and it closes when the job ends. `?afterSeq=` resumes a
+dropped connection from the last event seen, without a gap.
+
+**The recording stays.** It is an upload in the file store like any other:
+`GET /api/files/{id}` for its metadata, `…/content` for the bytes, and
+`DELETE /api/files/{id}` when it has served its purpose. Nothing deletes it
+for you — a transcript is worth little without the audio behind it, and only
+the caller knows when that stops being true. The job's `fileId` and `fileUrl`
+come back with the submit answer and with every poll.
+
+A job that a request submitted under a login is readable only by that user;
+on an installation without login, by anyone who reaches the endpoint, like
+the rest of this API.
+
 ## Beyond chat
 
 The same server exposes LLM configurations, the file store, session

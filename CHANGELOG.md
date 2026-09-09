@@ -32,13 +32,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `mindconnect.vector-store.embedding-config`; the local `embeddings` config
   stays the default.
 
-### Changed
-
-- **agents:** `AgentLoop.run` takes the tokens spent by earlier attempts as a
-  further argument, and `StreamEvent` has a new `TurnUsage` variant. Code
-  embedding `mc-agent-runtime-core` that calls `run` directly, or that
-  switches exhaustively over `StreamEvent`, needs the extra argument and the
-  extra arm. `StreamEvent.Done` is unchanged.
+- **agents:** transcription over the REST API, as a job.
+  `POST /api/transcriptions` takes a recording as multipart, stores it, queues
+  the work on the task queue and answers `202` with the job id plus both URLs
+  to follow it: one to poll, one to stream. `GET /api/transcriptions/{id}`
+  reports the status and, once done, the transcript with the detected language
+  and the recording's length; `?wait=` holds the request until the job ends,
+  for a caller who wants the synchronous feel without a loop.
+  `GET /api/transcriptions/{id}/events` is Server-Sent Events from the job's
+  channel — queued, running, completed — opening with the state as it is now,
+  so a late arrival is told what it missed, and `?afterSeq=` resumes a dropped
+  connection without a gap. The queue retries a provider hiccup, and `model`
+  names an LLM config whose alias is followed. The recording stays in the file
+  store, so a transcript keeps the audio behind it: its id and URL come back
+  with the job, and `DELETE /api/files/{id}` disposes of it when the caller
+  says so.
 
 - **agents:** speech to text — a Whisper model as a normal LLM config, and a
   microphone in the chat. A config's type can now be `SPEECH_TO_TEXT` next to
@@ -68,6 +76,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
   behind `${OPENAI_API_KEY}`, overridable through `SPEECH_TO_TEXT_MODEL` and
   `SPEECH_TO_TEXT_BASE_URL`); an existing one gets it on the next start, since
   seeding checks each entry by id.
+
+### Changed
+
+- **agents:** `AgentLoop.run` takes the tokens spent by earlier attempts as a
+  further argument, and `StreamEvent` has a new `TurnUsage` variant. Code
+  embedding `mc-agent-runtime-core` that calls `run` directly, or that
+  switches exhaustively over `StreamEvent`, needs the extra argument and the
+  extra arm. `StreamEvent.Done` is unchanged.
 
 ### Fixed
 

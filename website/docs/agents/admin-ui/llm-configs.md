@@ -41,9 +41,10 @@ it, the Test dialog included — it asks for a recording when the config at the
 end of the chain is a speech one.
 
 A fresh installation is seeded with a `speech-to-text` config: OpenAI's
-`whisper-1` behind `${OPENAI_API_KEY}`, answering in `verbose_json`. Point
-`SPEECH_TO_TEXT_BASE_URL` at Groq or a local Whisper server to use it without
-an OpenAI key, and `SPEECH_TO_TEXT_MODEL` at another model.
+`whisper-1` behind `${OPENAI_API_KEY}`. Point `SPEECH_TO_TEXT_BASE_URL` at
+Groq or a local Whisper server to use it without an OpenAI key, and
+`SPEECH_TO_TEXT_MODEL` at another model — the seed pins no response format,
+so switching the model cannot collide with one.
 
 ## Dictating in the chat {#dictation}
 

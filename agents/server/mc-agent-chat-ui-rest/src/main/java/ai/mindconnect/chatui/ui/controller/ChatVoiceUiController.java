@@ -38,8 +38,13 @@ import java.util.UUID;
 @RequestMapping("/chat/api/sessions/{sessionId}/voice")
 public class ChatVoiceUiController {
 
-    /** The LLM config the chat dictates with. An alias of this name is followed. */
-    public static final String CONFIG_NAME = "speech-to-text";
+    /**
+     * The LLM config the chat dictates with — the same name the transcription
+     * API defaults to, defined once so a rename cannot leave the two apart.
+     * An alias of this name is followed.
+     */
+    public static final String CONFIG_NAME =
+            ai.mindconnect.agentrest.service.TranscriptionJobService.DEFAULT_CONFIG_NAME;
 
     private static final Logger log = LoggerFactory.getLogger(ChatVoiceUiController.class);
 
@@ -141,12 +146,15 @@ public class ChatVoiceUiController {
      * sentence that says what to do rather than a class name.
      */
     private static String reason(Exception e) {
-        String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-        if (message.contains(CONFIG_NAME)) {
+        // Which failure it is decides the sentence, not what the message
+        // happens to contain: a config of the wrong type mentions the name
+        // too, and telling its owner to create one they already have sends
+        // them the wrong way.
+        if (e instanceof ai.mindconnect.common.DomainException) {
             return "No LLM config named '" + CONFIG_NAME + "'. Create one of type "
                     + "Speech to text in the admin UI, or point an alias of that name at one.";
         }
-        return message;
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 
     private static UiPatch toast(UiToast toast) {

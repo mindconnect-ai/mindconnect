@@ -95,8 +95,10 @@ public enum LlmProvider {
                         LlmConfigType.SPEECH_TO_TEXT),
                 AdditionalParamSpec.select("response_format", "Response Format",
                         List.of("json", "verbose_json", "text", "srt", "vtt"),
-                        "How the endpoint answers. 'verbose_json' adds language and duration; "
-                                + "'srt'/'vtt' return subtitles as plain text.",
+                        "How the endpoint answers. Leave empty for 'json', which every model "
+                                + "takes. 'verbose_json' adds language and duration, and "
+                                + "'srt'/'vtt' return subtitles — whisper-1 only; the "
+                                + "gpt-4o transcribe models refuse them.",
                         LlmConfigType.SPEECH_TO_TEXT));
 
         private SpeechParams() {
