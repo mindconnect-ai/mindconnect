@@ -27,6 +27,7 @@ class PgMessageRepositoryTest {
     void setUp() {
         Sql sql = Sql.of(TestDb.requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_message");
+        sql.execute("DROP TABLE IF EXISTS mc_message_seq");
         repo = new PgMessageRepository(sql).initSchema();
     }
 
@@ -68,7 +69,7 @@ class PgMessageRepositoryTest {
         Message compressed = m.withCompressed("[summary]", 5);
         repo.save(compressed);
 
-        assertThat(repo.countByConversationId(conversation)).isEqualTo(1);
+        assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT)).hasSize(1);
         assertThat(repo.findById(conversation, m.id())).contains(compressed);
         assertThat(repo.findById(conversation, m.id())).get()
                 .extracting(Message::compressed, Message::compressedContent).containsExactly(true, "[summary]");
@@ -83,8 +84,8 @@ class PgMessageRepositoryTest {
                 .extracting(Message::sequenceNum).containsExactly(1, 2, 3);
         assertThat(repo.findByConversationId(conversation, new PageRequest(1, 3)))
                 .extracting(Message::sequenceNum).containsExactly(4, 5);
-        assertThat(repo.countByConversationId(conversation)).isEqualTo(5);
-        assertThat(repo.countByConversationId(UUID.randomUUID())).isZero();
+        assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT)).hasSize(5);
+        assertThat(repo.findByConversationId(UUID.randomUUID(), PageRequest.DEFAULT)).isEmpty();
     }
 
     @Test
@@ -97,7 +98,56 @@ class PgMessageRepositoryTest {
 
         assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT))
                 .extracting(Message::sequenceNum).containsExactly(1, 5, 6);
-        assertThat(repo.countByConversationId(other)).isEqualTo(1);
+        assertThat(repo.findByConversationId(other, PageRequest.DEFAULT)).hasSize(1);
         repo.deleteBySequenceRange(conversation, 100, 200); // nothing there is not an error
+    }
+
+    @Test
+    void appendNumbersTheMessagesAndPicksUpFromWhatIsAlreadyStored() {
+        repo.append(conversation, seq -> message(seq));
+        repo.append(conversation, seq -> message(seq));
+
+        assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT))
+                .extracting(Message::sequenceNum).containsExactly(1, 2);
+
+        // A conversation written before the counter existed: the first
+        // append reads where it got to instead of starting over at 1.
+        UUID older = UUID.randomUUID();
+        IntStream.rangeClosed(1, 7).forEach(seq ->
+                repo.save(Message.of(older, sender, ParticipantType.USER, MessageType.CHAT, "m" + seq, seq)));
+
+        assertThat(repo.append(older, seq -> Message.of(older, sender, ParticipantType.USER,
+                MessageType.CHAT, "next", seq)).sequenceNum()).isEqualTo(8);
+    }
+
+    @Test
+    void twentyThreadsAppendingAtOnceGetTwentyDifferentNumbers() throws Exception {
+        int writers = 20;
+        var start = new java.util.concurrent.CountDownLatch(1);
+        var done = new java.util.concurrent.CountDownLatch(writers);
+        var failures = new java.util.concurrent.CopyOnWriteArrayList<Throwable>();
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(writers)) {
+            for (int i = 0; i < writers; i++) {
+                pool.submit(() -> {
+                    try {
+                        start.await();
+                        repo.append(conversation, seq -> message(seq));
+                    } catch (Throwable t) {
+                        failures.add(t);
+                    } finally {
+                        done.countDown();
+                    }
+                });
+            }
+            start.countDown();
+            assertThat(done.await(60, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        }
+
+        assertThat(failures).isEmpty();
+        assertThat(repo.findByConversationId(conversation, new PageRequest(0, 100)))
+                .extracting(Message::sequenceNum)
+                .as("every appender left with a number of its own")
+                .containsExactlyInAnyOrderElementsOf(
+                        IntStream.rangeClosed(1, writers).boxed().toList());
     }
 }

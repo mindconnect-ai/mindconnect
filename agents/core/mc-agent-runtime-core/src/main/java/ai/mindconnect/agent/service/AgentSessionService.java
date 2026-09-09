@@ -34,6 +34,9 @@ public class AgentSessionService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentSessionService.class);
 
+    /** No paging: {@link #loadHistory} returns the conversation entire. */
+    private static final int LOAD_ALL = Integer.MAX_VALUE;
+
     private final AgentDefinitionRepository definitionRepository;
     private final AgentSessionRepository sessionRepository;
     private final ConversationManager conversationManager;
@@ -179,9 +182,17 @@ public class AgentSessionService {
                 .orElseThrow(() -> DomainException.notFound("AgentSession", sessionId.toString()));
     }
 
+    /**
+     * The session's whole conversation, oldest first. Not a page: this is
+     * what the chat shows, and a cap here cuts away the newest messages,
+     * not the oldest. A conversation past the cap kept displaying its
+     * opening and silently dropped everything after it, the message just
+     * sent included. The runtime has always read the conversation entire;
+     * the display now agrees with it.
+     */
     public List<Message> loadHistory(UUID sessionId) {
         AgentSession session = findSession(sessionId);
-        return conversationManager.loadHistory(session.conversationId(), new PageRequest(0, 200));
+        return conversationManager.loadHistory(session.conversationId(), new PageRequest(0, LOAD_ALL));
     }
 
     /**

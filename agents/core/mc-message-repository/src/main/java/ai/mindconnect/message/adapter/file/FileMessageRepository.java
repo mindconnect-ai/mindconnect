@@ -12,7 +12,10 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.IntFunction;
 import java.util.logging.Logger;
+import java.util.stream.Stream;
 import java.nio.file.PathMatcher;
 
 /**
@@ -24,6 +27,21 @@ import java.nio.file.PathMatcher;
 public class FileMessageRepository implements MessageRepository {
 
     private static final Logger log = Logger.getLogger(FileMessageRepository.class.getName());
+
+    /**
+     * Locks for {@link #append}, one bucket per conversation by hash. A
+     * fixed set rather than one per conversation: nothing to create, and
+     * nothing that grows for as long as the process lives. Two
+     * conversations sharing a bucket wait for each other now and then,
+     * which costs a moment and breaks nothing.
+     *
+     * <p>Process-wide, which is what a directory of files is: two JVMs
+     * writing into the same store would still hand out the same number.
+     */
+    private static final int APPEND_LOCKS = 64;
+
+    private final ReentrantLock[] appendLocks = Stream.generate(ReentrantLock::new)
+            .limit(APPEND_LOCKS).toArray(ReentrantLock[]::new);
 
     private final Path baseDir;
     private final ObjectMapper objectMapper;
@@ -100,13 +118,42 @@ public class FileMessageRepository implements MessageRepository {
     }
 
     @Override
-    public int countByConversationId(UUID conversationId) {
+    public Message append(UUID conversationId, IntFunction<Message> create) {
+        ReentrantLock lock = appendLocks[Math.floorMod(conversationId.hashCode(), APPEND_LOCKS)];
+        lock.lock();
+        try {
+            return save(create.apply(maxSequenceNum(conversationId) + 1));
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * The highest number in the conversation, 0 when it has no messages.
+     * Read from the file names, which carry it zero-padded in front, so
+     * this costs a directory listing and opens nothing.
+     */
+    private int maxSequenceNum(UUID conversationId) {
         Path dir = messagesDir(conversationId);
         if (!Files.exists(dir)) return 0;
         try (var stream = Files.list(dir)) {
-            return (int) stream.filter(p -> p.toString().endsWith(".json")).count();
+            return stream.filter(p -> p.toString().endsWith(".json"))
+                    .mapToInt(p -> seqOf(p.getFileName().toString()))
+                    .filter(seq -> seq >= 0)
+                    .max().orElse(0);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    /** The leading digits of "0000000012_<uuid>.json"; -1 for a name of another shape. */
+    private static int seqOf(String fileName) {
+        int underscore = fileName.indexOf('_');
+        if (underscore < 1) return -1;
+        try {
+            return Integer.parseInt(fileName.substring(0, underscore));
+        } catch (NumberFormatException e) {
+            return -1;
         }
     }
 
@@ -117,18 +164,14 @@ public class FileMessageRepository implements MessageRepository {
         try (var stream = Files.list(dir)) {
             stream.filter(p -> p.toString().endsWith(".json"))
                     .forEach(p -> {
-                        // filename format: 0000000012_<uuid>.json — extract leading digits
-                        String name = p.getFileName().toString();
-                        try {
-                            int seq = Integer.parseInt(name.substring(0, name.indexOf('_')));
-                            if (seq >= fromSeq && seq <= toSeq) {
+                        int seq = seqOf(p.getFileName().toString());
+                        if (seq >= 0 && seq >= fromSeq && seq <= toSeq) {
+                            try {
                                 Files.delete(p);
                                 log.fine("Deleted message file: " + p.getFileName());
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
                             }
-                        } catch (NumberFormatException ignored) {
-                            // skip files that don't match naming convention
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
                         }
                     });
         } catch (IOException e) {
