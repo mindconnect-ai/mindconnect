@@ -93,6 +93,13 @@ public enum LlmProvider {
                         "Context that steers spelling, e.g. product or people names that occur "
                                 + "in the recordings.",
                         LlmConfigType.SPEECH_TO_TEXT),
+                AdditionalParamSpec.select("stream", "Stream the transcript",
+                        List.of("auto", "off"),
+                        "'auto' asks the endpoint to send the text as it forms — models that "
+                                + "cannot simply answer in one piece, and callers see no "
+                                + "difference. 'off' is for a server that rejects fields it does "
+                                + "not know.",
+                        LlmConfigType.SPEECH_TO_TEXT),
                 AdditionalParamSpec.select("response_format", "Response Format",
                         List.of("json", "verbose_json", "text", "srt", "vtt"),
                         "How the endpoint answers. Leave empty for 'json', which every model "

@@ -273,11 +273,32 @@ out, for a caller who wants the synchronous feel without a polling loop (60
 seconds is the cap).
 
 **Streaming.** `GET /api/transcriptions/{id}/events` is Server-Sent Events
-from the job's channel: `queued`, `running`, then `completed` carrying the
-transcript, or `failed` with the reason. The stream opens with the job's
-state as it is now, so attaching late tells you what you missed instead of
-leaving you waiting, and it closes when the job ends. `?afterSeq=` resumes a
-dropped connection from the last event seen, without a gap.
+from the job's channel:
+
+```
+event:queued    data:{"status":"queued"}
+event:running   data:{"status":"running"}
+event:delta     data:{"status":"delta","text":"The"}
+event:delta     data:{"status":"delta","text":" quick"}
+event:completed data:{"status":"completed","text":"The quick brown fox …"}
+```
+
+A `delta` carries a fragment, not the whole: append them as they come. How
+finely they arrive is the model's business — OpenAI's `gpt-4o-transcribe`
+models send the text as it forms, `whisper-1` answers in one piece and so
+sends a single delta at the end. The events are the same either way, so
+client code does not branch on the model. `completed` always carries the
+whole transcript and is the authority; a client that only wants the end can
+ignore every delta.
+
+The stream opens with the job's state as it is now, so attaching late tells
+you what you missed instead of leaving you waiting, and it closes when the
+job ends. `?afterSeq=` resumes a dropped connection from the last event seen,
+without a gap — though a very long transcript can push the earliest deltas
+out of the replay buffer, which is why `completed` repeats the whole text.
+
+A config can turn the asking off with the provider parameter `stream: off`,
+for an endpoint that rejects fields it does not know.
 
 **The recording stays.** It is an upload in the file store like any other:
 `GET /api/files/{id}` for its metadata, `…/content` for the bytes, and

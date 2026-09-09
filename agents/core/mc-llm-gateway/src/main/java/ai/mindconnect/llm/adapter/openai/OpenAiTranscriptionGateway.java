@@ -16,9 +16,11 @@ import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 /**
  * Speech-to-text against the OpenAI-compatible transcription endpoint,
@@ -53,28 +55,47 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
 
     @Override
     public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request) {
+        return transcribe(config, request, null);
+    }
+
+    /**
+     * Transcribes, and hands over the text as it forms when the model can do
+     * that. Asking costs nothing: the {@code stream} field is added only when
+     * somebody is listening, a model that cannot stream ignores it and
+     * answers with plain JSON, and the answer's content type says which of
+     * the two arrived. A config can opt out with {@code stream=off} for a
+     * server that refuses fields it does not know.
+     */
+    @Override
+    public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
+                                          Consumer<String> onDelta) {
         LlmConfig cfg = config.resolved(encryption);
         String responseFormat = param(cfg, "response_format", "json");
+        String stream = param(cfg, "stream", "auto");
+        boolean askForStream = onDelta != null
+                && !"off".equalsIgnoreCase(stream) && !"false".equalsIgnoreCase(stream);
 
         long start = System.currentTimeMillis();
         Request.Builder http = new Request.Builder()
                 .url(cfg.baseUrl() + "/v1/audio/transcriptions")
-                .post(multipartBody(cfg, request, responseFormat));
+                .post(multipartBody(cfg, request, responseFormat, askForStream));
         // A local server usually takes no key; sending an empty bearer breaks some of them.
         if (cfg.apiKey() != null && !cfg.apiKey().isBlank()) {
             http.header("Authorization", "Bearer " + cfg.apiKey());
         }
 
         try (Response response = httpClient.newCall(http.build()).execute()) {
-            String payload = response.body() != null ? response.body().string() : "";
             if (!response.isSuccessful()) {
+                String payload = response.body() != null ? response.body().string() : "";
                 throw new IllegalStateException("Transcription call failed (" + response.code()
                         + "): " + truncate(payload));
             }
-            TranscriptionResult result = parse(payload, responseFormat);
-            log.debug("Transcribed {} bytes with {} in {} ms ({} characters)",
+            TranscriptionResult result = streamed(response)
+                    ? readStream(response, onDelta)
+                    : readWhole(response, responseFormat, onDelta);
+            log.debug("Transcribed {} bytes with {} in {} ms ({} characters{})",
                     request.audio().length, cfg.model(), System.currentTimeMillis() - start,
-                    result.text().length());
+                    result.text().length(), streamed(response) ? ", streamed" : "");
             return result;
         } catch (IOException e) {
             throw new IllegalStateException("Transcription call to " + cfg.baseUrl() + " failed: "
@@ -83,9 +104,12 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     }
 
     /** The request body. Package-private so a test can read the parts back. */
-    MultipartBody multipartBody(LlmConfig cfg, TranscriptionRequest request, String responseFormat) {
+    MultipartBody multipartBody(LlmConfig cfg, TranscriptionRequest request, String responseFormat,
+                                boolean askForStream) {
         MultipartBody.Builder builder = new MultipartBody.Builder().setType(MultipartBody.FORM);
-        formFields(cfg, request, responseFormat).forEach(builder::addFormDataPart);
+        Map<String, String> fields = formFields(cfg, request, responseFormat);
+        if (askForStream) fields.put("stream", "true");
+        fields.forEach(builder::addFormDataPart);
         MediaType mediaType = request.contentType() == null ? OCTET_STREAM
                 : MediaType.parse(request.contentType());
         builder.addFormDataPart("file", request.filename(),
@@ -126,6 +150,63 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     private static String firstNonBlank(String first, String second) {
         if (first != null && !first.isBlank()) return first;
         return second != null && !second.isBlank() ? second : null;
+    }
+
+    /** Did the provider answer with an event stream rather than one document? */
+    private static boolean streamed(Response response) {
+        String type = response.header("content-type");
+        return type != null && type.toLowerCase(java.util.Locale.ROOT).startsWith("text/event-stream");
+    }
+
+    /**
+     * One document: parsed as before, and handed to a listening caller in a
+     * single piece so its handling does not depend on the model.
+     */
+    private TranscriptionResult readWhole(Response response, String responseFormat,
+                                          Consumer<String> onDelta) throws IOException {
+        String payload = response.body() != null ? response.body().string() : "";
+        TranscriptionResult result = parse(payload, responseFormat);
+        if (onDelta != null && result.text() != null && !result.text().isEmpty()) {
+            onDelta.accept(result.text());
+        }
+        return result;
+    }
+
+    /**
+     * The event stream: {@code transcript.text.delta} frames as the words
+     * form, {@code transcript.text.done} with the whole text and the usage.
+     * The done frame is the authority; the deltas are what a caller shows
+     * while waiting for it.
+     */
+    private TranscriptionResult readStream(Response response, Consumer<String> onDelta)
+            throws IOException {
+        StringBuilder assembled = new StringBuilder();
+        TranscriptionResult done = null;
+        try (BufferedReader reader = new BufferedReader(response.body().charStream())) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (!line.startsWith("data:")) continue;
+                String data = line.substring("data:".length()).trim();
+                if (data.isEmpty() || "[DONE]".equals(data)) continue;
+
+                JsonNode frame = objectMapper.readTree(data);
+                String type = frame.path("type").asText("");
+                if ("transcript.text.delta".equals(type)) {
+                    String delta = frame.path("delta").asText("");
+                    if (delta.isEmpty()) continue;
+                    assembled.append(delta);
+                    if (onDelta != null) onDelta.accept(delta);
+                } else if ("transcript.text.done".equals(type)) {
+                    JsonNode usage = frame.path("usage");
+                    done = new TranscriptionResult(frame.path("text").asText(""), null, null,
+                            usage.path("input_tokens").asInt(0),
+                            usage.path("output_tokens").asInt(0));
+                }
+            }
+        }
+        // No done frame — the stream broke off. What arrived is still a
+        // transcript, and saying so beats throwing away the words.
+        return done != null ? done : TranscriptionResult.of(assembled.toString());
     }
 
     private TranscriptionResult parse(String payload, String responseFormat) {

@@ -15,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -36,6 +38,7 @@ class OpenAiTranscriptionGatewayTest {
     private final AtomicReference<String> lastAuth = new AtomicReference<>();
     private volatile String responseBody = "{\"text\":\"hello\"}";
     private volatile int responseCode = 200;
+    private volatile String responseType = "application/json";
 
     @BeforeEach
     void startServer() throws Exception {
@@ -44,6 +47,7 @@ class OpenAiTranscriptionGatewayTest {
             lastAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
             lastBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", responseType);
             exchange.sendResponseHeaders(responseCode, bytes.length);
             try (OutputStream out = exchange.getResponseBody()) {
                 out.write(bytes);
@@ -153,6 +157,65 @@ class OpenAiTranscriptionGatewayTest {
         gateway().transcribe(local, recording());
 
         assertThat(lastAuth.get()).isNull();
+    }
+
+    @Test
+    void anEventStreamArrivesAsDeltasAndOneFinalText() {
+        responseType = "text/event-stream";
+        responseBody = """
+                data: {"type":"transcript.text.delta","delta":"Guten"}
+
+                data: {"type":"transcript.text.delta","delta":" Tag"}
+
+                data: {"type":"transcript.text.done","text":"Guten Tag",\
+                "usage":{"input_tokens":49,"output_tokens":21}}
+
+                data: [DONE]
+                """;
+        List<String> deltas = new ArrayList<>();
+
+        TranscriptionResult result = gateway().transcribe(config(), recording(), deltas::add);
+
+        assertThat(deltas).containsExactly("Guten", " Tag");
+        assertThat(result.text()).as("the done frame is the authority").isEqualTo("Guten Tag");
+        assertThat(result.inputTokens()).isEqualTo(49);
+        assertThat(lastBody.get()).contains("name=\"stream\"");
+    }
+
+    @Test
+    void aModelThatCannotStreamStillCallsTheConsumerOnce() {
+        responseBody = "{\"text\":\"one piece\"}";
+        List<String> deltas = new ArrayList<>();
+
+        TranscriptionResult result = gateway().transcribe(config(), recording(), deltas::add);
+
+        // whisper-1 ignores the stream field and answers with JSON — the
+        // caller's handling must not depend on which model served.
+        assertThat(deltas).containsExactly("one piece");
+        assertThat(result.text()).isEqualTo("one piece");
+    }
+
+    @Test
+    void withoutAConsumerNothingAsksForAStream() {
+        gateway().transcribe(config(), recording());
+
+        assertThat(lastBody.get()).doesNotContain("name=\"stream\"");
+    }
+
+    @Test
+    void aBrokenStreamKeepsTheWordsThatArrived() {
+        responseType = "text/event-stream";
+        responseBody = """
+                data: {"type":"transcript.text.delta","delta":"half a"}
+
+                data: {"type":"transcript.text.delta","delta":" sentence"}
+                """;
+        List<String> deltas = new ArrayList<>();
+
+        TranscriptionResult result = gateway().transcribe(config(), recording(), deltas::add);
+
+        assertThat(result.text()).isEqualTo("half a sentence");
+        assertThat(deltas).hasSize(2);
     }
 
     @Test

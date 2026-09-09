@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Transcription as a job: the recording is stored, a task is queued, and the
@@ -115,8 +116,14 @@ public class TranscriptionJobService {
         if (prompt != null) payload.put("prompt", prompt);
         if (userId != null) payload.put("userId", userId);
 
-        String taskId = queue.submit(TaskSubmission.of(TYPE, payload).withMaxAttempts(MAX_ATTEMPTS));
+        // The id is ours before the queue has it, so "queued" is on the
+        // channel before a worker can publish "running". Submitting first and
+        // announcing afterwards is a race the worker sometimes wins, and the
+        // events would then arrive out of order.
+        String taskId = "task_" + UUID.randomUUID();
         channels.publish(taskId, TranscriptionEvent.status("queued"));
+        queue.submit(TaskSubmission.of(TYPE, payload).withId(taskId).withMaxAttempts(MAX_ATTEMPTS));
+
         log.info("Transcription job {} queued ({} bytes, file {})", taskId, audio.length, stored.id());
         return new Job(taskId, stored.id());
     }
@@ -209,7 +216,12 @@ public class TranscriptionJobService {
 
         String configName = payload.get("configName") == null
                 ? DEFAULT_CONFIG_NAME : string(payload, "configName");
-        TranscriptionResult result = speech.transcribe(configName, request);
+        // The transcript goes onto the channel as it forms, so a watching
+        // client reads along instead of waiting for the end. A model that
+        // answers in one piece publishes one delta — same events, same code
+        // on the other side.
+        TranscriptionResult result = speech.transcribe(configName, request,
+                fragment -> channels.publish(taskId, TranscriptionEvent.delta(fragment)));
 
         channels.publish(taskId, TranscriptionEvent.completed(result.text(), result.language()));
         log.info("Transcription job {} done ({} characters)", taskId,

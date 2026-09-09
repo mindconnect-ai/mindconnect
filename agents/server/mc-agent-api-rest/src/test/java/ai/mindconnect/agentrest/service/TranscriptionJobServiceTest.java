@@ -151,9 +151,13 @@ class TranscriptionJobServiceTest {
 
         assertThat(finished.await(5, java.util.concurrent.TimeUnit.SECONDS))
                 .as("the transcript reached the channel").isTrue();
+        // The gateway here answers in one piece, so its text arrives as a
+        // single delta before the completion — the same shape a model that
+        // streams produces word by word, which is the point of the delta.
         assertThat(seen).extracting(TranscriptionEvent::status)
-                .containsExactly("queued", "running", "completed");
-        assertThat(seen.get(2).text()).isEqualTo("what was said");
+                .containsExactly("queued", "running", "delta", "completed");
+        assertThat(seen).extracting(TranscriptionEvent::text)
+                .containsExactly(null, null, "what was said", "what was said");
     }
 
     @Test

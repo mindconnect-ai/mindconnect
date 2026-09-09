@@ -40,13 +40,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and the recording's length; `?wait=` holds the request until the job ends,
   for a caller who wants the synchronous feel without a loop.
   `GET /api/transcriptions/{id}/events` is Server-Sent Events from the job's
-  channel — queued, running, completed — opening with the state as it is now,
+  channel — queued, running, the transcript as it forms in `delta` events,
+  then completed with the whole text — opening with the state as it is now,
   so a late arrival is told what it missed, and `?afterSeq=` resumes a dropped
   connection without a gap. The queue retries a provider hiccup, and `model`
   names an LLM config whose alias is followed. The recording stays in the file
   store, so a transcript keeps the audio behind it: its id and URL come back
   with the job, and `DELETE /api/files/{id}` disposes of it when the caller
-  says so.
+  says so. Whether the text arrives word by word depends on the model —
+  OpenAI's transcribe models stream it, `whisper-1` answers in one piece and
+  sends one delta — and the events are the same either way, so a client does
+  not branch on the model.
 
 - **agents:** speech to text — a Whisper model as a normal LLM config, and a
   microphone in the chat. A config's type can now be `SPEECH_TO_TEXT` next to

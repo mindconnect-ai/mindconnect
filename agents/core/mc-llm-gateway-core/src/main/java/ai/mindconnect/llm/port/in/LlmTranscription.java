@@ -26,4 +26,22 @@ public interface LlmTranscription {
      *                                                         the provider call fails
      */
     TranscriptionResult transcribe(String configName, TranscriptionRequest request);
+
+    /**
+     * The same call, with the transcript handed over as it forms — for a
+     * caller that shows it while it arrives. {@code onDelta} receives
+     * fragments in order; their concatenation is the returned text, which
+     * stays the authority.
+     *
+     * <p>A model that answers in one piece calls the consumer once at the
+     * end. Nothing about the caller's code changes with the model.
+     */
+    default TranscriptionResult transcribe(String configName, TranscriptionRequest request,
+                                           java.util.function.Consumer<String> onDelta) {
+        TranscriptionResult result = transcribe(configName, request);
+        if (onDelta != null && result.text() != null && !result.text().isEmpty()) {
+            onDelta.accept(result.text());
+        }
+        return result;
+    }
 }

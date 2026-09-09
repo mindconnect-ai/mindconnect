@@ -31,6 +31,12 @@ public class RoutingLlmTranscriptionService implements LlmTranscription {
         return gateway.transcribe(resolveConfig(configName), request);
     }
 
+    @Override
+    public TranscriptionResult transcribe(String configName, TranscriptionRequest request,
+                                          java.util.function.Consumer<String> onDelta) {
+        return gateway.transcribe(resolveConfig(configName), request, onDelta);
+    }
+
     /**
      * The config behind the name, aliases followed. A config of the wrong type
      * is refused here rather than at the provider: sending a chat model to the

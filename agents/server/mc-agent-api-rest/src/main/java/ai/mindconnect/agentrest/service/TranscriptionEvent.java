@@ -6,7 +6,7 @@ package ai.mindconnect.agentrest.service;
  * remaining fields are filled when they are known — the transcript on
  * {@code completed}, the reason on {@code failed}.
  *
- * @param status   queued, running, completed, failed or cancelled
+ * @param status   queued, running, delta, completed, failed or cancelled
  * @param text     the transcript, on completion
  * @param language the language the model detected, when it reports one
  * @param error    why the job failed, when it did
@@ -19,6 +19,15 @@ public record TranscriptionEvent(
 ) {
     public static TranscriptionEvent status(String status) {
         return new TranscriptionEvent(status, null, null, null);
+    }
+
+    /**
+     * A piece of the transcript as it forms. {@code text} is the fragment,
+     * not the whole — a client appends it. Whether these arrive one word at a
+     * time or all at once at the end is the model's business.
+     */
+    public static TranscriptionEvent delta(String fragment) {
+        return new TranscriptionEvent("delta", fragment, null, null);
     }
 
     public static TranscriptionEvent completed(String text, String language) {
