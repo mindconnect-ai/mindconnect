@@ -23,6 +23,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** a bundled `openai-embeddings` LLM config — OpenAI's
+  `text-embedding-3-small` (override with `OPENAI_EMBEDDING_MODEL`) with
+  `OPENAI_API_KEY`, for vector stores and file ingestion when no local
+  embedding server is running. Choose it in a store template or via
+  `mindconnect.vector-store.embedding-config`; the local `embeddings` config
+  stays the default.
+
 ### Fixed
 
 - **agents:** two messages appended at the same moment no longer claim the

@@ -56,14 +56,17 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `CLAUDE_HAIKU_MODEL` | `claude-haiku-default` | Override model id (default `claude-haiku-4-5`) |
 | `OPENAI_API_KEY` | `openai-default` | OpenAI API key |
 | `OPENAI_MODEL` | `openai-default` | Override model id (default `gpt-5.4-mini`) |
+| `OPENAI_EMBEDDING_MODEL` | `openai-embeddings` | Override the embedding model (default `text-embedding-3-small`; `OPENAI_API_KEY` is the key) |
+| `EMBEDDING_BASE_URL` | `embeddings` | Local embedding server (default `http://localhost:1234`, LM Studio) |
+| `EMBEDDING_MODEL` | `embeddings` | Override the local embedding model (default `text-embedding-nomic-embed-text-v1.5`) |
 | `AZURE_OPENAI_API_KEY` | `azure-openai-default` | Azure OpenAI key |
 | `AZURE_OPENAI_ENDPOINT` | `azure-openai-default` | Azure resource endpoint URL |
 | `AZURE_OPENAI_DEPLOYMENT` | `azure-openai-default` | Deployment name (default `gpt-4o`) |
 | `GEMINI_API_KEY` | `gemini-default` | Google Gemini key |
 | `GEMINI_MODEL` | `gemini-default` | Override model id (default `gemini-2.0-flash`) |
 
-Local providers (`lm-studio-default`, `agent-default`) need **no** key — they
-talk to LM Studio at `http://localhost:1234`.
+Local providers (`lm-studio-default`, `agent-default`, `embeddings`) need **no**
+key — they talk to LM Studio at `http://localhost:1234`.
 
 ## Tools
 
