@@ -33,6 +33,34 @@ the parts that need more explanation than a signature.
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
 
+## OpenAI Responses API
+
+The admin UI app also serves OpenAI's Responses API, in OpenAI's own wire
+format, so an official OpenAI SDK talks to a Mindconnect agent after a
+`base_url` change and nothing else (`mc-agent-api-responses-rest`; no
+separate process).
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /v1/responses` | create a response — body as OpenAI defines it: `model`, `input`, `instructions`, `previous_response_id`, `stream`; with `stream: true` (in the body, where the SDKs put it) the answer is the SSE event stream |
+| `GET /v1/responses/{id}` | retrieve a response |
+| `POST /v1/responses/{id}/cancel` | cancel one still running |
+
+Two words mean something else here than at OpenAI. The client's **model**
+is an agent or an LLM config: `model: "web-researcher"` has that agent
+answer with its prompt, tools and sub-agents; `model: "claude-haiku-default"`
+runs the default agent on that model, as a session-level override that
+changes nothing for anyone else. A name that is neither is refused rather
+than quietly answered by something else. The client's **conversation** is a
+session, so `previous_response_id` continues the session that response was
+made in.
+
+Not supported: client-side function tools — this runtime executes tools
+inside the turn instead of handing them back to the caller — and skills.
+
+A browser app on another origin may call this API, like every REST endpoint
+here: `mindconnect.cors.allowed-origins` (default `*`) says which origins.
+
 ## Chat
 
 A turn is streamed, not awaited. `POST` the user's message and read

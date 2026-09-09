@@ -70,7 +70,8 @@ springdoc:
   # The admin shell's API section embeds this Swagger UI. Scope it to the
   # runtime's REST API — the admin-ui page controllers return recursive
   # UiNode trees whose schemas freeze Swagger UI's example renderer.
-  paths-to-match: /api/**
+  # The agent API and the OpenAI Responses API; the UI endpoints stay out.
+  paths-to-match: /api/**, /v1/**
   swagger-ui:
     # Operations start collapsed; the standalone Schemas section is hidden
     # (belt and braces against expensive model rendering).
