@@ -84,6 +84,10 @@ services:
       # absolute URLs as http://, which Keycloak then rejects as an
       # unregistered redirect_uri the moment authentication is switched on.
       SERVER_FORWARD_HEADERS_STRATEGY: framework
+      # Match the realm's ssoSessionIdleTimeout. Spring's default is 30 minutes,
+      # so without this the servlet session ends long before Keycloak's, and you
+      # are sent back to the login page while your SSO session is still valid.
+      SERVER_SERVLET_SESSION_TIMEOUT: 8h
       MC_PERSISTENCE: postgres
       MC_POSTGRES_URL: jdbc:postgresql://postgres:5432/mindconnect
       MC_POSTGRES_USER: ${POSTGRES_USER}
