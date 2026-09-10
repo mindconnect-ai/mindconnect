@@ -23,6 +23,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Changed
+
+- **agents:** resolving tools no longer holds up the start. Providers that
+  reach outside the process — the Gmail tools spawn an MCP server in a
+  container — used to bind on the startup thread, so a machine without a
+  container runtime paid the full initialization timeout before the
+  application served its first request; here that was 47 seconds against 2.
+  Every provider now binds on its own virtual thread, the first round gets a
+  short grace period so in-process providers are ready when the runtime is,
+  and anything slower joins the catalog the moment it is ready. A provider
+  that fails for a passing reason is tried again a few times over about a
+  minute, which means a container runtime started after the application no
+  longer needs a restart to be noticed. `SpiToolRegistry` is `AutoCloseable`;
+  closing it stops the warm-up.
+
 ### Fixed
 
 - **agents:** an MCP server whose command cannot be run says so at once

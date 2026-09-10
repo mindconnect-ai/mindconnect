@@ -205,10 +205,24 @@ public interface MultiToolProvider {
 }
 ```
 
-The lifecycle mirrors `ToolFactory` (no-arg constructor → `bind` once →
+The lifecycle mirrors `ToolFactory` (no-arg constructor → `bind` →
 `isAvailable` → `create` per resolution), and registration is the same
 ServiceLoader mechanism with
 `META-INF/services/ai.mindconnect.agent.tool.MultiToolProvider`.
+
+**`bind` runs off the startup path.** A provider may have to reach outside the
+process — spawn a container, ask a remote catalog — and that is no reason for
+an application to wait. The registry starts every provider's `bind` on its own
+virtual thread and gives the first round a couple of hundred milliseconds
+before it carries on, which is plenty for the in-process providers and not
+enough for the others. Whoever misses that window joins the catalog the moment
+`isAvailable()` turns true; `toolNames()` and `isAvailable()` are asked live on
+every lookup, so nothing has to be told. A `bind` that throws, or one that
+leaves the provider unavailable, is tried again a few times over about a
+minute — the case worth catching is a container runtime that starts alongside
+the application rather than before it. Two consequences for a provider author:
+`bind` may run concurrently with the first lookups, so publish your state
+safely, and it may run more than once, so make it repeatable.
 
 Two things are specific to providers:
 
