@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -41,6 +42,16 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     private static final Logger log = LoggerFactory.getLogger(OpenAiTranscriptionGateway.class);
     private static final MediaType OCTET_STREAM = MediaType.get("application/octet-stream");
     private static final int MAX_ERROR_BODY = 500;
+
+    /**
+     * How long one transcription may take. The shared client deliberately has
+     * no read timeout — it also carries the chat's SSE streams, which must
+     * stay open — but a job that runs on the task queue needs an end: an
+     * endpoint that accepts the connection and then goes quiet would
+     * otherwise hold a worker and leave the task running for ever. Generous,
+     * because transcription is slow: a long recording takes minutes.
+     */
+    private static final Duration CALL_TIMEOUT = Duration.ofMinutes(15);
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -84,9 +95,18 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
             http.header("Authorization", "Bearer " + cfg.apiKey());
         }
 
-        try (Response response = httpClient.newCall(http.build()).execute()) {
+        try (Response response = call(http.build()).execute()) {
             if (!response.isSuccessful()) {
                 String payload = response.body() != null ? response.body().string() : "";
+                // Not every endpoint that speaks this API knows the stream
+                // field. One that rejects it says 400 — worth asking again
+                // without it before giving up, since the field was our idea,
+                // not the caller's. A config can skip this with stream=off.
+                if (askForStream && response.code() == 400) {
+                    log.debug("Endpoint {} refused the stream field; asking again without it",
+                            cfg.baseUrl());
+                    return transcribeWithoutStream(cfg, request, responseFormat, onDelta);
+                }
                 throw new IllegalStateException("Transcription call failed (" + response.code()
                         + "): " + truncate(payload));
             }
@@ -101,6 +121,37 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
             throw new IllegalStateException("Transcription call to " + cfg.baseUrl() + " failed: "
                     + e.getMessage(), e);
         }
+    }
+
+    /** The same call once more, this time as a plain batch request. */
+    private TranscriptionResult transcribeWithoutStream(LlmConfig cfg, TranscriptionRequest request,
+                                                        String responseFormat,
+                                                        Consumer<String> onDelta) {
+        Request.Builder http = new Request.Builder()
+                .url(cfg.baseUrl() + "/v1/audio/transcriptions")
+                .post(multipartBody(cfg, request, responseFormat, false));
+        if (cfg.apiKey() != null && !cfg.apiKey().isBlank()) {
+            http.header("Authorization", "Bearer " + cfg.apiKey());
+        }
+        try (Response response = call(http.build()).execute()) {
+            if (!response.isSuccessful()) {
+                String payload = response.body() != null ? response.body().string() : "";
+                throw new IllegalStateException("Transcription call failed (" + response.code()
+                        + "): " + truncate(payload));
+            }
+            return readWhole(response, responseFormat, onDelta);
+        } catch (IOException e) {
+            throw new IllegalStateException("Transcription call to " + cfg.baseUrl() + " failed: "
+                    + e.getMessage(), e);
+        }
+    }
+
+    /** One call with this adapter's own deadline on the shared client. */
+    private okhttp3.Call call(Request request) {
+        return httpClient.newBuilder()
+                .callTimeout(CALL_TIMEOUT)
+                .build()
+                .newCall(request);
     }
 
     /** The request body. Package-private so a test can read the parts back. */

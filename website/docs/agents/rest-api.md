@@ -270,7 +270,8 @@ The answer is `202` with everything needed to follow the job:
 it is done, the transcript plus the detected language and the recording's
 length. `?wait=30` holds the request until the job ends or the seconds run
 out, for a caller who wants the synchronous feel without a polling loop (60
-seconds is the cap).
+seconds is the cap). Running out is not an error: the answer is then the job
+as it stands, and the caller asks again.
 
 **Streaming.** `GET /api/transcriptions/{id}/events` is Server-Sent Events
 from the job's channel:

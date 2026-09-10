@@ -23,6 +23,27 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **agents:** an MCP server whose command cannot be run says so at once
+  instead of holding the application back. The Gmail tools spawn their server
+  through docker; on a machine without it — or with a docker link left behind
+  by an uninstalled Docker Desktop — startup used to stall for the full
+  initialization timeout and log a dropped reactive error before deciding the
+  provider was unavailable. The proxy now checks that the command resolves to
+  something executable before spawning, and names it when it does not.
+
+- **agents:** a transcription job asked to wait no longer answers with a
+  server error. `GET /api/transcriptions/{id}?wait=` treats running out of
+  seconds as what it is — the job is still going — and answers with the job as
+  it stands. The transcription call itself now has a deadline of its own, so
+  an endpoint that accepts a connection and then goes quiet can no longer hold
+  a queue worker and leave a job running for ever. And an endpoint that
+  rejects the `stream` field, which is asked for whenever a caller listens for
+  deltas, is simply asked again without it rather than failing the job; a
+  config that would rather skip that round trip sets the provider parameter
+  `stream=off`.
+
 ## [0.6.0] - 2026-09-10
 
 ### Added
