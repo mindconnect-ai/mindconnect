@@ -1,0 +1,59 @@
+{
+  "realm": "mindconnect",
+  "enabled": true,
+  "displayName": "Mindconnect",
+  "sslRequired": "all",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 10,
+  "waitIncrementSeconds": 60,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 86400,
+  "passwordPolicy": "length(12) and notUsername(undefined) and passwordHistory(3)",
+  "clients": [
+    {
+      "clientId": "mc-admin-ui",
+      "enabled": true,
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "protocol": "openid-connect",
+      "redirectUris": [
+        "https://app.mindconnect.ai/login/oauth2/code/keycloak"
+      ],
+      "webOrigins": [
+        "https://app.mindconnect.ai"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://app.mindconnect.ai/"
+      }
+    }
+  ],
+  "roles": {
+    "realm": [
+      { "name": "admin",     "description": "Full administrative access" },
+      { "name": "poweruser", "description": "Extended user with elevated rights" },
+      { "name": "user",      "description": "Standard user" },
+      { "name": "hr",        "description": "Human Resources access" },
+      { "name": "dev",       "description": "Developer access" }
+    ]
+  },
+  "users": [
+    {
+      "username": "david",
+      "email": "beisdog@web.de",
+      "firstName": "David",
+      "lastName": "Beisert",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": ["admin", "user"]
+    }
+  ]
+}

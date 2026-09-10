@@ -23,7 +23,26 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** a container image for the admin UI, published to GHCR on every
+  push to `main` as `ghcr.io/mindconnect-ai/mc-agent-admin-ui`. It is a layered
+  Spring Boot image, so a new version is a ~3 MB application layer on top of an
+  unchanged dependency layer instead of a fresh 344 MB — which is what makes
+  redeploying onto a small VPS practical. Chromium ships in the image, so the
+  Playwright-backed browser tools work without downloading a browser at
+  runtime. `deploy/` holds a single-host Compose setup to run it behind Caddy,
+  which obtains and renews its TLS certificates itself, next to Postgres and
+  Keycloak.
+
 ### Fixed
+
+- **agents:** the admin UI's Logout button no longer ends with "The backend is
+  unreachable". The header's logout is a link, and the SPA router turned every
+  such click into a fetch — but logout answers with a redirect to Keycloak on
+  another host, which a fetch cannot follow. The session was destroyed all the
+  same, so it logged you out and showed an error while doing it. Logout is now
+  an ordinary page navigation.
 
 - **agents:** a tool provider that cannot say whether it is ready no longer
   takes the catalogue with it. `isAvailable()` became a per-lookup call when

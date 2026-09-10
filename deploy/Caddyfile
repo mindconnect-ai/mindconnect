@@ -1,0 +1,32 @@
+# One block per hostname. Caddy fetches and renews the Let's Encrypt
+# certificates itself — no certbot, no renewal cron. Requires the DNS records
+# to point here and ports 80/443 to be reachable.
+#
+# Reload without downtime:
+#   docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Agent admin UI — also serves the OpenAI-compatible Responses API, so
+# there is no separate API service to route to.
+{$ADMIN_DOMAIN} {
+	# No buffering and no read timeout by default, which is what the agent's
+	# SSE streams need; nginx would require proxy_buffering off plus a raised
+	# proxy_read_timeout here.
+	reverse_proxy admin-ui:9090
+
+	request_body {
+		# Matches spring.servlet.multipart.max-request-size in the app.
+		max_size 100MB
+	}
+}
+
+{$AUTH_DOMAIN} {
+	reverse_proxy keycloak:8080
+}
+
+# {$CARDMARKET_DOMAIN} {
+# 	reverse_proxy cardmarket:8080
+# }
