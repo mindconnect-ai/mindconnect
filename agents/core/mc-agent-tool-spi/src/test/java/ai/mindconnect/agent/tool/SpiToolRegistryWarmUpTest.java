@@ -95,6 +95,37 @@ class SpiToolRegistryWarmUpTest {
         assertThat(registry.knownToolNames()).doesNotContain("flaky_tool");
     }
 
+    @Test
+    void aProviderThatCannotSayWhetherItIsReadyDoesNotBreakTheCatalogue() {
+        WarmUpProviders.slowBindMillis = 10;
+
+        registry = new SpiToolRegistry(EMPTY, getClass().getClassLoader(), new long[0]);
+
+        // The throwing provider is skipped and everyone else is still served —
+        // this runs on every lookup, so one broken bundle must not take the
+        // catalogue with it.
+        assertThat(within(5_000, () -> registry.knownToolNames().contains("slow_tool"))).isTrue();
+        assertThat(registry.knownToolNames()).contains("fast_tool").doesNotContain("throwing_tool");
+        assertThat(registry.toolNamesByGroup()).doesNotContainKey("warmup-throwing");
+    }
+
+    @Test
+    void aDeferredRegistryBindsNothingUntilItIsAsked() throws Exception {
+        WarmUpProviders.slowBindMillis = 10;
+
+        registry = SpiToolRegistry.deferred(EMPTY);
+        Thread.sleep(200);
+
+        assertThat(registry.knownToolNames())
+                .as("nothing bound before the host says so").isEmpty();
+
+        registry.warmUp();
+
+        assertThat(registry.knownToolNames()).contains("fast_tool");
+        registry.warmUp();   // twice is a no-op, not a second round
+        assertThat(WarmUpProviders.slowBinds.get()).isEqualTo(1);
+    }
+
     /** Polls until the condition holds, or the milliseconds run out. */
     private static boolean within(long millis, BooleanSupplier condition) {
         long deadline = System.currentTimeMillis() + millis;

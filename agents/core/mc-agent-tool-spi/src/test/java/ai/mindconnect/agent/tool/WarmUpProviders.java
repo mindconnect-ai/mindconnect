@@ -23,6 +23,8 @@ public final class WarmUpProviders {
     static volatile long slowBindMillis = 300;
     /** How many attempts {@link Flaky#bind} throws on before it works. */
     static volatile int flakyFailures = 2;
+    /** Whether {@link Throwing} throws when asked. */
+    static volatile boolean throwFromIsAvailable = true;
 
     static final AtomicInteger slowBinds = new AtomicInteger();
     static final AtomicInteger flakyBinds = new AtomicInteger();
@@ -30,6 +32,7 @@ public final class WarmUpProviders {
     static void reset() {
         slowBindMillis = 300;
         flakyFailures = 2;
+        throwFromIsAvailable = true;
         slowBinds.set(0);
         flakyBinds.set(0);
     }
@@ -73,6 +76,26 @@ public final class WarmUpProviders {
         @Override public void bind(ToolEnvironment env) { bound = true; }
 
         @Override public boolean isAvailable() { return bound; }
+
+        @Override
+        public Optional<Tool> create(String toolName, AgentTool agentTool, ToolCallScope scope) {
+            return Optional.empty();
+        }
+    }
+
+    /** Cannot say whether it is ready — a broken health check. */
+    public static final class Throwing implements MultiToolProvider {
+        @Override public Set<String> toolNames() { return Set.of("throwing_tool"); }
+
+        @Override public String group() { return "warmup-throwing"; }
+
+        @Override public void bind(ToolEnvironment env) { }
+
+        @Override
+        public boolean isAvailable() {
+            if (throwFromIsAvailable) throw new IllegalStateException("cannot say");
+            return true;
+        }
 
         @Override
         public Optional<Tool> create(String toolName, AgentTool agentTool, ToolCallScope scope) {

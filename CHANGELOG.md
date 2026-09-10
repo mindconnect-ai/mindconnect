@@ -23,6 +23,27 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **agents:** a tool provider that cannot say whether it is ready no longer
+  takes the catalogue with it. `isAvailable()` became a per-lookup call when
+  provider binding moved off the startup path; a provider throwing there would
+  have failed every turn and every catalogue render, for every provider. It is
+  now caught and logged, and the bundle counts as unavailable. The
+  documentation for tool authors says what `bind` and `isAvailable` may expect
+  of their surroundings — both run more often, and in more places, than they
+  used to.
+
+- **agents:** the Spring runtime starts the tool warm-up once its context is
+  refreshed rather than while the registry is being built. Binding asks the
+  environment for services, and that environment resolves them from the
+  application context: doing it from a warm-up thread mid-refresh meant
+  queueing behind the very startup that was waiting for the first round, so a
+  provider that should have been ready in microseconds could miss its window
+  for no reason. `SpiToolRegistry.deferred(...)` is the registry without the
+  warm-up for a host that starts in phases; embedders that build it directly
+  are unaffected.
+
 ### Changed
 
 - **agents:** resolving tools no longer holds up the start. Providers that
