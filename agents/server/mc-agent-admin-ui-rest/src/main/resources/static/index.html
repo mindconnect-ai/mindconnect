@@ -77,6 +77,9 @@
     <!-- "New group" next to the agent form's group select: the rubrics come
          from the agents themselves, so naming a new one needs a field. -->
     <script src="/js/group-picker.js" defer></script>
+    <!-- Logout leaves the SPA for Keycloak, so it must be a real navigation
+         and not a routed fetch. See the file for what goes wrong otherwise. -->
+    <script src="/js/logout.js" defer></script>
     <!-- Hands the active theme's colours to the json-viewer web component,
          which paints from a palette inside its own shadow root and so cannot
          be reached from app.css. -->

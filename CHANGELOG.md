@@ -37,6 +37,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** the admin UI's Logout button no longer ends with "The backend is
+  unreachable". The header's logout is a link, and the SPA router turned every
+  such click into a fetch — but logout answers with a redirect to Keycloak on
+  another host, which a fetch cannot follow. The session was destroyed all the
+  same, so it logged you out and showed an error while doing it. Logout is now
+  an ordinary page navigation.
+
 - **agents:** a tool provider that cannot say whether it is ready no longer
   takes the catalogue with it. `isAvailable()` became a per-lookup call when
   provider binding moved off the startup path; a provider throwing there would
