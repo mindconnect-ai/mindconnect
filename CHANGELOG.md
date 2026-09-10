@@ -23,6 +23,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** a container image for the admin UI, published to GHCR on every
+  push to `main` as `ghcr.io/mindconnect-ai/mc-agent-admin-ui`. It is a layered
+  Spring Boot image, so a new version is a ~3 MB application layer on top of an
+  unchanged dependency layer instead of a fresh 344 MB — which is what makes
+  redeploying onto a small VPS practical. Chromium ships in the image, so the
+  Playwright-backed browser tools work without downloading a browser at
+  runtime. `deploy/` holds a single-host Compose setup to run it behind Caddy,
+  which obtains and renews its TLS certificates itself, next to Postgres and
+  Keycloak.
+
 ### Fixed
 
 - **agents:** a tool provider that cannot say whether it is ready no longer

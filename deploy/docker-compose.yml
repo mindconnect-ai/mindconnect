@@ -1,0 +1,119 @@
+# Mindconnect on a single host: Caddy terminates TLS and routes, everything
+# else stays on the internal network with no published port.
+#
+#   docker compose pull && docker compose up -d
+#
+# Memory limits are sized for a 4 GB machine and are deliberately explicit —
+# without them one JVM sizes its heap against the whole host and the kernel
+# picks the victim. See README.md for the budget and its consequences.
+name: mindconnect
+
+services:
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    environment:
+      # The Caddyfile resolves {$VAR} against this container's environment,
+      # not against Compose's .env — without these it renders empty hostnames
+      # and an empty email, and refuses to start.
+      ACME_EMAIL: ${ACME_EMAIL:?set in .env}
+      ADMIN_DOMAIN: ${ADMIN_DOMAIN:?set in .env}
+      AUTH_DOMAIN: ${AUTH_DOMAIN:?set in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # certificates and ACME account — must persist
+      - caddy_config:/config
+    mem_limit: 96m
+    depends_on:
+      - admin-ui
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      POSTGRES_DB: mindconnect
+      # Databases created next to mindconnect on first start.
+      EXTRA_DATABASES: keycloak cardmarket
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-extra-databases.sh:/docker-entrypoint-initdb.d/10-extra-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d mindconnect"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 512m
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    restart: unless-stopped
+    # Not "start --optimized": that requires an image built ahead of time with
+    # kc.sh build, and refuses to run on a first-ever start.
+    command: start
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${POSTGRES_USER}
+      KC_DB_PASSWORD: ${POSTGRES_PASSWORD}
+      KC_HOSTNAME: https://${AUTH_DOMAIN}
+      # Caddy terminates TLS and forwards X-Forwarded-*; without this Keycloak
+      # builds its issuer and redirect URLs from the internal http address and
+      # every login bounces.
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN_USER:?set in .env}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_PASSWORD:?set in .env}
+      JAVA_OPTS_APPEND: "-XX:MaxRAMPercentage=70"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1g
+
+  admin-ui:
+    image: ghcr.io/mindconnect-ai/mc-agent-admin-ui:${MC_TAG:-main}
+    restart: unless-stopped
+    environment:
+      # Behind Caddy the app only ever sees plain HTTP. Without this it builds
+      # absolute URLs as http://, which Keycloak then rejects as an
+      # unregistered redirect_uri the moment authentication is switched on.
+      SERVER_FORWARD_HEADERS_STRATEGY: framework
+      MC_PERSISTENCE: postgres
+      MC_POSTGRES_URL: jdbc:postgresql://postgres:5432/mindconnect
+      MC_POSTGRES_USER: ${POSTGRES_USER}
+      MC_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      MINDCONNECT_ENCRYPTION_SECRET_KEY: ${MINDCONNECT_ENCRYPTION_SECRET_KEY:?32 chars, see README}
+      # Empty on the first start: the realm does not exist yet, and the app
+      # then runs with authentication off. Set MC_PROFILES=keycloak in .env
+      # once the realm and the client secret are in place.
+      SPRING_PROFILES_ACTIVE: ${MC_PROFILES:-}
+      KC_ISSUER_URI: https://${AUTH_DOMAIN}/realms/mindconnect
+      KC_CLIENT_ID: ${KC_CLIENT_ID:-mc-admin-ui}
+      KC_CLIENT_SECRET: ${KC_CLIENT_SECRET}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+    volumes:
+      - admin_data:/app/data     # workspaces and uploads stay on disk
+      - admin_logs:/app/logs
+    # No shm_size needed: PlaywrightHolder launches Chromium with
+    # --disable-dev-shm-usage, so it never touches Docker's small /dev/shm.
+    # It also passes --no-sandbox, which Ubuntu's AppArmor restrictions on
+    # unprivileged user namespaces would otherwise trip over — the container
+    # and its unprivileged user are then the only boundary around whatever
+    # page an agent decides to open.
+    depends_on:
+      postgres:
+        condition: service_healthy
+    mem_limit: 1600m
+
+volumes:
+  caddy_data:
+  caddy_config:
+  postgres_data:
+  admin_data:
+  admin_logs:
