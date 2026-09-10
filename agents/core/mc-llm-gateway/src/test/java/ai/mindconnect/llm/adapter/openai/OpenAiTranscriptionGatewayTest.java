@@ -34,6 +34,9 @@ class OpenAiTranscriptionGatewayTest {
     private static final byte[] AUDIO = "not really audio".getBytes(StandardCharsets.UTF_8);
 
     private HttpServer server;
+    /** Set per call before answering — lets a test stage a 400 then a 200. */
+    private final java.util.Queue<Runnable> responses = new java.util.ArrayDeque<>();
+    private List<String> bodiesSeen;
     private final AtomicReference<String> lastBody = new AtomicReference<>();
     private final AtomicReference<String> lastAuth = new AtomicReference<>();
     private volatile String responseBody = "{\"text\":\"hello\"}";
@@ -45,7 +48,11 @@ class OpenAiTranscriptionGatewayTest {
         server = HttpServer.create(new InetSocketAddress(0), 0);
         server.createContext("/v1/audio/transcriptions", exchange -> {
             lastAuth.set(exchange.getRequestHeaders().getFirst("Authorization"));
-            lastBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            lastBody.set(body);
+            if (bodiesSeen != null) bodiesSeen.add(body);
+            Runnable staged = responses.poll();
+            if (staged != null) staged.run();
             byte[] bytes = responseBody.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", responseType);
             exchange.sendResponseHeaders(responseCode, bytes.length);
@@ -216,6 +223,35 @@ class OpenAiTranscriptionGatewayTest {
 
         assertThat(result.text()).isEqualTo("half a sentence");
         assertThat(deltas).hasSize(2);
+    }
+
+    @Test
+    void anEndpointThatRefusesTheStreamFieldIsAskedAgainWithoutIt() {
+        // First call: 400, as a server that validates its form strictly
+        // answers an unknown field. Second call must arrive without it.
+        List<String> bodies = new ArrayList<>();
+        responses.add(() -> { responseCode = 400; responseBody = "{\"error\":\"unknown field stream\"}"; });
+        responses.add(() -> { responseCode = 200; responseBody = "{\"text\":\"asked again\"}"; });
+        bodiesSeen = bodies;
+        List<String> deltas = new ArrayList<>();
+
+        TranscriptionResult result = gateway().transcribe(config(), recording(), deltas::add);
+
+        assertThat(result.text()).isEqualTo("asked again");
+        assertThat(bodies).hasSize(2);
+        assertThat(bodies.get(0)).contains("name=\"stream\"");
+        assertThat(bodies.get(1)).as("the retry drops the field").doesNotContain("name=\"stream\"");
+        assertThat(deltas).containsExactly("asked again");
+    }
+
+    @Test
+    void aRefusalThatIsNotAboutTheStreamStillFails() {
+        responseCode = 401;
+        responseBody = "{\"error\":{\"message\":\"Incorrect API key\"}}";
+
+        assertThatThrownBy(() -> gateway().transcribe(config(), recording(), d -> { }))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("401");
     }
 
     @Test

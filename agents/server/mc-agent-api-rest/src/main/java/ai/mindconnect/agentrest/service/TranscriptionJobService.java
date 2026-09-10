@@ -8,6 +8,7 @@ import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskQueue;
+import ai.mindconnect.taskqueue.TaskQueueException;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.TaskSubmission;
@@ -138,11 +139,21 @@ public class TranscriptionJobService {
 
     /**
      * Waits for the job to end, at most {@code timeout}. Returns the record as
-     * it looks when the wait is over — still running is a valid answer.
+     * it looks when the wait is over — <em>still running</em> is a valid
+     * answer, and the common one for a recording longer than the patience of
+     * the caller.
+     *
+     * <p>The queue treats a timeout as an error and throws; here it is the
+     * expected outcome, so it is caught and answered with the job as it
+     * stands. Only an id nobody knows comes back empty.
      */
     public Optional<TaskRecord> await(String taskId, Duration timeout) {
         if (queue.get(taskId).isEmpty()) return Optional.empty();
-        return Optional.ofNullable(queue.await(taskId, timeout));
+        try {
+            return Optional.ofNullable(queue.await(taskId, timeout));
+        } catch (TaskQueueException e) {
+            return queue.get(taskId);
+        }
     }
 
     /** The transcript of a completed job, parsed back out of the task's result. */

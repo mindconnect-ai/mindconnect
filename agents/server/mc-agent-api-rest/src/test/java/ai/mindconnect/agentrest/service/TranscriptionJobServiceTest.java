@@ -161,6 +161,36 @@ class TranscriptionJobServiceTest {
     }
 
     @Test
+    void aWaitShorterThanTheJobAnswersWithTheJobAsItStands() throws Exception {
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        gateway = (configName, request) -> {
+            try {
+                release.await(5, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            return new TranscriptionResult("eventually", null, null, 0, 0);
+        };
+        String taskId = service.submit(AUDIO, "speech.webm", "audio/webm",
+                null, null, null, null).taskId();
+
+        // The queue treats a timeout as an error; a caller asking to wait a
+        // moment must still be told what the job is doing, not handed a
+        // failure.
+        Optional<TaskRecord> waited = service.await(taskId, Duration.ofMillis(200));
+
+        assertThat(waited).isPresent();
+        assertThat(waited.get().status().terminal()).as("still working").isFalse();
+        release.countDown();
+        queue.await(taskId, Duration.ofSeconds(5));
+    }
+
+    @Test
+    void anUnknownJobIsStillEmpty() {
+        assertThat(service.await("task_nobody", Duration.ofMillis(50))).isEmpty();
+    }
+
+    @Test
     void theRequesterIsRememberedForTheOwnerCheck() throws Exception {
         String taskId = service.submit(AUDIO, "speech.webm", "audio/webm",
                 null, null, null, "mc_user").taskId();

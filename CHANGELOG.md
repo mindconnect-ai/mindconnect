@@ -91,6 +91,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** an MCP server whose command cannot be run says so at once
+  instead of holding the application back. The Gmail tools spawn their server
+  through docker; on a machine without it — or with a docker link left behind
+  by an uninstalled Docker Desktop — startup used to stall for the full
+  initialization timeout and log a dropped reactive error before deciding the
+  provider was unavailable. The proxy now checks that the command resolves to
+  something executable before spawning, and names it when it does not.
+
 - **agents:** the Responses API reports what a turn cost. `usage` on
   `/v1/responses` was always zero: the runtime summed the providers' token
   counts per round but dropped them at the turn boundary, so every response
