@@ -210,7 +210,7 @@ The lifecycle mirrors `ToolFactory` (no-arg constructor → `bind` →
 ServiceLoader mechanism with
 `META-INF/services/ai.mindconnect.agent.tool.MultiToolProvider`.
 
-**`bind` runs off the startup path.** A provider may have to reach outside the
+**`bind` runs off the startup path, after the host is up.** A provider may have to reach outside the
 process — spawn a container, ask a remote catalog — and that is no reason for
 an application to wait. The registry starts every provider's `bind` on its own
 virtual thread and gives the first round a couple of hundred milliseconds
@@ -222,14 +222,20 @@ leaves the provider unavailable, is tried again a few times over about a
 minute — the case worth catching is a container runtime that starts alongside
 the application rather than before it. Two consequences for a provider author:
 `bind` may run concurrently with the first lookups, so publish your state
-safely, and it may run more than once, so make it repeatable.
+safely, and it may run more than once, so make it repeatable. A host that starts in phases can take the warm-up into
+its own hands — the Spring runtime builds the registry deferred and starts it
+when the context is refreshed, so a provider asking the container for a
+service never queues behind the container's own startup.
 
 Two things are specific to providers:
 
-- **`toolNames()` is consulted on every lookup** (catalog, admin-UI dropdown,
-  name resolution), so a provider backed by mutable data re-reads its source
-  there instead of caching in `bind` — keep it cheap (an in-memory map or a
-  directory listing, not a network round-trip).
+- **`toolNames()` and `isAvailable()` are consulted on every lookup** (catalog,
+  admin-UI dropdown, name resolution), so a provider backed by mutable data
+  re-reads its source there instead of caching in `bind` — keep both cheap (an
+  in-memory map or a directory listing, not a network round-trip, and
+  certainly not a health check). A provider that throws from `isAvailable()`
+  is taken as unavailable and logged, rather than failing the lookup for
+  everyone else.
 - **`group()` doubles as the name namespace**: by convention a provider's tool
   names compose as `group() + "_" + localName` — group `workflow`, workflow
   `pipeline` → tool `workflow_pipeline`; group `gmail` →

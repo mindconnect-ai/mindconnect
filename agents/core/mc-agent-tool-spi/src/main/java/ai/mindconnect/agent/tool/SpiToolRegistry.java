@@ -73,19 +73,44 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
     private final List<MultiToolProvider> providers;
     private final List<Thread> warmUpThreads = new java.util.concurrent.CopyOnWriteArrayList<>();
     private final long[] retryDelays;
-    private java.util.concurrent.CountDownLatch firstRound;
+    private final ToolEnvironment environment;
+    private final java.util.concurrent.atomic.AtomicBoolean warmedUp =
+            new java.util.concurrent.atomic.AtomicBoolean();
+    private volatile java.util.concurrent.CountDownLatch firstRound =
+            new java.util.concurrent.CountDownLatch(0);
 
     public SpiToolRegistry(ToolEnvironment environment) {
         this(environment, Thread.currentThread().getContextClassLoader());
     }
 
     public SpiToolRegistry(ToolEnvironment environment, ClassLoader classLoader) {
-        this(environment, classLoader, RETRY_DELAYS);
+        this(environment, classLoader, RETRY_DELAYS, true);
+    }
+
+    /**
+     * The registry without the warm-up: it is built, and nothing is bound
+     * until {@link #warmUp()} is called.
+     *
+     * <p>For a host that starts in phases. Binding asks the environment for
+     * services, and a host whose environment resolves those from a container
+     * that is still starting would have the warm-up queue behind its own
+     * startup — the Spring runtime hands this registry its providers once the
+     * context is up rather than while it is coming up.
+     */
+    public static SpiToolRegistry deferred(ToolEnvironment environment) {
+        return new SpiToolRegistry(environment, Thread.currentThread().getContextClassLoader(),
+                RETRY_DELAYS, false);
     }
 
     /** For tests: the same registry with its own patience. */
     SpiToolRegistry(ToolEnvironment environment, ClassLoader classLoader, long[] retryDelays) {
+        this(environment, classLoader, retryDelays, true);
+    }
+
+    private SpiToolRegistry(ToolEnvironment environment, ClassLoader classLoader,
+                            long[] retryDelays, boolean warmUpNow) {
         this.retryDelays = retryDelays;
+        this.environment = environment;
         // 1) Single-tool ToolFactory SPI
         Map<String, ToolFactory> facMap = new LinkedHashMap<>();
         for (ToolFactory factory : ServiceLoader.load(ToolFactory.class, classLoader)) {
@@ -128,7 +153,17 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
         if (log.isDebugEnabled()) {
             log.debug("  factories: {}", factoriesByName.keySet());
         }
-        warmUp(environment);
+        if (warmUpNow) warmUp();
+    }
+
+    /**
+     * Binds the providers, once. Returns when the first round has had its
+     * moment — see {@link #FIRST_ROUND_GRACE_MS} — not when every provider is
+     * ready. Calling it twice does nothing the second time.
+     */
+    public void warmUp() {
+        if (!warmedUp.compareAndSet(false, true)) return;
+        startWarmUp();
         awaitFirstRound();
     }
 
@@ -143,7 +178,7 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
      * attempts with a widening gap, and the first one that succeeds puts the
      * bundle in the catalog.
      */
-    private void warmUp(ToolEnvironment environment) {
+    private void startWarmUp() {
         this.firstRound = new java.util.concurrent.CountDownLatch(providers.size());
         for (MultiToolProvider provider : providers) {
             Thread worker = Thread.ofVirtual()
@@ -155,7 +190,7 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
 
     /**
      * Waits for the first attempt of every provider, but not for long. What is
-     * ready by then is ready when the constructor returns; the rest arrives
+     * ready by then is ready when the warm-up call returns; the rest arrives
      * while the application is already serving.
      */
     private void awaitFirstRound() {
@@ -252,7 +287,16 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
     private List<MultiToolProvider> ready() {
         List<MultiToolProvider> available = new ArrayList<>(providers.size());
         for (MultiToolProvider provider : providers) {
-            if (provider.isAvailable()) available.add(provider);
+            try {
+                if (provider.isAvailable()) available.add(provider);
+            } catch (RuntimeException e) {
+                // This runs on every lookup now, so a provider that throws
+                // here would fail every turn and every catalogue render — and
+                // take the other providers' tools with it. A bundle that
+                // cannot say whether it is ready is not ready.
+                log.warn("MultiToolProvider {} threw from isAvailable() — treating it as unavailable: {}",
+                        provider.getClass().getSimpleName(), e.toString());
+            }
         }
         return available;
     }

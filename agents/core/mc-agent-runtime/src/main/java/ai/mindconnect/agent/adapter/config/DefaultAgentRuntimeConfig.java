@@ -271,9 +271,33 @@ public class DefaultAgentRuntimeConfig {
                 .string("vectorStorePassword", vectorStorePassword)
                 .string("vectorStoreEmbeddingConfig", vectorStoreEmbeddingConfig)
                 .build();
-        SpiToolRegistry registry = new SpiToolRegistry(hostBacked(env, applicationContext));
+        // Deferred on purpose: binding asks the environment for services, and
+        // this one resolves them from the application context. Doing that from
+        // a warm-up thread while the context is still refreshing means queuing
+        // behind the very startup that is waiting for the first round. The
+        // listener below starts it once the context is up.
+        SpiToolRegistry registry = SpiToolRegistry.deferred(hostBacked(env, applicationContext));
         registryRef.set(registry);
         return registry;
+    }
+
+    /**
+     * Starts the tool warm-up once the application is up. Providers that reach
+     * outside the process bind on their own threads from here, and the ones
+     * that are in-process are ready a fraction of a second later — nothing in
+     * the startup path waits for either.
+     */
+    @Bean
+    org.springframework.context.ApplicationListener<
+            org.springframework.context.event.ContextRefreshedEvent> toolWarmUpStarter(
+            ai.mindconnect.agent.tool.ToolRegistry toolRegistry) {
+        // ContextRefreshedEvent rather than Boot's ApplicationReadyEvent: this
+        // module carries spring-context alone, and by the time it fires every
+        // singleton is built — which is the property that matters here. The
+        // warm-up itself only ever runs once, however often the event comes.
+        return event -> {
+            if (toolRegistry instanceof SpiToolRegistry spi) spi.warmUp();
+        };
     }
 
     /**
