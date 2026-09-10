@@ -157,7 +157,7 @@ class LlmConfigFormLmStudioTest {
         assertThat(prefill.capabilities()).containsExactly(LlmCapability.TOOL_CALLING);
         assertThat(prefill.hint()).contains("32768").contains("131072");
 
-        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(false, null, prefill);
+        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, null, prefill);
         assertThat(field(chat, "contextWindowTokens").getValue()).isEqualTo(32768);
         assertThat(field(chat, "contextWindowTokens").getHint()).startsWith("From LM Studio");
         assertThat(field(chat, "capabilities").getValue()).isEqualTo(List.of("TOOL_CALLING"));
@@ -168,7 +168,7 @@ class LlmConfigFormLmStudioTest {
         assertThat(vision.capabilities()).containsExactlyInAnyOrder(LlmCapability.TOOL_CALLING, LlmCapability.VISION);
         assertThat(vision.hint()).contains("not loaded");
 
-        UiFieldGroup embedding = LlmConfigFormComponent.typeGroup(true, null,
+        UiFieldGroup embedding = LlmConfigFormComponent.typeGroup(LlmConfigType.EMBEDDING, null,
                 LlmConfigFormComponent.LmStudioPrefill.of(NOMIC));
         assertThat(field(embedding, "contextWindowTokens").getValue()).isEqualTo(2048);
     }
@@ -177,7 +177,7 @@ class LlmConfigFormLmStudioTest {
     void withoutAPrefillTheConfigsOwnValuesShow() {
         LlmConfig config = LlmConfig.lmStudio("lm", "openai/gpt-oss-120b", "http://localhost:1234");
 
-        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(false, config, null);
+        UiFieldGroup chat = LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, config, null);
         assertThat(field(chat, "contextWindowTokens").getValue()).isEqualTo(config.contextWindowTokens());
         assertThat(field(chat, "contextWindowTokens").getHint()).doesNotContain("LM Studio");
         assertThat(field(chat, "capabilities").getValue())

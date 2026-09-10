@@ -19,7 +19,11 @@ A config has a `name`, `provider`, `model`, `baseUrl`, `apiKey`,
 `contextWindowTokens`, and optional `additionalParams`, rate-limit and retry
 settings. The form also covers:
 
-- **Type** — `Chat` or `Embedding` (embedding configs power the vector store);
+- **Type** — `Chat`, `Embedding` (embedding configs power the vector store)
+  or `Speech to text` (since 0.5.3: a Whisper-style model that turns a
+  recording into text). Only chat configs have sampling settings; a
+  speech-to-text config takes its language, prompt and response format
+  from the provider parameters;
 - **Capabilities** (chat configs) — what the model reads and does: tool
   calling, vision (images), documents (PDF), audio input. Vision and documents
   steer the runtime: an image or PDF sent with a message reaches the model as
@@ -31,6 +35,39 @@ settings. The form also covers:
 - provider-specific extra parameters, rendered from the provider catalog;
 - an **Encrypt** button next to the API-key field for literal keys.
 
+An alias works for a speech-to-text config like for any other: set
+*Delegates To* and every caller naming the alias lands on the config behind
+it, the Test dialog included — it asks for a recording when the config at the
+end of the chain is a speech one.
+
+A fresh installation is seeded with a `speech-to-text` config: OpenAI's
+`whisper-1` behind `${OPENAI_API_KEY}`. Point `SPEECH_TO_TEXT_BASE_URL` at
+Groq or a local Whisper server to use it without an OpenAI key, and
+`SPEECH_TO_TEXT_MODEL` at another model — the seed pins no response format,
+so switching the model cannot collide with one.
+
+## Dictating in the chat {#dictation}
+
+The chat composer has a microphone next to the **+**. Press it, speak, press it
+again: while it records, the mic turns red and the input's placeholder counts
+the seconds; on stop the recording goes to the server, and the transcript lands
+in the input — after whatever was already typed, so dictating adds to a draft
+rather than replacing it. Nothing is sent on its own; the words are read,
+corrected and sent by the person who spoke them.
+
+The chat always asks for the config named **`speech-to-text`**. That is a name,
+not a model: point an alias of that name at whichever config should serve the
+chat, and swap what is behind it without touching anything else. Without such a
+config the mic answers with a toast saying which config to create.
+
+Recording needs a microphone and a **secure context**, which is a browser rule,
+not a setting of this application: the microphone is handed out on HTTPS pages
+and on `localhost`, and nowhere else. A deployment behind TLS — a reverse proxy
+with a certificate, an ingress, Cloud Run — is therefore fine; the same server
+reached over plain `http://` on a host name is not, and the placeholder then
+says the page is served over plain HTTP. Typing and file upload are unaffected
+either way.
+
 ## LM Studio: pick a model instead of typing it {#lm-studio}
 
 A new config starts with no provider selected; the field is required. With
@@ -40,7 +77,9 @@ what it has installed, and the model field becomes a dropdown:
 - the list comes from LM Studio's native REST API (`GET {baseUrl}/api/v0/models`,
   falling back to `/api/v1/models` on newer versions) and is filtered by the
   config's type — chat models (`llm`, `vlm`) for a chat config, embedding
-  models for an embedding config;
+  models for an embedding config. LM Studio serves no transcription models,
+  so a speech-to-text config finds none there and points at OpenAI, Groq or a
+  local Whisper server instead;
 - each entry shows the model's context length and whether it is loaded, e.g.
   `openai/gpt-oss-120b · 32k loaded (max 128k) · tools`;
 - picking a model fills in **Context Window Tokens** with the length the model
@@ -71,6 +110,19 @@ takes a text to embed), sends a real request to the provider
   reports duration, token counts and finish reason.
 - ❌ **Error** — shows the failure (bad key, wrong endpoint, model not found,
   provider unreachable…).
+
+A `Speech to text` config is tested with a recording instead of a message: the
+dialog shows a drop zone, and dropping or picking an audio file (WebM, WAV,
+MP3, M4A, OGG, FLAC) posts it to `POST /admin/api/llm-configs/{id}/test-audio`.
+The transcript comes back in the same dialog, with the detected language and
+the length of the recording when the model reports them.
+
+The dialog can also record: **Record** asks the browser for the microphone and
+counts the seconds, **Stop** sends what was spoken to the same endpoint. It is
+browser-only — the recording is made and posted by the page, the server sees an
+ordinary upload. The microphone needs a secure context, so this works on
+`localhost` and over HTTPS; elsewhere the status line says the browser refused,
+and the drop zone still does the job.
 
 Test a cloud config right after creating it, to confirm the API key and
 `baseUrl` before wiring it into an agent.

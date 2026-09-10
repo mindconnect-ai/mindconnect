@@ -17,6 +17,13 @@ It is a **library** (a plain `jar`), not a server. The main ports:
 
 - **`LlmChat`** (in-port) — what callers use to stream a chat completion.
 - **`LlmEmbeddings`** (in-port) — embeddings, used by the vector store.
+- **`LlmTranscription`** (in-port) — speech to text, since 0.5.3: name a
+  config, hand over one recording, get one transcript. Routing works as it
+  does for chat, so an alias is followed.
+- **`TranscriptionGateway`** (out-port) — what a provider's speech-to-text
+  adapter implements. `OpenAiTranscriptionGateway` calls the
+  OpenAI-compatible `/v1/audio/transcriptions` endpoint, which OpenAI, Groq
+  and a local Whisper server all speak.
 - **`LlmGateway`** (out-port) — what each provider adapter implements.
 - **`LlmConfigRepository`** (out-port) — where configs are stored;
   `LlmCallListener` lets you observe every call (wire traces).
@@ -25,6 +32,7 @@ Between them sits the routing layer:
 
 ```
 caller → LlmChat (RoutingLlmChatService) → LlmGatewayRegistry → LlmGateway adapter → provider
+caller → LlmTranscription (RoutingLlmTranscriptionService) → TranscriptionGateway adapter → provider
 ```
 
 `RoutingLlmChatService` looks up the agent's `llmConfigName`, finds the matching

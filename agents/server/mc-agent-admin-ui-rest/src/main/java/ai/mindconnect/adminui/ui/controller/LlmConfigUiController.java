@@ -158,7 +158,7 @@ public class LlmConfigUiController {
                                 formId, id, catalog)))
                 .patch(UiPatch.Operation.replace("llm-type-cfg",
                         LlmConfigFormComponent.withHiddenIf(isAlias,
-                                LlmConfigFormComponent.typeGroup(type == LlmConfigType.EMBEDDING, config, prefill))))
+                                LlmConfigFormComponent.typeGroup(type, config, prefill))))
                 .patch(UiPatch.Operation.replace("llm-provider-params",
                         LlmConfigFormComponent.withHiddenIf(isAlias,
                                 LlmConfigFormComponent.providerParamsGroup(provider, type, config))));
@@ -361,6 +361,55 @@ public class LlmConfigUiController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Executes a speech-to-text test: the dropped recording goes to the
+     * transcription endpoint and the dialog comes back with the transcript.
+     * A separate endpoint because this one takes multipart, not a form body.
+     */
+    @PostMapping(value = "/{id}/test-audio",
+            consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<UiPatch> runAudioTest(
+            @PathVariable UUID id,
+            @RequestParam("audio") org.springframework.web.multipart.MultipartFile audio) {
+        return repository.findById(id)
+                .map(c -> {
+                    byte[] bytes;
+                    try {
+                        bytes = audio.getBytes();
+                    } catch (java.io.IOException e) {
+                        return ResponseEntity.ok(testPatch(c, null,
+                                LlmConfigTestService.Result.error(
+                                        "Could not read the upload: " + e.getMessage(), 0)));
+                    }
+                    String filename = audio.getOriginalFilename() == null
+                            ? "recording.webm" : audio.getOriginalFilename();
+                    LlmConfigTestService.Result result = testService.testTranscription(
+                            c, bytes, filename, audio.getContentType());
+                    return ResponseEntity.ok(testPatch(c, null, result));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * What a config under test really is. An alias carries no type of its
+     * own — it points at another config by name, and the test follows that
+     * name — so the type of the config behind it decides what the dialog
+     * asks for.
+     */
+    private LlmConfigType effectiveType(LlmConfig config) {
+        if (!config.isAlias()) return config.type();
+        try {
+            return repository.findResolvedByName(config.name())
+                    .map(LlmConfig::type)
+                    .orElse(config.type());
+        } catch (RuntimeException e) {
+            // A chain that is broken, circular or too deep throws. That is
+            // worth seeing — but in the dialog, where the test reports it,
+            // not as a 500 in place of the dialog.
+            return config.type();
+        }
+    }
+
     /** Close is just "remove the overlay" — the page behind stays as-is. */
     @PostMapping("/test-dialog/close")
     public UiPatch closeTestDialog() {
@@ -376,7 +425,7 @@ public class LlmConfigUiController {
      * outcome of the just-completed call (null for the initial open).
      */
     private UiPatch testPatch(LlmConfig c, String message, LlmConfigTestService.Result result) {
-        var component = new LlmConfigTestComponent(c, message, result);
+        var component = new LlmConfigTestComponent(c, effectiveType(c), message, result);
         UiDialog dialog = UiDialog.of(component.title(), null, component.render());
         dialog.setId("llm-test-dialog");
         return UiPatch.of()

@@ -49,10 +49,11 @@ public record LlmConfig(
          */
         RateLimitConfig rateLimit,
         /**
-         * What the model does — {@link LlmConfigType#CHAT} (default) or
-         * {@link LlmConfigType#EMBEDDING}. Embedding models turn text into
-         * vectors and have no sampling settings — temperature, output tokens,
-         * thinking etc. don't apply.
+         * What the model does — {@link LlmConfigType#CHAT} (default),
+         * {@link LlmConfigType#EMBEDDING} or
+         * {@link LlmConfigType#SPEECH_TO_TEXT}. Only chat models have sampling
+         * settings; temperature, output tokens, thinking etc. don't apply to
+         * the others, and each type is reached through its own port.
          */
         LlmConfigType type,
         /**
@@ -108,6 +109,12 @@ public record LlmConfig(
     @com.fasterxml.jackson.annotation.JsonIgnore
     public boolean isEmbedding() {
         return type == LlmConfigType.EMBEDDING;
+    }
+
+    /** Convenience: is this a speech-to-text model? */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isSpeechToText() {
+        return type == LlmConfigType.SPEECH_TO_TEXT;
     }
 
     /** Jackson deserialisation — trailing fields default for old persisted configs. */
@@ -203,6 +210,23 @@ public record LlmConfig(
     public static LlmConfig googleGemini(String name, String model, String apiKey) {
         return new LlmConfig(UUID.randomUUID(), name, LlmProvider.GOOGLE_GEMINI,
                 model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
+    }
+
+    /**
+     * A speech-to-text config for the OpenAI-compatible transcription
+     * endpoint: OpenAI itself, Groq, or a local Whisper server behind its own
+     * base URL. Sampling settings and the context window stay empty — they do
+     * not apply to a transcription call.
+     *
+     * @param model   e.g. {@code whisper-1} or {@code gpt-4o-mini-transcribe}
+     * @param baseUrl the provider root, without the {@code /v1/…} path
+     * @param apiKey  the key, or {@code null} for a keyless local server
+     */
+    public static LlmConfig speechToText(String name, LlmProvider provider, String model,
+                                         String baseUrl, String apiKey) {
+        return new LlmConfig(UUID.randomUUID(), name, provider, model, baseUrl, apiKey,
+                0.0, 0, Map.of(), null, false, null, null, null,
+                LlmConfigType.SPEECH_TO_TEXT, null);
     }
 
     /** Guards against runaway / circular alias chains. */

@@ -65,7 +65,7 @@ A minimal local config (no key needed):
 | `model` | string | Model id. Supports `${VAR}` / `${VAR:default}`. |
 | `baseUrl` | string | API endpoint (override for proxies / local servers). |
 | `apiKey` | string | API key — almost always an env-var placeholder like `${ANTHROPIC_API_KEY}`. Literal keys are stored encrypted in the Admin UI (the CLI stores them as-is — use placeholders there). |
-| `type` | enum? | `CHAT` (default) or `EMBEDDING` — embedding configs power the vector store. |
+| `type` | enum? | `CHAT` (default), `EMBEDDING` or `SPEECH_TO_TEXT`. Embedding configs power the vector store; speech-to-text configs turn a recording into text through `LlmTranscription` (since 0.5.3). Only chat configs have sampling settings. |
 | `capabilities` | string[]? | What the model reads and does: any of `TOOL_CALLING`, `VISION` (images), `DOCUMENTS` (PDF), `AUDIO_INPUT`. `VISION` and `DOCUMENTS` decide whether an image or PDF sent with a message reaches the model as content or as a placeholder line. **Omitted means not declared** — the provider's default applies (Anthropic and OpenAI: tool calling, vision, documents; Gemini: those plus audio; Azure OpenAI: tool calling, vision; local servers and routers: tool calling only). A declared list, `[]` included, always wins over that default. Chat configs only. |
 | `defaultTemperature` | number | Sampling temperature (e.g. `0.7`). |
 | `maxOutputTokens` | int | Max tokens the model may generate per response. |

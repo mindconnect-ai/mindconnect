@@ -64,6 +64,8 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `AZURE_OPENAI_DEPLOYMENT` | `azure-openai-default` | Deployment name (default `gpt-4o`) |
 | `GEMINI_API_KEY` | `gemini-default` | Google Gemini key |
 | `GEMINI_MODEL` | `gemini-default` | Override model id (default `gemini-2.0-flash`) |
+| `SPEECH_TO_TEXT_MODEL` | `speech-to-text` | Override model id (default `whisper-1`) |
+| `SPEECH_TO_TEXT_BASE_URL` | `speech-to-text` | Where the transcription endpoint lives (default `https://api.openai.com`) — point it at Groq or a local Whisper server |
 
 Local providers (`lm-studio-default`, `agent-default`, `embeddings`) need **no**
 key — they talk to LM Studio at `http://localhost:1234`.

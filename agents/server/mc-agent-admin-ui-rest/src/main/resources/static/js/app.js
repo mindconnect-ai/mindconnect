@@ -9,6 +9,7 @@ import { install as installJsonViewer } from "/sui-ext/jsonviewer/extension.js";
 import { install as installMarkdown }   from "/sui-ext/markdown/extension.js";
 import { install as installDiagram }    from "/sui-ext/diagram/extension.js";
 import { watchConnectionBudget }        from "/js/connection-budget.js";
+import { installAudioRecorder }         from "/js/audio-recorder.js";
 
 // ── Renderer + extensions ────────────────────────────────────────────────────
 
@@ -71,6 +72,11 @@ bus.setFetcher(bffFetch)
 // Too many tabs: each holds a stream or two, and a browser allows six per
 // site. The tabs count each other and warn before the seventh stalls them all.
 watchConnectionBudget(bus);
+
+// The microphone behind the "Record" button of a speech-to-text config's test
+// dialog. Browser-only: the handler records and posts, the server never knows
+// it was not an upload.
+installAudioRecorder(bus);
 
 // Console hook. `mc.streams()` lists the server-sent streams this tab holds
 // (a chat page should show `user-stream` and one `msg-list-…`, nothing

@@ -13,9 +13,10 @@ import java.util.Set;
  */
 public enum LlmProvider {
     LM_STUDIO(Set.of(LlmCapability.TOOL_CALLING)),
-    OPENAI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS)),
+    OPENAI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS),
+            SpeechParams.TRANSCRIPTION),
     AZURE_OPENAI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
-    GROQ(Set.of(LlmCapability.TOOL_CALLING)),
+    GROQ(Set.of(LlmCapability.TOOL_CALLING), SpeechParams.TRANSCRIPTION),
     ANTHROPIC(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS), List.of(
             AdditionalParamSpec.select("thinking", "Thinking",
                     List.of("adaptive", "disabled"),
@@ -71,5 +72,43 @@ public enum LlmProvider {
     /** The specs that apply to a config of the given type. */
     public List<AdditionalParamSpec> additionalParams(LlmConfigType type) {
         return additionalParams.stream().filter(spec -> spec.appliesTo(type)).toList();
+    }
+
+    /**
+     * Holder for the shared parameter lists. An enum constant cannot read a
+     * static field of its own enum — the constants are built first — so the
+     * lists live in a nested class the constructors may reference.
+     */
+    private static final class SpeechParams {
+        /**
+         * The knobs the OpenAI-compatible transcription endpoint understands.
+         * Every provider that speaks it shares this list.
+         */
+        static final List<AdditionalParamSpec> TRANSCRIPTION = List.of(
+                AdditionalParamSpec.text("language", "Language",
+                        "ISO-639-1 code of the spoken language (de, en, fr). Leave empty to let "
+                                + "the model detect it — naming it is faster and more accurate.",
+                        LlmConfigType.SPEECH_TO_TEXT),
+                AdditionalParamSpec.text("prompt", "Prompt",
+                        "Context that steers spelling, e.g. product or people names that occur "
+                                + "in the recordings.",
+                        LlmConfigType.SPEECH_TO_TEXT),
+                AdditionalParamSpec.select("stream", "Stream the transcript",
+                        List.of("auto", "off"),
+                        "'auto' asks the endpoint to send the text as it forms — models that "
+                                + "cannot simply answer in one piece, and callers see no "
+                                + "difference. 'off' is for a server that rejects fields it does "
+                                + "not know.",
+                        LlmConfigType.SPEECH_TO_TEXT),
+                AdditionalParamSpec.select("response_format", "Response Format",
+                        List.of("json", "verbose_json", "text", "srt", "vtt"),
+                        "How the endpoint answers. Leave empty for 'json', which every model "
+                                + "takes. 'verbose_json' adds language and duration, and "
+                                + "'srt'/'vtt' return subtitles — whisper-1 only; the "
+                                + "gpt-4o transcribe models refuse them.",
+                        LlmConfigType.SPEECH_TO_TEXT));
+
+        private SpeechParams() {
+        }
     }
 }

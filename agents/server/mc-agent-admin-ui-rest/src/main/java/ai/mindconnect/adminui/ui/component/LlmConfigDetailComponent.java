@@ -32,15 +32,24 @@ public final class LlmConfigDetailComponent implements UiComponent {
                 .field(UiField.text("delegatesTo", "Delegates To", config.delegatesTo()))
                 .field(UiField.text("provider", "Provider",
                         config.provider() != null ? config.provider().name() : null))
-                .field(UiField.text("type", "Type", config.isEmbedding() ? "Embedding" : "Chat"))
-                .field(UiField.text("capabilities", "Capabilities", capabilitiesSummary(config)))
-                .field(UiField.text("model", "Model", config.model()))
+                .field(UiField.text("type", "Type", typeLabel(config)));
+        // Capabilities and the sampling knobs belong to a chat model; a
+        // transcription call has neither, so its detail view does not pretend
+        // to carry them.
+        boolean speech = config.isSpeechToText();
+        if (!speech) {
+            detail.field(UiField.text("capabilities", "Capabilities", capabilitiesSummary(config)));
+        }
+        detail.field(UiField.text("model", "Model", config.model()))
                 .field(UiField.text("baseUrl", "Base URL", config.baseUrl()))
-                .field(UiField.text("apiKey", "API Key", "••••••••"))
-                .field(UiField.number("defaultTemperature", "Temperature", config.defaultTemperature()))
-                .field(UiField.number("maxOutputTokens", "Max Output Tokens", config.maxOutputTokens()))
-                .field(UiField.number("contextWindowTokens", "Context Window", config.contextWindowTokens()))
-                .field(UiField.text("retry", "Retry on rate limit", retrySummary(config)))
+                .field(UiField.text("apiKey", "API Key", "••••••••"));
+        if (!speech) {
+            detail.field(UiField.number("defaultTemperature", "Temperature", config.defaultTemperature()))
+                    .field(UiField.number("maxOutputTokens", "Max Output Tokens", config.maxOutputTokens()))
+                    .field(UiField.number("contextWindowTokens", "Context Window",
+                            config.contextWindowTokens()));
+        }
+        detail.field(UiField.text("retry", "Retry on rate limit", retrySummary(config)))
                 .field(UiField.text("maxConcurrentRequests", "Max Concurrent Requests",
                         config.rateLimit() == null ? "Unlimited"
                                 : String.valueOf(config.rateLimit().maxConcurrentRequests())))
@@ -75,6 +84,15 @@ public final class LlmConfigDetailComponent implements UiComponent {
      * provider's default marked as such; "none" for a config that declared
      * the empty set, "—" when nothing applies (an alias).
      */
+    /** The config type in words, for the detail view. */
+    private static String typeLabel(LlmConfig config) {
+        return switch (config.type()) {
+            case EMBEDDING -> "Embedding";
+            case SPEECH_TO_TEXT -> "Speech to text";
+            case CHAT -> "Chat";
+        };
+    }
+
     private static String capabilitiesSummary(LlmConfig config) {
         var effective = config.effectiveCapabilities();
         if (effective.isEmpty()) return config.declaresCapabilities() ? "none (declared)" : "—";

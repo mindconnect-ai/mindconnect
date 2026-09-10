@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.ui.component;
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -32,13 +33,22 @@ import ai.mindconnect.ui.model.UiText;
 public final class LlmConfigTestComponent implements UiComponent {
 
     private final LlmConfig config;
+    private final LlmConfigType type;
     private final String previousMessage;
     private final LlmConfigTestService.Result result;
 
+    /**
+     * @param type what the config under test really is. For an alias that is
+     *             the type of the config it points at — the test routes by
+     *             name and lands there, so the dialog has to offer what that
+     *             one needs (a recording for speech, a text for the rest).
+     */
     public LlmConfigTestComponent(LlmConfig config,
+                                   LlmConfigType type,
                                    String previousMessage,
                                    LlmConfigTestService.Result result) {
         this.config = config;
+        this.type = type;
         this.previousMessage = previousMessage;
         this.result = result;
     }
@@ -50,7 +60,10 @@ public final class LlmConfigTestComponent implements UiComponent {
 
     @Override
     public UiNode render() {
-        boolean embedding = config.isEmbedding();
+        if (type == LlmConfigType.SPEECH_TO_TEXT) {
+            return renderTranscription();
+        }
+        boolean embedding = type == LlmConfigType.EMBEDDING;
         var form = UiForm.of(id(), null)
                 .field(UiField.textarea("message", embedding ? "Text" : "Message",
                                 previousMessage == null ? "" : previousMessage)
@@ -70,11 +83,66 @@ public final class LlmConfigTestComponent implements UiComponent {
         return stack;
     }
 
+    /**
+     * The speech-to-text shape: a drop zone instead of a textarea. Picking or
+     * dropping a recording posts it to the test endpoint as multipart, and the
+     * transcript comes back in the same dialog. There is no Send button —
+     * choosing the file is the action.
+     */
+    private UiNode renderTranscription() {
+        var upload = ai.mindconnect.ui.model.UiUpload.of(id() + "-audio", "Recording")
+                // Fixed part name — the node id carries the config's uuid.
+                .name("audio")
+                .accept("audio/*,video/webm,.webm,.wav,.mp3,.m4a,.ogg,.flac")
+                .buttonLabel("Choose a recording")
+                .dropText("Drop an audio file here or")
+                .hint("Sent to the transcription endpoint as it is — the transcript comes back below. "
+                        + "WebM, WAV, MP3, M4A, OGG and FLAC all work.")
+                .uploadTo("/admin/api/llm-configs/" + config.id() + "/test-audio");
+
+        // Speaking instead of uploading: the button's trigger runs in the
+        // browser (INVOKE → the handler registered in audio-recorder.js),
+        // which records, posts the recording to the same endpoint the drop
+        // zone uses, and lets the bus apply the answer. A browser without a
+        // microphone — or one that was denied it — says so in the status line
+        // and the drop zone still works.
+        var record = ai.mindconnect.ui.model.UiTrigger.invoke("mc-record-audio");
+        record.setUrl("/admin/api/llm-configs/" + config.id() + "/test-audio");
+
+        var actions = UiForm.of(id(), null)
+                .action(UiAction.primary("record", "Record").icon("mic").onClick(record))
+                .action(UiAction.secondary("close", "Close").icon("close")
+                        .dispatch("POST", "/admin/api/llm-configs/test-dialog/close"));
+
+        var stack = UiStack.of(id() + "-stack")
+                .child(upload)
+                .child(actions)
+                .child(UiText.of(id() + "-record-status", "Or speak: Record starts, Stop transcribes.")
+                        .<UiText>withCssClass("llm-record-status"));
+        if (result != null) stack.child(renderResult());
+        return stack;
+    }
+
+    /**
+     * The tail of the success line. A transcription reports the recording it
+     * heard rather than a finish reason, and reports token counts only when
+     * the endpoint sent them — most speech endpoints bill by the minute.
+     */
+    private String metaTail() {
+        boolean tokens = type != LlmConfigType.SPEECH_TO_TEXT
+                || result.inputTokens() > 0 || result.outputTokens() > 0;
+        String head = tokens
+                ? " · " + result.inputTokens() + " in / " + result.outputTokens() + " out tokens"
+                : "";
+        if (result.finishReason().isEmpty()) return head;
+        return head + " · " + (type == LlmConfigType.SPEECH_TO_TEXT
+                ? result.finishReason()
+                : "finish=" + result.finishReason());
+    }
+
     private UiNode renderResult() {
         if (result.ok()) {
-            String meta = "✓ OK · " + result.durationMs() + " ms · "
-                    + result.inputTokens() + " in / " + result.outputTokens() + " out tokens"
-                    + (result.finishReason().isEmpty() ? "" : " · finish=" + result.finishReason());
+            String meta = "✓ OK · " + result.durationMs() + " ms" + metaTail();
             String body = result.text() == null || result.text().isEmpty()
                     ? "(empty response)"
                     : result.text();

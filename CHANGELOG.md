@@ -32,6 +32,55 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `mindconnect.vector-store.embedding-config`; the local `embeddings` config
   stays the default.
 
+- **agents:** transcription over the REST API, as a job.
+  `POST /api/transcriptions` takes a recording as multipart, stores it, queues
+  the work on the task queue and answers `202` with the job id plus both URLs
+  to follow it: one to poll, one to stream. `GET /api/transcriptions/{id}`
+  reports the status and, once done, the transcript with the detected language
+  and the recording's length; `?wait=` holds the request until the job ends,
+  for a caller who wants the synchronous feel without a loop.
+  `GET /api/transcriptions/{id}/events` is Server-Sent Events from the job's
+  channel — queued, running, the transcript as it forms in `delta` events,
+  then completed with the whole text — opening with the state as it is now,
+  so a late arrival is told what it missed, and `?afterSeq=` resumes a dropped
+  connection without a gap. The queue retries a provider hiccup, and `model`
+  names an LLM config whose alias is followed. The recording stays in the file
+  store, so a transcript keeps the audio behind it: its id and URL come back
+  with the job, and `DELETE /api/files/{id}` disposes of it when the caller
+  says so. Whether the text arrives word by word depends on the model —
+  OpenAI's transcribe models stream it, `whisper-1` answers in one piece and
+  sends one delta — and the events are the same either way, so a client does
+  not branch on the model.
+
+- **agents:** speech to text — a Whisper model as a normal LLM config, and a
+  microphone in the chat. A config's type can now be `SPEECH_TO_TEXT` next to
+  `CHAT` and `EMBEDDING`, with the same provider, key, encryption and admin
+  form as every other model. `LlmTranscription` is the port callers use: they
+  name a config and get a transcript, so an alias is followed exactly as it is
+  for a chat model — point `speech-to-text` at whichever config should serve
+  and swap it later without touching a caller. Behind it,
+  `OpenAiTranscriptionGateway` calls the OpenAI-compatible
+  `/v1/audio/transcriptions` endpoint, so OpenAI, Groq and a local Whisper
+  server all work by pointing the base URL at them; language, prompt and
+  response format are provider parameters on the config, and the LM Studio
+  model picker says it serves no transcription models rather than offering
+  chat ones.
+
+  In the chat, the composer's new microphone records in the browser and puts
+  the transcript into the input, after anything already typed — nothing is
+  sent without the person who spoke it pressing Send. Dictating while a turn
+  is still streaming brings the words back as a sticky toast, since there is
+  no input to fill at that moment. The admin UI tests a
+  speech config the same way: drop an audio file into the test dialog, or
+  press **Record**, speak and press **Stop**. Both need a microphone and a
+  secure context (`localhost` or HTTPS); where the browser refuses, uploading
+  a file still works.
+
+  A new installation is seeded with a `speech-to-text` config (`whisper-1`
+  behind `${OPENAI_API_KEY}`, overridable through `SPEECH_TO_TEXT_MODEL` and
+  `SPEECH_TO_TEXT_BASE_URL`); an existing one gets it on the next start, since
+  seeding checks each entry by id.
+
 ### Changed
 
 - **agents:** `AgentLoop.run` takes the tokens spent by earlier attempts as a
