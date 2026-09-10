@@ -136,20 +136,40 @@ docker compose exec -T postgres pg_dumpall -U mindconnect | gzip > dump-$(date +
 `.env`. Stored LLM credentials are encrypted with it and are unrecoverable
 without it.
 
-## Before CI publishes the image
+## Deploying without CI
 
 Until the workflow has run on `main`, `ghcr.io/mindconnect-ai/mc-agent-admin-ui`
 does not exist and `docker compose pull` fails. The image can be built on the
-host in the meantime — upload the jar and the Dockerfile and build with the tag
-Compose expects:
+host instead — upload the jar and the Dockerfile, then build it under a tag of
+your own:
 
 ```bash
-docker build -f Dockerfile -t ghcr.io/mindconnect-ai/mc-agent-admin-ui:main .
+docker build -f Dockerfile -t ghcr.io/mindconnect-ai/mc-agent-admin-ui:local .
+sed -i 's/^MC_TAG=.*/MC_TAG=local/' ../.env
+docker compose up -d admin-ui
 ```
 
-Compose then uses the local image. Once CI publishes, delete that build
-directory and `docker builder prune` — the build cache is a few gigabytes that
-the host has no further use for.
+Build it on the host, not on a developer machine: an Apple-silicon laptop
+produces arm64 images and this is amd64.
+
+The separate tag matters once CI does publish, because both paths would
+otherwise write `:main`. A local build and CI's would be indistinguishable, a
+stray `docker compose pull` would silently replace yours, and nothing would say
+which is running. With `MC_TAG=local` that same `pull` fails loudly instead —
+there is no `:local` in the registry — and `.env` answers "what is deployed
+right now" in one line.
+
+Going back is the same two settings in reverse:
+
+```bash
+sed -i 's/^MC_TAG=.*/MC_TAG=main/' .env
+docker compose pull && docker compose up -d
+docker builder prune -f
+```
+
+Keep the build directory. It holds a jar and a Dockerfile, and it is the
+difference between a one-command detour and re-uploading 344 MB. Prune the
+build *cache* freely — that is the part which grows.
 
 ## Known gaps
 
