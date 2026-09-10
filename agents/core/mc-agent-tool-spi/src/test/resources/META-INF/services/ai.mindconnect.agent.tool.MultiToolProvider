@@ -1,0 +1,3 @@
+ai.mindconnect.agent.tool.WarmUpProviders$Slow
+ai.mindconnect.agent.tool.WarmUpProviders$Flaky
+ai.mindconnect.agent.tool.WarmUpProviders$Fast

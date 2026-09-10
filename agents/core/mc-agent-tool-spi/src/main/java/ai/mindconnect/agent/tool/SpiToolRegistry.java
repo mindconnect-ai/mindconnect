@@ -49,18 +49,43 @@ import java.util.UUID;
  * in {@code META-INF/services/...ToolFactory} or
  * {@code META-INF/services/...MultiToolProvider}. No runtime code change.
  */
-public class SpiToolRegistry implements ToolRegistry {
+public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(SpiToolRegistry.class);
 
+    /**
+     * How long to wait before each further binding attempt. Four retries over
+     * roughly a minute: long enough for a container runtime that starts
+     * alongside the application, short enough that nobody waits on it.
+     */
+    private static final long[] RETRY_DELAYS = { 2_000L, 5_000L, 15_000L, 45_000L };
+
+    /**
+     * How long the constructor gives the first round of binds before it
+     * returns anyway. Most providers are in-process and bind in microseconds
+     * — a caller that builds a runtime and runs a turn on the next line
+     * should find them there. The ones that talk to something outside miss
+     * this window and join later, which is the whole point.
+     */
+    private static final long FIRST_ROUND_GRACE_MS = 200L;
+
     private final Map<String, ToolFactory> factoriesByName;
     private final List<MultiToolProvider> providers;
+    private final List<Thread> warmUpThreads = new java.util.concurrent.CopyOnWriteArrayList<>();
+    private final long[] retryDelays;
+    private java.util.concurrent.CountDownLatch firstRound;
 
     public SpiToolRegistry(ToolEnvironment environment) {
         this(environment, Thread.currentThread().getContextClassLoader());
     }
 
     public SpiToolRegistry(ToolEnvironment environment, ClassLoader classLoader) {
+        this(environment, classLoader, RETRY_DELAYS);
+    }
+
+    /** For tests: the same registry with its own patience. */
+    SpiToolRegistry(ToolEnvironment environment, ClassLoader classLoader, long[] retryDelays) {
+        this.retryDelays = retryDelays;
         // 1) Single-tool ToolFactory SPI
         Map<String, ToolFactory> facMap = new LinkedHashMap<>();
         for (ToolFactory factory : ServiceLoader.load(ToolFactory.class, classLoader)) {
@@ -86,36 +111,108 @@ public class SpiToolRegistry implements ToolRegistry {
         }
         this.factoriesByName = Map.copyOf(facMap);
 
-        // 2) Multi-tool MultiToolProvider SPI. Only the provider set is fixed
-        //    here — each provider's toolNames() is consulted live on every
-        //    lookup, so dynamic sources (workflow store, remote catalogs)
-        //    surface changes without a restart.
-        List<MultiToolProvider> active = new ArrayList<>();
+        // 2) Multi-tool MultiToolProvider SPI. The provider SET is what the
+        //    classpath offers — every one of them is kept. What changes over
+        //    time is whether a provider is ready and which names it carries,
+        //    and both are asked live on every lookup. That is what lets the
+        //    binding happen off this thread: a provider joins the catalog the
+        //    moment it is ready, without anybody restarting anything.
+        List<MultiToolProvider> discovered = new ArrayList<>();
         for (MultiToolProvider provider : ServiceLoader.load(MultiToolProvider.class, classLoader)) {
-            try {
-                provider.bind(environment);
-            } catch (RuntimeException e) {
-                log.error("MultiToolProvider {} failed to bind — bundle will be unavailable",
-                        provider.getClass().getName(), e);
-                continue;
-            }
-            if (!provider.isAvailable()) {
-                log.warn("MultiToolProvider {} reports itself unavailable — bundle will be skipped",
-                        provider.getClass().getSimpleName());
-                continue;
-            }
-            active.add(provider);
+            discovered.add(provider);
         }
-        this.providers = List.copyOf(active);
+        this.providers = List.copyOf(discovered);
 
-        log.info("SpiToolRegistry: registered {} single-tool factor(ies) and {} provider(s) currently contributing {} additional tool(s)",
-                factoriesByName.size(), providers.size(),
-                providers.stream().mapToInt(p -> p.toolNames().size()).sum());
+        log.info("SpiToolRegistry: {} single-tool factor(ies); warming up {} provider(s) in the background",
+                factoriesByName.size(), providers.size());
         if (log.isDebugEnabled()) {
             log.debug("  factories: {}", factoriesByName.keySet());
-            for (MultiToolProvider provider : providers) {
-                log.debug("  provider {}: {}", provider.getClass().getSimpleName(), provider.toolNames());
+        }
+        warmUp(environment);
+        awaitFirstRound();
+    }
+
+    /**
+     * Binds every provider off the caller's thread, one virtual thread each.
+     *
+     * <p>Binding can be slow and can fail for reasons that pass: an MCP server
+     * behind a container needs the container runtime to be up, a remote
+     * catalog needs the network. Doing it here would make every such case a
+     * slow start, and doing it once would make a runtime that appears a minute
+     * later useless until the next restart. So each provider gets a few
+     * attempts with a widening gap, and the first one that succeeds puts the
+     * bundle in the catalog.
+     */
+    private void warmUp(ToolEnvironment environment) {
+        this.firstRound = new java.util.concurrent.CountDownLatch(providers.size());
+        for (MultiToolProvider provider : providers) {
+            Thread worker = Thread.ofVirtual()
+                    .name("tool-warmup-" + provider.getClass().getSimpleName())
+                    .start(() -> bindWithRetries(provider, environment));
+            warmUpThreads.add(worker);
+        }
+    }
+
+    /**
+     * Waits for the first attempt of every provider, but not for long. What is
+     * ready by then is ready when the constructor returns; the rest arrives
+     * while the application is already serving.
+     */
+    private void awaitFirstRound() {
+        try {
+            if (!firstRound.await(FIRST_ROUND_GRACE_MS, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                log.info("SpiToolRegistry: {} provider(s) still warming up — they join when ready",
+                        firstRound.getCount());
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** One provider's attempts, until it is available or the attempts run out. */
+    private void bindWithRetries(MultiToolProvider provider, ToolEnvironment environment) {
+        String name = provider.getClass().getSimpleName();
+        for (int attempt = 1; attempt <= retryDelays.length + 1; attempt++) {
+            try {
+                provider.bind(environment);
+                if (provider.isAvailable()) {
+                    log.info("MultiToolProvider {} is ready with {} tool(s): {}",
+                            name, provider.toolNames().size(), provider.toolNames());
+                    return;
+                }
+                // The first "not yet" is worth a line; the retries are not.
+                if (attempt == 1) {
+                    log.info("MultiToolProvider {} is not available yet — trying again", name);
+                } else {
+                    log.debug("MultiToolProvider {} still unavailable (attempt {})", name, attempt);
+                }
+            } catch (RuntimeException e) {
+                log.warn("MultiToolProvider {} failed to bind on attempt {}: {}",
+                        name, attempt, e.toString());
+            } finally {
+                if (attempt == 1) firstRound.countDown();
+            }
+            if (attempt > retryDelays.length) break;
+            try {
+                Thread.sleep(retryDelays[attempt - 1]);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;                      // close() — stop trying, quietly
+            }
+        }
+        log.warn("MultiToolProvider {} stayed unavailable — its tools are not offered. "
+                + "Fix what it needs and restart, or leave it be if it is not wanted here.", name);
+    }
+
+    /**
+     * Stops the warm-up. Virtual threads never hold a JVM open, so this is for
+     * a registry that outlives its usefulness before the process does — a test,
+     * or an application context that closes.
+     */
+    @Override
+    public void close() {
+        for (Thread thread : warmUpThreads) {
+            thread.interrupt();
         }
     }
 
@@ -124,7 +221,7 @@ public class SpiToolRegistry implements ToolRegistry {
         // Union of ToolFactory names + each provider's *current* names.
         // ToolFactory keys come first (their order) followed by provider keys.
         Set<String> union = new LinkedHashSet<>(factoriesByName.keySet());
-        for (MultiToolProvider provider : providers) {
+        for (MultiToolProvider provider : ready()) {
             union.addAll(provider.toolNames());
         }
         return Set.copyOf(union);
@@ -138,13 +235,26 @@ public class SpiToolRegistry implements ToolRegistry {
             byGroup.computeIfAbsent(groupOrDefault(factory.group()), g -> new java.util.TreeSet<>())
                     .add(factory.name());
         }
-        for (MultiToolProvider provider : providers) {
+        for (MultiToolProvider provider : ready()) {
             Set<String> names = provider.toolNames();
             if (names.isEmpty()) continue;
             byGroup.computeIfAbsent(groupOrDefault(provider.group()), g -> new java.util.TreeSet<>())
                     .addAll(names);
         }
         return byGroup;
+    }
+
+    /**
+     * The providers that are ready this moment. A provider still warming up,
+     * or one that gave up, contributes nothing — and contributes again as soon
+     * as that changes, because nobody caches this.
+     */
+    private List<MultiToolProvider> ready() {
+        List<MultiToolProvider> available = new ArrayList<>(providers.size());
+        for (MultiToolProvider provider : providers) {
+            if (provider.isAvailable()) available.add(provider);
+        }
+        return available;
     }
 
     private static String groupOrDefault(String group) {
@@ -180,7 +290,7 @@ public class SpiToolRegistry implements ToolRegistry {
                             AliasTool.wrap(agentTool, factory.create(agentTool, scope)))));
         }
 
-        for (MultiToolProvider provider : providers) {
+        for (MultiToolProvider provider : ready()) {
             if (!provider.toolNames().contains(registryName)) {
                 continue;
             }
