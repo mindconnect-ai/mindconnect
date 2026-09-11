@@ -49,6 +49,11 @@ public record ToolCallScope(
         this(userId, sessionId, agentId, sessionId, null, List.of());
     }
 
+    /** A scope in a sub-agent's chain, with no working directory. */
+    public ToolCallScope(UserId userId, SessionId sessionId, AgentId agentId, SessionId rootSessionId) {
+        this(userId, sessionId, agentId, rootSessionId, null, List.of());
+    }
+
     /** A scope whose session is its own root, working in {@code workingDir}. */
     public ToolCallScope(UserId userId, SessionId sessionId, AgentId agentId,
                          String workingDir, List<String> additionalDirs) {

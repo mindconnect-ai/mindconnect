@@ -203,10 +203,6 @@ public class SessionFileService {
             return new AttachResult(stored, null, false,
                     stored.name() + ": vector stores are not configured in this application.");
         }
-        AgentSession chat = sessions.findById(sessionId).orElse(null);
-        if (chat == null) {
-            return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
-        }
         String storeName = "session-" + sessionId.value();
         VectorStoreTemplate template = stores.template(CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
             VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE,
@@ -217,7 +213,7 @@ public class SessionFileService {
         });
         // The store is the chat's user's: the vector tools reach it only on that user's behalf.
         stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.value(),
-                chat.userId() == null ? null : chat.userId().value());
+                session.userId() == null ? null : session.userId().value());
         VectorStoreInstance instance = stores.settingsFor(storeName);
 
         try {
@@ -255,7 +251,7 @@ public class SessionFileService {
                 // paths in the session's own directories.
                 if (copy.isPresent()) {
                     ToolCallScope scope = ToolCallScope.ofSession(
-                            chat.userId(), sessionId, copy.get().getParent().toString());
+                            session.userId(), sessionId, copy.get().getParent().toString());
                     report = scope.runWith(() -> runner.runWithAttributes(workflow,
                             Map.of("file", stored.name(), "store", storeName),
                             Map.of(ToolCallScope.class.getName(), scope)));
@@ -269,7 +265,7 @@ public class SessionFileService {
                     report = runner.runWithAttributes(workflow,
                             Map.of("file", spoolBase.relativize(target).toString(), "store", storeName),
                             Map.of(ToolCallScope.class.getName(),
-                                    new ToolCallScope(chat.userId(), sessionId, null)));
+                                    new ToolCallScope(session.userId(), sessionId, null)));
                 }
                 if (!report.success()) {
                     return new AttachResult(stored, storeName, false,

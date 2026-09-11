@@ -177,9 +177,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   into, *Use this folder* takes what the field says. It browses the server's
   tree under `mindconnect.tools.working-dir-root` and nothing beyond it; the
   additional directories are listed beneath with a *Remove* each and an
-  *Add this folder*. `GET /api/directories?userId=&path=` is the same listing over REST;
-  with login on, it and `PUT /api/sessions/{id}/working-dir` act only for the
-  logged-in user. The
+  *Add this folder*. `GET /api/directories?path=` is the same listing over REST,
+  over the caller's own tree, and `PUT /api/sessions/{id}/working-dir` changes
+  a session of theirs — like every session endpoint, someone else's answers 404. The
   root may carry `{user}` (`/srv/mindconnect/users/{user}`): then every
   user has a root of their own, created on first use, and picks from and
   works in that tree only — the way to run this on a multi-user server.

@@ -176,12 +176,10 @@ final class AttachSupport {
                 stores.registry().saveTemplate(created);
                 return created;
             });
-            var chat = sessions.findById(sessionId).orElseThrow(() ->
-                    new IllegalArgumentException("unknown session " + sessionId.value()));
             // The store is the chat's user's: the vector tools reach it only on that user's behalf.
             var store = stores.open(storeName, template.name(),
                     ai.mindconnect.vectorstore.tools.VectorStoreInstance.Scope.SESSION,
-                    sessionId.value(), chat.userId() == null ? null : chat.userId().value());
+                    sessionId.value(), session.userId() == null ? null : session.userId().value());
             var instance = stores.settingsFor(storeName);
             // A copy in the session's own directory, for the file tools and
             // for the ingestion workflow, which runs in the session's scope.
@@ -198,7 +196,7 @@ final class AttachSupport {
             if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()
                     && workflowModulesPresent()) {
                 message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows,
-                        namespace.value(), chat, copy.orElse(null));
+                        namespace.value(), session, copy.orElse(null));
             } else {
                 String text = new String(fileStore.content(stored.id()).readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
@@ -245,6 +243,7 @@ final class AttachSupport {
                           String partition,
                           ai.mindconnect.agent.runtime.domain.AgentSession chat,
                           java.nio.file.Path copyInSessionDir) throws Exception {
+            // `chat` is the session the upload belongs to; its user owns the store.
             var workflows = hostWorkflows != null ? hostWorkflows
                     : new ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository(
                             java.nio.file.Path.of(environment.get("dataBaseDir")), partition);
