@@ -102,12 +102,18 @@
      */
     const BADGE_RUNNING = "running";
     const BADGE_NEEDS_INPUT = "needs input";
+    // A chat started elsewhere that this browser has not opened yet.
+    const BADGE_NEW = "new";
 
     function markRow(row) {
         const badge = row.querySelector(".sui-menu-badge");
         const text = badge ? badge.textContent.trim() : "";
         row.classList.toggle("is-running", text === BADGE_RUNNING);
         row.classList.toggle("needs-input", text === BADGE_NEEDS_INPUT);
+        row.classList.toggle("is-new", text === BADGE_NEW);
+        // Remembered on the row: a turn in the chat replaces the badge for a
+        // while, and "new" has to come back when it ends.
+        if (text === BADGE_NEW) row.dataset.unseen = "1";
     }
 
     function setBadge(row, text) {
@@ -122,11 +128,48 @@
         markRow(row);
     }
 
+    /*
+     * A chat started elsewhere — another tab, the REST API — has no row until
+     * the page is rendered again, so the user would not know it exists. It
+     * gets one now, cloned from a row the server rendered so the markup is
+     * the framework's, and marked new until it is opened (the server stops
+     * marking it once it has been on screen).
+     */
+    function addNewRow(sessionId) {
+        const menu = document.getElementById(MENU_ID);
+        if (!menu) return null;
+        const rows = Array.from(menu.querySelectorAll("li.sui-menu-item"))
+            .filter((r) => (r.dataset.id || "").startsWith("chat-") && r.dataset.id !== "chat-new"
+                && r.querySelector("a.sui-menu-link"));
+        if (rows.length === 0) return null; // nothing to model the row on; the next render shows it
+        const row = rows[0].cloneNode(true);
+        row.id = "chat-" + sessionId;
+        row.dataset.id = "chat-" + sessionId;
+        row.classList.remove("is-running", "needs-input", "is-new", "chat-row");
+        Array.from(row.classList).filter((c) => /active|selected/.test(c)).forEach((c) => row.classList.remove(c));
+        row.querySelector(".chat-row-menu")?.remove();
+        const link = row.querySelector("a.sui-menu-link");
+        const href = "/chat/sessions/" + sessionId;
+        link.setAttribute("href", href);
+        if (link.hasAttribute("data-href")) link.setAttribute("data-href", href);
+        link.removeAttribute("aria-current");
+        const label = row.querySelector(".sui-menu-label");
+        if (label) label.textContent = "New chat";
+        const tip = row.querySelector(".sui-menu-tip");
+        if (tip) tip.textContent = "New chat";
+        rows[0].parentNode.insertBefore(row, rows[0]);
+        setBadge(row, BADGE_NEW);
+        return row;
+    }
+
     /** One event of the user's stream, applied to the row it concerns. */
     function applyUserEvent(event) {
         if (!event || !event.sessionId) return;
         const row = document.getElementById("chat-" + event.sessionId);
-        if (!row) return;
+        if (!row) {
+            if (event.type === "session_started") addNewRow(event.sessionId);
+            return;
+        }
         switch (event.type) {
             case "turn_started":
                 setBadge(row, BADGE_RUNNING);
@@ -139,7 +182,7 @@
                 if (row.classList.contains("needs-input")) setBadge(row, BADGE_RUNNING);
                 break;
             case "turn_finished":
-                setBadge(row, "now");
+                setBadge(row, row.dataset.unseen ? BADGE_NEW : "now");
                 break;
             case "session_titled": {
                 const label = row.querySelector(".sui-menu-label");

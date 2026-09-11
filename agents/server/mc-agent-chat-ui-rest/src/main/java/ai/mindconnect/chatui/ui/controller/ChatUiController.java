@@ -359,23 +359,35 @@ public class ChatUiController {
         return value instanceof String id ? SessionId.of(id) : null;
     }
 
-    /** Notes the chat about to be shown, so coming back to the chat lands on it again. */
-    private static void rememberShown(SessionId sessionId) {
+    /** The browser session's record of the chats it has had on screen, and since when. */
+    static final String SEEN_CHATS = "mc.chat.seen";
+
+    /**
+     * Notes the chat about to be shown — so coming back to the chat lands on
+     * it again, and so it no longer counts as new — and returns what this
+     * browser session has now seen, for marking the chats started elsewhere.
+     */
+    private static SeenChats rememberShown(SessionId sessionId) {
         var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
-        if (attributes != null) {
-            attributes.setAttribute(LAST_SHOWN_CHAT, sessionId.value(),
-                    org.springframework.web.context.request.RequestAttributes.SCOPE_SESSION);
-        }
+        if (attributes == null) return SeenChats.from(java.time.Instant.now()).withShown(sessionId);
+        int session = org.springframework.web.context.request.RequestAttributes.SCOPE_SESSION;
+        attributes.setAttribute(LAST_SHOWN_CHAT, sessionId.value(), session);
+        Object stored = attributes.getAttribute(SEEN_CHATS, session);
+        SeenChats seen = (stored instanceof SeenChats known ? known : SeenChats.from(java.time.Instant.now()))
+                .withShown(sessionId);
+        attributes.setAttribute(SEEN_CHATS, seen, session);
+        return seen;
     }
 
     private UiPage shell(AgentSession session,
                          List<? extends AgentSessionHeader> sessions) {
-        rememberShown(session.id());
+        var seen = rememberShown(session.id());
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
                 sessions, session, agent.name(), chat.renderContent(), agentIcons())
                 .withActivity(runningSessions(sessions), waitingSessions(sessions))
+                .withUnseen(seen.unseen(sessions))
                 .render();
         var page = UiPage.of("/chat/sessions/" + session.id().value(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.
