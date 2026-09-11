@@ -40,6 +40,7 @@ fresh empty one, so nothing has to be moved by hand at release time.
   are recorded on sign-in (`<data>/<namespace>/system/users/` or the `mc_user`
   table). New modules: `mc-user-core`, `mc-user`, `mc-user-pg`,
   `mc-agent-security`.
+
 - **agents:** MCP servers as registered tools. An operator registers a server
   under Admin → MCP Servers — a local process, a Docker image or a remote HTTP
   endpoint — tries it out with *Test connection*, and its tools appear in the
@@ -58,54 +59,28 @@ fresh empty one, so nothing has to be moved by hand at release time.
   again. Registrations live in `<data>/<namespace>/system/mcp-servers/`, one
   JSON file per server; a Gmail registration ships disabled. The modules sit in
   `agents/mcp`.
+
 - **agents:** tool settings in the admin UI: a tool can be switched off or given
   a different description for this installation, without touching any agent
   definition. What an agent definition says about a tool still wins for that
   agent. Stored in `<data>/<namespace>/system/tool-settings.json`.
+
 - **workflow:** run attributes. `WorkflowContext` carries values the host
   hands one run (`getAttribute` / `setAttribute`), passed in with
   `WorkflowExecutorService.executeWorkflow(workflow, params, attributes)` or
   `WorkflowRunService.runWithAttributes(...)`. Every step of the run sees them,
   parallel for-each blocks and called workflows included; a resumed run starts
   without them.
+
 - **agents:** `ToolCallScope.rootSessionId`, the chat at the top of a sub-agent
   chain, and `ToolInvoker.call(tool, arguments, scope)`, which the tool-call
   workflow step now calls with the scope found on its run.
+
 - **agents:** `ToolRegistry.releaseSession(sessionId)` and
   `MultiToolProvider.releaseSession(sessionId)`: whoever ends a session lets
   the tools go of what they hold for it. The tool test bench calls it after
   every test, so testing an MCP tool no longer leaves a connection — or a
   container — behind per click.
-
-### Changed
-
-- **agents:** the REST API answers only with what belongs to the caller.
-  `POST /api/sessions` takes `{agentId}` and the session belongs to the
-  authenticated user — a `userId` in the body is ignored; `GET /api/sessions`
-  lists the caller's sessions and ignores a `userId` parameter. Every
-  `/api/sessions/{id}/…` endpoint, the user stream (`/api/users/me/stream`) and
-  the workspace endpoints answer 404 for another user's data, exactly like for
-  data that does not exist. A client that passed another user's id to act for
-  them has to authenticate as that user instead.
-- **agents:** uploaded files remember who uploaded them (`creator`, a new
-  `mc_file` column added on start). `GET /api/files` lists only the caller's
-  files, only the uploader may delete one, and a file id in a chat message, a
-  session attach or a `/v1` request must be a file the caller may read. Files
-  uploaded before this version have no creator: they stay readable by id but are
-  no longer listed or deletable through the API. Transcription jobs are readable
-  only by whoever submitted them.
-- **agents:** a chat's upload store (`session-…`) answers only to the chat's
-  user. `/api/vector-stores` and the admin UI's vector-store pages no longer
-  list, open, search, fill or delete another user's, and no store can be created
-  under a `session-` name. Ingesting a stored file takes only a file the caller
-  may read, and the admin UI's files tab lists and deletes files by the same
-  rules as `/api/files`.
-- **agents:** the OpenAI Responses API (`/v1`) runs as the authenticated caller
-  instead of the fixed `mindconnect.responses.user-id`, which is removed (without
-  authentication the dev user, `MC_DEV_USER`, takes its place). Another user's
-  response or file answers `404 not_found`.
-- **agents:** the CLI's remote mode authenticates with an API token from
-  `MC_REMOTE_TOKEN` (`mindconnect.remote.token`) and no longer sends a user id.
 
 - **common:** `mc-file-repo`, the file counterpart of `mc-jdbc` for stores that
   keep one JSON document per file. `Documents` reads without locking and lets
@@ -117,28 +92,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
   its holder, and a second process on the same partition (namespace) of a data
   directory is refused — processes serving different namespaces share the
   directory as before. The file session store is the first to use it.
+
 - **common:** `RecordLog` in `mc-file-repo` — an ordered log of JSON records
   per parent (the messages of a conversation), one file per record, with an
   in-memory index of the file names: `append` hands out the next key under
   the directory's lock, pages read only their records, and a deleted tail's
   keys are never handed out again.
+
 - **agents:** `MessageRepository.update(conversation, id, change)` changes a
   stored message in one step.
+
 - **common:** `DocumentTable.insert` (writes a new row, `false` when the key
   exists) and `DocumentTable.update(key, change)`, which reads the row
   `FOR UPDATE` and writes the change in the same transaction.
-- **agents:** saving an agent, an LLM config or a vector-store template from a
-  form that was opened before someone else saved it is refused instead of
-  silently overwriting the other change. Agent definitions, LLM configs and
-  templates carry a `version` that every save raises; the admin UI forms send
-  the version they were opened with and answer a stale save with "was changed
-  by someone else in the meantime — your changes were not saved", keeping the
-  form on screen. Over REST the check is opt-in: send the `version` you read
-  (in the body of `POST /api/llm-configs`, `POST /api/vector-stores/templates`,
-  `PUT /api/agents/{id}`) to get `409 Conflict` for a stale save; without it a
-  save overwrites as before. A new template no longer replaces an existing one
-  of the same name, and adding, editing or removing an agent's tool no longer
-  drops a tool changed at the same time.
+
 - **common:** `Versions` and `StaleVersionException` in `mc-common` for such
   checks, and `compute(key, change)` in `Documents` and `DocumentTable`: decide
   on the stored document, or its absence, and write — under one lock.
@@ -183,20 +150,6 @@ fresh empty one, so nothing has to be moved by hand at release time.
   root may carry `{user}` (`/srv/mindconnect/users/{user}`): then every
   user has a root of their own, created on first use, and picks from and
   works in that tree only — the way to run this on a multi-user server.
-
-### Changed
-
-- **agents:** `AgentSessionRepository` has `create` and `update(id, change)`
-  instead of `save`. A session is changed in one step on the state the store
-  holds, never by writing back a copy read earlier; implementations of the port
-  need the two methods.
-- **agents:** the file persistence keeps a session in one directory,
-  `data/<namespace>/sessions/<sessionId>/` — `session.json`, working memory and
-  the session's workspace files. Sessions stored under the earlier
-  `users/<userId>/sessions/` are not read any more; a warning in the log says
-  where they are. One process serves a namespace: a second process opening the
-  same namespace of the same data directory — the Admin UI while the CLI runs
-  in local mode, say — stops at startup with a message saying so.
 
 - **agents:** every user has a directory on the server, and every session
   one of its own. `mindconnect.users.home` (default `<data.base-dir>/<namespace>/home/{user}`)
@@ -277,14 +230,6 @@ fresh empty one, so nothing has to be moved by hand at release time.
   works here without adding a file. For the project only the working directory
   itself is searched, not its parents.
 
-- **agents:** `run_agent` now tells the model which agents it can actually
-  reach — the project's own first, then the caller's roster — instead of
-  naming the same three in every prompt. The old description advertised
-  `web-researcher`, `file-finder` and `explorer` to every agent, including
-  ones whose roster held none of them, and never mentioned a project's own.
-  The bundled `coding-assistant` also gains `list_agents`, which it was
-  missing.
-
 - **agents:** a project can bring its own sub-agents, in
   `.mindconnect/agents/` in the working directory: one Markdown file each,
   front matter for `name`, `description`, `tools`, `disallowedTools` and
@@ -306,7 +251,74 @@ fresh empty one, so nothing has to be moved by hand at release time.
   false` takes away the choice of a chat's directories: no folder button, the
   directory endpoints refuse, and every chat works in its own directory under
   the user's home. A deleted chat's own directory is now removed with it.
+
 ### Changed
+
+- **agents:** the REST API answers only with what belongs to the caller.
+  `POST /api/sessions` takes `{agentId}` and the session belongs to the
+  authenticated user — a `userId` in the body is ignored; `GET /api/sessions`
+  lists the caller's sessions and ignores a `userId` parameter. Every
+  `/api/sessions/{id}/…` endpoint, the user stream (`/api/users/me/stream`) and
+  the workspace endpoints answer 404 for another user's data, exactly like for
+  data that does not exist. A client that passed another user's id to act for
+  them has to authenticate as that user instead.
+
+- **agents:** uploaded files remember who uploaded them (`creator`, a new
+  `mc_file` column added on start). `GET /api/files` lists only the caller's
+  files, only the uploader may delete one, and a file id in a chat message, a
+  session attach or a `/v1` request must be a file the caller may read. Files
+  uploaded before this version have no creator: they stay readable by id but are
+  no longer listed or deletable through the API. Transcription jobs are readable
+  only by whoever submitted them.
+
+- **agents:** a chat's upload store (`session-…`) answers only to the chat's
+  user. `/api/vector-stores` and the admin UI's vector-store pages no longer
+  list, open, search, fill or delete another user's, and no store can be created
+  under a `session-` name. Ingesting a stored file takes only a file the caller
+  may read, and the admin UI's files tab lists and deletes files by the same
+  rules as `/api/files`.
+
+- **agents:** the OpenAI Responses API (`/v1`) runs as the authenticated caller
+  instead of the fixed `mindconnect.responses.user-id`, which is removed (without
+  authentication the dev user, `MC_DEV_USER`, takes its place). Another user's
+  response or file answers `404 not_found`.
+
+- **agents:** the CLI's remote mode authenticates with an API token from
+  `MC_REMOTE_TOKEN` (`mindconnect.remote.token`) and no longer sends a user id.
+
+- **agents:** saving an agent, an LLM config or a vector-store template from a
+  form that was opened before someone else saved it is refused instead of
+  silently overwriting the other change. Agent definitions, LLM configs and
+  templates carry a `version` that every save raises; the admin UI forms send
+  the version they were opened with and answer a stale save with "was changed
+  by someone else in the meantime — your changes were not saved", keeping the
+  form on screen. Over REST the check is opt-in: send the `version` you read
+  (in the body of `POST /api/llm-configs`, `POST /api/vector-stores/templates`,
+  `PUT /api/agents/{id}`) to get `409 Conflict` for a stale save; without it a
+  save overwrites as before. A new template no longer replaces an existing one
+  of the same name, and adding, editing or removing an agent's tool no longer
+  drops a tool changed at the same time.
+
+- **agents:** `AgentSessionRepository` has `create` and `update(id, change)`
+  instead of `save`. A session is changed in one step on the state the store
+  holds, never by writing back a copy read earlier; implementations of the port
+  need the two methods.
+
+- **agents:** the file persistence keeps a session in one directory,
+  `data/<namespace>/sessions/<sessionId>/` — `session.json`, working memory and
+  the session's workspace files. Sessions stored under the earlier
+  `users/<userId>/sessions/` are not read any more; a warning in the log says
+  where they are. One process serves a namespace: a second process opening the
+  same namespace of the same data directory — the Admin UI while the CLI runs
+  in local mode, say — stops at startup with a message saying so.
+
+- **agents:** `run_agent` now tells the model which agents it can actually
+  reach — the project's own first, then the caller's roster — instead of
+  naming the same three in every prompt. The old description advertised
+  `web-researcher`, `file-finder` and `explorer` to every agent, including
+  ones whose roster held none of them, and never mentioned a project's own.
+  The bundled `coding-assistant` also gains `list_agents`, which it was
+  missing.
 
 - **agents:** an upload's copy for ingestion goes into the session's own
   directory instead of `vector-store-uploads/` under the tools base
@@ -345,6 +357,7 @@ fresh empty one, so nothing has to be moved by hand at release time.
   model, URL or key — so every upload failed, while testing the config it
   points at succeeded. A failed attachment is now also written to the log;
   until now its reason only showed in the chat's toast.
+
 - **agents:** knowing another user's chat session id is no longer enough to
   act in that chat. Most chat endpoints already checked the owner; sending a
   message, regenerating a reply, cancelling a turn, attaching, removing or
@@ -355,6 +368,7 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and `vector_delete_file` tools refuse the upload store of any other chat
   session, so the model cannot be talked into reading another user's
   attachments by naming their store.
+
 - **agents:** a chat's upload store now belongs to the chat's user, and only
   calls made for that user reach it. The check above applied inside a chat
   only: a workflow started from the workflow admin or
@@ -393,17 +407,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
   session, changed its copy and wrote it back, so whichever came last silently
   dropped what the others had written. The generated title also no longer
   replaces a name the user gave the chat while it was being generated.
+
 - **agents:** a message's token count, duration and compressed form no longer
   overwrite each other when they are set at the same time, and deleting the
   newest messages of a conversation no longer hands their sequence numbers to
   the next messages — summaries that covered the deleted range used to claim
   the new messages as well. With the file persistence a history page now reads
   only its own messages and appending lists nothing.
+
 - **agents:** two compactions of the same conversation no longer drop each
   other's summary. The file persistence kept all summaries in one
   `summaries.json` that every save read, extended and rewrote; each summary is
   now its own file under `conversations/<id>/summaries/`. Summaries in the old
   `summaries.json` are not read any more.
+
 - **agents:** two uploads into the same chat at the same moment register its
   vector store once; each could find the store missing and write its own
   record. The memory vector-store backend no longer blocks a carrier thread
