@@ -50,6 +50,17 @@ fresh empty one, so nothing has to be moved by hand at release time.
   chain, and `ToolInvoker.call(tool, arguments, scope)`, which the tool-call
   workflow step now calls with the scope found on its run.
 
+- **common:** `mc-file-repo`, the file counterpart of `mc-jdbc` for stores that
+  keep one JSON document per file. `Documents` reads without locking and lets
+  one writer at a time change a file — across the whole JVM, so two store
+  instances on the same directory take turns too — with `create`,
+  `createIfAbsent` and `update(key, change)` for changes that must not
+  overwrite each other. Writing while already holding a write lock fails at
+  once instead of risking a deadlock, a lock that stays taken times out naming
+  its holder, and a second process on the same partition (namespace) of a data
+  directory is refused — processes serving different namespaces share the
+  directory as before. The file stores do not use it yet.
+
 ### Removed
 
 - **agents:** the `mc-agent-tools-gmail` module. Gmail is now an MCP server
