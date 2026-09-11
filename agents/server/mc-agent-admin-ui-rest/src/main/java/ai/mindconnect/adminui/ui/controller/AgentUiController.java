@@ -21,6 +21,7 @@ import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
+import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
@@ -156,35 +157,43 @@ public class AgentUiController {
         return detail(def.id().value(), null, null, user);
     }
 
+    /**
+     * Saves the edit form against the version it was opened with; when the agent
+     * was saved since, the form stays on screen with a toast instead.
+     */
     @PutMapping("/{id}")
-    public ResponseEntity<UiPage> update(@PathVariable("id") String idValue,
-                                         @RequestBody Map<String, Object> raw,
-                                         @AuthenticationPrincipal OidcUser user) {
+    public ResponseEntity<?> update(@PathVariable("id") String idValue,
+                                    @RequestBody Map<String, Object> raw,
+                                    @AuthenticationPrincipal OidcUser user) {
         AgentId id = AgentId.of(idValue);
         var body = new FormBody(raw);
-        return registryService.find(id)
-                .map(existing -> {
-                    AgentPatch patch = AgentPatch.of()
-                            .withName(body.str("name"))
-                            .withDescription(body.str("description"))
-                            .withGroup(body.str("group"))
-                            .withIcon(body.str("icon"))
-                            .withSystemPrompt(body.str("systemPrompt"))
-                            .withWelcomeMessage(body.str("welcomeMessage"))
-                            .withLlmConfigName(body.str("llmConfigName"))
-                            .withMaxIterations(body.num("maxIterations", existing.maxIterations()))
-                            .withResponseReviewers(body.strList("responseReviewers"))
-                            .withCallableAgents(body.strList("callableAgents"))
-                            .withToolSearch(toolSearchFromForm(body));
-                    try {
-                        patch = withMemoryConfig(patch, body);
-                    } catch (IllegalArgumentException e) {
-                        return ResponseEntity.badRequest().<UiPage>build();
-                    }
-                    val def = registryService.update(id, patch);
-                    return detail(def.id().value(), null, null, user);
-                })
-                .orElse(ResponseEntity.notFound().build());
+        AgentDefinition existing = registryService.find(id).orElse(null);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        AgentPatch patch = AgentPatch.of()
+                .withName(body.str("name"))
+                .withDescription(body.str("description"))
+                .withGroup(body.str("group"))
+                .withIcon(body.str("icon"))
+                .withSystemPrompt(body.str("systemPrompt"))
+                .withWelcomeMessage(body.str("welcomeMessage"))
+                .withLlmConfigName(body.str("llmConfigName"))
+                .withMaxIterations(body.num("maxIterations", existing.maxIterations()))
+                .withResponseReviewers(body.strList("responseReviewers"))
+                .withCallableAgents(body.strList("callableAgents"))
+                .withToolSearch(toolSearchFromForm(body));
+        try {
+            patch = withMemoryConfig(patch, body);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
+        try {
+            val def = registryService.update(id, patch, VersionedForms.version(body));
+            return detail(def.id().value(), null, null, user);
+        } catch (StaleVersionException e) {
+            return ResponseEntity.ok(VersionedForms.changedMeanwhile("Agent '" + existing.name() + "'"));
+        }
     }
 
     /**
@@ -332,9 +341,11 @@ public class AgentUiController {
         return registryService.find(id)
                 .map(a -> {
                     AgentTool tool = toolFromBody(AgentToolId.random(), new FormBody(raw));
-                    List<AgentTool> tools = new ArrayList<>(a.tools());
-                    tools.add(tool);
-                    registryService.update(id, toolsPatch(tools));
+                    registryService.updateTools(id, tools -> {
+                        List<AgentTool> next = new ArrayList<>(tools);
+                        next.add(tool);
+                        return next;
+                    });
                     return detail(idValue, "tools", tool.id().value(), user);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -350,10 +361,9 @@ public class AgentUiController {
         return registryService.find(id)
                 .map(a -> {
                     AgentTool updated = toolFromBody(toolId, new FormBody(raw));
-                    List<AgentTool> tools = a.tools().stream()
+                    registryService.updateTools(id, tools -> tools.stream()
                             .map(t -> t.id().equals(toolId) ? updated : t)
-                            .toList();
-                    registryService.update(id, toolsPatch(tools));
+                            .toList());
                     return detail(idValue, "tools", toolId.value(), user);
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -368,18 +378,13 @@ public class AgentUiController {
         String userId = user.getPreferredUsername();
         return registryService.find(id)
                 .map(a -> {
-                    List<AgentTool> tools = a.tools().stream()
-                            .filter(t -> !t.id().equals(toolId)).toList();
-                    registryService.update(id, toolsPatch(tools));
+                    registryService.updateTools(id, tools -> tools.stream()
+                            .filter(t -> !t.id().equals(toolId)).toList());
                     return registryService.find(id)
                             .map(updated -> ResponseEntity.ok(new AgentDetailPage(updated, userId, sessionRepository).refreshTools()))
                             .orElse(ResponseEntity.<UiPatch>notFound().build());
                 })
                 .orElse(ResponseEntity.notFound().build());
-    }
-
-    private static AgentPatch toolsPatch(List<AgentTool> tools) {
-        return AgentPatch.of().withTools(tools);
     }
 
     /** The tool the form describes, under {@code toolId} — a fresh id for a new tool. */

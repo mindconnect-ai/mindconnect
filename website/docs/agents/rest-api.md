@@ -37,6 +37,22 @@ A server runs in one namespace, set with `mindconnect.namespace` (default
 `local`, `MC_NAMESPACE`); no endpoint names one. Ids travel as their plain
 value, in paths and in JSON.
 
+## Concurrent edits
+
+Agents, LLM configs and vector-store templates carry a `version` that every
+save raises. Send the version you read with a save to have it refused when
+someone else saved in between:
+
+- `PUT /api/agents/{id}` — `version` in the body, next to the fields you change
+- `POST /api/llm-configs`, `POST /api/vector-stores/templates` — the object as
+  you read it, `version` included
+
+A stale version answers `409 Conflict`, with `expectedVersion` and
+`storedVersion` in the body: read the object again and decide what to keep.
+Without a `version` a save overwrites whatever is stored, as it always did —
+what an import or a seed wants. A template saved with `"version": 0` is
+refused when one of that name exists already.
+
 ## OpenAI Responses API
 
 The admin UI app also serves OpenAI's Responses API, in OpenAI's own wire

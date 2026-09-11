@@ -48,8 +48,12 @@ public final class PgAgentDefinitionRepository implements AgentDefinitionReposit
     }
 
     @Override
+    /** Checks the version against the row read {@code FOR UPDATE} and stores it one higher, in one transaction. */
     public AgentDefinition save(AgentDefinition definition) {
-        return definitions.save(definition);
+        return definitions.compute(namespace.value(), definition.id().value(), current ->
+                definition.withVersion(ai.mindconnect.common.Versions.next(
+                        current.map(AgentDefinition::version).orElse(null), definition.version(),
+                        "AgentDefinition", definition.id().value())));
     }
 
     @Override

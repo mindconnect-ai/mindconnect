@@ -269,7 +269,8 @@ public class MigrationService {
         try {
             JsonNode storedNode   = mapper.valueToTree(stored);
             JsonNode incomingNode = mapper.valueToTree(incoming);
-            for (String field : List.of("createdAt", "updatedAt")) {
+            // The version counts saves, not content: a stored agent has one, a bundled one never does.
+            for (String field : List.of("createdAt", "updatedAt", "version")) {
                 ((ObjectNode) storedNode).remove(field);
                 ((ObjectNode) incomingNode).remove(field);
             }
