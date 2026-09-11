@@ -22,7 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
 
 /**
  * Speaking into the chat instead of typing. The composer's microphone records
@@ -121,9 +120,8 @@ public class ChatVoiceUiController {
 
     /** The session belongs to whoever is asking — the chat's own rule. */
     private boolean ownsSession(SessionId sessionId, OidcUser user) {
-        String userId = user == null ? "mc_user" : user.getPreferredUsername();
         return sessions.findById(sessionId)
-                .filter(session -> UserId.of(userId).equals(session.userId()))
+                .filter(session -> ai.mindconnect.chatui.service.SessionOwnership.owns(session, user))
                 .isPresent();
     }
 
@@ -133,7 +131,7 @@ public class ChatVoiceUiController {
      * of the same registry.
      */
     private boolean isStreaming(SessionId sessionId) {
-        return activeStreams.findHandle("msg-list-" + sessionId.value()).isPresent();
+        return activeStreams.findHandle(ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId)).isPresent();
     }
 
     /** What was typed, then what was said — with one space between them. */

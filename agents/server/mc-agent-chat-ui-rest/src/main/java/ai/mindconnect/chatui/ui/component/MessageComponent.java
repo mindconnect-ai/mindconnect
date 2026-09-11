@@ -121,7 +121,7 @@ public final class MessageComponent {
                     .confirm("Delete the response(s) after this message and generate a new one?")
                     // Plain dispatch — the regenerated turn streams on the
                     // session's stream like any other.
-                    .onClick(trigger(on(ChatUiController.class).regenerate(sessionId.value(), seq))));
+                    .onClick(trigger(on(ChatUiController.class).regenerate(sessionId.value(), seq, null))));
         }
 
         // Delete-from-here: remove this message and every message after it.

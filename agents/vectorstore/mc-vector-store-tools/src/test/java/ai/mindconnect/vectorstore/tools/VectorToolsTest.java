@@ -1,7 +1,10 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.Tool;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
@@ -72,9 +75,17 @@ class VectorToolsTest {
     }
 
     private Tool tool(VectorTools.BaseFactory factory) {
+        return tool(factory, null);
+    }
+
+    private Tool tool(VectorTools.BaseFactory factory, ToolCallScope scope) {
         factory.bind(env);
         assertThat(factory.isAvailable()).isTrue();
-        return factory.create(null, null);
+        return factory.create(null, scope);
+    }
+
+    private static ToolCallScope session(SessionId sessionId) {
+        return new ToolCallScope(UserId.of("alice"), sessionId, null);
     }
 
     @Test
@@ -122,5 +133,66 @@ class VectorToolsTest {
         assertThat(upsert.execute(Map.of("store", "kb", "file_id", "d", "chunks",
                 List.of(Map.of("title", "no text")))))
                 .startsWith("Error:").contains("text");
+    }
+
+    /**
+     * The upload store of a chat is that chat's alone. Named from inside
+     * another session — search, upsert or delete — the store is refused; the
+     * own session reaches it by omitting {@code store} or naming it. A store
+     * named like a session that does not exist yet is refused too, so the
+     * model cannot squat on a foreign session's name. The upload pipeline runs
+     * its tools without a session and keeps filling any session's store.
+     */
+    @Test
+    void sessionUploadStoresAreNotReachableFromOtherSessions() {
+        SessionId mine = SessionId.random();
+        SessionId theirs = SessionId.random();
+        String theirStore = "session-" + theirs.value();
+
+        // Their session's store and a session-scoped store under a free name.
+        Tool theirUpsert = tool(new VectorTools.UpsertFactory(), session(theirs));
+        assertThat(theirUpsert.execute(Map.of("store", theirStore, "scope", "session",
+                "file_id", "secret.pdf", "chunks", List.of(Map.of("text", "the finance report")))))
+                .contains("Stored 1 chunk(s)");
+        assertThat(theirUpsert.execute(Map.of("store", "their-notes", "scope", "session",
+                "file_id", "notes", "chunks", List.of(Map.of("text", "finance notes")))))
+                .contains("Stored 1 chunk(s)");
+
+        // The ingestion workflow resolves its tools detached — no session, no restriction.
+        assertThat(tool(new VectorTools.UpsertFactory()).execute(Map.of("store", theirStore,
+                "file_id", "second.pdf", "chunks", List.of(Map.of("text", "finance appendix")))))
+                .contains("Stored 1 chunk(s)");
+
+        Tool search = tool(new VectorTools.SearchFactory(), session(mine));
+        Tool upsert = tool(new VectorTools.UpsertFactory(), session(mine));
+        Tool delete = tool(new VectorTools.DeleteFileFactory(), session(mine));
+
+        assertThat(search.execute(Map.of("store", theirStore, "query", "finance")))
+                .startsWith("Error:").contains("another chat session").doesNotContain("report");
+        assertThat(search.execute(Map.of("store", "their-notes", "query", "finance")))
+                .startsWith("Error:").contains("another chat session");
+        assertThat(upsert.execute(Map.of("store", theirStore, "file_id", "x",
+                "chunks", List.of(Map.of("text", "planted")))))
+                .startsWith("Error:").contains("another chat session");
+        assertThat(delete.execute(Map.of("store", theirStore, "file_id", "secret.pdf")))
+                .startsWith("Error:").contains("another chat session");
+        assertThat(upsert.execute(Map.of("store", "session-" + SessionId.random().value(), "file_id", "x",
+                "chunks", List.of(Map.of("text", "squatting")))))
+                .startsWith("Error:");
+
+        // The own store stays reachable, by omission and by name.
+        assertThat(upsert.execute(Map.of("store", "session-" + mine.value(), "scope", "session",
+                "file_id", "mine.pdf", "chunks", List.of(Map.of("text", "podman container notes")))))
+                .contains("Stored 1 chunk(s)");
+        assertThat(search.execute(Map.of("query", "container"))).contains("podman");
+        assertThat(search.execute(Map.of("store", "session-" + mine.value(), "query", "container")))
+                .contains("podman");
+
+        // Knowledge bases are not session stores and stay open to everyone.
+        assertThat(upsert.execute(Map.of("store", "kb", "file_id", "d",
+                "chunks", List.of(Map.of("text", "shared knowledge")))))
+                .contains("Stored 1 chunk(s)");
+        assertThat(tool(new VectorTools.SearchFactory(), session(theirs))
+                .execute(Map.of("store", "kb", "query", "knowledge"))).contains("shared");
     }
 }

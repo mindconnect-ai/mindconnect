@@ -1,10 +1,13 @@
 package ai.mindconnect.chatui.ui.controller;
 
 import ai.mindconnect.chatui.service.ActiveStreams;
+import ai.mindconnect.chatui.service.SessionOwnership;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +33,11 @@ import java.util.Map;
  * <p>The chat-page renderer uses the single-stream lookup to decide
  * between rendering the Send and Stop button. UIs that show a global
  * "what's running?" indicator would use the list endpoint.
+ *
+ * <p>A channel is a chat session's, and so is everything on it — the
+ * reply as it streams, the right to stop it. The endpoints therefore answer
+ * only for channels whose session belongs to the caller (see {@link
+ * SessionOwnership}); the list shows the caller's own streams.
  */
 @RestController
 @RequestMapping("/chat/api/streams")
@@ -39,23 +47,30 @@ public class StreamController {
 
     private final ai.mindconnect.chatui.service.SessionStreams sessionStreams;
 
+    private final SessionOwnership ownership;
+
     @Autowired
     public StreamController(ActiveStreams activeStreams,
-                            ai.mindconnect.chatui.service.SessionStreams sessionStreams) {
+                            ai.mindconnect.chatui.service.SessionStreams sessionStreams,
+                            SessionOwnership ownership) {
         this.activeStreams = activeStreams;
         this.sessionStreams = sessionStreams;
+        this.ownership = ownership;
     }
 
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> list() {
+    public ResponseEntity<List<Map<String, Object>>> list(@AuthenticationPrincipal OidcUser user) {
         var streams = activeStreams.snapshot().stream()
+                .filter(h -> owned(h.channelId(), user))
                 .map(StreamController::serialize)
                 .toList();
         return ResponseEntity.ok(streams);
     }
 
     @GetMapping("/{channelId}")
-    public ResponseEntity<Map<String, Object>> get(@PathVariable String channelId) {
+    public ResponseEntity<Map<String, Object>> get(@PathVariable String channelId,
+                                                   @AuthenticationPrincipal OidcUser user) {
+        if (!owned(channelId, user)) return ResponseEntity.notFound().build();
         return activeStreams.findHandle(channelId)
                 .map(h -> ResponseEntity.ok(serialize(h)))
                 .orElseGet(() -> ResponseEntity.notFound().build());
@@ -67,7 +82,9 @@ public class StreamController {
      * 404 if no such stream is registered.
      */
     @DeleteMapping("/{channelId}")
-    public ResponseEntity<Void> cancel(@PathVariable String channelId) {
+    public ResponseEntity<Void> cancel(@PathVariable String channelId,
+                                       @AuthenticationPrincipal OidcUser user) {
+        if (!owned(channelId, user)) return ResponseEntity.notFound().build();
         return activeStreams.cancel(channelId)
                 ? ResponseEntity.noContent().build()
                 : ResponseEntity.notFound().build();
@@ -94,7 +111,9 @@ public class StreamController {
     public ResponseEntity<SseEmitter> resume(
             @PathVariable String channelId,
             @RequestParam(name = "lastSeq", defaultValue = "0") long lastSeq,
-            @RequestParam(name = "from", required = false) Long from) {
+            @RequestParam(name = "from", required = false) Long from,
+            @AuthenticationPrincipal OidcUser user) {
+        if (!owned(channelId, user)) return ResponseEntity.notFound().build();
         // `from` wins over `lastSeq`. The page renderer knows exactly what
         // the page it just rendered already shows and puts that position in
         // the resume URL; the client appends its own lastSeq=0 blindly, and
@@ -151,6 +170,10 @@ public class StreamController {
         headers.add("Sui-Stream-Label",
                 handleOpt.map(ActiveStreams.Handle::label).orElse("Agent"));
         return ResponseEntity.ok().headers(headers).body(emitter);
+    }
+
+    private boolean owned(String channelId, OidcUser user) {
+        return ownership.ownedByChannel(channelId, user).isPresent();
     }
 
     private static Map<String, Object> serialize(ActiveStreams.Handle h) {

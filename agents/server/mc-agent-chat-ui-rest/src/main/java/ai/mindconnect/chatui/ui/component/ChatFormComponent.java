@@ -166,7 +166,7 @@ public final class ChatFormComponent implements UiComponent {
                         // comes back on the session stream this client already
                         // reads, the same one every other client of the session
                         // reads.
-                        .onClick(trigger(on(ChatUiController.class).chatStream(sessionId.value(), null), id())));
+                        .onClick(trigger(on(ChatUiController.class).chatStream(sessionId.value(), null, null), id())));
         return form.<UiForm>withCssClass("chat-form");
     }
 
@@ -199,14 +199,14 @@ public final class ChatFormComponent implements UiComponent {
      * by the same channelId the client uses for re-mount detection.
      */
     private ai.mindconnect.ui.model.UiNode streamingForm() {
-        String channelId = "msg-list-" + sessionId.value();
+        String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId);
         var row = ai.mindconnect.ui.model.UiStack.of(id());
         row.direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL);
         row.withCssClass("chat-form chat-form--streaming");
         row.child(ai.mindconnect.ui.model.UiText.of(id() + ":thinking", "AI is thinking")
                 .withCssClass("chat-thinking"));
         row.child(UiAction.danger("stop", "Stop").icon("stop")
-                .onClick(trigger(on(StreamController.class).cancel(channelId))));
+                .onClick(trigger(on(StreamController.class).cancel(channelId, null))));
         return row;
     }
 }
