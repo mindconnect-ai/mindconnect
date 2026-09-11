@@ -264,6 +264,24 @@ fresh empty one, so nothing has to be moved by hand at release time.
   works here without adding a file. For the project only the working directory
   itself is searched, not its parents.
 
+- **agents:** `run_agent` now tells the model which agents it can actually
+  reach — the project's own first, then the caller's roster — instead of
+  naming the same three in every prompt. The old description advertised
+  `web-researcher`, `file-finder` and `explorer` to every agent, including
+  ones whose roster held none of them, and never mentioned a project's own.
+  The bundled `coding-assistant` also gains `list_agents`, which it was
+  missing.
+
+- **agents:** a project can bring its own sub-agents, in
+  `.mindconnect/agents/` in the working directory: one Markdown file each,
+  front matter for `name`, `description`, `tools`, `disallowedTools` and
+  `model`, the body as the system prompt. `run_agent` resolves them by name
+  ahead of the registry, `list_agents` shows them first. Their tools are the
+  caller's own narrowed by the file, never widened, each keeping the approval
+  the caller's binding gives it, so a repository cannot hand itself a shell.
+  `tools` and `disallowedTools` may be written as a comma list or as an
+  indented YAML block.
+
 ### Changed
 
 - **agents:** an upload's copy for ingestion goes into the session's own

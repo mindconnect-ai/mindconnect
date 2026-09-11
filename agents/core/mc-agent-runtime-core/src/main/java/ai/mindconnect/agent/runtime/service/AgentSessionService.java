@@ -285,6 +285,33 @@ public class AgentSessionService {
     }
 
     /**
+     * Opens a sub-session for an agent the registry has never heard of — a
+     * project's own, defined in a file beside its code. Same as the
+     * sub-agent {@code openChat} above, except the definition travels with
+     * the session instead of being looked up by id, because there is
+     * nothing to look up.
+     */
+    public AgentSession openSubChat(ai.mindconnect.agent.runtime.domain.session.SessionAgent agent,
+                                    UserId userId, SessionId parentSessionId, ChatTurnId parentTurnId,
+                                    String parentToolCallId, String workingDir,
+                                    List<String> additionalDirs) {
+        ConversationId conversationId = ConversationId.random();
+        List<Participant> participants = List.of(
+                Participant.user(conversationId, userId, userId.value()),
+                Participant.agent(conversationId, agent.id(), agent.label())
+        );
+        conversationManager.createConversation(conversationId, "Chat with " + agent.label(),
+                ConversationType.USER_AGENT, participants);
+
+        AgentSession session = AgentSession.startSubAgent(agent.id(), userId,
+                conversationId, parentSessionId, parentTurnId, parentToolCallId)
+                .withWorkingDir(workingDir)
+                .withAdditionalDirs(additionalDirs)
+                .withSessionAgents(List.of(agent));
+        return sessionRepository.save(session);
+    }
+
+    /**
      * Opens a chat for a session agent — either an inline one the user
      * assembled from a model and some tools, or a reference to a registry
      * agent with this chat's overrides.

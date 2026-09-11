@@ -5,6 +5,10 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import java.util.List;
 import java.util.Map;
@@ -84,5 +88,36 @@ class ListAgentsToolTest {
     void anEmptyNamespaceSaysSoRatherThanReturningNothing() {
         assertThat(new ListAgentsTool(repo(List.of())).execute(Map.of()))
                 .startsWith("No agents found");
+    }
+
+    @TempDir
+    Path project;
+
+    @Test
+    void theProjectsOwnAgentsAreListedFirst_andShadowARegisteredNamesake() throws Exception {
+        Path dir = Files.createDirectories(
+                project.resolve(ai.mindconnect.agent.runtime.service.agents.ProjectAgents.DIR));
+        Files.writeString(dir.resolve("verifier.md"), """
+                ---
+                description: Knows how this project is built
+                ---
+                Verify.
+                """);
+        var all = List.of(agent("verifier", null), agent("web-researcher", null));
+
+        String out = new ListAgentsTool(repo(all), null, project.toString()).execute(Map.of());
+
+        assertThat(out).startsWith("- verifier (this project): Knows how this project is built");
+        assertThat(out).contains("- web-researcher");
+        assertThat(out).as("the registered namesake is not offered twice")
+                .doesNotContain("verifier does things");
+    }
+
+    @Test
+    void withoutAWorkingDirectoryTheAnswerIsTheRegistryAlone() {
+        var all = List.of(agent("web-researcher", null));
+
+        assertThat(new ListAgentsTool(repo(all), null, null).execute(Map.of()))
+                .isEqualTo("- web-researcher: web-researcher does things");
     }
 }
