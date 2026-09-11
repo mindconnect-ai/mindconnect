@@ -14,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +68,7 @@ class VectorToolsTest {
             @Override public Optional<String> getString(String key) {
                 return switch (key) {
                     case "vectorStoreBackend" -> Optional.of("memory");
-                    case "dataBaseDir" -> Optional.of(dir.toString());
+                    case "dataBaseDir", "defaultBaseDir" -> Optional.of(dir.toString());
                     default -> Optional.empty();
                 };
             }
@@ -84,8 +85,23 @@ class VectorToolsTest {
         return factory.create(null, scope);
     }
 
-    private static ToolCallScope session(SessionId sessionId) {
-        return new ToolCallScope(UserId.of("alice"), sessionId, null);
+    private static ToolCallScope chat(String user, SessionId sessionId) {
+        return new ToolCallScope(UserId.of(user), sessionId, null);
+    }
+
+    private VectorStores stores() {
+        return VectorStores.fromEnvironment(env).orElseThrow();
+    }
+
+    /** A chat's upload store as the upload pipeline registers it: session-scoped, owned by the chat's user. */
+    private String uploadStore(String owner, SessionId chat) {
+        String name = "session-" + chat.value();
+        stores().open(name, null, VectorStoreInstance.Scope.SESSION, chat.value(), owner);
+        return name;
+    }
+
+    private static Map<String, Object> chunk(String store, String fileId, String text) {
+        return Map.of("store", store, "file_id", fileId, "chunks", List.of(Map.of("text", text)));
     }
 
     @Test
@@ -136,63 +152,159 @@ class VectorToolsTest {
     }
 
     /**
-     * The upload store of a chat is that chat's alone. Named from inside
-     * another session — search, upsert or delete — the store is refused; the
-     * own session reaches it by omitting {@code store} or naming it. A store
-     * named like a session that does not exist yet is refused too, so the
-     * model cannot squat on a foreign session's name. The upload pipeline runs
-     * its tools without a session and keeps filling any session's store.
+     * A chat's upload store belongs to the chat's user. Calls made for that
+     * user reach it — the ingestion workflow run on their behalf, another chat
+     * of theirs, a sub-agent their chat started. Calls for anyone else are
+     * refused, and so are calls for nobody in particular: a workflow started
+     * from the workflow admin or the REST API.
      */
     @Test
-    void sessionUploadStoresAreNotReachableFromOtherSessions() {
-        SessionId mine = SessionId.random();
-        SessionId theirs = SessionId.random();
-        String theirStore = "session-" + theirs.value();
+    void aChatsUploadStoreIsReachableOnlyForItsUser() {
+        SessionId bobsChat = SessionId.random();
+        String bobsStore = uploadStore("bob", bobsChat);
 
-        // Their session's store and a session-scoped store under a free name.
-        Tool theirUpsert = tool(new VectorTools.UpsertFactory(), session(theirs));
-        assertThat(theirUpsert.execute(Map.of("store", theirStore, "scope", "session",
-                "file_id", "secret.pdf", "chunks", List.of(Map.of("text", "the finance report")))))
+        // The ingestion workflow runs on behalf of bob's chat and fills the store.
+        assertThat(tool(new VectorTools.UpsertFactory(), chat("bob", bobsChat))
+                .execute(chunk(bobsStore, "secret.pdf", "the finance report")))
                 .contains("Stored 1 chunk(s)");
-        assertThat(theirUpsert.execute(Map.of("store", "their-notes", "scope", "session",
-                "file_id", "notes", "chunks", List.of(Map.of("text", "finance notes")))))
-                .contains("Stored 1 chunk(s)");
-
-        // The ingestion workflow resolves its tools detached — no session, no restriction.
-        assertThat(tool(new VectorTools.UpsertFactory()).execute(Map.of("store", theirStore,
-                "file_id", "second.pdf", "chunks", List.of(Map.of("text", "finance appendix")))))
+        // So does a session-scoped store under a free name.
+        assertThat(tool(new VectorTools.UpsertFactory(), chat("bob", bobsChat)).execute(Map.of(
+                "store", "bob-notes", "scope", "session", "file_id", "notes",
+                "chunks", List.of(Map.of("text", "finance notes")))))
                 .contains("Stored 1 chunk(s)");
 
-        Tool search = tool(new VectorTools.SearchFactory(), session(mine));
-        Tool upsert = tool(new VectorTools.UpsertFactory(), session(mine));
-        Tool delete = tool(new VectorTools.DeleteFileFactory(), session(mine));
+        // Runs for nobody in particular reach no chat's store.
+        assertThat(tool(new VectorTools.SearchFactory())
+                .execute(Map.of("store", bobsStore, "query", "finance")))
+                .startsWith("Error:").contains("another chat's uploads");
+        assertThat(tool(new VectorTools.UpsertFactory(), ToolCallScope.detached(UserId.of("workflow")))
+                .execute(chunk(bobsStore, "x", "planted")))
+                .startsWith("Error:").contains("another chat's uploads");
+        // Not even when it carries the owner's user id: only a call in a chat acts for a user.
+        assertThat(tool(new VectorTools.SearchFactory(), ToolCallScope.detached(UserId.of("bob")))
+                .execute(Map.of("store", bobsStore, "query", "finance")))
+                .startsWith("Error:").contains("another chat's uploads");
 
-        assertThat(search.execute(Map.of("store", theirStore, "query", "finance")))
-                .startsWith("Error:").contains("another chat session").doesNotContain("report");
-        assertThat(search.execute(Map.of("store", "their-notes", "query", "finance")))
-                .startsWith("Error:").contains("another chat session");
-        assertThat(upsert.execute(Map.of("store", theirStore, "file_id", "x",
-                "chunks", List.of(Map.of("text", "planted")))))
-                .startsWith("Error:").contains("another chat session");
-        assertThat(delete.execute(Map.of("store", theirStore, "file_id", "secret.pdf")))
-                .startsWith("Error:").contains("another chat session");
-        assertThat(upsert.execute(Map.of("store", "session-" + SessionId.random().value(), "file_id", "x",
-                "chunks", List.of(Map.of("text", "squatting")))))
+        // Alice, from her own chat: search, upsert and delete are refused ...
+        ToolCallScope alice = chat("alice", SessionId.random());
+        assertThat(tool(new VectorTools.SearchFactory(), alice)
+                .execute(Map.of("store", bobsStore, "query", "finance")))
+                .startsWith("Error:").doesNotContain("report");
+        assertThat(tool(new VectorTools.SearchFactory(), alice)
+                .execute(Map.of("store", "bob-notes", "query", "finance")))
+                .startsWith("Error:");
+        assertThat(tool(new VectorTools.UpsertFactory(), alice).execute(chunk(bobsStore, "x", "planted")))
+                .startsWith("Error:");
+        assertThat(tool(new VectorTools.DeleteFileFactory(), alice)
+                .execute(Map.of("store", bobsStore, "file_id", "secret.pdf")))
+                .startsWith("Error:");
+        // ... and so is a session name nobody registered: no squatting.
+        assertThat(tool(new VectorTools.UpsertFactory(), alice)
+                .execute(chunk("session-" + SessionId.random().value(), "x", "squatting")))
                 .startsWith("Error:");
 
-        // The own store stays reachable, by omission and by name.
-        assertThat(upsert.execute(Map.of("store", "session-" + mine.value(), "scope", "session",
-                "file_id", "mine.pdf", "chunks", List.of(Map.of("text", "podman container notes")))))
-                .contains("Stored 1 chunk(s)");
-        assertThat(search.execute(Map.of("query", "container"))).contains("podman");
-        assertThat(search.execute(Map.of("store", "session-" + mine.value(), "query", "container")))
-                .contains("podman");
+        // Bob reaches his store from another chat of his ...
+        assertThat(tool(new VectorTools.SearchFactory(), chat("bob", SessionId.random()))
+                .execute(Map.of("store", bobsStore, "query", "finance")))
+                .contains("the finance report");
+        // ... and a sub-agent his chat started searches it without naming it.
+        ToolCallScope subAgent = new ToolCallScope(UserId.of("bob"), SessionId.random(), null, bobsChat);
+        assertThat(tool(new VectorTools.SearchFactory(), subAgent).execute(Map.of("query", "finance")))
+                .contains("the finance report");
 
-        // Knowledge bases are not session stores and stay open to everyone.
-        assertThat(upsert.execute(Map.of("store", "kb", "file_id", "d",
-                "chunks", List.of(Map.of("text", "shared knowledge")))))
+        // Knowledge bases are not chat stores and stay open to everyone.
+        assertThat(tool(new VectorTools.UpsertFactory(), alice).execute(chunk("kb", "d", "shared knowledge")))
                 .contains("Stored 1 chunk(s)");
-        assertThat(tool(new VectorTools.SearchFactory(), session(theirs))
-                .execute(Map.of("store", "kb", "query", "knowledge"))).contains("shared");
+        assertThat(tool(new VectorTools.SearchFactory(), chat("bob", bobsChat))
+                .execute(Map.of("store", "kb", "query", "knowledge")))
+                .contains("shared");
+    }
+
+    /**
+     * An upload store registered before owners were recorded is reachable
+     * from its own chat only — until its chat writes to it again, through the
+     * upload pipeline or a tool, and the chat's user is recorded as its owner.
+     */
+    @Test
+    void anUploadStoreWithoutOwnerIsReachableFromItsOwnChatUntilItGetsOne() {
+        SessionId oldChat = SessionId.random();
+        String oldStore = "session-" + oldChat.value();
+        stores().open(oldStore, null, VectorStoreInstance.Scope.SESSION, oldChat.value());
+
+        assertThat(tool(new VectorTools.SearchFactory(), chat("carol", oldChat))
+                .execute(Map.of("query", "container")))
+                .contains("No results");
+        assertThat(tool(new VectorTools.SearchFactory(), chat("carol", SessionId.random()))
+                .execute(Map.of("store", oldStore, "query", "container")))
+                .startsWith("Error:");
+
+        // Its own chat writes to it: the store is claimed for the chat's user.
+        assertThat(tool(new VectorTools.UpsertFactory(), chat("carol", oldChat))
+                .execute(chunk(oldStore, "notes", "container notes")))
+                .contains("Stored 1 chunk(s)");
+        assertThat(stores().registry().instance(oldStore).orElseThrow().owner()).isEqualTo("carol");
+
+        assertThat(tool(new VectorTools.SearchFactory(), chat("carol", SessionId.random()))
+                .execute(Map.of("store", oldStore, "query", "container")))
+                .contains("container notes");
+    }
+
+    /**
+     * A chat's own store is the chat's however it came about: a tool writing
+     * into it before any upload registers it so, and the upload pipeline claims
+     * a store registered under the chat's name with another scope — but never
+     * one that already has an owner or belongs to another chat.
+     */
+    @Test
+    void aChatsOwnStoreIsRegisteredAsTheChatsWhoeverCreatesIt() {
+        SessionId davesChat = SessionId.random();
+        String davesStore = "session-" + davesChat.value();
+        assertThat(tool(new VectorTools.UpsertFactory(), chat("dave", davesChat))
+                .execute(chunk(davesStore, "early", "container notes")))
+                .contains("Stored 1 chunk(s)");
+        VectorStoreInstance registered = stores().registry().instance(davesStore).orElseThrow();
+        assertThat(registered.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
+        assertThat(registered.scopeRef()).isEqualTo(davesChat.value());
+        assertThat(registered.owner()).isEqualTo("dave");
+        assertThat(tool(new VectorTools.SearchFactory(), chat("dave", SessionId.random()))
+                .execute(Map.of("store", davesStore, "query", "container")))
+                .contains("container notes");
+
+        // Registered under the chat's name as GLOBAL: the chat's pipeline claims it.
+        SessionId erinsChat = SessionId.random();
+        String erinsStore = "session-" + erinsChat.value();
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "erin");
+        VectorStoreInstance claimed = stores().registry().instance(erinsStore).orElseThrow();
+        assertThat(claimed.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
+        assertThat(claimed.scopeRef()).isEqualTo(erinsChat.value());
+        assertThat(claimed.owner()).isEqualTo("erin");
+        // An owned store is not claimed again, and nobody claims another chat's name.
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "mallory");
+        assertThat(stores().registry().instance(erinsStore).orElseThrow().owner()).isEqualTo("erin");
+        String franksStore = "session-" + SessionId.random().value();
+        stores().open(franksStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(franksStore, null, VectorStoreInstance.Scope.SESSION, SessionId.random().value(), "mallory");
+        assertThat(stores().registry().instance(franksStore).orElseThrow().owner()).isNull();
+    }
+
+    @Test
+    void ingestFileFollowsTheSameRule() throws Exception {
+        Files.writeString(dir.resolve("doc.txt"), "finance numbers");
+        String bobsStore = uploadStore("bob", SessionId.random());
+        Tool ingest = tool(new VectorIngestFileTool.Factory(), chat("alice", SessionId.random()));
+
+        assertThat(ingest.execute(Map.of("path", "doc.txt", "store", bobsStore)))
+                .startsWith("Error:").contains("another chat's uploads");
+        assertThat(ingest.execute(Map.of("path", "doc.txt", "store", "kb")))
+                .contains("Stored");
+
+        // Its own chat's store, written before any upload, is registered as that chat's.
+        SessionId alicesChat = SessionId.random();
+        String alicesStore = "session-" + alicesChat.value();
+        assertThat(tool(new VectorIngestFileTool.Factory(), chat("alice", alicesChat))
+                .execute(Map.of("path", "doc.txt", "store", alicesStore)))
+                .contains("Stored");
+        assertThat(stores().registry().instance(alicesStore).orElseThrow().owner()).isEqualTo("alice");
     }
 }

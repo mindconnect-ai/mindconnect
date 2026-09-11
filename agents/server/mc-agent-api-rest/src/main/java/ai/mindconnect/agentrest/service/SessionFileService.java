@@ -27,6 +27,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.tool.ToolCallScope;
 
 /**
  * Attaches a stored file to a chat session — the one code path shared by the
@@ -164,6 +165,10 @@ public class SessionFileService {
             return new AttachResult(stored, null, false,
                     stored.name() + ": vector stores are not configured in this application.");
         }
+        AgentSession chat = sessions.findById(sessionId).orElse(null);
+        if (chat == null) {
+            return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
+        }
         String storeName = "session-" + sessionId.value();
         VectorStoreTemplate template = stores.template(CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
             VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE,
@@ -172,7 +177,9 @@ public class SessionFileService {
             stores.registry().saveTemplate(created);
             return created;
         });
-        stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.value());
+        // The store is the chat's user's: the vector tools reach it only on that user's behalf.
+        stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.value(),
+                chat.userId() == null ? null : chat.userId().value());
         VectorStoreInstance instance = stores.settingsFor(storeName);
 
         try {
@@ -200,9 +207,13 @@ public class SessionFileService {
                 var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                         new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                                 + "' not found"));
+                // The workflow's tool steps run on behalf of this chat's user and
+                // session — the calls its upload store accepts.
                 var report = new WorkflowRunService(workflowInstances)
-                        .run(workflow, Map.of("file", spoolBase.relativize(target).toString(),
-                                "store", storeName));
+                        .runWithAttributes(workflow, Map.of("file", spoolBase.relativize(target).toString(),
+                                "store", storeName),
+                                Map.of(ToolCallScope.class.getName(),
+                                        new ToolCallScope(chat.userId(), sessionId, null)));
                 if (!report.success()) {
                     return new AttachResult(stored, storeName, false,
                             stored.name() + ": ingestion failed — " + report.error());

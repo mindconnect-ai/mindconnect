@@ -66,6 +66,8 @@ c() { printf '%-16s %s\n' "$1" "$(curl -s -o /dev/null -m 5 -w '%{http_code}' "$
 
 ## Not covered here
 
-The `vector_search` / `vector_upsert` / `vector_delete_file` guard against a
-foreign `store: session-<id>` is a tool-level rule and is pinned by
-`VectorToolsTest.sessionUploadStoresAreNotReachableFromOtherSessions`.
+The rule that a chat's upload store (`session-<id>`) is reachable by the
+`vector_*` tools only for the chat's user is a tool-level rule and is pinned by
+`VectorToolsTest.aChatsUploadStoreIsReachableOnlyForItsUser`; that a workflow
+run as an agent tool passes the caller's scope to its tool steps by
+`WorkflowToolProviderTest.toolStepsRunOnBehalfOfTheCaller`.

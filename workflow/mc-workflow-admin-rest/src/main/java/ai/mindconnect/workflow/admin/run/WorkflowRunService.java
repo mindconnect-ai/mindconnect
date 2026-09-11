@@ -175,6 +175,23 @@ public class WorkflowRunService {
     public RunReport run(WorkflowData wf, Map<String, Object> params,
                          ai.mindconnect.workflow.execution.WorkflowEventListener extraListener,
                          boolean persist) {
+        return run(wf, params, extraListener, persist, Map.of());
+    }
+
+    /**
+     * Runs a workflow from the start with attributes for its steps — values the
+     * host hands the run, such as on whose behalf it happens (see
+     * {@link WorkflowContext#getAttributes()}). They are not part of a
+     * suspension: a run resumed later starts without them.
+     */
+    public RunReport runWithAttributes(WorkflowData wf, Map<String, Object> params,
+                                       Map<String, Object> attributes) {
+        return run(wf, params, null, false, attributes);
+    }
+
+    private RunReport run(WorkflowData wf, Map<String, Object> params,
+                          ai.mindconnect.workflow.execution.WorkflowEventListener extraListener,
+                          boolean persist, Map<String, Object> attributes) {
         Recorder recorder = new Recorder(wf);
         // SPI factory wires every WorkflowConfigurer on the classpath — so the
         // json:, javascript:, … resolvers are all active during the run.
@@ -187,7 +204,7 @@ public class WorkflowRunService {
 
         long startedAt = System.currentTimeMillis();
         try {
-            return report(wf, service.executeWorkflow(wf, params == null ? Map.of() : params),
+            return report(wf, service.executeWorkflow(wf, params == null ? Map.of() : params, attributes),
                     recorder, null, startedAt, persist);
         } catch (Exception e) {
             return failed(e);

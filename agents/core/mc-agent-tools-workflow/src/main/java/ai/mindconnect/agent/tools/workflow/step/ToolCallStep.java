@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.workflow.step;
 
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.workflow.execution.BaseStepInstance;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,7 +27,11 @@ public class ToolCallStep extends BaseStepInstance<ToolCallData> {
         Map<String, Object> arguments = parseArguments(cfg);
 
         logDebug("calling tool '%s'", cfg.getTool());
-        String result = ToolInvokers.require().call(cfg.getTool().trim(), arguments);
+        // On whose behalf: the host puts the caller's scope on the run (an agent
+        // tool, a chat upload); a run started for nobody in particular has none.
+        ToolCallScope scope = getWorkflowContext() == null ? null
+                : getWorkflowContext().getAttribute(ToolCallScope.class);
+        String result = ToolInvokers.require().call(cfg.getTool().trim(), arguments, scope);
         // Tools report failure as text by convention ("Error: …"). A failed
         // tool must FAIL the step — a workflow that reports success while its
         // tool errored is a silent lie (ingestion once "succeeded" with zero

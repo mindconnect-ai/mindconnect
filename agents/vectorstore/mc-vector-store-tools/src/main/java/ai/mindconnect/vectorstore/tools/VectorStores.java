@@ -133,14 +133,46 @@ public final class VectorStores {
      */
     public VectorStore open(String storeName, String templateName,
                             VectorStoreInstance.Scope scope, String scopeRef) {
+        return open(storeName, templateName, scope, scopeRef, null);
+    }
+
+    /**
+     * Like {@link #open(String, String, VectorStoreInstance.Scope, String)}, for
+     * a store that belongs to {@code owner} (a user id). Opened as a chat's
+     * store ({@code SESSION} scope), an existing instance without an owner is
+     * claimed for that chat — see {@link #claimsChatStore}.
+     */
+    public VectorStore open(String storeName, String templateName,
+                            VectorStoreInstance.Scope scope, String scopeRef, String owner) {
         VectorStoreInstance instance = registry.instance(storeName).orElse(null);
         if (instance == null) {
             VectorStoreTemplate template = template(templateName).orElseThrow(() ->
                     new IllegalArgumentException("Unknown vector store template '" + templateName + "'"));
             instance = registry.registerInstance(
-                    VectorStoreInstance.fromTemplate(storeName, template, scope, scopeRef));
+                    VectorStoreInstance.fromTemplate(storeName, template, scope, scopeRef, owner));
+        } else if (claimsChatStore(instance, storeName, scope, scopeRef, owner)) {
+            instance = instance.asChatStore(scopeRef, owner);
+            registry.saveInstance(instance);
         }
         return openWith(instance);
+    }
+
+    /**
+     * Whether opening a store for its own chat records the chat and its user on
+     * an instance that lacks an owner: one registered before owners were
+     * recorded, or one registered under the chat's {@code session-} name with
+     * another scope (a tool wrote into it before any upload). An instance that
+     * has an owner, or that belongs to another session, is left alone.
+     */
+    private static boolean claimsChatStore(VectorStoreInstance instance, String storeName,
+                                           VectorStoreInstance.Scope scope, String scopeRef, String owner) {
+        if (owner == null || scopeRef == null || scope != VectorStoreInstance.Scope.SESSION
+                || instance.owner() != null) {
+            return false;
+        }
+        return instance.scope() == VectorStoreInstance.Scope.SESSION
+                ? scopeRef.equals(instance.scopeRef())
+                : storeName.equals(VectorTools.SESSION_STORE_PREFIX + scopeRef);
     }
 
     /** Opens by the instance's own settings (no registration side effects). */

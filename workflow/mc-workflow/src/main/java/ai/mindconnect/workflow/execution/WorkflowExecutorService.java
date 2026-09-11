@@ -46,7 +46,22 @@ public class WorkflowExecutorService {
      * @return a {@link WorkflowResult} describing the outcome
      */
     public WorkflowResult executeWorkflow(WorkflowData workflowData, Map<String, Object> params) {
+        return executeWorkflow(workflowData, params, Map.of());
+    }
+
+    /**
+     * Like {@link #executeWorkflow(WorkflowData, Map)}, with attributes every
+     * step of the run can read (see {@link WorkflowContext#getAttributes()}) —
+     * values the host hands the run, such as on whose behalf it happens.
+     *
+     * @param attributes attribute values by key; may be null or empty
+     */
+    public WorkflowResult executeWorkflow(WorkflowData workflowData, Map<String, Object> params,
+                                          Map<String, Object> attributes) {
         WorkflowContext context = createContext(workflowData.getName());
+        if (attributes != null) {
+            attributes.forEach(context::setAttribute);
+        }
         WorkflowInstance instance = new WorkflowInstance();
         instance.init(workflowData, null, context);
         // Add all environment vars to scope

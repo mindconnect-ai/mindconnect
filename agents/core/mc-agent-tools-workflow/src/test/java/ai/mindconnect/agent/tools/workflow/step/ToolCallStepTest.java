@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.tools.workflow.step;
 
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.execution.WorkflowExecutorService;
 import ai.mindconnect.workflow.execution.WorkflowResult;
@@ -143,6 +146,35 @@ class ToolCallStepTest {
 
         assertThat(result.isSuccess()).as(String.valueOf(result.getError())).isTrue();
         assertThat(result.getResult()).isEqualTo("Error: inspect me downstream");
+    }
+
+    /**
+     * On whose behalf a tool runs is the host's to say: the scope it puts on
+     * the run reaches the invoker, and a run without one hands over none.
+     */
+    @Test
+    void theScopeOnTheRunReachesTheInvoker() {
+        List<ToolCallScope> scopes = new ArrayList<>();
+        ToolInvokers.set(new ToolInvoker() {
+            @Override
+            public String call(String tool, Map<String, Object> args) {
+                return call(tool, args, null);
+            }
+
+            @Override
+            public String call(String tool, Map<String, Object> args, ToolCallScope scope) {
+                scopes.add(scope);
+                return "ok";
+            }
+        });
+        ToolCallScope alice = new ToolCallScope(UserId.of("alice"), SessionId.random(), null);
+        WorkflowExecutorService service = new WorkflowExecutorService(SpiWorkflowContextFactory.create());
+
+        assertThat(service.executeWorkflow(workflow("{}"), Map.of("topic", "unused"),
+                Map.of(ToolCallScope.class.getName(), alice)).isSuccess()).isTrue();
+        assertThat(service.executeWorkflow(workflow("{}"), Map.of("topic", "unused")).isSuccess()).isTrue();
+
+        assertThat(scopes).containsExactly(alice, null);
     }
 
     @Test
