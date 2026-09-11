@@ -94,6 +94,26 @@ class AgentRuntimeBuilderTest {
     }
 
     @Test
+    void aChatOpenedByAgentIdAloneGetsItsOwnDirectoryToo() throws Exception {
+        // The chat UI and the local client open a chat by agent id alone. That
+        // must not be the one way in that forgets the chat's own directory.
+        try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))
+                .agentDefinition(demoAgent())
+                .build()) {
+            var def = runtime.agentDefinitions().findByName("test-agent").orElseThrow();
+
+            AgentSession session = runtime.sessionService().openChat(def.id(), UserId.of("user-2"));
+
+            assertThat(session.hasWorkingDir()).isTrue();
+            java.nio.file.Path own = java.nio.file.Path.of(session.workingDir());
+            assertThat(own).endsWith(java.nio.file.Path.of("home", "user-2", "sessions", session.id().value()));
+            assertThat(java.nio.file.Files.isDirectory(own)).isTrue();
+            assertThat(runtime.sessionService().sessionDir(session.id())).contains(own);
+        }
+    }
+
+    @Test
     void switchingTheModelKeepsTheSessionsDirectories() throws Exception {
         try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
                 .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))

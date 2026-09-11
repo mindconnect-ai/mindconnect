@@ -111,9 +111,11 @@ public class AgentSessionService {
     /**
      * Opens a brand-new top-level chat session for the given agent: creates
      * a conversation with USER/AGENT participants and persists the session.
+     * No directory is named, so it works in its own — the same as every chat
+     * that does not choose one, however it is opened.
      */
     public AgentSession openChat(AgentId agentDefinitionId, UserId userId) {
-        return openChat(agentDefinitionId, userId, null, null, null);
+        return openChat(agentDefinitionId, userId, (String) null);
     }
 
     /**
