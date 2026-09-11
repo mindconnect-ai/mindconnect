@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.adapter.pg;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

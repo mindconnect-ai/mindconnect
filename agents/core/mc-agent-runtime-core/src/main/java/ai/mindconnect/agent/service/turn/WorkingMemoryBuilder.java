@@ -7,7 +7,7 @@ import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.PromptRenderer;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.service.prompt.SystemPromptRenderer;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 
 import java.util.List;
 

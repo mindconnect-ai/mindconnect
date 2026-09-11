@@ -6,8 +6,9 @@ import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.memory.domain.SummaryPlacement;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.port.out.TokenCounters;
-import ai.mindconnect.common.AuthenticationInfo;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.domain.Message;
@@ -89,7 +90,7 @@ class CompressEligibilityTest {
 
     private int run(SummarizingWindowConfig cfg, List<Message> history) {
         return strategy(cfg).compressEligibleToolResults(def(), session(),
-                AuthenticationInfo.of("u", new Namespace("test")), history);
+                AuthenticationInfo.of(UserId.of("u"), new Namespace("test")), history);
     }
 
     // ── history building ────────────────────────────────────────────────────

@@ -21,7 +21,7 @@ import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.service.AgentChatService;
 import ai.mindconnect.agent.service.AgentSessionService;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;

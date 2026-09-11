@@ -35,6 +35,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
   which obtains and renews its TLS certificates itself, next to Postgres and
   Keycloak.
 
+### Changed
+
+- **agents:** `Namespace` and `AuthenticationInfo` moved from `mc-common`
+  (package `ai.mindconnect.common`) into the new dependency-free module
+  `mc-agent-domain`, package `ai.mindconnect.agent`, together with two new
+  types: `NamespacedId`, the shape every tenant-owned id will take, and
+  `UserId`, which `AuthenticationInfo.userId()` now returns instead of a
+  `String`. Embedders repoint two imports and wrap the user id in
+  `UserId.of(...)`; the agents modules pull the new module in transitively.
+  `mc-common` is tenant-free again, which is what the workflow and taskqueue
+  areas expect from it; its unused `DomainEvent` record went with the move.
+
 ### Fixed
 
 - **agents:** the admin UI's Logout button no longer ends with "The backend is

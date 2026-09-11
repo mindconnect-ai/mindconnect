@@ -10,7 +10,7 @@ import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tools.toolsearch.ToolSearchTool;
 import ai.mindconnect.agent.tools.toolsearch.ToolSearchToolFactory;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

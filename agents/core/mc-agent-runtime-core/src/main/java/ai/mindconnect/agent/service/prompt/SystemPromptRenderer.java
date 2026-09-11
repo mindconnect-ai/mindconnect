@@ -4,7 +4,7 @@ import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.PromptRenderer;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 
 /**
  * Builds the full system prompt the LLM sees: the agent's rendered template

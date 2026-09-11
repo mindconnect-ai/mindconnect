@@ -24,7 +24,8 @@ import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.agent.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.common.LoggingContext;
@@ -220,7 +221,7 @@ public final class AgentTurnWorker implements TaskWorker {
 
         MemoryStrategy memoryStrategy = memoryStrategyFactory.create(def);
         TokenCounter tokenCounter = memoryStrategy.resolveTokenCounter(def);
-        AuthenticationInfo auth = AuthenticationInfo.of(session.userId(), session.namespace());
+        AuthenticationInfo auth = AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
         UUID conversationId = session.conversationId();
 
         // THE load of this execution (concept 16: read once): everything

@@ -5,7 +5,7 @@ import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolAdvisor;
 import ai.mindconnect.common.LoggingContext;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.ToolCall;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -2,7 +2,7 @@ package ai.mindconnect.agent.service;
 
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.domain.ConversationHistory;

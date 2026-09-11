@@ -2,7 +2,7 @@ package ai.mindconnect.agent.adapter.pg;
 
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.memory.port.out.WorkingMemoryRepository;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.jdbc.Sql;
 
 import javax.sql.DataSource;
@@ -52,18 +52,18 @@ public final class PgWorkingMemoryRepository implements WorkingMemoryRepository 
         sql.update("INSERT INTO mc_working_memory (session_id, user_id, memory) VALUES (?, ?, ?) "
                         + "ON CONFLICT (session_id) DO UPDATE SET memory = EXCLUDED.memory, updated_at = now() "
                         + "WHERE mc_working_memory.user_id = EXCLUDED.user_id",
-                sessionId, auth.userId(), sql.json().jsonb(memory));
+                sessionId, auth.userId().value(), sql.json().jsonb(memory));
     }
 
     @Override
     public Optional<WorkingMemory> findBySessionId(UUID sessionId, AuthenticationInfo auth) {
         return sql.queryOne("SELECT memory FROM mc_working_memory WHERE session_id = ? AND user_id = ? AND memory IS NOT NULL",
-                row -> row.json("memory", WorkingMemory.class), sessionId, auth.userId());
+                row -> row.json("memory", WorkingMemory.class), sessionId, auth.userId().value());
     }
 
     @Override
     public void delete(UUID sessionId, AuthenticationInfo auth) {
-        sql.update("DELETE FROM mc_working_memory WHERE session_id = ? AND user_id = ?", sessionId, auth.userId());
+        sql.update("DELETE FROM mc_working_memory WHERE session_id = ? AND user_id = ?", sessionId, auth.userId().value());
     }
 
     @Override
@@ -71,14 +71,14 @@ public final class PgWorkingMemoryRepository implements WorkingMemoryRepository 
         sql.update("INSERT INTO mc_working_memory (session_id, user_id, summary) VALUES (?, ?, ?) "
                         + "ON CONFLICT (session_id) DO UPDATE SET summary = EXCLUDED.summary, updated_at = now() "
                         + "WHERE mc_working_memory.user_id = EXCLUDED.user_id",
-                sessionId, auth.userId(), summary);
+                sessionId, auth.userId().value(), summary);
     }
 
     /** Blank summaries read as absent, as they do from the file store. */
     @Override
     public Optional<String> loadSummary(UUID sessionId, AuthenticationInfo auth) {
         return sql.queryOne("SELECT summary FROM mc_working_memory WHERE session_id = ? AND user_id = ?",
-                        row -> row.string("summary"), sessionId, auth.userId())
+                        row -> row.string("summary"), sessionId, auth.userId().value())
                 .map(String::strip)
                 .filter(s -> !s.isBlank());
     }
@@ -86,6 +86,6 @@ public final class PgWorkingMemoryRepository implements WorkingMemoryRepository 
     @Override
     public void deleteSummary(UUID sessionId, AuthenticationInfo auth) {
         sql.update("UPDATE mc_working_memory SET summary = NULL, updated_at = now() WHERE session_id = ? AND user_id = ?",
-                sessionId, auth.userId());
+                sessionId, auth.userId().value());
     }
 }

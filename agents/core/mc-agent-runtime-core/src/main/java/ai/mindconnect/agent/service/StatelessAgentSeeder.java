@@ -2,7 +2,7 @@ package ai.mindconnect.agent.service;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

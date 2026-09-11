@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.domain;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

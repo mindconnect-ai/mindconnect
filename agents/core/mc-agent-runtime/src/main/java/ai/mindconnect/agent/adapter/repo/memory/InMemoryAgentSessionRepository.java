@@ -2,7 +2,7 @@ package ai.mindconnect.agent.adapter.repo.memory;
 
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 import java.util.Map;

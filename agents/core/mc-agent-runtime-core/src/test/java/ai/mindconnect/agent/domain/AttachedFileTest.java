@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.domain;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.responses;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.domain.session.SessionAgentRef;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.protocol.Session;

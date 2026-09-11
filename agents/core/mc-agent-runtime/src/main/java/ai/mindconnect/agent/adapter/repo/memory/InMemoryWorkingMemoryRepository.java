@@ -2,7 +2,7 @@ package ai.mindconnect.agent.adapter.repo.memory;
 
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.memory.port.out.WorkingMemoryRepository;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 
 import java.util.Map;
 import java.util.Optional;

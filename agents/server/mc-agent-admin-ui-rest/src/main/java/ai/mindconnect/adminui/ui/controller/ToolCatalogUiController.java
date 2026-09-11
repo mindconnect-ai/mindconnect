@@ -9,7 +9,7 @@ import ai.mindconnect.adminui.ui.page.ToolListPage;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;

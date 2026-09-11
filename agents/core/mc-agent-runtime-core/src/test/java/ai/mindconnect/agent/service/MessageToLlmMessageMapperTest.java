@@ -5,7 +5,7 @@ import ai.mindconnect.agent.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.domain.SessionStatus;
 import ai.mindconnect.agent.port.out.PartContentReader;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmContent;

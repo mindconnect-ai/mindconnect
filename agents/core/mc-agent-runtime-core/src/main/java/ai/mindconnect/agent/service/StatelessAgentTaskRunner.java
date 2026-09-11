@@ -4,7 +4,7 @@ import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.port.out.PromptRenderer;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.port.in.LlmChat;

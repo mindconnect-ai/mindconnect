@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.memory.port.out;
 
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 
 import java.util.Optional;
 import java.util.UUID;

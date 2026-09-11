@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.responses.config;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
 import ai.mindconnect.agent.responses.ModelResolver;

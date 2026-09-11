@@ -4,7 +4,7 @@ import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.domain.SessionStatus;
 import ai.mindconnect.agent.domain.view.AgentSessionHeader;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;

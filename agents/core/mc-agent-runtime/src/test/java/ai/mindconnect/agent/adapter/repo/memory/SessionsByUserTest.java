@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.adapter.repo.memory;
 
 import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;

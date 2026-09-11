@@ -5,8 +5,8 @@ import ai.mindconnect.agent.domain.AgentPatch;
 import ai.mindconnect.agent.domain.AgentSpec;
 import ai.mindconnect.agent.port.in.AgentRegistry;
 import ai.mindconnect.agent.service.AgentRegistryService;
-import ai.mindconnect.common.AuthenticationInfo;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 import java.util.Optional;

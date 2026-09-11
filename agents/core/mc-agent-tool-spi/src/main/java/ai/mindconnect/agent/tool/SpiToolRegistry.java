@@ -7,7 +7,7 @@ import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

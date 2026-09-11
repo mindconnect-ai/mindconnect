@@ -2,7 +2,7 @@ package ai.mindconnect.agent.service.prompt;
 
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.domain.SessionStatus;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;

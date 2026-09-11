@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.port.out;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 import java.util.Optional;

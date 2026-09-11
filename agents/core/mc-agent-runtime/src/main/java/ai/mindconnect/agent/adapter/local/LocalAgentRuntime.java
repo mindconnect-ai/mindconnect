@@ -7,9 +7,9 @@ import ai.mindconnect.agent.port.in.AgentRuntime;
 import ai.mindconnect.agent.service.AgentChatService;
 import ai.mindconnect.agent.service.AgentRegistryService;
 import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +47,7 @@ public class LocalAgentRuntime implements AgentRuntime {
     public AgentChatClient openChat(UUID agentId) {
         AgentDefinition def = registryService.find(namespace, agentId)
                 .orElseThrow(() -> DomainException.notFound("AgentDefinition", agentId.toString()));
-        AgentSession session = sessionService.openChat(agentId, namespace, auth.userId());
+        AgentSession session = sessionService.openChat(agentId, namespace, auth.userId().value());
         return new LocalAgentChatClient(chatService, sessionService, session, def);
     }
 
@@ -61,7 +61,7 @@ public class LocalAgentRuntime implements AgentRuntime {
 
     @Override
     public List<AgentSession> listSessions(UUID agentId) {
-        return sessionService.listSessions(agentId, namespace, auth.userId());
+        return sessionService.listSessions(agentId, namespace, auth.userId().value());
     }
 
     @Override
@@ -78,7 +78,7 @@ public class LocalAgentRuntime implements AgentRuntime {
      */
     private AgentSession loadSessionInTenant(UUID sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
-        if (!session.namespace().equals(namespace) || !session.userId().equals(auth.userId())) {
+        if (!session.namespace().equals(namespace) || !session.userId().equals(auth.userId().value())) {
             throw DomainException.notFound("AgentSession", sessionId.toString());
         }
         return session;

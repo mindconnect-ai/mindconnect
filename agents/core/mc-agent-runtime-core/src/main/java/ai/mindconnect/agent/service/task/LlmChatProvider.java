@@ -13,7 +13,8 @@ import ai.mindconnect.agent.service.round.LlmAnswer;
 import ai.mindconnect.agent.service.round.LlmProvider;
 import ai.mindconnect.agent.service.round.TurnMessage;
 import ai.mindconnect.agent.service.round.Usage;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.llm.domain.FinishReason;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -125,7 +126,7 @@ public final class LlmChatProvider implements LlmProvider {
      * does not reload (concept 16: read once per execution).
      */
     private List<LlmMessage> window(List<Message> history) {
-        AuthenticationInfo auth = AuthenticationInfo.of(session.userId(), session.namespace());
+        AuthenticationInfo auth = AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
         List<LlmMessage> window = new ArrayList<>();
         window.add(LlmMessage.system(
                 SystemPromptRenderer.render(promptRenderer, memoryStrategy, def, session, auth)));

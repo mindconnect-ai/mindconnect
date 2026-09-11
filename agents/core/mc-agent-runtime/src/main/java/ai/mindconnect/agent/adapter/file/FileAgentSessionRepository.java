@@ -2,7 +2,7 @@ package ai.mindconnect.agent.adapter.file;
 
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;

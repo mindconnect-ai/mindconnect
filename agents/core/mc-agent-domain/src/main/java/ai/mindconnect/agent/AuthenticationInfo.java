@@ -1,4 +1,4 @@
-package ai.mindconnect.common;
+package ai.mindconnect.agent;
 
 import java.util.List;
 
@@ -11,14 +11,14 @@ import java.util.List;
  * clients authenticate using standard transport mechanisms (Bearer tokens, OAuth).
  */
 public record AuthenticationInfo(
-        String userId,
+        UserId userId,
         Namespace namespace,
         List<String> roles
 ) {
 
     public AuthenticationInfo {
-        if (userId == null || userId.isBlank()) {
-            throw new IllegalArgumentException("userId must not be blank");
+        if (userId == null) {
+            throw new IllegalArgumentException("userId must not be null");
         }
         if (namespace == null) {
             throw new IllegalArgumentException("namespace must not be null");
@@ -26,11 +26,11 @@ public record AuthenticationInfo(
         roles = roles != null ? List.copyOf(roles) : List.of();
     }
 
-    public static AuthenticationInfo of(String userId, Namespace namespace) {
+    public static AuthenticationInfo of(UserId userId, Namespace namespace) {
         return new AuthenticationInfo(userId, namespace, List.of());
     }
 
-    public static AuthenticationInfo of(String userId, Namespace namespace, List<String> roles) {
+    public static AuthenticationInfo of(UserId userId, Namespace namespace, List<String> roles) {
         return new AuthenticationInfo(userId, namespace, roles);
     }
 }

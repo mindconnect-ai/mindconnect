@@ -2,7 +2,7 @@ package ai.mindconnect.agent.adapter.pg;
 
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 

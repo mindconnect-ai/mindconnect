@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.memory;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.port.out.ConversationRepository;

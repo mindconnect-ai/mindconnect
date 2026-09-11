@@ -70,6 +70,10 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
   core/adapter seam (`-core` modules carry domain + ports, siblings the implementations)
   - `mc-agents-parent/` — the area parent POM
   - `core/` — libraries (no runnable apps)
+    - `mc-agent-domain`: the area's shared vocabulary, package `ai.mindconnect.agent` —
+      `Namespace`, `NamespacedId`, `UserId`, `AuthenticationInfo`. Dependency-free. A type
+      is admitted only when two modules that do not depend on each other need it; every
+      other id record lives in the module that owns its entity
     - `mc-agent-runtime-core` / `mc-agent-runtime`: execution engine (turn loop, tool
       dispatch, sub-agent calls, approvals) / its adapters (file & in-memory repos,
       Pebble prompt renderer, tokenizer)

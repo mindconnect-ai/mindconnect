@@ -4,7 +4,7 @@ import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.port.out.PromptContextProvider;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 
 import java.util.List;
 import java.util.Map;

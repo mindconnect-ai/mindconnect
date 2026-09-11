@@ -2,7 +2,7 @@ package ai.mindconnect.agent.adapter.file;
 
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.memory.port.out.WorkingMemoryRepository;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +35,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public void save(UUID sessionId, AuthenticationInfo auth, WorkingMemory memory) {
-        Path file = sessionDir(auth.userId(), sessionId).resolve(MEMORY_FILE);
+        Path file = sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE);
         try {
             Files.createDirectories(file.getParent());
             mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), memory);
@@ -47,7 +47,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public Optional<WorkingMemory> findBySessionId(UUID sessionId, AuthenticationInfo auth) {
-        Path file = sessionDir(auth.userId(), sessionId).resolve(MEMORY_FILE);
+        Path file = sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE);
         if (!Files.exists(file)) return Optional.empty();
         try {
             return Optional.of(mapper.readValue(file.toFile(), WorkingMemory.class));
@@ -59,13 +59,13 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public void delete(UUID sessionId, AuthenticationInfo auth) {
-        deleteFile(sessionDir(auth.userId(), sessionId).resolve(MEMORY_FILE));
-        deleteFile(sessionDir(auth.userId(), sessionId).resolve(SUMMARY_FILE));
+        deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE));
+        deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE));
     }
 
     @Override
     public void saveSummary(UUID sessionId, AuthenticationInfo auth, String summary) {
-        Path file = sessionDir(auth.userId(), sessionId).resolve(SUMMARY_FILE);
+        Path file = sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE);
         try {
             Files.createDirectories(file.getParent());
             Files.writeString(file, summary);
@@ -77,7 +77,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public Optional<String> loadSummary(UUID sessionId, AuthenticationInfo auth) {
-        Path file = sessionDir(auth.userId(), sessionId).resolve(SUMMARY_FILE);
+        Path file = sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE);
         if (!Files.exists(file)) return Optional.empty();
         try {
             String content = Files.readString(file).strip();
@@ -90,7 +90,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public void deleteSummary(UUID sessionId, AuthenticationInfo auth) {
-        deleteFile(sessionDir(auth.userId(), sessionId).resolve(SUMMARY_FILE));
+        deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

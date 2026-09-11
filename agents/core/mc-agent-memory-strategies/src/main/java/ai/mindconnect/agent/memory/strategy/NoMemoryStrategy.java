@@ -7,7 +7,7 @@ import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.port.out.TokenCounters;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;

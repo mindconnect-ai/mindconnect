@@ -1,6 +1,6 @@
 package ai.mindconnect.message.domain;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import java.time.Instant;
 import java.util.List;

@@ -4,7 +4,7 @@ import ai.mindconnect.agent.adapter.config.DefaultAgentRuntimeConfig;
 import ai.mindconnect.agent.adapter.config.TodoToolsConfig;
 import ai.mindconnect.adminui.config.InfrastructureConfig;
 import ai.mindconnect.adminui.config.LlmConfig;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.adapter.file.MessageRepositoryConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;

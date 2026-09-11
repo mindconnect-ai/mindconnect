@@ -3,7 +3,7 @@ package ai.mindconnect.agent.tools.toolsearch;
 import ai.mindconnect.agent.tool.ToolRegistryRef;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

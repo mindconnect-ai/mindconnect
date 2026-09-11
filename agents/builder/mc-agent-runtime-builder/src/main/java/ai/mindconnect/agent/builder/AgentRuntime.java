@@ -7,7 +7,7 @@ import ai.mindconnect.agent.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.service.AgentChatService;
 import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
 

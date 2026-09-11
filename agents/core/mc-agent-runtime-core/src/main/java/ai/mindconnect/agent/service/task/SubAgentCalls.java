@@ -10,7 +10,7 @@ import ai.mindconnect.agent.service.AgentSessionService;
 import ai.mindconnect.agent.service.InlineAgentTools;
 import ai.mindconnect.agent.service.stream.SessionChannels;
 import ai.mindconnect.channel.Subscription;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.port.in.ConversationManager;

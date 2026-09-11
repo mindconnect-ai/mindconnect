@@ -230,7 +230,7 @@ class AgentLoopTest {
 
         ai.mindconnect.agent.domain.AgentDefinition base =
                 ai.mindconnect.agent.domain.AgentDefinition.create(
-                        new ai.mindconnect.common.Namespace("test"), "a", "d", "p", null, "llm");
+                        new ai.mindconnect.agent.Namespace("test"), "a", "d", "p", null, "llm");
         ai.mindconnect.agent.domain.AgentDefinition def = base.withBasicFields(
                 base.namespace(), base.name(), base.description(), base.systemPrompt(),
                 base.welcomeMessage(), base.llmConfigName(), base.maxIterations(),

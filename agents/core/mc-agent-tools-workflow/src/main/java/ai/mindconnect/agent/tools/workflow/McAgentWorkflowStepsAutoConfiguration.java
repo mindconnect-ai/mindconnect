@@ -13,7 +13,7 @@ import ai.mindconnect.agent.tools.workflow.step.AgentInvoker;
 import ai.mindconnect.agent.tools.workflow.step.AgentInvokers;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvoker;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvokers;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

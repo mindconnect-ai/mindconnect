@@ -19,7 +19,7 @@ import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agentrest.dto.StreamEventFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;

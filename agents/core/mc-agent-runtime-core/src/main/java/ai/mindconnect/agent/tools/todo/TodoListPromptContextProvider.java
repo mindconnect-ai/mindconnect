@@ -3,7 +3,7 @@ package ai.mindconnect.agent.tools.todo;
 import ai.mindconnect.agent.domain.AgentDefinition;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.port.out.PromptContextProvider;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 
 import java.util.ArrayList;
 import java.util.List;

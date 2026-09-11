@@ -7,9 +7,10 @@ import ai.mindconnect.agent.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.memory.port.out.WorkingMemoryRepository;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
@@ -202,7 +203,7 @@ public class AgentSessionService {
      */
     public void deleteSession(UUID sessionId) {
         AgentSession session = findSession(sessionId);
-        AuthenticationInfo auth = AuthenticationInfo.of(session.userId(), session.namespace());
+        AuthenticationInfo auth = AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
         workingMemoryRepository.delete(sessionId, auth);
         summaryRepository.deleteByConversationId(session.conversationId());
         todoListRepository.deleteBySession(sessionId);

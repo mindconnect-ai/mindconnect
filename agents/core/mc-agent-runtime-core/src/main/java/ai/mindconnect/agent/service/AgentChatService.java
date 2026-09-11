@@ -27,7 +27,8 @@ import ai.mindconnect.agent.service.round.TurnMessage;
 import ai.mindconnect.agent.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.service.turn.LocalChatTurnHandle;
 import ai.mindconnect.agent.service.turn.WorkingMemoryBuilder;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.llm.domain.ToolDefinition;
@@ -470,7 +471,7 @@ public class AgentChatService {
     }
 
     private static AuthenticationInfo authFor(AgentSession session) {
-        return AuthenticationInfo.of(session.userId(), session.namespace());
+        return AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
     }
 
     /**

@@ -10,7 +10,7 @@ import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.port.out.TokenCounter;
 import ai.mindconnect.agent.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.port.out.TokenCounters;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;

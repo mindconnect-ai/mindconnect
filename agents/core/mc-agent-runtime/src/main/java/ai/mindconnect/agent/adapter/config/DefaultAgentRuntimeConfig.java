@@ -38,7 +38,7 @@ import ai.mindconnect.agent.service.prompt.WorkspaceNotesProvider;
 import ai.mindconnect.agent.adapter.token.TokenCounterRegistry;
 import ai.mindconnect.agent.port.out.TokenCounters;
 import ai.mindconnect.agent.service.turn.ToolExecutor;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;

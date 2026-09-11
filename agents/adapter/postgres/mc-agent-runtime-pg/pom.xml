@@ -29,6 +29,10 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-common</artifactId>
         </dependency>
         <dependency>

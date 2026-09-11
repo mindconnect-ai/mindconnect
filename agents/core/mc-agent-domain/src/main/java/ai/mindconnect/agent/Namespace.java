@@ -1,4 +1,4 @@
-package ai.mindconnect.common;
+package ai.mindconnect.agent;
 
 public record Namespace(String value) {
 

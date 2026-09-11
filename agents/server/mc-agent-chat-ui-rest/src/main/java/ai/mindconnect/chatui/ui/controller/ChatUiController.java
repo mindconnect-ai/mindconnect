@@ -14,7 +14,7 @@ import ai.mindconnect.agent.service.AgentChatService;
 import ai.mindconnect.agent.service.AgentSessionService;
 import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.ui.model.UiAction;
 

@@ -4,7 +4,7 @@ import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.memory.domain.MemoryConfig;
 import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import java.time.Instant;
 import java.util.List;

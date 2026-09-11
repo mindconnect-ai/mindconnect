@@ -9,7 +9,7 @@ import ai.mindconnect.agent.domain.SessionStatus;
 import ai.mindconnect.agent.service.stream.UserChannels;
 import ai.mindconnect.agent.service.stream.UserEvent;
 import ai.mindconnect.agent.service.task.AgentTurnWorker;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;

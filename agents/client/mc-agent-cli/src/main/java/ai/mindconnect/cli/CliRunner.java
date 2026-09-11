@@ -7,7 +7,7 @@ import ai.mindconnect.agent.domain.StreamEvent;
 import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.springframework.beans.factory.annotation.Value;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;

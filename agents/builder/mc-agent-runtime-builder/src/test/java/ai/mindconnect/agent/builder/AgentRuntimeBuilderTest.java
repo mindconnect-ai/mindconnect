@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AgentRuntimeBuilderTest {
 
     private static AgentDefinition demoAgent() {
-        return AgentDefinition.create(new ai.mindconnect.common.Namespace("local"),
+        return AgentDefinition.create(new ai.mindconnect.agent.Namespace("local"),
                 "test-agent", "test", "You are a test.", null, "test-llm");
     }
 

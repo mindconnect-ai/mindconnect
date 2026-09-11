@@ -40,7 +40,7 @@ import ai.mindconnect.agent.adapter.prompt.PebblePromptRenderer;
 import ai.mindconnect.agent.service.prompt.WorkspaceNotesProvider;
 import ai.mindconnect.agent.port.out.TokenCounters;
 import ai.mindconnect.agent.service.turn.ToolExecutor;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;

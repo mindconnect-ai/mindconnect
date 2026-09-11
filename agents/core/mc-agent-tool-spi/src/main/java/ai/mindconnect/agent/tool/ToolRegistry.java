@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.tool;
 
 import ai.mindconnect.agent.tool.AgentTool;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 import java.util.Map;

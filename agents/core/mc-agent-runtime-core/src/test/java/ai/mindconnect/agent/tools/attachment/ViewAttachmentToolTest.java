@@ -4,7 +4,7 @@ import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.domain.AttachedFile;
 import ai.mindconnect.agent.domain.SessionStatus;
 import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;

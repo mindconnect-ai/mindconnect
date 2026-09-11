@@ -10,7 +10,7 @@ import ai.mindconnect.agent.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.domain.AgentSession;
 import ai.mindconnect.agent.domain.SessionStatus;
 import ai.mindconnect.agent.service.task.AgentTurnWorker;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.TaskSubmission;

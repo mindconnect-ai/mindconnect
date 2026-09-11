@@ -1,8 +1,9 @@
 package ai.mindconnect.agent.adapter.pg;
 
 import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.common.AuthenticationInfo;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.Namespace;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PgWorkingMemoryRepositoryTest {
 
-    private static final AuthenticationInfo DAVID = AuthenticationInfo.of("david", new Namespace("default"));
-    private static final AuthenticationInfo EVE = AuthenticationInfo.of("eve", new Namespace("default"));
+    private static final AuthenticationInfo DAVID = AuthenticationInfo.of(UserId.of("david"), new Namespace("default"));
+    private static final AuthenticationInfo EVE = AuthenticationInfo.of(UserId.of("eve"), new Namespace("default"));
 
     private final UUID session = UUID.randomUUID();
     private PgWorkingMemoryRepository repo;
