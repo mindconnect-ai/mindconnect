@@ -3,7 +3,7 @@ id: mcp-tool-settings-override
 area: mcp
 requires: [server-9091, npx, lm-studio-tool-model]
 duration: ~7 min
-last-verified: never
+last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
 
 # Override what a tool tells the model, and keep the original in view

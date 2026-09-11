@@ -3,7 +3,7 @@ id: chat-file-upload
 area: chat
 requires: [server-9091, lm-studio-embedding-model]
 duration: ~5 min
-last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
+last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
 
 # File upload in the chat: attach, search, answer
@@ -30,12 +30,15 @@ it via `vector_search`.
 
 ## Steps
 
-1. New session with an agent that has tools (e.g. `assistant-with-tools`);
-   click the **+** next to the input → attach `soup.md`.
+1. New session with an agent that has tools (e.g. `default-chat`); click the
+   **+** next to the input → **Attach…** → `soup.md`.
    **Expected:** A success toast ("… attached — the agent can now search
-   it."); the file appears as a chip above the input.
-2. Reload the page (F5).
-   **Expected:** The chip is still there (persisted, not stream state).
+   it."); the **Attached files** dialog lists `soup.md` with
+   *1 searchable chunk*. There is no chip above the input — attached files
+   live behind the **+**, whose count shows how many there are.
+2. Reload the page (F5) and open the **+** again.
+   **Expected:** The dialog still lists `soup.md` (persisted, not stream
+   state).
 3. Ask: `Was ist die Geheimzutat der Testsuppe? Nutze deine angehängten
    Dateien.`
    **Expected:** A `vector_search` task card runs; the answer names
@@ -51,8 +54,9 @@ it via `vector_search`.
    **Expected:** The answer is right again; the new user bubble has NO 📎
    line — a file is announced once, later turns rely on the system-prompt
    section.
-6. Remove the chip (×), then ask the same question again.
-   **Expected:** Removal toast. The new user bubble shows a
+6. In the **+** dialog click **Remove** next to `soup.md` and confirm, then
+   ask the same question again.
+   **Expected:** Removal toast ("Removed from the conversation."). The new user bubble shows a
    `🗑 soup.md removed` line; the agent answers that the file was removed
    and does NOT search the web for it. In the Memory view the new message
    carries a `[System note — removed from this chat: soup.md …]`, the
@@ -71,7 +75,7 @@ it via `vector_search`.
 
 - Automated twin for the server path: `ChatFileUploadSmokeTest`
   (mc-agent-admin-ui-app) — boots the real app, uploads via
-  `POST /admin/api/sessions/{id}/chat-files`, asserts chunks + announcement;
+  `POST /chat/api/sessions/{id}/chat-files`, asserts chunks + announcement;
   skips without an embeddings model. Runtime-level attach+ask twin:
   `RuntimeFileQaExampleTest`.
 - Found & fixed 2026-08-27: the seed data had NO `embeddings` llm-config —

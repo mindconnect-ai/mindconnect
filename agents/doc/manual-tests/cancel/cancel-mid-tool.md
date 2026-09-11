@@ -3,7 +3,7 @@ id: cancel-mid-tool
 area: cancel
 requires: [server-9091, lm-studio-tool-model]
 duration: ~3 min
-last-verified: 2026-08-27 (commit 20667bf, runs/2026-08-27-approval-und-kompression — via automated LM Studio suite)
+last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
 
 # Cancel mid-tool: stub closes the call, late output is discarded

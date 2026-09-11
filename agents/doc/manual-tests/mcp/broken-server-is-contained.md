@@ -3,7 +3,7 @@ id: mcp-broken-server-is-contained
 area: mcp
 requires: [server-9091]
 duration: ~5 min
-last-verified: never
+last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
 
 # A server that cannot start costs its own tools and nothing else

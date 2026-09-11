@@ -3,7 +3,7 @@ id: mcp-secrets-from-the-environment
 area: mcp
 requires: [server-9091, server-restartable]
 duration: ~6 min
-last-verified: never
+last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
 
 # A secret names where it lives; the registration never holds it

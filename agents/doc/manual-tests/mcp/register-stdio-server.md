@@ -3,7 +3,7 @@ id: mcp-register-stdio-server
 area: mcp
 requires: [server-9091, npx, lm-studio-tool-model]
 duration: ~8 min
-last-verified: never
+last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
 
 # Register a stdio MCP server and let an agent call it
@@ -84,5 +84,5 @@ actually calls it.
 - Tool names compose as `<toolNamePrefix>_<subTool>`. If step 5 shows names
   like `mfs_mfs_…`, the server already prefixes its own tools — that is a
   prefix choice, not a defect (see `mcp/catalog-takeover.md`).
-- Automated twin for the naming and namespace rules:
-  `McpMultiToolProviderTest`, `SpiToolRegistryScopeTest`.
+- Automated twin for the naming rules and the catalog's reaction to a new
+  registration: `McpMultiToolProviderTest`.
