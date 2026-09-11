@@ -122,11 +122,39 @@ class WorkingDirPolicyTest {
 
     @Test
     void aUserIdBecomesOnePathSegment() {
-        assertThat(WorkingDirPolicy.pathSafe("alice")).isEqualTo("alice");
-        assertThat(WorkingDirPolicy.pathSafe("alice@example.com")).isEqualTo("alice_example.com");
-        assertThat(WorkingDirPolicy.pathSafe("../etc")).as("no dot-dot, no separator").isEqualTo("_._etc");
-        assertThat(WorkingDirPolicy.pathSafe("a/b")).isEqualTo("a_b");
-        assertThat(WorkingDirPolicy.pathSafe(".hidden")).isEqualTo("_hidden");
+        String digest = "\\+[0-9a-f]{10}";
+        assertThat(WorkingDirPolicy.pathSafe("../etc")).as("no dot-dot, no separator").matches("_\\._etc" + digest);
+        assertThat(WorkingDirPolicy.pathSafe("a/b")).matches("a_b" + digest);
+        assertThat(WorkingDirPolicy.pathSafe(".hidden")).matches("_hidden" + digest);
+        assertThat(WorkingDirPolicy.pathSafe("alice@example.com")).matches("alice_example\\.com" + digest);
+        assertThat(WorkingDirPolicy.pathSafe("..")).matches("_\\." + digest);
+        assertThat(WorkingDirPolicy.pathSafe("alice@example.com")).as("the same id, the same segment")
+                .isEqualTo(WorkingDirPolicy.pathSafe("alice@example.com"));
+    }
+
+    @Test
+    void aSafeIdKeepsItsSegment_soAnExistingHomeStaysWhereItIs() {
+        for (String id : java.util.List.of("alice", "olivia", "mc_user", "alice_example.com", "_bob",
+                "user-1", "a.b")) {
+            assertThat(WorkingDirPolicy.pathSafe(id)).isEqualTo(id);
+        }
+    }
+
+    @Test
+    void twoIdsNeverShareASegment() {
+        assertThat(WorkingDirPolicy.pathSafe("alice@example.com"))
+                .isNotEqualTo(WorkingDirPolicy.pathSafe("alice_example.com"));
+        assertThat(WorkingDirPolicy.pathSafe(".bob")).isNotEqualTo(WorkingDirPolicy.pathSafe("_bob"));
+        assertThat(WorkingDirPolicy.pathSafe("a/b")).isNotEqualTo(WorkingDirPolicy.pathSafe("a:b"));
+    }
+
+    @Test
+    void twoUsersWhoseIdsReduceAlikeGetRootsOfTheirOwn() {
+        var policy = WorkingDirPolicy.within(tmp.resolve("users/{user}").toString());
+
+        assertThat(policy.forUser("alice@example.com").root())
+                .isNotEqualTo(policy.forUser("alice_example.com").root());
+        assertThat(policy.forUser("alice_example.com").root()).isEqualTo(tmp.resolve("users/alice_example.com"));
     }
 
     @Test

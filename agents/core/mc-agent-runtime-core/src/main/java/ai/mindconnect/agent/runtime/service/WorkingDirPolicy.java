@@ -88,8 +88,8 @@ public final class WorkingDirPolicy {
 
     /**
      * The policy for one user: a per-user root with the user's id filled
-     * in and the directory created; any other policy as it is. The id is
-     * reduced to letters, digits, dot, dash and underscore for the path.
+     * in and the directory created; any other policy as it is. The id
+     * becomes one path segment of its own, see {@link #pathSafe}.
      */
     public WorkingDirPolicy forUser(String userId) {
         if (template == null) return this;
@@ -185,11 +185,39 @@ public final class WorkingDirPolicy {
         return Path.of(path);
     }
 
-    /** A user id as one path segment: anything but letters, digits, dot, dash and underscore becomes an underscore. */
+    /** An id that is one path segment as it is: letters, digits, dot, dash and underscore, no leading dot. */
+    private static final java.util.regex.Pattern SAFE_ID =
+            java.util.regex.Pattern.compile("[A-Za-z0-9_-][A-Za-z0-9._-]*");
+
+    /**
+     * A user id as one path segment — a different one for every id, since
+     * the segment names the user's home and root. An id that is safe as it
+     * is ({@link #SAFE_ID}) stays as it is, so an existing home keeps its
+     * directory. Any other id has everything but letters, digits, dot, dash
+     * and underscore replaced by an underscore, a leading dot too, and gets
+     * {@code +} and the first ten hex digits of its SHA-256 appended.
+     * Without that suffix {@code alice@example.com} and
+     * {@code alice_example.com} would share a home, and with it each other's
+     * sessions; a {@code +} never occurs in a safe id, so a replaced id
+     * cannot meet a safe one either.
+     */
     static String pathSafe(String userId) {
+        if (SAFE_ID.matcher(userId).matches()) return userId;
         String safe = userId.trim().replaceAll("[^A-Za-z0-9._-]", "_");
         while (safe.startsWith(".")) safe = "_" + safe.substring(1);
-        return safe.isEmpty() ? "_" : safe;
+        if (safe.isEmpty()) safe = "_";
+        return safe + "+" + digest(userId);
+    }
+
+    /** The first ten hex digits of the id's SHA-256. */
+    private static String digest(String userId) {
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(userId.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(hash, 0, 5);
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
     }
 
     /** Same as {@link #forUser(String)}, for a typed user id. */

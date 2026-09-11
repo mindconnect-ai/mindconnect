@@ -39,8 +39,26 @@ class UserHomeTest {
         assertThat(Files.isDirectory(own.resolve("uploads"))).isTrue();
 
         assertThat(home.homeOf(UserId.of("bob")).orElseThrow()).isEqualTo(tmp.toRealPath().resolve("home/bob"));
-        assertThat(home.homeOf(UserId.of("../bob")).orElseThrow()).as("an id is one path segment")
-                .isEqualTo(tmp.toRealPath().resolve("home/_._bob"));
+        Path dotDotBob = home.homeOf(UserId.of("../bob")).orElseThrow();
+        assertThat(dotDotBob.getParent()).as("an id is one path segment").isEqualTo(tmp.toRealPath().resolve("home"));
+        assertThat(dotDotBob.getFileName().toString()).matches("_\\._bob\\+[0-9a-f]{10}");
+    }
+
+    @Test
+    void twoUsersNeverShareAHome() throws Exception {
+        var home = UserHome.under(tmp);
+        SessionId session = SessionId.random();
+
+        Path mail = home.homeOf(UserId.of("alice@example.com")).orElseThrow();
+        Path underscored = home.homeOf(UserId.of("alice_example.com")).orElseThrow();
+        assertThat(mail).isNotEqualTo(underscored);
+        assertThat(underscored.getFileName().toString()).as("a safe id keeps its directory")
+                .isEqualTo("alice_example.com");
+        assertThat(home.sessionDirOf(UserId.of("alice@example.com"), session).orElseThrow())
+                .isNotEqualTo(home.sessionDirOf(UserId.of("alice_example.com"), session).orElseThrow());
+
+        assertThat(home.homeOf(UserId.of(".bob")).orElseThrow())
+                .isNotEqualTo(home.homeOf(UserId.of("_bob")).orElseThrow());
     }
 
     @Test
