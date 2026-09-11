@@ -86,6 +86,6 @@ class WorkspaceApiControllerOwnershipTest {
     }
 
     private AgentSession session(String owner) {
-        return sessions.save(AgentSession.start(AGENT, UserId.of(owner), ConversationId.random()));
+        return sessions.create(AgentSession.start(AGENT, UserId.of(owner), ConversationId.random()));
     }
 }
