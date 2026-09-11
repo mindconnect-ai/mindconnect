@@ -31,21 +31,16 @@ body {
     flex-direction: column;
     width: 100%;
 }
-/* The shell ends at the bottom of the window, on every page.
+/* The shell fills #main. Its height is the framework's business now.
 
-   The framework says `min-height: 100dvh`, which fills the window but lets
-   the shell grow past it once the content is taller — and then the window
-   scrolls, carrying the header and the sidebar off the top. Its own
-   `.sui-shell-body { overflow: hidden }` and `.sui-shell-content { overflow:
-   auto }` are already waiting to scroll the content pane instead; they only
-   ever engage when something caps the height. The chat page and the API
-   explorer each capped it for themselves, so those two behaved and every
-   other screen did not.
-
-   `height` instead of `min-height` caps it here, once, for all of them. */
+   `.sui-shell` states `min-height: 100dvh` *and* `max-height: 100dvh` since
+   semantic-ui 0.2.1 — the cap is what makes its own `.sui-shell-body
+   { overflow: hidden }` and `.sui-shell-content { overflow: auto }` engage, so
+   the content pane scrolls instead of the window and the header and the
+   sidebar stay put. This file used to cap it here because the framework did
+   not; keeping that now would only shadow the rule that fixed it. */
 #main > .sui-shell {
     flex: 1 1 auto;
-    height: 100dvh;
 }
 
 /* A drawer needs a ground of its own.
@@ -55,12 +50,12 @@ body {
    falls apart the moment it floats above it — below 768px the RESPONSIVE menu
    becomes a drawer, and the page shows straight through the nav labels.
 
-   The framework does give its drawer an elevation, but `.sui-shell-body >
-   .sui-menu` (two classes) outweighs the `.sui-menu--responsive` rule inside
-   the media query (one class — a media query adds no specificity), so the
-   shadow is reset before it ever lands. Ground and elevation are therefore
-   both set here, in the very token the shell body paints itself with, so the
-   drawer is the sidebar's own colour in every theme.
+   The elevation is the framework's since 0.2.1: it restates the drawer's
+   shadow at the same weight and later in the file, so it wins by order rather
+   than by specificity. Only the ground is still set here, in the very token
+   the shell body paints itself with, so the drawer is the sidebar's own
+   colour in every theme — and for that it has to outweigh the themes, which
+   is what the paragraph below is about.
 
    The selector weight is deliberate. Every theme states `.sui-menu {
    background: transparent }` on purpose — a pushed sidebar should read as one
@@ -72,12 +67,10 @@ body {
    sidebar keeps the transparency its theme asked for. */
 :root .sui-shell-body > .sui-menu--overlay.sui-menu--overlay {
     background: var(--sui-color-bg);
-    box-shadow: 4px 0 16px rgb(0 0 0 / .28);
 }
 @media (max-width: 768px) {
     :root .sui-shell-body > .sui-menu--responsive.sui-menu--responsive {
         background: var(--sui-color-bg);
-        box-shadow: 4px 0 16px rgb(0 0 0 / .28);
     }
 }
 
