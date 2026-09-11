@@ -89,9 +89,14 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-message-repository-core` / `mc-message-repository`: conversation & message storage
     - `mc-agent-protocol` (+ `-openai`, `-mc-runtime`): protocol vocabulary and backend adapters
     - `mc-agent-tool-spi`: what a tool is — `Tool`, `ToolFactory`, `MultiToolProvider`, registry
-    - `mc-agent-tools*`: built-in tool providers (filesystem/workspace/bash, code, document, web, web-browser, workflow, gmail)
+    - `mc-agent-tools*`: built-in tool providers (filesystem/workspace/bash, code, document, web, web-browser, workflow)
     - `mc-credentials`: credential storage for tools & providers
-    - `mc-mcp-proxy`: proxy for Model Context Protocol servers
+  - `mcp/` — MCP servers as registered tools, split like the rest (ports in `-core`)
+    - `mc-mcp-gateway-core` / `mc-mcp-gateway-local`: gateway ports and types / the in-process gateway
+      (registrations on disk, discovery cache, Docker catalog)
+    - `mc-mcp-proxy`: one server over stdio or streamable HTTP, on the MCP Java SDK
+    - `mc-agent-tools-mcp`: the `MultiToolProvider` exposing registered servers' tools
+    - `mc-mcp-gateway-admin-ui-rest`: the `/mcp-gateway` admin screen
   - `vectorstore/` — the knowledge layer: `mc-vector-store` (SPI + memory backend),
     `mc-vector-store-pgvector`, `mc-vector-store-tools`, `mc-file-store-core` / `mc-file-store`
   - `adapter/` — alternative implementations of the core ports; `postgres/mc-*-pg`

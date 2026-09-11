@@ -82,10 +82,14 @@ class PinnedParamsToolTest {
                 Map.of("tool", "vector_search", "params", Map.of("store", "projekt-kb")));
 
         assertThat(AliasTool.registryName(aliased)).isEqualTo("vector_search");
-        Tool tool = PinnedParamsTool.wrap(aliased, AliasTool.wrap(aliased, delegate));
+        // The whole chain, as the registry builds it: the alias supplies the
+        // name, the description wrapper the text. AliasTool alone would leave
+        // the delegate's own description in place — that is its job now.
+        Tool tool = SpiToolRegistry.decorate(aliased, delegate);
 
         assertThat(tool.name()).isEqualTo("search_project_docs");
         assertThat(tool.description()).isEqualTo("Searches the project knowledge base.");
+        assertThat(AliasTool.wrap(aliased, delegate).description()).isEqualTo(delegate.description());
         // Pin still enforces on the underlying parameter names:
         tool.execute(Map.of("code", "q"));
         assertThat(delegate.executedWith).containsEntry("store", "projekt-kb");

@@ -59,8 +59,11 @@
         <module>core/mc-agent-tools-web</module>
         <module>core/mc-agent-tools-web-browser</module>
         <module>core/mc-agent-tools-workflow</module>
-        <module>core/mc-mcp-proxy</module>
-        <module>core/mc-agent-tools-gmail</module>
+        <module>mcp/mc-mcp-proxy</module>
+        <module>mcp/mc-mcp-gateway-core</module>
+        <module>mcp/mc-mcp-gateway-local</module>
+        <module>mcp/mc-agent-tools-mcp</module>
+        <module>mcp/mc-mcp-gateway-admin-ui-rest</module>
         <module>server/mc-agent-api-rest</module>
         <module>server/mc-agent-api-responses-rest</module>
         <module>server/mc-agent-api-app</module>

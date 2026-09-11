@@ -125,16 +125,33 @@ required.
 | `todo_write` | Creates / updates the session todo list. |
 | `todo_read` | Reads the current session todo list. |
 
-## Gmail tools (`mc-agent-tools-gmail`)
+## MCP servers (`agents/mcp`)
 
-Gmail is exposed through an **MCP** server (`mcp/gmail`, run via Docker). Each
-Gmail sub-tool appears as `gmail_<name>` (e.g. `gmail_search_emails`,
-`gmail_read_email`).
+Tools from [Model Context Protocol](https://modelcontextprotocol.io) servers are
+**registered, not compiled in**. Open **MCP Servers** in the admin UI, register a
+server, and its tools join the catalog as `<prefix>_<tool>` — a server registered
+with prefix `gmail` turns its `search_emails` into `gmail_search_emails`.
 
-| Needs | Notes |
-|-------|-------|
-| Docker | Runs the `mcp/gmail` image (override with `mc.tools.gmail.docker-image`). |
-| OAuth credentials | `gcp-oauth.keys.json` + `credentials.json` in `~/.gmail-mcp` (override with `mc.tools.gmail.credentials-dir`). |
+| Target | Runs the server as |
+|--------|--------------------|
+| `docker` | a container image, talking over stdio |
+| `process` | a local command such as `npx -y …`, talking over stdio |
+| `http` | a remote endpoint over streamable HTTP — https unless it is on localhost |
+
+- **Try before you save.** *Test connection* starts the server once and lists its tools.
+- **Suggestions.** With `MC_MCP_CATALOG_ENABLED=true` the screen searches Docker's MCP
+  catalog and prefills a registration, required secrets included.
+- **Secrets stay in the environment.** A value in `env` or `headers` may read
+  `${MY_TOKEN}` or `${MY_TOKEN:fallback}`; it is resolved when the server starts and
+  never written to the registration.
+- **The prefix is fixed** once a server is registered: agents bind the tool names it
+  produces. Register a new server to use a different one.
+- **Storage:** one JSON file per server under
+  `<data.base-dir>/<namespace>/system/mcp-servers/`, the discovered tools cached beside it.
+
+Gmail ships as a bundled, **disabled** registration running
+`@gongrzhe/server-gmail-autoauth-mcp` via `npx`. Run
+`npx @gongrzhe/server-gmail-autoauth-mcp auth` once, then enable it in the admin UI.
 
 ## Assigning tools to an agent
 

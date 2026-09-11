@@ -3,13 +3,14 @@ id: approval-allow-once
 area: approval
 requires: [server-9091, lm-studio-tool-model]
 duration: ~3 min
-last-verified: 2026-08-27 (commit 20667bf, runs/2026-08-27-approval-und-kompression — via automated LM Studio suite)
+last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
 
 # Allow once: the tool runs, the next call asks again
 
-**Goal:** "Allow once" releases exactly this call; the turn resumes as run 1
-of the SAME logical turn, and a later call of the same tool asks again.
+**Goal:** "Allow once" releases exactly this call; the tool runs within the
+SAME logical turn — the gate parks the call, it does not end the turn — and a
+later call of the same tool asks again.
 
 ## Preconditions
 
@@ -29,9 +30,10 @@ of the SAME logical turn, and a later call of the same tool asks again.
    **Expected:** Card disappears immediately; the search runs (task card with
    result); the agent answers using the search output.
 3. Check the message log.
-   **Expected:** All messages of this exchange share ONE `turnId`; the
-   messages written after the click carry `run=1` (the approval response and
-   everything after it), the ones before carry `run=0`.
+   **Expected:** All messages of this exchange share ONE `turnId`, and all
+   of them carry `run=0` — there is no resume execution. The approval itself
+   leaves no message in the log; the tool's `TOOL_RESULT` follows its
+   `TOOL_CALL` directly.
 4. In the SAME session send a second search request:
    `Suche im Web nach dem Wetter in München.`
    **Expected:** A NEW approval card appears — "once" did not stick.
@@ -44,4 +46,4 @@ of the SAME logical turn, and a later call of the same tool asks again.
 
 ## Notes
 
-- Automated twin: `ApprovalLmStudioTest.approveOnceRunsTheToolWithinTheSameLogicalTurn`.
+- Automated twin: `ApprovalLmStudioTest.allowOnceRunsTheToolOnTheOriginalTurn`.

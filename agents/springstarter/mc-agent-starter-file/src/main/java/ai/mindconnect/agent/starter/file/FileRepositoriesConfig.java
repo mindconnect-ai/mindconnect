@@ -15,6 +15,8 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.adapter.file.FileToolRepository;
+import ai.mindconnect.agent.tool.ToolRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -40,6 +42,16 @@ public class FileRepositoriesConfig {
     @Bean
     AgentSessionRepository agentSessionRepository(Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
         return new FileAgentSessionRepository(agentStorageDir, objectMapper, namespace);
+    }
+
+    /**
+     * The operator's decisions about tools. Its absence is a valid state —
+     * then nothing deviates from the shipped set — so nothing here creates
+     * a file until somebody actually decides something.
+     */
+    @Bean
+    ToolRepository toolRepository(Path agentStorageDir, Namespace namespace) {
+        return new FileToolRepository(agentStorageDir, namespace);
     }
 
     @Bean

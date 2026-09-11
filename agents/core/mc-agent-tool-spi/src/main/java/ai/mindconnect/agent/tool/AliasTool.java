@@ -8,14 +8,20 @@ import java.util.Map;
 /**
  * Lets an agent expose a registry tool under its own name. The override
  * {@code {"tool": "vector_search"}} means: resolve THAT factory, but present
- * it to the LLM as this {@link AgentTool}'s {@code name} (and, when set, its
- * {@code description}). An agent can therefore carry the same underlying tool
- * twice without collision — e.g. {@code search_project_docs} pinned to a
- * knowledge store next to the plain session-scoped {@code vector_search} —
- * and the alias name itself documents intent to the model.
+ * it to the LLM as this {@link AgentTool}'s {@code name}. An agent can
+ * therefore carry the same underlying tool twice without collision — e.g.
+ * {@code search_project_docs} pinned to a knowledge store next to the plain
+ * session-scoped {@code vector_search} — and the alias name itself documents
+ * intent to the model.
  *
- * <p>Applied by {@link SpiToolRegistry#resolve} before parameter pinning, so
- * pins reference the underlying tool's real parameter names.
+ * <p>The <em>name</em> is all this changes. The agent's description is
+ * applied by {@link DescribedTool}, for aliased and plain tools alike:
+ * carrying it here meant it only ever reached the model when a tool happened
+ * to be aliased, which made the description field on every other agent tool
+ * look effective while doing nothing.
+ *
+ * <p>Applied by {@link SpiToolRegistry} before parameter pinning, so pins
+ * reference the underlying tool's real parameter names.
  */
 public final class AliasTool implements Tool {
 
@@ -24,12 +30,10 @@ public final class AliasTool implements Tool {
 
     private final Tool delegate;
     private final String name;
-    private final String description;
 
-    private AliasTool(Tool delegate, String name, String description) {
+    private AliasTool(Tool delegate, String name) {
         this.delegate = delegate;
         this.name = name;
-        this.description = description;
     }
 
     /** The registry name to resolve for this agent tool: alias target, else the tool's own name. */
@@ -45,10 +49,7 @@ public final class AliasTool implements Tool {
                 || registryName(agentTool).equals(agentTool.name())) {
             return delegate;
         }
-        return new AliasTool(delegate, agentTool.name(),
-                agentTool.description() == null || agentTool.description().isBlank()
-                        ? delegate.description()
-                        : agentTool.description());
+        return new AliasTool(delegate, agentTool.name());
     }
 
     @Override
@@ -58,7 +59,7 @@ public final class AliasTool implements Tool {
 
     @Override
     public String description() {
-        return description;
+        return delegate.description();
     }
 
     @Override

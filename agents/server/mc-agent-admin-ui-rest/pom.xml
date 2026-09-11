@@ -72,6 +72,10 @@
         <!-- Seeds the bundled example workflows into the store on startup -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-mcp-gateway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-initial-data</artifactId>
             <version>${project.version}</version>
         </dependency>

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-mcp-gateway-core</artifactId>
+    <name>mc-mcp-gateway-core</name>
+    <packaging>jar</packaging>
+    <description>
+        Ports and domain types for MCP access: McpGateway (what an agent
+        needs to list and call MCP tools), the registration record that
+        describes one MCP server, and the value types crossing that port.
+        No implementation, no dependencies — the local gateway, a future
+        HTTP client and the tool provider all speak this and nothing else.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

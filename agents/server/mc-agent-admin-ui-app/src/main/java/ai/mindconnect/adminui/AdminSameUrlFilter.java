@@ -32,7 +32,7 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
 
     /** Sections whose controllers already serve JSON on the page URL. */
     private static final List<String> SAME_URL_SECTIONS = List.of(
-            "/workflow-admin", "/admin/vector-stores");
+            "/workflow-admin", "/admin/vector-stores", "/mcp-gateway");
 
     /** Sections whose controllers still live under /admin/api/<section>. */
     private static final List<String> LEGACY_SECTIONS = List.of(

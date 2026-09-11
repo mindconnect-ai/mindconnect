@@ -310,6 +310,16 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
     }
 
     @Override
+    public String subgroupOf(String toolName) {
+        for (MultiToolProvider provider : ready()) {
+            if (provider.toolNames().contains(toolName)) {
+                return provider.subgroup(toolName);
+            }
+        }
+        return null;   // a ToolFactory tool, or a name nobody serves
+    }
+
+    @Override
     public Optional<Tool> resolve(AgentTool agentTool, ToolCallScope scope) {
         if ("run_agent".equals(agentTool.name())) {
             return Optional.empty(); // handled inline by AgentChatService.dispatchSubAgent
@@ -321,14 +331,7 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
 
         ToolFactory factory = factoriesByName.get(registryName);
         if (factory != null) {
-            // Alias innermost (so pins reference the real parameter names),
-            // then the required-parameter guard, then pinning outermost: a
-            // pinned value must satisfy the requirement it would otherwise
-            // trip, and pinning is what removes the name from the schema
-            // again. The single funnel every tool source passes through.
-            return Optional.of(PinnedParamsTool.wrap(agentTool,
-                    RequiredParamsTool.wrap(agentTool,
-                            AliasTool.wrap(agentTool, factory.create(agentTool, scope)))));
+            return Optional.of(decorate(agentTool, factory.create(agentTool, scope)));
         }
 
         for (MultiToolProvider provider : ready()) {
@@ -340,12 +343,36 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
                 log.error("MultiToolProvider {} claimed '{}' but returned empty on create — tool will be unavailable",
                         provider.getClass().getSimpleName(), registryName);
             }
-            return built.map(tool -> PinnedParamsTool.wrap(agentTool,
-                    RequiredParamsTool.wrap(agentTool, AliasTool.wrap(agentTool, tool))));
+            return built.map(tool -> decorate(agentTool, tool));
         }
 
         log.error("Tool '{}' is configured on agent but has no registered implementation — tool will be unavailable",
                 agentTool.name());
         return Optional.empty();
+    }
+
+    /**
+     * The single funnel every tool source passes through, innermost first:
+     *
+     * <ol>
+     *   <li><b>description</b> — what the agent definition says about this
+     *       tool, applied whether or not the tool is aliased. It sits
+     *       innermost so everything above sees the text the model will see.</li>
+     *   <li><b>alias</b> — the agent's own name for it, so pins below
+     *       reference the underlying tool's real parameter names;</li>
+     *   <li><b>required-parameter guard</b>;</li>
+     *   <li><b>pinning</b>, outermost: a pinned value must satisfy the
+     *       requirement it would otherwise trip, and pinning is what removes
+     *       the name from the schema again.</li>
+     * </ol>
+     *
+     * <p>Package-private and static so the order is stated once and can be
+     * tested without a registry.
+     */
+    static Tool decorate(AgentTool agentTool, Tool tool) {
+        return PinnedParamsTool.wrap(agentTool,
+                RequiredParamsTool.wrap(agentTool,
+                        AliasTool.wrap(agentTool,
+                                DescribedTool.withDescription(tool, agentTool.description()))));
     }
 }

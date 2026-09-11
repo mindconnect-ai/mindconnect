@@ -1,0 +1,12 @@
+{
+  "id": "gmail",
+  "displayName": "Gmail",
+  "description": "GongRzhe/Gmail-MCP-Server, run from npm. Disabled until it is set up: run 'npx @gongrzhe/server-gmail-autoauth-mcp auth' once — it opens a Google login and writes ~/.gmail-mcp/credentials.json, which the server then finds by itself. Needs npx on the PATH of this process. Note the server's README suggests a Docker image 'mcp/gmail'; that image does not exist on Docker Hub.",
+  "enabled": false,
+  "toolNamePrefix": "gmail",
+  "target": {
+    "type": "process",
+    "command": ["npx", "-y", "@gongrzhe/server-gmail-autoauth-mcp"],
+    "env": {}
+  }
+}
