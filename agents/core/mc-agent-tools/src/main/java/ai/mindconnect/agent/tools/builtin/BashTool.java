@@ -6,26 +6,35 @@ import ai.mindconnect.agent.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 /**
  * Runs a shell command in the session's working directory and returns
  * what it printed. Output is drained while the command runs — a command
  * that prints more than the pipe holds used to block on a full pipe until
  * it was declared timed out — capped at {@link #MAX_OUTPUT_CHARS}, the
- * head kept and the tail summarised. The caller may set a timeout up to
- * {@link #MAX_TIMEOUT_SECONDS}; a command still running at the deadline is
- * killed — the whole process tree, not just the shell — and what it
- * printed so far comes back with the error.
+ * head kept (cut inside a line if need be) and the tail summarised. The
+ * caller may set a timeout up to {@link #MAX_TIMEOUT_SECONDS}; a command
+ * still running at the deadline is killed — the whole process tree, not
+ * just the shell — and what it printed so far comes back with the error.
+ * The call ends with the shell: a process it started that still holds the
+ * output open gets {@link #OUTPUT_GRACE_MS}, then is killed if it can be
+ * reached, and the call returns what was read either way.
  *
  * <p>A command that is not meant to return — a dev server, a watcher —
  * runs with {@code background}: it is started, its output goes to a log
@@ -42,6 +51,10 @@ public class BashTool implements Tool {
     static final int MAX_TIMEOUT_SECONDS = 600;
     /** The most output one call returns; the rest is counted, not shown. */
     static final int MAX_OUTPUT_CHARS = 30_000;
+    /** How long output may keep coming after the shell exited — from a process it started that inherited the pipe. */
+    static final long OUTPUT_GRACE_MS = 2_000;
+    /** The longest pause between two looks at the processes a command started. */
+    private static final long DESCENDANT_POLL_MAX_MS = 1_000;
     /** How long a background start watches the process before answering — long enough for a build step to fail. */
     static final long BACKGROUND_WATCH_MS = 3_000;
     /** How much of the log a background start quotes. */
@@ -138,6 +151,10 @@ public class BashTool implements Tool {
         Process process = null;
         Thread drainer = null;
         Output output = new Output();
+        // The processes the command started, as seen while the shell ran. One
+        // its parent let go of is re-parented and no descendant any more, but
+        // its handle still reaches it.
+        Set<ProcessHandle> started = new LinkedHashSet<>();
         try {
             process = new ProcessBuilder("bash", "-c", command)
                     .directory(workingDir)
@@ -147,19 +164,36 @@ public class BashTool implements Tool {
             // pipe as soon as the command prints more than the OS buffers.
             Process p = process;
             drainer = Thread.ofVirtual().name("bash-output").start(() -> drain(p, output));
-            boolean finished = process.waitFor(timeout, TimeUnit.SECONDS);
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeout);
+            boolean finished = waitForShell(process, deadline, started);
             if (!finished) {
                 BackgroundProcesses.killTree(process.toHandle());
+                killLeftovers(started);
                 drainer.join(2_000);
                 log.warn("bash: timed out after {}s", timeout);
                 return "Error: command timed out after " + timeout + " seconds"
                         + (output.isEmpty() ? "" : "\nOutput so far:\n" + output.text())
                         + "\n(A server or watcher that is meant to keep running must be started with background=true.)";
             }
-            drainer.join();
+            // The output ends when the last process holding the pipe closes it
+            // — not always the shell: a child that inherited it and runs on
+            // would hold the call as long as it lives. It gets a grace period,
+            // never past the deadline; the drainer is then no longer waited for.
+            String note = "";
+            long left = Math.max(0, deadline - System.nanoTime());
+            if (!drainer.join(Duration.ofNanos(Math.min(left, TimeUnit.MILLISECONDS.toNanos(OUTPUT_GRACE_MS))))) {
+                int killed = killLeftovers(started);
+                boolean closed = drainer.join(Duration.ofMillis(500));
+                log.warn("bash: output still held open after the shell exited — {} process(es) killed, output {}",
+                        killed, closed ? "closed" : "abandoned");
+                note = "(A process the command started kept the output open after the shell exited — "
+                        + (killed > 0 ? "it was killed." : "it could not be reached and may still be running.")
+                        + " Start a process meant to keep running with background=true.)";
+            }
             int exitCode = process.exitValue();
             log.info("bash exit={} ({} chars of output)", exitCode, output.length());
             String text = output.text();
+            if (!note.isEmpty()) text = text.isEmpty() ? note : text + "\n" + note;
             if (exitCode != 0) {
                 return "Exit code " + exitCode + ":\n" + text;
             }
@@ -180,8 +214,47 @@ public class BashTool implements Tool {
                 BackgroundProcesses.killTree(process.toHandle());
                 log.warn("bash: subprocess tree force-destroyed in finally");
             }
-            if (drainer != null) drainer.interrupt();
+            // A drainer still reading means something still holds the output:
+            // on cancel or error, what the command started goes too. Once the
+            // output has ended, a daemon a tool started for itself is left be.
+            if (drainer != null && drainer.isAlive()) {
+                killLeftovers(started);
+                drainer.interrupt();
+            }
         }
+    }
+
+    /**
+     * Waits for the shell until the deadline, noting on the way every process
+     * it started — looked at often at first, then less often, so a long build
+     * does not scan the process table many times a second.
+     */
+    private static boolean waitForShell(Process process, long deadline, Set<ProcessHandle> started)
+            throws InterruptedException {
+        long pollMs = 50;
+        while (true) {
+            try (Stream<ProcessHandle> descendants = process.descendants()) {
+                descendants.forEach(started::add);
+            }
+            long left = deadline - System.nanoTime();
+            if (left <= 0) return !process.isAlive();
+            if (process.waitFor(Math.min(left, TimeUnit.MILLISECONDS.toNanos(pollMs)), TimeUnit.NANOSECONDS)) {
+                return true;
+            }
+            pollMs = Math.min(pollMs * 2, DESCENDANT_POLL_MAX_MS);
+        }
+    }
+
+    /** Kills those of the noted processes still alive, with what they started; returns how many were. */
+    private static int killLeftovers(Set<ProcessHandle> started) {
+        int killed = 0;
+        for (ProcessHandle handle : started) {
+            if (handle.isAlive()) {
+                BackgroundProcesses.killTree(handle);
+                killed++;
+            }
+        }
+        return killed;
     }
 
     /** Starts the command detached from the call: output to a log file, the pid and the file back at once. */
@@ -264,12 +337,13 @@ public class BashTool implements Tool {
                 sessionId == null ? "no-session" : sessionId.value());
     }
 
+    /** Reads the output in chunks, not lines: a line without end must not grow in memory before the cap sees it. */
     private static void drain(Process process, Output output) {
-        try (BufferedReader reader = new BufferedReader(
-                new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                output.add(line);
+        try (Reader reader = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
+            char[] chunk = new char[8_192];
+            int read;
+            while ((read = reader.read(chunk)) != -1) {
+                output.add(chunk, 0, read);
             }
         } catch (IOException e) {
             // The process was killed under us; what was read stays.
@@ -297,14 +371,20 @@ public class BashTool implements Tool {
      * {@code setsid} or {@code disown} where a command starts. Such a process
      * outlives the shell this tool watches. Quoted text, {@code &&},
      * {@code |&} and redirections such as {@code 2>&1} and {@code &>} do not
-     * detach anything. Read off the text, not parsed — when in doubt it lets
-     * the command through.
+     * detach anything, nor does a {@code #} comment or the body of a
+     * here-document — a page written with {@code cat <<'EOF'} may say
+     * "Tom &amp; Jerry" or "don't". Read off the text, not parsed — when in
+     * doubt it lets the command through.
      */
     static String detaches(String command) {
         boolean inSingle = false, inDouble = false, escaped = false;
         boolean loneAmpersand = false, waits = false, commandPosition = true;
         String starter = null;
         StringBuilder word = new StringBuilder();
+        // Here-documents whose bodies start after the next line break.
+        List<Heredoc> heredocs = new ArrayList<>();
+        // Inside $(( … )) a << is a shift, not a here-document.
+        int arithmetic = 0;
         int n = command.length();
         for (int i = 0; i <= n; i++) {
             char c = i < n ? command.charAt(i) : '\n';
@@ -326,11 +406,20 @@ public class BashTool implements Tool {
             if (c == '\\') { escaped = true; continue; }
             if (c == '\'') { inSingle = true; continue; }
             if (c == '"') { inDouble = true; continue; }
+            if (c == '#' && word.length() == 0 && (i == 0 || isWordBoundary(command.charAt(i - 1)))) {
+                // A comment runs to the end of the line; its line break still separates.
+                int end = command.indexOf('\n', i);
+                i = (end < 0 ? n : end) - 1;
+                continue;
+            }
+
+            char prev = i > 0 && i <= n ? command.charAt(i - 1) : ' ';
+            char next = i + 1 < n ? command.charAt(i + 1) : ' ';
+            if (c == '(' && next == '(') arithmetic++;
+            else if (c == ')' && prev == ')' && arithmetic > 0) arithmetic--;
 
             boolean separator = c == ';' || c == '|' || c == '(' || c == ')' || c == '\n';
             if (c == '&') {
-                char prev = i > 0 ? command.charAt(i - 1) : ' ';
-                char next = i + 1 < n ? command.charAt(i + 1) : ' ';
                 boolean redirect = prev == '>' || prev == '<' || next == '>';
                 if (!redirect) {
                     separator = true;
@@ -349,12 +438,78 @@ public class BashTool implements Tool {
                     word.setLength(0);
                 }
                 if (separator) commandPosition = true;
+                if (c == '<' && next == '<' && prev != '<' && arithmetic == 0
+                        && (i + 2 >= n || command.charAt(i + 2) != '<')) {
+                    // <<DELIM, <<-DELIM, <<'DELIM' — but not the here-string <<<.
+                    i = readHeredocDelimiter(command, i + 2, heredocs) - 1;
+                } else if (c == '\n' && i < n && !heredocs.isEmpty()) {
+                    // The bodies are text, whatever they say; the command goes on after the last delimiter line.
+                    i = skipHeredocBodies(command, i + 1, heredocs) - 1;
+                    heredocs.clear();
+                }
                 continue;
             }
             word.append(c);
         }
         if (starter != null) return starter;
         return loneAmpersand && !waits ? "`&`" : null;
+    }
+
+    /** A here-document waiting for its body: the line that ends it, and whether leading tabs are stripped ({@code <<-}). */
+    private record Heredoc(String delimiter, boolean stripTabs) {
+    }
+
+    private static boolean isWordBoundary(char c) {
+        return Character.isWhitespace(c) || ";&|()<>".indexOf(c) >= 0;
+    }
+
+    /** Reads the delimiter after {@code <<}, quotes removed, and notes the here-document; returns where the command goes on. */
+    private static int readHeredocDelimiter(String command, int from, List<Heredoc> heredocs) {
+        int n = command.length(), j = from;
+        boolean stripTabs = j < n && command.charAt(j) == '-';
+        if (stripTabs) j++;
+        while (j < n && (command.charAt(j) == ' ' || command.charAt(j) == '\t')) j++;
+        StringBuilder delimiter = new StringBuilder();
+        while (j < n) {
+            char d = command.charAt(j);
+            if (d == '\'' || d == '"') {
+                int close = command.indexOf(d, j + 1);
+                if (close < 0) close = n;
+                delimiter.append(command, j + 1, close);
+                j = Math.min(close + 1, n);
+            } else if (d == '\\' && j + 1 < n) {
+                delimiter.append(command.charAt(j + 1));
+                j += 2;
+            } else if (isWordBoundary(d)) {
+                break;
+            } else {
+                delimiter.append(d);
+                j++;
+            }
+        }
+        if (delimiter.length() > 0) heredocs.add(new Heredoc(delimiter.toString(), stripTabs));
+        return j;
+    }
+
+    /**
+     * Skips the bodies of the noted here-documents, in order, from the start
+     * of the line after their operators; a body ends at a line equal to its
+     * delimiter. Returns where the command goes on — its end, for a body
+     * never closed.
+     */
+    private static int skipHeredocBodies(String command, int from, List<Heredoc> heredocs) {
+        int n = command.length(), pos = from;
+        for (Heredoc heredoc : heredocs) {
+            while (pos < n) {
+                int end = command.indexOf('\n', pos);
+                if (end < 0) end = n;
+                String line = command.substring(pos, end);
+                pos = Math.min(end + 1, n);
+                if (heredoc.stripTabs()) line = line.replaceFirst("^\t+", "");
+                if (line.equals(heredoc.delimiter())) break;
+            }
+        }
+        return pos;
     }
 
     /** Does the command look like one that never returns on its own? Only a guess — an explicit timeout overrides it. */
@@ -372,24 +527,66 @@ public class BashTool implements Tool {
         }
     }
 
-    /** The command's output as it arrives: the first {@link #MAX_OUTPUT_CHARS} kept, the rest counted. */
+    /**
+     * The command's output as it arrives: the first {@link #MAX_OUTPUT_CHARS}
+     * characters kept — cut inside a line when the cap falls there — the rest
+     * counted, never held. Line breaks come out as {@code \n}, and the last
+     * one is dropped, as reading line by line did.
+     */
     static final class Output {
         private final StringBuilder kept = new StringBuilder();
+        private boolean full;
         private long droppedLines;
         private long droppedChars;
+        /** A line break read but not yet written: the output's last one never is. */
+        private boolean pendingBreak;
+        /** The previous character was a {@code \r}; a {@code \n} right after it is the same break. */
+        private boolean afterCr;
+        /** Whether the current line has characters kept, and whether it has characters dropped. */
+        private boolean lineKept, lineDropped;
 
-        synchronized void add(String line) {
-            if (kept.length() + line.length() + 1 <= MAX_OUTPUT_CHARS) {
-                if (kept.length() > 0) kept.append('\n');
-                kept.append(line);
-            } else {
-                droppedLines++;
-                droppedChars += line.length() + 1;
+        synchronized void add(char[] chars, int offset, int length) {
+            for (int i = offset; i < offset + length; i++) {
+                char c = chars[i];
+                if (c == '\n' && afterCr) {
+                    afterCr = false;
+                    continue;
+                }
+                afterCr = c == '\r';
+                if (c == '\r' || c == '\n') {
+                    if (pendingBreak) put('\n');
+                    pendingBreak = true;
+                } else {
+                    if (pendingBreak) put('\n');
+                    pendingBreak = false;
+                    put(c);
+                }
             }
         }
 
+        private void put(char c) {
+            // A surrogate pair is kept whole or not at all.
+            int room = Character.isHighSurrogate(c) ? 2 : 1;
+            if (!full && kept.length() + room <= MAX_OUTPUT_CHARS) {
+                kept.append(c);
+                lineKept = c != '\n';
+                if (c == '\n') lineDropped = false;
+                return;
+            }
+            full = true;
+            droppedChars++;
+            if (c != '\n') {
+                lineDropped = true;
+                return;
+            }
+            // A line counts as not shown unless all of it was kept and only its break fell past the cap.
+            if (lineDropped || !lineKept) droppedLines++;
+            lineKept = false;
+            lineDropped = false;
+        }
+
         synchronized boolean isEmpty() {
-            return kept.length() == 0 && droppedLines == 0;
+            return kept.length() == 0 && droppedChars == 0;
         }
 
         synchronized int length() {
@@ -397,8 +594,9 @@ public class BashTool implements Tool {
         }
 
         synchronized String text() {
-            if (droppedLines == 0) return kept.toString();
-            return kept + "\n\n[output cut after " + MAX_OUTPUT_CHARS + " chars — " + droppedLines
+            if (droppedChars == 0) return kept.toString();
+            long lines = droppedLines + (lineDropped ? 1 : 0);
+            return kept + "\n\n[output cut after " + MAX_OUTPUT_CHARS + " chars — " + lines
                     + " more line(s), " + droppedChars + " chars, not shown; pipe through head, tail or grep]";
         }
     }

@@ -37,6 +37,130 @@ class BashToolOutputTest {
     }
 
     @Test
+    void aLineLongerThanTheCapKeepsItsHead_andTheRestIsCounted() {
+        BashTool bash = new BashTool(tmp.toFile());
+        int max = BashTool.MAX_OUTPUT_CHARS;
+
+        // What curl returning 40 KB of one-line JSON looks like: the head, not just the note.
+        String out = bash.execute(Map.of("command", "printf '%*s' 40000 '' | tr ' ' x"));
+        assertThat(out).isEqualTo("x".repeat(max) + "\n\n[output cut after " + max
+                + " chars — 1 more line(s), " + (40_000 - max) + " chars, not shown; pipe through head, tail or grep]");
+
+        // A line that never ends is not held in memory: it is cut at the cap while it grows.
+        String endless = bash.execute(Map.of("command", "yes | tr -d '\\n'", "timeout", 1));
+        assertThat(endless).startsWith("Error: command timed out after 1 seconds\nOutput so far:\nyyyy")
+                .contains("[output cut after " + max + " chars — 1 more line(s), ");
+        assertThat(endless.length()).isLessThan(max + 400);
+    }
+
+    @Test
+    void theOutputCountsLinesAsTheyWereShown() {
+        BashTool.Output output = new BashTool.Output();
+        char[] crlf = "one\r\ntwo\rthree\n".toCharArray();
+        output.add(crlf, 0, crlf.length);
+        assertThat(output.text()).as("line breaks normalised, the last one dropped").isEqualTo("one\ntwo\nthree");
+
+        BashTool.Output capped = new BashTool.Output();
+        char[] exact = ("a".repeat(BashTool.MAX_OUTPUT_CHARS) + "\nb\nc\n").toCharArray();
+        capped.add(exact, 0, exact.length);
+        assertThat(capped.text()).as("a line kept whole is not counted, though its break fell past the cap")
+                .isEqualTo("a".repeat(BashTool.MAX_OUTPUT_CHARS) + "\n\n[output cut after " + BashTool.MAX_OUTPUT_CHARS
+                        + " chars — 2 more line(s), 4 chars, not shown; pipe through head, tail or grep]");
+    }
+
+    @Test
+    void aChildHoldingTheOutputOpenDoesNotHoldTheCall() {
+        BashTool bash = new BashTool(tmp.toFile());
+        String marker = "sleep 31.7";
+        try {
+            // The quoted & passes the detach check; the inner shell exits at
+            // once and its sleep keeps the pipe — which used to hold the call
+            // for as long as the sleep ran.
+            long start = System.currentTimeMillis();
+            String out = bash.execute(Map.of("command", "echo before; bash -c '" + marker + " &'; echo after"));
+            long took = System.currentTimeMillis() - start;
+
+            assertThat(out).startsWith("before\nafter\n")
+                    .contains("kept the output open after the shell exited").contains("background=true");
+            assertThat(took).as("returns shortly after the shell").isLessThan(BashTool.OUTPUT_GRACE_MS + 4_000);
+        } finally {
+            killAll(marker);
+        }
+    }
+
+    @Test
+    void aChildHoldingTheOutputOpenIsKilled_whenItWasSeenWhileTheShellRan() throws Exception {
+        BashTool bash = new BashTool(tmp.toFile());
+        String marker = "sleep 32.7";
+        try {
+            long start = System.currentTimeMillis();
+            String out = bash.execute(Map.of("command", "bash -c '" + marker + " & sleep 1.5; echo shell done'"));
+            long took = System.currentTimeMillis() - start;
+
+            assertThat(out).startsWith("shell done\n").contains("it was killed.");
+            assertThat(took).isLessThan(1_500 + BashTool.OUTPUT_GRACE_MS + 4_000);
+            Thread.sleep(300);
+            assertThat(alive(marker)).as("the sleep that held the output is gone").isZero();
+        } finally {
+            killAll(marker);
+        }
+    }
+
+    @Test
+    void aCancelledCallReturnsAtOnce_evenWhileWaitingForHeldOutput() throws Exception {
+        BashTool bash = new BashTool(tmp.toFile());
+        String marker = "sleep 33.7";
+        try {
+            java.util.concurrent.atomic.AtomicReference<String> result = new java.util.concurrent.atomic.AtomicReference<>();
+            Thread caller = new Thread(() -> result.set(bash.execute(Map.of("command", "bash -c '" + marker + " &'"))));
+            long start = System.currentTimeMillis();
+            caller.start();
+            Thread.sleep(300);
+            caller.interrupt();
+            caller.join(5_000);
+            long took = System.currentTimeMillis() - start;
+
+            assertThat(caller.isAlive()).isFalse();
+            assertThat(result.get()).isEqualTo("Error: bash command cancelled");
+            assertThat(took).as("not after the grace period").isLessThan(BashTool.OUTPUT_GRACE_MS);
+        } finally {
+            killAll(marker);
+        }
+    }
+
+    @Test
+    void heredocBodiesAndCommentsAreText_notShellCode() throws Exception {
+        BashTool bash = new BashTool(tmp.toFile());
+
+        String page = "cat > index.html <<'EOF'\n<p>Tom & Jerry</p>\n<p>don't</p>\nEOF\necho written";
+        assertThat(bash.execute(Map.of("command", page))).isEqualTo("written");
+        assertThat(Files.readString(tmp.resolve("index.html"))).isEqualTo("<p>Tom & Jerry</p>\n<p>don't</p>\n");
+        assertThat(bash.execute(Map.of("command", "# build & test\necho ok # it's done & dusted"))).isEqualTo("ok");
+        assertThat(BashTool.detaches("cat <<-\"END\" | sort\n\tb & a\n\tEND\n")).isNull();
+        assertThat(BashTool.detaches("cat <<A <<\\B\n&\nA\n&\nB")).isNull();
+        assertThat(BashTool.detaches("x=$(cat <<EOF\nfish & chips\nEOF\n); echo \"$x\"")).isNull();
+
+        // An apostrophe in a body used to open a quote that hid what came after it.
+        assertThat(BashTool.detaches("cat > notes.txt <<EOF\ndon't\nEOF\nsleep 600 &")).isEqualTo("`&`");
+        assertThat(BashTool.detaches("cat <<'EOF'\n&\nEOF\nnohup sleep 600")).isEqualTo("`nohup`");
+        assertThat(BashTool.detaches("cat <<-EOF\n\tit's\n\tEOF\nsleep 600 &")).isEqualTo("`&`");
+        assertThat(BashTool.detaches("echo # it's\nsleep 600 &")).isEqualTo("`&`");
+        assertThat(BashTool.detaches("echo a#b &")).as("# inside a word is no comment").isEqualTo("`&`");
+        assertThat(BashTool.detaches("cat <<< word &")).as("a here-string has no body").isEqualTo("`&`");
+        assertThat(BashTool.detaches("echo $((1 << 2))\nsleep 600 &")).as("a shift is no here-document")
+                .isEqualTo("`&`");
+    }
+
+    private static long alive(String marker) {
+        return ProcessHandle.allProcesses().filter(h -> h.info().commandLine().orElse("").endsWith(marker)).count();
+    }
+
+    private static void killAll(String marker) {
+        ProcessHandle.allProcesses().filter(h -> h.info().commandLine().orElse("").endsWith(marker))
+                .forEach(ProcessHandle::destroyForcibly);
+    }
+
+    @Test
     void aCommandThatLetsAProcessGoIsRefused_beforeAnythingStarts() {
         BashTool bash = new BashTool(tmp.toFile());
 
