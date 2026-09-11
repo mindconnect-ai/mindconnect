@@ -33,4 +33,24 @@ class ToolCallScopeTest {
         assertThat(scope.additionalDirs()).isEmpty();
         assertThat(ToolCallScope.ofSession(UserId.of("u"), SessionId.random(), " ").hasWorkingDir()).isFalse();
     }
+
+    @Test
+    void aScopeCanBeBoundToTheRunningThread_andItsChildren() throws Exception {
+        ToolCallScope scope = ToolCallScope.ofSession(UserId.of("u"), SessionId.random(), "/work");
+        assertThat(ToolCallScope.current()).isEmpty();
+
+        String seen = scope.runWith(() -> {
+            assertThat(ToolCallScope.current()).contains(scope);
+            // A thread started inside sees the scope too — a workflow engine
+            // that fans out still resolves its tools in the session's scope.
+            var fromChild = new java.util.concurrent.atomic.AtomicReference<ToolCallScope>();
+            Thread child = new Thread(() -> fromChild.set(ToolCallScope.current().orElse(null)));
+            child.start();
+            try { child.join(); } catch (InterruptedException e) { throw new RuntimeException(e); }
+            assertThat(fromChild.get()).isEqualTo(scope);
+            return "ran";
+        });
+        assertThat(seen).isEqualTo("ran");
+        assertThat(ToolCallScope.current()).as("restored afterwards").isEmpty();
+    }
 }

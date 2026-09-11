@@ -345,18 +345,42 @@ public class DefaultAgentRuntimeConfig {
     }
 
     /**
+     * Each user's directory on this server: {@code mindconnect.users.home},
+     * a path with {@code {user}} in it, by default {@code <data-dir>/<namespace>/home/{user}}.
+     * A session opened without a working directory works in its own
+     * directory under there, and its uploads are put there for the file
+     * tools. Blank turns it off — sessions then have no directory of their own.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.service.UserHome userHome(
+            @Value("${mindconnect.users.home:#{null}}") String usersHome,
+            @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
+            Namespace namespace) {
+        if (usersHome == null) {
+            return ai.mindconnect.agent.runtime.service.UserHome.under(
+                    java.nio.file.Path.of(dataBaseDir).resolve(namespace.value()).toAbsolutePath());
+        }
+        return ai.mindconnect.agent.runtime.service.UserHome.of(usersHome);
+    }
+
+    /**
      * Where a session may work: under {@code mindconnect.tools.working-dir-root}
-     * when set, else under the tools' base directory — a server must not let
-     * a user point the file tools at any directory its process can read.
-     * A root with {@code {user}} in it gives every user a root of their own.
-     * The CLI sets the root to {@code /}: one user, their own machine.
+     * when set, else in the user's own home; without one, under the tools'
+     * base directory — a server must not let a user point the file tools at
+     * any directory its process can read. A root with {@code {user}} in it
+     * gives every user a root of their own. The CLI sets the root to
+     * {@code /}: one user, their own machine.
      */
     @Bean
     ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy(
             @Value("${mindconnect.tools.working-dir-root:}") String workingDirRoot,
-            @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir) {
+            @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir,
+            ai.mindconnect.agent.runtime.service.UserHome userHome) {
+        if (workingDirRoot != null && !workingDirRoot.isBlank()) {
+            return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(workingDirRoot);
+        }
         return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
-                workingDirRoot == null || workingDirRoot.isBlank() ? baseDir : workingDirRoot);
+                userHome.isConfigured() ? userHome.template() : baseDir);
     }
 
     /** The directories a user may pick a working directory from — the policy's tree, nothing beyond. */
@@ -375,10 +399,11 @@ public class DefaultAgentRuntimeConfig {
                                              TodoListRepository todoListRepository,
                                              ToolApprovalStore approvalStore,
                                              UserChannels userChannels,
-                                             ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy) {
+                                             ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy,
+                                             ai.mindconnect.agent.runtime.service.UserHome userHome) {
         return new AgentSessionService(definitionRepository, sessionRepository,
                 conversationManager, workingMemoryRepository, conversationSummaryRepository,
-                todoListRepository, approvalStore, userChannels, workingDirPolicy);
+                todoListRepository, approvalStore, userChannels, workingDirPolicy, userHome);
     }
 
     /**

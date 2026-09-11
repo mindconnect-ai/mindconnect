@@ -60,22 +60,35 @@ public final class SystemPromptRenderer {
         if (session == null) return "";
         // Images are not indexed — they travel with the message as image
         // parts (or their placeholders) and have no business in this list.
-        java.util.List<String> searchable = session.attachedFiles().stream()
+        java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> searchable = session.attachedFiles().stream()
                 .filter(f -> !f.isImage())
-                .map(AttachedFile::name)
                 .toList();
         if (searchable.isEmpty()) {
             return "";
         }
         StringBuilder out = new StringBuilder("\n\n## Attached files\n"
                 + "The user attached these files to this conversation:\n");
-        for (String file : searchable) {
-            out.append("- ").append(file).append(" (").append(AttachmentNotice.kind(file)).append(")\n");
+        boolean anyOnDisk = false;
+        for (var file : searchable) {
+            out.append("- ").append(file.name()).append(" (").append(AttachmentNotice.kind(file.name())).append(")");
+            if (file.hasPath()) {
+                out.append(" — on disk at `").append(file.path()).append('`');
+                anyOnDisk = true;
+            }
+            out.append('\n');
         }
-        return out.append("Their content is indexed for semantic search. To answer anything about them, "
+        out.append("Their content is indexed for semantic search. To answer anything about them, "
                 + "call `vector_search` with your question (no `store` argument needed) and read the "
-                + "returned chunks. They are NOT files on the filesystem: `file_read`, `document_outline`, "
-                + "`read_document`, `grep_document` and `bash` cannot open them, and a file name is not a path.")
-                .toString();
+                + "returned chunks.");
+        if (anyOnDisk) {
+            out.append(" A file with a path is also a file on disk — `file_read`, `document_outline`, "
+                    + "`read_document`, `grep_document` and `bash` open it by that path, for the parts "
+                    + "a search does not surface.");
+        }
+        if (searchable.stream().anyMatch(f -> !f.hasPath())) {
+            out.append(" A file without a path is NOT on the filesystem: `file_read`, `document_outline`, "
+                    + "`read_document`, `grep_document` and `bash` cannot open it, and its name is not a path.");
+        }
+        return out.toString();
     }
 }

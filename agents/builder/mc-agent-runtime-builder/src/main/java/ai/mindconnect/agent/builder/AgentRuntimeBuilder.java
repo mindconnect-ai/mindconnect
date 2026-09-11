@@ -246,6 +246,25 @@ public final class AgentRuntimeBuilder {
         return property("workingDirRoot", root.toString());
     }
 
+    /**
+     * Where each user's directory lives — a path with {@code {user}} in it.
+     * A session opened without a working directory works in its own
+     * directory under there, and its uploads are put there for the file
+     * tools. By default {@code <dataDir>/<namespace>/home/{user}}.
+     */
+    public AgentRuntimeBuilder usersHome(String template) {
+        return property("usersHome", template);
+    }
+
+    /** The users' home for an environment: {@code usersHome} when set, else under the namespace's data directory. */
+    static ai.mindconnect.agent.runtime.service.UserHome userHomeOf(Map<String, String> environment, String namespace) {
+        String template = environment.get("usersHome");
+        return template != null && !template.isBlank()
+                ? ai.mindconnect.agent.runtime.service.UserHome.of(template)
+                : ai.mindconnect.agent.runtime.service.UserHome.under(
+                        Path.of(environment.get("dataBaseDir")).resolve(namespace));
+    }
+
     public AgentRuntimeBuilder tavilyApiKey(String key) {
         return property("tavilyApiKey", key);
     }
@@ -442,15 +461,16 @@ public final class AgentRuntimeBuilder {
                 : new FileLlmCallTraceRepository(dataDir, namespace);
         var approvalStore = new ToolApprovalStore();
         var userChannels = new UserChannels();
-        // Where a session may work: under workingDirRoot when set, else under
-        // the tools' base directory — the same rule the Spring apps apply.
+        // Where a session may work: under workingDirRoot when set, else in the
+        // user's own home — the same rule the Spring apps apply.
+        var userHome = userHomeOf(environment, namespaceName);
         String workingDirRoot = environment.getOrDefault("workingDirRoot", "");
         var workingDirPolicy = ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
-                workingDirRoot.isBlank() ? environment.get("defaultBaseDir") : workingDirRoot);
+                workingDirRoot.isBlank() ? userHome.template() : workingDirRoot);
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
-                userChannels, workingDirPolicy);
+                userChannels, workingDirPolicy, userHome);
         var sessionChannels = new SessionChannels();
         var turnWorker = new AgentTurnWorker(
                 conversationManager, definitionRepository, sessionService,

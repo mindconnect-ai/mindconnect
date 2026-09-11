@@ -141,6 +141,11 @@ final class AttachSupport {
         return fileStore;
     }
 
+    /** The users' home the runtime keeps session directories under — the copy of an upload goes there. */
+    private ai.mindconnect.agent.runtime.service.UserHome userHome() {
+        return AgentRuntimeBuilder.userHomeOf(environment, namespace.value());
+    }
+
     /**
      * Ingests an ALREADY-STORED file into the session's vector store and
      * activates {@code vector_search} — the second half of {@link #attach},
@@ -150,6 +155,8 @@ final class AttachSupport {
     String attachStored(SessionId sessionId, ai.mindconnect.filestore.StoredFile stored) {
         var attached = new AttachedFile(
                 stored.id().value(), stored.name(), stored.contentType(), stored.size());
+        var session = sessions.findById(sessionId).orElseThrow(() ->
+                new IllegalArgumentException("Unknown session " + sessionId.value()));
         if (attached.isImage()) {
             // Not text to index: the image goes to the model with the next
             // message as an image part, or as that part's placeholder. Shown
@@ -176,12 +183,22 @@ final class AttachSupport {
                     ai.mindconnect.vectorstore.tools.VectorStoreInstance.Scope.SESSION,
                     sessionId.value(), chat.userId() == null ? null : chat.userId().value());
             var instance = stores.settingsFor(storeName);
-
+            // A copy in the session's own directory, for the file tools and
+            // for the ingestion workflow, which runs in the session's scope.
+            java.util.Optional<java.nio.file.Path> copy = userHome()
+                    .uploadsDirOf(session.userId(), sessionId).map(dir -> dir.resolve(stored.name()));
+            if (copy.isPresent()) {
+                try (InputStream in = fileStore.content(stored.id())) {
+                    java.nio.file.Files.copy(in, copy.get(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                attached = attached.withPath(copy.get().toString());
+            }
             String message;
             if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()
                     && workflowModulesPresent()) {
-                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows, namespace.value(),
-                        new ai.mindconnect.agent.tool.ToolCallScope(chat.userId(), sessionId, null));
+                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows,
+                        namespace.value(), chat, copy.orElse(null));
             } else {
                 String text = new String(fileStore.content(stored.id()).readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
@@ -217,27 +234,39 @@ final class AttachSupport {
                           ai.mindconnect.filestore.FileStore fileStore,
                           ai.mindconnect.workflow.persistence.port.WorkflowDataRepository hostWorkflows,
                           String partition,
-                          ai.mindconnect.agent.tool.ToolCallScope scope) throws Exception {
-            java.nio.file.Path base = java.nio.file.Path.of(
-                    environment.getOrDefault("defaultBaseDir", System.getProperty("user.home")));
-            java.nio.file.Path dir = base.resolve("vector-store-uploads").resolve(instance.name());
-            java.nio.file.Files.createDirectories(dir);
-            java.nio.file.Path target = dir.resolve(stored.name());
-            try (InputStream in = fileStore.content(stored.id())) {
-                java.nio.file.Files.copy(in, target,
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            }
+                          ai.mindconnect.agent.runtime.domain.AgentSession chat,
+                          java.nio.file.Path copyInSessionDir) throws Exception {
             var workflows = hostWorkflows != null ? hostWorkflows
                     : new ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository(
                             java.nio.file.Path.of(environment.get("dataBaseDir")), partition);
             var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                             + "' not found in the workflow store"));
-            // The tool steps run on behalf of the chat's user and session — the calls its store accepts.
-            var report = new ai.mindconnect.workflow.admin.run.WorkflowRunService(null)
-                    .runWithAttributes(workflow, Map.of("file", base.relativize(target).toString(),
-                            "store", instance.name()),
-                            Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(), scope));
+            var runner = new ai.mindconnect.workflow.admin.run.WorkflowRunService(null);
+            ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
+            // The tool steps run on behalf of the chat's user and session — the
+            // calls its store accepts — and resolve their paths in its directories.
+            if (copyInSessionDir != null) {
+                var scope = ai.mindconnect.agent.tool.ToolCallScope.ofSession(
+                        chat.userId(), chat.id(), copyInSessionDir.getParent().toString());
+                report = scope.runWith(() -> runner.runWithAttributes(workflow,
+                        Map.of("file", stored.name(), "store", instance.name()),
+                        Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(), scope)));
+            } else {
+                java.nio.file.Path base = java.nio.file.Path.of(
+                        environment.getOrDefault("defaultBaseDir", System.getProperty("user.home")));
+                java.nio.file.Path dir = base.resolve("vector-store-uploads").resolve(instance.name());
+                java.nio.file.Files.createDirectories(dir);
+                java.nio.file.Path target = dir.resolve(stored.name());
+                try (InputStream in = fileStore.content(stored.id())) {
+                    java.nio.file.Files.copy(in, target,
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+                report = runner.runWithAttributes(workflow,
+                        Map.of("file", base.relativize(target).toString(), "store", instance.name()),
+                        Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(),
+                                new ai.mindconnect.agent.tool.ToolCallScope(chat.userId(), chat.id(), null)));
+            }
             if (!report.success()) {
                 throw new IllegalStateException("ingestion workflow failed: " + report.error());
             }

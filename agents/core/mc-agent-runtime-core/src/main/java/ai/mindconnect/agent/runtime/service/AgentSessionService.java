@@ -54,6 +54,8 @@ public class AgentSessionService {
     private final ToolApprovalStore approvalStore;
     private final UserChannels userChannels;
     private final WorkingDirPolicy workingDirPolicy;
+    /** Where a session's own directory lives — none when the runtime has no users' home. */
+    private final UserHome userHome;
 
     /** Without a working-directory policy: any existing directory may become a session's. */
     public AgentSessionService(AgentDefinitionRepository definitionRepository,
@@ -78,7 +80,24 @@ public class AgentSessionService {
                                 ToolApprovalStore approvalStore,
                                 UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy) {
+        this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
+                summaryRepository, todoListRepository, approvalStore, userChannels,
+                workingDirPolicy, UserHome.none());
+    }
+
+    /** The full constructor: with the users' home a session's own directory lives in. */
+    public AgentSessionService(AgentDefinitionRepository definitionRepository,
+                                AgentSessionRepository sessionRepository,
+                                ConversationManager conversationManager,
+                                WorkingMemoryRepository workingMemoryRepository,
+                                ConversationSummaryRepository summaryRepository,
+                                TodoListRepository todoListRepository,
+                                ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore approvalStore,
+                                ai.mindconnect.agent.runtime.service.stream.UserChannels userChannels,
+                                WorkingDirPolicy workingDirPolicy,
+                                UserHome userHome) {
         this.workingDirPolicy = workingDirPolicy == null ? WorkingDirPolicy.unrestricted() : workingDirPolicy;
+        this.userHome = userHome == null ? UserHome.none() : userHome;
         this.definitionRepository = definitionRepository;
         this.sessionRepository = sessionRepository;
         this.conversationManager = conversationManager;
@@ -117,7 +136,49 @@ public class AgentSessionService {
         WorkingDirPolicy policy = workingDirPolicy.forUser(userId);
         String dir = policy.validate(workingDir);
         List<String> extras = validateAll(policy, additionalDirs);
-        return openChat(agentDefinitionId, userId, null, null, null, dir, extras);
+        return inOwnDirectoryWhenNone(openChat(agentDefinitionId, userId, null, null, null, dir, extras));
+    }
+
+    /**
+     * A session opened without a working directory works in its own: a
+     * directory under the user's home, created here, where its uploads land
+     * and its scratch files go. Nothing changes for a session that chose a
+     * directory, or when the runtime has no users' home.
+     */
+    private AgentSession inOwnDirectoryWhenNone(AgentSession session) {
+        if (session.hasWorkingDir()) return session;
+        return userHome.sessionDirOf(session.userId(), session.id())
+                .map(own -> sessionRepository.save(session.withWorkingDir(own.toString())))
+                .orElse(session);
+    }
+
+    /** A session's own directory — where its uploads are — when the runtime has a users' home. */
+    public java.util.Optional<java.nio.file.Path> sessionDir(SessionId sessionId) {
+        AgentSession session = findSession(sessionId);
+        return userHome.sessionDirOf(session.userId(), session.id());
+    }
+
+    /** The users' home this runtime keeps session directories under; may be unconfigured. */
+    public UserHome userHome() {
+        return userHome;
+    }
+
+    /**
+     * A session that moves away from its own directory keeps it reachable:
+     * the uploads and scratch files in there must not vanish from the tools
+     * because the user opened a project. Only a directory that exists is
+     * kept — a session that never had one gets nothing added.
+     */
+    private List<String> keepingOwnDirectory(AgentSession session, String newDir, List<String> extras) {
+        return userHome.existingSessionDirOf(session.userId(), session.id())
+                .map(java.nio.file.Path::toString)
+                .filter(own -> !own.equals(newDir) && !extras.contains(own))
+                .map(own -> {
+                    List<String> merged = new java.util.ArrayList<>(extras);
+                    merged.add(own);
+                    return List.copyOf(merged);
+                })
+                .orElse(extras);
     }
 
     /**
@@ -127,9 +188,7 @@ public class AgentSessionService {
      * Sub-agents already running keep the directory they were spawned with.
      */
     public AgentSession changeWorkingDir(SessionId sessionId, String workingDir) {
-        AgentSession session = findSession(sessionId);
-        String dir = workingDirPolicy.forUser(session.userId()).validate(workingDir);
-        return sessionRepository.save(session.withWorkingDir(dir));
+        return changeWorkingDir(sessionId, workingDir, null);
     }
 
     /**
@@ -142,7 +201,8 @@ public class AgentSessionService {
         WorkingDirPolicy policy = workingDirPolicy.forUser(session.userId());
         String dir = policy.validate(workingDir);
         List<String> extras = additionalDirs == null ? session.additionalDirs() : validateAll(policy, additionalDirs);
-        return sessionRepository.save(session.withWorkingDir(dir).withAdditionalDirs(extras));
+        return sessionRepository.save(session.withWorkingDir(dir)
+                .withAdditionalDirs(keepingOwnDirectory(session, dir, extras)));
     }
 
     /** Adds one directory to a session's additional directories ({@code /add-dir}). */
@@ -247,7 +307,7 @@ public class AgentSessionService {
         AgentSession session = AgentSession
                 .start(agent.id(), userId, conversationId)
                 .withSessionAgents(List.of(agent));
-        AgentSession saved = sessionRepository.create(session);
+        AgentSession saved = inOwnDirectoryWhenNone(sessionRepository.create(session));
         userChannels.publish(userId, new UserEvent
                 .SessionStarted(saved.id(), agent.id()));
         return saved;

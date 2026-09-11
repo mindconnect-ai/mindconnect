@@ -195,6 +195,31 @@ fresh empty one, so nothing has to be moved by hand at release time.
   same namespace of the same data directory — the Admin UI while the CLI runs
   in local mode, say — stops at startup with a message saying so.
 
+- **agents:** every user has a directory on the server, and every session
+  one of its own. `mindconnect.users.home` (default `<data.base-dir>/<namespace>/home/{user}`)
+  is where a user's directories live; a session opened without a working
+  directory works in `sessions/<id>` under it, the files attached to a chat
+  are put in that directory's `uploads/` — the system prompt names each
+  file's path, so `file_read`, the document tools and `bash` open them —
+  and when the session moves to a project its own directory stays
+  reachable as an additional directory. The users' home is also the
+  default root a working directory must lie under
+  (`mindconnect.tools.working-dir-root`), so the chat's chooser opens in
+  the user's own tree. An embedding sets it with
+  `AgentRuntimeBuilder.usersHome`. Sessions written before keep working as
+  they did: none of them gets a directory after the fact.
+
+- **agents:** `AttachedFile.path` — where the copy of an attached file lies
+  on disk, when there is one; `ToolCallScope.runWith` binds a scope to the
+  running thread, and a workflow tool-call step resolves its tools in that
+  scope, so an ingestion workflow runs against the session's own files.
+
+### Changed
+
+- **agents:** an upload's copy for ingestion goes into the session's own
+  directory instead of `vector-store-uploads/` under the tools base
+  directory — the user's home, on most machines.
+
 ### Removed
 
 - **agents:** the `mc-agent-tools-gmail` module. Gmail is now an MCP server

@@ -46,4 +46,23 @@ class SystemPromptRendererWorkingDirTest {
         assertThat(SystemPromptRenderer.workingDirSection(session())).isEmpty();
         assertThat(SystemPromptRenderer.workingDirSection(null)).isEmpty();
     }
+
+    @Test
+    void anAttachedFileWithACopyOnDiskIsNamedWithItsPath() {
+        var onDisk = new ai.mindconnect.agent.runtime.domain.AttachedFile("f1", "spec.docx", null, 10,
+                "/home/u/sessions/s1/uploads/spec.docx");
+        var indexedOnly = new ai.mindconnect.agent.runtime.domain.AttachedFile("f2", "notes.md", null, 5);
+
+        String both = SystemPromptRenderer.attachedFilesSection(
+                session().withAttachedFiles(java.util.List.of(onDisk, indexedOnly)));
+        assertThat(both)
+                .contains("- spec.docx (Word document) — on disk at `/home/u/sessions/s1/uploads/spec.docx`")
+                .contains("- notes.md (Markdown)\n")
+                .contains("A file with a path is also a file on disk")
+                .contains("A file without a path is NOT on the filesystem");
+
+        String onlyOnDisk = SystemPromptRenderer.attachedFilesSection(
+                session().withAttachedFiles(java.util.List.of(onDisk)));
+        assertThat(onlyOnDisk).doesNotContain("NOT on the filesystem");
+    }
 }

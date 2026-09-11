@@ -5,6 +5,8 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Per-invocation context passed to a {@link ToolFactory} when resolving a
@@ -76,6 +78,30 @@ public record ToolCallScope(
 
     public boolean inSession() {
         return sessionId != null;
+    }
+
+    /**
+     * The scope bound to the running thread by {@link #runWith}, if any —
+     * for code that resolves tools without a session of its own, such as a
+     * workflow ingesting a session's upload: it runs inside the session's
+     * scope and its tools land in the session's directories.
+     */
+    private static final InheritableThreadLocal<ToolCallScope> CURRENT = new InheritableThreadLocal<>();
+
+    /** The scope bound to this thread, or empty when none is. */
+    public static Optional<ToolCallScope> current() {
+        return Optional.ofNullable(CURRENT.get());
+    }
+
+    /** Runs {@code body} with this scope bound to the thread (and threads it starts), restoring what was there. */
+    public <T> T runWith(Supplier<T> body) {
+        ToolCallScope before = CURRENT.get();
+        CURRENT.set(this);
+        try {
+            return body.get();
+        } finally {
+            if (before == null) CURRENT.remove(); else CURRENT.set(before);
+        }
     }
 
     /** Has the session a working directory? */

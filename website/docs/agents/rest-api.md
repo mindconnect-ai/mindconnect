@@ -42,7 +42,7 @@ the request. In Swagger UI, **Authorize** takes the token. See
 | `PUT /api/agents/{id}/tools` | replace the tool list |
 | `POST /api/agents/{id}/copy` | duplicate as `{name}-copy` |
 | `DELETE /api/agents/{id}` | delete |
-| `POST /api/sessions` | start a session for the caller — body `{agentId, workingDir?, additionalDirs?}`; `workingDir` is the directory the session works in (the file tools' base, named in the prompt), `additionalDirs` further directories it may reach |
+| `POST /api/sessions` | start a session for the caller — body `{agentId, workingDir?, additionalDirs?}`; without `workingDir` the session works in its own directory under the user's home |
 | `PUT /api/sessions/{id}/working-dir` | change them — body `{workingDir, additionalDirs?}`; a null or blank `workingDir` clears it, an absent `additionalDirs` keeps the current ones, an empty list clears them |
 | `GET /api/directories?path=` | one level of the tree the caller may work in: `{root, current, parent, subdirs, truncated}` — the root without `path` |
 | `GET /api/sessions?agentId=` | the caller's sessions for one agent |

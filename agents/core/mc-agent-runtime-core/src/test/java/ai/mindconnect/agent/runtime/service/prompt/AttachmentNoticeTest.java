@@ -135,8 +135,9 @@ class AttachmentNoticeTest {
         assertThat(section).contains("- notes.md (Markdown)")
                 .contains("- deck.pptx (presentation)")
                 .contains("`vector_search`")
-                .contains("NOT files on the filesystem")
-                .contains("`document_outline`");
+                .contains("NOT on the filesystem")
+                .contains("`document_outline`")
+                .doesNotContain("on disk at");
         assertThat(SystemPromptRenderer.attachedFilesSection(session())).isEmpty();
     }
 }

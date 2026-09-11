@@ -64,4 +64,32 @@ class AgentRuntimeBuilderTest {
             assertThat(runtime.sessionService()).isNotNull();
         }
     }
+
+    @Test
+    void aSessionWorksInItsOwnDirectory_andKeepsItWhenMovedToAProject() throws Exception {
+        try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))
+                .agentDefinition(demoAgent())
+                .build()) {
+            AgentSession session = runtime.openSession("test-agent", UserId.of("user-1"));
+
+            assertThat(session.hasWorkingDir()).as("a session opened without a directory gets its own").isTrue();
+            java.nio.file.Path own = java.nio.file.Path.of(session.workingDir());
+            assertThat(own).endsWith(java.nio.file.Path.of("home", "user-1", "sessions", session.id().value()));
+            assertThat(java.nio.file.Files.isDirectory(own)).isTrue();
+            assertThat(runtime.sessionService().sessionDir(session.id())).contains(own);
+
+            // The home is also the root a working directory must lie under.
+            java.nio.file.Path project = java.nio.file.Files.createDirectories(
+                    own.getParent().getParent().resolve("project"));
+            AgentSession moved = runtime.changeWorkingDir(session.id(), project);
+            assertThat(moved.workingDir()).isEqualTo(project.toRealPath().toString());
+            assertThat(moved.additionalDirs()).as("the session's own directory stays reachable")
+                    .containsExactly(own.toString());
+
+            java.nio.file.Path elsewhere = java.nio.file.Files.createTempDirectory("elsewhere");
+            assertThatThrownBy(() -> runtime.changeWorkingDir(session.id(), elsewhere))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
+        }
+    }
 }

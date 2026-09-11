@@ -127,11 +127,14 @@ public class McAgentWorkflowStepsAutoConfiguration {
             @Override
             public String call(String toolName, java.util.Map<String, Object> arguments,
                                ToolCallScope scope) {
-                // A run started for nobody in particular — the workflow admin, the
-                // REST API — acts as the workflow user, who owns no chat.
+                // The scope the run was started with; else one bound to this
+                // thread — an upload being ingested, so a file tool lands in the
+                // session's directories; else the workflow user, who owns no chat.
+                var agentTool = AgentTool.of(toolName);
+                ToolCallScope effective = scope != null ? scope
+                        : ToolCallScope.current().orElseGet(() -> ToolCallScope.detached(UserId.of(WORKFLOW_USER)));
                 Tool tool = toolRegistry
-                        .resolve(AgentTool.of(toolName),
-                                scope != null ? scope : ToolCallScope.detached(UserId.of(WORKFLOW_USER)))
+                        .resolve(agentTool, effective)
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "No tool named '" + toolName + "' is resolvable"
                                 + " (known: " + toolRegistry.knownToolNames() + ")"));

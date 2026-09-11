@@ -32,11 +32,13 @@ import ai.mindconnect.agent.tool.ToolCallScope;
 /**
  * Attaches a stored file to a chat session — the one code path shared by the
  * external REST endpoint and the chat UI: ensure the {@code chat-uploads}
- * template, open the session's SESSION-scoped store, spool the content from
- * the {@link FileStore} (backend-agnostic) under the tools base dir, run the
- * template's ingestion workflow, and activate {@code vector_search} for the
- * session — persisted on the session, so the agent keeps the tool across
- * restarts.
+ * template, open the session's SESSION-scoped store, put a copy of the
+ * content from the {@link FileStore} (backend-agnostic) into the session's
+ * own directory — where the file tools read it — run the template's
+ * ingestion workflow in the session's scope, and activate
+ * {@code vector_search} for the session — persisted on the session, so the
+ * agent keeps the tool across restarts. Without a users' home the copy goes
+ * under the tools base dir, as it always did.
  *
  * <p>Vector stores and the workflow engine are optional in a host
  * application; attach reports a failed {@link AttachResult} (and the other
@@ -59,6 +61,8 @@ public class SessionFileService {
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
     private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path spoolBase;
+    /** Where a session's own directory is; unconfigured means the spool under the tools base dir. */
+    private final ai.mindconnect.agent.runtime.service.UserHome userHome;
 
     public SessionFileService(FileStore fileStore,
                               ObjectProvider<VectorStores> storesProvider,
@@ -66,7 +70,8 @@ public class SessionFileService {
                               AgentSessionRepository sessions,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
-                              @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir) {
+                              @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
+                              ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome) {
         this.fileStore = fileStore;
         this.storesProvider = storesProvider;
         this.activationsProvider = activationsProvider;
@@ -74,6 +79,12 @@ public class SessionFileService {
         this.workflowsProvider = workflowsProvider;
         this.workflowInstancesProvider = workflowInstancesProvider;
         this.spoolBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
+        this.userHome = userHome.getIfAvailable(ai.mindconnect.agent.runtime.service.UserHome::none);
+    }
+
+    /** The copy of an attached file on disk: in the session's uploads directory when there is one. */
+    private java.util.Optional<Path> uploadsDir(ai.mindconnect.agent.runtime.domain.AgentSession session) {
+        return userHome.uploadsDirOf(session.userId(), session.id());
     }
 
     /**
@@ -117,8 +128,12 @@ public class SessionFileService {
             for (String ingestedId : listAttachments(sessionId).keySet()) {
                 if (!Path.of(ingestedId).getFileName().toString().equals(fileName)) continue;
                 stores.openWith(stores.settingsFor(storeName)).deleteFile(ingestedId);
+                // A copy spooled under the tools base dir the old way carries
+                // its directory in the key; a bare name is a copy in the
+                // session's directory, removed below — never a file of that
+                // name in the base dir.
                 Path spooled = spoolBase.resolve(ingestedId).normalize();
-                if (spooled.startsWith(spoolBase)) {
+                if (ingestedId.startsWith("vector-store-uploads/") && spooled.startsWith(spoolBase)) {
                     try {
                         Files.deleteIfExists(spooled);
                     } catch (java.io.IOException ignored) {
@@ -127,6 +142,13 @@ public class SessionFileService {
                 }
             }
         }
+        sessions.findById(sessionId).ifPresent(session -> uploadsDir(session).ifPresent(dir -> {
+            try {
+                Files.deleteIfExists(dir.resolve(fileName));
+            } catch (java.io.IOException ignored) {
+                // The record and the chunks are gone; a stale copy is harmless.
+            }
+        }));
         sessions.update(sessionId, session -> session.withoutAttachedFile(fileName));
     }
 
@@ -145,6 +167,11 @@ public class SessionFileService {
 
     public AttachResult attach(SessionId sessionId, StoredFile stored) {
         AttachedFile attached = new AttachedFile(stored.id().value(), stored.name(), stored.contentType(), stored.size());
+        var sessionOpt = sessions.findById(sessionId);
+        if (sessionOpt.isEmpty()) {
+            return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
+        }
+        var session = sessionOpt.get();
         if (attached.isImage()) {
             // An image is not text to index: it goes to the model with the
             // next message as an image part — or as that part's placeholder
@@ -180,6 +207,15 @@ public class SessionFileService {
         VectorStoreInstance instance = stores.settingsFor(storeName);
 
         try {
+            // A copy in the session's own directory: the file tools read it
+            // there, and the ingestion workflow below runs against it.
+            java.util.Optional<Path> copy = uploadsDir(session).map(dir -> dir.resolve(stored.name()));
+            if (copy.isPresent()) {
+                try (InputStream content = fileStore.content(stored.id())) {
+                    Files.copy(content, copy.get(), StandardCopyOption.REPLACE_EXISTING);
+                }
+                attached = attached.withPath(copy.get().toString());
+            }
             if (instance.ingestionWorkflow() == null || instance.ingestionWorkflow().isBlank()) {
                 // No workflow on the template: the built-in default ingestion —
                 // OpenAI-style 800/400-token chunking straight from the stream.
@@ -195,22 +231,32 @@ public class SessionFileService {
                     return new AttachResult(stored, storeName, false,
                             stored.name() + ": the workflow engine is not configured in this application.");
                 }
-                Path dir = spoolBase.resolve("vector-store-uploads").resolve(storeName);
-                Files.createDirectories(dir);
-                Path target = dir.resolve(stored.name());
-                try (InputStream content = fileStore.content(stored.id())) {
-                    Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
-                }
                 var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                         new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                                 + "' not found"));
+                var runner = new WorkflowRunService(workflowInstances);
+                ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
                 // The workflow's tool steps run on behalf of this chat's user and
-                // session — the calls its upload store accepts.
-                var report = new WorkflowRunService(workflowInstances)
-                        .runWithAttributes(workflow, Map.of("file", spoolBase.relativize(target).toString(),
-                                "store", storeName),
-                                Map.of(ToolCallScope.class.getName(),
-                                        new ToolCallScope(chat.userId(), sessionId, null)));
+                // session — the calls its upload store accepts — and resolve their
+                // paths in the session's own directories.
+                if (copy.isPresent()) {
+                    ToolCallScope scope = ToolCallScope.ofSession(
+                            chat.userId(), sessionId, copy.get().getParent().toString());
+                    report = scope.runWith(() -> runner.runWithAttributes(workflow,
+                            Map.of("file", stored.name(), "store", storeName),
+                            Map.of(ToolCallScope.class.getName(), scope)));
+                } else {
+                    Path dir = spoolBase.resolve("vector-store-uploads").resolve(storeName);
+                    Files.createDirectories(dir);
+                    Path target = dir.resolve(stored.name());
+                    try (InputStream content = fileStore.content(stored.id())) {
+                        Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                    report = runner.runWithAttributes(workflow,
+                            Map.of("file", spoolBase.relativize(target).toString(), "store", storeName),
+                            Map.of(ToolCallScope.class.getName(),
+                                    new ToolCallScope(chat.userId(), sessionId, null)));
+                }
                 if (!report.success()) {
                     return new AttachResult(stored, storeName, false,
                             stored.name() + ": ingestion failed — " + report.error());

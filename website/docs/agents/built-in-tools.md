@@ -66,13 +66,20 @@ this folder* adds the field's path as one more. On a multi-user server give the 
 `{user}` placeholder (`/srv/mindconnect/users/{user}`): each user then picks
 from, and works in, a tree of their own.
 
-A session without one falls back to the tool's own `baseDir` override, then
-the **base directory** (`mindconnect.tools.base-dir`), which defaults to the
-**user home** — in the Admin UI too (its `mindconnect.data.base-dir: ./data`
-is a different property that only controls where *stored data* lives, not
-the file tools). On a server a working directory must lie under
-`mindconnect.tools.working-dir-root` (default: the base directory); the CLI
-sets that root to `/`.
+**Every session has a directory of its own.** A session opened without a
+working directory works in it: `sessions/<session-id>` under the user's
+home (`mindconnect.users.home`, by default `<data.base-dir>/<namespace>/home/{user}`). The
+files attached to a chat are put in its `uploads/` for the file tools —
+the system prompt names each file's path — and when the user moves the
+session to a project, the session's own directory stays reachable as an
+additional directory. On a server a working directory must lie under
+`mindconnect.tools.working-dir-root`, by default the user's home; the CLI
+sets that root to `/` and works where it was launched.
+
+A session with no directory at all — one written before 0.5.2, a runtime
+without a users' home — falls back to the tool's own `baseDir` override,
+then the **base directory** (`mindconnect.tools.base-dir`), which defaults
+to the **user home** of the process.
 
 ## Web tools (`mc-agent-tools-web`)
 
