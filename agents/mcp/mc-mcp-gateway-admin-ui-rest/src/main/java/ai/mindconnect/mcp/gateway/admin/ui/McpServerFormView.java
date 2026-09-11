@@ -107,6 +107,7 @@ final class McpServerFormView {
                         {"type":"docker","image":"…","mounts":[{"hostPath":"~/x","containerPath":"/x"}],"env":{}}
                         {"type":"process","command":["npx","-y","…"],"env":{}}
                         A remote server needs https unless it runs on this machine.
+                        docker and process start only where this installation allows them.
                         A value in "env" or "headers" is stored and sent as entered. ${NAME} is
                         reserved for variables of the signed-in user, which do not exist yet —
                         a registration that uses one cannot start."""));

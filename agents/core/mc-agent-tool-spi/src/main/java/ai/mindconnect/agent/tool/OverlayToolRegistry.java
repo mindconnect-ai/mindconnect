@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.tool;
 
+import ai.mindconnect.agent.SessionId;
+
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -104,6 +106,12 @@ public final class OverlayToolRegistry implements ToolRegistry {
     @Override
     public String subgroupOf(String toolName) {
         return delegate.subgroupOf(toolName);
+    }
+
+    /** What a session holds does not depend on what an operator decided. */
+    @Override
+    public void releaseSession(SessionId sessionId) {
+        delegate.releaseSession(sessionId);
     }
 
     /**

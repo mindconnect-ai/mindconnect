@@ -1,10 +1,12 @@
 package ai.mindconnect.agent.tools.mcp;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
+import ai.mindconnect.mcp.gateway.McpCaller;
 import ai.mindconnect.mcp.gateway.McpGateway;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerInfo;
@@ -101,6 +103,15 @@ public final class McpMultiToolProvider implements MultiToolProvider {
                 binding.tool().name(),
                 binding.tool().description(),
                 binding.tool().inputSchema()));
+    }
+
+    /** The gateway's connections for this session, and the containers behind them. */
+    @Override
+    public void releaseSession(SessionId sessionId) {
+        McpGateway current = gateway;
+        if (current != null && sessionId != null) {
+            current.release(new McpCaller(null, sessionId));
+        }
     }
 
     /**

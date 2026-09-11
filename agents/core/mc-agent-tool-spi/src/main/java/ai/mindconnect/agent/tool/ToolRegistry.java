@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tool;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 
 import java.util.List;
@@ -60,4 +61,12 @@ public interface ToolRegistry {
      * Catalogs use it to break a large group into readable sections.
      */
     default String subgroupOf(String toolName) { return null; }
+
+    /**
+     * Lets go of whatever the tools hold for one session — a pooled connection,
+     * a started container. Called by whoever ends the session; today that is
+     * the tool test bench, whose sessions last one call. Idempotent, and safe
+     * for a session that never used a tool. Default: nothing is held.
+     */
+    default void releaseSession(SessionId sessionId) { }
 }

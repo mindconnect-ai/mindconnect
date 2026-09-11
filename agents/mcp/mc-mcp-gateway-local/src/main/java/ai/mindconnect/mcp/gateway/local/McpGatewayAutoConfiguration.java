@@ -15,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -109,11 +110,14 @@ public class McpGatewayAutoConfiguration {
             McpProxy mcpProxy,
             McpSessionRegistry sessions,
             ObjectProvider<Namespace> namespace,
+            Environment environment,
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
             @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime) {
+        // Whether process and docker targets start is the installation's call:
+        // mindconnect.mcp.allow-process / allow-docker, unset following sign-in.
         return new LocalMcpGateway(repository, mcpProxy, sessions,
                 storageRoot(dataBaseDir), namespace.getIfAvailable(() -> Namespace.DEFAULT),
-                containerRuntime);
+                containerRuntime, McpStartPolicy.from(environment));
     }
 
     /**

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tool;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 
 import java.util.Optional;
@@ -84,6 +85,14 @@ public interface MultiToolProvider {
      * {@link #create} will be honored by the registry. Default {@code true}.
      */
     default boolean isAvailable() { return true; }
+
+    /**
+     * Lets go of whatever this provider holds for one session — the MCP
+     * provider's pooled connections and the containers behind them. The
+     * registry forwards {@link ToolRegistry#releaseSession} here. Idempotent;
+     * the default is a no-op for providers that hold nothing per session.
+     */
+    default void releaseSession(SessionId sessionId) {}
 
     /**
      * Build a tool for the given name. Returns {@link Optional#empty()} if

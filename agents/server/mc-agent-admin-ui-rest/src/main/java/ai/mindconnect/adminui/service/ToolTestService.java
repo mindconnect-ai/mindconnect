@@ -25,7 +25,9 @@ import java.util.Map;
  * (todo_write, workspace_write, …) therefore write into an isolated
  * scratch session that's never reused — no risk of polluting a real
  * conversation. The session directory is left on disk for inspection;
- * the admin can clean it up later if it accumulates.
+ * the admin can clean it up later if it accumulates. What a tool holds for
+ * the session in memory — an MCP server's pooled connection and the
+ * container behind it — is released as soon as the test is over.
  */
 @Service
 public class ToolTestService {
@@ -65,7 +67,8 @@ public class ToolTestService {
                     System.currentTimeMillis() - t0);
         }
 
-        var resolved = toolRegistry.resolve(agentTool, new ToolCallScope(UserId.of(TEST_USER_ID), SessionId.random(), null));
+        SessionId session = SessionId.random();
+        var resolved = toolRegistry.resolve(agentTool, new ToolCallScope(UserId.of(TEST_USER_ID), session, null));
         if (resolved.isEmpty()) {
             return Result.error("Tool '" + agentTool.name()
                     + "' could not be resolved (missing factory or unavailable)?",
@@ -84,6 +87,11 @@ public class ToolTestService {
             log.warn("Tool test '{}' failed after {} ms: {}",
                     agentTool.name(), durMs, e.getMessage());
             return Result.error(e.getClass().getSimpleName() + ": " + e.getMessage(), durMs);
+        } finally {
+            // Nobody comes back to this session. What a tool holds for it — an
+            // MCP server's pooled connection, the container behind it — would
+            // otherwise stay until an idle timeout, once per click.
+            toolRegistry.releaseSession(session);
         }
     }
 

@@ -72,9 +72,11 @@ public interface McpGateway {
      * containers. Idempotent, and safe to call for a session that never used
      * a tool.
      *
-     * <p>Nobody calls this yet: the runtime has no "session over" hook
-     * (concept 21, E4). Until it does, implementations must fall back on an
-     * idle timeout, or containers outlive the chats that started them.
+     * <p>Reached through {@code ToolRegistry.releaseSession} — today from the
+     * tool test bench, whose sessions last one call. A chat has no "session
+     * over" hook yet (concept 21, E4); until it does, implementations must
+     * fall back on an idle timeout, or containers outlive the chats that
+     * started them.
      */
     void release(McpCaller caller);
 }

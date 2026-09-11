@@ -88,7 +88,9 @@ public final class SdkMcpProxy implements McpProxy {
                 .env(spawn.env())
                 .build();
 
-        StdioClientTransport transport = new StdioClientTransport(params, jsonMapper);
+        // Started with a trimmed environment: the variables this process was
+        // started with — database password, LLM keys — are not the server's.
+        StdioClientTransport transport = new TrimmedStdioClientTransport(params, jsonMapper);
         transport.setStdErrorHandler(line ->
                 log.warn("[mcp:{}] {}", spawn.command(), line));
 
@@ -146,6 +148,25 @@ public final class SdkMcpProxy implements McpProxy {
                     "MCP initialize failed for " + what + ": " + e.getMessage(), e);
         }
         return new SdkMcpConnection(client, jsonMapper);
+    }
+
+    /**
+     * The SDK's stdio transport, starting its process with the trimmed
+     * environment of {@link InheritedEnvironment}. The SDK adds the
+     * registration's own variables after this, so those still arrive.
+     */
+    static final class TrimmedStdioClientTransport extends StdioClientTransport {
+
+        TrimmedStdioClientTransport(ServerParameters params, McpJsonMapper jsonMapper) {
+            super(params, jsonMapper);
+        }
+
+        @Override
+        protected ProcessBuilder getProcessBuilder() {
+            ProcessBuilder builder = new ProcessBuilder();
+            InheritedEnvironment.trim(builder.environment());
+            return builder;
+        }
     }
 
     /**

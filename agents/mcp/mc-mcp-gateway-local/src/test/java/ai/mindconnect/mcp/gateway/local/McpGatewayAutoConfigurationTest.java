@@ -2,10 +2,13 @@ package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.mcp.gateway.McpCaller;
 import ai.mindconnect.mcp.gateway.McpGateway;
+import ai.mindconnect.mcp.gateway.McpProbeResult;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.mcp.gateway.McpResult;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerInfo;
+import ai.mindconnect.mcp.gateway.McpServerRegistration;
+import ai.mindconnect.mcp.gateway.McpTarget;
 import ai.mindconnect.mcp.gateway.McpTool;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Test;
@@ -95,6 +98,20 @@ class McpGatewayAutoConfigurationTest {
                 assertThat(context).doesNotHaveBean(ai.mindconnect.mcp.gateway.McpCatalog.class));
         runner().withPropertyValues("mindconnect.mcp.catalog.enabled=true").run(context ->
                 assertThat(context).hasSingleBean(ai.mindconnect.mcp.gateway.McpCatalog.class));
+    }
+
+    @Test
+    void with_sign_in_on_a_process_target_does_not_start() {
+        // /mcp-gateway asks for a login, not an admin role: without this,
+        // anybody who can sign in runs a command on the server with a probe.
+        runner().withPropertyValues("mindconnect.auth.enabled=true").run(context -> {
+            McpProbeResult probe = context.getBean(McpRegistryAdmin.class).probe(new McpServerRegistration(
+                    McpServerId.of("shell"), null, null, true, "shell",
+                    new McpTarget.Process(List.of("/bin/sh", "-c", "env"), Map.of()), null));
+
+            assertThat(probe.ok()).isFalse();
+            assertThat(probe.message()).contains("process targets are switched off");
+        });
     }
 
     @Configuration(proxyBeanMethods = false)

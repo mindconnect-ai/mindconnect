@@ -23,6 +23,12 @@ import java.util.Map;
  * with no user and no session just to read its description and schema, and
  * a metadata question must not require the means to make a call. The caller
  * identity is assembled when there is actually something to call.
+ *
+ * <p>Every failure comes back as text starting with {@code Error:}. That is
+ * the prefix the tool-call worker, the chat's call history and the workflow
+ * tool step read a failure by; any other wording counts as a result, so the
+ * chat would show the call as successful and a workflow step would carry on
+ * with the complaint as its output.
  */
 final class McpToolAdapter implements Tool {
 
@@ -61,8 +67,12 @@ final class McpToolAdapter implements Tool {
     @Override
     public String execute(Map<String, Object> arguments) {
         if (scope.sessionId() == null) {
-            // Only the catalog resolves without a session, and it never calls.
-            return "Tool execution failed: no session — an MCP tool cannot be called outside an agent session.";
+            // Resolved outside an agent session. The catalog does that and never
+            // calls — but so does a workflow started from the workflow admin or
+            // the REST API, and that one does. Connections are held per session,
+            // so there is nothing to call through.
+            return "Error: " + agentToolName + " needs an agent session — an MCP tool runs in a chat "
+                    + "or in a workflow started from one, not in a run started for nobody in particular.";
         }
         McpCaller caller = new McpCaller(scope.userId(), scope.sessionId());
         try {
@@ -70,7 +80,7 @@ final class McpToolAdapter implements Tool {
             if (result.isError()) {
                 log.warn("{} → {}/{} returned an error: {}",
                         agentToolName, serverId, subToolName, result.asString());
-                return "Error from MCP server: " + result.asString();
+                return "Error: the MCP server reported: " + result.asString();
             }
             String text = result.asString();
             // An MCP server may answer "nothing found" with an empty text
@@ -82,7 +92,7 @@ final class McpToolAdapter implements Tool {
             return text;
         } catch (RuntimeException e) {
             log.error("{} → {}/{} failed", agentToolName, serverId, subToolName, e);
-            return "Tool execution failed: " + e.getMessage();
+            return "Error: " + e.getMessage();
         }
     }
 }

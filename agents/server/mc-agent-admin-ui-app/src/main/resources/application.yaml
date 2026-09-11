@@ -53,6 +53,13 @@ mindconnect:
   tools:
     tavily-api-key: ${TAVILY_API_KEY:}
   mcp:
+    # MCP servers this installation starts itself. A "process" target runs a
+    # command, a "docker" target a container — both with the rights of this
+    # server, and /mcp-gateway asks for a login, not an admin role. Unset,
+    # each follows sign-in: on while auth.enabled is false, off once it is
+    # true. Set explicitly with MINDCONNECT_MCP_ALLOW_PROCESS / _ALLOW_DOCKER.
+    # allow-process: false
+    # allow-docker: false
     # Suggestions for registering MCP servers, fetched from Docker's public
     # catalog. Off by default: it is an outbound call to a third party, and
     # an installation that does not want one should not make it because

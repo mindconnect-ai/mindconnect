@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tool;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.Tool;
@@ -317,6 +318,23 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
             }
         }
         return null;   // a ToolFactory tool, or a name nobody serves
+    }
+
+    /**
+     * Every provider lets go of what it holds for the session — ready or not,
+     * since one that dropped out may still hold something. One that fails is
+     * logged and does not keep the others from releasing theirs.
+     */
+    @Override
+    public void releaseSession(SessionId sessionId) {
+        for (MultiToolProvider provider : providers) {
+            try {
+                provider.releaseSession(sessionId);
+            } catch (RuntimeException e) {
+                log.warn("MultiToolProvider {} failed to release session {}: {}",
+                        provider.getClass().getSimpleName(), sessionId, e.toString());
+            }
+        }
     }
 
     @Override

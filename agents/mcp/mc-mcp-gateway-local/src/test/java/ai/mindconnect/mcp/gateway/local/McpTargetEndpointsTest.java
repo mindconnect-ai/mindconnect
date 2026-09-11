@@ -20,7 +20,7 @@ class McpTargetEndpointsTest {
     @TempDir
     Path existingHostDir;
 
-    private final McpTargetEndpoints endpoints = new McpTargetEndpoints("podman");
+    private final McpTargetEndpoints endpoints = new McpTargetEndpoints("podman", McpStartPolicy.allowAll());
 
     /** A variable that no environment sets, so the tests do not depend on one. */
     private static final String UNSET = "MC_TEST_VARIABLE_THAT_IS_NEVER_SET";
@@ -128,7 +128,7 @@ class McpTargetEndpointsTest {
 
     @Test
     void without_a_container_runtime_a_docker_target_says_so() {
-        McpTargetEndpoints none = new McpTargetEndpoints(null);
+        McpTargetEndpoints none = new McpTargetEndpoints(null, McpStartPolicy.allowAll());
 
         assertThatThrownBy(() -> none.toEndpoint(
                 new McpTarget.Docker("mcp/gmail:latest", List.of(), Map.of(), List.of(), List.of())))
@@ -172,9 +172,45 @@ class McpTargetEndpointsTest {
     @Test
     void an_http_target_without_a_runtime_still_works() {
         // The container binary is irrelevant for a server we do not start.
-        McpTargetEndpoints none = new McpTargetEndpoints(null);
+        McpTargetEndpoints none = new McpTargetEndpoints(null, McpStartPolicy.allowAll());
 
         assertThat(none.toEndpoint(new McpTarget.Http(URI.create("https://mcp.example.com/mcp"), Map.of())))
+                .isInstanceOf(McpHttpEndpoint.class);
+    }
+
+    @Test
+    void a_process_target_is_refused_where_the_installation_starts_no_processes() {
+        McpTargetEndpoints noProcesses = new McpTargetEndpoints("podman", new McpStartPolicy(false, true));
+
+        assertThatThrownBy(() -> noProcesses.toEndpoint(new McpTarget.Process(
+                List.of("/bin/sh", "-c", "env"), Map.of())))
+                .isInstanceOf(McpGatewayException.class)
+                .hasMessageContaining("process targets are switched off")
+                .hasMessageContaining("mindconnect.mcp.allow-process");
+        assertThat(noProcesses.toEndpoint(new McpTarget.Docker(
+                "mcp/github", List.of(), Map.of(), List.of(), List.of())))
+                .as("containers are a separate decision")
+                .isInstanceOf(McpStdioSpawn.class);
+    }
+
+    @Test
+    void a_docker_target_is_refused_where_the_installation_starts_no_containers() {
+        // Refused before the runtime is even looked at: "switched off" is the
+        // answer an operator can act on, "no container runtime" would not be.
+        McpTargetEndpoints noContainers = new McpTargetEndpoints(null, new McpStartPolicy(true, false));
+
+        assertThatThrownBy(() -> noContainers.toEndpoint(new McpTarget.Docker(
+                "alpine:3", List.of(), Map.of(), List.of("--privileged"), List.of())))
+                .isInstanceOf(McpGatewayException.class)
+                .hasMessageContaining("docker targets are switched off")
+                .hasMessageContaining("mindconnect.mcp.allow-docker");
+    }
+
+    @Test
+    void an_http_target_starts_nothing_here_and_needs_no_permission() {
+        McpTargetEndpoints nothingStarts = new McpTargetEndpoints(null, new McpStartPolicy(false, false));
+
+        assertThat(nothingStarts.toEndpoint(new McpTarget.Http(URI.create("https://mcp.example.com/mcp"), Map.of())))
                 .isInstanceOf(McpHttpEndpoint.class);
     }
 
