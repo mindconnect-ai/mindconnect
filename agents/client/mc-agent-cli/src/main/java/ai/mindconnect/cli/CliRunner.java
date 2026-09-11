@@ -192,7 +192,7 @@ public class CliRunner implements CommandLineRunner {
                     }
                     try {
                         java.util.List<String> dirs = new java.util.ArrayList<>(session.additionalDirs());
-                        dirs.add(dir);
+                        dirs.add(DirectoryArgument.resolve(dir, session.workingDir()));
                         session = client.changeWorkingDir(session.id(), session.workingDir(), dirs);
                         printDirectories(session);
                     } catch (Exception e) {
@@ -209,7 +209,8 @@ public class CliRunner implements CommandLineRunner {
                 if (input.equals("/cd") || input.startsWith("/cd ")) {
                     String dir = input.length() > 3 ? input.substring(3).trim() : "";
                     try {
-                        session = client.changeWorkingDir(session.id(), dir.isEmpty() ? null : dir);
+                        session = client.changeWorkingDir(session.id(),
+                                dir.isEmpty() ? null : DirectoryArgument.resolve(dir, session.workingDir()));
                         System.out.println(session.hasWorkingDir()
                                 ? "[Working directory: " + session.workingDir() + "]"
                                 : "[Working directory cleared — the tools use the runtime's default.]");
