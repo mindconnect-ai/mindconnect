@@ -36,9 +36,10 @@ import ai.mindconnect.agent.tool.ToolCallScope;
  * content from the {@link FileStore} (backend-agnostic) into the session's
  * own directory — where the file tools read it — run the template's
  * ingestion workflow in the session's scope, and activate
- * {@code vector_search} for the session — persisted on the session, so the
- * agent keeps the tool across restarts. Without a users' home the copy goes
- * under the tools base dir, as it always did.
+ * {@code vector_search}, {@code file_read} and {@code file_list} for the
+ * session — persisted on the session, so the agent keeps the tools across
+ * restarts. Without a users' home the copy goes under the tools base dir, as
+ * it always did.
  *
  * <p>Vector stores and the workflow engine are optional in a host
  * application; attach reports a failed {@link AttachResult} (and the other
@@ -88,6 +89,36 @@ public class SessionFileService {
     }
 
     /**
+     * Puts the content next to the session's other uploads and answers where
+     * it landed — empty when the session has no directory of its own. Every
+     * attached file goes through here, images included: whatever the model
+     * does with a file, the file tools can open it by that path.
+     */
+    private java.util.Optional<Path> copyIntoUploads(AgentSession session, StoredFile stored) throws java.io.IOException {
+        java.util.Optional<Path> target = uploadsDir(session).map(dir -> dir.resolve(stored.name()));
+        if (target.isPresent()) {
+            try (InputStream content = fileStore.content(stored.id())) {
+                Files.copy(content, target.get(), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
+        return target;
+    }
+
+    /**
+     * Records the file on the session and, when the copy landed in the
+     * session's own directory, that directory as an additional one — the
+     * system prompt names the copy's path, so the file tools must be allowed
+     * to open it. Both under one lock; false when the session is gone.
+     */
+    private boolean record(SessionId sessionId, AttachedFile attached, java.util.Optional<Path> copy) {
+        java.util.Optional<String> ownDir = copy.map(c -> c.getParent().getParent().toString());
+        return sessions.update(sessionId, current -> {
+            AgentSession updated = current.withAttachedFiles(List.of(attached));
+            return ownDir.map(updated::withAdditionalDir).orElse(updated);
+        }).isPresent();
+    }
+
+    /**
      * The files attached to the session, in attach order — the session's own
      * record, images included. {@link #listAttachments} adds the searchable
      * chunks each ingested file produced.
@@ -116,9 +147,10 @@ public class SessionFileService {
     /**
      * Detaches a file from the chat, named by its file name or by the id its
      * chunks were ingested under (the spooled path — what {@link #listAttachments}
-     * keys by). Its chunks leave the session's vector store and the spooled
-     * copy goes with them; an image, never ingested, simply leaves the
-     * session's record. The original in the file store is untouched.
+     * keys by). Its chunks leave the session's vector store and the copy in
+     * the session's directory goes with them; an image, never ingested, loses
+     * that copy and its entry on the session. The original in the file store
+     * is untouched.
      */
     public void deleteAttachment(SessionId sessionId, String fileIdOrName) {
         String fileName = Path.of(fileIdOrName).getFileName().toString();
@@ -166,9 +198,23 @@ public class SessionFileService {
     }
 
     /**
-     * Attaches a stored file to the session: an image is recorded, anything
-     * else is copied into the session's directory and ingested into its
-     * vector store. A failure comes back as the result — the chat shows it as
+     * The copy on disk is only reachable if the agent has the tools to reach
+     * it. An agent that finds its tools by searching would have to search
+     * first, while {@code vector_search} sits right in front of it from the
+     * ingest — so an upload activates the two file tools with it, and the
+     * prompt's "open it by that path" is advice the agent can follow.
+     */
+    private void activateFileTools(SessionId sessionId) {
+        DynamicToolActivations activations = activationsProvider.getIfAvailable();
+        if (activations != null) {
+            activations.activate(sessionId, List.of("file_read", "file_list"));
+        }
+    }
+
+    /**
+     * Attaches a stored file to the session: every file is copied into the
+     * session's directory, and everything but an image is also ingested into
+     * its vector store. A failure comes back as the result — the chat shows it as
      * a toast — and is logged, since the toast is gone once it fades.
      */
     public AttachResult attach(SessionId sessionId, StoredFile stored) {
@@ -189,13 +235,25 @@ public class SessionFileService {
         if (attached.isImage()) {
             // An image is not text to index: it goes to the model with the
             // next message as an image part — or as that part's placeholder
-            // when the model does not read images. Recorded on the session,
-            // nothing else to do.
-            AttachedFile image = attached;
-            if (sessions.update(sessionId, current -> current.withAttachedFiles(List.of(image))).isEmpty()) {
+            // when the model does not read images. It is still a file the
+            // user put in this chat, so it is copied into the session's
+            // uploads directory like any other: the file tools list it, and
+            // an agent that writes code can point at it by path. A failed
+            // copy costs the path, not the attachment.
+            java.util.Optional<Path> copy = java.util.Optional.empty();
+            try {
+                copy = copyIntoUploads(session, stored);
+            } catch (Exception e) {
+                log.warn("Copying image '{}' into the directory of session {} failed, attaching it without a path: {}",
+                        stored.name(), sessionId.value(), e.getMessage());
+            }
+            final AttachedFile bare = attached;
+            AttachedFile image = copy.map(c -> bare.withPath(c.toString())).orElse(bare);
+            if (!record(sessionId, image, copy)) {
                 return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
             }
             activateViewer(sessionId);
+            if (copy.isPresent()) activateFileTools(sessionId);
             return new AttachResult(stored, null, true,
                     stored.name() + " attached — it goes to the model with your next message.");
         }
@@ -220,11 +278,8 @@ public class SessionFileService {
         try {
             // A copy in the session's own directory: the file tools read it
             // there, and the ingestion workflow below runs against it.
-            java.util.Optional<Path> copy = uploadsDir(session).map(dir -> dir.resolve(stored.name()));
+            java.util.Optional<Path> copy = copyIntoUploads(session, stored);
             if (copy.isPresent()) {
-                try (InputStream content = fileStore.content(stored.id())) {
-                    Files.copy(content, copy.get(), StandardCopyOption.REPLACE_EXISTING);
-                }
                 attached = attached.withPath(copy.get().toString());
             }
             if (instance.ingestionWorkflow() == null || instance.ingestionWorkflow().isBlank()) {
@@ -279,19 +334,13 @@ public class SessionFileService {
             if (activations != null) {
                 activations.activate(sessionId, List.of("vector_search"));
             }
+            if (copy.isPresent()) activateFileTools(sessionId);
             if (attached.isPdf()) activateViewer(sessionId);
             // Announce the file in the system prompt (rendered fresh each
-            // round) so the model actually reaches for vector_search. The
-            // prompt names the copy's path, so the file tools must be able to
-            // open it: a session working in a project gets its own directory
-            // (the uploads' parent) as an additional directory — a no-op when
-            // it works in there already. Both in one change, under the lock.
-            AttachedFile recorded = attached;
-            java.util.Optional<String> ownDir = copy.map(c -> c.getParent().getParent().toString());
-            sessions.update(sessionId, current -> {
-                AgentSession updated = current.withAttachedFiles(List.of(recorded));
-                return ownDir.map(updated::withAdditionalDir).orElse(updated);
-            });
+            // round) so the model reaches for it at all — and give the session
+            // its own directory (the uploads' parent) as an additional one, so
+            // the path the prompt names is a path the file tools may open.
+            record(sessionId, attached, copy);
             return new AttachResult(stored, storeName, true,
                     stored.name() + " attached — the agent can now search it.");
         } catch (Exception e) {

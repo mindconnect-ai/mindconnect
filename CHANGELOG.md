@@ -34,6 +34,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
   directory) beside the absolute one, `glob` says that it returns files and
   never directories — `*` in a directory of sub-directories finds nothing —
   and the bundled `coding-assistant` gets `file_list`, which it was missing.
+- **agents:** an image attached to a chat is a file like any other. It was
+  only recorded on the session and handed to the model with the next message,
+  so `file_list` did not show it and no tool could open it; it is now copied
+  into the chat's uploads directory as well, named in the prompt with its
+  path, and removed again when the attachment is removed. Its content is
+  still not indexed — an image is not text to search.
+- **agents:** attaching a file activates `file_read` and `file_list` for the
+  chat, next to `vector_search`. An agent that finds its tools by searching
+  had the search tool in front of it and the file tools only behind a
+  `tool_search` call, so it searched an attachment it was told to open.
 
 ## [0.8.0] - 2026-09-11
 
