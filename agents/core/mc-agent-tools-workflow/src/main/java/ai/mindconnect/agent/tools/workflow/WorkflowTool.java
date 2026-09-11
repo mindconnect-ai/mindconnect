@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.workflow;
 
 import ai.mindconnect.agent.tool.Tool;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.schema.Schema;
 import ai.mindconnect.schema.SchemaValidator;
 import ai.mindconnect.workflow.domain.HaltData;
@@ -25,6 +26,10 @@ import java.util.Optional;
  * embedded engine — the definition is re-read from the repository per call, so admin-UI
  * edits apply to the very next invocation.
  *
+ * <p>The run acts for the caller: the {@link ToolCallScope} this tool was created with goes
+ * onto the run, so its tool-call steps resolve their tools for the same user, session and
+ * agent a direct call would have.
+ *
  * <p>Outcomes map to LLM-readable text: the workflow result on success, a descriptive error
  * on failure, and for a halt (human-in-the-loop suspension) a message naming the inputs the
  * halt is waiting for — resuming from an agent is not supported yet.
@@ -37,12 +42,15 @@ final class WorkflowTool implements Tool {
     private final String workflowId;
     private final Schema params;
     private final String description;
+    private final ToolCallScope scope;
 
-    WorkflowTool(WorkflowDataRepository repository, String workflowId, WorkflowData snapshot) {
+    WorkflowTool(WorkflowDataRepository repository, String workflowId, WorkflowData snapshot,
+                 ToolCallScope scope) {
         this.repository = repository;
         this.workflowId = workflowId;
         this.params = snapshot.getParams() != null ? snapshot.getParams() : Schema.object();
         this.description = buildDescription(workflowId, snapshot);
+        this.scope = scope;
     }
 
     @Override
@@ -78,7 +86,8 @@ final class WorkflowTool implements Tool {
 
         try {
             WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
-                    .executeWorkflow(wf, args);
+                    .executeWorkflow(wf, args,
+                            scope == null ? Map.of() : Map.of(ToolCallScope.class.getName(), scope));
             if (result.isError()) {
                 Throwable error = result.getError();
                 String message = error != null && error.getMessage() != null

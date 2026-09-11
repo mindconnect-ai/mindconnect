@@ -105,8 +105,9 @@ public final class WorkflowToolProvider implements MultiToolProvider {
             return Optional.empty();
         }
         String workflowId = toolName.substring(TOOL_NAME_PREFIX.length());
-        // scope may carry null userId/sessionId (the tool catalog resolves with nulls) — unused here.
+        // The run acts for this scope: its tool steps resolve their tools with it.
+        // The tool catalog probes with null userId/sessionId, which a run tolerates.
         return repository.findById(workflowId)
-                .map(wf -> new WorkflowTool(repository, workflowId, wf));
+                .map(wf -> new WorkflowTool(repository, workflowId, wf, scope));
     }
 }

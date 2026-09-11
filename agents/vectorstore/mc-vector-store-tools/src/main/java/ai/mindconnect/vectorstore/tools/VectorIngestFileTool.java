@@ -18,17 +18,21 @@ import java.util.Map;
  * Reads the file relative to the tools base directory, extracts text (via the
  * document reader when {@code mc-agent-tools-document} is on the classpath —
  * docx/pdf/markdown — else plain UTF-8), chunks OpenAI-style (800/400) and
- * embeds into the store, replacing previous chunks of the same path.
+ * embeds into the store, replacing previous chunks of the same path. A chat's
+ * upload store follows the same rule as for the other knowledge tools
+ * ({@link VectorTools#refusedStore}).
  */
 public final class VectorIngestFileTool implements Tool {
 
     private final VectorStores stores;
     private final String baseDir;
+    private final ToolCallScope callScope;
 
-    VectorIngestFileTool(VectorStores stores, String baseDir) {
+    VectorIngestFileTool(VectorStores stores, String baseDir, ToolCallScope callScope) {
         this.stores = stores;
         this.baseDir = baseDir == null || baseDir.isBlank()
                 ? System.getProperty("user.home") : baseDir;
+        this.callScope = callScope;
     }
 
     @Override
@@ -63,6 +67,10 @@ public final class VectorIngestFileTool implements Tool {
         String storeName = arguments.get("store") instanceof String s && !s.isBlank() ? s : null;
         if (relative == null || storeName == null) {
             return "Error: 'path' and 'store' are required.";
+        }
+        String denied = VectorTools.refusedStore(stores, storeName, callScope);
+        if (denied != null) {
+            return denied;
         }
         Path base = Path.of(baseDir).toAbsolutePath().normalize();
         Path file = base.resolve(relative).normalize();
@@ -123,7 +131,7 @@ public final class VectorIngestFileTool implements Tool {
         }
 
         @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-            return new VectorIngestFileTool(stores, baseDir);
+            return new VectorIngestFileTool(stores, baseDir, scope);
         }
     }
 }

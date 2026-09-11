@@ -149,6 +149,28 @@ For Jackson to deserialize it, the class must be on the classpath and visible to
 the object mapper (`WorkflowObjectMapperFactory.create()` resolves `@class`
 names by reflection, so no extra registration is needed for round-tripping).
 
+## Values from the host: run attributes
+
+A step sometimes needs something the workflow's variables should not carry —
+on whose behalf the run happens, say. Hand such values to one run as
+**attributes**; every step of that run reads them from its context, parallel
+`for_each` blocks and called workflows included:
+
+```java
+var result = service.executeWorkflow(wf, Map.of("name", "Ada"),
+        Map.of(Tenant.class.getName(), new Tenant("acme")));
+```
+
+```java
+// inside a step; null when the host passed none
+Tenant tenant = getWorkflowContext().getAttribute(Tenant.class);
+```
+
+Unlike variables, attributes are invisible to expressions and are not part of
+a halted run's snapshot, so a resumed run starts without them. The agents area
+uses them to run a workflow's tool-call steps for the user and chat that
+started the run.
+
 ## Optional: PlantUML support
 
 If you also want your step authorable from PlantUML, implement a `DslStepBuilder`

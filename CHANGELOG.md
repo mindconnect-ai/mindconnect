@@ -40,6 +40,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
   a different description for this installation, without touching any agent
   definition. What an agent definition says about a tool still wins for that
   agent. Stored in `<data>/<namespace>/system/tool-settings.json`.
+- **workflow:** run attributes. `WorkflowContext` carries values the host
+  hands one run (`getAttribute` / `setAttribute`), passed in with
+  `WorkflowExecutorService.executeWorkflow(workflow, params, attributes)` or
+  `WorkflowRunService.runWithAttributes(...)`. Every step of the run sees them,
+  parallel for-each blocks and called workflows included; a resumed run starts
+  without them.
+- **agents:** `ToolCallScope.rootSessionId`, the chat at the top of a sub-agent
+  chain, and `ToolInvoker.call(tool, arguments, scope)`, which the tool-call
+  workflow step now calls with the scope found on its run.
 
 ### Removed
 
@@ -60,6 +69,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and `vector_delete_file` tools refuse the upload store of any other chat
   session, so the model cannot be talked into reading another user's
   attachments by naming their store.
+- **agents:** a chat's upload store now belongs to the chat's user, and only
+  calls made for that user reach it. The check above applied inside a chat
+  only: a workflow started from the workflow admin or
+  `/api/workflows/{id}/run` resolved its tool steps for nobody in particular
+  and could read or fill any chat's uploads, and so could a chat model that
+  ran such a workflow as a tool; `vector_ingest_file` did not check at all. A
+  workflow run as an agent tool now runs its tool steps for the calling user
+  and session, the upload pipeline ingests on behalf of the chat's user, and a
+  run for nobody reaches no chat's store. A sub-agent's `vector_search`
+  without a store searches the uploads of the chat that started it. Upload
+  stores from before this change record their owner the next time their chat
+  uploads a file; until then only that chat reaches them.
 
 - **agents:** coming back to the chat no longer lands in a different
   conversation. The chat opened whichever conversation had been started

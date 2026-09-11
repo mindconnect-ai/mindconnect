@@ -46,7 +46,8 @@ public class WorkflowContextFactory {
                 scriptOutputWriter,
                 jsonMapper,
                 workflowDefinitionRegistry,
-                new ArrayList<>()
+                new ArrayList<>(),
+                new java.util.concurrent.ConcurrentHashMap<>()
         );
     }
 }

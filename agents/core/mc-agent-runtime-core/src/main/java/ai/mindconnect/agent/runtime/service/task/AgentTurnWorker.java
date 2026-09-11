@@ -250,7 +250,9 @@ public final class AgentTurnWorker implements TaskWorker {
         ConversationMessageLog messageLog = new ConversationMessageLog(
                 conversationManager, history, session.userId().value(), def.id(), turnId, run, tokenCounter);
 
-        SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session);
+        // A sub-agent's tools see the chat that started the chain: the user's uploads are there.
+        SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session,
+                session.parentSessionId() == null ? session.id() : sessionService.rootSession(session.id()).id());
         QueuedAgentRoundToolExecutor executor = new QueuedAgentRoundToolExecutor(
                 ctx, conversationManager, sessionService, def, session, turnId, run, conversationId, depth);
 

@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
@@ -28,6 +29,9 @@ import java.util.Map;
  * </ul>
  */
 public final class VectorTools {
+
+    /** The name prefix of a chat's upload store: {@code session-<sessionId>}. */
+    static final String SESSION_STORE_PREFIX = "session-";
 
     private VectorTools() {}
 
@@ -101,7 +105,7 @@ public final class VectorTools {
                     || !(arguments.get("chunks") instanceof List<?> rawChunks) || rawChunks.isEmpty()) {
                 return "Error: 'store', 'file_id' and a non-empty 'chunks' array are required.";
             }
-            String denied = foreignSessionStore(stores, storeName, callScope);
+            String denied = refusedStore(stores, storeName, callScope);
             if (denied != null) {
                 return denied;
             }
@@ -139,7 +143,11 @@ public final class VectorTools {
                             ? callScope.agentId().value() : null;
                     case GLOBAL -> null;
                 };
-                VectorStore store = stores.open(storeName, str(arguments, "template"), scope, scopeRef);
+                // A session-scoped store is the chat's user's, like an upload store.
+                String owner = scope == VectorStoreInstance.Scope.SESSION
+                        && callScope != null && callScope.userId() != null
+                        ? callScope.userId().value() : null;
+                VectorStore store = stores.open(storeName, str(arguments, "template"), scope, scopeRef, owner);
                 store.deleteFile(fileId);   // replace semantics
                 store.upsert(chunks);
                 return "Stored " + chunks.size() + " chunk(s) for file '" + fileId + "' in store '"
@@ -151,11 +159,6 @@ public final class VectorTools {
     }
 
     record SearchTool(VectorStores stores, ToolCallScope callScope) implements Tool {
-
-        /** The chat session's upload store — where attached files land. */
-        static String sessionStoreName(SessionId sessionId) {
-            return "session-" + sessionId.value();
-        }
 
         @Override public String name() { return "vector_search"; }
 
@@ -185,12 +188,15 @@ public final class VectorTools {
                 return "Error: 'query' is required.";
             }
             if (storeName == null) {
-                if (callScope == null || callScope.sessionId() == null) {
+                // The chat's store, not the session's own: a sub-agent's session
+                // has no uploads — the files were attached to the chat above it.
+                SessionId chat = chatSession(callScope);
+                if (chat == null) {
                     return "Error: no 'store' given and no chat session to default to.";
                 }
-                storeName = sessionStoreName(callScope.sessionId());
+                storeName = sessionStoreName(chat);
             }
-            String denied = foreignSessionStore(stores, storeName, callScope);
+            String denied = refusedStore(stores, storeName, callScope);
             if (denied != null) {
                 return denied;
             }
@@ -243,7 +249,7 @@ public final class VectorTools {
             if (storeName == null || fileId == null) {
                 return "Error: 'store' and 'file_id' are required.";
             }
-            String denied = foreignSessionStore(stores, storeName, callScope);
+            String denied = refusedStore(stores, storeName, callScope);
             if (denied != null) {
                 return denied;
             }
@@ -258,39 +264,75 @@ public final class VectorTools {
 
     // ── helpers ────────────────────────────────────────────────────────────
 
+    /** The upload store of a chat session — where attached files land. */
+    static String sessionStoreName(SessionId sessionId) {
+        return SESSION_STORE_PREFIX + sessionId.value();
+    }
+
+    /** The chat a call belongs to: the top of its sub-agent chain, where the user's uploads are. */
+    static SessionId chatSession(ToolCallScope scope) {
+        if (scope == null) {
+            return null;
+        }
+        return scope.rootSessionId() != null ? scope.rootSessionId() : scope.sessionId();
+    }
+
     /**
-     * A chat session's upload store holds what one user attached to one chat,
-     * and the model running in that chat is the user's proxy — so from inside
-     * a session a tool may only touch that session's own store. Everything
-     * else it names is a knowledge base (global or an agent's) and stays open.
-     * Two things mark a store as another session's: a registered
-     * {@code SESSION} scope naming a different session, and the
-     * {@code session-} name the upload pipeline uses — the name matters for
-     * stores that do not exist yet, or the model could create
-     * {@code session-<other>} itself and read what lands there later.
+     * A chat's upload store holds what one user attached to one chat, so it is
+     * that user's: a tool reaches it only when it runs for that user — in the
+     * chat itself, in another chat of theirs, in a sub-agent the chat started,
+     * or in a workflow run on their behalf. Everything else a tool names is a
+     * knowledge base (global or an agent's) and stays open.
      *
-     * <p>A call without a session is the installation's own run and is not
-     * restricted here: the ingestion workflow that fills an upload store
-     * resolves its tools detached from any session.
+     * <p>A store is a chat's when it is registered with the {@code SESSION}
+     * scope, or when its name has the {@code session-} form the upload
+     * pipeline uses. Its user is the owner recorded when the store was
+     * registered. Without an owner — a {@code session-} store nobody registered
+     * yet, or one from before owners were recorded — only its own chat reaches
+     * it; otherwise the model could create {@code session-<other>} itself and
+     * read what lands there later.
+     *
+     * <p>A call made for nobody in particular — a workflow started from the
+     * workflow admin or the REST API runs as the {@code workflow} user — owns
+     * no chat and reaches none. The upload pipeline runs its ingestion on
+     * behalf of the chat's user.
      *
      * @return the tool's error text, or {@code null} when access is fine
      */
-    static String foreignSessionStore(VectorStores stores, String storeName, ToolCallScope callScope) {
-        if (callScope == null || callScope.sessionId() == null) {
+    static String refusedStore(VectorStores stores, String storeName, ToolCallScope callScope) {
+        VectorStoreInstance registered = stores.registry().instance(storeName).orElse(null);
+        boolean chatStore = storeName.startsWith(SESSION_STORE_PREFIX)
+                || (registered != null && registered.scope() == VectorStoreInstance.Scope.SESSION);
+        if (!chatStore) {
             return null;
         }
-        SessionId own = callScope.sessionId();
-        if (storeName.equals(SearchTool.sessionStoreName(own))) {
-            return null;
+        if (registered != null && registered.owner() != null) {
+            UserId user = callScope == null ? null : callScope.userId();
+            return user != null && registered.owner().equals(user.value()) ? null : refusal(storeName);
         }
-        VectorStoreInstance settings = stores.settingsFor(storeName);
-        boolean anotherSessionsScope = settings.scope() == VectorStoreInstance.Scope.SESSION
-                && !own.value().equals(settings.scopeRef());
-        if (anotherSessionsScope || storeName.startsWith("session-")) {
-            return "Error: store '" + storeName + "' belongs to another chat session and is not "
-                    + "accessible from this one. Omit 'store' to search the files attached to this chat.";
+        return ownChat(storeName, registered, callScope) ? null : refusal(storeName);
+    }
+
+    /** Whether the call runs in the chat the store is named or registered for, or in a sub-agent of it. */
+    private static boolean ownChat(String storeName, VectorStoreInstance registered, ToolCallScope scope) {
+        if (scope == null) {
+            return false;
         }
-        return null;
+        for (SessionId session : new SessionId[]{scope.sessionId(), scope.rootSessionId()}) {
+            if (session == null) {
+                continue;
+            }
+            if (storeName.equals(sessionStoreName(session))
+                    || (registered != null && session.value().equals(registered.scopeRef()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String refusal(String storeName) {
+        return "Error: store '" + storeName + "' holds another chat's uploads and is not accessible "
+                + "here. Omit 'store' to search the files attached to this chat.";
     }
 
     private static Map<String, Object> schema(Map<String, Object> properties, List<String> required) {

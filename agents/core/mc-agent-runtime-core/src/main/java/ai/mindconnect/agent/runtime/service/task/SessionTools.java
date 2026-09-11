@@ -29,13 +29,25 @@ public final class SessionTools implements ToolDefinitionProvider {
     private final DynamicToolActivations dynamicToolActivations;
     private final AgentDefinition def;
     private final AgentSession session;
+    private final SessionId rootSessionId;
 
+    /** The toolset of a session that is its own root — a chat, not a sub-agent. */
     public SessionTools(ToolRegistry toolRegistry, DynamicToolActivations dynamicToolActivations,
                         AgentDefinition def, AgentSession session) {
+        this(toolRegistry, dynamicToolActivations, def, session, session.id());
+    }
+
+    /**
+     * @param rootSessionId the chat at the top of the session's sub-agent chain,
+     *                      handed to the tools as {@link ToolCallScope#rootSessionId()}
+     */
+    public SessionTools(ToolRegistry toolRegistry, DynamicToolActivations dynamicToolActivations,
+                        AgentDefinition def, AgentSession session, SessionId rootSessionId) {
         this.toolRegistry = toolRegistry;
         this.dynamicToolActivations = dynamicToolActivations;
         this.def = def;
         this.session = session;
+        this.rootSessionId = rootSessionId != null ? rootSessionId : session.id();
     }
 
     /**
@@ -73,9 +85,9 @@ public final class SessionTools implements ToolDefinitionProvider {
     }
 
     /** Whether {@code toolName} is one of the inline delegation tools this agent enables. */
-    /** Who is calling, for the factories and advisors: this session, its user, this agent. */
+    /** Who is calling, for the factories and advisors: this session, its user, this agent, its chat. */
     private ToolCallScope scope() {
-        return new ToolCallScope(session.userId(), session.id(), def.id());
+        return new ToolCallScope(session.userId(), session.id(), def.id(), rootSessionId);
     }
 
     public boolean isInline(String toolName) {

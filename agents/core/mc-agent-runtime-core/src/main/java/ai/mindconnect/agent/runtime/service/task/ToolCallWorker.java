@@ -333,7 +333,9 @@ public final class ToolCallWorker implements TaskWorker {
     private String runRegistryTool(AgentSession session, AgentDefinition def,
                                    TokenCounter tokenCounter, Consumer<StreamEvent> stream,
                                    String callId, String toolName, Map<String, Object> arguments) {
-        SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session);
+        // A sub-agent's tools see the chat that started the chain: the user's uploads are there.
+        SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session,
+                session.parentSessionId() == null ? session.id() : sessionService.rootSession(session.id()).id());
         ToolExecutor.Context toolContext = new ToolExecutor.Context(
                 stream, session.conversationId(), def.id(), tokenCounter,
                 session.userId(), session.id());

@@ -1,6 +1,11 @@
 package ai.mindconnect.agent.tools.workflow;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tools.workflow.step.ToolCallData;
+import ai.mindconnect.agent.tools.workflow.step.ToolInvoker;
+import ai.mindconnect.agent.tools.workflow.step.ToolInvokers;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
@@ -16,6 +21,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -81,6 +88,48 @@ class WorkflowToolProviderTest {
                 AgentTool.of(name), new ToolCallScope(null, null, null));
         assertThat(tool).isPresent();
         return tool.get();
+    }
+
+    /**
+     * A workflow run as an agent tool acts for its caller: the scope the tool
+     * was created with reaches the workflow's tool steps — not a detached one.
+     */
+    @Test
+    void toolStepsRunOnBehalfOfTheCaller() {
+        ToolCallData probe = new ToolCallData();
+        probe.setName("probe");
+        probe.setTool("probe_tool");
+        probe.setArguments("{}");
+        probe.setAssignResultToVar("out");
+        WorkflowData wf = new WorkflowData();
+        wf.setName("probing");
+        wf.setResultFrom("out");
+        wf.addSteps(probe);
+        repository.save("probing", wf);
+
+        List<ToolCallScope> scopes = new ArrayList<>();
+        ToolInvokers.set(new ToolInvoker() {
+            @Override
+            public String call(String tool, Map<String, Object> args) {
+                return call(tool, args, null);
+            }
+
+            @Override
+            public String call(String tool, Map<String, Object> args, ToolCallScope scope) {
+                scopes.add(scope);
+                return "probed";
+            }
+        });
+        try {
+            ToolCallScope alice = new ToolCallScope(UserId.of("alice"), SessionId.random(), null);
+            Tool tool = provider.create("workflow_probing", AgentTool.of("workflow_probing"), alice)
+                    .orElseThrow();
+
+            assertThat(tool.execute(Map.of())).isEqualTo("probed");
+            assertThat(scopes).containsExactly(alice);
+        } finally {
+            ToolInvokers.clear();
+        }
     }
 
     @Test

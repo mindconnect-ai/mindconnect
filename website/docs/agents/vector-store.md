@@ -86,6 +86,23 @@ All four tools take a `store` name and speak **text only**:
 | `vector_delete_file` | Removes one file from a store. |
 | `vector_ingest_file` | Path in, searchable content out: reads the file (docx/PDF/markdown via the document reader when `mc-agent-tools-document` is present, else plain text), chunks OpenAI-style (800/400) and embeds — the one-call ingestion for workflows (`glob → ForEach → vector_ingest_file`). |
 
+### A chat's upload store belongs to its user
+
+Files attached to a chat land in that chat's store, `session-<sessionId>`,
+registered with the `SESSION` scope and the chat's user as its **owner**.
+The tools reach such a store only when they run for that user: in the chat
+itself, in another chat of the same user, in a sub-agent the chat started
+(whose `vector_search` without a `store` searches the chat's uploads), or in a
+workflow run on the user's behalf — the upload pipeline runs its ingestion
+workflow that way, and a workflow used as an agent tool runs its tool steps for
+the calling user and session. Everything else is refused, including a workflow
+started from the workflow admin or `/api/workflows/{id}/run`, which runs for
+nobody in particular. Knowledge bases (`GLOBAL` and `AGENT` stores) stay open.
+
+A `session-…` name nobody registered yet, and an upload store from before
+owners were recorded, is reachable from its own chat only; the latter records
+its owner the next time the chat uploads a file.
+
 ## The file store
 
 **`FileStore`** is deliberately small: `save(name, contentType, stream)`

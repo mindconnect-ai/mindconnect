@@ -170,15 +170,19 @@ final class AttachSupport {
                 stores.registry().saveTemplate(created);
                 return created;
             });
+            var chat = sessions.findById(sessionId).orElseThrow(() ->
+                    new IllegalArgumentException("unknown session " + sessionId.value()));
+            // The store is the chat's user's: the vector tools reach it only on that user's behalf.
             var store = stores.open(storeName, template.name(),
                     ai.mindconnect.vectorstore.tools.VectorStoreInstance.Scope.SESSION,
-                    sessionId.value());
+                    sessionId.value(), chat.userId() == null ? null : chat.userId().value());
             var instance = stores.settingsFor(storeName);
 
             String message;
             if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()
                     && workflowModulesPresent()) {
-                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows, namespace.value());
+                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows, namespace.value(),
+                        new ai.mindconnect.agent.tool.ToolCallScope(chat.userId(), sessionId, null));
             } else {
                 String text = new String(fileStore.content(stored.id()).readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
@@ -214,7 +218,8 @@ final class AttachSupport {
                           ai.mindconnect.filestore.StoredFile stored,
                           ai.mindconnect.filestore.FileStore fileStore,
                           ai.mindconnect.workflow.persistence.port.WorkflowDataRepository hostWorkflows,
-                          String partition) throws Exception {
+                          String partition,
+                          ai.mindconnect.agent.tool.ToolCallScope scope) throws Exception {
             java.nio.file.Path base = java.nio.file.Path.of(
                     environment.getOrDefault("defaultBaseDir", System.getProperty("user.home")));
             java.nio.file.Path dir = base.resolve("vector-store-uploads").resolve(instance.name());
@@ -230,9 +235,11 @@ final class AttachSupport {
             var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                             + "' not found in the workflow store"));
+            // The tool steps run on behalf of the chat's user and session — the calls its store accepts.
             var report = new ai.mindconnect.workflow.admin.run.WorkflowRunService(null)
-                    .run(workflow, Map.of("file", base.relativize(target).toString(),
-                            "store", instance.name()));
+                    .runWithAttributes(workflow, Map.of("file", base.relativize(target).toString(),
+                            "store", instance.name()),
+                            Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(), scope));
             if (!report.success()) {
                 throw new IllegalStateException("ingestion workflow failed: " + report.error());
             }

@@ -133,12 +133,28 @@ public final class VectorStores {
      */
     public VectorStore open(String storeName, String templateName,
                             VectorStoreInstance.Scope scope, String scopeRef) {
+        return open(storeName, templateName, scope, scopeRef, null);
+    }
+
+    /**
+     * Like {@link #open(String, String, VectorStoreInstance.Scope, String)}, for
+     * a store that belongs to {@code owner} (a user id). A session store
+     * registered before owners were recorded gets its owner filled in when it
+     * is opened again for its own session.
+     */
+    public VectorStore open(String storeName, String templateName,
+                            VectorStoreInstance.Scope scope, String scopeRef, String owner) {
         VectorStoreInstance instance = registry.instance(storeName).orElse(null);
         if (instance == null) {
             VectorStoreTemplate template = template(templateName).orElseThrow(() ->
                     new IllegalArgumentException("Unknown vector store template '" + templateName + "'"));
             instance = registry.registerInstance(
-                    VectorStoreInstance.fromTemplate(storeName, template, scope, scopeRef));
+                    VectorStoreInstance.fromTemplate(storeName, template, scope, scopeRef, owner));
+        } else if (owner != null && instance.owner() == null
+                && instance.scope() == VectorStoreInstance.Scope.SESSION
+                && scopeRef != null && scopeRef.equals(instance.scopeRef())) {
+            instance = instance.withOwner(owner);
+            registry.saveInstance(instance);
         }
         return openWith(instance);
     }
