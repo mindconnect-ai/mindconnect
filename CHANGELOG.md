@@ -37,12 +37,47 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** every id is a typed record — `AgentId`, `SessionId`,
+  `ConversationId`, `MessageId`, `ChatTurnId`, `ParticipantId`,
+  `ConversationSummaryId`, `TraceId`, `LlmConfigId`, `FileId`, `AgentToolId`
+  and friends — instead of a `UUID` or a bare `String`. Ports, services,
+  repositories, the tool SPI, the builder facade and the CLI client take these
+  types, so a `findById(AgentId)` refuses a `SessionId` at compile time. Id
+  values are lower-case, file-name-safe strings: a readable `web-researcher`
+  is as valid as a UUID. In JSON an id is still its plain string.
+  `MessageRepository.findById` takes the conversation next to the message id.
+
+- **agents:** the namespace is no longer part of any domain object, id, port
+  or service, and `AuthenticationInfo` carries only the user and roles.
+  Persistence adapters are bound to one namespace when they are built, and a
+  process serves exactly one: the Spring starters read `mindconnect.namespace`
+  (default `local`; `MC_NAMESPACE` in the apps), the builder takes
+  `namespace(...)`, and adapters take it as their last constructor argument.
+  Everything a namespace stores on disk sits in one directory,
+  `<mindconnect.data.base-dir>/<namespace>/` — `data/local/` by default, with
+  `files`, `workflows` and `vector-stores` beside the rest — so the properties
+  `mindconnect.file-store.dir`, `mindconnect.workflow-admin.dir` and
+  `mindconnect.vector-store.dir` are gone, and existing data has to move into
+  that directory (or start with an empty one).
+  On Postgres every `mc_*` table carries a `namespace` column in its primary
+  key and the workflow tables a `partition_key`, and pgvector tables are named
+  `vs_<namespace>__<store>`; there is no migration, so drop the `mc_*` tables
+  of an existing database before starting this version. The REST API loses
+  its `namespace` parameters (the query parameter on the agent endpoints and
+  the field in the body of `POST /api/sessions`), agent JSON its `namespace`
+  field, and factories such as `LlmConfig.lmStudio(...)`, `AgentTool.of(...)`
+  and `AgentDefinition.create(...)` their namespace argument.
+
+- **agents:** the protocol (`mc-agent-protocol`) no longer names a tenant:
+  `Sessions.open(agentName)` and `Conversations.create()` lose their
+  `namespace` argument, and `Session` and `Conversation` their `namespace`
+  field. `AgentRuntimeBackend` needs none either — the runtime it wraps is
+  bound to one.
+
 - **agents:** `Namespace` and `AuthenticationInfo` moved from `mc-common`
   (package `ai.mindconnect.common`) into the new dependency-free module
-  `mc-agent-domain`, package `ai.mindconnect.agent`, together with two new
-  types: `NamespacedId`, the shape every tenant-owned id will take, and
-  `UserId`, which `AuthenticationInfo.userId()` now returns instead of a
-  `String`. Embedders repoint two imports and wrap the user id in
+  `mc-agent-domain`, package `ai.mindconnect.agent`, together with `UserId`,
+  which `AuthenticationInfo.userId()` now returns instead of a `String`. Embedders repoint two imports and wrap the user id in
   `UserId.of(...)`; the agents modules pull the new module in transitively.
   `mc-common` is tenant-free again, which is what the workflow and taskqueue
   areas expect from it; its unused `DomainEvent` record went with the move.
@@ -73,6 +108,28 @@ fresh empty one, so nothing has to be moved by hand at release time.
   difference and keeps what it has.
 
 ### Fixed
+
+- **agents:** a store file of the `memory` vector-store backend loads whatever
+  its formatting. It is written one chunk per line, and it was read that way
+  too, so a file someone had pretty-printed to read it counted as unreadable —
+  and the chat's attachment list then showed no chunks without saying why. The
+  file is now read as a sequence of JSON objects, and an unreadable session
+  store is logged as a warning.
+
+- **agents:** a tool call no longer fails now and then with "tool call was
+  interrupted before completion: tool task ended FAILED without a result".
+  With the file persistence, a session was saved by truncating and rewriting
+  `session.json`; a tool task reading the session at that moment found an
+  empty file and failed before the tool ran. Sessions are now written to a
+  temporary file and moved into place in one step.
+
+- **agents:** a sub-agent's approval question is answered only through the
+  chat that shows its card. The open questions were keyed by the tool call's
+  id alone, which the model provider hands out and which is unique only within
+  one response: an answer sent through another session reached the waiting
+  tool all the same, and two chats that got the same call id shared one entry,
+  so one card never appeared. `POST /api/sessions/{id}/approvals/{callId}` now
+  answers 404 when that session has no such open question.
 
 - **agents:** the admin UI's Logout button no longer ends with "The backend is
   unreachable". The header's logout is a link, and the SPA router turned every

@@ -50,7 +50,7 @@ class OpenAiHostedToolsExampleTest {
         backend.register(PseudoAgent.of("researcher", TestOpenAi.model(),
                         "Answer briefly. You MUST use web search for current facts.")
                 .withHostedTool("web_search"));
-        Session session = backend.openSessionForAgent("examples", "researcher");
+        Session session = backend.openSessionForAgent("researcher");
 
         Response r = backend.create(ResponseRequest.text(session.id(),
                 "Search the web: what is today's top headline from any major news site?"));
@@ -71,7 +71,7 @@ class OpenAiHostedToolsExampleTest {
                 .withHostedTool(Map.of("type", "code_interpreter",
                         "container", Map.of("type", "auto")))
                 .withToolChoice("required"));
-        Session session = backend.openSessionForAgent("examples", "analyst");
+        Session session = backend.openSessionForAgent("analyst");
 
         // Not memorizable — the model MUST actually run code for this:
         Response r = backend.create(ResponseRequest.text(session.id(),
@@ -89,7 +89,7 @@ class OpenAiHostedToolsExampleTest {
     void uploadPdfAndAskAgainstIt() {
         backend.register(PseudoAgent.of("reader", TestOpenAi.model(),
                 "Answer strictly from the attached document."));
-        Session session = backend.openSessionForAgent("examples", "reader");
+        Session session = backend.openSessionForAgent("reader");
 
         StoredFile file = backend.files().upload("secret.pdf", "application/pdf",
                 minimalPdf("The secret code is MC-4711"));
@@ -117,7 +117,7 @@ class OpenAiHostedToolsExampleTest {
                 .withHostedTool(Map.of("type", "code_interpreter",
                         "container", Map.of("type", "auto", "file_ids", List.of(csv.id()))))
                 .withToolChoice("required"));
-        Session session = backend.openSessionForAgent("examples", "data-analyst");
+        Session session = backend.openSessionForAgent("data-analyst");
 
         Response r = backend.create(ResponseRequest.text(session.id(),
                 "Sum the revenue column of sales.csv."));

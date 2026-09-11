@@ -9,7 +9,7 @@ import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiList;
 
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * The card that asks a human whether a tool may run.
@@ -61,12 +61,12 @@ public final class ApprovalCardComponent {
      * concatenated query string buried among the punctuation. Passing them as
      * arguments also hands the encoding of callId to the URI builder.
      */
-    private static UiTrigger answer(UUID sessionId, String callId, boolean approved, String scope) {
+    private static UiTrigger answer(SessionId sessionId, String callId, boolean approved, String scope) {
         return trigger(on(ChatUiController.class)
-                .approvalAnswered(sessionId, callId, approved, scope, null));
+                .approvalAnswered(sessionId.value(), callId, approved, scope, null));
     }
 
-    public static UiList.Item approvalCard(UUID sessionId, String callId,
+    public static UiList.Item approvalCard(SessionId sessionId, String callId,
                                            String toolName, String argsJson, String time) {
 
         // Buttons live IN the card body (a plain stack renders them as real,

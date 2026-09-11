@@ -1,13 +1,11 @@
 package ai.mindconnect.agent.runtime.tools.todo;
 
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-
+import ai.mindconnect.agent.SessionId;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Outbound port for persisting the working todo list of an
- * {@link AgentSession}.
+ * {@link ai.mindconnect.agent.runtime.domain.AgentSession}.
  *
  * <p>Replace-only semantics: every {@link #save(TodoList)} overwrites the
  * previous snapshot. There is no append or patch — the LLM submits the
@@ -16,11 +14,11 @@ import java.util.UUID;
 public interface TodoListRepository {
 
     /** Returns the current list for a session, or empty if none has been saved yet. */
-    Optional<TodoList> findBySession(UUID sessionId);
+    Optional<TodoList> findBySession(SessionId sessionId);
 
     /** Overwrites the existing list. Returns the saved snapshot. */
     TodoList save(TodoList list);
 
     /** Drops the list for a session. Idempotent. */
-    void deleteBySession(UUID sessionId);
+    void deleteBySession(SessionId sessionId);
 }

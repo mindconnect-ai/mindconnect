@@ -47,8 +47,9 @@ public class CliConfig {
     // FOR LOCAL
     @Bean
     LlmConfigRepository llmConfigRepository(
-            @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new FileLlmConfigRepository(Path.of(baseDir));
+            @Value("${mindconnect.data.base-dir:data}") String baseDir,
+            ai.mindconnect.agent.Namespace namespace) {
+        return new FileLlmConfigRepository(Path.of(baseDir), namespace);
     }
 
     @Bean

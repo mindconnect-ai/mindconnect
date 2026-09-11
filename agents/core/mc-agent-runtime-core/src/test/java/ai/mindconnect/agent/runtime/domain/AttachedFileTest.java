@@ -1,13 +1,15 @@
 package ai.mindconnect.agent.runtime.domain;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.message.domain.ConversationId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,6 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AttachedFileTest {
 
     private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
+
+    private static AgentSession newSession() {
+        return new AgentSession(SessionId.random(), AgentId.random(), UserId.of("u"),
+                ConversationId.random(), "t", SessionStatus.ACTIVE, Instant.now(),
+                null, null, null, null);
+    }
 
     @Test
     void kindsFollowTheMediaTypeAndFallBackToTheExtension() {
@@ -61,9 +69,7 @@ class AttachedFileTest {
     @Test
     void aSessionWrittenWithBareNamesStillLoads() throws Exception {
         // A session as written before the record existed: names only.
-        String current = json.writeValueAsString(new AgentSession(UUID.randomUUID(), UUID.randomUUID(),
-                new Namespace("local"), "u", UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(),
-                null, null, null, null));
+        String current = json.writeValueAsString(newSession());
         assertThat(current).contains("\"attachedFiles\":[]");
         String legacy = current.replace("\"attachedFiles\":[]", "\"attachedFiles\":[\"notes.md\",\"photo.png\"]");
 
@@ -76,8 +82,7 @@ class AttachedFileTest {
 
     @Test
     void aSessionRoundTripsItsAttachedFiles() throws Exception {
-        AgentSession session = new AgentSession(UUID.randomUUID(), UUID.randomUUID(), new Namespace("local"),
-                "u", UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null)
+        AgentSession session = newSession()
                 .withAttachedFiles(List.of(new AttachedFile("f-1", "photo.png", "image/png", 240_000)));
 
         String written = json.writeValueAsString(session);
@@ -89,8 +94,7 @@ class AttachedFileTest {
 
     @Test
     void attachingTheSameNameAgainReplacesTheEntryInPlace() {
-        AgentSession session = new AgentSession(UUID.randomUUID(), UUID.randomUUID(), new Namespace("local"),
-                "u", UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null)
+        AgentSession session = newSession()
                 .withAttachedFiles(List.of(AttachedFile.named("a.md"), new AttachedFile("f-1", "photo.png", "image/png", 1)))
                 .withAttachedFiles(List.of(new AttachedFile("f-2", "photo.png", "image/png", 2)));
 

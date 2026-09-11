@@ -1,22 +1,26 @@
 package ai.mindconnect.message.service;
 
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;
+import ai.mindconnect.message.domain.ConversationHistory;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.MessageType;
-import ai.mindconnect.message.domain.ParticipantType;
 import ai.mindconnect.message.domain.Participant;
+import ai.mindconnect.message.domain.ParticipantType;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.ConversationRepository;
 import ai.mindconnect.message.port.out.MessageRepository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.function.IntFunction;
 
 public class ConversationService implements ConversationManager {
 
@@ -29,38 +33,38 @@ public class ConversationService implements ConversationManager {
     }
 
     @Override
-    public Conversation createConversation(Namespace namespace, String topic,
+    public Conversation createConversation(ConversationId id, String topic,
                                            ConversationType type, List<Participant> participants) {
-        Conversation conversation = Conversation.create(namespace, topic, type, participants);
+        Conversation conversation = Conversation.create(id, topic, type, participants);
         return conversationRepository.save(conversation);
     }
 
     @Override
-    public ai.mindconnect.message.domain.ConversationHistory loadCompleteHistory(UUID conversationId) {
-        return ai.mindconnect.message.domain.ConversationHistory.of(conversationId,
-                loadHistory(conversationId, new ai.mindconnect.common.PageRequest(0, Integer.MAX_VALUE)));
+    public ConversationHistory loadCompleteHistory(ConversationId conversation) {
+        return ConversationHistory.of(conversation,
+                loadHistory(conversation, new PageRequest(0, Integer.MAX_VALUE)));
     }
 
     @Override
-    public Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
-                                            MessageType type, String content, UUID turnId) {
-        return addMessageToConversation(conversationId, senderId, senderType, type, content, turnId,
-                null, java.util.Map.of());
+    public Message addMessageToConversation(ConversationId conversation, String senderId, ParticipantType senderType,
+                                            MessageType type, String content, ChatTurnId turnId) {
+        return addMessageToConversation(conversation, senderId, senderType, type, content, turnId,
+                null, Map.of());
     }
 
     @Override
-    public Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
-                                            MessageType type, String content, UUID turnId, Integer run,
-                                            java.util.Map<String, Object> metadata) {
-        return append(conversationId, seq -> Message.of(conversationId, senderId, senderType, type, content, seq),
+    public Message addMessageToConversation(ConversationId conversation, String senderId, ParticipantType senderType,
+                                            MessageType type, String content, ChatTurnId turnId, Integer run,
+                                            Map<String, Object> metadata) {
+        return append(conversation, seq -> Message.of(conversation, senderId, senderType, type, content, seq),
                 turnId, run, metadata);
     }
 
     @Override
-    public Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
-                                            MessageType type, List<ContentPart> parts, UUID turnId, Integer run,
-                                            java.util.Map<String, Object> metadata) {
-        return append(conversationId, seq -> Message.of(conversationId, senderId, senderType, type, parts, seq),
+    public Message addMessageToConversation(ConversationId conversation, String senderId, ParticipantType senderType,
+                                            MessageType type, List<ContentPart> parts, ChatTurnId turnId, Integer run,
+                                            Map<String, Object> metadata) {
+        return append(conversation, seq -> Message.of(conversation, senderId, senderType, type, parts, seq),
                 turnId, run, metadata);
     }
 
@@ -70,62 +74,65 @@ public class ConversationService implements ConversationManager {
      * writing afterwards is what used to give two messages the same number
      * whenever a turn appended twice at once.
      */
-    private Message append(UUID conversationId, java.util.function.IntFunction<Message> create,
-                           UUID turnId, Integer run, java.util.Map<String, Object> metadata) {
-        conversationRepository.findById(conversationId)
-                .orElseThrow(() -> DomainException.notFound("Conversation", conversationId.toString()));
-        return messageRepository.append(conversationId, seq -> {
+    private Message append(ConversationId conversation, IntFunction<Message> create,
+                           ChatTurnId turnId, Integer run, Map<String, Object> metadata) {
+        requireConversation(conversation);
+        return messageRepository.append(conversation, seq -> {
             Message message = create.apply(seq).withTurnId(turnId).withMetadata(metadata);
             return run != null ? message.withRun(run) : message;
         });
     }
 
     @Override
-    public void compressMessage(UUID conversationId, UUID messageId, String stub, Integer compressedTokenCount) {
-        messageRepository.findById(conversationId, messageId)
+    public void compressMessage(ConversationId conversation, MessageId message, String stub, Integer compressedTokenCount) {
+        messageRepository.findById(conversation, message)
                 .map(m -> m.withCompressed(stub, compressedTokenCount))
                 .ifPresent(messageRepository::save);
     }
 
     @Override
-    public void updateTokenCount(UUID conversationId, UUID messageId, int tokenCount) {
-        messageRepository.findById(conversationId, messageId)
+    public void updateTokenCount(ConversationId conversation, MessageId message, int tokenCount) {
+        messageRepository.findById(conversation, message)
                 .map(m -> m.withTokenCount(tokenCount))
                 .ifPresent(messageRepository::save);
     }
 
     @Override
-    public void updateDurationMs(UUID conversationId, UUID messageId, long durationMs) {
-        messageRepository.findById(conversationId, messageId)
+    public void updateDurationMs(ConversationId conversation, MessageId message, long durationMs) {
+        messageRepository.findById(conversation, message)
                 .map(m -> m.withDurationMs(durationMs))
                 .ifPresent(messageRepository::save);
     }
 
     @Override
-    public Optional<Conversation> findById(UUID conversationId) {
-        return conversationRepository.findById(conversationId);
+    public Optional<Conversation> findById(ConversationId id) {
+        return conversationRepository.findById(id);
     }
 
     @Override
-    public List<Conversation> listByNamespace(Namespace namespace, PageRequest page) {
-        return conversationRepository.findByNamespace(namespace, page);
+    public List<Conversation> list(PageRequest page) {
+        return conversationRepository.findAll(page);
     }
 
     @Override
-    public List<Message> loadHistory(UUID conversationId, PageRequest page) {
-        conversationRepository.findById(conversationId)
-                .orElseThrow(() -> DomainException.notFound("Conversation", conversationId.toString()));
-        return messageRepository.findByConversationId(conversationId, page);
+    public List<Message> loadHistory(ConversationId conversation, PageRequest page) {
+        requireConversation(conversation);
+        return messageRepository.findByConversation(conversation, page);
     }
 
     @Override
-    public int deleteMessages(UUID conversationId, int fromSeq, int toSeq) {
-        List<Message> all = messageRepository.findByConversationId(conversationId, new PageRequest(0, 500));
+    public int deleteMessages(ConversationId conversation, int fromSeq, int toSeq) {
+        List<Message> all = messageRepository.findByConversation(conversation, new PageRequest(0, 500));
         int count = (int) all.stream()
                 .filter(m -> m.sequenceNum() >= fromSeq && m.sequenceNum() <= toSeq)
                 .count();
         if (count == 0) return 0;
-        messageRepository.deleteBySequenceRange(conversationId, fromSeq, toSeq);
+        messageRepository.deleteBySequenceRange(conversation, fromSeq, toSeq);
         return count;
+    }
+
+    private void requireConversation(ConversationId conversation) {
+        conversationRepository.findById(conversation)
+                .orElseThrow(() -> DomainException.notFound("Conversation", conversation.toString()));
     }
 }

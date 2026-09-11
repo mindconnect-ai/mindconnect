@@ -1,9 +1,13 @@
 package ai.mindconnect.message.adapter.pg;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ContentPart;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,8 +22,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PgMessageRepositoryTest {
 
-    private final UUID conversation = UUID.randomUUID();
-    private final UUID sender = UUID.randomUUID();
+    private static final Namespace NS = new Namespace("test");
+
+    private final ConversationId conversation = ConversationId.random();
+    private final String sender = UUID.randomUUID().toString();
 
     private PgMessageRepository repo;
 
@@ -28,7 +34,7 @@ class PgMessageRepositoryTest {
         Sql sql = Sql.of(TestDb.requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_message");
         sql.execute("DROP TABLE IF EXISTS mc_message_seq");
-        repo = new PgMessageRepository(sql).initSchema();
+        repo = new PgMessageRepository(sql, NS).initSchema();
     }
 
     private Message message(int seq) {
@@ -41,12 +47,13 @@ class PgMessageRepositoryTest {
                 .withMetadata(Map.of("tool", "web", "nested", Map.of("k", List.of(1, 2))))
                 .withTokenCount(42)
                 .withDurationMs(1234L)
-                .withTurnId(UUID.randomUUID())
+                .withTurnId(ChatTurnId.random())
                 .withRun(2);
         repo.save(m);
 
         assertThat(repo.findById(conversation, m.id())).contains(m);
-        assertThat(repo.findById(UUID.randomUUID(), m.id())).as("scoped to the conversation").isEmpty();
+        assertThat(repo.findById(ConversationId.random(), m.id())).as("scoped to the conversation").isEmpty();
+        assertThat(repo.findById(conversation, MessageId.random())).isEmpty();
     }
 
     @Test
@@ -69,7 +76,7 @@ class PgMessageRepositoryTest {
         Message compressed = m.withCompressed("[summary]", 5);
         repo.save(compressed);
 
-        assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT)).hasSize(1);
+        assertThat(repo.findByConversation(conversation, PageRequest.DEFAULT)).hasSize(1);
         assertThat(repo.findById(conversation, m.id())).contains(compressed);
         assertThat(repo.findById(conversation, m.id())).get()
                 .extracting(Message::compressed, Message::compressedContent).containsExactly(true, "[summary]");
@@ -78,27 +85,27 @@ class PgMessageRepositoryTest {
     @Test
     void aConversationIsReadInSequenceOrderAndPaged() {
         List.of(3, 1, 2, 5, 4).forEach(seq -> repo.save(message(seq)));
-        repo.save(Message.of(UUID.randomUUID(), sender, ParticipantType.AGENT, MessageType.CHAT, "other", 1));
+        repo.save(Message.of(ConversationId.random(), sender, ParticipantType.AGENT, MessageType.CHAT, "other", 1));
 
-        assertThat(repo.findByConversationId(conversation, new PageRequest(0, 3)))
+        assertThat(repo.findByConversation(conversation, new PageRequest(0, 3)))
                 .extracting(Message::sequenceNum).containsExactly(1, 2, 3);
-        assertThat(repo.findByConversationId(conversation, new PageRequest(1, 3)))
+        assertThat(repo.findByConversation(conversation, new PageRequest(1, 3)))
                 .extracting(Message::sequenceNum).containsExactly(4, 5);
-        assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT)).hasSize(5);
-        assertThat(repo.findByConversationId(UUID.randomUUID(), PageRequest.DEFAULT)).isEmpty();
+        assertThat(repo.findByConversation(conversation, PageRequest.DEFAULT)).hasSize(5);
+        assertThat(repo.findByConversation(ConversationId.random(), PageRequest.DEFAULT)).isEmpty();
     }
 
     @Test
     void deleteBySequenceRangeIsInclusiveAndScopedToTheConversation() {
         IntStream.rangeClosed(1, 6).forEach(seq -> repo.save(message(seq)));
-        UUID other = UUID.randomUUID();
+        ConversationId other = ConversationId.random();
         repo.save(Message.of(other, sender, ParticipantType.USER, MessageType.CHAT, "keep", 3));
 
         repo.deleteBySequenceRange(conversation, 2, 4);
 
-        assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT))
+        assertThat(repo.findByConversation(conversation, PageRequest.DEFAULT))
                 .extracting(Message::sequenceNum).containsExactly(1, 5, 6);
-        assertThat(repo.findByConversationId(other, PageRequest.DEFAULT)).hasSize(1);
+        assertThat(repo.findByConversation(other, PageRequest.DEFAULT)).hasSize(1);
         repo.deleteBySequenceRange(conversation, 100, 200); // nothing there is not an error
     }
 
@@ -107,12 +114,12 @@ class PgMessageRepositoryTest {
         repo.append(conversation, seq -> message(seq));
         repo.append(conversation, seq -> message(seq));
 
-        assertThat(repo.findByConversationId(conversation, PageRequest.DEFAULT))
+        assertThat(repo.findByConversation(conversation, PageRequest.DEFAULT))
                 .extracting(Message::sequenceNum).containsExactly(1, 2);
 
         // A conversation written before the counter existed: the first
         // append reads where it got to instead of starting over at 1.
-        UUID older = UUID.randomUUID();
+        ConversationId older = ConversationId.random();
         IntStream.rangeClosed(1, 7).forEach(seq ->
                 repo.save(Message.of(older, sender, ParticipantType.USER, MessageType.CHAT, "m" + seq, seq)));
 
@@ -144,7 +151,7 @@ class PgMessageRepositoryTest {
         }
 
         assertThat(failures).isEmpty();
-        assertThat(repo.findByConversationId(conversation, new PageRequest(0, 100)))
+        assertThat(repo.findByConversation(conversation, new PageRequest(0, 100)))
                 .extracting(Message::sequenceNum)
                 .as("every appender left with a number of its own")
                 .containsExactlyInAnyOrderElementsOf(

@@ -1,10 +1,10 @@
 package ai.mindconnect.agent.runtime.domain.session;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.tool.AgentTool;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * A session bound to an agent from the registry, optionally with a different
@@ -18,13 +18,13 @@ import java.util.UUID;
  * and that detaching into an {@link InlineSessionAgent} was the honest way to
  * change it. That reasoning predates {@code callableAgents}: detaching now
  * silently drops the roster the agent was given, so a chat that edits its
- * prompt would quietly regain the run of every agent in the namespace. Keeping
+ * prompt would quietly regain the run of every agent. Keeping
  * the binding and overriding the prompt is the lesser evil — and the name is
  * kept honest by showing the override in the chat header rather than by
  * forbidding it.
  */
 public record SessionAgentRef(
-        UUID id,
+        AgentId id,
         boolean main,
         String label,
         /** {@code null} = the agent's own. */
@@ -38,18 +38,17 @@ public record SessionAgentRef(
 ) implements SessionAgent {
 
     /** Pre-override constructor: the agent's own prompt. */
-    public SessionAgentRef(UUID id, boolean main, String label, String llmConfigName,
+    public SessionAgentRef(AgentId id, boolean main, String label, String llmConfigName,
                            List<AgentTool> tools, AgentDefinition.ToolSearchConfig toolSearch) {
         this(id, main, label, llmConfigName, tools, toolSearch, null);
     }
 
-    /** Whether this chat runs on something other than the agent's own prompt. */
     public boolean hasPromptOverride() {
         return systemPrompt != null && !systemPrompt.isBlank();
     }
 
     /** The agent this session runs — the id is the reference. */
-    public UUID agentId() {
+    public AgentId agentId() {
         return id;
     }
 }

@@ -6,7 +6,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agentrest.service.SessionFileService;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.UserId;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -71,8 +71,6 @@ class ChatFileUploadSmokeTest {
             var dir = Files.createTempDirectory("mc-upload-test");
             registry.add("mindconnect.data.base-dir", dir::toString);
             registry.add("mindconnect.tools.base-dir", dir::toString);
-            registry.add("mindconnect.vector-store.dir", () -> dir.resolve("vector-stores").toString());
-            registry.add("mindconnect.workflow-admin.dir", () -> dir.resolve("workflows").toString());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -83,7 +81,6 @@ class ChatFileUploadSmokeTest {
     @Autowired AgentSessionRepository sessions;
     @Autowired AgentSessionService sessionService;
     @Autowired SessionFileService sessionFiles;
-    @Autowired Namespace namespace;
 
     /** True when LM Studio answers and has a loaded embeddings model. */
     static boolean embeddingsUp() {
@@ -107,8 +104,8 @@ class ChatFileUploadSmokeTest {
                 "LM Studio is not running at " + LM_STUDIO + " or no embeddings model is loaded");
 
         // Any seeded agent will do — the upload path is agent-agnostic.
-        AgentDefinition agent = agents.findByNamespace(namespace).stream().findFirst().orElseThrow();
-        AgentSession session = sessionService.openChat(agent.id(), namespace, "upload-tester");
+        AgentDefinition agent = agents.findAll().stream().findFirst().orElseThrow();
+        AgentSession session = sessionService.openChat(agent.id(), UserId.of("upload-tester"));
 
         String text = "Mindconnect upload smoke test.\n"
                 + "The secret ingredient of the test soup is paprika.\n".repeat(40);
@@ -120,7 +117,7 @@ class ChatFileUploadSmokeTest {
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
 
         ResponseEntity<String> response = rest.postForEntity(
-                "/chat/api/sessions/" + session.id() + "/chat-files",
+                "/chat/api/sessions/" + session.id().value() + "/chat-files",
                 new HttpEntity<>(form, headers), String.class);
 
         assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();

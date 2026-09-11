@@ -225,7 +225,7 @@ public final class ResponseAssembler {
         String callId = nextItemId("task");
         openAgentTasks.put(t.taskId(), callId);
         addItem(new ConversationItem.AgentCall(callId, t.agentName(), t.input(),
-                t.subSessionId() == null ? null : t.subSessionId().toString()));
+                t.subSessionId() == null ? null : t.subSessionId().value()));
     }
 
     private void closeAgentTask(UUID taskId, String text, boolean failed) {

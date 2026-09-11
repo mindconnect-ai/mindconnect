@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.service.task;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
@@ -46,7 +49,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -130,19 +132,19 @@ public final class AgentTurnWorker implements TaskWorker {
      * ({@code Message.turnId}/{@code Message.run}), so the running task is
      * findable from domain state alone and submitting stays idempotent.
      */
-    public static String taskIdFor(UUID turnId, int run) {
-        return run == 0 ? "task_turn_" + turnId : "task_turn_" + turnId + "_r" + run;
+    public static String taskIdFor(ChatTurnId turnId, int run) {
+        return run == 0 ? "task_turn_" + turnId.value() : "task_turn_" + turnId.value() + "_r" + run;
     }
 
     /** The submission for one turn execution: ids only (concept 11's payload rule). */
-    public static TaskSubmission submission(UUID turnId, int run, UUID sessionId,
-                                            int depth, UUID parentTurnId) {
+    public static TaskSubmission submission(ChatTurnId turnId, int run, SessionId sessionId,
+                                            int depth, ChatTurnId parentTurnId) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put(TURN_ID, turnId.toString());
+        payload.put(TURN_ID, turnId.value());
         payload.put(RUN, run);
-        payload.put(SESSION_ID, sessionId.toString());
+        payload.put(SESSION_ID, sessionId.value());
         payload.put(DEPTH, depth);
-        if (parentTurnId != null) payload.put(PARENT_TURN_ID, parentTurnId.toString());
+        if (parentTurnId != null) payload.put(PARENT_TURN_ID, parentTurnId.value());
         return TaskSubmission.of(TYPE, payload).withPriority(depth).withId(taskIdFor(turnId, run));
     }
 
@@ -152,21 +154,20 @@ public final class AgentTurnWorker implements TaskWorker {
      * worker for sub-agents). Returns the persisted message.
      */
     public static Message appendUserMessage(ConversationManager conversationManager,
-                                            UUID conversationId, String text,
-                                            UUID turnId, TokenCounter tokenCounter) {
-        return appendUserMessage(conversationManager, conversationId, text, turnId, tokenCounter, Map.of());
+                                            ConversationId conversationId, UserId sender, String text,
+                                            ChatTurnId turnId, TokenCounter tokenCounter) {
+        return appendUserMessage(conversationManager, conversationId, sender, text, turnId, tokenCounter, Map.of());
     }
 
     /** Same, with metadata on the message — e.g. the attachments it announces. */
     public static Message appendUserMessage(ConversationManager conversationManager,
-                                            UUID conversationId, String text,
-                                            UUID turnId, TokenCounter tokenCounter,
+                                            ConversationId conversationId, UserId sender, String text,
+                                            ChatTurnId turnId, TokenCounter tokenCounter,
                                             Map<String, Object> metadata) {
         Message persisted = conversationManager.addMessageToConversation(
-                conversationId, UUID.randomUUID() /* user sender — see follow-up task */,
+                conversationId, sender.value(),
                 ParticipantType.USER, MessageType.CHAT, text, turnId, 0, metadata);
-        conversationManager.updateTokenCount(conversationId, persisted.id(),
-                tokenCounter.countText(text));
+        conversationManager.updateTokenCount(persisted.conversationId(), persisted.id(), tokenCounter.countText(text));
         return persisted;
     }
 
@@ -176,15 +177,14 @@ public final class AgentTurnWorker implements TaskWorker {
      * media part costs is the provider's business.
      */
     public static Message appendUserMessage(ConversationManager conversationManager,
-                                            UUID conversationId,
+                                            ConversationId conversationId, UserId sender,
                                             java.util.List<ai.mindconnect.message.domain.ContentPart> parts,
-                                            UUID turnId, TokenCounter tokenCounter,
+                                            ChatTurnId turnId, TokenCounter tokenCounter,
                                             Map<String, Object> metadata) {
         Message persisted = conversationManager.addMessageToConversation(
-                conversationId, UUID.randomUUID() /* user sender — see follow-up task */,
+                conversationId, sender.value(),
                 ParticipantType.USER, MessageType.CHAT, parts, turnId, 0, metadata);
-        conversationManager.updateTokenCount(conversationId, persisted.id(),
-                tokenCounter.countText(persisted.content()));
+        conversationManager.updateTokenCount(persisted.conversationId(), persisted.id(), tokenCounter.countText(persisted.content()));
         return persisted;
     }
 
@@ -192,11 +192,12 @@ public final class AgentTurnWorker implements TaskWorker {
 
     @Override
     public TaskOutcome execute(TaskContext ctx) {
-        UUID turnId = uuid(ctx, TURN_ID);
-        UUID sessionId = uuid(ctx, SESSION_ID);
+        ChatTurnId turnId = ChatTurnId.of(string(ctx, TURN_ID));
+        SessionId sessionId = SessionId.of(string(ctx, SESSION_ID));
         int run = ((Number) ctx.task().payload().getOrDefault(RUN, 0)).intValue();
         int depth = ((Number) ctx.task().payload().getOrDefault(DEPTH, 0)).intValue();
-        UUID parentTurnId = optionalUuid(ctx, PARENT_TURN_ID);
+        String parentTurn = optionalString(ctx, PARENT_TURN_ID);
+        ChatTurnId parentTurnId = parentTurn == null ? null : ChatTurnId.of(parentTurn);
         if (depth > MAX_DEPTH) {
             throw new IllegalStateException(
                     "Sub-agent depth limit (" + MAX_DEPTH + ") exceeded at depth " + depth);
@@ -210,7 +211,7 @@ public final class AgentTurnWorker implements TaskWorker {
         }
     }
 
-    private TaskOutcome runTurn(TaskContext ctx, UUID turnId, int run, UUID parentTurnId, int depth,
+    private TaskOutcome runTurn(TaskContext ctx, ChatTurnId turnId, int run, ChatTurnId parentTurnId, int depth,
                                 AgentSession session, AgentDefinition def) {
         Cancellation cancellation = new Cancellation();
         ctx.onCancel(cancellation::cancel);
@@ -221,8 +222,8 @@ public final class AgentTurnWorker implements TaskWorker {
 
         MemoryStrategy memoryStrategy = memoryStrategyFactory.create(def);
         TokenCounter tokenCounter = memoryStrategy.resolveTokenCounter(def);
-        AuthenticationInfo auth = AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
-        UUID conversationId = session.conversationId();
+        AuthenticationInfo auth = AuthenticationInfo.of(session.userId());
+        ConversationId conversationId = session.conversationId();
 
         // THE load of this execution (concept 16: read once): everything
         // downstream — fold, window, user message — reads this instance,
@@ -247,8 +248,7 @@ public final class AgentTurnWorker implements TaskWorker {
                 .map(ai.mindconnect.message.domain.ChatTurn::userMessage);
 
         ConversationMessageLog messageLog = new ConversationMessageLog(
-                conversationManager, history, UUID.randomUUID() /* user sender — see follow-up task */,
-                def.id(), turnId, run, tokenCounter);
+                conversationManager, history, session.userId().value(), def.id(), turnId, run, tokenCounter);
 
         SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session);
         QueuedAgentRoundToolExecutor executor = new QueuedAgentRoundToolExecutor(
@@ -266,7 +266,7 @@ public final class AgentTurnWorker implements TaskWorker {
                 MAX_ROUNDS, message -> { }, List.of(reviewer));
 
         int roundsSoFar = roundsSoFar(ctx);
-        TurnOutcome outcome = loop.run(turnId.toString(), conversationId, session.id(),
+        TurnOutcome outcome = loop.run(turnId.value(), conversationId, session.id(),
                 cancellation, roundsSoFar, usageSoFar(ctx));
         // The usage rides in the task state for the same reason the round count
         // does: a turn that suspends on a tool resumes as a fresh execution,
@@ -328,10 +328,10 @@ public final class AgentTurnWorker implements TaskWorker {
     private record ForcedAnswer(String text, Usage usage) { }
 
     private ForcedAnswer forceFinalAnswer(LlmChatProvider llm, ConversationMessageLog messageLog,
-                                          UUID turnId, UUID conversationId, AgentSession session,
+                                          ChatTurnId turnId, ConversationId conversationId, AgentSession session,
                                           Cancellation cancellation, ReviewerAdvisor reviewer) {
         try {
-            LlmAnswer answer = llm.ask(turnId.toString(), session.id(),
+            LlmAnswer answer = llm.ask(turnId.value(), session.id(),
                     messageLog.load(conversationId), List.of(), cancellation);
             String text = answer.messages().stream()
                     .filter(m -> m.type() == MessageType.CHAT)
@@ -396,17 +396,17 @@ public final class AgentTurnWorker implements TaskWorker {
         return value instanceof Number n ? n.longValue() : 0L;
     }
 
-    private static UUID uuid(TaskContext ctx, String key) {
+    private static String string(TaskContext ctx, String key) {
         Object value = ctx.task().payload().get(key);
         if (value == null) {
             throw new IllegalArgumentException("Turn task is missing payload key '" + key + "'");
         }
-        return UUID.fromString(value.toString());
+        return value.toString();
     }
 
-    private static UUID optionalUuid(TaskContext ctx, String key) {
+    private static String optionalString(TaskContext ctx, String key) {
         Object value = ctx.task().payload().get(key);
-        return value == null ? null : UUID.fromString(value.toString());
+        return value == null ? null : value.toString();
     }
 
     private static String string(Object value) {

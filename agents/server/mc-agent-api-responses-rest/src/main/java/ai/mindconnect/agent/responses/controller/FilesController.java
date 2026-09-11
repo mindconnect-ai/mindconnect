@@ -2,6 +2,7 @@ package ai.mindconnect.agent.responses.controller;
 
 import ai.mindconnect.agent.protocol.StoredFile;
 import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.InputStreamResource;
@@ -69,7 +70,7 @@ public class FilesController {
         if (store == null) {
             throw new IllegalStateException("File support is not wired on this server");
         }
-        var stored = store.find(id).orElse(null);
+        var stored = fileId(id).flatMap(store::find).orElse(null);
         if (stored == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ResponsesController.error("not_found", "No file with id '" + id + "'."));
@@ -83,7 +84,16 @@ public class FilesController {
         return ResponseEntity.ok()
                 .contentType(type)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + stored.name() + "\"")
-                .body(new InputStreamResource(store.content(id)));
+                .body(new InputStreamResource(store.content(stored.id())));
+    }
+
+    /** The file id, or empty for a value no file id can have — simply not found. */
+    private java.util.Optional<FileId> fileId(String id) {
+        try {
+            return java.util.Optional.of(FileId.of(id));
+        } catch (IllegalArgumentException e) {
+            return java.util.Optional.empty();
+        }
     }
 
     /** OpenAI's file object: {@code id, object, bytes, created_at, filename, purpose}. */

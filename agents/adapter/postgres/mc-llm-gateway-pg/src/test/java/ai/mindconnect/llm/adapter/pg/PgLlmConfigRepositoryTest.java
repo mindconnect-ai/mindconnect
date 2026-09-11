@@ -1,7 +1,9 @@
 package ai.mindconnect.llm.adapter.pg;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +14,6 @@ import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -23,18 +24,36 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 class PgLlmConfigRepositoryTest {
 
+    private static final Namespace NS = new Namespace("test");
+
+    private Sql sql;
     private PgLlmConfigRepository repo;
 
     @BeforeEach
     void setUp() {
-        Sql sql = Sql.of(requirePostgres());
+        sql = Sql.of(requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_llm_config");
-        repo = new PgLlmConfigRepository(sql).initSchema();
+        repo = new PgLlmConfigRepository(sql, NS).initSchema();
+    }
+
+    @Test
+    void aRepositoryBoundToAnotherNamespaceSeesNothing() {
+        PgLlmConfigRepository other = new PgLlmConfigRepository(sql, new Namespace("other")).initSchema();
+        LlmConfig config = LlmConfig.claude("claude", "claude-sonnet-5", "key");
+        repo.save(config);
+
+        assertThat(other.findById(config.id())).isEmpty();
+        assertThat(other.findByName("claude")).isEmpty();
+        assertThat(other.findAll()).isEmpty();
+        other.deleteById(config.id());
+
+        assertThat(repo.findById(config.id())).contains(config);
+        assertThat(repo.findAll()).containsExactly(config);
     }
 
     @Test
     void aConfigSurvivesTheRoundTripUnchanged() {
-        LlmConfig config = new LlmConfig(UUID.randomUUID(), "claude", LlmProvider.ANTHROPIC,
+        LlmConfig config = new LlmConfig(LlmConfigId.random(), "claude", LlmProvider.ANTHROPIC,
                 "claude-sonnet-5", "https://api.anthropic.com", "sk-secret", 0.3, 8192,
                 Map.of("top_p", 0.9, "stop", List.of("END")), 200_000, false, null, null, null,
                 LlmConfigType.CHAT,
@@ -50,7 +69,7 @@ class PgLlmConfigRepositoryTest {
     void savingAgainReplacesTheConfigAndItsName() {
         LlmConfig first = LlmConfig.lmStudio("local", "qwen", "http://localhost:1234");
         repo.save(first);
-        LlmConfig renamed = LlmConfig.fromJson(first.id(), "local-qwen", first.provider(), "qwen-2",
+        LlmConfig renamed = LlmConfig.fromJson(first.id().value(), "local-qwen", first.provider(), "qwen-2",
                 first.baseUrl(), first.apiKey(), 0.1, 1024, Map.of(), null, false, null, null, null, null, null);
         repo.save(renamed);
 
@@ -87,7 +106,7 @@ class PgLlmConfigRepositoryTest {
     @Test
     void initSchemaIsIdempotent() {
         repo.save(LlmConfig.alias("x", "y"));
-        new PgLlmConfigRepository(Sql.of(requirePostgres())).initSchema();
+        new PgLlmConfigRepository(Sql.of(requirePostgres()), NS).initSchema();
         assertThat(repo.findAll()).hasSize(1);
     }
 

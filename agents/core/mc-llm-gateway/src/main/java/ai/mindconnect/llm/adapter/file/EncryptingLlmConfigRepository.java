@@ -1,5 +1,7 @@
 package ai.mindconnect.llm.adapter.file;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
+
 import ai.mindconnect.common.util.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -7,7 +9,6 @@ import ai.mindconnect.llm.port.out.LlmConfigRepository;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Decorator that encrypts the {@code apiKey} with an {@code enc:} prefix before
@@ -33,7 +34,7 @@ public class EncryptingLlmConfigRepository implements LlmConfigRepository {
     }
 
     @Override
-    public Optional<LlmConfig> findById(UUID id) {
+    public Optional<LlmConfig> findById(LlmConfigId id) {
         return delegate.findById(id);
     }
 
@@ -48,7 +49,7 @@ public class EncryptingLlmConfigRepository implements LlmConfigRepository {
     }
 
     @Override
-    public void deleteById(UUID id) {
+    public void deleteById(LlmConfigId id) {
         delegate.deleteById(id);
     }
 

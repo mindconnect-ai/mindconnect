@@ -24,7 +24,7 @@ class WorkflowDataRepositoryTest {
     static Stream<WorkflowDataRepository> implementations() {
         return Stream.of(
                 new InMemoryWorkflowDataRepository(),
-                new FileWorkflowDataRepository(tempDir.resolve("defs")));
+                new FileWorkflowDataRepository(tempDir.resolve("defs"), "test"));
     }
 
     @ParameterizedTest

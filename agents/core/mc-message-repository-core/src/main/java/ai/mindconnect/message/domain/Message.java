@@ -3,14 +3,18 @@ package ai.mindconnect.message.domain;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 public record Message(
-        UUID id,
-        UUID conversationId,
-        UUID senderId,
+        MessageId id,
+        ConversationId conversationId,
+        /**
+         * Who sent it, as the raw value of the sender's id — an agent's
+         * {@code AgentId} value or a user's {@code UserId} value, which
+         * {@link #senderType()} tells apart. This module sits below both types.
+         */
+        String senderId,
         ParticipantType senderType,
-        UUID recipientId,
+        String recipientId,
         MessageType type,
         String content,
         Map<String, Object> metadata,
@@ -29,7 +33,7 @@ public record Message(
          */
         Long durationMs,
         /**
-         * Identifier of the agent chat-turn that produced this message.
+         * The agent chat-turn that produced this message.
          * <p>
          * One turn produces one user CHAT (the prompt) plus all the
          * assistant TOOL_CALL / TOOL_RESULT / CHAT messages emitted by the
@@ -43,7 +47,7 @@ public record Message(
          *   • messages persisted before this field existed (no backfill)
          *   • messages created outside an agent turn (e.g. broadcast)
          */
-        UUID turnId,
+        ChatTurnId turnId,
         /**
          * Which LOOP RUN of the turn wrote this message: 0 for the first
          * execution, 1+ for approval resumes. Together with {@link #turnId}
@@ -68,9 +72,9 @@ public record Message(
         parts = parts == null ? null : List.copyOf(parts);
     }
 
-    public static Message of(UUID conversationId, UUID senderId, ParticipantType senderType,
+    public static Message of(ConversationId conversationId, String senderId, ParticipantType senderType,
                              MessageType type, String content, int seq) {
-        return new Message(UUID.randomUUID(), conversationId, senderId, senderType, null,
+        return new Message(MessageId.random(), conversationId, senderId, senderType, null,
                 type, content, Map.of(), seq, Instant.now(), false, null, null, null, null, null, null, null);
     }
 
@@ -79,9 +83,9 @@ public record Message(
      * of the parts, joined — so the record keeps its invariant without the
      * caller having to.
      */
-    public static Message of(UUID conversationId, UUID senderId, ParticipantType senderType,
+    public static Message of(ConversationId conversationId, String senderId, ParticipantType senderType,
                              MessageType type, List<ContentPart> parts, int seq) {
-        return new Message(UUID.randomUUID(), conversationId, senderId, senderType, null,
+        return new Message(MessageId.random(), conversationId, senderId, senderType, null,
                 type, ContentPart.textOf(parts), Map.of(), seq, Instant.now(), false, null, null, null,
                 null, null, null, parts);
     }
@@ -144,7 +148,7 @@ public record Message(
     }
 
     /** Returns a copy of this message tagged with the given chat-turn id. */
-    public Message withTurnId(UUID turnId) {
+    public Message withTurnId(ChatTurnId turnId) {
         return new Message(id, conversationId, senderId, senderType, recipientId,
                 type, content, metadata, sequenceNum, sentAt, compressed, compressedContent,
                 tokenCount, compressedTokenCount, durationMs, turnId, run, parts);

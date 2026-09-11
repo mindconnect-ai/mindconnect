@@ -1,17 +1,21 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.Namespace;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.logging.Logger;
 
 /**
@@ -26,8 +30,8 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
     private final Path baseDir;
     private final ObjectMapper objectMapper;
 
-    public FileAgentSessionRepository(Path agentStorageDir, ObjectMapper objectMapper) {
-        this.baseDir = agentStorageDir.toAbsolutePath();
+    public FileAgentSessionRepository(Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
+        this.baseDir = agentStorageDir.resolve(namespace.value()).toAbsolutePath();
         this.objectMapper = objectMapper;
         log.info("AgentSessionRepository base: " + this.baseDir);
     }
@@ -46,7 +50,16 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
         Path file = fileFor(session);
         try {
             Files.createDirectories(file.getParent());
-            objectMapper.writeValue(file.toFile(), session);
+            // Written beside the target and moved over it in one step: a session is
+            // read while other threads save it (tool tasks, title generation), and a
+            // reader must never see the half-written file.
+            Path tmp = Files.createTempFile(file.getParent(), FILE_NAME + ".", ".tmp");
+            try {
+                objectMapper.writeValue(tmp.toFile(), session);
+                Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } finally {
+                Files.deleteIfExists(tmp);
+            }
             return session;
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -54,163 +67,116 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
-    public Optional<AgentSession> findById(UUID id) {
-        // We don't know the userId without scanning; do a broad search.
-        // In practice this is called after listing sessions (so userId is known),
-        // but we support the generic lookup by scanning users/ dirs.
+    public Optional<AgentSession> findById(SessionId id) {
+        return allSessionDirs()
+                .filter(d -> d.getFileName().toString().equals(id.value()))
+                .map(d -> d.resolve(FILE_NAME))
+                .filter(Files::exists)
+                .map(f -> read(f))
+                .filter(s -> s.id().equals(id))
+                .findFirst();
+    }
+
+    @Override
+    public List<AgentSession> findByAgent(AgentId agent, UserId user) {
+        return userSessions(user)
+                .filter(s -> s.agentDefinitionId().equals(agent) && s.userId().equals(user))
+                .sorted(NEWEST_FIRST)
+                .toList();
+    }
+
+    @Override
+    public List<AgentSession> findByUser(UserId user) {
+        return userSessions(user)
+                .filter(s -> s.userId().equals(user)
+                        && s.parentSessionId() == null)
+                .sorted(NEWEST_FIRST)
+                .toList();
+    }
+
+    @Override
+    public List<AgentSession> findByParentSession(SessionId parent) {
+        return allSessionDirs()
+                .map(d -> d.resolve(FILE_NAME))
+                .filter(Files::exists)
+                .map(f -> read(f))
+                .filter(s -> parent.equals(s.parentSessionId()))
+                .sorted(java.util.Comparator.comparing(AgentSession::startedAt))
+                .toList();
+    }
+
+    @Override
+    public void deleteById(SessionId id) {
+        findById(id).ifPresent(session -> {
+            Path sessionDir = userSessionsDir(session.userId()).resolve(id.value());
+            if (!Files.isDirectory(sessionDir)) return;
+            try {
+                deleteRecursively(sessionDir);
+                log.info("Deleted session directory: " + sessionDir);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        });
+    }
+
+    // ── layout: users/<user>/sessions/<session>/session.json ────────────────
+
+    /** Every session directory of every user. */
+    private java.util.stream.Stream<Path> allSessionDirs() {
         Path usersDir = baseDir.resolve("users");
-        if (!Files.exists(usersDir)) return Optional.empty();
+        if (!Files.exists(usersDir)) return java.util.stream.Stream.empty();
         try (var userStream = Files.list(usersDir)) {
             return userStream
                     .filter(Files::isDirectory)
                     .flatMap(userDir -> {
                         Path sessionsDir = userDir.resolve("sessions");
                         if (!Files.exists(sessionsDir)) return java.util.stream.Stream.empty();
-                        try {
-                            return Files.list(sessionsDir);
+                        try (var sessions = Files.list(sessionsDir)) {
+                            return sessions.filter(Files::isDirectory).toList().stream();
                         } catch (IOException e) {
                             throw new UncheckedIOException(e);
                         }
                     })
-                    .filter(Files::isDirectory)
-                    .filter(d -> d.getFileName().toString().equals(id.toString()))
-                    .map(d -> d.resolve(FILE_NAME))
-                    .filter(Files::exists)
-                    .map(f -> {
-                        try {
-                            return objectMapper.readValue(f.toFile(), AgentSession.class);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })
-                    .findFirst();
+                    .toList().stream();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    @Override
-    public List<AgentSession> findByAgentDefinitionId(UUID agentDefinitionId, Namespace namespace, String userId) {
-        Path sessionsDir = userSessionsDir(userId);
-        if (!Files.exists(sessionsDir)) return List.of();
+    /** The sessions under one user's directory, read in {@code namespace}. */
+    private java.util.stream.Stream<AgentSession> userSessions(UserId user) {
+        Path sessionsDir = userSessionsDir(user);
+        if (!Files.exists(sessionsDir)) return java.util.stream.Stream.empty();
         try (var stream = Files.list(sessionsDir)) {
             return stream
                     .filter(Files::isDirectory)
                     .map(d -> d.resolve(FILE_NAME))
                     .filter(Files::exists)
-                    .map(f -> {
-                        try {
-                            return objectMapper.readValue(f.toFile(), AgentSession.class);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })
-                    .filter(s -> s.agentDefinitionId().equals(agentDefinitionId)
-                            && s.namespace().equals(namespace)
-                            && s.userId().equals(userId))
-                    .sorted(NEWEST_FIRST)
-                    .toList();
+                    .map(f -> read(f))
+                    .toList().stream();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
-    @Override
-    public List<AgentSession> findByUser(Namespace namespace, String userId) {
-        Path sessionsDir = userSessionsDir(userId);
-        if (!Files.exists(sessionsDir)) return List.of();
-        try (var stream = Files.list(sessionsDir)) {
-            return stream
-                    .filter(Files::isDirectory)
-                    .map(d -> d.resolve(FILE_NAME))
-                    .filter(Files::exists)
-                    .map(f -> {
-                        try {
-                            return objectMapper.readValue(f.toFile(), AgentSession.class);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })
-                    .filter(s -> s.namespace().equals(namespace)
-                            && s.userId().equals(userId)
-                            && s.parentSessionId() == null)
-                    .sorted(NEWEST_FIRST)
-                    .toList();
+    /** Reads a session in {@code namespace}; one written before the namespace was recorded takes it from here. */
+    private AgentSession read(Path file) {
+        try {
+            return objectMapper.readerFor(AgentSession.class)
+                    .readValue(file.toFile());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
-
-    @Override
-    public List<AgentSession> findByParentSessionId(UUID parentSessionId) {
-        // Sub-agent sessions can live under any user's sessions/ dir, so we
-        // walk every user. The session.json files are tiny so the scan is
-        // cheap; this is called from the trace UI to show sub-agent calls.
-        Path usersDir = baseDir.resolve("users");
-        if (!Files.exists(usersDir)) return List.of();
-        try (var userStream = Files.list(usersDir)) {
-            return userStream
-                    .filter(Files::isDirectory)
-                    .flatMap(userDir -> {
-                        Path sessionsDir = userDir.resolve("sessions");
-                        if (!Files.exists(sessionsDir)) return java.util.stream.Stream.empty();
-                        try {
-                            return Files.list(sessionsDir);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })
-                    .filter(Files::isDirectory)
-                    .map(d -> d.resolve(FILE_NAME))
-                    .filter(Files::exists)
-                    .map(f -> {
-                        try {
-                            return objectMapper.readValue(f.toFile(), AgentSession.class);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })
-                    .filter(s -> parentSessionId.equals(s.parentSessionId()))
-                    .sorted(java.util.Comparator.comparing(AgentSession::startedAt))
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    @Override
-    public void deleteById(UUID id) {
-        Path usersDir = baseDir.resolve("users");
-        if (!Files.exists(usersDir)) return;
-        try (var userStream = Files.list(usersDir)) {
-            userStream
-                    .filter(Files::isDirectory)
-                    .map(u -> u.resolve("sessions").resolve(id.toString()))
-                    .filter(Files::isDirectory)
-                    .findFirst()
-                    .ifPresent(sessionDir -> {
-                        try {
-                            deleteRecursively(sessionDir);
-                            log.info("Deleted session directory: " + sessionDir);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    // ── helpers ───────────────────────────────────────────────────────────────
 
     private Path fileFor(AgentSession session) {
         return userSessionsDir(session.userId())
-                .resolve(session.id().toString())
+                .resolve(session.id().value())
                 .resolve(FILE_NAME);
     }
 
-    private Path userSessionsDir(String userId) {
-        return baseDir.resolve("users").resolve(sanitize(userId)).resolve("sessions");
+    private Path userSessionsDir(UserId user) {
+        return baseDir.resolve("users").resolve(sanitize(user.value())).resolve("sessions");
     }
 
     private String sanitize(String value) {

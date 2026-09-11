@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.service;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -51,7 +52,7 @@ public class SessionAgentResolver {
         return withOverrides(load(main.id()), (SessionAgentRef) main);
     }
 
-    private AgentDefinition load(java.util.UUID id) {
+    private AgentDefinition load(AgentId id) {
         return definitions.findById(id)
                 .orElseThrow(() -> DomainException.notFound("AgentDefinition", id.toString()));
     }
@@ -64,7 +65,7 @@ public class SessionAgentResolver {
     private static AgentDefinition inlineDefinition(AgentSession session, InlineSessionAgent inline) {
         Instant now = session.startedAt() != null ? session.startedAt() : Instant.now();
         return new AgentDefinition(
-                inline.id(), session.namespace(), inline.label(), "", null, null,
+                inline.id(), inline.label(), "", null, null,
                 inline.systemPrompt(), null, inline.llmConfigName(),
                 DEFAULT_MAX_ITERATIONS, SummarizingWindowConfig.DEFAULT,
                 AgentDefinitionStatus.ACTIVE, inline.tools(), java.util.List.of(), null,

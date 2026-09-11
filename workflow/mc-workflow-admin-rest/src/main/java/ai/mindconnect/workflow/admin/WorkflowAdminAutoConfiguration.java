@@ -19,8 +19,9 @@ import java.nio.file.Path;
  * Auto-configures the embeddable workflow admin when present on a Spring Boot
  * host's classpath.
  *
- * <p>Registers a default {@link FileWorkflowDataRepository} (directory from
- * {@code mindconnect.workflow-admin.dir}, default {@code data/workflows}) and
+ * <p>Registers a default {@link FileWorkflowDataRepository} (under
+ * {@code <mindconnect.data.base-dir>/<mindconnect.namespace>/workflows}, default
+ * {@code data/local/workflows}) and
  * the {@link WorkflowAdminUiController}. Host apps that want different storage
  * register their own {@link WorkflowDataRepository} bean and the
  * {@code @ConditionalOnMissingBean} gate steps aside.
@@ -43,21 +44,23 @@ public class WorkflowAdminAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     public WorkflowDataRepository workflowDataRepository(
-            @Value("${mindconnect.workflow-admin.dir:data/workflows}") String dir) {
-        return new FileWorkflowDataRepository(Path.of(dir));
+            @Value("${mindconnect.data.base-dir:data}") String dir,
+            @Value("${mindconnect.namespace:local}") String partition) {
+        return new FileWorkflowDataRepository(Path.of(dir), partition);
     }
 
     /**
      * Where runs live — the instance is the run record: the resume state while
-     * halted, the readable history after. Same directory as the definitions by
-     * default; the repository keeps them in an {@code instances/} subdirectory,
-     * so a run outlives the process that started it.
+     * halted, the readable history after. Beside the definitions, in an
+     * {@code instances/} subdirectory, so a run outlives the process that
+     * started it.
      */
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     public WorkflowInstanceRepository workflowInstanceRepository(
-            @Value("${mindconnect.workflow-admin.dir:data/workflows}") String dir) {
-        return new FileWorkflowInstanceRepository(Path.of(dir));
+            @Value("${mindconnect.data.base-dir:data}") String dir,
+            @Value("${mindconnect.namespace:local}") String partition) {
+        return new FileWorkflowInstanceRepository(Path.of(dir), partition);
     }
 }

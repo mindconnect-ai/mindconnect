@@ -49,14 +49,14 @@ public class FileWorkflowInstanceRepositoryTest {
                 .executeWorkflow(wf, Map.of());
         Assertions.assertThat(halted.isHalted()).isTrue();
 
-        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir);
+        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, "test");
         String instanceId = repository.save(
                 WorkflowInstanceSnapshots.capture(halted.getInstance(), 1_700_000_000_000L));
 
         // --- the process dies here -------------------------------------------
 
         // --- pass two: nothing survives but the file --------------------------
-        FileWorkflowInstanceRepository reopened = new FileWorkflowInstanceRepository(baseDir);
+        FileWorkflowInstanceRepository reopened = new FileWorkflowInstanceRepository(baseDir, "test");
         WorkflowInstanceSnapshot loaded = reopened.findById(instanceId).orElseThrow();
 
         Assertions.assertThat(loaded.getWorkflowName()).isEqualTo("approval");
@@ -112,13 +112,13 @@ public class FileWorkflowInstanceRepositoryTest {
                 .executeWorkflow(wf, Map.of());
         Assertions.assertThat(halted.isHalted()).isTrue();
 
-        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir);
+        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, "test");
         String id = repository.save(WorkflowInstanceSnapshots.capture(halted.getInstance(), 1L));
 
         // --- the process dies; the user replies some time later ---------------
 
         WorkflowInstanceSnapshot loaded =
-                new FileWorkflowInstanceRepository(baseDir).findById(id).orElseThrow();
+                new FileWorkflowInstanceRepository(baseDir, "test").findById(id).orElseThrow();
 
         // The suspension can say what it is waiting for, without being rebuilt.
         Assertions.assertThat(WorkflowInstanceSnapshots.pendingHalt(wf, loaded))
@@ -139,7 +139,7 @@ public class FileWorkflowInstanceRepositoryTest {
 
     @Test
     public void listsSuspendedInstancesNewestFirst() {
-        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir);
+        FileWorkflowInstanceRepository repository = new FileWorkflowInstanceRepository(baseDir, "test");
         repository.save(snapshot("a", 1_000L));
         repository.save(snapshot("b", 3_000L));
         repository.save(snapshot("a", 2_000L));
@@ -158,7 +158,7 @@ public class FileWorkflowInstanceRepositoryTest {
             // it back as the same thing — which is the honest problem here.
         });
 
-        Assertions.assertThatThrownBy(() -> new FileWorkflowInstanceRepository(baseDir).save(snapshot))
+        Assertions.assertThatThrownBy(() -> new FileWorkflowInstanceRepository(baseDir, "test").save(snapshot))
                 .isInstanceOf(SnapshotSerializer.UnwritableSnapshotException.class)
                 .hasMessageContaining("handle")
                 .hasMessageContaining("cannot be written to JSON");

@@ -36,6 +36,12 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-domain</artifactId>
         </dependency>
+        <!-- FileId: the media parts of a message point at files in the store, and
+             the port that reads them takes the typed id rather than a bare value. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-store-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-common</artifactId>

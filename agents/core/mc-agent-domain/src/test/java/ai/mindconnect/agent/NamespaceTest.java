@@ -23,6 +23,6 @@ class NamespaceTest {
 
     @Test
     void defaultNamespace() {
-        assertThat(Namespace.DEFAULT.value()).isEqualTo("default");
+        assertThat(Namespace.DEFAULT.value()).isEqualTo("local");
     }
 }

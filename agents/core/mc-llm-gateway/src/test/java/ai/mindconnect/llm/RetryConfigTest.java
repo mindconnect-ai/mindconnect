@@ -11,10 +11,17 @@ class RetryConfigTest {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    /** Reads a config file as the file store does. */
+    private LlmConfig read(String json) throws Exception {
+        return mapper.readerFor(LlmConfig.class)
+                .readValue(json);
+    }
+
     @Test
     void deserialisesRetryBlockFromConfigJson() throws Exception {
         String json = """
             {
+              "id": "claude-haiku-default",
               "name": "claude-haiku-default",
               "provider": "ANTHROPIC",
               "model": "claude-haiku-4-5",
@@ -22,7 +29,7 @@ class RetryConfigTest {
                          "baseBackoffMillis": 2000, "maxBackoffMillis": 30000 }
             }
             """;
-        LlmConfig config = mapper.readValue(json, LlmConfig.class);
+        LlmConfig config = read(json);
 
         assertThat(config.retry()).isNotNull();
         assertThat(config.retry().maxAttempts()).isEqualTo(5);
@@ -35,9 +42,9 @@ class RetryConfigTest {
         // Old persisted configs have no "retry" key — must still load, and a
         // missing policy means NO retry (null), not silent defaults.
         String json = """
-            { "name": "old", "provider": "OPENAI", "model": "gpt-4o" }
+            { "id": "old", "name": "old", "provider": "OPENAI", "model": "gpt-4o" }
             """;
-        LlmConfig config = mapper.readValue(json, LlmConfig.class);
+        LlmConfig config = read(json);
 
         assertThat(config.retry()).isNull();
     }

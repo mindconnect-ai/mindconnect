@@ -18,7 +18,10 @@ import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agentrest.dto.StreamEventFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,7 +35,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * External REST API for agents and their chat sessions: agent CRUD, session
@@ -77,14 +79,14 @@ public class AgentApiController {
     // ── Agent CRUD ──────────────────────────────────────────────────────────
 
     @Operation(tags = "Agents", summary = "Create an agent",
-            description = "Creates an agent in the namespace with the default workspace tools "
+            description = "Creates an agent with the default workspace tools "
                     + "(workspace_read/write/list) pre-registered.")
     @PostMapping("/agents")
     public AgentDefinition createAgent(@RequestBody CreateAgentRequest req) {
-        log.info("POST /api/agents name={} namespace={}", req.name(), req.namespace());
+        log.info("POST /api/agents name={}", req.name());
         AgentSpec spec = new AgentSpec(req.name(), req.description(),
                 req.systemPrompt(), req.welcomeMessage(), req.llmConfigName());
-        AgentDefinition agent = registryService.create(new Namespace(req.namespace()), spec);
+        AgentDefinition agent = registryService.create(spec);
         log.info("Created agent: {} ({})", agent.name(), agent.id());
         return agent;
     }
@@ -100,10 +102,9 @@ public class AgentApiController {
                     + "Covers the same fields as the admin UI's edit form, through the same "
                     + "AgentRegistryService path.")
     @PutMapping("/agents/{agentId}")
-    public AgentDefinition updateAgent(@PathVariable UUID agentId,
-                                       @RequestParam String namespace,
+    public AgentDefinition updateAgent(@PathVariable String agentId,
                                        @RequestBody UpdateAgentRequest req) {
-        log.info("PUT /api/agents/{} namespace={}", agentId, namespace);
+        log.info("PUT /api/agents/{}", agentId);
         AgentPatch patch = AgentPatch.of()
                 .withName(req.name())
                 .withDescription(req.description())
@@ -113,17 +114,16 @@ public class AgentApiController {
                 .withMaxIterations(req.maxIterations())
                 .withResponseReviewers(req.responseReviewers())
                 .withToolSearch(req.toolSearch());
-        return registryService.update(new Namespace(namespace), agentId, patch);
+        return registryService.update(AgentId.of(agentId), patch);
     }
 
     @Operation(tags = "Agents", summary = "Delete an agent")
     @DeleteMapping("/agents/{agentId}")
-    public ResponseEntity<Void> deleteAgent(@PathVariable UUID agentId,
-                                            @RequestParam String namespace) {
-        log.info("DELETE /api/agents/{} namespace={}", agentId, namespace);
-        Namespace ns = new Namespace(namespace);
-        if (registryService.find(ns, agentId).isEmpty()) return ResponseEntity.notFound().build();
-        registryService.delete(ns, agentId);
+    public ResponseEntity<Void> deleteAgent(@PathVariable String agentId) {
+        log.info("DELETE /api/agents/{}", agentId);
+        AgentId id = AgentId.of(agentId);
+        if (registryService.find(id).isEmpty()) return ResponseEntity.notFound().build();
+        registryService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -131,38 +131,36 @@ public class AgentApiController {
             description = "Creates \"{name}-copy\" with a fresh id and no tools "
                     + "(tools carry per-agent ids).")
     @PostMapping("/agents/{agentId}/copy")
-    public ResponseEntity<AgentDefinition> copyAgent(@PathVariable UUID agentId,
-                                                     @RequestParam String namespace) {
-        log.info("POST /api/agents/{}/copy namespace={}", agentId, namespace);
-        Namespace ns = new Namespace(namespace);
-        if (registryService.find(ns, agentId).isEmpty()) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(registryService.copy(ns, agentId));
+    public ResponseEntity<AgentDefinition> copyAgent(@PathVariable String agentId) {
+        log.info("POST /api/agents/{}/copy", agentId);
+        AgentId id = AgentId.of(agentId);
+        if (registryService.find(id).isEmpty()) return ResponseEntity.notFound().build();
+        return ResponseEntity.ok(registryService.copy(id));
     }
 
     @Operation(tags = "Agents", summary = "Replace an agent's tools",
             description = "Sets the complete tool list — tools not in the request are removed.")
     @PutMapping("/agents/{agentId}/tools")
-    public AgentDefinition updateTools(@PathVariable UUID agentId,
-                                        @RequestParam String namespace,
+    public AgentDefinition updateTools(@PathVariable String agentId,
                                         @RequestBody UpdateToolsRequest req) {
-        log.info("PUT /api/agents/{}/tools namespace={} count={}", agentId, namespace, req.tools().size());
-        AgentPatch patch = AgentPatch.of().withTools(req.tools());
-        return registryService.update(new Namespace(namespace), agentId, patch);
+        log.info("PUT /api/agents/{}/tools count={}", agentId, req.tools().size());
+        // The tools come in the shape an agent is read in.
+        AgentPatch patch = AgentPatch.of().withTools(req.tools().stream().map(t -> t.toTool()).toList());
+        return registryService.update(AgentId.of(agentId), patch);
     }
 
-    @Operation(tags = "Agents", summary = "List agents in a namespace")
+    @Operation(tags = "Agents", summary = "List agents")
     @GetMapping("/agents")
-    public List<AgentDefinition> listAgents(@RequestParam String namespace) {
-        log.info("GET /api/agents namespace={}", namespace);
-        return registryService.list(new Namespace(namespace));
+    public List<AgentDefinition> listAgents() {
+        log.info("GET /api/agents");
+        return registryService.list();
     }
 
     @Operation(tags = "Agents", summary = "Get an agent")
     @GetMapping("/agents/{agentId}")
-    public ResponseEntity<AgentDefinition> findAgent(@PathVariable UUID agentId,
-                                                     @RequestParam String namespace) {
-        log.info("GET /api/agents/{} namespace={}", agentId, namespace);
-        return registryService.find(new Namespace(namespace), agentId)
+    public ResponseEntity<AgentDefinition> findAgent(@PathVariable String agentId) {
+        log.info("GET /api/agents/{}", agentId);
+        return registryService.find(AgentId.of(agentId))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -174,8 +172,9 @@ public class AgentApiController {
                     + "history, memory and file endpoints.")
     @PostMapping("/sessions")
     public AgentSession startSession(@RequestBody StartSessionRequest req) {
-        log.info("POST /api/sessions agentId={} namespace={} userId={}", req.agentId(), req.namespace(), req.userId());
-        AgentSession session = sessionService.openChat(req.agentId(), new Namespace(req.namespace()), req.userId());
+        log.info("POST /api/sessions agentId={} userId={}", req.agentId(), req.userId());
+        AgentSession session = sessionService.openChat(
+                AgentId.of(req.agentId()), UserId.of(req.userId()));
         log.info("Session started: {}", session.id());
         return session;
     }
@@ -183,11 +182,11 @@ public class AgentApiController {
     @Operation(tags = "Sessions", summary = "List a user's sessions for an agent")
     @GetMapping("/sessions")
     public List<AgentSession> listSessions(
-            @RequestParam UUID agentId,
-            @RequestParam String namespace,
+            @RequestParam String agentId,
             @RequestParam String userId) {
-        log.info("GET /api/sessions agentId={} namespace={} userId={}", agentId, namespace, userId);
-        List<AgentSession> sessions = sessionService.listSessions(agentId, new Namespace(namespace), userId);
+        log.info("GET /api/sessions agentId={} userId={}", agentId, userId);
+        List<AgentSession> sessions = sessionService.listSessions(
+                AgentId.of(agentId), UserId.of(userId));
         log.info("Found {} session(s)", sessions.size());
         return sessions;
     }
@@ -199,10 +198,11 @@ public class AgentApiController {
                     + "Server-Sent Events: token deltas, tool calls, task updates, then a final "
                     + "Done frame. The stream closes when the turn completes or fails.")
     @PostMapping(value = "/sessions/{sessionId}/chat", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streaming(@PathVariable UUID sessionId, @RequestBody String message) {
+    public SseEmitter streaming(@PathVariable String sessionId, @RequestBody String message) {
         log.info("POST /api/sessions/{}/chat message=\"{}\"", sessionId,
                 message.length() > 80 ? message.substring(0, 80) + "…" : message);
-        return streamTurn(sessionId, ai.mindconnect.message.domain.ContentPart.text(message));
+        return streamTurn(SessionId.of(sessionId),
+                ai.mindconnect.message.domain.ContentPart.text(message));
     }
 
     /**
@@ -220,7 +220,7 @@ public class AgentApiController {
                     + "Events like the plain-text variant.")
     @PostMapping(value = "/sessions/{sessionId}/chat", consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamingWithParts(@PathVariable UUID sessionId,
+    public SseEmitter streamingWithParts(@PathVariable String sessionId,
                                          @RequestBody ai.mindconnect.agentrest.dto.ChatRequest request) {
         String message = request.message() == null ? "" : request.message();
         log.info("POST /api/sessions/{}/chat (json) message=\"{}\" parts={}", sessionId,
@@ -235,7 +235,7 @@ public class AgentApiController {
         if (message.isBlank() && parts.size() == 1) {
             throw new IllegalArgumentException("A chat message needs text or at least one part");
         }
-        return streamTurn(sessionId, parts);
+        return streamTurn(SessionId.of(sessionId), parts);
     }
 
     /** A requested part as a domain part — the file's name, type and size from the store. */
@@ -243,22 +243,22 @@ public class AgentApiController {
         if (part.fileId() == null || part.fileId().isBlank()) {
             throw new IllegalArgumentException("A part needs a fileId — upload via POST /api/files first");
         }
-        ai.mindconnect.filestore.StoredFile stored = fileStore.find(part.fileId()).orElseThrow(() ->
+        ai.mindconnect.filestore.StoredFile stored = fileStore.find(FileId.of(part.fileId())).orElseThrow(() ->
                 new IllegalArgumentException("Unknown fileId '" + part.fileId()
                         + "' — upload via POST /api/files first"));
         String kind = part.kind() == null ? "" : part.kind().toLowerCase(java.util.Locale.ROOT);
         return switch (kind) {
             case "image" -> new ai.mindconnect.message.domain.ContentPart.Image(
-                    stored.id(), stored.name(), stored.contentType(), stored.size());
+                    stored.id().value(), stored.name(), stored.contentType(), stored.size());
             case "file", "document" -> new ai.mindconnect.message.domain.ContentPart.File(
-                    stored.id(), stored.name(), stored.contentType(), stored.size());
+                    stored.id().value(), stored.name(), stored.contentType(), stored.size());
             default -> throw new IllegalArgumentException(
                     "Unknown part kind '" + part.kind() + "' — use image or file");
         };
     }
 
     /** Starts the turn and streams it as Server-Sent Events until it ends. */
-    private SseEmitter streamTurn(UUID sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
+    private SseEmitter streamTurn(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
         SseEmitter emitter = new SseEmitter(120_000L);
 
         ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> {
@@ -312,7 +312,7 @@ public class AgentApiController {
         SseEmitter emitter = new SseEmitter(120_000L);
 
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        ai.mindconnect.channel.Subscription subscription = userChannels.subscribe(userId, afterSeq, event -> {
+        ai.mindconnect.channel.Subscription subscription = userChannels.subscribe(UserId.of(userId), afterSeq, event -> {
             try {
                 attachedSent.await();
                 emitter.send(SseEmitter.event().data(
@@ -326,7 +326,7 @@ public class AgentApiController {
         try {
             emitter.send(SseEmitter.event().data(
                     compactMapper.writeValueAsString(UserEventFrame.Attached.of(
-                            userChannels.earliestBufferedSeq(userId), userChannels.lastSeq(userId))),
+                            userChannels.earliestBufferedSeq(UserId.of(userId)), userChannels.lastSeq(UserId.of(userId)))),
                     MediaType.APPLICATION_JSON));
         } catch (Exception e) {
             subscription.close();
@@ -346,8 +346,8 @@ public class AgentApiController {
                     + "running. The SSE stream still ends with its normal Done event once the "
                     + "loop reaches the next cancel-check point.")
     @DeleteMapping("/sessions/{sessionId}/chat")
-    public ResponseEntity<Void> cancelChat(@PathVariable UUID sessionId) {
-        boolean cancelled = chatService.cancelChat(sessionId);
+    public ResponseEntity<Void> cancelChat(@PathVariable String sessionId) {
+        boolean cancelled = chatService.cancelChat(SessionId.of(sessionId));
         log.info("DELETE /api/sessions/{}/chat → cancelled={}", sessionId, cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
@@ -363,7 +363,7 @@ public class AgentApiController {
                     + "across turns until the client disconnects or the emitter times out — "
                     + "reattaching with the last seen seq is the intended loop.")
     @GetMapping(value = "/sessions/{sessionId}/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter sessionStream(@PathVariable UUID sessionId,
+    public SseEmitter sessionStream(@PathVariable String sessionId,
                                     @RequestParam(defaultValue = "0") long afterSeq) {
         log.info("GET /api/sessions/{}/stream afterSeq={}", sessionId, afterSeq);
         SseEmitter emitter = new SseEmitter(120_000L);
@@ -371,13 +371,13 @@ public class AgentApiController {
         // The replay runs on the channel's drain thread and could outrun the
         // attached frame below — the latch holds event frames until it is out.
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        AgentChatService.Attachment attachment = chatService.attach(sessionId, afterSeq, event -> {
+        AgentChatService.Attachment attachment = chatService.attach(SessionId.of(sessionId), afterSeq, event -> {
             try {
                 attachedSent.await();
                 emitter.send(SseEmitter.event().data(
                         compactMapper.writeValueAsString(new SessionStreamFrame(
                                 event.seq(),
-                                event.value().turnId().toString(),
+                                event.value().turnId().value(),
                                 event.value().run(),
                                 StreamEventFrame.from(event.value().event()))),
                         MediaType.APPLICATION_JSON));
@@ -408,18 +408,18 @@ public class AgentApiController {
 
     @Operation(tags = "Sessions", summary = "Load the session's message history")
     @GetMapping("/sessions/{sessionId}/history")
-    public List<Message> loadHistory(@PathVariable UUID sessionId) {
+    public List<Message> loadHistory(@PathVariable String sessionId) {
         log.info("GET /api/sessions/{}/history", sessionId);
-        List<Message> history = sessionService.loadHistory(sessionId);
+        List<Message> history = sessionService.loadHistory(SessionId.of(sessionId));
         log.info("Returning {} message(s) for session {}", history.size(), sessionId);
         return history;
     }
 
     @Operation(tags = "Sessions", summary = "Delete a session")
     @DeleteMapping("/sessions/{sessionId}")
-    public ResponseEntity<Void> deleteSession(@PathVariable UUID sessionId) {
+    public ResponseEntity<Void> deleteSession(@PathVariable String sessionId) {
         log.info("DELETE /api/sessions/{}", sessionId);
-        sessionService.deleteSession(sessionId);
+        sessionService.deleteSession(SessionId.of(sessionId));
         return ResponseEntity.noContent().build();
     }
 
@@ -427,11 +427,11 @@ public class AgentApiController {
             description = "Removes messages with sequence numbers in [fromSeq, toSeq] from the "
                     + "session history and returns how many were deleted.")
     @DeleteMapping("/sessions/{sessionId}/messages")
-    public ResponseEntity<Map<String, Object>> deleteMessages(@PathVariable UUID sessionId,
+    public ResponseEntity<Map<String, Object>> deleteMessages(@PathVariable String sessionId,
                                                                @RequestParam int fromSeq,
                                                                @RequestParam int toSeq) {
         log.info("DELETE /api/sessions/{}/messages fromSeq={} toSeq={}", sessionId, fromSeq, toSeq);
-        int deleted = sessionService.deleteMessages(sessionId, fromSeq, toSeq);
+        int deleted = sessionService.deleteMessages(SessionId.of(sessionId), fromSeq, toSeq);
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "deletedMessages", deleted));
@@ -441,18 +441,18 @@ public class AgentApiController {
             description = "The prompt-assembly view: which messages are live, compressed or "
                     + "truncated, plus token accounting.")
     @GetMapping("/sessions/{sessionId}/memory")
-    public WorkingMemory getWorkingMemory(@PathVariable UUID sessionId) {
+    public WorkingMemory getWorkingMemory(@PathVariable String sessionId) {
         log.info("GET /api/sessions/{}/memory", sessionId);
-        return chatService.memorySnapshot(sessionId);
+        return chatService.memorySnapshot(SessionId.of(sessionId));
     }
 
     @Operation(tags = "Sessions", summary = "Compress the session's working memory",
             description = "Summarises older turns to reclaim context window; returns how many "
                     + "messages were compressed.")
     @PostMapping("/sessions/{sessionId}/compress")
-    public ResponseEntity<Map<String, Object>> compressMemory(@PathVariable UUID sessionId) {
+    public ResponseEntity<Map<String, Object>> compressMemory(@PathVariable String sessionId) {
         log.info("POST /api/sessions/{}/compress", sessionId);
-        int compressed = chatService.compressMemory(sessionId);
+        int compressed = chatService.compressMemory(SessionId.of(sessionId));
         return ResponseEntity.ok(Map.of(
                 "sessionId", sessionId,
                 "compressedMessages", compressed));
@@ -467,8 +467,8 @@ public class AgentApiController {
                     + "that connects later (or reattaches after a restart) rebuilds its cards "
                     + "from here. Each entry's content is the call JSON the card shows.")
     @GetMapping("/sessions/{sessionId}/approvals")
-    public List<ToolApproval> openApprovals(@PathVariable UUID sessionId) {
-        List<ToolApproval> open = chatService.openApprovals(sessionId);
+    public List<ToolApproval> openApprovals(@PathVariable String sessionId) {
+        List<ToolApproval> open = chatService.openApprovals(SessionId.of(sessionId));
         log.info("GET /api/sessions/{}/approvals → {} open", sessionId, open.size());
         return open;
     }
@@ -480,12 +480,12 @@ public class AgentApiController {
                     + "continues on its original stream the moment the decision arrives. "
                     + "204 when it was delivered, 404 for a stale card whose task is gone.")
     @PostMapping("/sessions/{sessionId}/approvals/{callId}")
-    public ResponseEntity<Void> answerApproval(@PathVariable UUID sessionId,
+    public ResponseEntity<Void> answerApproval(@PathVariable String sessionId,
                                                @PathVariable String callId,
                                                @RequestParam boolean approved,
                                                @RequestParam(defaultValue = "once") String scope) {
         boolean delivered = chatService.answerApproval(
-                sessionId, callId, approved, ApprovalScope.fromParam(scope));
+                SessionId.of(sessionId), callId, approved, ApprovalScope.fromParam(scope));
         log.info("POST /api/sessions/{}/approvals/{} approved={} scope={} → delivered={}",
                 sessionId, callId, approved, scope, delivered);
         return delivered ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();

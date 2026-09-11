@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.local;
 
+import ai.mindconnect.agent.SessionId;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
@@ -11,7 +13,6 @@ import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -43,7 +44,7 @@ public class LocalAgentChatClient implements AgentChatClient {
     }
 
     @Override
-    public UUID sessionId() { return session.id(); }
+    public SessionId sessionId() { return session.id(); }
 
     @Override
     public AgentDefinition definition() { return definition; }

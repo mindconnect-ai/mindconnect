@@ -1,8 +1,11 @@
 package ai.mindconnect.agent.runtime.service.prompt;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -19,19 +22,24 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AttachmentNoticeTest {
 
     private static AgentSession session(String... attached) {
-        return new AgentSession(UUID.randomUUID(), UUID.randomUUID(), Namespace.DEFAULT, "david",
-                UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
-                List.of(), java.util.Arrays.stream(attached)
-                        .map(AttachedFile::named).toList());
+        return session(java.util.Arrays.stream(attached).map(AttachedFile::named).toList());
+    }
+
+    private static AgentSession session(List<AttachedFile> files) {
+        return new AgentSession(SessionId.random(), AgentId.random(), UserId.of("david"),
+                ConversationId.random(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
+                List.of(), files);
     }
 
     private static Message user(String text, Map<String, Object> metadata) {
-        return Message.of(UUID.randomUUID(), UUID.randomUUID(), ParticipantType.USER, MessageType.CHAT, text, 1)
+        return Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER,
+                        MessageType.CHAT, text, 1)
                 .withMetadata(metadata);
     }
 
     private static Message agent(String text) {
-        return Message.of(UUID.randomUUID(), UUID.randomUUID(), ParticipantType.AGENT, MessageType.CHAT, text, 2);
+        return Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.AGENT,
+                MessageType.CHAT, text, 2);
     }
 
     private static Map<String, Object> attached(String... names) {
@@ -91,10 +99,8 @@ class AttachmentNoticeTest {
         // The session's record decides, not the extension: an image uploaded
         // under a name without one is still an image, a generic content type
         // does not make a .png a document.
-        AgentSession odd = new AgentSession(UUID.randomUUID(), UUID.randomUUID(), Namespace.DEFAULT, "david",
-                UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
-                List.of(), List.of(new AttachedFile("f-1", "scan", "image/jpeg", 1),
-                        new AttachedFile("f-2", "photo.png", "application/octet-stream", 1)));
+        AgentSession odd = session(List.of(new AttachedFile("f-1", "scan", "image/jpeg", 1),
+                new AttachedFile("f-2", "photo.png", "application/octet-stream", 1)));
         assertThat(AttachmentNotice.forModel(user("?", attached("scan", "photo.png")), odd)).isEqualTo("?");
     }
 

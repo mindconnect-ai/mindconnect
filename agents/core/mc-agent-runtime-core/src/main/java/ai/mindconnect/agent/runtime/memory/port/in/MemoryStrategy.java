@@ -3,7 +3,6 @@ package ai.mindconnect.agent.runtime.memory.port.in;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -16,7 +15,7 @@ import java.util.List;
  * conversation history is reflected in each LLM request: what goes into the live
  * window, when/how it is compressed, and what the system-prompt addendum looks like.
  * <p>
- * One implementation per {@link MemoryConfig} subtype.
+ * One implementation per {@link ai.mindconnect.agent.runtime.memory.domain.MemoryConfig} subtype.
  * Instances are obtained from the {@link MemoryStrategyFactory}.
  */
 public interface MemoryStrategy {

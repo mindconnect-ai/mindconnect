@@ -1,5 +1,9 @@
 package ai.mindconnect.agent.runtime.tools.toolsearch;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.ToolRegistryRef;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
@@ -9,7 +13,7 @@ import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -50,8 +53,7 @@ class ToolSearchToolTest {
         groups.put("documents", new LinkedHashSet<>(List.of("document_sections")));
         groups.put("code", new LinkedHashSet<>(List.of("code_execute")));
         return new ToolRegistry() {
-            @Override public Optional<Tool> resolve(AgentTool agentTool, Namespace namespace,
-                                                    String userId, UUID sessionId) {
+            @Override public Optional<Tool> resolve(AgentTool agentTool, ToolCallScope scope) {
                 return Optional.ofNullable(tools.get(agentTool.name()));
             }
             @Override public Map<String, Set<String>> toolNamesByGroup() { return groups; }
@@ -60,50 +62,49 @@ class ToolSearchToolTest {
 
     /** Minimal in-memory session store — activations persist on the session. */
     private static AgentSessionRepository sessionRepo(
-            Map<UUID, AgentSession> byId) {
+            Map<SessionId, AgentSession> byId) {
         return new AgentSessionRepository() {
             @Override public AgentSession save(
                     AgentSession session) {
                 byId.put(session.id(), session);
                 return session;
             }
-            @Override public Optional<AgentSession> findById(UUID id) {
+            @Override public Optional<AgentSession> findById(SessionId id) {
                 return Optional.ofNullable(byId.get(id));
             }
-            @Override public List<AgentSession> findByAgentDefinitionId(
-                    UUID agentDefinitionId, Namespace namespace, String userId) {
+            @Override public List<AgentSession> findByAgent(AgentId agent, UserId user) {
                 return List.of();
             }
             @Override public List<AgentSession> findByUser(
-                    Namespace namespace, String userId) {
+                    UserId userId) {
                 return List.of();
             }
-            @Override public List<AgentSession> findByParentSessionId(
-                    UUID parentSessionId) {
+            @Override public List<AgentSession> findByParentSession(
+                    SessionId parentSessionId) {
                 return List.of();
             }
-            @Override public void deleteById(UUID id) { byId.remove(id); }
+            @Override public void deleteById(SessionId id) { byId.remove(id); }
         };
     }
 
     private ToolRegistryRef ref;
     private DynamicToolActivations activations;
-    private UUID sessionId;
+    private SessionId sessionId;
 
     @BeforeEach
     void setUp() {
         ref = new ToolRegistryRef();
         ref.set(stubRegistry());
-        sessionId = UUID.randomUUID();
-        Map<UUID, AgentSession> sessions = new java.util.HashMap<>();
+        sessionId = SessionId.random();
+        Map<SessionId, AgentSession> sessions = new java.util.HashMap<>();
         sessions.put(sessionId, new AgentSession(
-                sessionId, UUID.randomUUID(), new Namespace("test"), "u", UUID.randomUUID(),
+                sessionId, AgentId.random(), UserId.of("u"), ConversationId.random(),
                 null, null, null, null, null, null, null));
         activations = new DynamicToolActivations(sessionRepo(sessions));
     }
 
     private ToolSearchTool tool(Set<String> assigned, Set<String> allowedGroups) {
-        return new ToolSearchTool(ref, activations, new Namespace("test"), sessionId,
+        return new ToolSearchTool(ref, activations, sessionId,
                 assigned, allowedGroups);
     }
 
@@ -155,10 +156,10 @@ class ToolSearchToolTest {
 
     @Test
     void effectiveRefsHonourDeferredFlagAndInjectToolSearch() {
-        UUID agentId = UUID.randomUUID();
-        AgentTool always = AgentTool.of(agentId, "web_fetch");
-        AgentTool deferred = new AgentTool(UUID.randomUUID(), agentId, "document_sections",
-                null, Map.of("params", Map.of("path", "spec.docx")), true, true);
+        AgentId agentId = AgentId.random();
+        AgentTool always = AgentTool.of("web_fetch");
+        AgentTool deferred = new AgentTool(AgentToolId.random(), "document_sections",
+                null, Map.of("params", Map.of("path", "spec.docx")), true, true, false, null);
         AgentDefinition def = definition(agentId, List.of(always, deferred),
                 new AgentDefinition.ToolSearchConfig(true, List.of("code")));
 
@@ -182,17 +183,17 @@ class ToolSearchToolTest {
 
     @Test
     void effectiveRefsWithoutToolSearchBehaveLikeBefore() {
-        UUID agentId = UUID.randomUUID();
+        AgentId agentId = AgentId.random();
         AgentDefinition def = definition(agentId,
-                List.of(AgentTool.of(agentId, "web_fetch")), null);
+                List.of(AgentTool.of("web_fetch")), null);
 
         assertThat(activations.effectiveRefs(def, sessionId))
                 .extracting(AgentTool::name).containsExactly("web_fetch");
     }
 
-    private static AgentDefinition definition(UUID agentId, List<AgentTool> tools,
+    private static AgentDefinition definition(AgentId agentId, List<AgentTool> tools,
                                               AgentDefinition.ToolSearchConfig toolSearch) {
-        return new AgentDefinition(agentId, new Namespace("test"), "a", null, null, null, null, null,
+        return new AgentDefinition(agentId, "a", null, null, null, null, null,
                 "cfg", 5, null, null, tools, List.of(), null, toolSearch, null, null);
     }
 
@@ -202,10 +203,10 @@ class ToolSearchToolTest {
         factory.bind(env(Map.of(ToolRegistryRef.class, ref, DynamicToolActivations.class, activations)));
         assertThat(factory.isAvailable()).isTrue();
 
-        var agentTool = new AgentTool(null, null, "tool_search", null,
-                Map.of("groups", List.of("Web", " documents ")), true, false);
+        var agentTool = new AgentTool(AgentToolId.random(), "tool_search", null,
+                Map.of("groups", List.of("Web", " documents ")), true, false, false, null);
         Tool created = factory.create(agentTool,
-                new ToolCallScope(new Namespace("test"), "u", sessionId, null));
+                new ToolCallScope(UserId.of("u"), sessionId, null));
         // May find web/documents tools but not code_execute.
         assertThat(created.execute(Map.of("query", "execute program container")))
                 .doesNotContain("code_execute");

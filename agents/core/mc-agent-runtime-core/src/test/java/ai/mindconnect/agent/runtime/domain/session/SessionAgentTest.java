@@ -1,8 +1,10 @@
 package ai.mindconnect.agent.runtime.domain.session;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.message.domain.ConversationId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -15,25 +17,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /** The session agent's contract: its id, its invariant, and its JSON. */
 class SessionAgentTest {
 
-    private static final Namespace NS = new Namespace("local");
     // Same module set the repositories use — Instant needs jsr310.
     private static final ObjectMapper JSON = new ObjectMapper()
             .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 
     private static AgentSession session() {
-        return AgentSession.start(UUID.randomUUID(), NS, "alice", UUID.randomUUID());
+        return AgentSession.start(AgentId.random(), UserId.of("alice"), ConversationId.random());
     }
 
     @Test
-    void inlineAgentStampsItsIdIntoEveryTool() {
+    void inlineAgentBindsEveryToolItNames() {
         var agent = InlineSessionAgent.of("Chat", "be helpful", "gpt",
                 List.of("workspace_read", "todo_write"), true);
 
-        // The id these tools carry is what SpiToolRegistry turns into a
-        // ToolCallScope, and the AGENT_USER workspace is keyed by it. Null
-        // here means the agent-scoped workspace throws at call time.
-        assertThat(agent.tools()).hasSize(2)
-                .allSatisfy(tool -> assertThat(tool.agentDefinitionId()).isEqualTo(agent.id()));
+        // A tool binding no longer points back at its agent — a tool call
+        // learns the agent from its ToolCallScope.
+        assertThat(agent.tools()).hasSize(2);
+        assertThat(agent.tools()).extracting(t -> t.id()).doesNotHaveDuplicates();
         assertThat(agent.tools()).extracting(t -> t.name())
                 .containsExactly("workspace_read", "todo_write");
     }
@@ -73,7 +73,7 @@ class SessionAgentTest {
     @Test
     void inlineAndRefSurviveJsonRoundTrip() throws Exception {
         var inline = InlineSessionAgent.of("Chat", "be helpful", "gpt", List.of("todo_read"), true);
-        var ref = new SessionAgentRef(UUID.randomUUID(), true, "Poet", "claude", null, null);
+        var ref = new SessionAgentRef(AgentId.random(), true, "Poet", "claude", null, null);
 
         for (SessionAgent agent : List.of(inline, ref)) {
             String json = JSON.writeValueAsString(agent);
@@ -86,7 +86,7 @@ class SessionAgentTest {
     void aSessionWithoutTheFieldStillDeserialises() throws Exception {
         // Every session.json written before session agents existed.
         String legacy = """
-                {"id":"%s","agentDefinitionId":"%s","namespace":{"value":"local"},
+                {"id":"%s","agentDefinitionId":"%s",
                  "userId":"alice","conversationId":"%s","status":"ACTIVE",
                  "startedAt":"2026-08-29T10:00:00Z"}
                 """.formatted(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID());

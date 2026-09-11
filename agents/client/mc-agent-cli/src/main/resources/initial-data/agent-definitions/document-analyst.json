@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000023",
-  "namespace": {
-    "value": "local"
-  },
   "name": "document-analyst",
   "description": "Sub-agent for long documents (PDF, Word). Given a document path and a question, uses outline/grep/page-range tools to answer with exact page citations — without blowing context on the full text. Call via run_agent.",
   "group": "sub-agents",

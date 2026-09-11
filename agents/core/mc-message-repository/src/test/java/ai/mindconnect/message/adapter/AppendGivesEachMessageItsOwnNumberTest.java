@@ -1,5 +1,7 @@
 package ai.mindconnect.message.adapter;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
@@ -38,33 +40,34 @@ class AppendGivesEachMessageItsOwnNumberTest {
     @TempDir
     static Path dir;
 
-    private static final UUID CONVERSATION = UUID.randomUUID();
-    private static final UUID SENDER = UUID.randomUUID();
+    private static final Namespace NS = new Namespace("local");
+    private static final String SENDER = UUID.randomUUID().toString();
 
     static List<MessageRepository> stores() {
         return List.of(new InMemoryMessageRepository(),
                 new FileMessageRepository(dir.resolve(UUID.randomUUID().toString()),
-                        new ObjectMapper().registerModule(new JavaTimeModule())));
+                        new ObjectMapper().registerModule(new JavaTimeModule()), NS));
     }
 
-    private static Message message(UUID conversation, int seq) {
+    private static Message message(ConversationId conversation, int seq) {
         return Message.of(conversation, SENDER, ParticipantType.USER, MessageType.CHAT, "m" + seq, seq);
     }
 
     @ParameterizedTest
     @MethodSource("stores")
     void theNumbersRunFromOne_andAStoreWithMessagesCarriesOn(MessageRepository store) {
-        UUID conversation = UUID.randomUUID();
+        ConversationId conversation = ConversationId.random();
 
         assertThat(store.append(conversation, seq -> message(conversation, seq)).sequenceNum()).isEqualTo(1);
         assertThat(store.append(conversation, seq -> message(conversation, seq)).sequenceNum()).isEqualTo(2);
 
-        UUID older = UUID.randomUUID();
+        ConversationId older = ConversationId.random();
         IntStream.rangeClosed(1, 7).forEach(seq -> store.save(message(older, seq)));
         assertThat(store.append(older, seq -> message(older, seq)).sequenceNum())
                 .as("picks up above what is already stored").isEqualTo(8);
 
-        assertThat(store.append(UUID.randomUUID(), s -> message(UUID.randomUUID(), s)).sequenceNum())
+        ConversationId fresh = ConversationId.random();
+        assertThat(store.append(fresh, s -> message(fresh, s)).sequenceNum())
                 .as("each conversation counts on its own").isEqualTo(1);
     }
 
@@ -72,7 +75,7 @@ class AppendGivesEachMessageItsOwnNumberTest {
     @MethodSource("stores")
     void twentyThreadsAppendingAtOnceGetTwentyDifferentNumbers(MessageRepository store) throws Exception {
         int writers = 20;
-        UUID conversation = UUID.randomUUID();
+        ConversationId conversation = ConversationId.random();
         var start = new CountDownLatch(1);
         var done = new CountDownLatch(writers);
         var failures = new CopyOnWriteArrayList<Throwable>();
@@ -95,7 +98,7 @@ class AppendGivesEachMessageItsOwnNumberTest {
         }
 
         assertThat(failures).isEmpty();
-        assertThat(store.findByConversationId(conversation, new PageRequest(0, 100)))
+        assertThat(store.findByConversation(conversation, new PageRequest(0, 100)))
                 .extracting(Message::sequenceNum)
                 .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, writers).boxed().toList());
     }

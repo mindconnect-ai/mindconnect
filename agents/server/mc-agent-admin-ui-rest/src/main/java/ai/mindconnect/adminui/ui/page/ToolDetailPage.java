@@ -25,7 +25,7 @@ public final class ToolDetailPage extends AdminPage {
 
     @Override
     public UiPage render() {
-        return UiPage.of("/admin/agents/" + agent.id() + "/tools/" + tool.id(),
+        return UiPage.of("/admin/agents/" + agent.id().value() + "/tools/" + tool.id().value(),
                 new ToolDetailComponent(agent, tool, toolRegistry).render());
     }
 }

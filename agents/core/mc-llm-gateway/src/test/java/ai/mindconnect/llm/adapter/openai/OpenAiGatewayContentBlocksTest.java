@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmContent;
@@ -27,7 +28,7 @@ class OpenAiGatewayContentBlocksTest {
     private final OpenAiCompatibleGateway gateway =
             new OpenAiCompatibleGateway(new OkHttpClient(), new ObjectMapper(), encryption);
 
-    private final LlmConfig config = new LlmConfig(java.util.UUID.randomUUID(), "openai", LlmProvider.OPENAI,
+    private final LlmConfig config = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
             "gpt-5", "https://api.openai.com", "sk-test", 0.7, 4096, Map.of(), 128_000,
             false, null, null, null, null, null);
 
@@ -70,7 +71,7 @@ class OpenAiGatewayContentBlocksTest {
     @Test
     void aServerWithoutFileBlocksGetsTheDocumentAsANote() throws Exception {
         // LM Studio, Ollama, Groq, … answer an unknown content type with a 400.
-        LlmConfig local = new LlmConfig(java.util.UUID.randomUUID(), "local", LlmProvider.LM_STUDIO,
+        LlmConfig local = new LlmConfig(LlmConfigId.random(), "local", LlmProvider.LM_STUDIO,
                 "some-vision-model", "http://localhost:1234", "lm-studio", 0.7, 4096, Map.of(), 128_000,
                 false, null, null, null, null, null);
         LlmMessage user = LlmMessage.user(List.of(

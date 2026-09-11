@@ -17,7 +17,8 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 
 /**
  * Tabular view of an agent's chat sessions with Open / Delete row
@@ -33,7 +34,7 @@ public final class SessionTableComponent implements UiComponent {
     private final AgentDefinition agent;
     private final String userId;
     private final AgentSessionRepository sessionRepository;
-    private final UUID selectedSessionId;
+    private final SessionId selectedSessionId;
 
     public SessionTableComponent(AgentDefinition agent, String userId,
                                   AgentSessionRepository sessionRepository) {
@@ -42,7 +43,7 @@ public final class SessionTableComponent implements UiComponent {
 
     public SessionTableComponent(AgentDefinition agent, String userId,
                                   AgentSessionRepository sessionRepository,
-                                  UUID selectedSessionId) {
+                                  SessionId selectedSessionId) {
         this.agent = agent;
         this.userId = userId;
         this.sessionRepository = sessionRepository;
@@ -51,40 +52,40 @@ public final class SessionTableComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "session-table-" + agent.id();
+        return "session-table-" + agent.id().value();
     }
 
     @Override
     public UiTable render() {
         List<AgentSession> sessions = sessionRepository
-                .findByAgentDefinitionId(agent.id(), agent.namespace(), userId);
+                .findByAgent(agent.id(), UserId.of(userId));
 
         var table = UiTable.of(id(), "Sessions")
                 .action(UiAction.primary("new-session", "New Session").icon("add")
-                        .onClick(trigger(on(ChatUiController.class).startSession(agent.id(), null))))
+                        .onClick(trigger(on(ChatUiController.class).startSession(agent.id().value(), null))))
                 .column(UiTable.Column.text("title", "Title").asSortable())
                 .column(UiTable.Column.text("status", "Status"))
                 .column(UiTable.Column.text("userId", "User"))
                 .column(UiTable.Column.date("startedAt", "Started").asSortable())
                 .column(UiTable.Column.date("completedAt", "Completed"))
                 .rowAction(UiAction.secondary("open", "Open").icon("show")
-                        .onClick(trigger(on(ChatUiController.class).getSession(ROW_ID, null))))
+                        .onClick(trigger(on(ChatUiController.class).getSession(ROW_ID.toString(), null))))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this session?")
                         .onClick(trigger(on(AgentUiController.class)
-                                .deleteSession(agent.id(), ROW_ID, null))));
+                                .deleteSession(agent.id().value(), ROW_ID.toString(), null))));
 
         for (AgentSession s : sessions) {
             table.row(Map.of(
-                "id",          s.id().toString(),
+                "id",          s.id().value(),
                 "title",       s.title() != null ? s.title() : "(untitled)",
                 "status",      s.status() != null ? s.status().name() : "",
-                "userId",      s.userId() != null ? s.userId() : "",
+                "userId",      s.userId() != null ? s.userId().value() : "",
                 "startedAt",   s.startedAt() != null ? DT_FMT.format(s.startedAt()) : "",
                 "completedAt", s.completedAt() != null ? DT_FMT.format(s.completedAt()) : ""
             ));
         }
-        if (selectedSessionId != null) table.selectedRow(selectedSessionId.toString());
+        if (selectedSessionId != null) table.selectedRow(selectedSessionId.value());
         return table;
     }
 }

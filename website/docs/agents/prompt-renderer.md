@@ -53,7 +53,7 @@ override an earlier one. The built-in providers:
 | Provider | Variables |
 |----------|-----------|
 | `CurrentDateProvider` | `current_date`, `current_datetime`, `current_time` |
-| `AgentMetadataProvider` | `agent_name`, `agent_id`, `namespace`, `user_id`, `session_id` |
+| `AgentMetadataProvider` | `agent_name`, `agent_id`, `user_id`, `session_id` |
 | `AgentToolsProvider` | `tools` |
 | `WorkspaceNotesProvider` | `user_notes`, `user_profile` |
 | `TodoListPromptContextProvider` | `todos`, `todo_list_md` |

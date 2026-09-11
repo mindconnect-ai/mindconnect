@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.service.stream;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.Subscription;
@@ -40,8 +41,8 @@ public final class UserChannels {
     }
 
     /** Announces {@code event} to every client attached to {@code userId}'s stream. */
-    public void publish(String userId, UserEvent event) {
-        if (userId == null || userId.isBlank() || event == null) return;
+    public void publish(UserId userId, UserEvent event) {
+        if (userId == null || event == null) return;
         channel(userId).publish(event);
     }
 
@@ -50,26 +51,26 @@ public final class UserChannels {
      * from the buffer, then continue live. The event's {@code seq} is the
      * cursor for the next reconnect.
      */
-    public Subscription subscribe(String userId, long afterSeq,
+    public Subscription subscribe(UserId userId, long afterSeq,
                                   Consumer<Channel.Event<UserEvent>> consumer) {
         return channel(userId).subscribe(afterSeq, consumer);
     }
 
     /** The newest sequence the user's stream has seen (0 when nothing happened). */
-    public long lastSeq(String userId) {
+    public long lastSeq(UserId userId) {
         return channel(userId).lastSeq();
     }
 
     /** The oldest sequence still in the buffer — everything before it is gone. */
-    public long earliestBufferedSeq(String userId) {
+    public long earliestBufferedSeq(UserId userId) {
         return channel(userId).earliestBufferedSeq();
     }
 
-    private Channel<UserEvent> channel(String userId) {
+    private Channel<UserEvent> channel(UserId userId) {
         return registry.channel(id(userId));
     }
 
-    private static String id(String userId) {
-        return "user_" + userId;
+    private static String id(UserId userId) {
+        return "user_" + userId.value();
     }
 }

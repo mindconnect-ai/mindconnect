@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,20 +51,22 @@ public class FilesApiController {
     @Operation(summary = "List stored files")
     @GetMapping
     public List<StoredFile> list() {
-        return fileStore.list();
+        return fileStore.list().stream().toList();
     }
 
     @Operation(summary = "Get file metadata")
     @GetMapping("/{id}")
     public ResponseEntity<StoredFile> find(@PathVariable String id) {
-        return fileStore.find(id).map(ResponseEntity::ok)
+        return fileStore.find(FileId.of(id)).map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @Operation(summary = "Download the file content")
     @GetMapping("/{id}/content")
-    public ResponseEntity<InputStreamResource> content(@PathVariable String id) throws IOException {
-        var file = fileStore.find(id).orElse(null);
+    public ResponseEntity<InputStreamResource> content(@PathVariable String id)
+            throws IOException {
+        FileId fileId = FileId.of(id);
+        var file = fileStore.find(fileId).orElse(null);
         if (file == null) {
             return ResponseEntity.notFound().build();
         }
@@ -72,7 +75,7 @@ public class FilesApiController {
                 .contentType(file.contentType() != null
                         ? MediaType.parseMediaType(file.contentType())
                         : MediaType.APPLICATION_OCTET_STREAM)
-                .body(new InputStreamResource(fileStore.content(id)));
+                .body(new InputStreamResource(fileStore.content(fileId)));
     }
 
     @Operation(summary = "Delete a file",
@@ -80,7 +83,7 @@ public class FilesApiController {
                     + "stores stay.")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable String id) throws IOException {
-        fileStore.delete(id);
+        fileStore.delete(FileId.of(id));
         return ResponseEntity.noContent().build();
     }
 }

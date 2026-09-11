@@ -9,11 +9,10 @@ import java.util.EnumSet;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Function;
 
 public record LlmConfig(
-        UUID id,
+        LlmConfigId id,
         String name,
         LlmProvider provider,
         String model,
@@ -120,7 +119,7 @@ public record LlmConfig(
     /** Jackson deserialisation — trailing fields default for old persisted configs. */
     @JsonCreator
     public static LlmConfig fromJson(
-            @JsonProperty("id")                   UUID id,
+            @JsonProperty("id")                   String id,
             @JsonProperty("name")                 String name,
             @JsonProperty("provider")             LlmProvider provider,
             @JsonProperty("model")                String model,
@@ -136,12 +135,11 @@ public record LlmConfig(
             @JsonProperty("rateLimit")            RateLimitConfig rateLimit,
             @JsonProperty("type")                 LlmConfigType type,
             @JsonProperty("capabilities")         Set<LlmCapability> capabilities) {
-        return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
+        return new LlmConfig(new LlmConfigId(id), name, provider, model, baseUrl, apiKey,
                 defaultTemperature, maxOutputTokens,
                 additionalParams != null ? additionalParams : Map.of(),
                 contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
     }
-
 
     /**
      * Creates an alias config that delegates to another config by name. Aliases
@@ -149,27 +147,27 @@ public record LlmConfig(
      * {@link #delegatesTo} to the target config at call time.
      */
     public static LlmConfig alias(String name, String delegatesTo) {
-        return new LlmConfig(UUID.randomUUID(), name, null, null, null, null,
+        return new LlmConfig(LlmConfigId.random(), name, null, null, null, null,
                 0.0, 0, Map.of(), null, true, delegatesTo, null, null, null, null);
     }
 
     public static LlmConfig lmStudio(String name, String model, String baseUrl) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.LM_STUDIO,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.LM_STUDIO,
                 model, baseUrl, "lm-studio", 0.7, 2048, Map.of(), 131_072, false, null, null, null, null, null);
     }
 
     public static LlmConfig claude(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.ANTHROPIC,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.ANTHROPIC,
                 model, "https://api.anthropic.com", apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig ollama(String name, String model, String baseUrl) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OLLAMA,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.OLLAMA,
                 model, baseUrl, "ollama", 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig mistral(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.MISTRAL,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.MISTRAL,
                 model, "https://api.mistral.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
@@ -178,37 +176,37 @@ public record LlmConfig(
      * @param deployment Azure deployment name (used as the model identifier in the URL)
      */
     public static LlmConfig azureOpenAi(String name, String deployment, String baseUrl, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.AZURE_OPENAI,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.AZURE_OPENAI,
                 deployment, baseUrl, apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig deepSeek(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.DEEPSEEK,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.DEEPSEEK,
                 model, "https://api.deepseek.com", apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig together(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.TOGETHER,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.TOGETHER,
                 model, "https://api.together.xyz", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig openRouter(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OPENROUTER,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.OPENROUTER,
                 model, "https://openrouter.ai/api", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig perplexity(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.PERPLEXITY,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.PERPLEXITY,
                 model, "https://api.perplexity.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig fireworks(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.FIREWORKS,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.FIREWORKS,
                 model, "https://api.fireworks.ai/inference", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig googleGemini(String name, String model, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.GOOGLE_GEMINI,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.GOOGLE_GEMINI,
                 model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
     }
 
@@ -224,7 +222,7 @@ public record LlmConfig(
      */
     public static LlmConfig speechToText(String name, LlmProvider provider, String model,
                                          String baseUrl, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), name, provider, model, baseUrl, apiKey,
+        return new LlmConfig(LlmConfigId.random(), name, provider, model, baseUrl, apiKey,
                 0.0, 0, Map.of(), null, false, null, null, null,
                 LlmConfigType.SPEECH_TO_TEXT, null);
     }
@@ -286,19 +284,32 @@ public record LlmConfig(
 
     /**
      * Returns a copy with all {@code ${VAR_NAME}} / {@code ${VAR_NAME:default}}
-     * placeholders expanded from environment variables across every string field
-     * ({@code name}, {@code model}, {@code baseUrl}, {@code apiKey}).
-     * Call this at the point of use (e.g. in a gateway), not at save time, so
-     * the raw placeholder is preserved in storage.
+     * placeholders expanded across every string field ({@code name},
+     * {@code model}, {@code baseUrl}, {@code apiKey}), from the process
+     * environment alone. Call this at the point of use (e.g. in a gateway),
+     * not at save time, so the raw placeholder is preserved in storage.
+     *
+     * <p>Prefer {@link #resolved(java.util.Map)} when the caller has settings of
+     * its own to resolve against: this one sees only the process environment.
      */
     public LlmConfig resolved() {
+        return resolved(System.getenv());
+    }
+
+    /**
+     * The same, resolved against {@code env} — the tenant's settings layered
+     * over the process environment, in that order. What a tenant sets wins;
+     * what only the installation sets still resolves; a placeholder's own
+     * {@code :default} is the last word.
+     */
+    public LlmConfig resolved(java.util.Map<String, String> env) {
         return new LlmConfig(
                 id,
-                EnvVarResolver.resolve(name),
+                EnvVarResolver.resolve(name, env),
                 provider,
-                EnvVarResolver.resolve(model),
-                EnvVarResolver.resolve(baseUrl),
-                EnvVarResolver.resolve(apiKey),
+                EnvVarResolver.resolve(model, env),
+                EnvVarResolver.resolve(baseUrl, env),
+                EnvVarResolver.resolve(apiKey, env),
                 defaultTemperature,
                 maxOutputTokens,
                 additionalParams,
@@ -317,7 +328,13 @@ public record LlmConfig(
      * Gateways call this once at the top of {@code chatStreaming}.
      */
     public LlmConfig resolved(ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
-        LlmConfig r = resolved();
+        return resolved(System.getenv(), encryption);
+    }
+
+    /** Resolves against {@code env}, then decrypts the API key. */
+    public LlmConfig resolved(java.util.Map<String, String> env,
+                              ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
+        LlmConfig r = resolved(env);
         return r.withApiKey(encryption.resolve(r.apiKey()));
     }
 }

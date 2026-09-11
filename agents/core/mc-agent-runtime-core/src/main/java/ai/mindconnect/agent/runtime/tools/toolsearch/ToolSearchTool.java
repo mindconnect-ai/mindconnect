@@ -1,9 +1,10 @@
 package ai.mindconnect.agent.runtime.tools.toolsearch;
 
+import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.ToolRegistryRef;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
-import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +15,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * The {@code tool_search} tool: lets an agent discover tools from the live
@@ -35,19 +35,16 @@ public final class ToolSearchTool implements Tool {
 
     private final ToolRegistryRef registryRef;
     private final DynamicToolActivations activations;
-    private final Namespace namespace;
-    private final UUID sessionId;
+    private final SessionId sessionId;
     /** The agent's deferred tools — always searchable. */
     private final Set<String> assignedNames;
     /** Registry groups additionally searchable; {@code "*"} = all, empty = none. */
     private final Set<String> allowedGroups;
 
-    public ToolSearchTool(ToolRegistryRef registryRef, DynamicToolActivations activations,
-                          Namespace namespace, UUID sessionId,
+    public ToolSearchTool(ToolRegistryRef registryRef, DynamicToolActivations activations, SessionId sessionId,
                           Set<String> assignedNames, Set<String> allowedGroups) {
         this.registryRef = registryRef;
         this.activations = activations;
-        this.namespace = namespace;
         this.sessionId = sessionId;
         this.assignedNames = assignedNames;
         this.allowedGroups = allowedGroups;
@@ -169,7 +166,7 @@ public final class ToolSearchTool implements Tool {
     private String describe(String toolName) {
         try {
             return registryRef.get()
-                    .resolve(AgentTool.of(UUID.randomUUID(), toolName), namespace, null, null)
+                    .resolve(AgentTool.of(toolName), ToolCallScope.detached(null))
                     .map(Tool::description)
                     .orElse("");
         } catch (RuntimeException e) {

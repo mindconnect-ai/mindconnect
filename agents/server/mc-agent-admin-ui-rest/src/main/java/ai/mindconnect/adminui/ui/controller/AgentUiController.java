@@ -1,6 +1,5 @@
 package ai.mindconnect.adminui.ui.controller;
 
-
 import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.adminui.ui.component.ToolTestComponent;
 import ai.mindconnect.adminui.ui.page.AgentDetailPage;
@@ -8,15 +7,17 @@ import ai.mindconnect.adminui.ui.page.AgentFormPage;
 import ai.mindconnect.adminui.ui.page.AgentListPage;
 import ai.mindconnect.adminui.ui.page.ToolDetailPage;
 import ai.mindconnect.adminui.ui.page.ToolFormPage;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentPatch;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
@@ -34,8 +35,10 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
+/**
+ * The agent screens. Ids in paths are their plain values.
+ */
 @RestController
 @RequestMapping("/admin/api/agents")
 public class AgentUiController {
@@ -48,7 +51,6 @@ public class AgentUiController {
     private final LlmConfigRepository llmConfigRepository;
     private final ToolRegistry toolRegistry;
     private final ToolTestService toolTestService;
-    private final Namespace defaultNamespace;
     private final ObjectMapper objectMapper;
 
     public AgentUiController(AgentRegistryService registryService,
@@ -57,7 +59,6 @@ public class AgentUiController {
                                 LlmConfigRepository llmConfigRepository,
                                 ToolRegistry toolRegistry,
                                 ToolTestService toolTestService,
-                                Namespace defaultNamespace,
                                 ObjectMapper objectMapper) {
         this.registryService = registryService;
         this.repository = repository;
@@ -65,13 +66,12 @@ public class AgentUiController {
         this.llmConfigRepository = llmConfigRepository;
         this.toolRegistry = toolRegistry;
         this.toolTestService = toolTestService;
-        this.defaultNamespace = defaultNamespace;
         this.objectMapper = objectMapper;
     }
 
     @GetMapping
     public UiPage list(@RequestParam(required = false) String q) {
-        List<AgentDefinition> all = filterAgents(registryService.list(defaultNamespace), q);
+        List<AgentDefinition> all = filterAgents(registryService.list(), q);
         return new AgentListPage(all, q).render();
     }
 
@@ -93,35 +93,38 @@ public class AgentUiController {
 
     @GetMapping("/new")
     public UiPage newForm() {
-        return new AgentFormPage(null, llmConfigRepository, repository, defaultNamespace, objectMapper).render();
+        return new AgentFormPage(null, llmConfigRepository, repository, objectMapper).render();
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UiPage> detail(@PathVariable UUID id,
+    public ResponseEntity<UiPage> detail(@PathVariable("id") String idValue,
                                          @RequestParam(required = false) String section,
                                          @RequestParam(required = false) String row,
                                          @AuthenticationPrincipal OidcUser user) {
+        AgentId id = AgentId.of(idValue);
         String userId = user.getPreferredUsername();
-        return registryService.find(defaultNamespace, id)
+        return registryService.find(id)
                 .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository, section, row).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}/sessions/{sessionId}")
-    public ResponseEntity<UiPatch> deleteSession(@PathVariable UUID id,
-                                                 @PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> deleteSession(@PathVariable("id") String idValue,
+                                                 @PathVariable("sessionId") String sessionIdValue,
                                                  @AuthenticationPrincipal OidcUser user) {
+        AgentId id = AgentId.of(idValue);
         String userId = user.getPreferredUsername();
-        sessionRepository.deleteById(sessionId);
-        return registryService.find(defaultNamespace, id)
+        sessionRepository.deleteById(SessionId.of(sessionIdValue));
+        return registryService.find(id)
                 .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository).refreshSessions()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}/edit")
-    public ResponseEntity<UiPage> editForm(@PathVariable UUID id) {
-        return registryService.find(defaultNamespace, id)
-                .map(a -> ResponseEntity.ok(new AgentFormPage(a, llmConfigRepository, repository, defaultNamespace, objectMapper).render()))
+    public ResponseEntity<UiPage> editForm(@PathVariable("id") String idValue) {
+        AgentId id = AgentId.of(idValue);
+        return registryService.find(id)
+                .map(a -> ResponseEntity.ok(new AgentFormPage(a, llmConfigRepository, repository, objectMapper).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -129,12 +132,11 @@ public class AgentUiController {
     public ResponseEntity<UiPage> create(@RequestBody Map<String, Object> raw,
                                          @AuthenticationPrincipal OidcUser user) {
         var body = new FormBody(raw);
-        var ns = new Namespace(body.str("namespace"));
         AgentSpec spec = new AgentSpec(
                 body.str("name"), body.str("description"),
                 body.str("systemPrompt"), body.str("welcomeMessage"),
                 body.str("llmConfigName"));
-        var agent = registryService.create(ns, spec);
+        var agent = registryService.create(spec);
         // responseReviewers, maxIterations, toolSearch and memoryConfig are
         // applied as a follow-up patch (AgentSpec doesn't carry them yet).
         // Default maxIterations = whatever create() picked (10).
@@ -150,19 +152,19 @@ public class AgentUiController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().build();
         }
-        val def = registryService.update(ns, agent.id(), patch);
-        return detail(def.id(), null, null, user);
+        val def = registryService.update(agent.id(), patch);
+        return detail(def.id().value(), null, null, user);
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UiPage> update(@PathVariable UUID id,
+    public ResponseEntity<UiPage> update(@PathVariable("id") String idValue,
                                          @RequestBody Map<String, Object> raw,
                                          @AuthenticationPrincipal OidcUser user) {
+        AgentId id = AgentId.of(idValue);
         var body = new FormBody(raw);
-        return registryService.find(defaultNamespace, id)
+        return registryService.find(id)
                 .map(existing -> {
                     AgentPatch patch = AgentPatch.of()
-                            .withNamespace(new Namespace(body.str("namespace")))
                             .withName(body.str("name"))
                             .withDescription(body.str("description"))
                             .withGroup(body.str("group"))
@@ -179,8 +181,8 @@ public class AgentUiController {
                     } catch (IllegalArgumentException e) {
                         return ResponseEntity.badRequest().<UiPage>build();
                     }
-                    val def = registryService.update(defaultNamespace, id, patch);
-                    return detail(def.id(), null, null, user);
+                    val def = registryService.update(id, patch);
+                    return detail(def.id().value(), null, null, user);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -219,11 +221,12 @@ public class AgentUiController {
     }
 
     @PostMapping("/{id}/copy")
-    public ResponseEntity<UiPage> copy(@PathVariable UUID id) {
-        return registryService.find(defaultNamespace, id)
+    public ResponseEntity<UiPage> copy(@PathVariable("id") String idValue) {
+        AgentId id = AgentId.of(idValue);
+        return registryService.find(id)
                 .map(existing -> {
-                    var copy = registryService.copy(defaultNamespace, id);
-                    return ResponseEntity.ok(new AgentFormPage(copy, llmConfigRepository, repository, defaultNamespace, objectMapper).render());
+                    var copy = registryService.copy(id);
+                    return ResponseEntity.ok(new AgentFormPage(copy, llmConfigRepository, repository, objectMapper).render());
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -231,16 +234,19 @@ public class AgentUiController {
     // ── Tool endpoints ──────────────────────────────────────────────────────
 
     @GetMapping("/{id}/tools/new")
-    public ResponseEntity<UiPage> newToolForm(@PathVariable UUID id) {
-        return registryService.find(defaultNamespace, id)
+    public ResponseEntity<UiPage> newToolForm(@PathVariable("id") String idValue) {
+        AgentId id = AgentId.of(idValue);
+        return registryService.find(id)
                 .map(a -> ResponseEntity.ok(new ToolFormPage(a, null, toolRegistry).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}/tools/{toolId}")
-    public ResponseEntity<UiPage> viewTool(@PathVariable UUID id,
-                                           @PathVariable UUID toolId) {
-        var agentOpt = registryService.find(defaultNamespace, id);
+    public ResponseEntity<UiPage> viewTool(@PathVariable("id") String idValue,
+                                           @PathVariable("toolId") String toolIdValue) {
+        AgentId id = AgentId.of(idValue);
+        AgentToolId toolId = AgentToolId.of(toolIdValue);
+        var agentOpt = registryService.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
         var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
@@ -249,9 +255,11 @@ public class AgentUiController {
     }
 
     @GetMapping("/{id}/tools/{toolId}/edit")
-    public ResponseEntity<UiPage> editToolForm(@PathVariable UUID id,
-                                               @PathVariable UUID toolId) {
-        var agentOpt = registryService.find(defaultNamespace, id);
+    public ResponseEntity<UiPage> editToolForm(@PathVariable("id") String idValue,
+                                               @PathVariable("toolId") String toolIdValue) {
+        AgentId id = AgentId.of(idValue);
+        AgentToolId toolId = AgentToolId.of(toolIdValue);
+        var agentOpt = registryService.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
         var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
@@ -265,9 +273,11 @@ public class AgentUiController {
      * its state survives opening and closing the dialog.
      */
     @GetMapping("/{id}/tools/{toolId}/test")
-    public ResponseEntity<UiPatch> testToolDialog(@PathVariable UUID id,
-                                                  @PathVariable UUID toolId) {
-        var agentOpt = registryService.find(defaultNamespace, id);
+    public ResponseEntity<UiPatch> testToolDialog(@PathVariable("id") String idValue,
+                                                  @PathVariable("toolId") String toolIdValue) {
+        AgentId id = AgentId.of(idValue);
+        AgentToolId toolId = AgentToolId.of(toolIdValue);
+        var agentOpt = registryService.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
         var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
@@ -281,10 +291,12 @@ public class AgentUiController {
      * can read the result and optionally re-send with tweaked args.
      */
     @PostMapping("/{id}/tools/{toolId}/test")
-    public ResponseEntity<UiPatch> runToolTest(@PathVariable UUID id,
-                                               @PathVariable UUID toolId,
+    public ResponseEntity<UiPatch> runToolTest(@PathVariable("id") String idValue,
+                                               @PathVariable("toolId") String toolIdValue,
                                                @RequestBody Map<String, Object> raw) {
-        var agentOpt = registryService.find(defaultNamespace, id);
+        AgentId id = AgentId.of(idValue);
+        AgentToolId toolId = AgentToolId.of(toolIdValue);
+        var agentOpt = registryService.find(id);
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         var a    = agentOpt.get();
         var tool = a.tools().stream().filter(t -> t.id().equals(toolId)).findFirst().orElse(null);
@@ -313,48 +325,53 @@ public class AgentUiController {
     }
 
     @PostMapping("/{id}/tools")
-    public ResponseEntity<UiPage> addTool(@PathVariable UUID id,
+    public ResponseEntity<UiPage> addTool(@PathVariable("id") String idValue,
                                           @RequestBody Map<String, Object> raw,
                                           @AuthenticationPrincipal OidcUser user) {
-        return registryService.find(defaultNamespace, id)
+        AgentId id = AgentId.of(idValue);
+        return registryService.find(id)
                 .map(a -> {
-                    AgentTool tool = toolFromBody(id, null, new FormBody(raw));
+                    AgentTool tool = toolFromBody(AgentToolId.random(), new FormBody(raw));
                     List<AgentTool> tools = new ArrayList<>(a.tools());
                     tools.add(tool);
-                    registryService.update(defaultNamespace, id, toolsPatch(tools));
-                    return detail(id, "tools", tool.id().toString(), user);
+                    registryService.update(id, toolsPatch(tools));
+                    return detail(idValue, "tools", tool.id().value(), user);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}/tools/{toolId}")
-    public ResponseEntity<UiPage> updateTool(@PathVariable UUID id,
-                                             @PathVariable UUID toolId,
+    public ResponseEntity<UiPage> updateTool(@PathVariable("id") String idValue,
+                                             @PathVariable("toolId") String toolIdValue,
                                              @RequestBody Map<String, Object> raw,
                                              @AuthenticationPrincipal OidcUser user) {
-        return registryService.find(defaultNamespace, id)
+        AgentId id = AgentId.of(idValue);
+        AgentToolId toolId = AgentToolId.of(toolIdValue);
+        return registryService.find(id)
                 .map(a -> {
-                    AgentTool updated = toolFromBody(id, toolId, new FormBody(raw));
+                    AgentTool updated = toolFromBody(toolId, new FormBody(raw));
                     List<AgentTool> tools = a.tools().stream()
                             .map(t -> t.id().equals(toolId) ? updated : t)
                             .toList();
-                    registryService.update(defaultNamespace, id, toolsPatch(tools));
-                    return detail(id, "tools", toolId.toString(), user);
+                    registryService.update(id, toolsPatch(tools));
+                    return detail(idValue, "tools", toolId.value(), user);
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @DeleteMapping("/{id}/tools/{toolId}")
-    public ResponseEntity<UiPatch> deleteTool(@PathVariable UUID id,
-                                              @PathVariable UUID toolId,
+    public ResponseEntity<UiPatch> deleteTool(@PathVariable("id") String idValue,
+                                              @PathVariable("toolId") String toolIdValue,
                                               @AuthenticationPrincipal OidcUser user) {
+        AgentId id = AgentId.of(idValue);
+        AgentToolId toolId = AgentToolId.of(toolIdValue);
         String userId = user.getPreferredUsername();
-        return registryService.find(defaultNamespace, id)
+        return registryService.find(id)
                 .map(a -> {
                     List<AgentTool> tools = a.tools().stream()
                             .filter(t -> !t.id().equals(toolId)).toList();
-                    registryService.update(defaultNamespace, id, toolsPatch(tools));
-                    return registryService.find(defaultNamespace, id)
+                    registryService.update(id, toolsPatch(tools));
+                    return registryService.find(id)
                             .map(updated -> ResponseEntity.ok(new AgentDetailPage(updated, userId, sessionRepository).refreshTools()))
                             .orElse(ResponseEntity.<UiPatch>notFound().build());
                 })
@@ -365,7 +382,8 @@ public class AgentUiController {
         return AgentPatch.of().withTools(tools);
     }
 
-    private AgentTool toolFromBody(UUID agentId, UUID toolId, FormBody body) {
+    /** The tool the form describes, under {@code toolId} — a fresh id for a new tool. */
+    private AgentTool toolFromBody(AgentToolId toolId, FormBody body) {
         // Name: prefer explicit custom name, fall back to selected builtin name.
         String builtin = body.str("builtinName");
         String name = body.str("name");
@@ -403,17 +421,17 @@ public class AgentUiController {
             } catch (NumberFormatException ignored) {
             }
         }
-        UUID id = toolId != null ? toolId : UUID.randomUUID();
-        return new AgentTool(id, agentId, name, body.str("description"), overrides, enabled, deferred,
+        return new AgentTool(toolId, name, body.str("description"), overrides, enabled, deferred,
                 needsApproval, maxResultChars);
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<UiPage> delete(@PathVariable UUID id) {
-        return registryService.find(defaultNamespace, id)
+    public ResponseEntity<UiPage> delete(@PathVariable("id") String idValue) {
+        AgentId id = AgentId.of(idValue);
+        return registryService.find(id)
                 .map(existing -> {
-                    registryService.delete(existing.namespace(), id);
-                    List<AgentDefinition> all = registryService.list(existing.namespace());
+                    registryService.delete(id);
+                    List<AgentDefinition> all = registryService.list();
                     return ResponseEntity.ok(new AgentListPage(all).render());
                 })
                 .orElse(ResponseEntity.notFound().build());

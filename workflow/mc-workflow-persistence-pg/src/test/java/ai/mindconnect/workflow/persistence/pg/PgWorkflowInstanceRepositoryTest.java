@@ -16,7 +16,7 @@ class PgWorkflowInstanceRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        repo = new PgWorkflowInstanceRepository(TestDb.fresh("mc_workflow_instance")).initSchema();
+        repo = new PgWorkflowInstanceRepository(TestDb.fresh("mc_workflow_instance"), "test").initSchema();
     }
 
     private static WorkflowInstanceSnapshot snapshot(String workflow, long suspendedAt) {

@@ -2,12 +2,11 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,10 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AgentListActionUrlsTest {
 
-    private static final UUID AGENT_ID = UUID.fromString("11111111-2222-3333-4444-555555555555");
+    private static final AgentId AGENT_ID = AgentId.of("11111111-2222-3333-4444-555555555555");
 
     private static AgentDefinition agent() {
-        return new AgentDefinition(AGENT_ID, new Namespace("local"), "Scout", "A test agent",
+        return new AgentDefinition(AGENT_ID, "Scout", "A test agent",
                 "assistants", "bot", "prompt", null, "cfg", 5, null,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null);
     }
@@ -41,9 +40,9 @@ class AgentListActionUrlsTest {
 
         assertThat(json).contains("\"url\":\"/admin/api/agents/search\"");
         assertThat(json).contains("\"url\":\"/admin/api/agents/new\"");
-        assertThat(json).contains("\"url\":\"/chat/api/agents/" + AGENT_ID + "/sessions\"");
-        assertThat(json).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "/copy\"");
-        assertThat(json).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "\"");
+        assertThat(json).contains("\"url\":\"/chat/api/agents/" + AGENT_ID.value() + "/sessions\"");
+        assertThat(json).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/copy\"");
+        assertThat(json).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "\"");
     }
 
     @Test

@@ -1,11 +1,15 @@
 package ai.mindconnect.agent.runtime.service.turn;
 
+import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolAdvisor;
 import ai.mindconnect.common.LoggingContext;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.ToolCall;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +17,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -38,23 +41,27 @@ public class ToolExecutor {
 
     /**
      * Per-call context: everything that varies per turn. The extra
-     * {@code namespace}/{@code userId}/{@code sessionId} fields are
+     * {@code userId}/{@code sessionId} fields are
      * forwarded to advisors via {@link ToolAdvisor.Invocation}; callers
      * that don't use advisors can pass {@code null} for them — the
      * {@link Tool#execute} tail of the chain doesn't read them.
      */
     public record Context(Consumer<StreamEvent> stream,
-                          UUID conversationId,
-                          UUID agentId,
+                          ConversationId conversationId,
+                          AgentId agentId,
                           TokenCounter counter,
-                          Namespace namespace,
-                          String userId,
-                          UUID sessionId) {
+                          UserId userId,
+                          SessionId sessionId) {
 
         /** Backward-compat ctor for callers that don't carry advisor context yet. */
-        public Context(Consumer<StreamEvent> stream, UUID conversationId,
-                       UUID agentId, TokenCounter counter) {
-            this(stream, conversationId, agentId, counter, null, null, null);
+        public Context(Consumer<StreamEvent> stream, ConversationId conversationId,
+                       AgentId agentId, TokenCounter counter) {
+            this(stream, conversationId, agentId, counter, null, null);
+        }
+
+        /** The call's scope as the advisors see it; the tenant is the conversation's. */
+        public ToolCallScope scope() {
+            return new ToolCallScope(userId, sessionId, agentId);
         }
     }
 
@@ -149,10 +156,7 @@ public class ToolExecutor {
         ToolAdvisor.Invocation advisorInv = new ToolAdvisor.Invocation(
                 tc.name(),
                 tc.arguments(),
-                ctx.namespace(),
-                ctx.userId(),
-                ctx.sessionId(),
-                ctx.agentId(),
+                ctx.scope(),
                 tc.id());
 
         // Build the chain: each advisor wraps the next one; the tail runs

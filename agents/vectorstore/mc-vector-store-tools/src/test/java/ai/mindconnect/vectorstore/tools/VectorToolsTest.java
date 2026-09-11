@@ -1,8 +1,10 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,7 +15,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -37,7 +38,7 @@ class VectorToolsTest {
             }).toList();
 
     private static final LlmConfigRepository FAKE_CONFIGS = new LlmConfigRepository() {
-        @Override public Optional<LlmConfig> findById(UUID id) { return Optional.empty(); }
+        @Override public Optional<LlmConfig> findById(LlmConfigId id) { return Optional.empty(); }
         @Override public Optional<LlmConfig> findByName(String name) {
             return "embeddings".equals(name)
                     ? Optional.of(LlmConfig.lmStudio("embeddings", "fake-model", "http://unused"))
@@ -45,7 +46,7 @@ class VectorToolsTest {
         }
         @Override public List<LlmConfig> findAll() { return List.of(); }
         @Override public void save(LlmConfig config) { }
-        @Override public void deleteById(UUID id) { }
+        @Override public void deleteById(LlmConfigId id) { }
     };
 
     private ToolEnvironment env;
@@ -57,12 +58,13 @@ class VectorToolsTest {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) FAKE_EMBEDDINGS);
                 if (type == LlmConfigRepository.class) return Optional.of((T) FAKE_CONFIGS);
+                if (type == Namespace.class) return Optional.of((T) new Namespace("test"));
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {
                 return switch (key) {
                     case "vectorStoreBackend" -> Optional.of("memory");
-                    case "vectorStoreDir" -> Optional.of(dir.toString());
+                    case "dataBaseDir" -> Optional.of(dir.toString());
                     default -> Optional.empty();
                 };
             }

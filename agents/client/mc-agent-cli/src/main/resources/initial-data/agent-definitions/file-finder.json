@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000006",
-  "namespace": {
-    "value": "local"
-  },
   "name": "file-finder",
   "description": "Sub-agent that locates files on the user's filesystem by name, type or location hint. Call via run_agent.",
   "group": "sub-agents",

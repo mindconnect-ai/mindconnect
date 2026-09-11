@@ -28,18 +28,32 @@ public class FileWorkflowInstanceRepository implements WorkflowInstanceRepositor
     private final Path directory;
     private final SnapshotSerializer serializer;
 
-    public FileWorkflowInstanceRepository(Path baseDir) {
-        this(baseDir, new SnapshotSerializer());
+    /**
+     * @param baseDir   the data directory; the instances live in
+     *                  {@code <baseDir>/<partition>/workflows/instances}
+     * @param partition the directory level this repository reads and writes —
+     *                  one partition never sees the instances of another
+     */
+    public FileWorkflowInstanceRepository(Path baseDir, String partition) {
+        this(baseDir, partition, new SnapshotSerializer());
     }
 
-    public FileWorkflowInstanceRepository(Path baseDir, SnapshotSerializer serializer) {
-        this.directory = baseDir.resolve("instances");
+    public FileWorkflowInstanceRepository(Path baseDir, String partition, SnapshotSerializer serializer) {
+        this.directory = baseDir.resolve(checkPartition(partition)).resolve("workflows").resolve("instances");
         this.serializer = serializer;
         try {
             Files.createDirectories(directory);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot create " + directory, e);
         }
+    }
+
+    /** A partition is one directory level: a plain, non-blank name. */
+    static String checkPartition(String partition) {
+        if (partition == null || partition.isBlank() || !partition.matches("[A-Za-z0-9._-]+") || partition.startsWith(".")) {
+            throw new IllegalArgumentException("Not a valid partition: '" + partition + "'");
+        }
+        return partition;
     }
 
     @Override

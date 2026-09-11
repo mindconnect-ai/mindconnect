@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.tools.attachment;
 
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
@@ -14,7 +16,6 @@ import ai.mindconnect.message.port.in.ConversationManager;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Shows the model an attached image or PDF again. A file the model reads
@@ -39,10 +40,10 @@ public final class ViewAttachmentTool implements Tool {
 
     private final AgentSessionRepository sessions;
     private final ConversationManager conversations;
-    private final UUID sessionId;
+    private final SessionId sessionId;
 
     public ViewAttachmentTool(AgentSessionRepository sessions, ConversationManager conversations,
-                              UUID sessionId) {
+                              SessionId sessionId) {
         this.sessions = sessions;
         this.conversations = conversations;
         this.sessionId = sessionId;
@@ -108,12 +109,12 @@ public final class ViewAttachmentTool implements Tool {
         // media inline. Recorded before this result is, which the sanitizer
         // sorts out: results follow their calls, the message follows both.
         ConversationHistory history = conversations.loadCompleteHistory(session.conversationId());
-        UUID turnId = history.currentTurnId().orElse(null);
+        ChatTurnId turnId = history.currentTurnId().orElse(null);
         String kind = file.isImage() ? "image" : "document";
         List<ContentPart> parts = List.of(
                 new ContentPart.Text("[" + name + " — " + kind + " shown again at the assistant's request]"),
                 AttachmentParts.part(file));
-        conversations.addMessageToConversation(session.conversationId(), UUID.randomUUID(),
+        conversations.addMessageToConversation(session.conversationId(), session.userId().value(),
                 ParticipantType.USER, MessageType.CHAT, parts, turnId, history.currentRun(),
                 Map.of(INSERTED_BY, NAME, ATTACHMENT, name));
         return "Showing '" + name + "' — the " + kind + " follows this result as a message of its own.";

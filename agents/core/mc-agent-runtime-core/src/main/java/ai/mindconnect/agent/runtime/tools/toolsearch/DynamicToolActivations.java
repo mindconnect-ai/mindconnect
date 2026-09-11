@@ -1,16 +1,14 @@
 package ai.mindconnect.agent.runtime.tools.toolsearch;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Session-scoped set of tools the agent discovered at runtime via
@@ -19,19 +17,19 @@ import java.util.UUID;
  * {@code AgentChatService.resolveTools} merges in on every round, so a tool
  * found mid-turn is offered to the LLM from the next round on.
  *
- * <p>Persisted on the {@link AgentSession}
+ * <p>Persisted on the {@link ai.mindconnect.agent.runtime.domain.AgentSession}
  * itself: activations survive restarts and are deleted with the session.
  */
 public final class DynamicToolActivations {
 
-    private final AgentSessionRepository sessions;
+    private final ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions;
 
-    public DynamicToolActivations(AgentSessionRepository sessions) {
+    public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions) {
         this.sessions = sessions;
     }
 
     /** Marks {@code toolNames} usable for {@code sessionId}, persisted on the session. */
-    public void activate(UUID sessionId, Collection<String> toolNames) {
+    public void activate(SessionId sessionId, Collection<String> toolNames) {
         if (sessionId == null || toolNames.isEmpty()) {
             return;
         }
@@ -40,7 +38,7 @@ public final class DynamicToolActivations {
     }
 
     /** The names activated for this session; empty set when none (or unknown session). */
-    public Set<String> activated(UUID sessionId) {
+    public Set<String> activated(SessionId sessionId) {
         if (sessionId == null) {
             return Set.of();
         }
@@ -64,7 +62,7 @@ public final class DynamicToolActivations {
      *       overrides so the factory needs no definition lookup.</li>
      * </ul>
      */
-    public List<AgentTool> effectiveRefs(AgentDefinition def, UUID sessionId) {
+    public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
         Set<String> activated = activated(sessionId);
         List<AgentTool> refs = new ArrayList<>();
         List<String> deferredNames = new ArrayList<>();
@@ -80,12 +78,12 @@ public final class DynamicToolActivations {
         }
         for (String name : activated) {
             if (def.tools().stream().noneMatch(t -> name.equals(t.name()))) {
-                refs.add(AgentTool.of(def.id(), name));
+                refs.add(AgentTool.of(name));
             }
         }
         var search = def.toolSearchOrOff();
         if (search.enabled()) {
-            refs.add(AgentTool.of(def.id(), "tool_search", null, Map.of(
+            refs.add(AgentTool.of("tool_search", null, Map.of(
                     "assigned", List.copyOf(deferredNames),
                     "groups", List.copyOf(search.groups()))));
         }

@@ -1,20 +1,22 @@
 package ai.mindconnect.agent.runtime.port.in;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.AgentPatch;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Design-time use cases for {@link AgentDefinition} management.
  *
- * <p>Instances are bound to a {@code (AuthenticationInfo, Namespace)} pair at
- * construction. Methods therefore take no auth or tenant arguments — the
- * binding is implicit. Authorization, validation and default-tool seeding
- * are policy of this port; the underlying repository remains identity-agnostic.
+ * <p>Instances are bound to an {@code AuthenticationInfo} at construction.
+ * Methods therefore take no auth arguments — the binding is implicit. Authorization, validation and
+ * default-tool seeding are policy of this port; the underlying repository
+ * remains identity-agnostic.
+ *
+ * <p>Agents are addressed by their {@link AgentId}, like everywhere else.
  *
  * <p>Separate from {@link AgentRuntime} because the two have distinct
  * consumers: an agent editor only needs this port; a chat UI only needs
@@ -23,25 +25,24 @@ import java.util.UUID;
 public interface AgentRegistry {
 
     /**
-     * Creates a new {@link AgentDefinition} in the bound namespace. Implementations
+     * Creates a new {@link AgentDefinition}. Implementations
      * are expected to validate {@code spec} (e.g. non-blank name), assign an id,
      * and seed any default tools.
      */
     AgentDefinition create(AgentSpec spec);
 
     /**
-     * Applies the given patch to the agent identified by {@code agentId}. Only
-     * fields present in the patch are changed; absent fields are left as-is.
-     * Throws if the agent does not exist or is not visible in the bound namespace.
+     * Applies the patch to the agent. Only fields present in the patch are
+     * changed. Throws if the agent does not exist.
      */
-    AgentDefinition update(UUID agentId, AgentPatch patch);
+    AgentDefinition update(AgentId agentId, AgentPatch patch);
 
-    /** Returns the agent if it exists and is visible in the bound namespace. */
-    Optional<AgentDefinition> find(UUID agentId);
+    /** The agent, if it exists. */
+    Optional<AgentDefinition> find(AgentId agentId);
 
-    /** Lists all agents in the bound namespace. */
+    /** Lists all agents. */
     List<AgentDefinition> list();
 
     /** Deletes the agent. No-op if it does not exist. */
-    void delete(UUID agentId);
+    void delete(AgentId agentId);
 }

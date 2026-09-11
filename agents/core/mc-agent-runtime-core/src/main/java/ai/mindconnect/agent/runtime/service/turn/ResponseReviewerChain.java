@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service.turn;
 
+import ai.mindconnect.message.domain.MessageId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
@@ -14,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -45,9 +46,9 @@ public class ResponseReviewerChain {
     private final AgentDefinition def;
     private final String userMessage;
     private final String draftResponse;
-    private final UUID conversationId;
+    private final ConversationId conversationId;
     /** Excluded from {@code last_messages} so the just-persisted current turn isn't duplicated. */
-    private final UUID currentUserMessageId;
+    private final MessageId currentUserMessageId;
     private final Consumer<StreamEvent> stream;
 
     public ResponseReviewerChain(AgentTaskRunner runTask,
@@ -55,8 +56,8 @@ public class ResponseReviewerChain {
                                   AgentDefinition def,
                                   String userMessage,
                                   String draftResponse,
-                                  UUID conversationId,
-                                  UUID currentUserMessageId,
+                                  ConversationId conversationId,
+                                  MessageId currentUserMessageId,
                                   Consumer<StreamEvent> stream) {
         this.runTask = runTask;
         this.conversationManager = conversationManager;

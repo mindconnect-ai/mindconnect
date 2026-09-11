@@ -1,5 +1,7 @@
 package ai.mindconnect.cli.agentclient;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
+
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -12,7 +14,6 @@ import okhttp3.Response;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 public class RemoteLlmConfigRepository implements LlmConfigRepository {
 
@@ -44,9 +45,9 @@ public class RemoteLlmConfigRepository implements LlmConfigRepository {
     }
 
     @Override
-    public Optional<LlmConfig> findById(UUID id) {
+    public Optional<LlmConfig> findById(LlmConfigId id) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/llm-configs/" + id)
+                .url(baseUrl + "/api/llm-configs/" + id.value())
                 .get().build();
         try (Response resp = http.newCall(req).execute()) {
             if (resp.code() == 404) return Optional.empty();
@@ -76,9 +77,9 @@ public class RemoteLlmConfigRepository implements LlmConfigRepository {
     }
 
     @Override
-    public void deleteById(UUID id) {
+    public void deleteById(LlmConfigId id) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/llm-configs/" + id)
+                .url(baseUrl + "/api/llm-configs/" + id.value())
                 .delete().build();
         try (Response resp = http.newCall(req).execute()) {
             assertOk(resp);

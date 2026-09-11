@@ -1,6 +1,8 @@
 package ai.mindconnect.agent.memory.strategy;
 
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
 import org.junit.jupiter.api.Test;
@@ -21,8 +23,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ToolPairSanitizerThinkingTest {
 
-    private static final UUID CONV = UUID.randomUUID();
-    private static final UUID AGENT = UUID.randomUUID();
+    private static final ConversationId CONV = ConversationId.random();
+    private static final String AGENT = UUID.randomUUID().toString();
 
     private Message toolCallWithThinking(int seq, String callId) {
         // Mirrors the stored TOOL_CALL shape (LlmChatProvider.toolCallContent): thinkingBlocks
@@ -42,7 +44,7 @@ class ToolPairSanitizerThinkingTest {
     }
 
     private Message msg(int seq, MessageType type, ParticipantType sender, String content) {
-        return new Message(UUID.randomUUID(), CONV, AGENT, sender, null, type, content,
+        return new Message(MessageId.random(), CONV, AGENT, sender, null, type, content,
                 Map.of(), seq, Instant.now(), false, null, null, null, null, null, null, null);
     }
 

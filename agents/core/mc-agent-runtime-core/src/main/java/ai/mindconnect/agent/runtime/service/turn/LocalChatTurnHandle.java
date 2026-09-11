@@ -1,9 +1,10 @@
 package ai.mindconnect.agent.runtime.service.turn;
 
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -20,12 +21,12 @@ import java.util.concurrent.CompletableFuture;
  */
 public final class LocalChatTurnHandle implements ChatTurnHandle {
 
-    private final UUID id;
-    private final UUID sessionId;
+    private final ChatTurnId id;
+    private final SessionId sessionId;
     private final CompletableFuture<String> result;
     private final Runnable cancelAction;
 
-    public LocalChatTurnHandle(UUID id, UUID sessionId,
+    public LocalChatTurnHandle(ChatTurnId id, SessionId sessionId,
                                CompletableFuture<String> result,
                                Runnable cancelAction) {
         this.id = id;
@@ -35,10 +36,10 @@ public final class LocalChatTurnHandle implements ChatTurnHandle {
     }
 
     @Override
-    public UUID id() { return id; }
+    public ChatTurnId id() { return id; }
 
     @Override
-    public UUID sessionId() { return sessionId; }
+    public SessionId sessionId() { return sessionId; }
 
     @Override
     public TurnStatus status() {

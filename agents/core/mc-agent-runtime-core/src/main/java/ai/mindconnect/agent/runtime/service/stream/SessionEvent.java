@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.runtime.service.stream;
 
+import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 
-import java.util.UUID;
 
 /**
  * What travels on a session's channel: the event plus its origin in the
@@ -14,5 +14,5 @@ import java.util.UUID;
  * let a subscriber filter one turn out of the shared stream, or notice that
  * a partial answer restarted.
  */
-public record SessionEvent(UUID turnId, int run, StreamEvent event) {
+public record SessionEvent(ChatTurnId turnId, int run, StreamEvent event) {
 }

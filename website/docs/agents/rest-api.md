@@ -21,17 +21,21 @@ the parts that need more explanation than a signature.
 
 | | |
 |---|---|
-| `POST /api/agents` | create an agent in a namespace |
-| `GET /api/agents?namespace=` | list them |
-| `GET /api/agents/{id}?namespace=` | one agent |
-| `PUT /api/agents/{id}?namespace=` | partial update — absent fields keep their value |
-| `PUT /api/agents/{id}/tools?namespace=` | replace the tool list |
-| `POST /api/agents/{id}/copy?namespace=` | duplicate as `{name}-copy` |
-| `DELETE /api/agents/{id}?namespace=` | delete |
-| `POST /api/sessions` | start a session — body `{agentId, namespace, userId}` |
-| `GET /api/sessions?agentId=&namespace=&userId=` | a user's sessions for one agent |
+| `POST /api/agents` | create an agent |
+| `GET /api/agents` | list them |
+| `GET /api/agents/{id}` | one agent |
+| `PUT /api/agents/{id}` | partial update — absent fields keep their value |
+| `PUT /api/agents/{id}/tools` | replace the tool list |
+| `POST /api/agents/{id}/copy` | duplicate as `{name}-copy` |
+| `DELETE /api/agents/{id}` | delete |
+| `POST /api/sessions` | start a session — body `{agentId, userId}` |
+| `GET /api/sessions?agentId=&userId=` | a user's sessions for one agent |
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
+
+A server runs in one namespace, set with `mindconnect.namespace` (default
+`local`, `MC_NAMESPACE`); no endpoint names one. Ids travel as their plain
+value, in paths and in JSON.
 
 ## OpenAI Responses API
 

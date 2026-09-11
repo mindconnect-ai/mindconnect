@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.message.domain.Message;
 
@@ -9,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -87,7 +88,7 @@ public final class AgentLoop {
      *                     the same reason: a turn that waited for a tool would
      *                     otherwise report only what its last leg spent.
      */
-    public TurnOutcome run(String requestId, UUID conversationId, UUID sessionId,
+    public TurnOutcome run(String requestId, ConversationId conversationId, SessionId sessionId,
                            Cancellation cancellation, int roundsSoFar, Usage usageSoFar) {
         List<Message> history = new ArrayList<>(messages.load(conversationId));
 
@@ -149,7 +150,7 @@ public final class AgentLoop {
     }
 
     /** Append, then announce. A failing announcer does not cost the round. */
-    private List<Message> record(UUID conversationId, List<Message> history, List<TurnMessage> added) {
+    private List<Message> record(ConversationId conversationId, List<Message> history, List<TurnMessage> added) {
         List<Message> persisted = new ArrayList<>(added.size());
         for (TurnMessage turnMessage : added) {
             Message stored = messages.append(conversationId, turnMessage);

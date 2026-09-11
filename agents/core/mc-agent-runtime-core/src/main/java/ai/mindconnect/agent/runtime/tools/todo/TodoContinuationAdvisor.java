@@ -40,7 +40,7 @@ public class TodoContinuationAdvisor implements ToolAdvisor {
 
     @Override
     public boolean applies(Invocation inv) {
-        if (inv.sessionId() == null) return false;
+        if (inv.scope().sessionId() == null) return false;
         // todo_write / todo_read already print the list; appending a hint
         // would be visual noise + LLM-confusing duplication.
         String name = inv.toolName();
@@ -52,7 +52,7 @@ public class TodoContinuationAdvisor implements ToolAdvisor {
         Result result = chain.proceed(inv);
         if (result.failed()) return result;
 
-        TodoList list = service.load(inv.sessionId());
+        TodoList list = service.load(inv.scope().sessionId());
         if (list == null || !list.hasOpenItems()) return result;
 
         return result.append(formatHint(list));

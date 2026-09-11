@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.adapter.anthropic;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -31,7 +32,7 @@ class ClaudeGatewayThinkingTest {
             new ClaudeGateway(new OkHttpClient(), mapper, encryption);
 
     private LlmConfig config(Map<String, Object> additionalParams) {
-        return new LlmConfig(java.util.UUID.randomUUID(), "claude", LlmProvider.ANTHROPIC,
+        return new LlmConfig(LlmConfigId.random(), "claude", LlmProvider.ANTHROPIC,
                 "claude-opus-4-8", "https://api.anthropic.com", "sk-test",
                 0.7, 8192, additionalParams, 200_000, false, null, null, null, null, null);
     }

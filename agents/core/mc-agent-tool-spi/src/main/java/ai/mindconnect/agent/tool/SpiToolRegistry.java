@@ -7,7 +7,6 @@ import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +18,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * {@link ToolRegistry} that discovers tool sources from the classpath via
@@ -312,11 +310,10 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
     }
 
     @Override
-    public Optional<Tool> resolve(AgentTool agentTool, Namespace namespace, String userId, UUID sessionId) {
+    public Optional<Tool> resolve(AgentTool agentTool, ToolCallScope scope) {
         if ("run_agent".equals(agentTool.name())) {
             return Optional.empty(); // handled inline by AgentChatService.dispatchSubAgent
         }
-        ToolCallScope scope = new ToolCallScope(namespace, userId, sessionId, agentTool.agentDefinitionId());
 
         // The alias override may point this agent tool at a different registry
         // name (exposed to the LLM under the agent tool's own name).

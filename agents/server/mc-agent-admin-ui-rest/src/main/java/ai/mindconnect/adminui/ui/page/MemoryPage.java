@@ -44,7 +44,7 @@ public final class MemoryPage extends AdminPage {
 
     @Override
     public UiPage render() {
-        String sessionId = session.id().toString();
+        String sessionId = session.id().value();
 
         UiList masterUi = master.render();
         var detail = new MemoryDetailSectionComponent(

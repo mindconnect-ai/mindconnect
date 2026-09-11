@@ -15,6 +15,7 @@ import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.protocol.item.Role;
 import ai.mindconnect.common.util.McEnv;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 
@@ -24,7 +25,6 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -78,17 +78,17 @@ class RuntimeToolsExampleTest {
     @EnabledIf("hasWebSearch")
     void webSearch() throws Exception {
         try (AgentRuntime runtime = runtime()) {
-            AgentDefinition researcher = AgentDefinition.create(runtime.namespace(), "researcher",
+            AgentDefinition researcher = AgentDefinition.create("researcher",
                     "Searches the web and reports briefly.",
                     "Answer briefly. You MUST use web_search for current facts; "
                             + "use web_read on the most promising result when needed.",
                     null, "chat");
             runtime.agentDefinitions().save(researcher.withTools(List.of(
-                    AgentTool.of(researcher.id(), "web_search"),
-                    AgentTool.of(researcher.id(), "web_read"))));
+                    AgentTool.of("web_search"),
+                    AgentTool.of("web_read"))));
 
             AgentRuntimeBackend backend = backend(runtime);
-            Session session = backend.open(runtime.namespace().value(), "researcher");
+            Session session = backend.open("researcher");
 
             Response r = backend.create(ResponseRequest.text(session.id(),
                     "Search the web: what is the latest stable OpenJDK release?"));
@@ -108,17 +108,17 @@ class RuntimeToolsExampleTest {
         try (AgentRuntime runtime = runtime()) {
             // the larger model follows the tool contract reliably; mini
             // occasionally hallucinates a digest instead of computing one
-            AgentDefinition analyst = AgentDefinition.create(runtime.namespace(), "analyst",
+            AgentDefinition analyst = AgentDefinition.create("analyst",
                     "Computes with real code.",
                     "You are unable to compute anything yourself — hashes, sums, anything: "
                             + "an answer from memory WILL be wrong. Always call the "
                             + "code_execute tool (language python) and report only its result.",
                     null, "chat");
             runtime.agentDefinitions().save(analyst.withTools(List.of(
-                    AgentTool.of(analyst.id(), "code_execute"))));
+                    AgentTool.of("code_execute"))));
 
             AgentRuntimeBackend backend = backend(runtime);
-            Session session = backend.open(runtime.namespace().value(), "analyst");
+            Session session = backend.open("analyst");
 
             // Not memorizable — the model MUST actually run code for this:
             Response r = backend.create(ResponseRequest.text(session.id(),
@@ -137,17 +137,17 @@ class RuntimeToolsExampleTest {
     @EnabledIf("hasCodeRuntime")
     void uploadCsvAndAnalyzeWithCode() throws Exception {
         try (AgentRuntime runtime = runtime()) {
-            AgentDefinition analyst = AgentDefinition.create(runtime.namespace(), "data-analyst",
+            AgentDefinition analyst = AgentDefinition.create("data-analyst",
                     "Analyzes uploaded data with real code.",
                     "The user's uploaded documents are searchable with vector_search. "
                             + "For any calculation you MUST run python via code_execute — "
                             + "never calculate in your head. Report only the number.",
                     null, "chat");
             runtime.agentDefinitions().save(analyst.withTools(List.of(
-                    AgentTool.of(analyst.id(), "code_execute"))));
+                    AgentTool.of("code_execute"))));
 
             AgentRuntimeBackend backend = backend(runtime);
-            Session session = backend.open(runtime.namespace().value(), "data-analyst");
+            Session session = backend.open("data-analyst");
 
             StoredFile csv = backend.files().upload("sales.csv", "text/csv",
                     "region,revenue\nnorth,10\nsouth,20\nwest,30\n"
@@ -198,7 +198,7 @@ class RuntimeToolsExampleTest {
 
     /** Model, URL and key come from mc.env — local by default, no cost. */
     private static LlmConfig local(String name, String model, String apiKey, LlmConfigType type) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.LM_STUDIO, model,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.LM_STUDIO, model,
                 TestModels.baseUrl(), apiKey, 0.2, 2048, Map.of(), 128_000,
                 false, null, null, null, type, null);
     }

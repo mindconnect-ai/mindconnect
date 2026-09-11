@@ -16,7 +16,7 @@ public final class LlmConfigDetailPage extends AdminPage {
 
     @Override
     public UiPage render() {
-        return UiPage.of("/admin/llm-configs/" + config.id(),
+        return UiPage.of("/admin/llm-configs/" + config.id().value(),
                 new LlmConfigDetailComponent(config).render());
     }
 }

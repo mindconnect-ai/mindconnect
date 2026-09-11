@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000024",
-  "namespace": {
-    "value": "local"
-  },
   "name": "verifier",
   "description": "Adversarial verification sub-agent. Given a claim plus the evidence/paths/URLs it rests on, tries to REFUTE it and returns a verdict (confirmed / refuted / uncertain) with reasons. Call via run_agent before trusting an important sub-result.",
   "group": "sub-agents",

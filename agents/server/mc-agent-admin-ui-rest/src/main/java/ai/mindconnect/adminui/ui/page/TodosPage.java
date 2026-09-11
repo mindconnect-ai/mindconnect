@@ -41,7 +41,7 @@ public final class TodosPage extends AdminPage {
 
     @Override
     public UiPage render() {
-        String sessionId = session.id().toString();
+        String sessionId = session.id().value();
 
         UiList listUi = todoList.render();
 

@@ -3,7 +3,7 @@ id: chat-file-upload
 area: chat
 requires: [server-9091, lm-studio-embedding-model]
 duration: ~5 min
-last-verified: never (endpoint path verified by ChatFileUploadSmokeTest, 2026-08-27)
+last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
 ---
 
 # File upload in the chat: attach, search, answer

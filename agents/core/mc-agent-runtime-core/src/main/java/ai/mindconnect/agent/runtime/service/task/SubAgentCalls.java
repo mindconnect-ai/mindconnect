@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service.task;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
@@ -10,7 +12,6 @@ import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.InlineAgentTools;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.channel.Subscription;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskQueue;
@@ -70,7 +71,7 @@ final class SubAgentCalls {
         this.queue = queue;
     }
 
-    String run(TaskContext ctx, AgentSession parentSession, AgentDefinition caller, UUID parentTurnId,
+    String run(TaskContext ctx, AgentSession parentSession, AgentDefinition caller, ChatTurnId parentTurnId,
                                 int parentDepth, Consumer<StreamEvent> parentStream,
                                 String toolName, String toolCallId, Map<String, Object> arguments) {
         return InlineAgentTools.RUN_AGENTS.equals(toolName)
@@ -93,7 +94,7 @@ final class SubAgentCalls {
      * <p>Never throws for tool failures — errors become text.
      */
     private String dispatchOne(TaskContext ctx, AgentSession parentSession, AgentDefinition caller,
-                               UUID parentTurnId,
+                               ChatTurnId parentTurnId,
                                int parentDepth, Consumer<StreamEvent> parentStream,
                                String toolCallId, int slot, Map<String, Object> arguments) {
         if (parentDepth + 1 > AgentTurnWorker.MAX_DEPTH) {
@@ -123,8 +124,8 @@ final class SubAgentCalls {
         // on one sub-session and collapse into a single run.
         UUID cardId = UUID.nameUUIDFromBytes(
                 ("subagent:" + toolCallId + "#" + slot).getBytes(java.nio.charset.StandardCharsets.UTF_8));
-        UUID childTurnId = UUID.nameUUIDFromBytes(
-                ("subturn:" + toolCallId + "#" + slot).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        ChatTurnId childTurnId = ChatTurnId.of(UUID.nameUUIDFromBytes(
+                ("subturn:" + toolCallId + "#" + slot).getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString());
 
         // The resume anchor: the sub-session this exact call+slot spawned —
         // identified by its FIRST turn id, which is deterministic.
@@ -134,20 +135,19 @@ final class SubAgentCalls {
                 .findFirst().orElse(null);
 
         if (subSession == null) {
-            Namespace namespace = parentSession.namespace();
             AgentDefinition target;
             try {
-                target = definitionRepository.findByNamespace(namespace).stream()
+                target = definitionRepository.findAll().stream()
                         .filter(a -> a.name().equalsIgnoreCase(agentName))
                         .findFirst()
                         .orElseThrow(() -> new IllegalArgumentException(
-                                "No agent named '" + agentName + "' in namespace " + namespace.value()));
+                                "No agent named '" + agentName + "'"));
             } catch (Exception e) {
                 log.warn("Failed to resolve sub-agent '{}': {}", agentName, e.getMessage());
                 return "Error: " + e.getMessage();
             }
             try {
-                subSession = sessionService.openChat(target.id(), namespace, parentSession.userId(),
+                subSession = sessionService.openChat(target.id(), parentSession.userId(),
                         parentSession.id(), parentTurnId, toolCallId);
             } catch (Exception e) {
                 log.warn("Failed to open sub-session for '{}': {}", agentName, e.getMessage());
@@ -155,7 +155,7 @@ final class SubAgentCalls {
                 return "Error: " + e.getMessage();
             }
             MemoryStrategy targetStrategy = memoryStrategyFactory.create(target);
-            AgentTurnWorker.appendUserMessage(conversationManager, subSession.conversationId(),
+            AgentTurnWorker.appendUserMessage(conversationManager, subSession.conversationId(), parentSession.userId(),
                     message, childTurnId, targetStrategy.resolveTokenCounter(target));
             parentStream.accept(new StreamEvent.SubAgentStarted(
                     cardId, agentName, parentDepth + 1, subSession.id(), message));
@@ -166,7 +166,7 @@ final class SubAgentCalls {
         // together they name the task. submitChild is idempotent by that id,
         // so this is the first submit, a no-op on resume, and a crash repair.
         var subHistory = conversationManager.loadCompleteHistory(subSession.conversationId());
-        UUID currentTurn = subHistory.currentTurnId().orElse(null);
+        ChatTurnId currentTurn = subHistory.currentTurnId().orElse(null);
         if (currentTurn == null) {
             return "Error: sub-session has no turn to run";
         }
@@ -198,7 +198,7 @@ final class SubAgentCalls {
     /** {@code run_agents}: submit all, await all — they run concurrently on the queue. */
     @SuppressWarnings("unchecked")
     private String dispatchBatch(TaskContext ctx, AgentSession parentSession, AgentDefinition caller,
-                                 UUID parentTurnId,
+                                 ChatTurnId parentTurnId,
                                  int parentDepth, Consumer<StreamEvent> parentStream,
                                  String toolCallId, Map<String, Object> arguments) {
         if (parentDepth + 1 > AgentTurnWorker.MAX_DEPTH) {
@@ -248,7 +248,7 @@ final class SubAgentCalls {
     }
 
     /** The conversation's FIRST turn id — the deterministic identity of the sub-session's spawn. */
-    private UUID firstUserTurnId(UUID conversationId) {
+    private ChatTurnId firstUserTurnId(ConversationId conversationId) {
         var turns = conversationManager.loadCompleteHistory(conversationId).turns();
         return turns.isEmpty() ? null : turns.get(0).turnId();
     }

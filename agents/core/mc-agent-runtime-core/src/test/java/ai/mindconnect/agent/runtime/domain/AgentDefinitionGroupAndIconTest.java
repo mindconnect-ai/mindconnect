@@ -1,10 +1,9 @@
 package ai.mindconnect.agent.runtime.domain;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -21,7 +20,7 @@ class AgentDefinitionGroupAndIconTest {
     }
 
     private static AgentDefinition withGroupAndIcon(String group, String icon) {
-        return new AgentDefinition(UUID.randomUUID(), new Namespace("local"), "n", "d", group, icon,
+        return new AgentDefinition(AgentId.random(), "n", "d", group, icon,
                 "prompt", null, "cfg", 5, null, AgentDefinitionStatus.ACTIVE,
                 List.of(), List.of(), null, null, null, null);
     }
@@ -68,7 +67,7 @@ class AgentDefinitionGroupAndIconTest {
     /** The pre-group constructor still exists for callers that predate the field. */
     @Test
     void legacyConstructorLeavesTheAgentUngrouped() {
-        var def = new AgentDefinition(UUID.randomUUID(), new Namespace("local"), "n", "d",
+        var def = new AgentDefinition(AgentId.random(), "n", "d",
                 "prompt", null, "cfg", 5, null, AgentDefinitionStatus.ACTIVE,
                 List.of(), List.of(), null, null);
         assertThat(def.group()).isNull();

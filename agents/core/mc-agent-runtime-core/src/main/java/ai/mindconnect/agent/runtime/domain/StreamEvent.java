@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.domain;
 
+import ai.mindconnect.agent.SessionId;
+
 import java.util.Map;
 import java.util.UUID;
 
@@ -84,11 +86,12 @@ public sealed interface StreamEvent
      */
     record ApprovalRequested(String requestId, String callId, String toolName,
                              Map<String, Object> arguments,
-                             UUID originSessionId, String toolTaskId) implements StreamEvent {}
+                             SessionId originSessionId, String toolTaskId) implements StreamEvent {}
 
     /**
      * Fired when a sub-agent run was just dispatched. Carries the run's task id
-     * (correlation key for following SubAgentEvent / SubAgentDone / SubAgentError),
+     * (a correlation key for following SubAgentEvent / SubAgentDone /
+     * SubAgentError — not an entity id, so a plain UUID),
      * the target agent's name, the depth of the run in the call tree (0 = root),
      * the spawned sub-session's id, and the {@code input} — the task message the
      * sub-agent was given. The sub-session id is the <em>durable</em> identifier —
@@ -97,7 +100,7 @@ public sealed interface StreamEvent
      * patches; {@code input} lets the live card show the call's Input immediately,
      * like a normal tool call.
      */
-    record SubAgentStarted(UUID taskId, String agentName, int depth, UUID subSessionId, String input)
+    record SubAgentStarted(UUID taskId, String agentName, int depth, SessionId subSessionId, String input)
             implements StreamEvent {}
 
     /**
@@ -115,7 +118,7 @@ public sealed interface StreamEvent
      * so a live UI can show the answer inside the sub-agent card without waiting for
      * a page reload. May be {@code null} when the run produced no text.
      */
-    record SubAgentDone(UUID taskId, String agentName, UUID subSessionId, String finalText)
+    record SubAgentDone(UUID taskId, String agentName, SessionId subSessionId, String finalText)
             implements StreamEvent {}
 
     /**

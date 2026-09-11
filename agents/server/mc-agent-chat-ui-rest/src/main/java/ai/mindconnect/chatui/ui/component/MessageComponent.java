@@ -13,7 +13,7 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.ui.model.UiList;
 
 import java.time.format.DateTimeFormatter;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * One message in the conversation: who said it, when, what it cost in tokens,
@@ -26,13 +26,13 @@ import java.util.UUID;
  */
 public final class MessageComponent {
 
-    private final UUID sessionId;
+    private final SessionId sessionId;
     private final AgentDefinition agent;
     private final Message message;
     private final boolean fromUser;
     private final DateTimeFormatter timeFormat;
 
-    public MessageComponent(UUID sessionId, AgentDefinition agent, Message message,
+    public MessageComponent(SessionId sessionId, AgentDefinition agent, Message message,
                             boolean fromUser, DateTimeFormatter timeFormat) {
         this.sessionId = sessionId;
         this.agent = agent;
@@ -81,7 +81,7 @@ public final class MessageComponent {
 
     /** Where the chat serves a file it holds, inline — see {@code ChatFilesUiController#content}. */
     private String contentUrl(String fileId) {
-        return "/chat/api/sessions/" + sessionId + "/chat-files/"
+        return "/chat/api/sessions/" + sessionId.value() + "/chat-files/"
                 + java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8) + "/content";
     }
 
@@ -109,29 +109,29 @@ public final class MessageComponent {
         String css     = isUser ? "user-message" : "bot-message";
         int seq        = m.sequenceNum();
 
-        var item = UiList.Item.of(m.id().toString(), label)
-                .content(UiMarkdown.of("msg-" + m.id(), withAttachmentChip(m)).withCssClass(css));
+        var item = UiList.Item.of(m.id().value(), label)
+                .content(UiMarkdown.of("msg-" + m.id().value(), withAttachmentChip(m)).withCssClass(css));
 
         // Regenerate (USER messages only): delete this message + everything
         // after it, then re-run the turn (streaming) with the same text. Uses
         // the STREAM behaviour so the live tokens/task-cards flow exactly like
         // a normal send.
         if (isUser) {
-            item.action(UiAction.icon("regen-" + m.id(), "Regenerate").icon("refresh-cw")
+            item.action(UiAction.icon("regen-" + m.id().value(), "Regenerate").icon("refresh-cw")
                     .confirm("Delete the response(s) after this message and generate a new one?")
                     // Plain dispatch — the regenerated turn streams on the
                     // session's stream like any other.
-                    .onClick(trigger(on(ChatUiController.class).regenerate(sessionId, seq))));
+                    .onClick(trigger(on(ChatUiController.class).regenerate(sessionId.value(), seq))));
         }
 
         // Delete-from-here: remove this message and every message after it.
         // toSeq = MAX_VALUE → the range delete runs to the end of the
         // conversation. Sub-agent sessions are not cleaned up.
-        item.action(UiAction.icon("delete-" + m.id(), "Delete from here").icon("trash-2")
+        item.action(UiAction.icon("delete-" + m.id().value(), "Delete from here").icon("trash-2")
                 .style(UiAction.Style.DANGER)
                 .confirm("Delete this message and all following messages?")
                 .onClick(trigger(on(ChatUiController.class)
-                        .deleteMessages(sessionId, seq, Integer.MAX_VALUE, null))));
+                        .deleteMessages(sessionId.value(), seq, Integer.MAX_VALUE, null))));
         return item;
     }
     /**
@@ -145,8 +145,8 @@ public final class MessageComponent {
                 : m.metadata().get(ViewAttachmentTool.ATTACHMENT);
         String line = icon("repeat") + " *" + markdownSafe(name == null ? "attachment" : name.toString())
                 + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
-        return UiList.Item.of(m.id().toString(), "")
-                .content(UiMarkdown.of("msg-" + m.id(), line).withCssClass("reshown-message"));
+        return UiList.Item.of(m.id().value(), "")
+                .content(UiMarkdown.of("msg-" + m.id().value(), line).withCssClass("reshown-message"));
     }
 
     /** " · 42 tok" for a single message; empty when not counted. */

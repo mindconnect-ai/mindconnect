@@ -1,9 +1,10 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * The loop's two hands on the conversation: load the truth, append what a
@@ -18,7 +19,7 @@ import java.util.UUID;
  */
 public interface MessageLog {
 
-    List<Message> load(UUID conversationId);
+    List<Message> load(ConversationId conversationId);
 
-    Message append(UUID conversationId, TurnMessage message);
+    Message append(ConversationId conversationId, TurnMessage message);
 }

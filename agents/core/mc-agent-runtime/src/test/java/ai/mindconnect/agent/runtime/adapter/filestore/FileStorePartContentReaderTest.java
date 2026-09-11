@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.filestore;
 
 import ai.mindconnect.agent.runtime.port.out.PartContentReader;
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,29 +22,29 @@ class FileStorePartContentReaderTest {
 
     /** The smallest FileStore that can hold a file: a map. */
     static final class MapFileStore implements FileStore {
-        final Map<String, StoredFile> files = new HashMap<>();
-        final Map<String, byte[]> bytes = new HashMap<>();
+        final Map<FileId, StoredFile> files = new HashMap<>();
+        final Map<FileId, byte[]> bytes = new HashMap<>();
         boolean failReads;
 
         @Override
         public StoredFile save(String name, String contentType, InputStream content) throws IOException {
             byte[] data = content.readAllBytes();
-            StoredFile file = new StoredFile(UUID.randomUUID().toString(), name, contentType, data.length, Instant.now());
+            StoredFile file = new StoredFile(FileId.random(), name, contentType, data.length, Instant.now());
             files.put(file.id(), file);
             bytes.put(file.id(), data);
             return file;
         }
 
-        @Override public Optional<StoredFile> find(String id) { return Optional.ofNullable(files.get(id)); }
+        @Override public Optional<StoredFile> find(FileId id) { return Optional.ofNullable(files.get(id)); }
 
         @Override
-        public InputStream content(String id) throws IOException {
+        public InputStream content(FileId id) throws IOException {
             if (failReads) throw new IOException("disk on fire");
             return new ByteArrayInputStream(bytes.get(id));
         }
 
         @Override public List<StoredFile> list() { return List.copyOf(files.values()); }
-        @Override public void delete(String id) { files.remove(id); bytes.remove(id); }
+        @Override public void delete(FileId id) { files.remove(id); bytes.remove(id); }
     }
 
     private final MapFileStore store = new MapFileStore();
@@ -63,7 +63,7 @@ class FileStorePartContentReaderTest {
 
     @Test
     void anUnknownOrNullIdReadsAsEmpty() {
-        assertThat(reader.read("nope")).isEmpty();
+        assertThat(reader.read(FileId.of("nope"))).isEmpty();
         assertThat(reader.read(null)).isEmpty();
     }
 

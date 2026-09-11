@@ -85,7 +85,7 @@ public final class LlmConfigFormComponent implements UiComponent {
 
     @Override
     public String id() {
-        return config == null ? "llm-config-new" : "llm-config-" + config.id();
+        return config == null ? "llm-config-new" : "llm-config-" + config.id().value();
     }
 
     /**
@@ -241,7 +241,7 @@ public final class LlmConfigFormComponent implements UiComponent {
      * patch has its anchor and the value survives), just not visible.
      */
     public static ai.mindconnect.ui.model.UiFieldGroup aliasGroup(
-            boolean isAlias, String delegatesTo, java.util.UUID selfId, List<LlmConfig> allConfigs) {
+            boolean isAlias, String delegatesTo, ai.mindconnect.llm.domain.LlmConfigId selfId, List<LlmConfig> allConfigs) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-alias-cfg", null);
         List<UiField.Option> delegateOptions = allConfigs.stream()
                 .filter(c -> selfId == null || !c.id().equals(selfId))
@@ -271,7 +271,7 @@ public final class LlmConfigFormComponent implements UiComponent {
      */
     public static ai.mindconnect.ui.model.UiFieldGroup baseGroup(
             boolean isAlias, String type, String provider, String model, String baseUrl,
-            String apiKey, String formId, java.util.UUID configId,
+            String apiKey, String formId, ai.mindconnect.llm.domain.LlmConfigId configId,
             LmStudioModelCatalog.Catalog lmStudio) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-base-cfg", null);
         if (isAlias) group.hidden();
@@ -289,7 +289,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                 .map(p -> UiField.Option.of(p.name(), p.name()))
                 .forEach(providerOptions::add);
         String swapUrl = "/admin/api/llm-configs/field-groups?form=" + formId
-                + (configId == null ? "" : "&id=" + configId);
+                + (configId == null ? "" : "&id=" + configId.value());
         group.field(UiField.select("type", "Type",
                         type == null ? LlmConfigType.CHAT.name() : type,
                         List.of(UiField.Option.of("CHAT", "Chat"),
@@ -416,7 +416,7 @@ public final class LlmConfigFormComponent implements UiComponent {
     public UiForm render() {
         boolean isNew = config == null;
         boolean isAlias = !isNew && config.isAlias();
-        java.util.UUID configId = isNew ? null : config.id();
+        ai.mindconnect.llm.domain.LlmConfigId configId = isNew ? null : config.id();
 
         return UiForm.of(id(), isNew ? "New LLM Config" : "Edit LLM Config: " + config.name())
                 .field(nameField(isNew ? null : config.name()))
@@ -427,7 +427,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                         // the delegation target, provider mode everything else.
                         .onChange(UiTrigger.api("POST",
                                 "/admin/api/llm-configs/field-groups?form=" + id()
-                                        + (isNew ? "" : "&id=" + configId), id())))
+                                        + (isNew ? "" : "&id=" + configId.value()), id())))
                 .content(aliasGroup(isAlias, isNew ? null : config.delegatesTo(), configId, allConfigs))
                 .content(baseGroup(isAlias,
                         isNew ? null : config.type().name(),
@@ -445,7 +445,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                 .action(UiAction.primary("save", "Save").icon("save")
                         .dispatch(isNew ? "POST" : "PUT",
                                   isNew ? "/admin/api/llm-configs"
-                                        : "/admin/api/llm-configs/" + config.id(),
+                                        : "/admin/api/llm-configs/" + config.id().value(),
                                   id()))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel")
                         .dispatch("GET", "/admin/api/llm-configs"))

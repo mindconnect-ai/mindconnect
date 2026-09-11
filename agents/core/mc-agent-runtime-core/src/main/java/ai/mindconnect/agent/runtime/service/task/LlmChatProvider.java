@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.service.task;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
@@ -14,7 +15,6 @@ import ai.mindconnect.agent.runtime.service.round.LlmProvider;
 import ai.mindconnect.agent.runtime.service.round.TurnMessage;
 import ai.mindconnect.agent.runtime.service.round.Usage;
 import ai.mindconnect.agent.AuthenticationInfo;
-import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.llm.domain.FinishReason;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -39,7 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -93,7 +92,7 @@ public final class LlmChatProvider implements LlmProvider {
     }
 
     @Override
-    public LlmAnswer ask(String requestId, UUID sessionId, List<Message> history,
+    public LlmAnswer ask(String requestId, SessionId sessionId, List<Message> history,
                          List<ToolDefinition> toolDefinitions, Cancellation cancellation) {
         stream.accept(new StreamEvent.AskingLlm());
         LlmRequest request = LlmRequest.streaming(def.llmConfigName(), window(history), toolDefinitions);
@@ -126,7 +125,7 @@ public final class LlmChatProvider implements LlmProvider {
      * does not reload (concept 16: read once per execution).
      */
     private List<LlmMessage> window(List<Message> history) {
-        AuthenticationInfo auth = AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
+        AuthenticationInfo auth = AuthenticationInfo.of(session.userId());
         List<LlmMessage> window = new ArrayList<>();
         window.add(LlmMessage.system(
                 SystemPromptRenderer.render(promptRenderer, memoryStrategy, def, session, auth)));

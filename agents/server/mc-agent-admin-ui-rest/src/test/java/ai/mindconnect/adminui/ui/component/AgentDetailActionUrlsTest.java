@@ -4,13 +4,14 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -25,10 +26,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AgentDetailActionUrlsTest {
 
-    private static final UUID AGENT_ID = UUID.fromString("11111111-2222-3333-4444-555555555555");
+    private static final AgentId AGENT_ID = AgentId.of("11111111-2222-3333-4444-555555555555");
 
     private static AgentDefinition agent() {
-        return new AgentDefinition(AGENT_ID, new Namespace("local"), "Scout", "A test agent",
+        return new AgentDefinition(AGENT_ID, "Scout", "A test agent",
                 "assistants", "bot", "prompt", null, "cfg", 5, null,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null);
     }
@@ -36,11 +37,11 @@ class AgentDetailActionUrlsTest {
     /** Renders without a database: the detail header only asks for the session list. */
     private static final AgentSessionRepository NO_SESSIONS = new AgentSessionRepository() {
         @Override public AgentSession save(AgentSession session) { throw new UnsupportedOperationException(); }
-        @Override public Optional<AgentSession> findById(UUID id) { return Optional.empty(); }
-        @Override public List<AgentSession> findByAgentDefinitionId(UUID id, Namespace ns, String userId) { return List.of(); }
-        @Override public List<AgentSession> findByUser(Namespace ns, String userId) { return List.of(); }
-        @Override public List<AgentSession> findByParentSessionId(UUID parentSessionId) { return List.of(); }
-        @Override public void deleteById(UUID id) { throw new UnsupportedOperationException(); }
+        @Override public Optional<AgentSession> findById(SessionId id) { return Optional.empty(); }
+        @Override public List<AgentSession> findByAgent(AgentId agent, UserId user) { return List.of(); }
+        @Override public List<AgentSession> findByUser(UserId user) { return List.of(); }
+        @Override public List<AgentSession> findByParentSession(SessionId parent) { return List.of(); }
+        @Override public void deleteById(SessionId id) { throw new UnsupportedOperationException(); }
     };
 
     private static String json(Object node) throws Exception {
@@ -51,8 +52,8 @@ class AgentDetailActionUrlsTest {
     void theDetailHeaderKeepsItsRoutes() throws Exception {
         String out = json(new AgentDetailComponent(agent(), "u", NO_SESSIONS).render());
 
-        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "/edit\"");
-        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "\"");
+        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/edit\"");
+        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "\"");
         assertThat(out).contains("\"method\":\"DELETE\"");
     }
 
@@ -60,15 +61,15 @@ class AgentDetailActionUrlsTest {
     void theToolTableKeepsItsRoutes() throws Exception {
         String out = json(new ToolTableComponent(agent()).render());
 
-        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "/tools/new\"");
+        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/tools/new\"");
     }
 
     @Test
     void aRowActionRendersThePlaceholderTheClientFillsIn() throws Exception {
         String out = json(new ToolTableComponent(agent()).render());
 
-        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "/tools/{id}\"");
-        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "/tools/{id}/edit\"");
+        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/tools/{id}\"");
+        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/tools/{id}/edit\"");
         // The braces must survive the URI builder unencoded, and the sentinel
         // must not leak into what the client sees.
         assertThat(out).doesNotContain("%7Bid%7D");
@@ -84,9 +85,9 @@ class AgentDetailActionUrlsTest {
     void theSessionTableReachesBothControllers() throws Exception {
         String out = json(new SessionTableComponent(agent(), "u", NO_SESSIONS).render());
 
-        assertThat(out).contains("\"url\":\"/chat/api/agents/" + AGENT_ID + "/sessions\"");
+        assertThat(out).contains("\"url\":\"/chat/api/agents/" + AGENT_ID.value() + "/sessions\"");
         assertThat(out).contains("\"url\":\"/chat/api/sessions/{id}\"");
-        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID + "/sessions/{id}\"");
+        assertThat(out).contains("\"url\":\"/admin/api/agents/" + AGENT_ID.value() + "/sessions/{id}\"");
         assertThat(out).doesNotContain("%7Bid%7D");
     }
 }

@@ -1,12 +1,14 @@
 package ai.mindconnect.agent.runtime.tools.workspace;
 
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.AgentId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.UUID;
 
 /**
  * Manages the three workspace scopes for agents:
@@ -25,21 +27,21 @@ public class WorkspaceService {
         this.baseDir = baseDir.toAbsolutePath().normalize();
     }
 
-    public Path userWorkspace(String userId) {
-        return ensure(baseDir.resolve("user").resolve(sanitize(userId)));
+    public Path userWorkspace(UserId userId) {
+        return ensure(baseDir.resolve("user").resolve(sanitize(userId.value())));
     }
 
-    public Path agentUserWorkspace(UUID agentId, String userId) {
+    public Path agentUserWorkspace(AgentId agentId, UserId userId) {
         return ensure(baseDir.resolve("agent")
-                .resolve(agentId.toString())
-                .resolve(sanitize(userId)));
+                .resolve(agentId.value())
+                .resolve(sanitize(userId.value())));
     }
 
-    public Path sessionWorkspace(UUID agentId, String userId, UUID sessionId) {
+    public Path sessionWorkspace(AgentId agentId, UserId userId, SessionId sessionId) {
         return ensure(baseDir.resolve("session")
-                .resolve(agentId.toString())
-                .resolve(sanitize(userId))
-                .resolve(sessionId.toString()));
+                .resolve(agentId.value())
+                .resolve(sanitize(userId.value()))
+                .resolve(sessionId.value()));
     }
 
     public Path baseDir() {

@@ -1,18 +1,19 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.message.domain.ConversationId;
+
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /** In-memory {@link ConversationSummaryRepository} — process-lifetime storage, no persistence. */
 public class InMemoryConversationSummaryRepository implements ConversationSummaryRepository {
 
-    private final Map<UUID, List<ConversationSummary>> store = new ConcurrentHashMap<>();
+    private final Map<ConversationId, List<ConversationSummary>> store = new ConcurrentHashMap<>();
 
     @Override
     public void save(ConversationSummary summary) {
@@ -20,12 +21,12 @@ public class InMemoryConversationSummaryRepository implements ConversationSummar
     }
 
     @Override
-    public List<ConversationSummary> findByConversationId(UUID conversationId) {
+    public List<ConversationSummary> findByConversation(ConversationId conversationId) {
         return List.copyOf(store.getOrDefault(conversationId, List.of()));
     }
 
     @Override
-    public void deleteByConversationId(UUID conversationId) {
+    public void deleteByConversation(ConversationId conversationId) {
         store.remove(conversationId);
     }
 }

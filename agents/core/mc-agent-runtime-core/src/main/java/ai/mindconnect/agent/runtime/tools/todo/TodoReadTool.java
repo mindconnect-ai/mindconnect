@@ -1,9 +1,9 @@
 package ai.mindconnect.agent.runtime.tools.todo;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Read-only view of the session's current todo list.
@@ -28,9 +28,9 @@ public class TodoReadTool implements Tool {
     public static final String NAME = "todo_read";
 
     private final TodoListService service;
-    private final UUID sessionId;
+    private final SessionId sessionId;
 
-    public TodoReadTool(TodoListService service, UUID sessionId) {
+    public TodoReadTool(TodoListService service, SessionId sessionId) {
         this.service = service;
         this.sessionId = sessionId;
     }

@@ -1,6 +1,8 @@
 package ai.mindconnect.chatui.ui.controller;
 
-
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.chatui.ui.page.ChatPage;
@@ -23,7 +25,6 @@ import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
@@ -71,7 +72,6 @@ public class ChatUiController {
     private final ToolApprovalStore approvalStore;
     /** What the embedding app adds to the chat — none in a standalone chat app. */
     private final ai.mindconnect.chatui.ui.ChatHostLinks hostLinks;
-    private final Namespace defaultNamespace;
     private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository;
     private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
     private final SessionAgentResolver agentResolver;
@@ -82,7 +82,6 @@ public class ChatUiController {
                              AgentSessionRepository sessionRepository,
                              TodoListService todoListService,
                              WorkspaceStore workspaceStore,
-                             Namespace defaultNamespace,
                              ObjectMapper objectMapper,
                              LlmCallTraceRepository traceRepository,
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
@@ -105,12 +104,10 @@ public class ChatUiController {
         this.sessionStreams = sessionStreams;
         this.approvalStore = approvalStore;
         this.hostLinks = hostLinks.getIfAvailable(() -> ai.mindconnect.chatui.ui.ChatHostLinks.NONE);
-        this.defaultNamespace = defaultNamespace;
         this.llmConfigRepository = llmConfigRepository;
         this.toolRegistry = toolRegistry;
         this.agentResolver = new SessionAgentResolver(agentRepository);
     }
-
 
     /**
      * The attach dialog the chat form's "+" opens: the drop-zone in a modal,
@@ -126,7 +123,7 @@ public class ChatUiController {
     @GetMapping({"", "/"})
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
         // Headers for the sidebar; only the chat being shown is loaded whole.
-        var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId(user));
+        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)));
         var latest = sessions.isEmpty()
                 ? java.util.Optional.<AgentSession>empty()
                 : sessionRepository.findById(sessions.get(0).id());
@@ -160,18 +157,19 @@ public class ChatUiController {
         var session = openDefaultChat(userId);
         log.info("New chat {}", session.id());
         return ResponseEntity.ok(
-                shell(session, sessionRepository.findHeadersByUser(defaultNamespace, userId)));
+                shell(session, sessionRepository.findHeadersByUser(UserId.of(userId))));
     }
 
     /** Model and tools of this chat, as a dialog over the conversation. */
     @GetMapping("/sessions/{sessionId}/settings")
-    public ResponseEntity<UiPatch> settingsDialog(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> settingsDialog(@PathVariable("sessionId") String sessionIdValue,
                                                   @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
         var effective = agentResolver.resolve(session);
-        UUID agentId = boundAgentId(session);
+        AgentId agentId = boundAgentId(session);
 
         var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
                 sessionId, llmConfigRepository.findAll(), selectableAgents(agentId), allToolNames(),
@@ -188,9 +186,10 @@ public class ChatUiController {
 
     /** Applies the dialog: either an agent takes over, or model and tools do. */
     @PostMapping("/sessions/{sessionId}/settings")
-    public ResponseEntity<UiPage> applySettings(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPage> applySettings(@PathVariable("sessionId") String sessionIdValue,
                                                 @RequestBody Map<String, Object> raw,
                                                 @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var body = new FormBody(raw);
@@ -198,7 +197,7 @@ public class ChatUiController {
 
         SessionAgent agent;
         if (agentId != null && !agentId.isBlank()) {
-            var def = agentRepository.findById(UUID.fromString(agentId))
+            var def = agentRepository.findById(AgentId.of(agentId))
                     .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
             // Switching to another agent hands the chat over completely: that
             // agent's model, tools and prompt win, which is what the picker
@@ -253,23 +252,24 @@ public class ChatUiController {
         var saved = sessionService.replaceSessionAgent(sessionId, agent);
         String userId = userId(user);
         return ResponseEntity.ok(
-                shell(saved, sessionRepository.findHeadersByUser(defaultNamespace, userId)));
+                shell(saved, sessionRepository.findHeadersByUser(UserId.of(userId))));
     }
 
     /** The rename dialog for one chat. */
     @GetMapping("/sessions/{sessionId}/rename")
-    public ResponseEntity<UiPatch> renameDialog(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> renameDialog(@PathVariable("sessionId") String sessionIdValue,
                                                 @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String current = sessionOpt.get().title();
 
-        var form = ai.mindconnect.ui.model.UiForm.of("chat-rename-" + sessionId, "Rename chat")
+        var form = ai.mindconnect.ui.model.UiForm.of("chat-rename-" + sessionId.value(), "Rename chat")
                 .field(ai.mindconnect.ui.model.UiField.text("title", "Title", current)
                         .asEditable().asRequired())
                 .action(UiAction.primary("save", "Save").icon("save")
-                        .onClick(trigger(on(ChatUiController.class).rename(sessionId, null, null),
-                                "chat-rename-" + sessionId)))
+                        .onClick(trigger(on(ChatUiController.class).rename(sessionId.value(), null, null),
+                                "chat-rename-" + sessionId.value())))
                 .action(UiAction.secondary("cancel", "Cancel")
                         .onClick(trigger(on(ChatUiController.class).closeDialog())));
 
@@ -282,9 +282,10 @@ public class ChatUiController {
 
     /** Applies a new title and redraws — the sidebar entry changes with it. */
     @PostMapping("/sessions/{sessionId}/rename")
-    public ResponseEntity<UiPage> rename(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPage> rename(@PathVariable("sessionId") String sessionIdValue,
                                          @RequestBody Map<String, Object> raw,
                                          @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String title = new FormBody(raw).str("title");
@@ -292,7 +293,7 @@ public class ChatUiController {
             sessionService.updateTitle(sessionId, title.trim());
         }
         String userId = userId(user);
-        var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId);
+        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId));
         var current = sessionRepository.findById(sessionId).orElseThrow();
         return ResponseEntity.ok(shell(current, sessions));
     }
@@ -302,8 +303,9 @@ public class ChatUiController {
      * the last. The conversation goes with it; there is nothing left to show.
      */
     @PostMapping("/sessions/{sessionId}/delete")
-    public ResponseEntity<UiPage> deleteSession(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPage> deleteSession(@PathVariable("sessionId") String sessionIdValue,
                                                 @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         String userId = userId(user);
         if (ownedSession(sessionId, user).isEmpty()) {
             return ResponseEntity.notFound().build();
@@ -311,7 +313,7 @@ public class ChatUiController {
         sessionService.deleteSession(sessionId);
         log.info("Chat {} deleted", sessionId);
 
-        var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId);
+        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId));
         var newest = sessions.isEmpty()
                 ? java.util.Optional.<AgentSession>empty()
                 : sessionRepository.findById(sessions.get(0).id());
@@ -329,10 +331,10 @@ public class ChatUiController {
      * secret — it travels in URLs, links and logs.
      */
     private java.util.Optional<AgentSession> ownedSession(
-            UUID sessionId, OidcUser user) {
+            SessionId sessionId, OidcUser user) {
         String userId = userId(user);
         return sessionRepository.findById(sessionId)
-                .filter(session -> userId.equals(session.userId()));
+                .filter(session -> UserId.of(userId).equals(session.userId()));
     }
 
     /** Closes the settings dialog without touching anything. */
@@ -352,7 +354,7 @@ public class ChatUiController {
                 sessions, session, agent.name(), chat.renderContent(), agentIcons())
                 .withActivity(runningSessions(sessions), waitingSessions(sessions))
                 .render();
-        var page = UiPage.of("/chat/sessions/" + session.id(), appShell);
+        var page = UiPage.of("/chat/sessions/" + session.id().value(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.
         if (!chat.activeStreams().isEmpty()) {
             page.setActiveStreams(chat.activeStreams());
@@ -366,22 +368,21 @@ public class ChatUiController {
     /**
      * Opens a chat that nobody started from an agent page.
      *
-     * <p>It runs on the seeded {@code default-chat} agent where the namespace
+     * <p>It runs on the seeded {@code default-chat} agent where the installation
      * has one, so its prompt, its model, its tools and the roster it may
      * delegate to are configuration like every other agent's — changed in the
      * admin UI rather than compiled in here. That is the point: the defaults
      * of the chat everyone lands in should not be the one thing you cannot
      * edit.
      *
-     * <p>A namespace seeded before that agent existed has no such definition,
+     * <p>An installation seeded before that agent existed has no such definition,
      * and falls back to the inline agent this controller has always built. So
      * upgrading changes nothing until the agent is installed.
      */
     private AgentSession openDefaultChat(String userId) {
-        return agentRepository.findByName(defaultNamespace, DEFAULT_CHAT_AGENT)
-                .map(a -> sessionService.openChat(a.id(), defaultNamespace, userId))
-                .orElseGet(() -> sessionService.openChat(inlineDefaultChatAgent(),
-                        defaultNamespace, userId));
+        return agentRepository.findByName(DEFAULT_CHAT_AGENT)
+                .map(a -> sessionService.openChat(a.id(), UserId.of(userId)))
+                .orElseGet(() -> sessionService.openChat(inlineDefaultChatAgent(), UserId.of(userId)));
     }
 
     /** The fallback chat agent: the standard model, the standard tools. */
@@ -474,7 +475,7 @@ public class ChatUiController {
             }
             picked.put(n, byName.containsKey(n)
                     ? byName.get(n)
-                    : ai.mindconnect.agent.tool.AgentTool.of(def.id(), n));
+                    : ai.mindconnect.agent.tool.AgentTool.of(n));
         }
         return List.copyOf(picked.values());
     }
@@ -493,15 +494,15 @@ public class ChatUiController {
      * <p>The id is checked against the registry: an inline agent's id is minted
      * for the session and would otherwise look like a binding.
      */
-    private UUID boundAgentId(AgentSession session) {
-        UUID ref = session.mainAgent()
+    private AgentId boundAgentId(AgentSession session) {
+        AgentId ref = session.mainAgent()
                 .filter(a -> a instanceof SessionAgentRef)
                 .map(SessionAgent::id)
                 .orElse(null);
         if (ref != null) {
             return ref;
         }
-        UUID fromSession = session.agentDefinitionId();
+        AgentId fromSession = session.agentDefinitionId();
         return fromSession != null && agentRepository.findById(fromSession).isPresent()
                 ? fromSession : null;
     }
@@ -511,16 +512,16 @@ public class ChatUiController {
      * registry in one go: a row only needs the icon, and resolving every
      * session's agent separately would be one lookup per conversation.
      */
-    private java.util.Map<UUID, String> agentIcons() {
-        var icons = new java.util.HashMap<UUID, String>();
-        for (AgentDefinition a : agentRepository.findByNamespace(defaultNamespace)) {
+    private java.util.Map<AgentId, String> agentIcons() {
+        var icons = new java.util.HashMap<AgentId, String>();
+        for (AgentDefinition a : agentRepository.findAll()) {
             icons.put(a.id(), a.iconOrDefault());
         }
         return icons;
     }
 
-    private List<AgentDefinition> selectableAgents(UUID currentAgentId) {
-        return agentRepository.findByNamespace(defaultNamespace).stream()
+    private List<AgentDefinition> selectableAgents(AgentId currentAgentId) {
+        return agentRepository.findAll().stream()
                 .filter(a -> a.status() != AgentDefinitionStatus.DEPRECATED)
                 .filter(a -> CHAT_GROUP.equals(a.groupOrDefault()) || a.id().equals(currentAgentId))
                 .toList();
@@ -557,21 +558,23 @@ public class ChatUiController {
     }
 
     @PostMapping("/agents/{agentId}/sessions")
-    public ResponseEntity<UiPage> startSession(@PathVariable UUID agentId,
+    public ResponseEntity<UiPage> startSession(@PathVariable("agentId") String agentIdValue,
                                                @AuthenticationPrincipal OidcUser user) {
+        AgentId agentId = AgentId.of(agentIdValue);
         String userId = user.getPreferredUsername();
         return agentRepository.findById(agentId)
                 .map(agent -> {
-                    var session = sessionService.openChat(agentId, agent.namespace(), userId);
+                    var session = sessionService.openChat(agentId, UserId.of(userId));
                     return ResponseEntity.ok(shell(session,
-                            sessionRepository.findHeadersByUser(defaultNamespace, userId)));
+                            sessionRepository.findHeadersByUser(UserId.of(userId))));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/sessions/{sessionId}/attach-dialog")
-    public ResponseEntity<UiPatch> attachDialog(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> attachDialog(@PathVariable("sessionId") String sessionIdValue,
                                                 @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         if (ownedSession(sessionId, user).isEmpty()) {
             return ResponseEntity.notFound().build();
         }
@@ -591,11 +594,12 @@ public class ChatUiController {
     }
 
     @GetMapping("/sessions/{sessionId}")
-    public ResponseEntity<UiPage> getSession(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPage> getSession(@PathVariable("sessionId") String sessionIdValue,
                                              @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         return ownedSession(sessionId, user)
                 .map(session -> ResponseEntity.ok(shell(session,
-                        sessionRepository.findHeadersByUser(defaultNamespace, userId(user)))))
+                        sessionRepository.findHeadersByUser(UserId.of(userId(user))))))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -613,7 +617,7 @@ public class ChatUiController {
         // registry — not page-local state. Lets a navigate-back during a
         // live turn render the form in Stop-mode without any client-side
         // reconciliation.
-        String channelId = "msg-list-" + session.id();
+        String channelId = "msg-list-" + session.id().value();
         var handleOpt = activeStreams.findHandle(channelId);
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
@@ -646,23 +650,23 @@ public class ChatUiController {
                         "/chat/api/streams/" + channelId + "/sse?from=" + from,
                         handleOpt.map(ai.mindconnect.chatui.service.ActiveStreams.Handle::label)
                                 .orElse(agentLabel),
-                        "/chat/sessions/" + session.id(),
+                        "/chat/sessions/" + session.id().value(),
                         returnLabel)));
         return page;
     }
 
     /** The sessions with a turn in flight — the stream registry is the truth, as for the Stop button. */
-    private java.util.Set<UUID> runningSessions(List<? extends AgentSessionHeader> sessions) {
-        java.util.Set<UUID> running = new java.util.HashSet<>();
+    private java.util.Set<SessionId> runningSessions(List<? extends AgentSessionHeader> sessions) {
+        java.util.Set<SessionId> running = new java.util.HashSet<>();
         for (var s : sessions) {
-            if (activeStreams.findHandle("msg-list-" + s.id()).isPresent()) running.add(s.id());
+            if (activeStreams.findHandle("msg-list-" + s.id().value()).isPresent()) running.add(s.id());
         }
         return running;
     }
 
     /** The sessions with a tool stopped at the approval gate — the store is the truth, as for the cards. */
-    private java.util.Set<UUID> waitingSessions(List<? extends AgentSessionHeader> sessions) {
-        java.util.Set<UUID> waiting = new java.util.HashSet<>();
+    private java.util.Set<SessionId> waitingSessions(List<? extends AgentSessionHeader> sessions) {
+        java.util.Set<SessionId> waiting = new java.util.HashSet<>();
         for (var s : sessions) {
             if (!approvalStore.openForRoot(s.id()).isEmpty()) waiting.add(s.id());
         }
@@ -674,7 +678,7 @@ public class ChatUiController {
      * from the ToolApprovalStore, the single truth for bubbled requests
      * (entry exists = card shows; answered/cancelled/deleted = entry gone).
      */
-    private List<ai.mindconnect.ui.model.UiList.Item> bubbledApprovalCards(UUID sessionId) {
+    private List<ai.mindconnect.ui.model.UiList.Item> bubbledApprovalCards(SessionId sessionId) {
         return approvalStore.openForRoot(sessionId).stream()
                 .map(open -> {
                     var call = ai.mindconnect.chatui.ui.component.ApprovalCardComponent
@@ -686,7 +690,6 @@ public class ChatUiController {
                 })
                 .toList();
     }
-
 
     /**
      * Rebuilds the nested sub-agent card tree for a single parent
@@ -706,12 +709,12 @@ public class ChatUiController {
      * out of {@code ACTIVE} on disk). When done, "failed" is inferred from
      * the sub-agent having produced no final assistant text.
      */
-    private List<TaskCardComponent> buildSubAgentCards(UUID parentSessionId, String toolCallId,
+    private List<TaskCardComponent> buildSubAgentCards(SessionId parentSessionId, String toolCallId,
                                                        boolean running, String inputJson, String resultText) {
         if (toolCallId == null || toolCallId.isBlank()) return List.of();
         List<AgentSession> children;
         try {
-            children = sessionRepository.findByParentSessionId(parentSessionId).stream()
+            children = sessionRepository.findByParentSession(parentSessionId).stream()
                     .filter(s -> toolCallId.equals(s.parentToolCallId()))
                     .sorted(java.util.Comparator.comparing(
                             AgentSession::startedAt))
@@ -738,7 +741,7 @@ public class ChatUiController {
                         child.id(), childAgent, childHistory, null,
                         (tcId, r, in, out) -> buildSubAgentCards(child.id(), tcId, r, in, out));
 
-                var childList = TaskCardComponent.subAgentChildList(child.id().toString());
+                var childList = TaskCardComponent.subAgentChildList(child.id().value());
                 for (TaskCardComponent t : childComp.allHistoricTaskCards()) {
                     childList.item(((UiList) t.render()).getItems().get(0));
                 }
@@ -757,9 +760,9 @@ public class ChatUiController {
                 // Node id MUST match the live stream's id (task-sub-{sessionId})
                 // so a reload mid-run produces the same <li> and the run's
                 // continuing live patches keep landing on it.
-                String nodeId = "task-sub-" + child.id();
+                String nodeId = "task-sub-" + child.id().value();
                 cards.add(TaskCardComponent.historicSubAgent(
-                        nodeId, agentName, child.id().toString(),
+                        nodeId, agentName, child.id().value(),
                         running, failed, durationOf(child), childInput, resultText,
                         childList, finalText));
             } catch (Exception e) {
@@ -787,9 +790,10 @@ public class ChatUiController {
     }
 
     @PostMapping("/sessions/{sessionId}/chat")
-    public ResponseEntity<UiPatch> chat(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> chat(@PathVariable("sessionId") String sessionIdValue,
                                         @RequestBody Map<String, Object> raw,
                                         @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var body    = new FormBody(raw);
         String text = body.str("message");
         if (text == null || text.isBlank()) {
@@ -817,9 +821,10 @@ public class ChatUiController {
      * next cancel-check point.
      */
     @DeleteMapping("/sessions/{sessionId}/chat")
-    public ResponseEntity<Void> cancelChat(@PathVariable UUID sessionId) {
+    public ResponseEntity<Void> cancelChat(@PathVariable("sessionId") String sessionIdValue) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         boolean cancelled = chatService.cancelChat(sessionId);
-        log.info("DELETE /chat/api/sessions/{}/chat → cancelled={}", sessionId, cancelled);
+        log.info("DELETE /chat/api/sessions/{}/chat → cancelled={}", sessionId.value(), cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
 
@@ -832,11 +837,12 @@ public class ChatUiController {
      * spawned by the removed turns are not cleaned up.
      */
     @DeleteMapping("/sessions/{sessionId}/messages")
-    public ResponseEntity<UiPatch> deleteMessages(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> deleteMessages(@PathVariable("sessionId") String sessionIdValue,
                                                    @RequestParam int fromSeq,
                                                    @RequestParam int toSeq,
                                                    @AuthenticationPrincipal OidcUser user) {
-        log.info("DELETE /chat/api/sessions/{}/messages fromSeq={} toSeq={}", sessionId, fromSeq, toSeq);
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        log.info("DELETE /chat/api/sessions/{}/messages fromSeq={} toSeq={}", sessionId.value(), fromSeq, toSeq);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
@@ -849,8 +855,9 @@ public class ChatUiController {
     }
 
     @PostMapping("/sessions/{sessionId}/chat/stream")
-    public ResponseEntity<ai.mindconnect.ui.model.UiPatch> chatStream(@PathVariable UUID sessionId,
+    public ResponseEntity<ai.mindconnect.ui.model.UiPatch> chatStream(@PathVariable("sessionId") String sessionIdValue,
                                                  @RequestBody Map<String, Object> raw) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var body = new FormBody(raw);
         String text = body.str("message");
         if (text == null || text.isBlank()) {
@@ -877,11 +884,12 @@ public class ChatUiController {
      * (no store entry any more) delivers nothing — the refresh alone drops it.
      */
     @PostMapping("/sessions/{sessionId}/approval")
-    public ResponseEntity<UiPatch> approvalAnswered(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> approvalAnswered(@PathVariable("sessionId") String sessionIdValue,
                                                     @RequestParam String callId,
                                                     @RequestParam boolean approved,
                                                     @RequestParam(defaultValue = "once") String scope,
                                                     @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
@@ -889,7 +897,7 @@ public class ChatUiController {
         boolean delivered = chatService.answerApproval(sessionId, callId, approved,
                 ApprovalScope.fromParam(scope));
         log.info("POST /chat/api/sessions/{}/approval call={} approved={} scope={} delivered={}",
-                sessionId, callId, approved, scope, delivered);
+                sessionId.value(), callId, approved, scope, delivered);
         return ResponseEntity.ok(buildChatPage(sessionOpt.get(), agentOpt.get()).headerOnly());
     }
 
@@ -903,8 +911,9 @@ public class ChatUiController {
      * left in place (not cleaned up).
      */
     @PostMapping(value = "/sessions/{sessionId}/messages/{seq}/regenerate")
-    public ResponseEntity<ai.mindconnect.ui.model.UiPatch> regenerate(@PathVariable UUID sessionId,
+    public ResponseEntity<ai.mindconnect.ui.model.UiPatch> regenerate(@PathVariable("sessionId") String sessionIdValue,
                                                  @PathVariable int seq) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = sessionRepository.findById(sessionId);
         if (sessionOpt.isEmpty()) {
             return ResponseEntity.badRequest().build();
@@ -970,16 +979,16 @@ public class ChatUiController {
                                                                           AgentDefinition agent,
                                                                           String text, boolean initialRefresh,
                                                                           java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
-        UUID sessionId = session.id();
+        SessionId sessionId = session.id();
         // Channel id == the id of the message-list container the patches
         // target. This way the client's {@code findStreamTarget} lookup
         // naturally detects "chat page mounted", and both the submitter and
         // any observer resolve the same stream.
-        String channelId = "msg-list-" + sessionId;
-        String returnHref = "/chat/sessions/" + sessionId;
+        String channelId = "msg-list-" + sessionId.value();
+        String returnHref = "/chat/sessions/" + sessionId.value();
         String streamLabel = agent.name() != null ? agent.name() : "Agent";
-        String pendingId  = "bot-pending-"  + sessionId;
-        String thinkingId = "bot-thinking-" + sessionId;
+        String pendingId  = "bot-pending-"  + sessionId.value();
+        String thinkingId = "bot-thinking-" + sessionId.value();
 
         // The streaming-time page is built once with the pre-turn history;
         // it owns the form / message-list / task-card patch shapes the
@@ -1038,7 +1047,7 @@ public class ChatUiController {
         // run's continuing live patches still land. Child tool events are
         // correlated only by taskId, so this is how we resolve their
         // container's session-keyed id.
-        java.util.Map<java.util.UUID, java.util.UUID> taskToSession = new java.util.concurrent.ConcurrentHashMap<>();
+        java.util.Map<java.util.UUID, SessionId> taskToSession = new java.util.concurrent.ConcurrentHashMap<>();
         // Why a reviewer rewrote or blocked the answer, keyed by reviewer.
         // ResponseRevised arrives before the decision it explains.
         java.util.Map<String, String> reviewerDetail = new java.util.concurrent.ConcurrentHashMap<>();
@@ -1237,7 +1246,7 @@ public class ChatUiController {
                                       java.util.LinkedHashMap<String, LiveTask> liveTasks,
                                       String[] openTaskNodeId,
                                       ai.mindconnect.chatui.service.StreamBus bus,
-                                      java.util.Map<java.util.UUID, java.util.UUID> taskToSession) {
+                                      java.util.Map<java.util.UUID, SessionId> taskToSession) {
         // Walk to the innermost real event; the last wrapper taskId is the
         // immediate parent sub-agent that owns the event.
         java.util.UUID parentTaskId = topWrapper.taskId();
@@ -1281,12 +1290,12 @@ public class ChatUiController {
 
     /** The session-keyed nesting scope for a parent sub-agent run, or {@code null} at top level. */
     private static String scopeOf(java.util.UUID parentTaskId,
-                                  java.util.Map<java.util.UUID, java.util.UUID> taskToSession) {
+                                  java.util.Map<java.util.UUID, SessionId> taskToSession) {
         if (parentTaskId == null) return null;
-        java.util.UUID sid = taskToSession.get(parentTaskId);
+        SessionId sid = taskToSession.get(parentTaskId);
         // Fall back to the taskId itself if the mapping is somehow missing —
         // still consistent within this live stream.
-        return (sid != null ? sid : parentTaskId).toString();
+        return sid != null ? sid.value() : parentTaskId.toString();
     }
 
     /** Marker key under which a pending revision reason is parked. */
@@ -1297,15 +1306,15 @@ public class ChatUiController {
      * card are the same node — the verdict REPLACEs the "reviewing…" header
      * instead of appending a second entry.
      */
-    private static String reviewerNodeId(UUID sessionId, String reviewerName) {
-        return "task-review-" + sessionId + "-" + reviewerName.replaceAll("[^A-Za-z0-9_-]", "-");
+    private static String reviewerNodeId(SessionId sessionId, String reviewerName) {
+        return "task-review-" + sessionId.value() + "-" + reviewerName.replaceAll("[^A-Za-z0-9_-]", "-");
     }
 
     private void startToolCard(ChatPage liveView,
                                java.util.LinkedHashMap<String, LiveTask> liveTasks,
                                String[] openTaskNodeId,
                                ai.mindconnect.chatui.service.StreamBus bus,
-                               java.util.Map<java.util.UUID, java.util.UUID> taskToSession,
+                               java.util.Map<java.util.UUID, SessionId> taskToSession,
                                java.util.UUID parentTaskId, String toolName, java.util.Map<String, Object> arguments) {
         String scope = scopeOf(parentTaskId, taskToSession);
         String key  = "tool-" + (scope == null ? "top" : scope) + "-" + liveTasks.size() + "-" + toolName;
@@ -1339,12 +1348,12 @@ public class ChatUiController {
                                    java.util.LinkedHashMap<String, LiveTask> liveTasks,
                                    String[] openTaskNodeId,
                                    ai.mindconnect.chatui.service.StreamBus bus,
-                                   java.util.Map<java.util.UUID, java.util.UUID> taskToSession,
+                                   java.util.Map<java.util.UUID, SessionId> taskToSession,
                                    java.util.UUID parentTaskId, java.util.UUID taskId, String agentName,
-                                   java.util.UUID subSessionId, String input) {
+                                   SessionId subSessionId, String input) {
         // Key the card on the durable session id so a reload rebuilds the
         // identical node and continuing patches still target it.
-        java.util.UUID cardKey = subSessionId != null ? subSessionId : taskId;
+        String cardKey = subSessionId != null ? subSessionId.value() : taskId.toString();
         if (subSessionId != null) taskToSession.put(taskId, subSessionId);
         String scope = scopeOf(parentTaskId, taskToSession);
         String node  = "task-sub-" + cardKey;
@@ -1353,8 +1362,8 @@ public class ChatUiController {
         // The run_agent task message is carried on SubAgentStarted, so the
         // Input block shows immediately — like a normal tool call. The
         // open-session link uses the durable session id.
-        var card = TaskCardComponent.runningSubAgent(node, agentName, cardKey.toString(),
-                cardKey.toString(), input);
+        var card = TaskCardComponent.runningSubAgent(node, agentName, cardKey,
+                cardKey, input);
         publishPatch(bus, appendCard(liveView, scope, card));
         openTaskNodeId[0] = node;
     }
@@ -1363,7 +1372,7 @@ public class ChatUiController {
                                     java.util.LinkedHashMap<String, LiveTask> liveTasks,
                                     String[] openTaskNodeId,
                                     ai.mindconnect.chatui.service.StreamBus bus,
-                                    java.util.Map<java.util.UUID, java.util.UUID> taskToSession,
+                                    java.util.Map<java.util.UUID, SessionId> taskToSession,
                                     java.util.UUID taskId, String agentName,
                                     String finalText, String error) {
         LiveTask lt = liveTasks.get("sub-" + taskId);
@@ -1373,8 +1382,8 @@ public class ChatUiController {
         // nested child <ul> back to empty and wipe the children already
         // streamed into it. Instead flip the summary marker (visible while
         // collapsed) in place and append the answer beneath the nested tree.
-        java.util.UUID cardKey = taskToSession.getOrDefault(taskId, taskId);
-        String tid = cardKey.toString();
+        SessionId subSession = taskToSession.get(taskId);
+        String tid = subSession != null ? subSession.value() : taskId.toString();
         var summary = error != null
                 ? TaskCardComponent.failedSubAgentSummary(tid, agentName)
                 : TaskCardComponent.doneSubAgentSummary(tid, agentName, lt.durationMs);
@@ -1450,7 +1459,7 @@ public class ChatUiController {
      * so the UI can still render without the token bar — never lets a stats
      * failure tear down the page.
      */
-    private WorkingMemory safeMemorySnapshot(UUID sessionId) {
+    private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
             return chatService.memorySnapshot(sessionId);
         } catch (Exception e) {

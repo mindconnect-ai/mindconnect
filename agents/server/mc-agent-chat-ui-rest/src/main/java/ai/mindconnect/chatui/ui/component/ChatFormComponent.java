@@ -12,7 +12,8 @@ import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiPatch;
 
-import java.util.UUID;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * The chat-input form at the bottom of a {@code ChatPage} — a single
@@ -33,8 +34,8 @@ import java.util.UUID;
  */
 public final class ChatFormComponent implements UiComponent {
 
-    private final UUID sessionId;
-    private final UUID agentId;
+    private final SessionId sessionId;
+    private final AgentId agentId;
     /**
      * Whether the chat turn is currently streaming when the page is rendered.
      * Drives {@link #render()} between the idle Send form and the streaming
@@ -43,11 +44,11 @@ public final class ChatFormComponent implements UiComponent {
      */
     private final boolean streaming;
 
-    public ChatFormComponent(UUID sessionId, UUID agentId) {
+    public ChatFormComponent(SessionId sessionId, AgentId agentId) {
         this(sessionId, agentId, false);
     }
 
-    public ChatFormComponent(UUID sessionId, UUID agentId, boolean streaming) {
+    public ChatFormComponent(SessionId sessionId, AgentId agentId, boolean streaming) {
         this.sessionId = sessionId;
         this.agentId = agentId;
         this.streaming = streaming;
@@ -55,7 +56,7 @@ public final class ChatFormComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "chat-form-" + sessionId;
+        return "chat-form-" + sessionId.value();
     }
 
     /** Renders the composer in whichever state matches the live stream registry. */
@@ -80,7 +81,7 @@ public final class ChatFormComponent implements UiComponent {
      * for something you only look at when you go looking.
      */
     private UiAction attachAction() {
-        var open = trigger(on(ChatUiController.class).attachDialog(sessionId, null));
+        var open = trigger(on(ChatUiController.class).attachDialog(sessionId.value(), null));
         if (attachmentCount == 0) {
             return UiAction.icon("attach", "Attach files").icon("add")
                     .onClick(open);
@@ -157,7 +158,7 @@ public final class ChatFormComponent implements UiComponent {
                 // Model and tools sit on the composer, where you notice them
                 // while typing — not in a settings page you have to go find.
                 .action(UiAction.secondary("model", modelLabel).icon("ai")
-                        .onClick(trigger(on(ChatUiController.class).settingsDialog(sessionId, null)))
+                        .onClick(trigger(on(ChatUiController.class).settingsDialog(sessionId.value(), null)))
                         .<UiAction>withCssClass("chat-model-btn"))
                 .action(UiAction.icon("send", "Send").icon("send")
                         .style(UiAction.Style.PRIMARY)
@@ -165,7 +166,7 @@ public final class ChatFormComponent implements UiComponent {
                         // comes back on the session stream this client already
                         // reads, the same one every other client of the session
                         // reads.
-                        .onClick(trigger(on(ChatUiController.class).chatStream(sessionId, null), id())));
+                        .onClick(trigger(on(ChatUiController.class).chatStream(sessionId.value(), null), id())));
         return form.<UiForm>withCssClass("chat-form");
     }
 
@@ -184,7 +185,7 @@ public final class ChatFormComponent implements UiComponent {
      */
     private UiAction recordAction() {
         var trigger = ai.mindconnect.ui.model.UiTrigger.invoke("mc-record-audio", id());
-        trigger.setUrl("/chat/api/sessions/" + sessionId + "/voice/transcribe");
+        trigger.setUrl("/chat/api/sessions/" + sessionId.value() + "/voice/transcribe");
         return UiAction.icon("record", "Dictate").icon("mic")
                 .onClick(trigger)
                 .<UiAction>withCssClass("chat-record-btn");
@@ -198,7 +199,7 @@ public final class ChatFormComponent implements UiComponent {
      * by the same channelId the client uses for re-mount detection.
      */
     private ai.mindconnect.ui.model.UiNode streamingForm() {
-        String channelId = "msg-list-" + sessionId;
+        String channelId = "msg-list-" + sessionId.value();
         var row = ai.mindconnect.ui.model.UiStack.of(id());
         row.direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL);
         row.withCssClass("chat-form chat-form--streaming");

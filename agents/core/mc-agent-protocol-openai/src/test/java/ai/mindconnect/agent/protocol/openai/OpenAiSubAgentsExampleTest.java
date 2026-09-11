@@ -38,7 +38,7 @@ class OpenAiSubAgentsExampleTest {
 
     @Test
     void leadDelegatesToPoet() {
-        Session session = backend.openSessionForAgent("examples", "lead");
+        Session session = backend.openSessionForAgent("lead");
 
         Response r = backend.create(ResponseRequest.text(session.id(),
                 "I need a short poem about Lisbon."));

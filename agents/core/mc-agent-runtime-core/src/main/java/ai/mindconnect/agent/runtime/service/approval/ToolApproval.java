@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.service.approval;
 
+import ai.mindconnect.agent.SessionId;
 import java.time.Instant;
-import java.util.UUID;
 
 /**
  * One OPEN approval question bubbled up from a sub-agent — everything the
@@ -27,8 +27,9 @@ public record ToolApproval(
         String callId,
         String toolName,
         String content,
-        UUID originSessionId,
-        UUID rootSessionId,
+        SessionId originSessionId,
+        SessionId rootSessionId,
         String toolTaskId,
         Instant requestedAt) {
+
 }

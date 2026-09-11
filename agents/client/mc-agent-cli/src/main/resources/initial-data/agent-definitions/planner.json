@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000020",
-  "namespace": {
-    "value": "local"
-  },
   "name": "planner",
   "description": "Orchestrator agent that decomposes a large task into sub-tasks, delegates each to a specialized sub-agent via run_agent, verifies the results and synthesizes a final answer.",
   "group": "assistants",
@@ -26,7 +23,7 @@
       "id": "00000003-0000-0000-0000-000000000200",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000020",
       "name": "list_agents",
-      "description": "Lists all available agents in the current namespace with their names and descriptions. Call this FIRST to discover your workforce before planning.",
+      "description": "Lists all available agents with their names and descriptions. Call this FIRST to discover your workforce before planning.",
       "enabled": true
     },
     {

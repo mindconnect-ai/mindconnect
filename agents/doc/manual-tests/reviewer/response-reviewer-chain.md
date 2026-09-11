@@ -3,7 +3,7 @@ id: reviewer-response-chain
 area: reviewer
 requires: [server-9091, lm-studio-tool-model]
 duration: ~8 min
-last-verified: never (chain logic verified by ResponseReviewerChainTest + AgentLoopTest, 2026-08-27)
+last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
 ---
 
 # Response reviewers: rewrite and BLOCK before the user sees anything

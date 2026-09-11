@@ -1,5 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -23,11 +26,15 @@ import static org.assertj.core.api.Assertions.assertThat;
  * turn's output travels on the session's stream, which every client of the
  * session is already reading, so submitting is an ordinary request that
  * returns as soon as the turn is queued.
+ *
+ * <p>URLs and channel ids carry the bare id value, never {@code namespace/value}:
+ * the expectations below spell the bare value out literally.
  */
 class ChatActionUrlsTest {
 
-    private static final UUID SESSION = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
-    private static final UUID AGENT   = UUID.fromString("11111111-2222-3333-4444-555555555555");
+    private static final String SESSION_VALUE = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+    private static final SessionId SESSION = SessionId.of(SESSION_VALUE);
+    private static final AgentId AGENT   = AgentId.of("11111111-2222-3333-4444-555555555555");
 
     private static String json(Object node) throws Exception {
         return new ObjectMapper().writeValueAsString(node);
@@ -37,9 +44,9 @@ class ChatActionUrlsTest {
     void theComposerKeepsItsRoutes() throws Exception {
         String out = json(new ChatFormComponent(SESSION, AGENT).render());
 
-        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION + "/attach-dialog\"");
-        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION + "/settings\"");
-        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION + "/chat/stream\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/attach-dialog\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/settings\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/chat/stream\"");
     }
 
     /**
@@ -61,21 +68,21 @@ class ChatActionUrlsTest {
     void stopCancelsTheSessionsStream() throws Exception {
         String out = json(new ChatFormComponent(SESSION, AGENT, true).render());
 
-        assertThat(out).contains("\"url\":\"/chat/api/streams/msg-list-" + SESSION + "\"");
+        assertThat(out).contains("\"url\":\"/chat/api/streams/msg-list-" + SESSION_VALUE + "\"");
         assertThat(out).contains("\"method\":\"DELETE\"");
     }
 
     @Test
     void aUserMessageCanBeRegeneratedAndDeletedFromHere() throws Exception {
-        var message = Message.of(UUID.randomUUID(), UUID.randomUUID(), ParticipantType.USER,
+        var message = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER,
                 MessageType.CHAT, "hi", 7);
         var item = new MessageComponent(SESSION, null, message, true,
                 DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())).item();
 
         String out = json(item);
 
-        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION + "/messages/7/regenerate\"");
-        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/messages/7/regenerate\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE
                 + "/messages?fromSeq=7&toSeq=" + Integer.MAX_VALUE + "\"");
     }
 }

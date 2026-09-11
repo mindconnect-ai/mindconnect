@@ -1,10 +1,9 @@
 package ai.mindconnect.agent.runtime.domain;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class AgentDefinitionRosterTest {
 
     private static AgentDefinition withRoster(List<String> roster) {
-        return new AgentDefinition(UUID.randomUUID(), new Namespace("local"), "planner", "d",
+        return new AgentDefinition(AgentId.random(), "planner", "d",
                 null, null, "prompt", null, "cfg", 5, null, AgentDefinitionStatus.ACTIVE,
                 List.of(), List.of(), roster, null, null, null);
     }

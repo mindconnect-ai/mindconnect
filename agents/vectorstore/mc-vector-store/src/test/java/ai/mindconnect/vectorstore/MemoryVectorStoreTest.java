@@ -22,7 +22,7 @@ class MemoryVectorStoreTest {
     Path dir;
 
     private Map<String, String> config(String... extra) {
-        Map<String, String> cfg = new java.util.HashMap<>(Map.of("dir", dir.toString()));
+        Map<String, String> cfg = new java.util.HashMap<>(Map.of("baseDir", dir.toString(), "namespace", "test"));
         for (int i = 0; i < extra.length; i += 2) cfg.put(extra[i], extra[i + 1]);
         return cfg;
     }
@@ -101,5 +101,23 @@ class MemoryVectorStoreTest {
     void discoverFindsTheMemoryBackend() {
         assertThat(VectorStoreBackend.discover())
                 .anySatisfy(b -> assertThat(b.type()).isEqualTo("memory"));
+    }
+
+    @Test
+    void storesOfTwoNamespacesDoNotMix() {
+        new MemoryVectorBackend().open("shared", config()).upsert(List.of(chunk("a", "f1", 1f, 0f)));
+
+        VectorStore other = new MemoryVectorBackend().open("shared", config("namespace", "other"));
+
+        assertThat(other.chunkCount()).isZero();
+        assertThat(new MemoryVectorBackend().listStores(config())).contains("shared");
+        assertThat(new MemoryVectorBackend().listStores(config("namespace", "other"))).doesNotContain("shared");
+    }
+
+    @Test
+    void aStoreWithoutANamespaceIsRefused() {
+        Map<String, String> noNamespace = Map.of("baseDir", dir.toString());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> new MemoryVectorBackend().open("s", noNamespace))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

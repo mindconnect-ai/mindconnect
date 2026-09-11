@@ -7,7 +7,6 @@ import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
 import ai.mindconnect.ui.model.UiAction;
@@ -34,7 +33,6 @@ public final class AgentFormComponent implements UiComponent {
     private final AgentDefinition agent;
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentRepository;
-    private final Namespace defaultNamespace;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     /**
@@ -44,18 +42,16 @@ public final class AgentFormComponent implements UiComponent {
     public AgentFormComponent(AgentDefinition agent,
                               LlmConfigRepository llmConfigRepository,
                               AgentDefinitionRepository agentRepository,
-                              Namespace defaultNamespace,
                               com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.agent = agent;
         this.llmConfigRepository = llmConfigRepository;
         this.agentRepository = agentRepository;
-        this.defaultNamespace = defaultNamespace;
         this.objectMapper = objectMapper;
     }
 
     @Override
     public String id() {
-        return agent == null ? "agent-new" : "agent-" + agent.id();
+        return agent == null ? "agent-new" : "agent-" + agent.id().value();
     }
 
     @Override
@@ -67,10 +63,6 @@ public final class AgentFormComponent implements UiComponent {
                         c.name() + " (" + c.provider() + " / " + c.model() + ")"))
                 .toList();
 
-        // Namespace options — hardcoded "local" for now, extensible later.
-        List<UiField.Option> nsOptions = List.of(
-                UiField.Option.of("local", "local"));
-
         // The rubrics that exist, read off the agents themselves — there is no
         // group registry, and inventing one for a value only the list groups by
         // would be a table to keep in sync for nothing. The seeded three are
@@ -79,16 +71,16 @@ public final class AgentFormComponent implements UiComponent {
         // it, so opening the form cannot silently refile the agent.
         java.util.SortedSet<String> groupNames = new java.util.TreeSet<>(
                 List.of("assistants", "sub-agents", "utilities"));
-        agentRepository.findByNamespace(isNew ? defaultNamespace : agent.namespace())
+        agentRepository.findAll()
                 .forEach(other -> groupNames.add(other.groupOrDefault()));
         if (!isNew) groupNames.add(agent.groupOrDefault());
         List<UiField.Option> groupOptions = groupNames.stream()
                 .map(g -> UiField.Option.of(g, ToolCatalogComponent.displayGroup(g)))
                 .toList();
 
-        // Reviewer candidates: every other agent in the same namespace.
+        // Reviewer candidates: every other agent.
         List<UiField.Option> reviewerOptions = agentRepository
-                .findByNamespace(isNew ? defaultNamespace : agent.namespace()).stream()
+                .findAll().stream()
                 .filter(other -> isNew || !other.id().equals(agent.id()))
                 .map(other -> UiField.Option.of(other.name(), other.name()))
                 .toList();
@@ -103,9 +95,6 @@ public final class AgentFormComponent implements UiComponent {
                 .icon(isNew ? AgentDefinition.DEFAULT_ICON : agent.iconOrDefault());
 
         var form = UiForm.of(id(), null)
-                .field(UiField.select("namespace", "Namespace",
-                        isNew ? defaultNamespace.value() : agent.namespace().value(), nsOptions)
-                        .asEditable().asRequired())
                 .field(UiField.text("name", "Name", isNew ? null : agent.name())
                         .asEditable().asRequired())
                 .field(UiField.text("description", "Description", isNew ? null : agent.description())
@@ -170,11 +159,11 @@ public final class AgentFormComponent implements UiComponent {
                 .action(UiAction.primary("save", "Save").icon("save")
                         .onClick(isNew
                                 ? trigger(on(AgentUiController.class).create(null, null), id())
-                                : trigger(on(AgentUiController.class).update(agent.id(), null, null), id())))
+                                : trigger(on(AgentUiController.class).update(agent.id().value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel")
                         .onClick(isNew
                                 ? trigger(on(AgentUiController.class).list(null))
-                                : trigger(on(AgentUiController.class).detail(agent.id(), null, null, null))))
+                                : trigger(on(AgentUiController.class).detail(agent.id().value(), null, null, null))))
                 .link(UiLink.of("back", "/admin/agents", "← Back to Agents"));
 
         return UiStack.of(id() + "-page").child(header).child(form);

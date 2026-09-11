@@ -1,10 +1,11 @@
 package ai.mindconnect.adminui.chat;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.chatui.ui.ChatHostLinks;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * What the admin UI adds to the chat surface: the way back to the agent, the
@@ -19,13 +20,13 @@ import java.util.UUID;
 public class AdminChatHostLinks implements ChatHostLinks {
 
     @Override
-    public String backHref(UUID agentId, UUID sessionId) {
-        return "/admin/agents/" + agentId + "?section=sessions&row=" + sessionId;
+    public String backHref(AgentId agentId, SessionId sessionId) {
+        return "/admin/agents/" + agentId.value() + "?section=sessions&row=" + sessionId.value();
     }
 
     @Override
-    public List<ToolLink> sessionTools(UUID sessionId) {
-        String base = "/admin/api/sessions/" + sessionId;
+    public List<ToolLink> sessionTools(SessionId sessionId) {
+        String base = "/admin/api/sessions/" + sessionId.value();
         return List.of(
                 new ToolLink("memory",    "Working Memory", "chart",  base + "/memory?dialog=true"),
                 new ToolLink("traces",    "Traces",         "list",   base + "/traces?dialog=true"),

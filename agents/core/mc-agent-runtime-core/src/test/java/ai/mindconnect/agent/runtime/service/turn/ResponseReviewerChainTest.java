@@ -3,12 +3,14 @@ package ai.mindconnect.agent.runtime.service.turn;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.domain.ConversationHistory;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.Participant;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -37,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ResponseReviewerChainTest {
 
-    private final UUID conversationId = UUID.randomUUID();
+    private final ConversationId conversationId = ConversationId.random();
     private final InMemoryConversations conversations = new InMemoryConversations(conversationId);
     private final List<StreamEvent> events = new ArrayList<>();
 
@@ -58,8 +60,8 @@ class ResponseReviewerChainTest {
     };
 
     private AgentDefinition defWithReviewers(String... reviewers) {
-        AgentDefinition base = AgentDefinition.create(new Namespace("test"), "a", "d", "p", null, "llm");
-        return base.withBasicFields(base.namespace(), base.name(), base.description(),
+        AgentDefinition base = AgentDefinition.create("a", "d", "p", null, "llm");
+        return base.withBasicFields(base.name(), base.description(),
                 base.systemPrompt(), base.welcomeMessage(), base.llmConfigName(),
                 base.maxIterations(), List.of(reviewers));
     }
@@ -183,54 +185,54 @@ class ResponseReviewerChainTest {
     // ── fake store (only what the chain reads) ──────────────────────────────
 
     private static final class InMemoryConversations implements ConversationManager {
-        private final UUID conversationId;
+        private final ConversationId conversationId;
         private final List<Message> messages = new ArrayList<>();
         private int seq;
 
-        private InMemoryConversations(UUID conversationId) {
+        private InMemoryConversations(ConversationId conversationId) {
             this.conversationId = conversationId;
         }
 
         Message append(ParticipantType sender, MessageType type, String content) {
-            Message m = Message.of(conversationId, UUID.randomUUID(), sender, type, content, ++seq);
+            Message m = Message.of(conversationId, UUID.randomUUID().toString(), sender, type, content, ++seq);
             messages.add(m);
             return m;
         }
 
-        @Override public List<Message> loadHistory(UUID id, PageRequest page) {
+        @Override public List<Message> loadHistory(ConversationId id, PageRequest page) {
             return List.copyOf(messages);
         }
 
-        @Override public ConversationHistory loadCompleteHistory(UUID id) {
+        @Override public ConversationHistory loadCompleteHistory(ConversationId id) {
             return ConversationHistory.of(id, List.copyOf(messages));
         }
 
-        @Override public Conversation createConversation(Namespace namespace, String title,
+        @Override public Conversation createConversation(ConversationId id, String title,
                 ConversationType type, List<Participant> participants) {
             throw new UnsupportedOperationException();
         }
-        @Override public Optional<Conversation> findById(UUID id) { return Optional.empty(); }
-        @Override public List<Conversation> listByNamespace(Namespace namespace, PageRequest page) {
+        @Override public Optional<Conversation> findById(ConversationId id) { return Optional.empty(); }
+        @Override public List<Conversation> list(PageRequest page) {
             return List.of();
         }
-        @Override public Message addMessageToConversation(UUID id, UUID senderId,
-                ParticipantType senderType, MessageType type, String content, UUID turnId) {
+        @Override public Message addMessageToConversation(ConversationId id, String senderId,
+                ParticipantType senderType, MessageType type, String content, ChatTurnId turnId) {
             throw new UnsupportedOperationException();
         }
-        @Override public Message addMessageToConversation(UUID id, UUID senderId,
-                ParticipantType senderType, MessageType type, String content, UUID turnId,
+        @Override public Message addMessageToConversation(ConversationId id, String senderId,
+                ParticipantType senderType, MessageType type, String content, ChatTurnId turnId,
                 Integer run, Map<String, Object> metadata) {
             throw new UnsupportedOperationException();
         }
-        @Override public Message addMessageToConversation(UUID id, UUID senderId,
+        @Override public Message addMessageToConversation(ConversationId id, String senderId,
                 ParticipantType senderType, MessageType type,
-                java.util.List<ai.mindconnect.message.domain.ContentPart> parts, UUID turnId,
+                java.util.List<ai.mindconnect.message.domain.ContentPart> parts, ChatTurnId turnId,
                 Integer run, Map<String, Object> metadata) {
             throw new UnsupportedOperationException();
         }
-        @Override public void compressMessage(UUID id, UUID messageId, String stub, Integer tokens) { }
-        @Override public void updateTokenCount(UUID id, UUID messageId, int tokenCount) { }
-        @Override public void updateDurationMs(UUID id, UUID messageId, long durationMs) { }
-        @Override public int deleteMessages(UUID id, int fromSeq, int toSeq) { return 0; }
+        @Override public void compressMessage(ConversationId id, MessageId messageId, String stub, Integer tokens) { }
+        @Override public void updateTokenCount(ConversationId id, MessageId messageId, int tokenCount) { }
+        @Override public void updateDurationMs(ConversationId id, MessageId messageId, long durationMs) { }
+        @Override public int deleteMessages(ConversationId id, int fromSeq, int toSeq) { return 0; }
     }
 }

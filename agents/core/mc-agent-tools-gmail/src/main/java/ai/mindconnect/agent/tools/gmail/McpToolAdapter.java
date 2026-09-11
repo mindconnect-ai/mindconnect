@@ -9,7 +9,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -32,7 +31,7 @@ final class McpToolAdapter implements Tool {
     private final String description;
     private final Map<String, Object> inputSchema;
     private final McpSessionRegistry registry;
-    private final UUID sessionId;
+    private final String sessionId;
     private final String providerKey;
     private final Supplier<McpStdioSpawn> spawnSupplier;
 
@@ -41,7 +40,7 @@ final class McpToolAdapter implements Tool {
                    String description,
                    Map<String, Object> inputSchema,
                    McpSessionRegistry registry,
-                   UUID sessionId,
+                   String sessionId,
                    String providerKey,
                    Supplier<McpStdioSpawn> spawnSupplier) {
         this.agentToolName = agentToolName;

@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.service;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
@@ -12,7 +13,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -25,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ThrottlingLlmGatewayTest {
 
     private static LlmConfig config(String name, RateLimitConfig rateLimit) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.OPENAI,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.OPENAI,
                 "model", "http://x", "key", 0.7, 4096, Map.of(), null,
                 false, null, null, rateLimit, null, null);
     }

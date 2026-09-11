@@ -20,7 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
+import ai.mindconnect.message.domain.ChatTurnId;
 
 /**
  * LLM-call-trace inspector page. Master-detail layout, same as the
@@ -39,12 +39,12 @@ public final class TracesPage extends AdminPage {
     private final AgentDefinition agent;
     private final List<LlmCallTrace> traces;
     private final List<Message> history;
-    private final UUID selectedTurnId;
-    private final Map<UUID, List<LlmCallTrace>> byTurn;
+    private final ChatTurnId selectedTurnId;
+    private final Map<ChatTurnId, List<LlmCallTrace>> byTurn;
 
     public TracesPage(AgentSession session, AgentDefinition agent,
                        List<LlmCallTrace> traces, List<Message> history,
-                       UUID selectedTurnId) {
+                       ChatTurnId selectedTurnId) {
         this.session = session;
         this.agent = agent;
         this.traces = traces;
@@ -55,7 +55,7 @@ public final class TracesPage extends AdminPage {
 
     @Override
     public UiPage render() {
-        String sessionId = session.id().toString();
+        String sessionId = session.id().value();
 
         var master = new TraceMasterListComponent(session.id(), byTurn, history, selectedTurnId);
         var detail = new TraceDetailSectionComponent(
@@ -83,7 +83,7 @@ public final class TracesPage extends AdminPage {
      * Patch for clicking a turn in the master list: replaces the
      * detail pane with the roundtrips of that turn.
      */
-    public UiPatch selectTurn(UUID turnId) {
+    public UiPatch selectTurn(ChatTurnId turnId) {
         var detail = new TraceDetailSectionComponent(
                 byTurn.getOrDefault(turnId, List.of()), history);
         return patch(UiPatch.Operation.replace(TraceDetailSectionComponent.DETAIL_ID, detail.render()));
@@ -100,8 +100,8 @@ public final class TracesPage extends AdminPage {
      * <p>Iteration order of the returned map is chronological by the
      * root turn's earliest timestamp.
      */
-    private static Map<UUID, List<LlmCallTrace>> groupByTurn(List<LlmCallTrace> traces) {
-        Map<UUID, LlmCallTrace> firstByTurnId = new HashMap<>();
+    private static Map<ChatTurnId, List<LlmCallTrace>> groupByTurn(List<LlmCallTrace> traces) {
+        Map<ChatTurnId, LlmCallTrace> firstByTurnId = new HashMap<>();
         for (LlmCallTrace t : traces) {
             if (t.context() == null || t.context().turnId() == null) continue;
             firstByTurnId.putIfAbsent(t.context().turnId(), t);
@@ -112,9 +112,9 @@ public final class TracesPage extends AdminPage {
                 .sorted(Comparator.comparing(LlmCallTrace::startedAt))
                 .toList();
 
-        Map<UUID, List<LlmCallTrace>> byRoot = new LinkedHashMap<>();
+        Map<ChatTurnId, List<LlmCallTrace>> byRoot = new LinkedHashMap<>();
         for (LlmCallTrace t : sorted) {
-            UUID root = resolveRootTurnId(t, firstByTurnId);
+            ChatTurnId root = resolveRootTurnId(t, firstByTurnId);
             byRoot.computeIfAbsent(root, k -> new ArrayList<>()).add(t);
         }
         return byRoot;
@@ -126,11 +126,11 @@ public final class TracesPage extends AdminPage {
      * isn't in our trace set (orphan — treat the orphan's own turnId
      * as its own root). Guards against accidental cycles.
      */
-    private static UUID resolveRootTurnId(LlmCallTrace t, Map<UUID, LlmCallTrace> firstByTurnId) {
-        Set<UUID> guard = new HashSet<>();
+    private static ChatTurnId resolveRootTurnId(LlmCallTrace t, Map<ChatTurnId, LlmCallTrace> firstByTurnId) {
+        Set<ChatTurnId> guard = new HashSet<>();
         LlmCallTrace cur = t;
         while (cur != null && cur.context() != null) {
-            UUID parent = cur.context().parentTurnId();
+            ChatTurnId parent = cur.context().parentTurnId();
             if (parent == null) return cur.context().turnId();
             if (!guard.add(cur.context().turnId())) return cur.context().turnId();
             LlmCallTrace next = firstByTurnId.get(parent);
@@ -141,9 +141,9 @@ public final class TracesPage extends AdminPage {
     }
 
     /** Most recent turn = the last one in chronological iteration order. */
-    private static UUID pickLatestTurnId(Map<UUID, List<LlmCallTrace>> byTurn) {
-        UUID last = null;
-        for (UUID id : byTurn.keySet()) last = id;
+    private static ChatTurnId pickLatestTurnId(Map<ChatTurnId, List<LlmCallTrace>> byTurn) {
+        ChatTurnId last = null;
+        for (ChatTurnId id : byTurn.keySet()) last = id;
         return last;
     }
 }

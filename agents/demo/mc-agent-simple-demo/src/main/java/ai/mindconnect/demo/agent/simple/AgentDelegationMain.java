@@ -1,11 +1,11 @@
 package ai.mindconnect.demo.agent.simple;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 
@@ -32,23 +32,21 @@ public class AgentDelegationMain {
                 .tavilyApiKey(tavilyKey)
                 .build()) {
 
-            Namespace ns = runtime.namespace();
-
             // Sub-agent: fetches and reads web pages.
-            AgentDefinition researcher = AgentDefinition.create(ns, "web-researcher",
+            AgentDefinition researcher = AgentDefinition.create("web-researcher",
                     "Reads web pages and reports what they say.",
                     "You are a web researcher. For open questions, use web_search first, "
                             + "then web_read on the most promising result. Be brief and cite "
                             + "the URLs you used.",
                     null, "demo-llm");
             List<AgentTool> researcherTools = tavilyKey.isBlank()
-                    ? List.of(AgentTool.of(researcher.id(), "web_read"))
-                    : List.of(AgentTool.of(researcher.id(), "web_read"),
-                              AgentTool.of(researcher.id(), "web_search"));
+                    ? List.of(AgentTool.of("web_read"))
+                    : List.of(AgentTool.of("web_read"),
+                              AgentTool.of("web_search"));
             runtime.agentDefinitions().save(researcher.withTools(researcherTools));
 
             // Orchestrator: no web access of its own — it must delegate.
-            AgentDefinition orchestrator = AgentDefinition.create(ns, "orchestrator",
+            AgentDefinition orchestrator = AgentDefinition.create("orchestrator",
                     "Coordinates work by delegating to specialist agents.",
                     "You coordinate specialist agents. You have NO web access yourself — "
                             + "for anything on the web, call the run_agent tool with "
@@ -56,13 +54,13 @@ public class AgentDelegationMain {
                             + "Then summarize the researcher's findings for the user.",
                     null, "demo-llm");
             runtime.agentDefinitions().save(orchestrator.withTools(
-                    List.of(AgentTool.of(orchestrator.id(), "run_agent"))));
+                    List.of(AgentTool.of("run_agent"))));
 
             String question = args.length > 0 ? String.join(" ", args)
                     : "What is the latest stable OpenJDK release and when was it published? "
                             + "Search the web for current information.";
             System.out.println("Q: " + question);
-            String answer = runtime.ask("orchestrator", "demo-user", question,
+            String answer = runtime.ask("orchestrator", UserId.of("demo-user"), question,
                     AgentDelegationMain::printEvent);
             System.out.println("A: " + answer);
         }

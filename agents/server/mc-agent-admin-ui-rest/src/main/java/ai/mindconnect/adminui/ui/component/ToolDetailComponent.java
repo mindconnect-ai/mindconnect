@@ -7,6 +7,7 @@ import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.ui.model.UiAction;
@@ -42,7 +43,7 @@ public final class ToolDetailComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "tool-detail-" + tool.id();
+        return "tool-detail-" + tool.id().value();
     }
 
     @Override
@@ -56,7 +57,7 @@ public final class ToolDetailComponent implements UiComponent {
         // Schema comes from the registry, or — for inline tools (run_agent /
         // run_agents, handled by AgentChatService) — from the inline defs.
         Object schema = null;
-        var resolved = toolRegistry.resolve(tool, agent.namespace(), null, null);
+        var resolved = toolRegistry.resolve(tool, ToolCallScope.detached(null));
         if (resolved.isPresent()) {
             schema = resolved.get().parametersSchema();
         } else {
@@ -71,11 +72,11 @@ public final class ToolDetailComponent implements UiComponent {
                 .field(UiField.textarea("overrides", "Overrides (JSON)", overridesJson))
                 .field(UiField.text("enabled",     "Enabled",     tool.enabled() ? "Yes" : "No"))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
-                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id(), tool.id()))))
+                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id().value(), tool.id().value()))))
                 .action(UiAction.secondary("test", "Test").icon("flash")
-                        .onClick(trigger(on(AgentUiController.class).testToolDialog(agent.id(), tool.id()))))
+                        .onClick(trigger(on(AgentUiController.class).testToolDialog(agent.id().value(), tool.id().value()))))
                 .link(UiLink.of("back",
-                        "/admin/agents/" + agent.id() + "?section=tools&row=" + tool.id(),
+                        "/admin/agents/" + agent.id().value() + "?section=tools&row=" + tool.id().value(),
                         "← Back to Agent"));
 
         // The parameters the LLM will actually be offered (pinned params are

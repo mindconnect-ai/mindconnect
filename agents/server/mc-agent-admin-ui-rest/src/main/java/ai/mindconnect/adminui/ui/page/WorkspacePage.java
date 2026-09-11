@@ -52,7 +52,7 @@ public final class WorkspacePage extends AdminPage {
 
     @Override
     public UiPage render() {
-        String sessionId = session.id().toString();
+        String sessionId = session.id().value();
 
         UiList sessionListUi = sessionList.render();
         UiList agentListUi   = agentList.render();

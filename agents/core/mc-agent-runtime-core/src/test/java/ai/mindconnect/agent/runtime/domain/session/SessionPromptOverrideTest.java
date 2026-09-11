@@ -1,8 +1,7 @@
 package ai.mindconnect.agent.runtime.domain.session;
 
+import ai.mindconnect.agent.AgentId;
 import org.junit.jupiter.api.Test;
-
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionPromptOverrideTest {
 
     private static SessionAgentRef ref(String prompt) {
-        return new SessionAgentRef(UUID.randomUUID(), true, "default-chat", null, null, null, prompt);
+        return new SessionAgentRef(AgentId.random(), true, "default-chat", null, null, null, prompt);
     }
 
     @Test
@@ -38,7 +37,7 @@ class SessionPromptOverrideTest {
     /** The header names the agent, so the override has to be visible somewhere. */
     @Test
     void theBindingSurvivesTheOverride() {
-        UUID agentId = UUID.randomUUID();
+        AgentId agentId = AgentId.random();
         var r = new SessionAgentRef(agentId, true, "default-chat", null, null, null, "mine");
 
         assertThat(r.agentId()).isEqualTo(agentId);
@@ -48,7 +47,7 @@ class SessionPromptOverrideTest {
     /** Sessions written before the field existed deserialise as "no override". */
     @Test
     void thePreOverrideConstructorStillWorks() {
-        var r = new SessionAgentRef(UUID.randomUUID(), true, "Poet", "claude", null, null);
+        var r = new SessionAgentRef(AgentId.random(), true, "Poet", "claude", null, null);
 
         assertThat(r.systemPrompt()).isNull();
         assertThat(r.hasPromptOverride()).isFalse();

@@ -46,7 +46,7 @@ public final class AgentDetailPage extends AdminPage {
     public UiPage render() {
         var detail = new AgentDetailComponent(agent, userId, sessionRepository,
                 initialSection, selectedRowId);
-        return UiPage.of("/admin/agents/" + agent.id(), detail.render());
+        return UiPage.of("/admin/agents/" + agent.id().value(), detail.render());
     }
 
     /**

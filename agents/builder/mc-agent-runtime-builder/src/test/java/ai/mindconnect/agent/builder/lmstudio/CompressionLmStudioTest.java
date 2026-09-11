@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.builder.lmstudio;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
@@ -55,7 +56,7 @@ class CompressionLmStudioTest {
     void oldReadResultsCompressTheNewestThreeStayFull() {
         try (AgentRuntime runtime = runtime("compressor", ROBOT_PROMPT,
                 aggressiveCompression(), List.of(tool("it_big", false)))) {
-            AgentSession session = runtime.openSession("compressor", "tester");
+            AgentSession session = runtime.openSession("compressor", UserId.of("tester"));
 
             for (int i = 1; i <= 4; i++) {
                 String answer = runtime.chat(session.id(),
@@ -104,7 +105,7 @@ class CompressionLmStudioTest {
                 SummaryPlacement.SYSTEM_PROMPT, 1_000);
         try (AgentRuntime runtime = runtime("uncompressed", ROBOT_PROMPT,
                 off, List.of(tool("it_big", false)))) {
-            AgentSession session = runtime.openSession("uncompressed", "tester");
+            AgentSession session = runtime.openSession("uncompressed", UserId.of("tester"));
 
             for (int i = 1; i <= 4; i++) {
                 runtime.chat(session.id(),

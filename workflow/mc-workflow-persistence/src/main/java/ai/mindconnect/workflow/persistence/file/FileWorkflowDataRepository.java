@@ -31,17 +31,23 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
     private final Path baseDir;
     private final JacksonWorkflowSerializer serializer;
 
-    public FileWorkflowDataRepository(Path baseDir) {
-        this(baseDir, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
+    /**
+     * @param baseDir   the data directory; the definitions live in
+     *                  {@code <baseDir>/<partition>/workflows}
+     * @param partition the directory level this repository reads and writes —
+     *                  one partition never sees the definitions of another
+     */
+    public FileWorkflowDataRepository(Path baseDir, String partition) {
+        this(baseDir, partition, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
     }
 
-    public FileWorkflowDataRepository(Path baseDir, JacksonWorkflowSerializer serializer) {
-        this.baseDir = baseDir;
+    public FileWorkflowDataRepository(Path baseDir, String partition, JacksonWorkflowSerializer serializer) {
+        this.baseDir = baseDir.resolve(FileWorkflowInstanceRepository.checkPartition(partition)).resolve("workflows");
         this.serializer = serializer;
         try {
-            Files.createDirectories(baseDir);
+            Files.createDirectories(this.baseDir);
         } catch (IOException e) {
-            throw new UncheckedIOException("Cannot create workflow store dir: " + baseDir, e);
+            throw new UncheckedIOException("Cannot create workflow store dir: " + this.baseDir, e);
         }
     }
 

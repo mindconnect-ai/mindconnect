@@ -7,13 +7,13 @@ import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
@@ -29,33 +29,29 @@ public final class AgentRuntime implements AutoCloseable {
     private final AgentDefinitionRepository definitionRepository;
     private final LlmConfigRepository llmConfigRepository;
     private final ConversationManager conversationManager;
-    private final Namespace namespace;
     private final ExecutorService turnExecutor;
     private final AttachSupport attachSupport;   // null when the file/vector modules are absent
     private final ToolApprovalStore approvalStore;
 
     AgentRuntime(AgentChatService chatService, AgentSessionService sessionService,
                  AgentDefinitionRepository definitionRepository, LlmConfigRepository llmConfigRepository,
-                 ConversationManager conversationManager,
-                 Namespace namespace, ExecutorService turnExecutor, AttachSupport attachSupport,
+                 ConversationManager conversationManager, ExecutorService turnExecutor, AttachSupport attachSupport,
                  ToolApprovalStore approvalStore) {
         this.chatService = chatService;
         this.sessionService = sessionService;
         this.definitionRepository = definitionRepository;
         this.llmConfigRepository = llmConfigRepository;
         this.conversationManager = conversationManager;
-        this.namespace = namespace;
         this.turnExecutor = turnExecutor;
         this.attachSupport = attachSupport;
         this.approvalStore = approvalStore;
     }
 
     /** Opens a chat session with the named agent. */
-    public AgentSession openSession(String agentName, String userId) {
-        AgentDefinition def = definitionRepository.findByName(namespace, agentName)
-                .orElseThrow(() -> new IllegalArgumentException("No agent named '" + agentName
-                        + "' in namespace '" + namespace.value() + "'"));
-        return sessionService.openChat(def.id(), namespace, userId);
+    public AgentSession openSession(String agentName, UserId userId) {
+        AgentDefinition def = definitionRepository.findByName(agentName)
+                .orElseThrow(() -> new IllegalArgumentException("No agent named '" + agentName + "'"));
+        return sessionService.openChat(def.id(), userId);
     }
 
     /**
@@ -64,14 +60,14 @@ public final class AgentRuntime implements AutoCloseable {
      * to the registry and nothing has to be cleaned up afterwards — the chat
      * dies with its session.
      *
-     * <p>The counterpart to {@link #openSession(String, String)} for the case
+     * <p>The counterpart to {@link #openSession(String, UserId)} for the case
      * where an application wants a plain assistant rather than a curated one.
      *
      * @param llmConfigName the model, by the name of a stored LlmConfig
      * @param toolNames     tools offered up front; empty for a chat without any
      */
     public AgentSession openSession(String llmConfigName, java.util.List<String> toolNames,
-                                    String userId) {
+                                    UserId userId) {
         return openSession(llmConfigName, toolNames, DEFAULT_CHAT_PROMPT, true, userId);
     }
 
@@ -84,7 +80,7 @@ public final class AgentRuntime implements AutoCloseable {
      *                   context
      */
     public AgentSession openSession(String llmConfigName, java.util.List<String> toolNames,
-                                    String systemPrompt, boolean toolSearch, String userId) {
+                                    String systemPrompt, boolean toolSearch, UserId userId) {
         if (llmConfigName == null || llmConfigName.isBlank()) {
             throw new IllegalArgumentException("A session without an agent needs a model name");
         }
@@ -93,12 +89,12 @@ public final class AgentRuntime implements AutoCloseable {
         }
         var agent = InlineSessionAgent.of(
                 "Chat", systemPrompt, llmConfigName, toolNames, toolSearch);
-        return sessionService.openChat(agent, namespace, userId);
+        return sessionService.openChat(agent, userId);
     }
 
     /** Opens an agentless session and asks it one question. */
     public String ask(String llmConfigName, java.util.List<String> toolNames,
-                      String userId, String message, Consumer<StreamEvent> events) {
+                      UserId userId, String message, Consumer<StreamEvent> events) {
         AgentSession session = openSession(llmConfigName, toolNames, userId);
         return chat(session.id(), message, events);
     }
@@ -111,7 +107,7 @@ public final class AgentRuntime implements AutoCloseable {
             """;
 
     /** Sends one message in an existing session and blocks for the answer. */
-    public String chat(UUID sessionId, String message, Consumer<StreamEvent> events) {
+    public String chat(SessionId sessionId, String message, Consumer<StreamEvent> events) {
         return chat(sessionId, ai.mindconnect.message.domain.ContentPart.text(message), events);
     }
 
@@ -120,7 +116,7 @@ public final class AgentRuntime implements AutoCloseable {
      * documents sent with it, referenced by the ids {@link #fileStore()}
      * holds them under. A vision model sees the image with the question.
      */
-    public String chat(UUID sessionId, java.util.List<ai.mindconnect.message.domain.ContentPart> parts,
+    public String chat(SessionId sessionId, java.util.List<ai.mindconnect.message.domain.ContentPart> parts,
                        Consumer<StreamEvent> events) {
         ChatTurnHandle handle = chatService.submitChat(sessionId, parts, events);
         try {
@@ -134,7 +130,7 @@ public final class AgentRuntime implements AutoCloseable {
     }
 
     /** One-shot convenience: open a session, ask, return the answer. */
-    public String ask(String agentName, String userId, String message, Consumer<StreamEvent> events) {
+    public String ask(String agentName, UserId userId, String message, Consumer<StreamEvent> events) {
         AgentSession session = openSession(agentName, userId);
         return chat(session.id(), message, events);
     }
@@ -150,7 +146,7 @@ public final class AgentRuntime implements AutoCloseable {
      * classpath, and an ingestion workflow (see
      * {@link AgentRuntimeBuilder#workflowFromClasspath}).
      */
-    public String attachFile(UUID sessionId, String fileName, java.io.InputStream content) {
+    public String attachFile(SessionId sessionId, String fileName, java.io.InputStream content) {
         requireAttachSupport();
         return attachSupport.attach(sessionId, fileName, content);
     }
@@ -183,11 +179,10 @@ public final class AgentRuntime implements AutoCloseable {
     }
 
     /** Ingests an already-uploaded file into the session's vector store. */
-    public String attachStored(UUID sessionId, ai.mindconnect.filestore.StoredFile stored) {
+    public String attachStored(SessionId sessionId, ai.mindconnect.filestore.StoredFile stored) {
         requireAttachSupport();
         return attachSupport.attachStored(sessionId, stored);
     }
-    public Namespace namespace() { return namespace; }
 
     @Override
     public void close() {

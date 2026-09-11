@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000005",
-  "namespace": {
-    "value": "local"
-  },
   "name": "answer-relevance-checker",
   "description": "Reviews an agent's draft answer for relevance to the user's question. Returns the unchanged answer, a corrected version, or a BLOCK: line.",
   "group": "reviewer",

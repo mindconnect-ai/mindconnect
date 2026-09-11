@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
@@ -116,7 +117,7 @@ class TranscriptionJobServiceTest {
 
         // The upload belongs to whoever made it: it is fetchable and
         // deletable through the file API, and nothing here disposes of it.
-        assertThat(files.find(job.fileId())).isPresent();
+        assertThat(files.find(FileId.of(job.fileId()))).isPresent();
     }
 
     @Test
@@ -131,7 +132,7 @@ class TranscriptionJobServiceTest {
 
         assertThat(done.status()).isEqualTo(TaskStatus.FAILED);
         assertThat(done.failure().message()).contains("provider is down");
-        assertThat(files.find(job.fileId())).as("a failed job keeps its evidence").isPresent();
+        assertThat(files.find(FileId.of(job.fileId()))).as("a failed job keeps its evidence").isPresent();
     }
 
     @Test
@@ -203,12 +204,13 @@ class TranscriptionJobServiceTest {
 
     /** Enough of a file store to hold bytes and hand them back. */
     private static final class StubFileStore implements FileStore {
-        private final Map<String, byte[]> stored = new LinkedHashMap<>();
-        private final Map<String, StoredFile> meta = new LinkedHashMap<>();
+        private final Map<FileId, byte[]> stored = new LinkedHashMap<>();
+        private final Map<FileId, StoredFile> meta = new LinkedHashMap<>();
 
         @Override
-        public StoredFile save(String name, String contentType, InputStream content) throws IOException {
-            String id = "file-" + UUID.randomUUID();
+        public StoredFile save(String name, String contentType, InputStream content)
+                throws IOException {
+            FileId id = FileId.of("file-" + UUID.randomUUID());
             byte[] bytes = content.readAllBytes();
             stored.put(id, bytes);
             StoredFile file = new StoredFile(id, name, contentType, bytes.length, Instant.now());
@@ -216,17 +218,20 @@ class TranscriptionJobServiceTest {
             return file;
         }
 
-        @Override public Optional<StoredFile> find(String id) { return Optional.ofNullable(meta.get(id)); }
+        @Override public Optional<StoredFile> find(FileId id) { return Optional.ofNullable(meta.get(id)); }
 
         @Override
-        public InputStream content(String id) {
+        public InputStream content(FileId id) {
             return new ByteArrayInputStream(stored.get(id));
         }
 
-        @Override public List<StoredFile> list() { return List.copyOf(meta.values()); }
+        @Override
+        public List<StoredFile> list() {
+            return meta.values().stream().toList();
+        }
 
         @Override
-        public void delete(String id) {
+        public void delete(FileId id) {
             stored.remove(id);
             meta.remove(id);
         }

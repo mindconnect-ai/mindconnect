@@ -1,15 +1,16 @@
 package ai.mindconnect.cli.agentclient;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.UserId;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -21,36 +22,40 @@ import java.util.function.Consumer;
  * shape independently. Migration / debugging operations like restoreSession
  * and recompressToolResults are intentionally absent: they were maintenance
  * helpers and are no longer part of the CLI surface.
+ *
+ * <p>Agents and sessions are addressed by their typed ids; the remote
+ * implementation puts an id's value into the path, the local one hands it
+ * straight to the runtime.
  */
 public interface AgentClient {
 
     // ── Agents ──────────────────────────────────────────────────────────────
 
-    Optional<AgentDefinition> findAgent(Namespace namespace, UUID agentId);
+    Optional<AgentDefinition> findAgent(AgentId agentId);
 
-    List<AgentDefinition> listAgents(Namespace namespace);
+    List<AgentDefinition> listAgents();
 
     // ── Sessions ────────────────────────────────────────────────────────────
 
-    AgentSession startSession(UUID agentDefinitionId, Namespace namespace, String userId);
+    AgentSession startSession(AgentId agentDefinitionId, UserId userId);
 
-    List<AgentSession> listSessions(UUID agentDefinitionId, Namespace namespace, String userId);
+    List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId);
 
-    List<Message> loadHistory(UUID sessionId);
+    List<Message> loadHistory(SessionId sessionId);
 
-    void deleteSession(UUID sessionId);
+    void deleteSession(SessionId sessionId);
 
-    int deleteMessages(UUID sessionId, int fromSeq, int toSeq);
+    int deleteMessages(SessionId sessionId, int fromSeq, int toSeq);
 
     // ── Chat ────────────────────────────────────────────────────────────────
 
-    String chat(UUID sessionId, String userMessage, Consumer<StreamEvent> eventHandler);
+    String chat(SessionId sessionId, String userMessage, Consumer<StreamEvent> eventHandler);
 
-    boolean cancelChat(UUID sessionId);
+    boolean cancelChat(SessionId sessionId);
 
     // ── Memory ──────────────────────────────────────────────────────────────
 
-    WorkingMemory getWorkingMemory(UUID sessionId);
+    WorkingMemory getWorkingMemory(SessionId sessionId);
 
-    int compressMemory(UUID sessionId);
+    int compressMemory(SessionId sessionId);
 }

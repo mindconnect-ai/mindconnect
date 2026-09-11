@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000004",
-  "namespace": {
-    "value": "local"
-  },
   "name": "web-researcher",
   "description": "Sub-agent that performs focused web research and returns structured findings. Call via run_agent.",
   "group": "sub-agents",

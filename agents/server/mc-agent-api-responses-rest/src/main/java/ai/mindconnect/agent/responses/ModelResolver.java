@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.responses;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 
@@ -49,14 +48,11 @@ public final class ModelResolver {
 
     private final AgentDefinitionRepository agents;
     private final LlmConfigRepository llmConfigs;
-    private final Namespace namespace;
     private final String defaultAgentName;
 
-    public ModelResolver(AgentDefinitionRepository agents, LlmConfigRepository llmConfigs,
-                         Namespace namespace, String defaultAgentName) {
+    public ModelResolver(AgentDefinitionRepository agents, LlmConfigRepository llmConfigs, String defaultAgentName) {
         this.agents = agents;
         this.llmConfigs = llmConfigs;
-        this.namespace = namespace;
         this.defaultAgentName = defaultAgentName;
     }
 
@@ -70,7 +66,7 @@ public final class ModelResolver {
         }
         String name = model.trim();
 
-        if (agents.findByName(namespace, name).isPresent()) {
+        if (agents.findByName(name).isPresent()) {
             return Resolution.agent(name);
         }
         if (llmConfigs.findByName(name).isPresent()) {

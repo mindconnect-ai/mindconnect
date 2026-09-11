@@ -1,11 +1,12 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.llm.domain.ToolDefinition;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * The way to the model. {@code requestId} and {@code sessionId} tell the
@@ -29,6 +30,6 @@ public interface LlmProvider {
      * the implementation registers its abort hook on it and closes the live
      * connection instead of waiting for the last token.
      */
-    LlmAnswer ask(String requestId, UUID sessionId, List<Message> history,
+    LlmAnswer ask(String requestId, SessionId sessionId, List<Message> history,
                   List<ToolDefinition> toolDefinitions, Cancellation cancellation);
 }

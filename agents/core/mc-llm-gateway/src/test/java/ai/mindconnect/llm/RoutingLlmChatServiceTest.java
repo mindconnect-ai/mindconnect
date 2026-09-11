@@ -13,7 +13,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
@@ -29,13 +28,13 @@ class RoutingLlmChatServiceTest {
 
     @BeforeEach
     void setUp() {
-        Map<UUID, LlmConfig> store = new ConcurrentHashMap<>();
+        Map<LlmConfigId, LlmConfig> store = new ConcurrentHashMap<>();
         repo = new LlmConfigRepository() {
             @Override public void save(LlmConfig c) { store.put(c.id(), c); }
-            @Override public Optional<LlmConfig> findById(UUID id) { return Optional.ofNullable(store.get(id)); }
+            @Override public Optional<LlmConfig> findById(LlmConfigId id) { return Optional.ofNullable(store.get(id)); }
             @Override public Optional<LlmConfig> findByName(String name) { return store.values().stream().filter(c -> c.name().equals(name)).findFirst(); }
-            @Override public List<LlmConfig> findAll() { return List.copyOf(store.values()); }
-            @Override public void deleteById(UUID id) { store.remove(id); }
+            @Override public List<LlmConfig> findAll() { return store.values().stream().toList(); }
+            @Override public void deleteById(LlmConfigId id) { store.remove(id); }
         };
         config = LlmConfig.lmStudio("test", "llama3", "http://localhost:1234");
         repo.save(config);

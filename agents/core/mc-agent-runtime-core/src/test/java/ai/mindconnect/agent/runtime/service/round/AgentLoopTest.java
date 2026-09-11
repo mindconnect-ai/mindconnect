@@ -1,7 +1,10 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.llm.domain.ToolDefinition;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -28,8 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class AgentLoopTest {
 
-    private final UUID conversationId = UUID.randomUUID();
-    private final UUID sessionId = UUID.randomUUID();
+    private final ConversationId conversationId = ConversationId.random();
+    private final SessionId sessionId = SessionId.random();
 
     // ── fakes ───────────────────────────────────────────────────────────────
 
@@ -38,20 +41,20 @@ class AgentLoopTest {
         private final List<Message> messages = new ArrayList<>();
         private int seq;
 
-        Message seed(UUID conversationId, ParticipantType sender, MessageType type,
+        Message seed(ConversationId conversationId, ParticipantType sender, MessageType type,
                      String content, Map<String, Object> metadata) {
-            Message m = Message.of(conversationId, UUID.randomUUID(), sender, type, content, ++seq)
+            Message m = Message.of(conversationId, UUID.randomUUID().toString(), sender, type, content, ++seq)
                     .withMetadata(metadata);
             messages.add(m);
             return m;
         }
 
-        @Override public List<Message> load(UUID conversationId) {
+        @Override public List<Message> load(ConversationId conversationId) {
             return List.copyOf(messages);
         }
 
-        @Override public Message append(UUID conversationId, TurnMessage turnMessage) {
-            Message m = Message.of(conversationId, UUID.randomUUID(), turnMessage.senderType(),
+        @Override public Message append(ConversationId conversationId, TurnMessage turnMessage) {
+            Message m = Message.of(conversationId, UUID.randomUUID().toString(), turnMessage.senderType(),
                             turnMessage.type(), turnMessage.content(), ++seq)
                     .withMetadata(turnMessage.metadata());
             messages.add(m);
@@ -73,7 +76,7 @@ class AgentLoopTest {
             return this;
         }
 
-        @Override public LlmAnswer ask(String requestId, UUID sessionId, List<Message> history,
+        @Override public LlmAnswer ask(String requestId, SessionId sessionId, List<Message> history,
                                        List<ToolDefinition> toolDefinitions, Cancellation cancellation) {
             calls++;
             if (script.isEmpty()) throw new AssertionError("Model asked more often than scripted");
@@ -94,12 +97,12 @@ class AgentLoopTest {
             results.put(callId, new ToolResult.Running());
         }
 
-        @Override public void execute(String requestId, UUID sessionId, ToolCalls.Call call) {
+        @Override public void execute(String requestId, SessionId sessionId, ToolCalls.Call call) {
             executed.add(call.callId());
             results.putIfAbsent(call.callId(), new ToolResult.Running());
         }
 
-        @Override public ToolResult result(UUID sessionId, String callId) {
+        @Override public ToolResult result(SessionId sessionId, String callId) {
             return results.getOrDefault(callId, new ToolResult.Lost("unknown callId"));
         }
     }
@@ -113,7 +116,7 @@ class AgentLoopTest {
     private record Fixture(InMemoryLog log, ScriptedLlm llm, HandSteeredExecutorAgentRound executor,
                            AgentLoop loop, List<Message> published) {
 
-        static Fixture create(UUID conversationId) {
+        static Fixture create(ConversationId conversationId) {
             InMemoryLog log = new InMemoryLog();
             log.seed(conversationId, ParticipantType.USER, MessageType.CHAT, "do it", Map.of());
             ScriptedLlm llm = new ScriptedLlm();
@@ -124,7 +127,7 @@ class AgentLoopTest {
             return new Fixture(log, llm, executor, loop, published);
         }
 
-        TurnOutcome run(UUID conversationId, UUID sessionId) {
+        TurnOutcome run(ConversationId conversationId, SessionId sessionId) {
             return loop.run("req1", conversationId, sessionId, new Cancellation(), 0, Usage.ZERO);
         }
     }
@@ -232,16 +235,13 @@ class AgentLoopTest {
         Fixture f = Fixture.create(conversationId);
         f.llm.answer(TurnMessage.assistant("model draft"));
 
-        AgentDefinition base =
-                AgentDefinition.create(
-                        new ai.mindconnect.agent.Namespace("test"), "a", "d", "p", null, "llm");
+        AgentDefinition base = AgentDefinition.create("a", "d", "p", null, "llm");
         AgentDefinition def = base.withBasicFields(
-                base.namespace(), base.name(), base.description(), base.systemPrompt(),
+                base.name(), base.description(), base.systemPrompt(),
                 base.welcomeMessage(), base.llmConfigName(), base.maxIterations(),
                 List.of("tone-reviewer"));
         AgentSession session =
-                AgentSession.startSubAgent(def.id(),
-                        def.namespace(), "u", conversationId, null, null, null);
+                AgentSession.startSubAgent(def.id(), UserId.of("u"), conversationId, null, null, null);
         AgentTaskRunner reviewerAgent =
                 new AgentTaskRunner() {
                     @Override public String run(String task, String userMessage) {

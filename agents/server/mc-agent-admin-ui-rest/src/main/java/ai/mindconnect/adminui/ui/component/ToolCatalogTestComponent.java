@@ -5,7 +5,7 @@ import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -16,7 +16,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Body of the "Test tool" modal for the top-level tool catalog — the same
@@ -28,18 +27,15 @@ public final class ToolCatalogTestComponent implements UiComponent {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final String toolName;
-    private final Namespace namespace;
     private final ToolRegistry toolRegistry;
     private final String previousJson;
     private final ToolTestService.Result result;
 
     public ToolCatalogTestComponent(String toolName,
-                                    Namespace namespace,
                                     ToolRegistry toolRegistry,
                                     String previousJson,
                                     ToolTestService.Result result) {
         this.toolName = toolName;
-        this.namespace = namespace;
         this.toolRegistry = toolRegistry;
         this.previousJson = previousJson;
         this.result = result;
@@ -83,7 +79,7 @@ public final class ToolCatalogTestComponent implements UiComponent {
     /** Resolves the tool's parameter schema, or null if the tool can't resolve. */
     private Map<String, Object> resolveSchema() {
         var resolved = toolRegistry.resolve(
-                AgentTool.of(new UUID(0, 0), toolName), namespace, null, null);
+                AgentTool.of(toolName), ToolCallScope.detached(null));
         return resolved.map(t -> t.parametersSchema()).orElse(null);
     }
 

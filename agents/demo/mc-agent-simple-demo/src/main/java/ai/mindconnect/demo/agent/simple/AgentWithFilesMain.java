@@ -1,5 +1,6 @@
 package ai.mindconnect.demo.agent.simple;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
@@ -37,7 +38,7 @@ public class AgentWithFilesMain {
                 .agentDefinitionFromClasspath("demo-agent.json")
                 .build()) {
 
-            AgentSession session = runtime.openSession("demo-agent", "demo-user");
+            AgentSession session = runtime.openSession("demo-agent", UserId.of("demo-user"));
             String result = runtime.attachFile(session.id(), "company-policy.md",
                     new ByteArrayInputStream(POLICY.getBytes(StandardCharsets.UTF_8)));
             System.out.println("Attach: " + result);

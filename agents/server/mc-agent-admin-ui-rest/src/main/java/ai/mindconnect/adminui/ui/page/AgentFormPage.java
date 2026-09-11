@@ -4,7 +4,6 @@ import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.AgentFormComponent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.ui.model.UiPage;
 
@@ -23,7 +22,6 @@ public final class AgentFormPage extends AdminPage {
     private final AgentDefinition agent;
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentRepository;
-    private final Namespace defaultNamespace;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     /**
@@ -34,12 +32,10 @@ public final class AgentFormPage extends AdminPage {
     public AgentFormPage(AgentDefinition agent,
                           LlmConfigRepository llmConfigRepository,
                           AgentDefinitionRepository agentRepository,
-                          Namespace defaultNamespace,
                           com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
         this.agent = agent;
         this.llmConfigRepository = llmConfigRepository;
         this.agentRepository = agentRepository;
-        this.defaultNamespace = defaultNamespace;
         this.objectMapper = objectMapper;
     }
 
@@ -47,9 +43,9 @@ public final class AgentFormPage extends AdminPage {
     public UiPage render() {
         String url = agent == null
                 ? "/admin/agents/new"
-                : "/admin/agents/" + agent.id() + "/edit";
+                : "/admin/agents/" + agent.id().value() + "/edit";
         return UiPage.of(url,
-                new AgentFormComponent(agent, llmConfigRepository, agentRepository, defaultNamespace, objectMapper)
+                new AgentFormComponent(agent, llmConfigRepository, agentRepository, objectMapper)
                         .render());
     }
 }

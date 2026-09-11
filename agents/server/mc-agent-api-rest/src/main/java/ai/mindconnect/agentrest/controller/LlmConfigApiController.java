@@ -2,6 +2,7 @@ package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -14,10 +15,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * External REST API for LLM configs. Persistence goes through the
@@ -68,9 +69,9 @@ public class LlmConfigApiController {
 
     @Operation(summary = "Get an LLM config")
     @GetMapping("/{id}")
-    public ResponseEntity<LlmConfig> findById(@PathVariable UUID id) {
+    public ResponseEntity<LlmConfig> findById(@PathVariable String id) {
         log.info("GET /api/llm-configs/{}", id);
-        return repository.findById(id)
+        return repository.findById(LlmConfigId.of(id))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -88,10 +89,11 @@ public class LlmConfigApiController {
 
     @Operation(summary = "Delete an LLM config")
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+    public ResponseEntity<Void> delete(@PathVariable String id) {
         log.info("DELETE /api/llm-configs/{}", id);
-        if (repository.findById(id).isEmpty()) return ResponseEntity.notFound().build();
-        repository.deleteById(id);
+        LlmConfigId configId = LlmConfigId.of(id);
+        if (repository.findById(configId).isEmpty()) return ResponseEntity.notFound().build();
+        repository.deleteById(configId);
         return ResponseEntity.noContent().build();
     }
 
@@ -105,13 +107,13 @@ public class LlmConfigApiController {
                     + "(aliases followed) and returns the reply with token counts — the "
                     + "same check as the admin UI's Test button.")
     @PostMapping("/{id}/test")
-    public ResponseEntity<LlmConfigTestService.Result> test(@PathVariable UUID id,
+    public ResponseEntity<LlmConfigTestService.Result> test(@PathVariable String id,
                                                             @RequestBody TestRequest request) {
         log.info("POST /api/llm-configs/{}/test", id);
         if (request.message() == null || request.message().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
-        return repository.findById(id)
+        return repository.findById(LlmConfigId.of(id))
                 .map(config -> ResponseEntity.ok(testService.test(config, request.message())))
                 .orElse(ResponseEntity.notFound().build());
     }

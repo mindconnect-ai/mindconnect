@@ -2,7 +2,6 @@ package ai.mindconnect.agent.runtime.service;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -66,14 +65,11 @@ public class StatelessAgentSeeder {
 
     // ── fields ────────────────────────────────────────────────────────────────
     private final AgentDefinitionRepository repository;
-    private final Namespace namespace;
     private final String defaultLlmConfigName;
 
     public StatelessAgentSeeder(AgentDefinitionRepository repository,
-                                Namespace namespace,
                                 String defaultLlmConfigName) {
         this.repository = repository;
-        this.namespace = namespace;
         this.defaultLlmConfigName = defaultLlmConfigName;
     }
 
@@ -90,11 +86,11 @@ public class StatelessAgentSeeder {
             return;
         }
         for (SeedEntry entry : SEEDS) {
-            repository.findByName(namespace, entry.name()).ifPresentOrElse(
+            repository.findByName(entry.name()).ifPresentOrElse(
                     existing -> log.debug("Stateless agent '{}' already exists — skipping seed", entry.name()),
                     () -> {
                         AgentDefinition def = AgentDefinition.create(
-                                namespace, entry.name(), entry.description(),
+                                entry.name(), entry.description(),
                                 entry.systemPrompt(), null,
                                 defaultLlmConfigName);
                         repository.save(def);

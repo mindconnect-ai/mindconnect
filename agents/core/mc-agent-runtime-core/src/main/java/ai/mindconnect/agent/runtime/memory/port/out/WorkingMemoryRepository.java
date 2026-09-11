@@ -1,30 +1,33 @@
 package ai.mindconnect.agent.runtime.memory.port.out;
 
-import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Persists and retrieves internal session data that is never agent-visible:
- * working memory snapshots and the conversation summary used for context compression.
+ * working memory snapshots and the conversation summary used for context
+ * compression.
  *
- * All methods receive {@link AuthenticationInfo} explicitly — no in-memory index required.
+ * <p>Keyed by {@link SessionId} alone. The id carries the tenant, and the
+ * session it names carries the user — the {@code AuthenticationInfo} every
+ * method used to take repeated both and could contradict the session.
  */
 public interface WorkingMemoryRepository {
 
-    void save(UUID sessionId, AuthenticationInfo auth, WorkingMemory memory);
+    void save(SessionId session, AuthenticationInfo auth, WorkingMemory memory);
 
-    Optional<WorkingMemory> findBySessionId(UUID sessionId, AuthenticationInfo auth);
+    Optional<WorkingMemory> findBySession(SessionId session, AuthenticationInfo auth);
 
-    void delete(UUID sessionId, AuthenticationInfo auth);
+    void delete(SessionId session, AuthenticationInfo auth);
 
     // ── Summary ───────────────────────────────────────────────────────────────
 
-    void saveSummary(UUID sessionId, AuthenticationInfo auth, String summary);
+    void saveSummary(SessionId session, AuthenticationInfo auth, String summary);
 
-    Optional<String> loadSummary(UUID sessionId, AuthenticationInfo auth);
+    Optional<String> loadSummary(SessionId session, AuthenticationInfo auth);
 
-    void deleteSummary(UUID sessionId, AuthenticationInfo auth);
+    void deleteSummary(SessionId session, AuthenticationInfo auth);
 }

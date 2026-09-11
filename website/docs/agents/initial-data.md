@@ -39,9 +39,9 @@ existing install you confirm the overwrite in the CLI, while in the Admin UI you
 apply pending changes via the **Migrations** page (or edit the record in the UI).
 
 The Admin UI ships a third seed folder, `initial-data/workflows/`, installed by
-a separate mechanism (`InitialWorkflowLoader`, a plain file copy into
-`mindconnect.workflow-admin.dir`, default `data/workflows`) that never
-overwrites existing files.
+a separate mechanism (`InitialWorkflowLoader`, which saves them into the
+workflow store — with file persistence `<data.base-dir>/<namespace>/workflows`,
+default `data/local/workflows`) that never overwrites existing workflows.
 
 Load failures are logged per file and otherwise swallowed — a malformed JSON
 shows up as a missing agent, not as a startup error.

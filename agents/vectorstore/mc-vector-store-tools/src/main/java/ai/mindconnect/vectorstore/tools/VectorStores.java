@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
@@ -27,27 +28,35 @@ import java.util.Optional;
  * resolve to it.
  *
  * <p>ToolEnvironment strings: {@code vectorStoreBackend} (default
- * {@code memory}), {@code vectorStoreDir} / {@code vectorStoreUrl} /
- * {@code vectorStoreUser} / {@code vectorStorePassword},
+ * {@code memory}), {@code dataBaseDir} (the {@code memory} backend and the
+ * registry live in {@code <dataBaseDir>/<namespace>/vector-stores}),
+ * {@code vectorStoreUrl} / {@code vectorStoreUser} / {@code vectorStorePassword},
  * {@code vectorStoreEmbeddingConfig} (default {@code embeddings}).
  */
 public final class VectorStores {
 
     public static final String DEFAULT_TEMPLATE = "default";
 
+    /** The backend config key that names the namespace a store belongs to. */
+    public static final String NAMESPACE_KEY = "namespace";
+
     private final List<VectorStoreBackend> backends;
     private final VectorStoreTemplate defaultTemplate;
     private final FileVectorStoreRegistry registry;
     private final LlmEmbeddings embeddings;
     private final LlmConfigRepository configs;
+    /** Handed to every backend as the {@code namespace} config key: a store lives in one namespace. */
+    private final Namespace namespace;
 
     VectorStores(List<VectorStoreBackend> backends, VectorStoreTemplate defaultTemplate,
-                 FileVectorStoreRegistry registry, LlmEmbeddings embeddings, LlmConfigRepository configs) {
+                 FileVectorStoreRegistry registry, LlmEmbeddings embeddings, LlmConfigRepository configs,
+                 Namespace namespace) {
         this.backends = backends;
         this.defaultTemplate = defaultTemplate;
         this.registry = registry;
         this.embeddings = embeddings;
         this.configs = configs;
+        this.namespace = namespace;
     }
 
     /** Empty when the environment lacks a backend or the embedding services. */
@@ -57,18 +66,20 @@ public final class VectorStores {
         LlmEmbeddings embeddings = env.get(LlmEmbeddings.class).orElse(null);
         LlmConfigRepository configs = env.get(LlmConfigRepository.class).orElse(null);
         boolean backendKnown = backends.stream().anyMatch(b -> type.equals(b.type()));
-        if (!backendKnown || embeddings == null || configs == null) {
+        Namespace namespace = env.get(Namespace.class).orElse(null);
+        if (!backendKnown || embeddings == null || configs == null || namespace == null) {
             org.slf4j.LoggerFactory.getLogger(VectorStores.class).warn(
-                    "Vector tools disabled: backend '{}' {}, LlmEmbeddings {}, LlmConfigRepository {} "
+                    "Vector tools disabled: backend '{}' {}, LlmEmbeddings {}, LlmConfigRepository {}, Namespace {} "
                     + "(discovered backends: {})",
                     type, backendKnown ? "ok" : "not found",
                     embeddings == null ? "missing" : "ok",
                     configs == null ? "missing" : "ok",
+                    namespace == null ? "missing" : "ok",
                     backends.stream().map(VectorStoreBackend::type).toList());
             return Optional.empty();
         }
         Map<String, String> config = new HashMap<>();
-        env.getString("vectorStoreDir").ifPresent(v -> config.put("dir", v));
+        env.getString("dataBaseDir").ifPresent(v -> config.put("baseDir", v));
         env.getString("vectorStoreUrl").ifPresent(v -> config.put("url", v));
         env.getString("vectorStoreUser").ifPresent(v -> config.put("user", v));
         env.getString("vectorStorePassword").ifPresent(v -> config.put("password", v));
@@ -76,9 +87,9 @@ public final class VectorStores {
                 env.getString("vectorStoreEmbeddingConfig").orElse("embeddings"),
                 "file-ingestion",
                 Map.of("description", "Built-in template from mindconnect.vector-store.* properties"));
-        Path root = Path.of(config.getOrDefault("dir", "data/vector-stores"));
+        Path root = Path.of(config.getOrDefault("baseDir", "data")).resolve(namespace.value()).resolve("vector-stores");
         return Optional.of(new VectorStores(backends, defaultTemplate,
-                new FileVectorStoreRegistry(root), embeddings, configs));
+                new FileVectorStoreRegistry(root), embeddings, configs, namespace));
     }
 
     // ── templates & instances (registry + built-in default) ───────────────
@@ -141,6 +152,7 @@ public final class VectorStores {
                         + "' is not on the classpath"));
         Map<String, String> config = new HashMap<>(defaultTemplate.backendConfig());
         config.putAll(instance.backendConfig());
+        config.put(NAMESPACE_KEY, namespace.value());
         return backend.open(instance.name(), config);
     }
 
@@ -156,6 +168,7 @@ public final class VectorStores {
         if (backendConfig != null) {
             config.putAll(backendConfig);
         }
+        config.put(NAMESPACE_KEY, namespace.value());
         return backend.listStores(config);
     }
 

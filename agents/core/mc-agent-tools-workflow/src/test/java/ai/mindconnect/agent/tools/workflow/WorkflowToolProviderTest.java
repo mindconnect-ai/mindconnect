@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.workflow;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
@@ -17,7 +18,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -64,18 +64,21 @@ class WorkflowToolProviderTest {
 
     @BeforeEach
     void setUp() {
-        repository = new FileWorkflowDataRepository(dir);
+        repository = new FileWorkflowDataRepository(dir, "test");
         repository.save("greeting", greeting());
         repository.save("halting", halting());
 
         provider = new WorkflowToolProvider();
-        provider.bind(MapToolEnvironment.builder().string("workflowDir", dir.toString()).build());
+        provider.bind(MapToolEnvironment.builder()
+                .string("dataBaseDir", dir.toString())
+                .service(Namespace.class, new Namespace("test"))
+                .build());
     }
 
     private Tool tool(String name) {
         // Mirrors the tool catalog's probe: null userId and sessionId must be tolerated.
         Optional<Tool> tool = provider.create(name,
-                AgentTool.of(UUID.randomUUID(), name), new ToolCallScope(null, null, null, null));
+                AgentTool.of(name), new ToolCallScope(null, null, null));
         assertThat(tool).isPresent();
         return tool.get();
     }
@@ -150,10 +153,10 @@ class WorkflowToolProviderTest {
     @Test
     void unknownWorkflowYieldsNoTool() {
         assertThat(provider.create("workflow_nope",
-                AgentTool.of(UUID.randomUUID(), "workflow_nope"),
-                new ToolCallScope(null, null, null, null))).isEmpty();
+                AgentTool.of("workflow_nope"),
+                new ToolCallScope(null, null, null))).isEmpty();
         assertThat(provider.create("not_a_workflow_tool",
-                AgentTool.of(UUID.randomUUID(), "not_a_workflow_tool"),
-                new ToolCallScope(null, null, null, null))).isEmpty();
+                AgentTool.of("not_a_workflow_tool"),
+                new ToolCallScope(null, null, null))).isEmpty();
     }
 }

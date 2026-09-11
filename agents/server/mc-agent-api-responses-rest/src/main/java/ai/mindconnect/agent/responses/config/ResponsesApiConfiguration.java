@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.responses.config;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
 import ai.mindconnect.agent.responses.ModelResolver;
@@ -74,18 +73,16 @@ public class ResponsesApiConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ModelResolver responsesModelResolver(AgentDefinitionRepository agents,
-                                                LlmConfigRepository llmConfigs,
-                                                Namespace namespace) {
-        return new ModelResolver(agents, llmConfigs, namespace, defaultAgent);
+                                                LlmConfigRepository llmConfigs) {
+        return new ModelResolver(agents, llmConfigs, defaultAgent);
     }
 
     @Bean
     @ConditionalOnMissingBean
     public SessionBinder responsesSessionBinder(AgentRuntimeBackend backend,
                                                 AgentSessionService sessions,
-                                                AgentDefinitionRepository agents,
-                                                Namespace namespace) {
-        return new SessionBinder(backend, sessions, agents, namespace);
+                                                AgentDefinitionRepository agents) {
+        return new SessionBinder(backend, sessions, agents);
     }
 
     @Bean

@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.service.task;
 
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.runtime.service.round.MessageLog;
 import ai.mindconnect.agent.runtime.service.round.TurnMessage;
@@ -10,7 +13,6 @@ import ai.mindconnect.message.domain.ParticipantType;
 import ai.mindconnect.message.port.in.ConversationManager;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * {@link MessageLog} over the conversation manager — the loop's persistence,
@@ -30,15 +32,15 @@ public final class ConversationMessageLog implements MessageLog {
     private final ConversationManager conversationManager;
     /** Nullable — append-only use (tool worker) has no execution-wide history. */
     private final ConversationHistory history;
-    private final UUID userSenderId;
-    private final UUID agentSenderId;
-    private final UUID turnId;
+    private final String userSenderId;
+    private final AgentId agentSenderId;
+    private final ChatTurnId turnId;
     private final int run;
     private final TokenCounter tokenCounter;
 
     public ConversationMessageLog(ConversationManager conversationManager,
                                   ConversationHistory history,
-                                  UUID userSenderId, UUID agentSenderId, UUID turnId, int run,
+                                  String userSenderId, AgentId agentSenderId, ChatTurnId turnId, int run,
                                   TokenCounter tokenCounter) {
         this.conversationManager = conversationManager;
         this.history = history;
@@ -51,31 +53,31 @@ public final class ConversationMessageLog implements MessageLog {
 
     /** Append-only variant — no cached history, {@link #load} reads fresh. */
     public ConversationMessageLog(ConversationManager conversationManager,
-                                  UUID userSenderId, UUID agentSenderId, UUID turnId, int run,
+                                  String userSenderId, AgentId agentSenderId, ChatTurnId turnId, int run,
                                   TokenCounter tokenCounter) {
         this(conversationManager, null, userSenderId, agentSenderId, turnId, run, tokenCounter);
     }
 
     @Override
-    public List<Message> load(UUID conversationId) {
+    public List<Message> load(ConversationId conversationId) {
         return history != null
                 ? history.messages()
                 : conversationManager.loadHistory(conversationId, new PageRequest(0, LOAD_ALL));
     }
 
     @Override
-    public Message append(UUID conversationId, TurnMessage turnMessage) {
-        UUID senderId = turnMessage.senderType() == ParticipantType.USER ? userSenderId : agentSenderId;
+    public Message append(ConversationId conversationId, TurnMessage turnMessage) {
+        String senderId = turnMessage.senderType() == ParticipantType.USER ? userSenderId : agentSenderId.value();
         Message persisted = conversationManager.addMessageToConversation(
                 conversationId, senderId, turnMessage.senderType(), turnMessage.type(),
                 turnMessage.content(), turnId, run, turnMessage.metadata());
-        conversationManager.updateTokenCount(conversationId, persisted.id(),
+        conversationManager.updateTokenCount(persisted.conversationId(), persisted.id(),
                 tokenCounter.countText(turnMessage.content()));
         // Wall-clock durations ride in metadata (the executor measured them);
         // the column is what the UI reads.
         Object durationMs = turnMessage.metadata().get("durationMs");
         if (durationMs instanceof Number duration) {
-            conversationManager.updateDurationMs(conversationId, persisted.id(), duration.longValue());
+            conversationManager.updateDurationMs(persisted.conversationId(), persisted.id(), duration.longValue());
         }
         if (history != null) {
             history.append(persisted);

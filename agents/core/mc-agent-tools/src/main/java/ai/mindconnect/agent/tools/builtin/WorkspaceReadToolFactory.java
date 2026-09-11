@@ -10,6 +10,6 @@ public final class WorkspaceReadToolFactory extends WorkspaceToolFactory {
     @Override public String group() { return "workspace"; }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new WorkspaceReadTool(workspaceStore, scope.agentDefinitionId(), scope.userId(), scope.sessionId());
+        return new WorkspaceReadTool(workspaceStore, scope.agentId(), scope.userId(), scope.sessionId());
     }
 }

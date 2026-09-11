@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.channel.Subscription;
@@ -123,7 +124,8 @@ public class UserStream {
                 detach(emitter);
             }
         });
-        Subscription events = userChannels.subscribe(userId, userChannels.lastSeq(userId), event -> {
+        UserId user = UserId.of(userId);
+        Subscription events = userChannels.subscribe(user, userChannels.lastSeq(user), event -> {
             try {
                 emitter.send(SseEmitter.event()
                         .name("user")

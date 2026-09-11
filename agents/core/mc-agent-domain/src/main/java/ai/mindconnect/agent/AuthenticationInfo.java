@@ -12,7 +12,6 @@ import java.util.List;
  */
 public record AuthenticationInfo(
         UserId userId,
-        Namespace namespace,
         List<String> roles
 ) {
 
@@ -20,17 +19,14 @@ public record AuthenticationInfo(
         if (userId == null) {
             throw new IllegalArgumentException("userId must not be null");
         }
-        if (namespace == null) {
-            throw new IllegalArgumentException("namespace must not be null");
-        }
         roles = roles != null ? List.copyOf(roles) : List.of();
     }
 
-    public static AuthenticationInfo of(UserId userId, Namespace namespace) {
-        return new AuthenticationInfo(userId, namespace, List.of());
+    public static AuthenticationInfo of(UserId userId) {
+        return new AuthenticationInfo(userId, List.of());
     }
 
-    public static AuthenticationInfo of(UserId userId, Namespace namespace, List<String> roles) {
-        return new AuthenticationInfo(userId, namespace, roles);
+    public static AuthenticationInfo of(UserId userId, List<String> roles) {
+        return new AuthenticationInfo(userId, roles);
     }
 }

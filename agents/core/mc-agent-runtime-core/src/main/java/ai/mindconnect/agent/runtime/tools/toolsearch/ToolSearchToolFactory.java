@@ -64,7 +64,6 @@ public final class ToolSearchToolFactory implements ToolFactory {
     @Override
     public Tool create(AgentTool agentTool, ToolCallScope scope) {
         return new ToolSearchTool(registryRef, activations,
-                scope == null ? null : scope.namespace(),
                 scope == null ? null : scope.sessionId(),
                 names(agentTool, "assigned", false),
                 names(agentTool, "groups", true));

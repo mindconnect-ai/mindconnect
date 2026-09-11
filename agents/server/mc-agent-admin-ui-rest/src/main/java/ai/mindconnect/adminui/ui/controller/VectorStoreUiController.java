@@ -1,6 +1,5 @@
 package ai.mindconnect.adminui.ui.controller;
 
-
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.ui.model.UiAction;
@@ -144,8 +143,8 @@ public class VectorStoreUiController {
                         .dispatch("DELETE", "/admin/vector-stores/files/{id}"));
         for (ai.mindconnect.filestore.StoredFile f : fileStore.list()) {
             files.row(Map.of(
-                    "id", f.id(),
-                    "fid", f.id(),
+                    "id", f.id().value(),
+                    "fid", f.id().value(),
                     "name", f.name(),
                     "type", f.contentType() == null ? "" : f.contentType(),
                     "size", readableSize(f.size()),
@@ -247,7 +246,7 @@ public class VectorStoreUiController {
 
     @DeleteMapping("/files/{id}")
     public UiPage deleteStoredFile(@PathVariable String id) throws java.io.IOException {
-        fileStore.delete(id);
+        fileStore.delete(ai.mindconnect.filestore.FileId.of(id));
         return list("files");
     }
 
@@ -332,9 +331,6 @@ public class VectorStoreUiController {
                     .hint("e.g. jdbc:postgresql://localhost:5433/postgres"));
             group.field(UiField.text("user", "DB User", config.get("user")).asEditable());
             group.field(UiField.password("password", "DB Password", config.get("password")).asEditable());
-        } else {
-            group.field(UiField.text("dir", "Directory", config.get("dir")).asEditable()
-                    .hint("Optional override; default is mindconnect.vector-store.dir (data/vector-stores)"));
         }
         return group;
     }
@@ -347,7 +343,6 @@ public class VectorStoreUiController {
         putIfPresent(current, "url", body.str("url"));
         putIfPresent(current, "user", body.str("user"));
         putIfPresent(current, "password", body.str("password"));
-        putIfPresent(current, "dir", body.str("dir"));
         return ai.mindconnect.ui.model.UiPatch.of().patch(
                 ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-backend-cfg",
                         backendConfigGroup(body.str("backend"), current)));
@@ -365,7 +360,6 @@ public class VectorStoreUiController {
         putIfPresent(backendConfig, "url", body.str("url"));
         putIfPresent(backendConfig, "user", body.str("user"));
         putIfPresent(backendConfig, "password", body.str("password"));
-        putIfPresent(backendConfig, "dir", body.str("dir"));
         Map<String, String> metadata = new LinkedHashMap<>();
         putIfPresent(metadata, "description", body.str("description"));
         stores.registry().saveTemplate(new VectorStoreTemplate(name.trim(),

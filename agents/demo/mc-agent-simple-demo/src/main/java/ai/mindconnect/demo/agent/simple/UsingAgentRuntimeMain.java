@@ -1,5 +1,6 @@
 package ai.mindconnect.demo.agent.simple;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 
@@ -25,7 +26,7 @@ public class UsingAgentRuntimeMain {
             String question = args.length > 0 ? String.join(" ", args)
                     : "In one sentence: what is a vector store?";
             System.out.println("Q: " + question);
-            String answer = runtime.ask("demo-agent", "demo-user", question, event -> { });
+            String answer = runtime.ask("demo-agent", UserId.of("demo-user"), question, event -> { });
             System.out.println("A: " + answer);
         }
     }

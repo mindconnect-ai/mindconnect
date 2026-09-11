@@ -4,6 +4,8 @@ spring:
     banner-mode: off
 
 mindconnect:
+  # The namespace the local stores are bound to: data under <base-dir>/<namespace>.
+  namespace: ${MC_NAMESPACE:local}
   user:
     id: mcuser
   agent:

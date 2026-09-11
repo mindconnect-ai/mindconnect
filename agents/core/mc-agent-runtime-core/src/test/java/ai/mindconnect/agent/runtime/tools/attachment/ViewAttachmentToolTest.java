@@ -1,16 +1,21 @@
 package ai.mindconnect.agent.runtime.tools.attachment;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.domain.ConversationHistory;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.Participant;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -28,19 +33,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ViewAttachmentToolTest {
 
-    private static final UUID CONVERSATION = UUID.randomUUID();
-    private static final UUID SESSION = UUID.randomUUID();
-    private static final UUID AGENT = UUID.randomUUID();
-    private static final UUID TURN = UUID.randomUUID();
+    private static final ConversationId CONVERSATION = ConversationId.random();
+    private static final SessionId SESSION = SessionId.random();
+    private static final AgentId AGENT = AgentId.random();
+    private static final ChatTurnId TURN = ChatTurnId.random();
 
     private static final AttachedFile PHOTO = new AttachedFile("f-1", "photo.png", "image/png", 240);
     private static final AttachedFile NOTES = new AttachedFile("f-3", "notes.md", "text/markdown", 12);
 
     /** The conversation so far: the user's question and the assistant's tool call, in one turn. */
     private final List<Message> messages = new ArrayList<>(List.of(
-            Message.of(CONVERSATION, UUID.randomUUID(), ParticipantType.USER, MessageType.CHAT, "show me", 1)
+            Message.of(CONVERSATION, UUID.randomUUID().toString(), ParticipantType.USER, MessageType.CHAT, "show me", 1)
                     .withTurnId(TURN),
-            Message.of(CONVERSATION, AGENT, ParticipantType.AGENT, MessageType.TOOL_CALL, "{}", 2)
+            Message.of(CONVERSATION, AGENT.value(), ParticipantType.AGENT, MessageType.TOOL_CALL, "{}", 2)
                     .withTurnId(TURN).withRun(1)));
 
     private final Conversations conversations = new Conversations();
@@ -48,7 +53,7 @@ class ViewAttachmentToolTest {
     private final ViewAttachmentTool tool = new ViewAttachmentTool(sessions, conversations, SESSION);
 
     private void session(AttachedFile... files) {
-        sessions.session = new AgentSession(SESSION, AGENT, Namespace.DEFAULT, "u", CONVERSATION, "t",
+        sessions.session = new AgentSession(SESSION, AGENT, UserId.of("u"), CONVERSATION, "t",
                 SessionStatus.ACTIVE, Instant.now(), null, null, null, null, List.of(), List.of(files));
     }
 
@@ -108,29 +113,29 @@ class ViewAttachmentToolTest {
     private final class Conversations implements ConversationManager {
         final List<Message> appended = new ArrayList<>();
 
-        @Override public Conversation createConversation(Namespace ns, String topic, ConversationType type,
+        @Override public Conversation createConversation(ConversationId id, String topic, ConversationType type,
                                                          List<Participant> participants) {
             throw new UnsupportedOperationException();
         }
-        @Override public Optional<Conversation> findById(UUID id) { throw new UnsupportedOperationException(); }
-        @Override public List<Conversation> listByNamespace(Namespace ns, PageRequest page) {
+        @Override public Optional<Conversation> findById(ConversationId id) { throw new UnsupportedOperationException(); }
+        @Override public List<Conversation> list(PageRequest page) {
             throw new UnsupportedOperationException();
         }
-        @Override public List<Message> loadHistory(UUID id, PageRequest page) { return List.copyOf(messages); }
-        @Override public ConversationHistory loadCompleteHistory(UUID id) {
+        @Override public List<Message> loadHistory(ConversationId id, PageRequest page) { return List.copyOf(messages); }
+        @Override public ConversationHistory loadCompleteHistory(ConversationId id) {
             return ConversationHistory.of(id, messages);
         }
-        @Override public Message addMessageToConversation(UUID id, UUID senderId, ParticipantType senderType,
-                                                          MessageType type, String content, UUID turnId) {
+        @Override public Message addMessageToConversation(ConversationId id, String senderId, ParticipantType senderType,
+                                                          MessageType type, String content, ChatTurnId turnId) {
             throw new UnsupportedOperationException();
         }
-        @Override public Message addMessageToConversation(UUID id, UUID senderId, ParticipantType senderType,
-                                                          MessageType type, String content, UUID turnId,
+        @Override public Message addMessageToConversation(ConversationId id, String senderId, ParticipantType senderType,
+                                                          MessageType type, String content, ChatTurnId turnId,
                                                           Integer run, Map<String, Object> metadata) {
             throw new UnsupportedOperationException();
         }
-        @Override public Message addMessageToConversation(UUID id, UUID senderId, ParticipantType senderType,
-                                                          MessageType type, List<ContentPart> parts, UUID turnId,
+        @Override public Message addMessageToConversation(ConversationId id, String senderId, ParticipantType senderType,
+                                                          MessageType type, List<ContentPart> parts, ChatTurnId turnId,
                                                           Integer run, Map<String, Object> metadata) {
             Message m = Message.of(id, senderId, senderType, type, parts, messages.size() + 1)
                     .withTurnId(turnId).withMetadata(metadata);
@@ -139,22 +144,22 @@ class ViewAttachmentToolTest {
             appended.add(m);
             return m;
         }
-        @Override public void compressMessage(UUID id, UUID messageId, String stub, Integer tokens) { }
-        @Override public void updateTokenCount(UUID id, UUID messageId, int tokenCount) { }
-        @Override public void updateDurationMs(UUID id, UUID messageId, long durationMs) { }
-        @Override public int deleteMessages(UUID id, int fromSeq, int toSeq) { return 0; }
+        @Override public void compressMessage(ConversationId id, MessageId messageId, String stub, Integer tokens) { }
+        @Override public void updateTokenCount(ConversationId id, MessageId messageId, int tokenCount) { }
+        @Override public void updateDurationMs(ConversationId id, MessageId messageId, long durationMs) { }
+        @Override public int deleteMessages(ConversationId id, int fromSeq, int toSeq) { return 0; }
     }
 
     private static final class Sessions implements AgentSessionRepository {
         AgentSession session;
 
         @Override public AgentSession save(AgentSession s) { session = s; return s; }
-        @Override public Optional<AgentSession> findById(UUID id) {
+        @Override public Optional<AgentSession> findById(SessionId id) {
             return Optional.ofNullable(session).filter(s -> s.id().equals(id));
         }
-        @Override public List<AgentSession> findByAgentDefinitionId(UUID a, Namespace ns, String u) { return List.of(); }
-        @Override public List<AgentSession> findByUser(Namespace ns, String u) { return List.of(); }
-        @Override public List<AgentSession> findByParentSessionId(UUID p) { return List.of(); }
-        @Override public void deleteById(UUID id) { }
+        @Override public List<AgentSession> findByAgent(AgentId a, UserId u) { return List.of(); }
+        @Override public List<AgentSession> findByUser(UserId u) { return List.of(); }
+        @Override public List<AgentSession> findByParentSession(SessionId p) { return List.of(); }
+        @Override public void deleteById(SessionId id) { }
     }
 }

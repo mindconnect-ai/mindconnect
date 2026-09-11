@@ -22,7 +22,6 @@ import java.time.Instant;
  */
 public record Session(
         String id,
-        String namespace,
         String conversationId,
         String agentName,
         Instant createdAt

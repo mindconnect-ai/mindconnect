@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
+
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -14,7 +17,6 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Stores conversation summaries under:
@@ -32,8 +34,8 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
     private final Path baseDir;
     private final ObjectMapper mapper;
 
-    public FileConversationSummaryRepository(Path baseDir) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+    public FileConversationSummaryRepository(Path baseDir, Namespace namespace) {
+        this.baseDir = baseDir.resolve(namespace.value()).toAbsolutePath().normalize();
         this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
@@ -55,14 +57,14 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
     }
 
     @Override
-    public List<ConversationSummary> findByConversationId(UUID conversationId) {
+    public List<ConversationSummary> findByConversation(ConversationId conversationId) {
         Path file = fileFor(conversationId);
         if (!Files.exists(file)) return List.of();
         return load(file);
     }
 
     @Override
-    public void deleteByConversationId(UUID conversationId) {
+    public void deleteByConversation(ConversationId conversationId) {
         Path file = fileFor(conversationId);
         try {
             Files.deleteIfExists(file);
@@ -73,17 +75,19 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private Path fileFor(UUID conversationId) {
+    private Path fileFor(ConversationId conversationId) {
         return baseDir
                 .resolve("conversations")
-                .resolve(conversationId.toString())
+                .resolve(conversationId.value())
                 .resolve(FILE_NAME);
     }
 
+    /** Summaries written before the namespace was recorded take it from the conversation asked for. */
     private List<ConversationSummary> load(Path file) {
         if (!Files.exists(file)) return new ArrayList<>();
         try {
-            List<ConversationSummary> list = mapper.readValue(file.toFile(), LIST_TYPE);
+            List<ConversationSummary> list = mapper.readerFor(LIST_TYPE)
+                    .readValue(file.toFile());
             list.sort(Comparator.comparingInt(ConversationSummary::fromSequenceNum));
             return new ArrayList<>(list);
         } catch (IOException e) {

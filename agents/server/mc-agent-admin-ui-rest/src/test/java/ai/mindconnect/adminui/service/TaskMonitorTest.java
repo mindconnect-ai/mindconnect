@@ -10,7 +10,10 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.TaskSubmission;
@@ -23,7 +26,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -38,9 +40,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TaskMonitorTest {
 
-    private static final Namespace NS = new Namespace("local");
-    private static final UUID AGENT_ID = UUID.randomUUID();
-    private static final UUID ALICE_SESSION = UUID.randomUUID();
+    private static final AgentId AGENT_ID = AgentId.random();
+    private static final SessionId ALICE_SESSION = SessionId.random();
 
     private LocalTaskQueue queue;
     private TaskMonitor monitor;
@@ -65,11 +66,11 @@ class TaskMonitorTest {
         });
 
         var definitions = new InMemoryAgentDefinitionRepository();
-        definitions.save(new AgentDefinition(AGENT_ID, NS, "Scout", "A test agent",
+        definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
                 "assistants", "bot", "prompt", null, "cfg", 5, null,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
         var sessions = new InMemoryAgentSessionRepository();
-        sessions.save(new AgentSession(ALICE_SESSION, AGENT_ID, NS, "alice", UUID.randomUUID(),
+        sessions.save(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"), ConversationId.random(),
                 "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
                 null, null, null, null, null, null, null));
 
@@ -85,7 +86,7 @@ class TaskMonitorTest {
 
     private String submitTurn() {
         return queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE,
-                Map.of(AgentTurnWorker.SESSION_ID, ALICE_SESSION.toString(), AgentTurnWorker.DEPTH, 0)));
+                Map.of(AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0)));
     }
 
     @Test

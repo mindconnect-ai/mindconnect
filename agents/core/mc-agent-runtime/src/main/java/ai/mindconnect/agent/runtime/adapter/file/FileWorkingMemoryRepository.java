@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.AuthenticationInfo;
@@ -11,7 +14,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Stores internal session data under:
@@ -29,12 +31,12 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
     private final Path baseDir;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public FileWorkingMemoryRepository(Path baseDir) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+    public FileWorkingMemoryRepository(Path baseDir, Namespace namespace) {
+        this.baseDir = baseDir.resolve(namespace.value()).toAbsolutePath().normalize();
     }
 
     @Override
-    public void save(UUID sessionId, AuthenticationInfo auth, WorkingMemory memory) {
+    public void save(SessionId sessionId, AuthenticationInfo auth, WorkingMemory memory) {
         Path file = sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE);
         try {
             Files.createDirectories(file.getParent());
@@ -46,7 +48,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
     }
 
     @Override
-    public Optional<WorkingMemory> findBySessionId(UUID sessionId, AuthenticationInfo auth) {
+    public Optional<WorkingMemory> findBySession(SessionId sessionId, AuthenticationInfo auth) {
         Path file = sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE);
         if (!Files.exists(file)) return Optional.empty();
         try {
@@ -58,13 +60,13 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
     }
 
     @Override
-    public void delete(UUID sessionId, AuthenticationInfo auth) {
+    public void delete(SessionId sessionId, AuthenticationInfo auth) {
         deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE));
         deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE));
     }
 
     @Override
-    public void saveSummary(UUID sessionId, AuthenticationInfo auth, String summary) {
+    public void saveSummary(SessionId sessionId, AuthenticationInfo auth, String summary) {
         Path file = sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE);
         try {
             Files.createDirectories(file.getParent());
@@ -76,7 +78,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
     }
 
     @Override
-    public Optional<String> loadSummary(UUID sessionId, AuthenticationInfo auth) {
+    public Optional<String> loadSummary(SessionId sessionId, AuthenticationInfo auth) {
         Path file = sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE);
         if (!Files.exists(file)) return Optional.empty();
         try {
@@ -89,18 +91,18 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
     }
 
     @Override
-    public void deleteSummary(UUID sessionId, AuthenticationInfo auth) {
+    public void deleteSummary(SessionId sessionId, AuthenticationInfo auth) {
         deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private Path sessionDir(String userId, UUID sessionId) {
+    private Path sessionDir(String userId, SessionId sessionId) {
         return baseDir
                 .resolve("users")
                 .resolve(sanitize(userId))
                 .resolve("sessions")
-                .resolve(sessionId.toString());
+                .resolve(sessionId.value());
     }
 
     private void deleteFile(Path file) {

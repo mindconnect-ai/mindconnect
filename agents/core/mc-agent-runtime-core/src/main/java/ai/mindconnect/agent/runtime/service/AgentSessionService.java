@@ -8,10 +8,13 @@ import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.AuthenticationInfo;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
@@ -25,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * CRUD operations on {@link AgentSession} — opening new chats, looking up,
@@ -73,20 +75,8 @@ public class AgentSessionService {
      * Opens a brand-new top-level chat session for the given agent: creates
      * a conversation with USER/AGENT participants and persists the session.
      */
-    public AgentSession openChat(UUID agentDefinitionId, Namespace namespace, String userId) {
-        return openChat(agentDefinitionId, namespace, userId, null, null, null);
-    }
-
-    /**
-     * Back-compat overload (no parent tool-call id). Kept so existing
-     * call-sites that don't yet thread the {@code tool_call_id} through
-     * keep compiling. Prefer the four-arg variant below for sub-agent
-     * spawns so the UI can nest the spawned session's activity under
-     * the exact {@code run_agent} card that started it.
-     */
-    public AgentSession openChat(UUID agentDefinitionId, Namespace namespace, String userId,
-                                  UUID parentSessionId, UUID parentTurnId) {
-        return openChat(agentDefinitionId, namespace, userId, parentSessionId, parentTurnId, null);
+    public AgentSession openChat(AgentId agentDefinitionId, UserId userId) {
+        return openChat(agentDefinitionId, userId, null, null, null);
     }
 
     /**
@@ -101,21 +91,22 @@ public class AgentSessionService {
      * <p>
      * Pass {@code null} for all three parents on top-level (user-initiated) sessions.
      */
-    public AgentSession openChat(UUID agentDefinitionId, Namespace namespace, String userId,
-                                  UUID parentSessionId, UUID parentTurnId,
+    public AgentSession openChat(AgentId agentDefinitionId, UserId userId,
+                                  SessionId parentSessionId, ChatTurnId parentTurnId,
                                   String parentToolCallId) {
         AgentDefinition def = definitionRepository.findById(agentDefinitionId)
                 .orElseThrow(() -> DomainException.notFound("AgentDefinition", agentDefinitionId.toString()));
 
+        ConversationId conversationId = ConversationId.random();
         List<Participant> participants = List.of(
-                Participant.user(UUID.randomUUID(), userId, userId),
-                Participant.agent(UUID.randomUUID(), agentDefinitionId.toString(), def.name())
+                Participant.user(conversationId, userId, userId.value()),
+                Participant.agent(conversationId, agentDefinitionId, def.name())
         );
-        var conversation = conversationManager.createConversation(
-                namespace, "Chat with " + def.name(), ConversationType.USER_AGENT, participants);
+        conversationManager.createConversation(conversationId, "Chat with " + def.name(),
+                ConversationType.USER_AGENT, participants);
 
-        AgentSession session = AgentSession.startSubAgent(agentDefinitionId, namespace, userId,
-                conversation.id(), parentSessionId, parentTurnId, parentToolCallId);
+        AgentSession session = AgentSession.startSubAgent(agentDefinitionId, userId,
+                conversationId, parentSessionId, parentTurnId, parentToolCallId);
         AgentSession saved = sessionRepository.save(session);
         // A sub-agent's session is the parent turn's business, not news for
         // the user's session list.
@@ -137,17 +128,17 @@ public class AgentSessionService {
      * that id resolves to nothing in the registry — which is the point: the
      * chat is not findable under any agent, because it belongs to none.
      */
-    public AgentSession openChat(SessionAgent agent,
-                                 Namespace namespace, String userId) {
+    public AgentSession openChat(SessionAgent agent, UserId userId) {
+        ConversationId conversationId = ConversationId.random();
         List<Participant> participants = List.of(
-                Participant.user(UUID.randomUUID(), userId, userId),
-                Participant.agent(UUID.randomUUID(), agent.id().toString(), agent.label())
+                Participant.user(conversationId, userId, userId.value()),
+                Participant.agent(conversationId, agent.id(), agent.label())
         );
-        var conversation = conversationManager.createConversation(
-                namespace, "Chat with " + agent.label(), ConversationType.USER_AGENT, participants);
+        conversationManager.createConversation(conversationId, "Chat with " + agent.label(),
+                ConversationType.USER_AGENT, participants);
 
         AgentSession session = AgentSession
-                .start(agent.id(), namespace, userId, conversation.id())
+                .start(agent.id(), userId, conversationId)
                 .withSessionAgents(List.of(agent));
         AgentSession saved = sessionRepository.save(session);
         userChannels.publish(userId, new UserEvent
@@ -167,10 +158,10 @@ public class AgentSessionService {
      * said by that agent. What the new agent does not inherit is the previous
      * one's workspace — a different agent, a different memory.
      */
-    public AgentSession replaceSessionAgent(UUID sessionId,
+    public AgentSession replaceSessionAgent(SessionId sessionId,
                                             SessionAgent agent) {
         AgentSession session = findSession(sessionId);
-        AgentSession moved = new AgentSession(session.id(), agent.id(), session.namespace(),
+        AgentSession moved = new AgentSession(session.id(), agent.id(),
                 session.userId(), session.conversationId(), session.title(), session.status(),
                 session.startedAt(), session.completedAt(), session.parentSessionId(),
                 session.parentTurnId(), session.parentToolCallId(), session.activatedTools(),
@@ -178,11 +169,11 @@ public class AgentSessionService {
         return sessionRepository.save(moved);
     }
 
-    public List<AgentSession> listSessions(UUID agentDefinitionId, Namespace namespace, String userId) {
-        return sessionRepository.findByAgentDefinitionId(agentDefinitionId, namespace, userId);
+    public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
+        return sessionRepository.findByAgent(agentDefinitionId, userId);
     }
 
-    public AgentSession findSession(UUID sessionId) {
+    public AgentSession findSession(SessionId sessionId) {
         return sessionRepository.findById(sessionId)
                 .orElseThrow(() -> DomainException.notFound("AgentSession", sessionId.toString()));
     }
@@ -195,7 +186,7 @@ public class AgentSessionService {
      * sent included. The runtime has always read the conversation entire;
      * the display now agrees with it.
      */
-    public List<Message> loadHistory(UUID sessionId) {
+    public List<Message> loadHistory(SessionId sessionId) {
         AgentSession session = findSession(sessionId);
         return conversationManager.loadHistory(session.conversationId(), new PageRequest(0, LOAD_ALL));
     }
@@ -205,18 +196,18 @@ public class AgentSessionService {
      * memory snapshot, conversation summaries). Conversation messages
      * themselves belong to the conversation, not the session, and are kept.
      */
-    public void deleteSession(UUID sessionId) {
+    public void deleteSession(SessionId sessionId) {
         AgentSession session = findSession(sessionId);
-        AuthenticationInfo auth = AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
+        AuthenticationInfo auth = AuthenticationInfo.of(session.userId());
         workingMemoryRepository.delete(sessionId, auth);
-        summaryRepository.deleteByConversationId(session.conversationId());
+        summaryRepository.deleteByConversation(session.conversationId());
         todoListRepository.deleteBySession(sessionId);
         approvalStore.deleteForSession(sessionId);
         sessionRepository.deleteById(sessionId);
         log.info("Deleted session {} and associated data", sessionId);
     }
 
-    public int deleteMessages(UUID sessionId, int fromSeq, int toSeq) {
+    public int deleteMessages(SessionId sessionId, int fromSeq, int toSeq) {
         AgentSession session = findSession(sessionId);
         if (fromSeq > toSeq) throw new IllegalArgumentException("fromSeq must be <= toSeq");
         int count = conversationManager.deleteMessages(session.conversationId(), fromSeq, toSeq);
@@ -229,7 +220,7 @@ public class AgentSessionService {
      * Sets the title of the given session. Used by the title-generation flow
      * after the first user/agent exchange completes.
      */
-    public AgentSession updateTitle(UUID sessionId, String title) {
+    public AgentSession updateTitle(SessionId sessionId, String title) {
         AgentSession session = findSession(sessionId);
         return sessionRepository.save(session.withTitle(title));
     }
@@ -239,14 +230,14 @@ public class AgentSessionService {
      * session run without asking. Per tool name, never per parameter set —
      * see {@link AgentSession#approvedTools()}.
      */
-    public AgentSession approveToolForSession(UUID sessionId, String toolName) {
+    public AgentSession approveToolForSession(SessionId sessionId, String toolName) {
         AgentSession session = findSession(sessionId);
         return sessionRepository.save(session.withApprovedTool(toolName));
     }
 
     /** The sub-sessions spawned from {@code parentSessionId} by run_agent calls. */
-    public java.util.List<AgentSession> subSessions(UUID parentSessionId) {
-        return sessionRepository.findByParentSessionId(parentSessionId);
+    public java.util.List<AgentSession> subSessions(SessionId parentSessionId) {
+        return sessionRepository.findByParentSession(parentSessionId);
     }
 
     /**
@@ -255,7 +246,7 @@ public class AgentSessionService {
      * the root covers every sub-agent of that conversation — a sub-session
      * lives exactly one run_agent call, so storing on it would be pointless.
      */
-    public boolean isToolApproved(UUID sessionId, String toolName) {
+    public boolean isToolApproved(SessionId sessionId, String toolName) {
         AgentSession session = findSession(sessionId);
         while (session != null) {
             if (session.approvedTools().contains(toolName)) return true;
@@ -266,7 +257,7 @@ public class AgentSessionService {
     }
 
     /** The topmost session of this session's parent chain (itself when root). */
-    public AgentSession rootSession(UUID sessionId) {
+    public AgentSession rootSession(SessionId sessionId) {
         AgentSession session = findSession(sessionId);
         while (session.parentSessionId() != null) {
             AgentSession parent = sessionRepository.findById(session.parentSessionId()).orElse(null);
@@ -277,7 +268,7 @@ public class AgentSessionService {
     }
 
     /** How many parent hops above this session — 0 for a root session. */
-    public int sessionDepth(UUID sessionId) {
+    public int sessionDepth(SessionId sessionId) {
         int depth = 0;
         AgentSession session = findSession(sessionId);
         while (session.parentSessionId() != null) {

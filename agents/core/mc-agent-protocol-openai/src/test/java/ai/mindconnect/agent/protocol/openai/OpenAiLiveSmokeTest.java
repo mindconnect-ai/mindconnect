@@ -30,7 +30,7 @@ class OpenAiLiveSmokeTest {
 
     @Test
     void blockingChat() {
-        Session session = backend.openSessionForAgent("smoke", "echo");
+        Session session = backend.openSessionForAgent("echo");
         Response r = backend.create(ResponseRequest.text(session.id(), "Wer ist Justin Biber"));
         System.out.println("Response:" + r.outputText());
         assertThat(r.status()).isEqualTo(ResponseStatus.COMPLETED);
@@ -39,7 +39,7 @@ class OpenAiLiveSmokeTest {
 
     @Test
     void toolLoopExecutesLocalTool() {
-        Session session = backend.openSessionForAgent("smoke", "echo");
+        Session session = backend.openSessionForAgent("echo");
         ToolHandler weather = ToolHandler.of(
                 new ToolDefinition("get_weather", "Current weather for a city",
                         Map.of("type", "object",

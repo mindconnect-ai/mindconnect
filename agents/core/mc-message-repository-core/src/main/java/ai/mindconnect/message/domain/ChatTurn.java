@@ -2,7 +2,6 @@ package ai.mindconnect.message.domain;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * One logical exchange: a user CHAT message and everything it caused — tool
@@ -25,7 +24,7 @@ public record ChatTurn(Message userMessage, List<Message> messages) {
     }
 
     /** The turn's id — stable across approval resumes. Null only on legacy data. */
-    public UUID turnId() {
+    public ChatTurnId turnId() {
         return userMessage.turnId();
     }
 

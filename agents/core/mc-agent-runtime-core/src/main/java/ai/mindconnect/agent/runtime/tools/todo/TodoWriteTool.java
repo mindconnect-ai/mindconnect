@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.tools.todo;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.util.ArrayList;
@@ -22,9 +23,9 @@ public class TodoWriteTool implements Tool {
     public static final String NAME = "todo_write";
 
     private final TodoListService service;
-    private final UUID sessionId;
+    private final SessionId sessionId;
 
-    public TodoWriteTool(TodoListService service, UUID sessionId) {
+    public TodoWriteTool(TodoListService service, SessionId sessionId) {
         this.service = service;
         this.sessionId = sessionId;
     }

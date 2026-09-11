@@ -9,6 +9,7 @@ import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.adminui.ui.controller.ToolCatalogUiController;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
@@ -54,7 +55,7 @@ public final class ToolTestComponent implements UiComponent {
     }
 
     @Override
-    public String id() { return "tool-test-" + tool.id(); }
+    public String id() { return "tool-test-" + tool.id().value(); }
 
     public String title() { return "Test " + tool.name(); }
 
@@ -74,7 +75,7 @@ public final class ToolTestComponent implements UiComponent {
                 .asEditable().asRequired()
                 .hint("A JSON object passed to Tool.execute(Map). Empty object = no arguments."))
             .action(UiAction.primary("send", "Send").icon("send")
-                    .onClick(trigger(on(AgentUiController.class).runToolTest(agent.id(), tool.id(), null),
+                    .onClick(trigger(on(AgentUiController.class).runToolTest(agent.id().value(), tool.id().value(), null),
                             id())))
             // Close only removes the overlay (a tiny remove-patch) — never a
             // page reload, so the page state behind the dialog survives.
@@ -93,7 +94,7 @@ public final class ToolTestComponent implements UiComponent {
      * just won't see the schema box.
      */
     private String renderSchema() {
-        var resolved = toolRegistry.resolve(tool, agent.namespace(), null, null);
+        var resolved = toolRegistry.resolve(tool, ToolCallScope.detached(null));
         if (resolved.isEmpty()) return null;
         try {
             return MAPPER.writerWithDefaultPrettyPrinter()

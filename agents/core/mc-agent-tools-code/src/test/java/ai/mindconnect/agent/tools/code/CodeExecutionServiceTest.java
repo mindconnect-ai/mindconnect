@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.tools.code;
 
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
@@ -15,7 +18,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -200,16 +202,16 @@ class CodeExecutionServiceTest {
                 "dataBaseDir", dir.resolve("data").toString())));
         service = null; // factory owns its service; nothing extra to close here
 
-        var agentTool = new ai.mindconnect.agent.tool.AgentTool(
-                null, null, "code_execute", null, Map.of("network", "bridge"), true);
-        Tool bridged = factory.create(agentTool, new ToolCallScope(null, "u", UUID.randomUUID(), null));
+        var agentTool = AgentTool.of("code_execute", null, Map.of("network", "bridge"));
+        Tool bridged = factory.create(agentTool,
+                new ToolCallScope(UserId.of("u"), SessionId.random(), null));
         assertThat(bridged.description()).contains("Network access is enabled");
         bridged.execute(Map.of("language", "python", "code", "print(1)"));
         assertThat(calls()).anySatisfy(c -> assertThat(c).startsWith("run ").contains("--network bridge"));
 
-        var invalid = new ai.mindconnect.agent.tool.AgentTool(
-                null, null, "code_execute", null, Map.of("network", "host"), true);
-        Tool fallback = factory.create(invalid, new ToolCallScope(null, "u", UUID.randomUUID(), null));
+        var invalid = AgentTool.of("code_execute", null, Map.of("network", "host"));
+        Tool fallback = factory.create(invalid,
+                new ToolCallScope(UserId.of("u"), SessionId.random(), null));
         assertThat(fallback.description()).contains("NO network access");
     }
 
@@ -246,11 +248,12 @@ class CodeExecutionServiceTest {
                 "dataBaseDir", dir.resolve("data").toString())));
         assertThat(withRuntime.isAvailable()).isTrue();
 
-        UUID sessionId = UUID.randomUUID();
-        Tool tool = withRuntime.create(null, new ToolCallScope(null, "user", sessionId, null));
+        SessionId sessionId = SessionId.random();
+        Tool tool = withRuntime.create(null, new ToolCallScope(UserId.of("user"), sessionId, null));
         assertThat(tool.execute(Map.of("language", "node", "code", "console.log(1)")))
                 .contains("ran[console.log(1)]");
-        assertThat(dir.resolve("data/code-exec").resolve(sessionId.toString())).isDirectory();
+        // The scratch dir is keyed by the session id's bare value, as before the ids were typed.
+        assertThat(dir.resolve("data/code-exec").resolve(sessionId.value())).isDirectory();
     }
 
     private static ToolEnvironment env(Map<String, String> strings) {

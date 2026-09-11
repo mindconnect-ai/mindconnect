@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.file;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.FileStoreBackend;
@@ -38,14 +39,25 @@ public class FilePersistenceAutoConfiguration {
     private static final Logger log = LoggerFactory.getLogger(FilePersistenceAutoConfiguration.class);
 
     /**
+     * The one namespace this JVM runs in ({@code mindconnect.namespace}, default
+     * {@code local}). Every repository is bound to it when it is built; nothing
+     * above the repositories names it.
+     */
+    @Bean
+    Namespace mindconnectNamespace(@Value("${mindconnect.namespace:local}") String namespace) {
+        return new Namespace(namespace);
+    }
+
+    /**
      * Encrypted at rest when the application has an {@link EncryptionHelper};
      * plain otherwise — which the CLI and embedders without a key accept.
      */
     @Bean
     @ConditionalOnMissingBean(LlmConfigRepository.class)
     LlmConfigRepository llmConfigRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                            Namespace namespace,
                                             ObjectProvider<EncryptionHelper> encryption) {
-        LlmConfigRepository files = new FileLlmConfigRepository(Path.of(baseDir));
+        LlmConfigRepository files = new FileLlmConfigRepository(Path.of(baseDir), namespace);
         EncryptionHelper helper = encryption.getIfAvailable();
         if (helper == null) {
             log.warn("No EncryptionHelper — LLM credentials are stored unencrypted under {}", baseDir);
@@ -54,15 +66,16 @@ public class FilePersistenceAutoConfiguration {
         return new EncryptingLlmConfigRepository(files, helper);
     }
 
-    /** Uploads: the {@code filesystem} backend under {@code mindconnect.file-store.dir} unless configured otherwise. */
+    /** Uploads: the {@code filesystem} backend under {@code <mindconnect.data.base-dir>/<namespace>/files} unless configured otherwise. */
     @Bean
     @ConditionalOnMissingBean(FileStore.class)
     FileStore fileStore(@Value("${mindconnect.file-store.backend:filesystem}") String backend,
-                        @Value("${mindconnect.file-store.dir:data/files}") String dir) {
+                        @Value("${mindconnect.data.base-dir:data}") String baseDir,
+                        Namespace namespace) {
         return FileStoreBackend.byType(backend)
                 .orElseThrow(() -> new IllegalStateException("No file-store backend '" + backend
                         + "' on the classpath (available: "
                         + FileStoreBackend.discover().stream().map(FileStoreBackend::type).toList() + ")"))
-                .open(Map.of("dir", dir));
+                .open(Map.of("baseDir", baseDir, "namespace", namespace.value()));
     }
 }

@@ -1,5 +1,8 @@
 package ai.mindconnect.adminui.service;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
@@ -25,7 +28,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledExecutorService;
@@ -71,7 +73,7 @@ public class TaskMonitor implements TaskListener {
     private static final int QUERY_LIMIT = 1000;
 
     /** One task, resolved into words for a person: what it does and for whom. */
-    public record TaskView(TaskRecord task, String label, String detail, String owner, UUID sessionId) {
+    public record TaskView(TaskRecord task, String label, String detail, String owner, SessionId sessionId) {
         public String id() { return task.id(); }
         public TaskStatus status() { return task.status(); }
         public boolean active() { return !task.status().terminal(); }
@@ -174,8 +176,8 @@ public class TaskMonitor implements TaskListener {
 
     /** The board right now — for the dialog; the stream sends the same. */
     public Snapshot snapshot() {
-        Map<UUID, Optional<AgentSession>> sessionCache = new HashMap<>();
-        Map<UUID, Optional<AgentDefinition>> definitionCache = new HashMap<>();
+        Map<SessionId, Optional<AgentSession>> sessionCache = new HashMap<>();
+        Map<AgentId, Optional<AgentDefinition>> definitionCache = new HashMap<>();
 
         List<TaskRecord> active = new ArrayList<>();
         active.addAll(queue.byStatus(TaskStatus.RUNNING, QUERY_LIMIT));
@@ -197,9 +199,9 @@ public class TaskMonitor implements TaskListener {
     }
 
     private TaskView view(TaskRecord task,
-                          Map<UUID, Optional<AgentSession>> sessionCache,
-                          Map<UUID, Optional<AgentDefinition>> definitionCache) {
-        UUID sessionId = uuid(task.payload().get(AgentTurnWorker.SESSION_ID));
+                          Map<SessionId, Optional<AgentSession>> sessionCache,
+                          Map<AgentId, Optional<AgentDefinition>> definitionCache) {
+        SessionId sessionId = sessionIdOf(task);
         Optional<AgentSession> session = sessionId == null
                 ? Optional.empty()
                 : sessionCache.computeIfAbsent(sessionId, this::findSession);
@@ -221,7 +223,7 @@ public class TaskMonitor implements TaskListener {
             label = task.type();
             detail = null;
         }
-        String owner = session.map(AgentSession::userId).orElse(null);
+        String owner = session.map(AgentSession::userId).map(UserId::value).orElse(null);
         return new TaskView(task, label, detail, owner, sessionId);
     }
 
@@ -237,7 +239,7 @@ public class TaskMonitor implements TaskListener {
         return out.toString();
     }
 
-    private Optional<AgentSession> findSession(UUID id) {
+    private Optional<AgentSession> findSession(SessionId id) {
         try {
             return sessions.findById(id);
         } catch (RuntimeException e) {
@@ -245,7 +247,7 @@ public class TaskMonitor implements TaskListener {
         }
     }
 
-    private Optional<AgentDefinition> findDefinition(UUID id) {
+    private Optional<AgentDefinition> findDefinition(AgentId id) {
         try {
             return definitions.findById(id);
         } catch (RuntimeException e) {
@@ -253,10 +255,15 @@ public class TaskMonitor implements TaskListener {
         }
     }
 
-    private static UUID uuid(Object value) {
+    /**
+     * The session a task runs for. The payload carries the id's value; a
+     * payload missing it, or holding a value that is no id, has no session.
+     */
+    private static SessionId sessionIdOf(TaskRecord task) {
+        Object value = task.payload().get(AgentTurnWorker.SESSION_ID);
         if (value == null) return null;
         try {
-            return UUID.fromString(String.valueOf(value));
+            return SessionId.of(String.valueOf(value));
         } catch (IllegalArgumentException e) {
             return null;
         }

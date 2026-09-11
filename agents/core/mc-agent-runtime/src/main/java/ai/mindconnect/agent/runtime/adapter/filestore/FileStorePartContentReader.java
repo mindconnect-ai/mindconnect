@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.filestore;
 
+import ai.mindconnect.filestore.FileId;
+
 import ai.mindconnect.agent.runtime.port.out.PartContentReader;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -28,7 +30,7 @@ public final class FileStorePartContentReader implements PartContentReader {
     }
 
     @Override
-    public Optional<Content> read(String fileId) {
+    public Optional<Content> read(FileId fileId) {
         if (fileId == null) return Optional.empty();
         StoredFile file = fileStore.find(fileId).orElse(null);
         if (file == null) return Optional.empty();

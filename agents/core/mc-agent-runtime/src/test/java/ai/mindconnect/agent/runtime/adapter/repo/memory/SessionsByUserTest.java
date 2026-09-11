@@ -1,11 +1,13 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -15,13 +17,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SessionsByUserTest {
 
-    private static final Namespace NS = new Namespace("local");
     private final InMemoryAgentSessionRepository repo = new InMemoryAgentSessionRepository();
 
-    private AgentSession save(String user, Instant startedAt, UUID parent) {
-        var base = AgentSession.startSubAgent(UUID.randomUUID(), NS, user, UUID.randomUUID(),
+    private AgentSession save(String user, Instant startedAt, SessionId parent) {
+        var base = AgentSession.startSubAgent(AgentId.random(), UserId.of(user), ConversationId.random(),
                 parent, null, parent == null ? null : "call-1");
-        var withTime = new AgentSession(base.id(), base.agentDefinitionId(), base.namespace(),
+        var withTime = new AgentSession(base.id(), base.agentDefinitionId(),
                 base.userId(), base.conversationId(), base.title(), base.status(),
                 startedAt, base.completedAt(), base.parentSessionId(), base.parentTurnId(),
                 base.parentToolCallId(), base.activatedTools(), base.attachedFiles(),
@@ -36,7 +37,7 @@ class SessionsByUserTest {
         save("alice", Instant.parse("2026-08-29T11:00:00Z"), newer.id());   // sub-agent
         save("bob",   Instant.parse("2026-08-29T12:00:00Z"), null);         // someone else
 
-        assertThat(repo.findByUser(NS, "alice"))
+        assertThat(repo.findByUser(UserId.of("alice")))
                 .extracting(AgentSession::id)
                 .containsExactly(newer.id(), older.id());
     }
@@ -48,13 +49,13 @@ class SessionsByUserTest {
 
         // One unreadable timestamp should misplace a row, not throw — the
         // sidebar is the user's whole history.
-        assertThat(repo.findByUser(NS, "alice"))
+        assertThat(repo.findByUser(UserId.of("alice")))
                 .extracting(AgentSession::id)
                 .containsExactly(dated.id(), undated.id());
     }
 
     @Test
     void noSessionsIsAnEmptyList() {
-        assertThat(repo.findByUser(NS, "nobody")).isEmpty();
+        assertThat(repo.findByUser(UserId.of("nobody"))).isEmpty();
     }
 }

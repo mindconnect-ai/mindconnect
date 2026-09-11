@@ -1,6 +1,8 @@
 package ai.mindconnect.message.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
+
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.port.out.ConversationRepository;
@@ -13,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Stores conversations under:
@@ -30,8 +31,8 @@ public class FileConversationRepository implements ConversationRepository {
     private final Path baseDir;
     private final ObjectMapper objectMapper;
 
-    public FileConversationRepository(Path messageStorageDir, ObjectMapper objectMapper) {
-        this.baseDir = messageStorageDir.resolve("conversations").toAbsolutePath();
+    public FileConversationRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
+        this.baseDir = messageStorageDir.resolve(namespace.value()).resolve("conversations").toAbsolutePath();
         this.objectMapper = objectMapper;
         try {
             Files.createDirectories(this.baseDir);
@@ -54,32 +55,33 @@ public class FileConversationRepository implements ConversationRepository {
     }
 
     @Override
-    public Optional<Conversation> findById(UUID id) {
+    public Optional<Conversation> findById(ConversationId id) {
         Path file = fileFor(id);
         if (!Files.exists(file)) return Optional.empty();
+        Conversation conversation = read(file);
+        // The directory is flat: a file of another tenant with the same value is not this conversation.
+        return conversation.id().equals(id) ? Optional.of(conversation) : Optional.empty();
+    }
+
+    /** A conversation written before the namespace was recorded takes the one asked for. */
+    private Conversation read(Path file) {
         try {
-            return Optional.of(objectMapper.readValue(file.toFile(), Conversation.class));
+            return objectMapper.readerFor(Conversation.class)
+                    .readValue(file.toFile());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     @Override
-    public List<Conversation> findByNamespace(Namespace namespace, PageRequest page) {
+    public List<Conversation> findAll(PageRequest page) {
         if (!Files.exists(baseDir)) return List.of();
         try (var stream = Files.list(baseDir)) {
             return stream
                     .filter(Files::isDirectory)
                     .map(d -> d.resolve(FILE_NAME))
                     .filter(Files::exists)
-                    .map(f -> {
-                        try {
-                            return objectMapper.readValue(f.toFile(), Conversation.class);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })
-                    .filter(c -> c.namespace().equals(namespace))
+                    .map(f -> read(f))
                     .sorted((a, b) -> b.createdAt().compareTo(a.createdAt()))
                     .skip(page.offset())
                     .limit(page.size())
@@ -89,7 +91,7 @@ public class FileConversationRepository implements ConversationRepository {
         }
     }
 
-    private Path fileFor(UUID id) {
-        return baseDir.resolve(id.toString()).resolve(FILE_NAME);
+    private Path fileFor(ConversationId id) {
+        return baseDir.resolve(id.value()).resolve(FILE_NAME);
     }
 }

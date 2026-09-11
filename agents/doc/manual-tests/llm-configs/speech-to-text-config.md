@@ -3,7 +3,7 @@ id: llm-configs-speech-to-text
 area: llm-configs
 requires: [server-9091, openai-key]
 duration: ~4 min
-last-verified: 2026-09-09 (whisper-1 against api.openai.com, admin UI on 9098; the Record path with a stubbed recorder)
+last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
 ---
 
 # A speech-to-text config transcribes a recording

@@ -46,4 +46,5 @@ public record LlmRequest(
     public LlmRequest withAdditionalParams(Map<String, Object> params) {
         return new LlmRequest(configName, messages, tools, temperature, maxOutputTokens, stream, params);
     }
+
 }

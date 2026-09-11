@@ -21,7 +21,7 @@ import java.util.Optional;
 public interface Sessions {
 
     /** Opens a session with a fresh conversation, bound to the named agent. */
-    Session open(String namespace, String agentName);
+    Session open(String agentName);
 
     /**
      * Binds the named agent to an EXISTING conversation — continuing the same

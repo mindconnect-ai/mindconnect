@@ -21,9 +21,9 @@ import java.util.Set;
  * an {@code ai.mindconnect.schema.Schema}), so the LLM knows exactly which inputs the workflow
  * expects. Executing the tool runs the workflow synchronously on the embedded engine.
  *
- * <p>The store directory comes from the {@code workflowDir} environment string (the same
- * directory the embedded workflow admin manages, {@code data/workflows} by default), so
- * workflows created or edited in the admin UI are what the tools run.
+ * <p>Without a host store the workflows are read from {@code <dataBaseDir>/<namespace>/workflows}
+ * — the same directory the embedded workflow admin manages, {@code data/local/workflows} by
+ * default — so workflows created or edited in the admin UI are what the tools run.
  *
  * <p>Fully dynamic: {@link #toolNames()} re-lists the store on every call (the registry
  * consults it live), so a workflow created in the admin UI is a tool on the very next
@@ -48,7 +48,7 @@ public final class WorkflowToolProvider implements MultiToolProvider {
     /**
      * The host's {@link WorkflowDataRepository} when it provides one — the
      * same store the workflow admin writes to, whatever it is backed by —
-     * and the file store under {@code workflowDir} otherwise.
+     * and the file store under {@code <dataBaseDir>/<namespace>/workflows} otherwise.
      */
     @Override
     public void bind(ToolEnvironment env) {
@@ -59,9 +59,15 @@ public final class WorkflowToolProvider implements MultiToolProvider {
                     toolNames().size());
             return;
         }
-        String dir = env.getString("workflowDir").orElse("data/workflows");
+        String dir = env.getString("dataBaseDir").orElse("data");
         try {
-            repository = new FileWorkflowDataRepository(Path.of(dir));
+            var namespace = env.get(ai.mindconnect.agent.Namespace.class);
+            if (namespace.isEmpty()) {
+                log.warn("WorkflowToolProvider: the tool environment names no namespace — no workflow tools available");
+                repository = null;
+                return;
+            }
+            repository = new FileWorkflowDataRepository(Path.of(dir), namespace.get().value());
             log.info("WorkflowToolProvider: offering workflows from {} as tools (currently {})",
                     dir, toolNames().size());
         } catch (RuntimeException e) {

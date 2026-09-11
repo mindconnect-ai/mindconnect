@@ -23,6 +23,7 @@ export TAVILY_API_KEY=tvly-...
 |----------|---------|-------|
 | `MINDCONNECT_ENCRYPTION_SECRET_KEY` | _(none)_ | **Required.** Encrypts stored LLM credentials. No default on purpose — the app **fails to start** without it. Must be **16, 24 or 32 characters** (used directly as an AES key). |
 | `MC_PERSISTENCE` | `file` | `file` keeps everything under `mindconnect.data.base-dir`; `postgres` keeps it in the database — see [Persistence](./persistence.md#postgres). Since 0.3.0. |
+| `MC_NAMESPACE` | `local` | The namespace this process runs in: file data lives under `<base-dir>/<namespace>/`, Postgres rows carry it in their key. One process serves one namespace. |
 | `MC_POSTGRES_URL` | `jdbc:postgresql://localhost:5432/mindconnect` | JDBC URL, used with `MC_PERSISTENCE=postgres`. Tables are created on start. |
 | `MC_POSTGRES_USER` / `MC_POSTGRES_PASSWORD` | _(empty)_ | Database credentials. |
 | `MC_UPLOAD_MAX_FILE_SIZE` / `MC_UPLOAD_MAX_REQUEST_SIZE` | `25MB` / `100MB` | Upload limits — one file, and all files of one upload request (the chat's attach dialog sends every selected file in one request). Bound to `spring.servlet.multipart.max-file-size` / `max-request-size`; an upload above either is answered with HTTP 413. The runtime sends a file inline to the model up to 20MB. |
@@ -35,16 +36,16 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | Property | Default | Notes |
 |----------|---------|-------|
 | `mindconnect.persistence` | `file` | `file` or `postgres` — bound to `MC_PERSISTENCE` in the apps' yaml. |
+| `mindconnect.namespace` | `local` | The one namespace every repository is bound to — bound to `MC_NAMESPACE` in the apps' yaml. |
 | `mindconnect.postgres.*` | — | `url`, `username`, `password`, `pool-size` (default 10) for `postgres` mode; bound to `MC_POSTGRES_*`. |
 | `mindconnect.data.base-dir` | `data` | Root for **all** file persistence (definitions, configs, conversations, workspaces); in `postgres` mode only the file-based side channels. |
 | `mindconnect.tools.base-dir` | user home | Working/base directory for `bash` and the file tools — security-relevant. |
 | `mindconnect.user.id` | app-specific | The user id that owns sessions and data (the CLI ships a hard-coded default). |
 | `mindconnect.remote.url` | _(unset)_ | Points the CLI at a remote agent server instead of local mode. |
 | `mindconnect.code-exec.*` | — | Sandbox limits for `code_execute`: `runtime`, `network`, `languages`, `memory`, `cpus`, `timeout-seconds`, `idle-seconds`. |
-| `mindconnect.vector-store.*` | — | Vector-store backend: `backend`, `dir`, `url`, `user`, `password`, `embedding-config` (default `embeddings`). |
-| `mindconnect.file-store.*` | — | File-store backend: `backend`, `dir`. |
+| `mindconnect.vector-store.*` | — | Vector-store backend: `backend`, `url`, `user`, `password`, `embedding-config` (default `embeddings`). The `memory` backend keeps its files in `<data.base-dir>/<namespace>/vector-stores`. |
+| `mindconnect.file-store.*` | — | File-store backend: `backend`. The `filesystem` backend keeps uploads in `<data.base-dir>/<namespace>/files`. |
 | `mindconnect.cors.allowed-origins` | `*` | Origins that may call the REST endpoints from a browser (`/api`, `/chat/api`, `/v1`), comma-separated. `*` lets every origin call without credentials; a list of origins may also send the session cookie. Both server apps. |
-| `mindconnect.workflow-admin.dir` | `data/workflows` | Where the workflow admin stores workflows. |
 | `mindconnect.agent.trace.max-per-session` | `50` | LLM call-trace retention per session. |
 
 ## LLM providers

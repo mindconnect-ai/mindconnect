@@ -1,11 +1,14 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.SessionId;
+
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Reads a file from one of the three workspace scopes.
@@ -17,11 +20,11 @@ import java.util.UUID;
 public class WorkspaceReadTool implements Tool {
 
     private final WorkspaceStore workspaceStore;
-    private final UUID agentId;
-    private final String userId;
-    private final UUID sessionId;
+    private final AgentId agentId;
+    private final UserId userId;
+    private final SessionId sessionId;
 
-    public WorkspaceReadTool(WorkspaceStore workspaceStore, UUID agentId, String userId, UUID sessionId) {
+    public WorkspaceReadTool(WorkspaceStore workspaceStore, AgentId agentId, UserId userId, SessionId sessionId) {
         this.workspaceStore = workspaceStore;
         this.agentId = agentId;
         this.userId = userId;

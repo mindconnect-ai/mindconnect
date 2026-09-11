@@ -1,5 +1,9 @@
 package ai.mindconnect.cli.agentclient;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
@@ -8,12 +12,10 @@ import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
@@ -25,7 +27,7 @@ import java.util.function.Consumer;
  * ({@link AgentRegistryService}, {@link AgentSessionService},
  * {@link AgentChatService}). No adapter façade is interposed because the CLI
  * already runs inside the same JVM as the runtime and provides its own
- * namespace/user context per call.
+ * user context per call.
  */
 public class LocalAgentClient implements AgentClient {
 
@@ -44,46 +46,46 @@ public class LocalAgentClient implements AgentClient {
     // ── Agents ──────────────────────────────────────────────────────────────
 
     @Override
-    public Optional<AgentDefinition> findAgent(Namespace namespace, UUID agentId) {
-        return registryService.find(namespace, agentId);
+    public Optional<AgentDefinition> findAgent(AgentId agentId) {
+        return registryService.find(agentId);
     }
 
     @Override
-    public List<AgentDefinition> listAgents(Namespace namespace) {
-        return registryService.list(namespace);
+    public List<AgentDefinition> listAgents() {
+        return registryService.list();
     }
 
     // ── Sessions ────────────────────────────────────────────────────────────
 
     @Override
-    public AgentSession startSession(UUID agentDefinitionId, Namespace namespace, String userId) {
-        return sessionService.openChat(agentDefinitionId, namespace, userId);
+    public AgentSession startSession(AgentId agentDefinitionId, UserId userId) {
+        return sessionService.openChat(agentDefinitionId, userId);
     }
 
     @Override
-    public List<AgentSession> listSessions(UUID agentDefinitionId, Namespace namespace, String userId) {
-        return sessionService.listSessions(agentDefinitionId, namespace, userId);
+    public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
+        return sessionService.listSessions(agentDefinitionId, userId);
     }
 
     @Override
-    public List<Message> loadHistory(UUID sessionId) {
+    public List<Message> loadHistory(SessionId sessionId) {
         return sessionService.loadHistory(sessionId);
     }
 
     @Override
-    public void deleteSession(UUID sessionId) {
+    public void deleteSession(SessionId sessionId) {
         sessionService.deleteSession(sessionId);
     }
 
     @Override
-    public int deleteMessages(UUID sessionId, int fromSeq, int toSeq) {
+    public int deleteMessages(SessionId sessionId, int fromSeq, int toSeq) {
         return sessionService.deleteMessages(sessionId, fromSeq, toSeq);
     }
 
     // ── Chat ────────────────────────────────────────────────────────────────
 
     @Override
-    public String chat(UUID sessionId, String userMessage, Consumer<StreamEvent> eventHandler) {
+    public String chat(SessionId sessionId, String userMessage, Consumer<StreamEvent> eventHandler) {
         ChatTurnHandle handle = chatService.submitChat(sessionId, userMessage, eventHandler);
         try {
             return handle.result().join();
@@ -97,19 +99,19 @@ public class LocalAgentClient implements AgentClient {
     }
 
     @Override
-    public boolean cancelChat(UUID sessionId) {
+    public boolean cancelChat(SessionId sessionId) {
         return chatService.cancelChat(sessionId);
     }
 
     // ── Memory ──────────────────────────────────────────────────────────────
 
     @Override
-    public WorkingMemory getWorkingMemory(UUID sessionId) {
+    public WorkingMemory getWorkingMemory(SessionId sessionId) {
         return chatService.memorySnapshot(sessionId);
     }
 
     @Override
-    public int compressMemory(UUID sessionId) {
+    public int compressMemory(SessionId sessionId) {
         return chatService.compressMemory(sessionId);
     }
 }

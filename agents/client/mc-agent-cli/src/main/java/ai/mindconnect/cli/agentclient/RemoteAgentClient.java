@@ -1,10 +1,15 @@
 package ai.mindconnect.cli.agentclient;
 
+import ai.mindconnect.agent.UserId;
+
+import ai.mindconnect.agent.SessionId;
+
+import ai.mindconnect.agent.AgentId;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -33,7 +38,7 @@ public class RemoteAgentClient implements AgentClient {
      * the local stream immediately rather than waiting for the server's
      * cooperative cancel to flush a final {@code Done} event.
      */
-    private final Map<UUID, Call> activeChatCalls = new ConcurrentHashMap<>();
+    private final Map<SessionId, Call> activeChatCalls = new ConcurrentHashMap<>();
 
     public RemoteAgentClient(String baseUrl, OkHttpClient http, ObjectMapper mapper) {
         this.baseUrl = baseUrl.replaceAll("/$", "");
@@ -46,10 +51,9 @@ public class RemoteAgentClient implements AgentClient {
     // the read/list/chat/memory surface of AgentClient.
 
     @Override
-    public Optional<AgentDefinition> findAgent(Namespace namespace, UUID agentDefinitionId) {
+    public Optional<AgentDefinition> findAgent(AgentId agentId) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/agents/" + agentDefinitionId
-                        + "?namespace=" + namespace.value())
+                .url(baseUrl + "/api/agents/" + agentId.value())
                 .get().build();
         try (Response resp = http.newCall(req).execute()) {
             if (resp.code() == 404) return Optional.empty();
@@ -61,9 +65,9 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public List<AgentDefinition> listAgents(Namespace namespace) {
+    public List<AgentDefinition> listAgents() {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/agents?namespace=" + namespace.value())
+                .url(baseUrl + "/api/agents")
                 .get().build();
         return execute(req, new TypeReference<>() {
         });
@@ -72,11 +76,10 @@ public class RemoteAgentClient implements AgentClient {
     // --- RunSessionUseCase ---
 
     @Override
-    public AgentSession startSession(UUID agentDefinitionId, Namespace namespace, String userId) {
+    public AgentSession startSession(AgentId agentDefinitionId, UserId userId) {
         String body = toJson(Map.of(
-                "agentId", agentDefinitionId,
-                "namespace", namespace.value(),
-                "userId", userId));
+                "agentId", agentDefinitionId.value(),
+                "userId", userId.value()));
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions")
                 .post(RequestBody.create(body, JSON)).build();
@@ -84,28 +87,27 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public List<AgentSession> listSessions(UUID agentDefinitionId, Namespace namespace, String userId) {
-        String url = baseUrl + "/api/sessions?agentId=" + agentDefinitionId
-                + "&namespace=" + namespace.value()
-                + "&userId=" + userId;
+    public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
+        String url = baseUrl + "/api/sessions?agentId=" + agentDefinitionId.value()
+                + "&userId=" + userId.value();
         Request req = new Request.Builder().url(url).get().build();
         return execute(req, new TypeReference<>() {
         });
     }
 
     @Override
-    public List<Message> loadHistory(UUID sessionId) {
+    public List<Message> loadHistory(SessionId sessionId) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/sessions/" + sessionId + "/history")
+                .url(baseUrl + "/api/sessions/" + sessionId.value() + "/history")
                 .get().build();
         return execute(req, new TypeReference<>() {
         });
     }
 
     @Override
-    public String chat(UUID sessionId, String userMessage, Consumer<StreamEvent> eventHandler) {
+    public String chat(SessionId sessionId, String userMessage, Consumer<StreamEvent> eventHandler) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/sessions/" + sessionId + "/chat")
+                .url(baseUrl + "/api/sessions/" + sessionId.value() + "/chat")
                 .post(RequestBody.create(userMessage, TEXT)).build();
 
         StringBuilder full = new StringBuilder();
@@ -208,9 +210,9 @@ public class RemoteAgentClient implements AgentClient {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");
                 int depth = node.path("depth").asInt(0);
-                UUID subSessionId = node.path("subSessionId").isMissingNode()
+                SessionId subSessionId = node.path("subSessionId").isMissingNode()
                         || node.path("subSessionId").isNull()
-                        ? null : UUID.fromString(node.path("subSessionId").asText());
+                        ? null : SessionId.of(node.path("subSessionId").asText());
                 String input = node.path("text").isMissingNode() || node.path("text").isNull()
                         ? null : node.path("text").asText();
                 yield new StreamEvent.SubAgentStarted(taskId, agentName, depth, subSessionId, input);
@@ -218,7 +220,7 @@ public class RemoteAgentClient implements AgentClient {
             case "sub_agent_done" -> {
                 UUID taskId = UUID.fromString(node.path("taskId").asText());
                 String agentName = node.path("agentName").asText("");
-                UUID subSessionId = UUID.fromString(node.path("subSessionId").asText());
+                SessionId subSessionId = SessionId.of(node.path("subSessionId").asText());
                 String finalText = node.path("finalText").isMissingNode()
                         || node.path("finalText").isNull()
                         ? null : node.path("finalText").asText();
@@ -245,7 +247,7 @@ public class RemoteAgentClient implements AgentClient {
                         node.path("text").asText(null),
                         node.path("toolName").asText(""),
                         Map.of(),
-                        origin == null || origin.isBlank() ? null : UUID.fromString(origin),
+                        origin == null || origin.isBlank() ? null : SessionId.of(origin),
                         node.path("error").asText(null));
             }
             default -> null;
@@ -253,11 +255,11 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public boolean cancelChat(UUID sessionId) {
+    public boolean cancelChat(SessionId sessionId) {
         // Send the cooperative cancel to the server first so the turn loop exits
         // and stops doing work as soon as it can.
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/sessions/" + sessionId + "/chat")
+                .url(baseUrl + "/api/sessions/" + sessionId.value() + "/chat")
                 .delete().build();
         boolean serverCancelled;
         try (Response response = http.newCall(req).execute()) {
@@ -275,17 +277,17 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public WorkingMemory getWorkingMemory(UUID sessionId) {
+    public WorkingMemory getWorkingMemory(SessionId sessionId) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/sessions/" + sessionId + "/memory")
+                .url(baseUrl + "/api/sessions/" + sessionId.value() + "/memory")
                 .get().build();
         return execute(req, WorkingMemory.class);
     }
 
     @Override
-    public int compressMemory(UUID sessionId) {
+    public int compressMemory(SessionId sessionId) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/sessions/" + sessionId + "/compress")
+                .url(baseUrl + "/api/sessions/" + sessionId.value() + "/compress")
                 .post(RequestBody.create("", JSON)).build();
         try (Response resp = http.newCall(req).execute()) {
             assertOk(resp);
@@ -297,9 +299,9 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public void deleteSession(UUID sessionId) {
+    public void deleteSession(SessionId sessionId) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/sessions/" + sessionId)
+                .url(baseUrl + "/api/sessions/" + sessionId.value())
                 .delete().build();
         try (Response resp = http.newCall(req).execute()) {
             assertOk(resp);
@@ -309,9 +311,9 @@ public class RemoteAgentClient implements AgentClient {
     }
 
     @Override
-    public int deleteMessages(UUID sessionId, int fromSeq, int toSeq) {
+    public int deleteMessages(SessionId sessionId, int fromSeq, int toSeq) {
         Request req = new Request.Builder()
-                .url(baseUrl + "/api/sessions/" + sessionId + "/messages?fromSeq=" + fromSeq + "&toSeq=" + toSeq)
+                .url(baseUrl + "/api/sessions/" + sessionId.value() + "/messages?fromSeq=" + fromSeq + "&toSeq=" + toSeq)
                 .delete().build();
         try (Response resp = http.newCall(req).execute()) {
             assertOk(resp);

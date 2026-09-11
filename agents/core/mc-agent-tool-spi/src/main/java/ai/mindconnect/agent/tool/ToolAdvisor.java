@@ -1,9 +1,7 @@
 package ai.mindconnect.agent.tool;
 
-import ai.mindconnect.agent.Namespace;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Filter chain around every tool invocation.
@@ -66,7 +64,6 @@ public interface ToolAdvisor {
      *
      * @param toolName  the tool's registered name (e.g. {@code "bash"})
      * @param arguments JSON-shaped argument map the LLM produced
-     * @param namespace tenant scope
      * @param userId    end-user identifier (may be {@code "anonymous"})
      * @param sessionId the chat session this call belongs to
      * @param agentDefinitionId which agent issued the call
@@ -75,16 +72,12 @@ public interface ToolAdvisor {
     record Invocation(
             String toolName,
             Map<String, Object> arguments,
-            Namespace namespace,
-            String userId,
-            UUID sessionId,
-            UUID agentDefinitionId,
+            /** Whose call this is — the same scope the tool was resolved with. */
+            ToolCallScope scope,
             String toolCallId
     ) {
-        /** Returns a copy with the supplied argument map. */
         public Invocation withArguments(Map<String, Object> next) {
-            return new Invocation(toolName, next, namespace, userId,
-                    sessionId, agentDefinitionId, toolCallId);
+            return new Invocation(toolName, next, scope, toolCallId);
         }
     }
 

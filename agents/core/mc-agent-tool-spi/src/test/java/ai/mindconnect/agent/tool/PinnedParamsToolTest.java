@@ -39,7 +39,7 @@ class PinnedParamsToolTest {
     }
 
     private static AgentTool toolWithOverrides(Map<String, Object> overrides) {
-        return new AgentTool(null, null, "code_execute", null, overrides, true);
+        return new AgentTool(AgentToolId.random(), "code_execute", null, overrides);
     }
 
     @Test
@@ -77,9 +77,9 @@ class PinnedParamsToolTest {
     @Test
     void aliasExposesTheDelegateUnderTheAgentToolName() {
         RecordingTool delegate = new RecordingTool();
-        AgentTool aliased = new AgentTool(null, null, "search_project_docs",
+        AgentTool aliased = new AgentTool(AgentToolId.random(), "search_project_docs",
                 "Searches the project knowledge base.",
-                Map.of("tool", "vector_search", "params", Map.of("store", "projekt-kb")), true);
+                Map.of("tool", "vector_search", "params", Map.of("store", "projekt-kb")));
 
         assertThat(AliasTool.registryName(aliased)).isEqualTo("vector_search");
         Tool tool = PinnedParamsTool.wrap(aliased, AliasTool.wrap(aliased, delegate));
@@ -90,7 +90,7 @@ class PinnedParamsToolTest {
         tool.execute(Map.of("code", "q"));
         assertThat(delegate.executedWith).containsEntry("store", "projekt-kb");
         // Without the alias override, the wrap is a no-op:
-        AgentTool plain = new AgentTool(null, null, "code_execute", null, Map.of(), true);
+        AgentTool plain = new AgentTool(AgentToolId.random(), "code_execute", null, Map.of());
         assertThat(AliasTool.wrap(plain, delegate)).isSameAs(delegate);
     }
 

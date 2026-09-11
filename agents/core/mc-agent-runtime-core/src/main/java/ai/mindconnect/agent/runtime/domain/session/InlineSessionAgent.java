@@ -1,10 +1,10 @@
 package ai.mindconnect.agent.runtime.domain.session;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.tool.AgentTool;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * An agent that exists only inside its session — the shape a chat takes when
@@ -15,7 +15,8 @@ import java.util.UUID;
  * applies.
  */
 public record InlineSessionAgent(
-        UUID id,
+        /** An inline agent is an agent without a stored definition; its id is minted with the session. */
+        AgentId id,
         boolean main,
         String label,
         String systemPrompt,
@@ -33,21 +34,18 @@ public record InlineSessionAgent(
      * Builds one from tool <em>names</em> — the shape every caller actually
      * has.
      *
-     * <p>The id is minted here and stamped into each {@link AgentTool},
-     * because that is the field {@code SpiToolRegistry} passes into every
-     * {@code ToolCallScope} and the {@code AGENT_USER} workspace is keyed by.
-     * Assembling the tools by hand and leaving it null is an easy mistake
-     * with a quiet consequence: the agent scope throws, and the chat's
-     * persistent memory is silently unreachable.
+     * <p>The id is minted here. A tool call learns the agent from its
+     * {@code ToolCallScope}, which is also what the {@code AGENT_USER}
+     * workspace is keyed by — so this id is the one the chat's persistent
+     * memory lives under.
      *
      * @param toolSearch whether the chat may find the remaining tools itself
      */
-    public static InlineSessionAgent of(String label, String systemPrompt, String llmConfigName,
-                                        List<String> toolNames, boolean toolSearch) {
-        UUID id = UUID.randomUUID();
+    public static InlineSessionAgent of(String label, String systemPrompt,
+                                        String llmConfigName, List<String> toolNames, boolean toolSearch) {
+        AgentId id = AgentId.random();
         List<AgentTool> tools = (toolNames == null ? List.<String>of() : toolNames).stream()
-                .map(name -> new AgentTool(UUID.randomUUID(), id, name, null,
-                        java.util.Map.of(), true, false, false))
+                .map(name -> AgentTool.of(name))
                 .toList();
         var search = toolSearch
                 ? new AgentDefinition.ToolSearchConfig(true, List.of("*"))
@@ -58,8 +56,7 @@ public record InlineSessionAgent(
     /** The same agent under a new id — used when a chat detaches from one. */
     public InlineSessionAgent withTools(List<String> toolNames, boolean toolSearch) {
         List<AgentTool> rebuilt = (toolNames == null ? List.<String>of() : toolNames).stream()
-                .map(name -> new AgentTool(UUID.randomUUID(), id, name, null,
-                        java.util.Map.of(), true, false, false))
+                .map(name -> AgentTool.of(name))
                 .toList();
         var search = toolSearch
                 ? new AgentDefinition.ToolSearchConfig(true, List.of("*"))
@@ -67,7 +64,6 @@ public record InlineSessionAgent(
         return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, rebuilt, search);
     }
 
-    /** The same agent on a different model. */
     public InlineSessionAgent withLlmConfigName(String llmConfigName) {
         return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, tools, toolSearch);
     }

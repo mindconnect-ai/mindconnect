@@ -1,14 +1,13 @@
 package ai.mindconnect.agent.runtime.domain.session;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
-import java.util.UUID;
+import ai.mindconnect.agent.AgentId;
 
 /**
  * An agent as a session sees it: either a reference to an
- * {@link AgentDefinition} from the registry, or a
+ * {@link ai.mindconnect.agent.runtime.domain.AgentDefinition} from the registry, or a
  * definition that lives inside the session and nowhere else.
  *
  * <p>The inline variant is what a chat gets when the user picked a model and
@@ -33,7 +32,7 @@ import java.util.UUID;
 public sealed interface SessionAgent permits InlineSessionAgent, SessionAgentRef {
 
     /** Stable id: workspace scope, message attribution, participant. */
-    UUID id();
+    AgentId id();
 
     /** Exactly one per session drives the turn. */
     boolean main();
