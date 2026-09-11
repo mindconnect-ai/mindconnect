@@ -30,13 +30,13 @@ returns the result. Sub-agents can call sub-agents recursively.
 ## Example: the research-lead flow
 
 A `research-lead` agent decomposes a question, spawns `web-researcher`
-sub-agents in parallel, has a `verifier` check the findings, and writes
-the final answer to the shared workspace.
+sub-agents in parallel, has a `verifier` check the findings, and answers
+with one cited report.
 
 ![Research-lead flow](doc/images/research-lead-flow.svg)
 
 Here it is running end to end — plan, parallel sub-agents, verify, and
-the finished `report.md` in the workspace:
+the finished report:
 
 ![Sub-agents running](doc/images/sub-agents-flow.webp)
 
@@ -76,7 +76,7 @@ Concepts: `mc-sandbox/agents/doc/concepts/21-*`, `22-*`, `23-*`. Manual tests:
 |--------|---------|
 | `postgres/mc-llm-gateway-pg` | `LlmConfigRepository` on Postgres — one JSONB document per config, via `mc-jdbc` |
 | `postgres/mc-message-repository-pg` | `ConversationRepository` and `MessageRepository` on Postgres — paged by `created_at` / `seq` |
-| `postgres/mc-agent-runtime-pg` | The runtime's seven ports on Postgres — definitions, sessions, LLM traces, todo lists, summaries, working memory, workspace files |
+| `postgres/mc-agent-runtime-pg` | The runtime's seven ports on Postgres — definitions, sessions, LLM traces, todo lists, summaries, working memory |
 | `postgres/mc-file-store-pg` | `FileStore` on Postgres — uploads as `bytea` rows |
 
 The default stores are file-based and need no database. A `-pg` module is a
@@ -117,14 +117,11 @@ An app adds both; the property picks.
 |--------|---------|
 | `mc-agent-cli` | Command-line chat client |
 
-## Memory & collaboration
+## Memory
 
-Agents share results through a workspace and remember across sessions
-via episodic memory.
+Agents remember across sessions via episodic memory.
 
-| Episodic memory | Shared workspace |
-|---|---|
-| ![Episodic memory](doc/images/episodic-memory.svg) | ![Shared workspace](doc/images/shared-workspace.svg) |
+![Episodic memory](doc/images/episodic-memory.svg)
 
 ## Build & run
 

@@ -38,8 +38,6 @@ flow running live in the Admin UI.
   example with parallel sub-agents.
 - **[Memory](./memory.md)** — per-agent memory strategies (auto-compression,
   summarizing window, …).
-- **[Workspace & collaboration](./workspace.md)** — the shared file area, its
-  three scopes, and how agents exchange work.
 - **[Built-in tools](./built-in-tools.md)** — every tool that ships, and what it
   needs.
 - **[Creating a tool](./creating-a-tool.md)** — add your own tool via the SPI.

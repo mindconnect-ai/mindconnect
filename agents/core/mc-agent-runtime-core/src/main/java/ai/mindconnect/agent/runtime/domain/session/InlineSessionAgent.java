@@ -35,9 +35,8 @@ public record InlineSessionAgent(
      * has.
      *
      * <p>The id is minted here. A tool call learns the agent from its
-     * {@code ToolCallScope}, which is also what the {@code AGENT_USER}
-     * workspace is keyed by — so this id is the one the chat's persistent
-     * memory lives under.
+     * {@code ToolCallScope}, and whatever is keyed by the agent — approvals,
+     * the system prompt's agent metadata — is keyed by this id.
      *
      * @param toolSearch whether the chat may find the remaining tools itself
      */

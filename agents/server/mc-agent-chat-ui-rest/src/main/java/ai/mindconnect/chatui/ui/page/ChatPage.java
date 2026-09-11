@@ -110,7 +110,7 @@ public final class ChatPage {
     /**
      * The exits, collected behind one "…" button: up to the parent session
      * for a sub-agent chat, back to the agent, and whatever dialogs the host
-     * offers (working memory, traces, todos, workspace). Null when there is
+     * offers (working memory, traces, todos). Null when there is
      * nothing to show — a standalone chat publishes no host links and has no
      * parent, so it gets no button at all.
      */

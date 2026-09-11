@@ -5,8 +5,8 @@ Diese Demo zeigt die drei Kernfähigkeiten der Orchestrierungs-Architektur:
 
 Der Demo-Agent heißt **`research-lead`**. Er recherchiert eine mehrteilige Frage,
 indem er die Sub-Topics gleichzeitig an `web-researcher` delegiert, die Kernaussagen
-vom `verifier` gegenchecken lässt und einen zitierten Markdown-Report nach
-`report.md` ins Session-Workspace schreibt.
+vom `verifier` gegenchecken lässt und mit einem zitierten Markdown-Report
+antwortet.
 
 ---
 
@@ -27,7 +27,7 @@ vom `verifier` gegenchecken lässt und einen zitierten Markdown-Report nach
 
 3. **Smoke-Test**: Öffne einen Chat mit `research-lead`, tippe den Hauptprompt (unten),
    und schau dass (a) ein todo-Plan erscheint, (b) mehrere `web-researcher`-Sub-Agenten
-   PARALLEL starten, (c) `report.md` im Workspace landet.
+   PARALLEL starten, (c) die Antwort ein vollständiger, zitierter Report ist.
 
 ---
 
@@ -52,9 +52,9 @@ der Agent MUSS sie parallel fan-outen. Genau das macht den `run_agents`-Vorteil 
 3. **Fact-Check**: ein zweiter `run_agents`-Call mit mehreren `verifier`-Tasks prüft die
    Kernaussagen (z.B. "Qdrant ist Apache-2.0", "Milvus skaliert auf Milliarden Vektoren")
    gegen die Quell-URLs.
-4. **Report**: `workspace_write` schreibt `report.md`; der Agent meldet den Pfad und gibt
-   eine kurze Chat-Zusammenfassung + Empfehlung.
-5. **Beweis**: `report.md` im Workspace öffnen → fertiger, zitierter Vergleich.
+4. **Report**: der Agent antwortet mit dem Report selbst — Executive Summary, ein
+   Abschnitt je Sub-Topic, Vergleich/Empfehlung, Quellen.
+5. **Beweis**: die Antwort ist der fertige, zitierte Vergleich.
 
 ---
 
@@ -81,8 +81,8 @@ Alle drei haben dasselbe Muster: 3 unabhängige Achsen → paralleler Fan-out.
   die App aus der IntelliJ-Run-Config mit dem Env-Var gestartet wurde.
 - **Sub-Agent gibt kaputtes JSON zurück** → einmal denselben Prompt erneut schicken; mit
   starkem Modell tritt das selten auf.
-- **`report.md` fehlt** → der Agent hat nur im Chat geantwortet. Nachschieben:
-  *"Schreib den Report als report.md ins Workspace."*
+- **Nur eine Kurzfassung statt des Reports** → nachschieben:
+  *"Gib mir den vollständigen Report mit allen Abschnitten und Quellen."*
 
 ---
 

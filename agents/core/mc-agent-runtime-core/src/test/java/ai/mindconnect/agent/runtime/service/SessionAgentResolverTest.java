@@ -68,7 +68,7 @@ class SessionAgentResolverTest {
     @Test
     void anInlineAgentIsAssembledFromTheSessionItself() {
         var inline = InlineSessionAgent.of("Chat", "be helpful", "gpt",
-                List.of("workspace_read"), true);
+                List.of("file_read"), true);
         var session = sessionFor(inline.id()).withSessionAgents(List.of(inline));
 
         AgentDefinition resolved = resolver.resolve(session);
@@ -78,7 +78,7 @@ class SessionAgentResolverTest {
         assertThat(resolved.name()).isEqualTo("Chat");
         assertThat(resolved.systemPrompt()).isEqualTo("be helpful");
         assertThat(resolved.llmConfigName()).isEqualTo("gpt");
-        assertThat(resolved.tools()).extracting(t -> t.name()).containsExactly("workspace_read");
+        assertThat(resolved.tools()).extracting(t -> t.name()).containsExactly("file_read");
         assertThat(resolved.toolSearchOrOff().enabled()).isTrue();
         // Not a knob a chat gets to turn: it decides how long conversations
         // survive compression.

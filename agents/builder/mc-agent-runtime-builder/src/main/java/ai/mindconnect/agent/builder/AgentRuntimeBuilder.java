@@ -5,7 +5,6 @@ import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.adapter.file.FileWorkspaceStore;
 import ai.mindconnect.agent.runtime.adapter.llm.LlmToolResultSummarizer;
 import ai.mindconnect.agent.runtime.adapter.file.FileLlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.*;
@@ -33,7 +32,6 @@ import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
@@ -47,7 +45,6 @@ import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
 import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
-import ai.mindconnect.agent.runtime.service.prompt.WorkspaceNotesProvider;
 import ai.mindconnect.agent.runtime.port.out.TokenCounters;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.Namespace;
@@ -313,10 +310,6 @@ public final class AgentRuntimeBuilder {
         // 1. Persistence — file-based rooted at dataDir, Postgres, or purely in-memory;
         //    every store is bound to the one namespace this runtime runs in.
         Namespace namespace = new Namespace(namespaceName);
-        WorkspaceStore workspaceStore = inMemory
-                ? new InMemoryWorkspaceStore()
-                : sql != null ? new PgWorkspaceStore(sql, namespace).initSchema()
-                : new FileWorkspaceStore(dataDir, namespace);
         WorkingMemoryRepository workingMemoryRepository = inMemory
                 ? new InMemoryWorkingMemoryRepository()
                 : sql != null ? new PgWorkingMemoryRepository(sql, namespace).initSchema()
@@ -396,7 +389,7 @@ public final class AgentRuntimeBuilder {
         TokenCounters tokenCounterRegistry = new TokenCounterRegistry();
         List<PromptContextProvider> promptProviders = List.of(
                 new CurrentDateProvider(), new AgentMetadataProvider(),
-                new AgentToolsProvider(), new WorkspaceNotesProvider(workspaceStore));
+                new AgentToolsProvider());
         PromptRenderer promptRenderer = new PebblePromptRenderer(promptProviders);
         AgentTaskRunner statelessRunner = new StatelessAgentTaskRunner(
                 definitionRepository, llmChat, resolveDefaultLlmConfigName(), promptRenderer);
@@ -425,7 +418,6 @@ public final class AgentRuntimeBuilder {
                 .service(AgentSessionRepository.class, sessionRepository)
                 .service(MessageRepository.class, messageRepository)
                 .service(ai.mindconnect.message.port.in.ConversationManager.class, conversationManager)
-                .service(WorkspaceStore.class, workspaceStore)
                 .service(TodoListService.class, todoListService)
                 .service(ToolRegistryRef.class, registryRef)
                 .service(DynamicToolActivations.class, activations)

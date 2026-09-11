@@ -22,7 +22,7 @@ import java.util.Map;
  *
  * <p>Each test runs in a synthetic session (a random {@code sessionId},
  * {@code userId = "admin-test"}). Session-scoped tools
- * (todo_write, workspace_write, …) therefore write into an isolated
+ * (todo_write, …) therefore write into an isolated
  * scratch session that's never reused — no risk of polluting a real
  * conversation. The session directory is left on disk for inspection;
  * the admin can clean it up later if it accumulates. What a tool holds for

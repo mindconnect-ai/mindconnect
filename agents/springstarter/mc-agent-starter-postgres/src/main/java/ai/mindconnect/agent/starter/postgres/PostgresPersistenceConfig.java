@@ -7,14 +7,12 @@ import ai.mindconnect.agent.runtime.adapter.pg.PgConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgLlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.adapter.pg.PgWorkspaceStore;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.FileStoreBackend;
@@ -130,11 +128,6 @@ public class PostgresPersistenceConfig {
     @Bean
     WorkingMemoryRepository workingMemoryRepository(Sql mindconnectSql, Namespace namespace) {
         return new PgWorkingMemoryRepository(mindconnectSql, namespace).initSchema();
-    }
-
-    @Bean
-    WorkspaceStore workspaceStore(Sql mindconnectSql, Namespace namespace) {
-        return new PgWorkspaceStore(mindconnectSql, namespace).initSchema();
     }
 
     // ── messages ────────────────────────────────────────────────────────────

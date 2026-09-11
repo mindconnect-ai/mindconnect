@@ -202,6 +202,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
   that used `gmail_*` tools keep the same names once the registration is
   enabled.
 
+- **agents:** the workspace tools are gone — `workspace_read`, `workspace_write`,
+  `workspace_list`, their three scopes (session, agent + user, user), the
+  `WorkspaceStore` port with its file, in-memory and Postgres stores, the
+  *Workspace* dialog in the admin UI, `GET /api/workspaces/…`, and the
+  `user_notes` / `user_profile` prompt variables the notes provider filled
+  from them. A session's working directory and the file tools are where an
+  agent reads and writes files now; a newly created agent starts with no
+  tools instead of the three. The `mc_workspace_file` table is left in place
+  in an existing Postgres database — drop it by hand when nothing needs the
+  files any more. The bundled `research-lead` answers with its report
+  instead of saving `report.md`.
+
 ### Fixed
 
 - **agents:** knowing another user's chat session id is no longer enough to

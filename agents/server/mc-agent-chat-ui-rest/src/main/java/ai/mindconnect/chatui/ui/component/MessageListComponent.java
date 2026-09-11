@@ -20,8 +20,8 @@ import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
  * The main conversation list of a chat page. Renders the message
  * history (interleaved with historic task cards rebuilt from
  * persisted TOOL_CALL/TOOL_RESULT messages) and exposes both the
- * navigation action buttons (Back / Memory / Traces / Todos /
- * Workspace) and the token-usage suffix in its title.
+ * navigation action buttons (Back / Memory / Traces / Todos)
+ * and the token-usage suffix in its title.
  *
  * <p>The component is the heart of the chat page in patch terms:
  * almost every streaming event translates into a patch against either

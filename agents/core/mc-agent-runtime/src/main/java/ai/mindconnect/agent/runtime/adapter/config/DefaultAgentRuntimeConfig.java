@@ -13,7 +13,6 @@ import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepositor
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
@@ -29,7 +28,6 @@ import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
 import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
-import ai.mindconnect.agent.runtime.service.prompt.WorkspaceNotesProvider;
 import ai.mindconnect.agent.runtime.adapter.token.TokenCounterRegistry;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.Namespace;
@@ -139,11 +137,6 @@ public class DefaultAgentRuntimeConfig {
     }
 
     @Bean
-    PromptContextProvider workspaceNotesProvider(WorkspaceStore workspaceStore) {
-        return new WorkspaceNotesProvider(workspaceStore);
-    }
-
-    @Bean
     PromptRenderer promptRenderer(List<PromptContextProvider> providers) {
         return new PebblePromptRenderer(providers);
     }
@@ -196,7 +189,6 @@ public class DefaultAgentRuntimeConfig {
                                DynamicToolActivations dynamicToolActivations,
                                AgentSessionRepository sessionRepository,
                                MessageRepository messageRepository,
-                               WorkspaceStore workspaceStore,
                                TodoListService todoListService,
                                Namespace namespace,
                                @Value("${mindconnect.tools.tavily-api-key:}") String tavilyApiKey,
@@ -234,7 +226,6 @@ public class DefaultAgentRuntimeConfig {
                 .service(DynamicToolActivations.class, dynamicToolActivations)
                 .service(AgentSessionRepository.class, sessionRepository)
                 .service(MessageRepository.class, messageRepository)
-                .service(WorkspaceStore.class, workspaceStore)
                 .service(TodoListService.class, todoListService)
                 .string("defaultBaseDir", baseDir)
                 // The data directory: workflows and memory vector stores live in <dataBaseDir>/<namespace>/.

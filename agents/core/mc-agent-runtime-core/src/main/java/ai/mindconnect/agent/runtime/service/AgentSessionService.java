@@ -230,7 +230,7 @@ public class AgentSessionService {
      * agent with this chat's overrides.
      *
      * <p>{@code agentDefinitionId} is set to the session agent's id either
-     * way, so the workspace scope, the message attribution and the
+     * way, so the message attribution and the
      * conversation participant keep working unchanged. For an inline agent
      * that id resolves to nothing in the registry — which is the point: the
      * chat is not findable under any agent, because it belongs to none.
@@ -258,12 +258,12 @@ public class AgentSessionService {
      * attaching the chat to a registry agent.
      *
      * <p>{@code agentDefinitionId} moves with the agent. It is the id the
-     * session is listed under and the key its workspace is filed by, and both
+     * session is listed under, and both
      * should describe the agent the chat actually runs — a chat detached from
      * "Poet" has no business still appearing under {@code ?agentId=Poet}.
      * The messages written so far keep the old id, which is right: they were
      * said by that agent. What the new agent does not inherit is the previous
-     * one's workspace — a different agent, a different memory.
+     * one's memory — a different agent, a different memory.
      */
     public AgentSession replaceSessionAgent(SessionId sessionId,
                                             SessionAgent agent) {

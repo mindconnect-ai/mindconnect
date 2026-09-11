@@ -9,7 +9,7 @@ import java.util.List;
 
 /**
  * What the admin UI adds to the chat surface: the way back to the agent, the
- * inspection dialogs (working memory, traces, todos, workspace) and the link
+ * inspection dialogs (working memory, traces, todos) and the link
  * to the session's LLM config.
  *
  * <p>These all point at {@code /admin/api/**}, which is exactly why they live
@@ -30,8 +30,7 @@ public class AdminChatHostLinks implements ChatHostLinks {
         return List.of(
                 new ToolLink("memory",    "Working Memory", "chart",  base + "/memory?dialog=true"),
                 new ToolLink("traces",    "Traces",         "list",   base + "/traces?dialog=true"),
-                new ToolLink("todos",     "Todos",          "check",  base + "/todos?dialog=true"),
-                new ToolLink("workspace", "Workspace",      "folder", base + "/workspace?dialog=true"));
+                new ToolLink("todos",     "Todos",          "check",  base + "/todos?dialog=true"));
     }
 
     @Override

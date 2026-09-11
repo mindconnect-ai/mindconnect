@@ -89,7 +89,7 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-message-repository-core` / `mc-message-repository`: conversation & message storage
     - `mc-agent-protocol` (+ `-openai`, `-mc-runtime`): protocol vocabulary and backend adapters
     - `mc-agent-tool-spi`: what a tool is — `Tool`, `ToolFactory`, `MultiToolProvider`, registry
-    - `mc-agent-tools*`: built-in tool providers (filesystem/workspace/bash, code, document, web, web-browser, workflow)
+    - `mc-agent-tools*`: built-in tool providers (filesystem/bash, code, document, web, web-browser, workflow)
     - `mc-credentials`: credential storage for tools & providers
   - `mcp/` — MCP servers as registered tools, split like the rest (ports in `-core`)
     - `mc-mcp-gateway-core` / `mc-mcp-gateway-local`: gateway ports and types / the in-process gateway

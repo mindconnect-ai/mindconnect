@@ -5,7 +5,6 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentPatch;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.common.StaleVersionException;
 
@@ -36,7 +35,7 @@ public class AgentRegistryService {
 
     /**
      * Creates a new agent. Validates the spec
-     * (non-blank name) and seeds the default workspace tools.
+     * (non-blank name); the agent starts with no tools.
      */
     public AgentDefinition create(AgentSpec spec) {
         if (spec.name() == null || spec.name().isBlank()) {
@@ -44,14 +43,6 @@ public class AgentRegistryService {
         }
         AgentDefinition def = AgentDefinition.create(spec.name(), spec.description(), spec.systemPrompt(),
                 spec.welcomeMessage(), spec.llmConfigName());
-        def = def.withTools(List.of(
-                AgentTool.of("workspace_read",
-                        "Reads a file from the agent workspace (session, agent, or user scope)."),
-                AgentTool.of("workspace_write",
-                        "Writes a file to the agent workspace (session or agent scope)."),
-                AgentTool.of("workspace_list",
-                        "Lists files in a workspace scope (session, agent, or user).")
-        ));
         return definitionRepository.save(def);
     }
 

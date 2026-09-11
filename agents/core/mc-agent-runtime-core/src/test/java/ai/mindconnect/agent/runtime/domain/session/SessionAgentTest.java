@@ -28,14 +28,14 @@ class SessionAgentTest {
     @Test
     void inlineAgentBindsEveryToolItNames() {
         var agent = InlineSessionAgent.of("Chat", "be helpful", "gpt",
-                List.of("workspace_read", "todo_write"), true);
+                List.of("file_read", "todo_write"), true);
 
         // A tool binding no longer points back at its agent — a tool call
         // learns the agent from its ToolCallScope.
         assertThat(agent.tools()).hasSize(2);
         assertThat(agent.tools()).extracting(t -> t.id()).doesNotHaveDuplicates();
         assertThat(agent.tools()).extracting(t -> t.name())
-                .containsExactly("workspace_read", "todo_write");
+                .containsExactly("file_read", "todo_write");
     }
 
     @Test

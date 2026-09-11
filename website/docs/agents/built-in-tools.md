@@ -74,17 +74,6 @@ the file tools). On a server a working directory must lie under
 `mindconnect.tools.working-dir-root` (default: the base directory); the CLI
 sets that root to `/`.
 
-## Workspace tools (`mc-agent-tools`)
-
-The shared file area agents use to exchange work (see
-[workspace & collaboration](./workspace.md)). No keys required.
-
-| Tool | Description |
-|------|-------------|
-| `workspace_write` | Writes (or overwrites) a file in a workspace scope. |
-| `workspace_read` | Reads a file from a workspace scope. |
-| `workspace_list` | Lists files available in a workspace scope. |
-
 ## Web tools (`mc-agent-tools-web`)
 
 | Tool | Description | Needs |

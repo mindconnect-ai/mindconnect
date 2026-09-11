@@ -30,7 +30,7 @@ any other agent it discovers via `list_agents`. You create it by editing JSON in
   "systemPrompt": "You are a research lead. …",
   "llmConfigName": "agent-default",
   "memoryConfig": { "kind": "auto_compact", "compactAtRatio": 0.8 },
-  "tools": [ { "name": "run_agents" }, { "name": "workspace_write" } ]
+  "tools": [ { "name": "run_agents" }, { "name": "todo_write" } ]
 }
 ```
 

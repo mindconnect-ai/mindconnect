@@ -7,7 +7,7 @@ import java.util.List;
  * Used by the /memory endpoint and CLI /memory command.
  */
 public record WorkingMemory(
-        /** The fully-built system prompt text (after workspace injection). */
+        /** The fully-built system prompt text (after the prompt providers ran). */
         String systemPrompt,
         /** Token count for the system prompt. */
         int systemPromptTokens,

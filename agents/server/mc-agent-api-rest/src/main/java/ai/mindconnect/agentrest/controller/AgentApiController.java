@@ -95,8 +95,7 @@ public class AgentApiController {
     // ── Agent CRUD ──────────────────────────────────────────────────────────
 
     @Operation(tags = "Agents", summary = "Create an agent",
-            description = "Creates an agent with the default workspace tools "
-                    + "(workspace_read/write/list) pre-registered.")
+            description = "Creates an agent; it starts with no tools.")
     @PostMapping("/agents")
     public AgentDefinition createAgent(@RequestBody CreateAgentRequest req) {
         log.info("POST /api/agents name={}", req.name());

@@ -20,7 +20,6 @@ import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.service.InlineAgentTools;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
@@ -60,7 +59,6 @@ public class ChatUiController {
     private final AgentDefinitionRepository agentRepository;
     private final AgentSessionRepository sessionRepository;
     private final TodoListService todoListService;
-    private final WorkspaceStore workspaceStore;
     private final ObjectMapper objectMapper;
     /** Optional — null in setups where trace persistence is disabled. */
     private final LlmCallTraceRepository traceRepository;
@@ -82,7 +80,6 @@ public class ChatUiController {
                              AgentDefinitionRepository agentRepository,
                              AgentSessionRepository sessionRepository,
                              TodoListService todoListService,
-                             WorkspaceStore workspaceStore,
                              ObjectMapper objectMapper,
                              LlmCallTraceRepository traceRepository,
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
@@ -101,7 +98,6 @@ public class ChatUiController {
         this.agentRepository = agentRepository;
         this.sessionRepository = sessionRepository;
         this.todoListService = todoListService;
-        this.workspaceStore = workspaceStore;
         this.objectMapper = objectMapper;
         this.traceRepository = traceRepository;
         this.activeStreams = activeStreams;
@@ -238,9 +234,9 @@ public class ChatUiController {
             agent = new SessionAgentRef(
                     def.id(), true, def.name(), llm, toolOverride, searchOverride, prompt);
         } else {
-            // Staying inline keeps the same agent — and therefore the same
-            // workspace — while only the model and tools change. Coming from a
-            // ref agent it is a new one, and the switch says so.
+            // Staying inline keeps the same agent while only the model and
+            // tools change. Coming from a ref agent it is a new one, and the
+            // switch says so.
             var previous = sessionOpt.get().mainAgent().orElse(null);
             String prompt = body.str("systemPrompt");
             var fresh = inlineAgent(body.str("llmConfigName"),
@@ -591,8 +587,7 @@ public class ChatUiController {
             Today's date: {{ current_date }}
 
             You can call specialised sub-agents with `run_agent` when a task
-            needs one — `list_agents` shows which exist. Use the workspace
-            tools to keep notes across the conversation, and `todo_write` to
+            needs one — `list_agents` shows which exist. Use `todo_write` to
             publish a plan before starting anything with several steps.
             """;
 

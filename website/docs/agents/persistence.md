@@ -6,7 +6,7 @@ sidebar_position: 8
 # Persistence
 
 Everything the runtime needs to remember — agent definitions, sessions,
-messages, working memory, summaries, todos, LLM-call traces, the workspace —
+messages, working memory, summaries, todos, LLM-call traces —
 is stored through a small set of **repository ports**. Two implementations
 ship: the default writes plain files to disk, the other keeps everything in
 **Postgres**. One setting switches between them; nothing else in the runtime,
@@ -29,7 +29,6 @@ matching adapter in `adapter/file`:
 | `TodoListRepository` | Session todo lists | `FileTodoListRepository` | `PgTodoListRepository` |
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
 | `LlmConfigRepository` | LLM configs (credentials encrypted) | `FileLlmConfigRepository` | `PgLlmConfigRepository` |
-| `WorkspaceStore` | Workspace files | `FileWorkspaceStore` | `PgWorkspaceStore` |
 | `FileStore` | Uploaded files (ports in `mc-file-store-core`) | `FilesystemFileStore` | `PgFileStore` |
 | `WorkflowDataRepository` | Workflow definitions ([workflow area](../workflow/overview.md)) | `FileWorkflowDataRepository` | `PgWorkflowDataRepository` |
 | `WorkflowInstanceRepository` | Suspended workflow runs | `FileWorkflowInstanceRepository` | `PgWorkflowInstanceRepository` |
@@ -121,7 +120,7 @@ have written, rendered by the application's `ObjectMapper`.
 
 The tables are named `mc_agent_definition`, `mc_agent_session`,
 `mc_conversation`, `mc_message`, `mc_working_memory`, `mc_conversation_summary`,
-`mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`, `mc_workspace_file`,
+`mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`,
 `mc_workflow`, `mc_workflow_instance` and `mc_file`. The small JDBC layer
 underneath — `Sql`, `Row`, `DocumentTable` — lives in `common/mc-jdbc`; the
 adapters are the `agents/adapter/postgres/*-pg` and

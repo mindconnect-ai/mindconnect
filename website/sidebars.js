@@ -41,7 +41,6 @@ const sidebars = {
             },
             'agents/memory',
             'agents/prompt-renderer',
-            'agents/workspace',
             'agents/vector-store',
             'agents/persistence',
             'agents/creating-a-tool',
