@@ -30,6 +30,18 @@ public class InMemoryMessageRepository implements MessageRepository {
         return message;
     }
 
+    /** Serialized with {@link #append}, so a change is applied to the message as it is stored. */
+    @Override
+    public synchronized Optional<Message> update(ConversationId conversation, MessageId id,
+                                                 java.util.function.UnaryOperator<Message> change) {
+        Optional<Message> current = findById(conversation, id);
+        if (current.isEmpty()) return Optional.empty();
+        Message changed = java.util.Objects.requireNonNull(change.apply(current.get()),
+                "update: the change returned null");
+        if (changed != current.get()) save(changed);
+        return Optional.of(changed);
+    }
+
     @Override
     public List<Message> findByConversation(ConversationId conversationId, PageRequest page) {
         return store.stream()

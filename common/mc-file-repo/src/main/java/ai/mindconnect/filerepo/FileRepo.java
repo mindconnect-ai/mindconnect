@@ -15,6 +15,9 @@ import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -49,10 +52,25 @@ public final class FileRepo {
 
     private static final ConcurrentHashMap<Path, FileRepo> OPEN = new ConcurrentHashMap<>();
 
+    /** How many {@link RecordLog} directories keep their index in memory; the least recently used go first. */
+    private static final int MAX_LOG_STATES = 1024;
+
     private final Path root;
 
     @SuppressWarnings({"unused", "FieldCanBeLocal"}) // held for the lifetime of the JVM
     private final FileLock processLock;
+
+    /**
+     * The indexes of the {@link RecordLog} directories, shared by every log on this
+     * partition. A dropped index is read again from the file names on next use.
+     */
+    private final Map<Path, LogState> logStates = Collections.synchronizedMap(
+            new LinkedHashMap<>(64, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<Path, LogState> eldest) {
+                    return size() > MAX_LOG_STATES;
+                }
+            });
 
     private FileRepo(Path root) {
         this.root = root;
@@ -96,6 +114,19 @@ public final class FileRepo {
             throw new IllegalArgumentException("Path leads out of the partition " + root + ": " + relative);
         }
         return file;
+    }
+
+    LogState logState(Path dir) {
+        return logStates.get(dir);
+    }
+
+    void putLogState(Path dir, LogState state) {
+        logStates.put(dir, state);
+    }
+
+    /** Drops every in-memory index, as a restart would. */
+    void forgetLogStates() {
+        logStates.clear();
     }
 
     /** Deletes the temporary files of interrupted writes that are older than {@code age}; returns how many. */

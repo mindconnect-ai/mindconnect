@@ -1,194 +1,76 @@
 package ai.mindconnect.message.adapter.file;
 
-import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.MessageId;
-
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.filerepo.FileRepo;
+import ai.mindconnect.filerepo.RecordLog;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.port.out.MessageRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.IntFunction;
+import java.util.function.UnaryOperator;
 import java.util.logging.Logger;
-import java.util.stream.Stream;
-import java.nio.file.PathMatcher;
 
 /**
  * Stores messages under:
- *   {base}/conversations/{conversationId}/messages/{seq}_{messageId}.json
+ *   {base}/{namespace}/conversations/{conversationId}/messages/{seq}_{messageId}.json
  *
- * Co-located with the conversation.json written by FileConversationRepository.
+ * <p>Co-located with the conversation.json written by FileConversationRepository.
+ * The directory is a {@link RecordLog}: the next sequence number comes from its
+ * in-memory index under the conversation's write lock, so appending lists
+ * nothing and two appends never share a number — not even after the newest
+ * messages were deleted. A history page reads only its own messages, and
+ * finding a message by id opens one file.
  */
 public class FileMessageRepository implements MessageRepository {
 
     private static final Logger log = Logger.getLogger(FileMessageRepository.class.getName());
 
-    /**
-     * Locks for {@link #append}, one bucket per conversation by hash. A
-     * fixed set rather than one per conversation: nothing to create, and
-     * nothing that grows for as long as the process lives. Two
-     * conversations sharing a bucket wait for each other now and then,
-     * which costs a moment and breaks nothing.
-     *
-     * <p>Process-wide, which is what a directory of files is: two JVMs
-     * writing into the same store would still hand out the same number.
-     */
-    private static final int APPEND_LOCKS = 64;
-
-    private final ReentrantLock[] appendLocks = Stream.generate(ReentrantLock::new)
-            .limit(APPEND_LOCKS).toArray(ReentrantLock[]::new);
-
-    private final Path baseDir;
-    private final ObjectMapper objectMapper;
+    private final RecordLog<ConversationId, Message> messages;
 
     public FileMessageRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        this.baseDir = messageStorageDir.resolve(namespace.value()).resolve("conversations").toAbsolutePath();
-        this.objectMapper = objectMapper;
-        log.info("MessageRepository storage: " + this.baseDir);
+        FileRepo repo = FileRepo.open(messageStorageDir, namespace.value());
+        this.messages = RecordLog.of(Message.class)
+                .dir((ConversationId conversation) -> "conversations/" + conversation.value() + "/messages")
+                .key(Message::sequenceNum)
+                .id(m -> m.id().value())
+                .build(repo, objectMapper);
+        log.info("MessageRepository storage: " + repo.resolve("conversations"));
     }
 
     @Override
     public Message save(Message message) {
-        try {
-            Path dir = messagesDir(message.conversationId());
-            Files.createDirectories(dir);
-            Path file = fileFor(message);
-            boolean isUpdate = Files.exists(file);
-            AtomicFiles.write(file, out -> objectMapper.writeValue(out, message));
-            if (!isUpdate) {
-                log.fine("Saved new message " + message.id());
-            } else {
-                log.fine("Updated existing message " + message.id());
-            }
-            return message;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return messages.put(message.conversationId(), message);
     }
 
     @Override
-    public List<Message> findByConversation(ConversationId conversationId, PageRequest page) {
-        Path dir = messagesDir(conversationId);
-        if (!Files.exists(dir)) return List.of();
-        try (var stream = Files.list(dir)) {
-            return stream
-                    .filter(p -> p.toString().endsWith(".json"))
-                    .sorted()
-                    .map(p -> read(p, conversationId))
-                    .skip(page.offset())
-                    .limit(page.size())
-                    .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    public Optional<Message> update(ConversationId conversation, MessageId id, UnaryOperator<Message> change) {
+        return messages.update(conversation, id.value(), change);
     }
 
     @Override
-    public Optional<Message> findById(ConversationId conversationId, MessageId id) {
-        Path dir = messagesDir(conversationId);
-        if (!Files.exists(dir)) return Optional.empty();
-        // Use glob to match "*_{messageId}.json" — avoids full directory scan
-        PathMatcher matcher = dir.getFileSystem()
-                .getPathMatcher("glob:**/*_" + id.value() + ".json");
-        try (var stream = Files.list(dir)) {
-            return stream
-                    .filter(matcher::matches)
-                    .findFirst()
-                    .map(p -> read(p, conversationId));
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    public List<Message> findByConversation(ConversationId conversation, PageRequest page) {
+        return messages.page(conversation, page.offset(), page.size());
     }
 
     @Override
-    public Message append(ConversationId conversationId, IntFunction<Message> create) {
-        ReentrantLock lock = appendLocks[Math.floorMod(conversationId.hashCode(), APPEND_LOCKS)];
-        lock.lock();
-        try {
-            return save(create.apply(maxSequenceNum(conversationId) + 1));
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /**
-     * The highest number in the conversation, 0 when it has no messages.
-     * Read from the file names, which carry it zero-padded in front, so
-     * this costs a directory listing and opens nothing.
-     */
-    private int maxSequenceNum(ConversationId conversationId) {
-        Path dir = messagesDir(conversationId);
-        if (!Files.exists(dir)) return 0;
-        try (var stream = Files.list(dir)) {
-            return stream.filter(p -> p.toString().endsWith(".json"))
-                    .mapToInt(p -> seqOf(p.getFileName().toString()))
-                    .filter(seq -> seq >= 0)
-                    .max().orElse(0);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    /** The leading digits of "0000000012_<uuid>.json"; -1 for a name of another shape. */
-    private static int seqOf(String fileName) {
-        int underscore = fileName.indexOf('_');
-        if (underscore < 1) return -1;
-        try {
-            return Integer.parseInt(fileName.substring(0, underscore));
-        } catch (NumberFormatException e) {
-            return -1;
-        }
+    public Optional<Message> findById(ConversationId conversation, MessageId id) {
+        return messages.find(conversation, id.value());
     }
 
     @Override
-    public void deleteBySequenceRange(ConversationId conversationId, int fromSeq, int toSeq) {
-        Path dir = messagesDir(conversationId);
-        if (!Files.exists(dir)) return;
-        try (var stream = Files.list(dir)) {
-            stream.filter(p -> p.toString().endsWith(".json"))
-                    .forEach(p -> {
-                        int seq = seqOf(p.getFileName().toString());
-                        if (seq >= 0 && seq >= fromSeq && seq <= toSeq) {
-                            try {
-                                Files.delete(p);
-                                log.fine("Deleted message file: " + p.getFileName());
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
-                        }
-                    });
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    public Message append(ConversationId conversation, IntFunction<Message> create) {
+        return messages.append(conversation, seq -> create.apply(Math.toIntExact(seq)));
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
-
-    private Path messagesDir(ConversationId conversationId) {
-        return baseDir.resolve(conversationId.value()).resolve("messages");
-    }
-
-    private Path fileFor(Message message) {
-        String name = String.format("%010d_%s.json", message.sequenceNum(), message.id().value());
-        return messagesDir(message.conversationId()).resolve(name);
-    }
-
-    /** A message written before the namespace was recorded takes it from the conversation asked for. */
-    private Message read(Path file, ConversationId conversationId) {
-        try {
-            return objectMapper.readerFor(Message.class)
-                    .readValue(file.toFile());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    @Override
+    public void deleteBySequenceRange(ConversationId conversation, int fromSeq, int toSeq) {
+        messages.deleteKeyRange(conversation, fromSeq, toSeq);
     }
 }

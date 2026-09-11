@@ -60,6 +60,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
   its holder, and a second process on the same partition (namespace) of a data
   directory is refused — processes serving different namespaces share the
   directory as before. The file session store is the first to use it.
+- **common:** `RecordLog` in `mc-file-repo` — an ordered log of JSON records
+  per parent (the messages of a conversation), one file per record, with an
+  in-memory index of the file names: `append` hands out the next key under
+  the directory's lock, pages read only their records, and a deleted tail's
+  keys are never handed out again.
+- **agents:** `MessageRepository.update(conversation, id, change)` changes a
+  stored message in one step.
 - **common:** `DocumentTable.insert` (writes a new row, `false` when the key
   exists) and `DocumentTable.update(key, change)`, which reads the row
   `FOR UPDATE` and writes the change in the same transaction.
@@ -135,6 +142,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   session, changed its copy and wrote it back, so whichever came last silently
   dropped what the others had written. The generated title also no longer
   replaces a name the user gave the chat while it was being generated.
+- **agents:** a message's token count, duration and compressed form no longer
+  overwrite each other when they are set at the same time, and deleting the
+  newest messages of a conversation no longer hands their sequence numbers to
+  the next messages — summaries that covered the deleted range used to claim
+  the new messages as well. With the file persistence a history page now reads
+  only its own messages and appending lists nothing.
 
 - **agents:** tool calls no longer fail at random when sub-agents run in
   parallel. With the file persistence most stores truncated a file and wrote it

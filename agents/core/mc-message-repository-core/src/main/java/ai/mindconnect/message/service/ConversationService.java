@@ -85,23 +85,17 @@ public class ConversationService implements ConversationManager {
 
     @Override
     public void compressMessage(ConversationId conversation, MessageId message, String stub, Integer compressedTokenCount) {
-        messageRepository.findById(conversation, message)
-                .map(m -> m.withCompressed(stub, compressedTokenCount))
-                .ifPresent(messageRepository::save);
+        messageRepository.update(conversation, message, m -> m.withCompressed(stub, compressedTokenCount));
     }
 
     @Override
     public void updateTokenCount(ConversationId conversation, MessageId message, int tokenCount) {
-        messageRepository.findById(conversation, message)
-                .map(m -> m.withTokenCount(tokenCount))
-                .ifPresent(messageRepository::save);
+        messageRepository.update(conversation, message, m -> m.withTokenCount(tokenCount));
     }
 
     @Override
     public void updateDurationMs(ConversationId conversation, MessageId message, long durationMs) {
-        messageRepository.findById(conversation, message)
-                .map(m -> m.withDurationMs(durationMs))
-                .ifPresent(messageRepository::save);
+        messageRepository.update(conversation, message, m -> m.withDurationMs(durationMs));
     }
 
     @Override
