@@ -214,11 +214,52 @@ fresh empty one, so nothing has to be moved by hand at release time.
   running thread, and a workflow tool-call step resolves its tools in that
   scope, so an ingestion workflow runs against the session's own files.
 
+- **agents:** a bundled `coding-assistant` agent beside `default-chat`: it
+  works in the project chosen with the chat's folder button — `grep` and
+  `glob` to orient, `file_read` with line numbers, `file_edit` for exact
+  changes, `file_write` for new files, `bash` (with approval) for the build
+  and tests, `todo_write` for the plan, and the `explorer` sub-agent for a
+  sweep of an unfamiliar codebase. Forty tool rounds per turn, auto-compact
+  memory.
+
+- **agents:** two file tools for editing code: `file_edit` replaces one
+  exact passage of a file (`old_string` → `new_string`; the passage must
+  be unique unless `replace_all`) and returns a unified diff of the
+  change, and `grep` searches file contents for a regular expression under
+  a directory or in one file — `file:line: text`, newest files first, with
+  `glob`, `ignore_case`, `context` and `files_only`, binary files and build
+  directories skipped, results capped. `file_edit` forgives indentation the
+  model got wrong when the passage is otherwise unique and keeps the
+  file's own, and answers a passage that is not there with the closest
+  one, numbered, so the next attempt copies what the file really says. `file_read` now numbers its lines
+  `cat -n` style and pages through a long file with `offset` and `limit`
+  (2,000 lines or 20,000 characters per call, and it says where to
+  continue); a binary file is refused with a pointer to the document
+  tools. The bundled `default-chat`, `code-analyst`, `explorer`, `verifier`
+  and `file-finder` agents get the new tools.
+
+- **agents:** `bash` takes a `timeout` (seconds, default 120, max 600) and
+  caps its output at 30,000 characters, keeping the head and counting the
+  rest. With `background` it starts a command that is not meant to return
+  — a dev server, a watcher — watches it for three seconds and answers
+  with the pid, whether it still runs or already exited with which code,
+  the log so far and the log file under `logs/` in the session's
+  directory, so a build error is in the tool result instead of in a file
+  nobody reads; `process_kill` ends such
+  a process (with everything it spawned) or lists the session's, and
+  whatever still runs when the runtime stops is killed with it.
+
 ### Changed
 
 - **agents:** an upload's copy for ingestion goes into the session's own
   directory instead of `vector-store-uploads/` under the tools base
   directory — the user's home, on most machines.
+
+- **agents:** the Admin UI app lets a session work anywhere under the
+  user's home by default (`mindconnect.tools.working-dir-root` set to
+  `${user.home}` in its yaml, `MC_WORKING_DIR_ROOT` to override) — it is a
+  one-user app on a developer's machine; the users' home stays the default
+  root for the API app and for any host that does not set the property.
 
 ### Removed
 
@@ -315,6 +356,25 @@ fresh empty one, so nothing has to be moved by hand at release time.
   unreadable summaries file is no longer overwritten with just the newest
   summary. A tool task that does fail is logged, and the tool result names the
   reason.
+
+- **agents:** the LLM-config form no longer fails with a 500 while a base
+  URL for LM Studio is being typed: a host without a scheme is taken as
+  `http://`, and what is not a URL yet reads as an unreachable server in
+  the model catalog instead of an exception.
+
+- **agents:** switching a chat's model or agent in the *Model & tools*
+  dialog no longer drops the chat's working directory and additional
+  directories: the file tools went back to the server's default directory
+  after a switch, and the model started searching the wrong tree.
+
+- **agents:** `bash` no longer reports a false timeout for a command that
+  prints more than the pipe holds (about 64 KB): the output is drained
+  while the command runs instead of after it finished, which it never did
+  once the pipe was full.
+
+- **agents:** stopping a turn, or a timeout, now ends what a `bash` command
+  started, not just the shell: `bash -c "npm run dev"` left npm and the
+  node server running on their port after the shell was killed.
 
 ## [0.7.0] - 2026-09-11
 

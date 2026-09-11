@@ -181,6 +181,9 @@ class LmStudioModelCatalogTest {
         assertThat(LmStudioModelCatalog.normalise("  ")).isEqualTo("http://localhost:1234");
         assertThat(LmStudioModelCatalog.normalise("http://box:1234/")).isEqualTo("http://box:1234");
         assertThat(LmStudioModelCatalog.normalise("http://box:1234/v1")).isEqualTo("http://box:1234");
+        assertThat(LmStudioModelCatalog.normalise("box:1234")).as("a host without a scheme means http")
+                .isEqualTo("http://box:1234");
+        assertThat(LmStudioModelCatalog.normalise("HTTPS://box")).isEqualTo("HTTPS://box");
     }
 
     @Test
@@ -196,5 +199,16 @@ class LmStudioModelCatalogTest {
         var embedding = new LmStudioModel("nomic", "nomic", LmStudioModel.Kind.EMBEDDING,
                 true, 2048, 2048, false, false);
         assertThat(embedding.label()).isEqualTo("nomic · 2k loaded · embedding");
+    }
+
+    @Test
+    void halfATypedUrlIsAnUnreachableServer_notAnException() {
+        var catalog = new LmStudioModelCatalog(new OkHttpClient(), new ObjectMapper());
+
+        var result = catalog.fetch("dbeise:not a port");
+
+        assertThat(result.available()).isFalse();
+        assertThat(result.error()).startsWith("Not a URL: http://dbeise:not a port");
+        assertThat(result.models()).isEmpty();
     }
 }

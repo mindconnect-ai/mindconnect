@@ -32,6 +32,13 @@
       "name": "get_current_datetime",
       "description": "Returns the current date and time.",
       "enabled": true
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000033",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000006",
+      "name": "grep",
+      "description": "Searches file contents for a regular expression under a directory, like grep -rn; glob narrows the files.",
+      "enabled": true
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",

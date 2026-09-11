@@ -92,4 +92,26 @@ class AgentRuntimeBuilderTest {
                     .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
         }
     }
+
+    @Test
+    void switchingTheModelKeepsTheSessionsDirectories() throws Exception {
+        try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))
+                .llmConfig(LlmConfig.lmStudio("other-llm", "other-model", "http://localhost:9"))
+                .agentDefinition(demoAgent())
+                .build()) {
+            AgentSession session = runtime.openSession("test-agent", UserId.of("user-1"));
+            java.nio.file.Path own = java.nio.file.Path.of(session.workingDir());
+            java.nio.file.Path project = java.nio.file.Files.createDirectories(own.getParent().getParent().resolve("proj"));
+            runtime.changeWorkingDir(session.id(), project);
+
+            var def = runtime.agentDefinitions().findByName("test-agent").orElseThrow();
+            AgentSession switched = runtime.sessionService().replaceSessionAgent(session.id(),
+                    new ai.mindconnect.agent.runtime.domain.session.SessionAgentRef(
+                            def.id(), true, def.name(), "other-llm", null, null, null));
+
+            assertThat(switched.workingDir()).as("a model switch is not a cd").isEqualTo(project.toRealPath().toString());
+            assertThat(switched.additionalDirs()).containsExactly(own.toString());
+        }
+    }
 }

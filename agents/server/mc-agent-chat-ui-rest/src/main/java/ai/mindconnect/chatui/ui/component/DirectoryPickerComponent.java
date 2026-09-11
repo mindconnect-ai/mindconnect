@@ -38,8 +38,16 @@ public final class DirectoryPickerComponent {
     /** The form's id — browsing redraws the form under it. */
     public static final String ID = "chat-dir-picker";
 
-    /** The field the chosen path travels in. */
-    public static final String PATH_FIELD = "path";
+    /**
+     * The field the chosen path travels in. Not {@code path}: the client
+     * sends a form's fields along with every action in it, and a GET action
+     * — Up — would then carry the field beside its own {@code path} query
+     * parameter, and Spring would join the two with a comma.
+     */
+    public static final String PATH_FIELD = "dir";
+
+    /** The field a new folder's name travels in. */
+    public static final String NEW_FOLDER_FIELD = "newFolder";
 
     private DirectoryPickerComponent() {}
 
@@ -59,7 +67,7 @@ public final class DirectoryPickerComponent {
                                 .onClick(trigger(on(ChatUiController.class).goDir(sessionId, null, null), ID))))
                 .content(UiStack.of(ID + "-lists").gap(12)
                         .child(folders(sessionId, listing))
-                        .child(additional(sessionId, session)))
+                        .child(additional(sessionId, session, listing)))
                 .action(UiAction.primary("use", "Use this folder").icon("check")
                         .onClick(trigger(on(ChatUiController.class).useDir(sessionId, null, null), ID)))
                 .action(UiAction.secondary("cancel", "Cancel")
@@ -82,6 +90,13 @@ public final class DirectoryPickerComponent {
             list.item(UiList.Item.of(ID + "-f-none", "No folders inside"));
         }
         var stack = UiStack.of(ID + "-tree").gap(4).child(list);
+        // A folder that does not exist yet: named here, created in the
+        // directory shown, and the dialog steps into it.
+        stack.child(UiField.text(NEW_FOLDER_FIELD, "New folder", null)
+                .asEditable()
+                .placeholder("Name of a folder to create in " + name(listing.current()))
+                .trailing(UiAction.secondary("create", "Create").icon("folder-plus")
+                        .onClick(trigger(on(ChatUiController.class).createDir(sessionId, null, null), ID))));
         if (listing.truncated()) {
             stack.child(UiText.of(ID + "-more", "Only the first " + WorkingDirBrowser.MAX_ENTRIES
                     + " folders are shown — type the path instead."));
@@ -92,10 +107,14 @@ public final class DirectoryPickerComponent {
         return stack;
     }
 
-    /** The directories the chat reaches beside its working one, each removable, plus a way to add the field's. */
-    private static UiNode additional(SessionId sessionId, AgentSession session) {
+    /**
+     * The directories the chat reaches beside its working one, each
+     * removable, plus a way to add the one shown above — the button names
+     * it, so "this folder" is never in doubt.
+     */
+    private static UiNode additional(SessionId sessionId, AgentSession session, WorkingDirBrowser.Listing listing) {
         var list = UiList.of(ID + "-extra", "Additional directories").icon("folder-plus")
-                .action(UiAction.secondary("add", "Add this folder").icon("add")
+                .action(UiAction.secondary("add", "Add " + name(listing.current())).icon("add")
                         .onClick(trigger(on(ChatUiController.class).addDir(sessionId, null, null), ID)));
         for (String dir : session.additionalDirs()) {
             list.item(UiList.Item.of(ID + "-x-" + itemId(dir), dir).icon("folder")
@@ -103,8 +122,10 @@ public final class DirectoryPickerComponent {
                             .onClick(trigger(on(ChatUiController.class).removeDir(sessionId, dir, null)))));
         }
         if (session.additionalDirs().isEmpty()) {
-            list.item(UiList.Item.of(ID + "-x-none", "None — reachable by absolute path beside the working "
-                    + "directory: a library checked out next to the project, a data folder."));
+            list.item(UiList.Item.of(ID + "-x-none", "None yet. Step into a folder above — a library next to "
+                    + "the project, a data folder — and add it here; the chat then reaches it by absolute "
+                    + "path beside its working directory. Add as many as you need, then go back to the "
+                    + "project and use it."));
         }
         return list;
     }

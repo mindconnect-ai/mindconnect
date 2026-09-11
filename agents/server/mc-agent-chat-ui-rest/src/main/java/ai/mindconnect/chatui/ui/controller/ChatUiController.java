@@ -324,6 +324,21 @@ public class ChatUiController {
                         : "Working in the server's default directory.").title("Working directory")));
     }
 
+    /** Creates the named folder in the directory shown and steps into it — the chooser's New folder. */
+    @PostMapping("/sessions/{sessionId}/dirs/create")
+    public ResponseEntity<UiPatch> createDir(@PathVariable SessionId sessionId,
+                                             @RequestBody Map<String, Object> raw,
+                                             @AuthenticationPrincipal OidcUser user) {
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var session = sessionOpt.get();
+        String name = raw == null ? null
+                : new FormBody(raw).str(ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.NEW_FOLDER_FIELD);
+        var created = dirBrowser.create(session.userId(), pathOf(raw), name);
+        return ResponseEntity.ok(redrawnPicker(session, dirBrowser.list(session.userId(), created.toString()))
+                .toast(ai.mindconnect.ui.model.UiToast.success("Created " + created).title("New folder")));
+    }
+
     /** Adds the field's path to the additional directories; the dialog stays open and shows it. */
     @PostMapping("/sessions/{sessionId}/dirs/add")
     public ResponseEntity<UiPatch> addDir(@PathVariable SessionId sessionId,

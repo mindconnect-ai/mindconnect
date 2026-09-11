@@ -36,8 +36,8 @@ class FileToolsRootsTest {
         FileRoots roots = roots();
         FileReadTool read = new FileReadTool(roots);
 
-        assertThat(read.execute(Map.of("path", "README.md"))).isEqualTo("# project");
-        assertThat(read.execute(Map.of("path", tmp.resolve("lib/util.java").toString()))).isEqualTo("class Util {}");
+        assertThat(read.execute(Map.of("path", "README.md"))).isEqualTo("1\t# project");
+        assertThat(read.execute(Map.of("path", tmp.resolve("lib/util.java").toString()))).isEqualTo("1\tclass Util {}");
         assertThat(read.execute(Map.of("path", tmp.resolve("secret/key.txt").toString())))
                 .startsWith("Error: path is outside the allowed directories (");
         assertThat(read.execute(Map.of("path", "../secret/key.txt")))

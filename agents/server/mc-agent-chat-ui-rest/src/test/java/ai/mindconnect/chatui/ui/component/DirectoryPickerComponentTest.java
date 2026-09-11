@@ -40,7 +40,8 @@ class DirectoryPickerComponentTest {
 
         String out = json(DirectoryPickerComponent.form(SESSION, session(), listing));
 
-        assertThat(out).contains("\"id\":\"path\"").contains("\"value\":\"/srv/users/u/app\"");
+        assertThat(out).as("the field is not called path: a GET action in the form would carry it beside its own path parameter")
+                .contains("\"id\":\"dir\"").doesNotContain("\"id\":\"path\"").contains("\"value\":\"/srv/users/u/app\"");
         assertThat(out).as("use, open and add post the form, so the field's path travels with them")
                 .contains("\"url\":\"" + BASE + "/use\"")
                 .contains("\"url\":\"" + BASE + "/go\"")
@@ -51,7 +52,12 @@ class DirectoryPickerComponentTest {
                 .contains("\"url\":\"" + BASE + "?path=/srv/users/u/app/my%20docs\"")
                 .contains("\"label\":\"Up\"")
                 .contains("\"url\":\"" + BASE + "?path=/srv/users/u\"");
-        assertThat(out).contains("Folders in app").contains("Anything under /srv/users/u goes.");
+        assertThat(out).contains("Folders in app").contains("Anything under /srv/users/u goes.")
+                .as("the add button names the folder shown").contains("\"label\":\"Add app\"");
+        assertThat(out).as("a new folder: named in its own field, created by a form action")
+                .contains("\"id\":\"newFolder\"")
+                .contains("\"url\":\"" + BASE + "/create\"")
+                .contains("Name of a folder to create in app");
     }
 
     @Test
@@ -74,7 +80,8 @@ class DirectoryPickerComponentTest {
                 AgentSession.start(AgentId.random(), UserId.of("u"), ConversationId.random()), listing));
 
         assertThat(out).contains("Only the first " + WorkingDirBrowser.MAX_ENTRIES + " folders are shown")
-                .contains("None — reachable by absolute path")
+                .contains("None yet. Step into a folder above")
+                .contains("\"label\":\"Add u\"")
                 .doesNotContain("Anything under");
     }
 

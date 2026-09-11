@@ -113,6 +113,8 @@ public class LmStudioModelCatalog {
 
     static String normalise(String baseUrl) {
         String base = baseUrl == null || baseUrl.isBlank() ? DEFAULT_BASE_URL : baseUrl.trim();
+        // A host typed without a scheme — "my-mac:1234" — means http; LM Studio speaks nothing else locally.
+        if (!base.matches("(?i)https?://.*")) base = "http://" + base;
         while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
         // Configs sometimes carry the OpenAI prefix; the native API lives next to it.
         if (base.endsWith("/v1")) base = base.substring(0, base.length() - 3);
@@ -120,7 +122,13 @@ public class LmStudioModelCatalog {
     }
 
     private JsonNode get(String url) throws IOException {
-        Request request = new Request.Builder().url(url).get().build();
+        Request request;
+        try {
+            request = new Request.Builder().url(url).get().build();
+        } catch (IllegalArgumentException e) {
+            // Half a URL, typed into the form as we speak: no server there yet.
+            throw new Unreachable("Not a URL: " + url, e);
+        }
         Response response;
         try {
             response = httpClient.newCall(request).execute();

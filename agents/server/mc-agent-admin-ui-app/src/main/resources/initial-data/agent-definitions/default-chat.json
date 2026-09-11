@@ -196,6 +196,39 @@
       "deferred": false,
       "needsApproval": true,
       "maxResultChars": null
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000071",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
+      "name": "file_edit",
+      "description": "Replaces one exact passage of a text file with another and returns a unified diff; read the file first.",
+      "overrides": {"mountDir": "~"},
+      "enabled": true,
+      "deferred": false,
+      "needsApproval": true,
+      "maxResultChars": null
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000072",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
+      "name": "grep",
+      "description": "Searches file contents for a regular expression under a directory, like grep -rn; glob narrows the files.",
+      "overrides": {"mountDir": "~"},
+      "enabled": true,
+      "deferred": false,
+      "needsApproval": true,
+      "maxResultChars": null
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000073",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
+      "name": "process_kill",
+      "description": "Ends a process bash started with background=true, with everything it spawned; without a pid lists them.",
+      "overrides": {"mountDir": "~"},
+      "enabled": true,
+      "deferred": false,
+      "needsApproval": true,
+      "maxResultChars": null
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",

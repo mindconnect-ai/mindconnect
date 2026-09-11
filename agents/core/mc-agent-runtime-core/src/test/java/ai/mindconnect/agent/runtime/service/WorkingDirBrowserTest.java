@@ -84,4 +84,28 @@ class WorkingDirBrowserTest {
         assertThat(listing.subdirs()).hasSize(WorkingDirBrowser.MAX_ENTRIES);
         assertThat(listing.truncated()).isTrue();
     }
+
+    @Test
+    void aFolderIsCreatedInsideTheTree_andNowhereElse() throws Exception {
+        Files.createDirectories(tmp.resolve("root/projects"));
+        var browser = new WorkingDirBrowser(WorkingDirPolicy.within(tmp.resolve("root").toString()));
+
+        Path created = browser.create("alice", tmp.resolve("root/projects").toString(), " my-app ");
+        assertThat(created).isEqualTo(tmp.resolve("root/projects/my-app"));
+        assertThat(Files.isDirectory(created)).isTrue();
+        assertThat(browser.create("alice", null, "at-root")).as("no parent: the root")
+                .isEqualTo(tmp.resolve("root/at-root"));
+        assertThat(browser.create("alice", tmp.resolve("root/projects").toString(), "my-app"))
+                .as("creating what exists is fine").isEqualTo(created);
+
+        assertThatThrownBy(() -> browser.create("alice", tmp.toString(), "x"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
+        for (String bad : java.util.List.of("", "  ", "a/b", "..", ".", ".hidden")) {
+            assertThatThrownBy(() -> browser.create("alice", tmp.resolve("root").toString(), bad))
+                    .as(bad).isInstanceOf(IllegalArgumentException.class);
+        }
+        Files.writeString(tmp.resolve("root/notes.txt"), "x");
+        assertThatThrownBy(() -> browser.create("alice", tmp.resolve("root").toString(), "notes.txt"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("A file of that name");
+    }
 }

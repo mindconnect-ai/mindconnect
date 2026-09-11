@@ -65,6 +65,14 @@
       "overrides": {
         "baseDir": ""
       }
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000246",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000024",
+      "name": "grep",
+      "description": "Searches file contents for a regular expression under a directory, like grep -rn; glob narrows the files.",
+      "enabled": true,
+      "overrides": {"baseDir": ""}
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",

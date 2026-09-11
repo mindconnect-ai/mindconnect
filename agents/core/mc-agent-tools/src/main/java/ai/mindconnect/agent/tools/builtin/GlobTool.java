@@ -52,15 +52,8 @@ public class GlobTool implements Tool {
     /** Hard wall-clock cap on the directory walk to keep tool calls bounded. */
     private static final long TIMEOUT_MS = 60_000L;
 
-    /** Directories skipped during the walk regardless of the glob pattern. */
-    private static final Set<String> EXCLUDED_DIRS = Set.of(
-            ".git", ".svn", ".hg",
-            "target", "build", "dist", "out", "bin",
-            "node_modules", ".gradle", ".mvn",
-            ".idea", ".vscode", ".settings",
-            "__pycache__", ".venv", "venv", ".tox",
-            ".next", ".nuxt", ".cache"
-    );
+    /** Directories skipped during the walk regardless of the glob pattern — the list every file tool shares. */
+    private static final Set<String> EXCLUDED_DIRS = FileWalks.EXCLUDED_DIRS;
 
     private final Path baseDir;
     private final FileRoots roots;

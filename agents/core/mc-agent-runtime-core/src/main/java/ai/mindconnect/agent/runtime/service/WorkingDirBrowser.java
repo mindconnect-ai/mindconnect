@@ -42,6 +42,40 @@ public final class WorkingDirBrowser {
     public record Listing(String root, String current, String parent, List<String> subdirs, boolean truncated) {}
 
     /**
+     * Creates {@code name} inside {@code parent} — the directory shown, or
+     * the root when {@code parent} is {@code null} — and answers the new
+     * directory. The parent is validated like any working directory, so
+     * nothing is created outside the policy's tree; the name is one plain
+     * segment: no separators, not {@code .} or {@code ..}, not hidden.
+     */
+    public Path create(String userId, String parent, String name) {
+        if (name == null || name.isBlank()) {
+            throw new IllegalArgumentException("A folder needs a name");
+        }
+        String n = name.trim();
+        if (n.contains("/") || n.contains("\\") || n.equals(".") || n.equals("..") || n.startsWith(".")) {
+            throw new IllegalArgumentException("Not a folder name: " + n
+                    + " — one plain name, no slashes, not starting with a dot");
+        }
+        WorkingDirPolicy user = policy.forUser(userId);
+        Path root = user.realRoot();
+        String base = parent == null || parent.isBlank()
+                ? (root != null ? root : Path.of(System.getProperty("user.home"))).toString()
+                : user.validate(parent);
+        Path dir = Path.of(base).resolve(n);
+        if (Files.exists(dir)) {
+            if (Files.isDirectory(dir)) return dir;
+            throw new IllegalArgumentException("A file of that name is already there: " + dir);
+        }
+        try {
+            Files.createDirectory(dir);
+        } catch (IOException e) {
+            throw new IllegalArgumentException("Cannot create " + dir + ": " + e.getMessage());
+        }
+        return dir;
+    }
+
+    /**
      * The sub-directories of {@code path} for {@code userId} — of the root
      * when {@code path} is {@code null} or blank. An
      * {@link IllegalArgumentException} names a path that is no directory or
@@ -76,6 +110,11 @@ public final class WorkingDirBrowser {
             throw new IllegalArgumentException("Cannot list " + dir + ": " + e.getMessage());
         }
         return new Listing(root == null ? null : root.toString(), current, parentOrNull, List.copyOf(subdirs), truncated);
+    }
+
+    /** {@link #create(String, String, String)} for a typed user id. */
+    public Path create(ai.mindconnect.agent.UserId userId, String parent, String name) {
+        return create(userId == null ? null : userId.value(), parent, name);
     }
 
     /** Same as {@link #list(String, String)}, for a typed user id. */
