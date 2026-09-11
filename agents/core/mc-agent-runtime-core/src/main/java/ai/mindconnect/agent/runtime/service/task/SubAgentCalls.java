@@ -73,15 +73,22 @@ final class SubAgentCalls {
      * off for the same reason — an agent that could look up further tools
      * would be widening the set through the back door. Without a model of
      * its own it runs on the caller's.
+     *
+     * <p>The roster is the caller's too. A project agent that inherits
+     * {@code run_agent} would otherwise have an empty roster, which reads as
+     * "anyone": a caller limited to one explorer could reach every agent in
+     * the registry by way of a file in the repository. A caller without a
+     * roster passes none on, so nothing is taken away either.
      */
-    private static ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent inlineFor(
+    static ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent inlineFor(
             ai.mindconnect.agent.runtime.service.agents.ProjectAgents.ProjectAgent agent, AgentDefinition caller) {
         var tools = agent.toolsFrom(caller == null ? java.util.List.of() : caller.tools());
         String model = agent.model() != null ? agent.model()
                 : (caller == null ? null : caller.llmConfigName());
+        var roster = caller == null ? java.util.List.<String>of() : caller.effectiveCallableAgents();
         return new ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent(
                 ai.mindconnect.agent.AgentId.random(), true, agent.name(), agent.systemPrompt(), model, tools,
-                AgentDefinition.ToolSearchConfig.OFF);
+                AgentDefinition.ToolSearchConfig.OFF, roster);
     }
 
     void attach(TaskQueue queue) {

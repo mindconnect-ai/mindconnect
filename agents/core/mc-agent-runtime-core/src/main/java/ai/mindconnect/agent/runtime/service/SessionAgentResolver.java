@@ -60,7 +60,9 @@ public class SessionAgentResolver {
     /**
      * The session's own agent as a definition. The memory config is the
      * system default on purpose — it decides how long chats survive
-     * compression and is not something a chat picker should set.
+     * compression and is not something a chat picker should set. The roster
+     * is the one the agent carries: empty for a chat from the picker, the
+     * caller's for a project's agent.
      */
     private static AgentDefinition inlineDefinition(AgentSession session, InlineSessionAgent inline) {
         Instant now = session.startedAt() != null ? session.startedAt() : Instant.now();
@@ -68,7 +70,7 @@ public class SessionAgentResolver {
                 inline.id(), inline.label(), "", null, null,
                 inline.systemPrompt(), null, inline.llmConfigName(),
                 DEFAULT_MAX_ITERATIONS, SummarizingWindowConfig.DEFAULT,
-                AgentDefinitionStatus.ACTIVE, inline.tools(), java.util.List.of(), null,
+                AgentDefinitionStatus.ACTIVE, inline.tools(), java.util.List.of(), inline.callableAgents(),
                 inline.toolSearch(), now, now);
     }
 

@@ -63,7 +63,9 @@ That is what makes opening someone else's repository safe: the file can only
 narrow what the agent calling it was already allowed to do. It is not subject
 to the caller's `callableAgents` roster, though — that roster curates the
 registry, and this agent comes from the same directory whose instructions the
-caller is already following.
+caller is already following. What it calls in turn is: it inherits the
+caller's roster along with its tools, so an agent limited to two others cannot
+reach a third by way of a file in the repository.
 :::
 
 ## Why delegate?

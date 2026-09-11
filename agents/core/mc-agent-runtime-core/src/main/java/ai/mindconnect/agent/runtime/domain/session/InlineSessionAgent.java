@@ -22,12 +22,29 @@ public record InlineSessionAgent(
         String systemPrompt,
         String llmConfigName,
         List<AgentTool> tools,
-        AgentDefinition.ToolSearchConfig toolSearch
+        AgentDefinition.ToolSearchConfig toolSearch,
+        /**
+         * The agents this one may call, by name — for a project's agent the
+         * roster of the agent that called it, so handing a task to a file in
+         * the repository cannot reach further than the caller could. Empty
+         * means no restriction, as on {@link AgentDefinition#callableAgents()}:
+         * a chat assembled in the picker, and every session written before
+         * the field existed.
+         */
+        List<String> callableAgents
 ) implements SessionAgent {
 
     public InlineSessionAgent {
         if (tools == null) tools = List.of();
         if (label == null || label.isBlank()) label = "Chat";
+        callableAgents = callableAgents == null ? List.of() : List.copyOf(callableAgents);
+    }
+
+    /** Without a roster: the agent may call every agent, as a chat from the picker always could. */
+    public InlineSessionAgent(AgentId id, boolean main, String label, String systemPrompt,
+                              String llmConfigName, List<AgentTool> tools,
+                              AgentDefinition.ToolSearchConfig toolSearch) {
+        this(id, main, label, systemPrompt, llmConfigName, tools, toolSearch, List.of());
     }
 
     /**
@@ -60,10 +77,12 @@ public record InlineSessionAgent(
         var search = toolSearch
                 ? new AgentDefinition.ToolSearchConfig(true, List.of("*"))
                 : AgentDefinition.ToolSearchConfig.OFF;
-        return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, rebuilt, search);
+        return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, rebuilt, search,
+                callableAgents);
     }
 
     public InlineSessionAgent withLlmConfigName(String llmConfigName) {
-        return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, tools, toolSearch);
+        return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, tools, toolSearch,
+                callableAgents);
     }
 }

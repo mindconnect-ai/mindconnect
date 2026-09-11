@@ -83,6 +83,22 @@ class SessionAgentResolverTest {
         // Not a knob a chat gets to turn: it decides how long conversations
         // survive compression.
         assertThat(resolved.effectiveMemoryConfig()).isEqualTo(SummarizingWindowConfig.DEFAULT);
+        assertThat(resolved.effectiveCallableAgents()).as("a chat from the picker reaches every agent")
+                .isEmpty();
+        assertThat(resolved.mayCall("anyone")).isTrue();
+    }
+
+    @Test
+    void anInlineAgentsRosterBecomesTheDefinitionsRoster() {
+        var plain = InlineSessionAgent.of("helper", "help", "gpt", List.of("run_agent"), false);
+        var inline = new InlineSessionAgent(plain.id(), true, plain.label(), plain.systemPrompt(),
+                plain.llmConfigName(), plain.tools(), plain.toolSearch(), List.of("explorer"));
+        var session = sessionFor(inline.id()).withSessionAgents(List.of(inline));
+
+        AgentDefinition resolved = resolver.resolve(session);
+
+        assertThat(resolved.effectiveCallableAgents()).containsExactly("explorer");
+        assertThat(resolved.mayCall("deployer")).isFalse();
     }
 
     @Test

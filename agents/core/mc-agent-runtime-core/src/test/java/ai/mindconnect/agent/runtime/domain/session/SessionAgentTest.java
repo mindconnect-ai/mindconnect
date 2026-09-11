@@ -83,6 +83,23 @@ class SessionAgentTest {
     }
 
     @Test
+    void anInlineAgentsRosterSurvivesJson_andOneWrittenWithoutItHasNone() throws Exception {
+        var plain = InlineSessionAgent.of("helper", "help", "gpt", List.of("run_agent"), false);
+        var withRoster = new InlineSessionAgent(plain.id(), true, "helper", "help", "gpt",
+                plain.tools(), plain.toolSearch(), List.of("explorer"));
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(withRoster), SessionAgent.class)).isEqualTo(withRoster);
+
+        // Every inline agent stored before the roster travelled with it.
+        String legacy = """
+                {"kind":"inline","id":"%s","main":true,"label":"Chat","systemPrompt":"p",
+                 "llmConfigName":"gpt","tools":[],"toolSearch":{"enabled":false,"groups":[]}}
+                """.formatted(UUID.randomUUID());
+        var restored = (InlineSessionAgent) JSON.readValue(legacy, SessionAgent.class);
+        assertThat(restored.callableAgents()).as("no roster, no restriction").isEmpty();
+    }
+
+    @Test
     void aSessionWithoutTheFieldStillDeserialises() throws Exception {
         // Every session.json written before session agents existed.
         String legacy = """
