@@ -48,8 +48,11 @@ class BashToolOutputTest {
 
         // A line that never ends is not held in memory: it is cut at the cap while it grows.
         String endless = bash.execute(Map.of("command", "yes | tr -d '\\n'", "timeout", 1));
+        // How much the command got out before the kill — and so how many lines
+        // the note counts — is the machine's business, not this test's.
         assertThat(endless).startsWith("Error: command timed out after 1 seconds\nOutput so far:\nyyyy")
-                .contains("[output cut after " + max + " chars — 1 more line(s), ");
+                .contains("[output cut after " + max + " chars — ")
+                .contains(" chars, not shown");
         assertThat(endless.length()).isLessThan(max + 400);
     }
 

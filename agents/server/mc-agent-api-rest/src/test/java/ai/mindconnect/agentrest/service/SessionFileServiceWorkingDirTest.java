@@ -81,7 +81,7 @@ class SessionFileServiceWorkingDirTest {
     void aChatWorkingInAProjectReachesItsUploads() throws Exception {
         UserId alice = UserId.of("alice");
         Path project = Files.createDirectories(temp.resolve("project")).toRealPath();
-        AgentSession session = sessions.save(AgentSession.start(AgentId.random(), alice, ConversationId.random())
+        AgentSession session = sessions.create(AgentSession.start(AgentId.random(), alice, ConversationId.random())
                 .withWorkingDir(project.toString()));
 
         var result = service.attach(session.id(), files.save("report.md", "text/markdown",
@@ -106,8 +106,8 @@ class SessionFileServiceWorkingDirTest {
     void aChatInItsOwnDirectory_orAboveIt_getsNothingAdded() throws Exception {
         UserId bob = UserId.of("bob");
         AgentSession inOwn = AgentSession.start(AgentId.random(), bob, ConversationId.random());
-        inOwn = sessions.save(inOwn.withWorkingDir(home.sessionDirOf(bob, inOwn.id()).orElseThrow().toString()));
-        AgentSession inHome = sessions.save(AgentSession.start(AgentId.random(), bob, ConversationId.random())
+        inOwn = sessions.create(inOwn.withWorkingDir(home.sessionDirOf(bob, inOwn.id()).orElseThrow().toString()));
+        AgentSession inHome = sessions.create(AgentSession.start(AgentId.random(), bob, ConversationId.random())
                 .withWorkingDir(home.homeOf(bob).orElseThrow().toString()));
 
         for (AgentSession session : List.of(inOwn, inHome)) {
@@ -127,6 +127,12 @@ class SessionFileServiceWorkingDirTest {
     private static final class StubFileStore implements FileStore {
         private final Map<FileId, byte[]> stored = new LinkedHashMap<>();
         private final Map<FileId, StoredFile> meta = new LinkedHashMap<>();
+
+        @Override
+        public StoredFile save(String name, String contentType, InputStream content,
+                               ai.mindconnect.agent.UserId creator) throws IOException {
+            return save(name, contentType, content);
+        }
 
         @Override
         public StoredFile save(String name, String contentType, InputStream content) throws IOException {

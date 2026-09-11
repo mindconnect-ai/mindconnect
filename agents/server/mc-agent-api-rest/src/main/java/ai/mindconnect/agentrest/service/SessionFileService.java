@@ -191,7 +191,8 @@ public class SessionFileService {
             // next message as an image part — or as that part's placeholder
             // when the model does not read images. Recorded on the session,
             // nothing else to do.
-            if (sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached))).isEmpty()) {
+            AttachedFile image = attached;
+            if (sessions.update(sessionId, current -> current.withAttachedFiles(List.of(image))).isEmpty()) {
                 return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
             }
             activateViewer(sessionId);

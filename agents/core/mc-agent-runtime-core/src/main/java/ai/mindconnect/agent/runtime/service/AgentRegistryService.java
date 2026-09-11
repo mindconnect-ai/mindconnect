@@ -5,6 +5,7 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentPatch;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.common.StaleVersionException;
 

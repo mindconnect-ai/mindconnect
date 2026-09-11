@@ -73,9 +73,12 @@ public class AgentApiController {
                             UserChannels userChannels,
                             SessionAccess sessionAccess,
                             ObjectMapper objectMapper,
-                            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.runtime.service.WorkingDirBrowser> dirBrowser) {
-        this.dirBrowser = dirBrowser.getIfAvailable(() ->
-                new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(sessionService.workingDirPolicy()));
+                            @org.springframework.lang.Nullable
+                            ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser) {
+        // A host that defines no browser gets one over the session service's
+        // policy — the same tree, without a bean to declare.
+        this.dirBrowser = dirBrowser != null ? dirBrowser
+                : new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(sessionService.workingDirPolicy());
         this.registryService = registryService;
         this.sessionService = sessionService;
         this.chatService = chatService;

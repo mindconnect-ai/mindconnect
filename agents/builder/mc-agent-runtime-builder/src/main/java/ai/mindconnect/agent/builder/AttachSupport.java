@@ -161,7 +161,8 @@ final class AttachSupport {
             // Not text to index: the image goes to the model with the next
             // message as an image part, or as that part's placeholder. Shown
             // once; afterwards the model asks for it through view_attachment.
-            sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached)));
+            var image = attached;
+            sessions.update(sessionId, current -> current.withAttachedFiles(List.of(image)));
             activations.activate(sessionId,
                     List.of(ViewAttachmentTool.NAME));
             return stored.name() + " attached — it goes to the model with the next message.";

@@ -150,7 +150,7 @@ public class AgentSessionService {
     private AgentSession inOwnDirectoryWhenNone(AgentSession session) {
         if (session.hasWorkingDir()) return session;
         return userHome.sessionDirOf(session.userId(), session.id())
-                .map(own -> sessionRepository.save(session.withWorkingDir(own.toString())))
+                .map(own -> change(session.id(), stored -> stored.withWorkingDir(own.toString())))
                 .orElse(session);
     }
 
@@ -212,8 +212,8 @@ public class AgentSessionService {
         String dir = policy.validate(workingDir, held);
         List<String> extras = additionalDirs == null ? session.additionalDirs()
                 : validateAll(policy, additionalDirs, held);
-        return sessionRepository.save(session.withWorkingDir(dir)
-                .withAdditionalDirs(keepingOwnDirectory(session, dir, extras)));
+        return change(sessionId, stored -> stored.withWorkingDir(dir)
+                .withAdditionalDirs(keepingOwnDirectory(stored, dir, extras)));
     }
 
     /** Adds one directory to a session's additional directories ({@code /add-dir}). */
@@ -222,9 +222,11 @@ public class AgentSessionService {
         AgentSession session = findSession(sessionId);
         String validated = workingDirPolicy.forUser(session.userId()).validate(dir, directoriesHeld(session));
         if (validated == null) throw new IllegalArgumentException("A directory is required");
-        java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(session.additionalDirs());
-        merged.add(validated);
-        return sessionRepository.save(session.withAdditionalDirs(List.copyOf(merged)));
+        return change(sessionId, stored -> {
+            java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(stored.additionalDirs());
+            merged.add(validated);
+            return stored.withAdditionalDirs(List.copyOf(merged));
+        });
     }
 
     /**
@@ -346,7 +348,7 @@ public class AgentSessionService {
                 .withWorkingDir(workingDir)
                 .withAdditionalDirs(additionalDirs)
                 .withSessionAgents(List.of(agent));
-        return sessionRepository.save(session);
+        return sessionRepository.create(session);
     }
 
     /**
