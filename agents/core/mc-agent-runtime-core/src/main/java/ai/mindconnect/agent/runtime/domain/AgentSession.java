@@ -209,6 +209,18 @@ public record AgentSession(
                 .findFirst();
     }
 
+    /**
+     * This session running {@code agent} instead. The agent id moves with it:
+     * {@code agentDefinitionId} is the id the session is listed under and the
+     * key its workspace is filed by, and both should name the agent the chat
+     * actually runs.
+     */
+    public AgentSession withSessionAgent(ai.mindconnect.agent.runtime.domain.session.SessionAgent agent) {
+        return new AgentSession(id, agent.id(), userId, conversationId,
+                title, status, startedAt, completedAt, parentSessionId, parentTurnId,
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, java.util.List.of(agent));
+    }
+
     /** This session with its agents replaced. */
     public AgentSession withSessionAgents(
             java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> agents) {

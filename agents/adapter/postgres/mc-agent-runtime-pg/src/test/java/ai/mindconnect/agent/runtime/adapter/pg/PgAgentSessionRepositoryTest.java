@@ -12,9 +12,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class PgAgentSessionRepositoryTest {
 
@@ -38,7 +44,7 @@ class PgAgentSessionRepositoryTest {
         AgentSession s = session("david", "2026-09-03T10:00:00Z", null)
                 .withActivatedTools(List.of("web_search"))
                 .withApprovedTool("bash");
-        repo.save(s);
+        repo.create(s);
         assertThat(repo.findById(s.id())).contains(s);
     }
 
@@ -49,7 +55,7 @@ class PgAgentSessionRepositoryTest {
         AgentSession undated = session("david", null, null);
         AgentSession child = session("david", "2026-09-04T00:00:00Z", newest.id());
         AgentSession someoneElse = session("eve", "2026-09-05T00:00:00Z", null);
-        for (AgentSession s : List.of(oldest, child, undated, newest, someoneElse)) repo.save(s);
+        for (AgentSession s : List.of(oldest, child, undated, newest, someoneElse)) repo.create(s);
 
         assertThat(repo.findByUser(UserId.of("david"))).containsExactly(newest, oldest, undated);
         assertThat(repo.findByAgent(AGENT, UserId.of("david"))).containsExactly(child, newest, oldest, undated);
@@ -61,9 +67,9 @@ class PgAgentSessionRepositoryTest {
     void headersMatchTheFullSessionsFieldForField() {
         AgentSession a = session("david", "2026-09-03T00:00:00Z", null).withApprovedTool("bash");
         AgentSession b = session("david", "2026-09-01T00:00:00Z", null);
-        repo.save(a);
-        repo.save(b);
-        repo.save(session("david", "2026-09-02T00:00:00Z", a.id()));
+        repo.create(a);
+        repo.create(b);
+        repo.create(session("david", "2026-09-02T00:00:00Z", a.id()));
 
         var headers = repo.findHeadersByUser(UserId.of("david"));
         assertThat(headers).hasSize(2);
@@ -81,9 +87,42 @@ class PgAgentSessionRepositoryTest {
     @Test
     void deleteRemovesTheSessionOnly() {
         AgentSession s = session("david", "2026-09-03T10:00:00Z", null);
-        repo.save(s);
+        repo.create(s);
         repo.deleteById(s.id());
         assertThat(repo.findById(s.id())).isEmpty();
         repo.deleteById(s.id());
+    }
+
+    @Test
+    void createRefusesAnExistingSession() {
+        AgentSession s = repo.create(session("david", "2026-09-03T10:00:00Z", null));
+
+        assertThatThrownBy(() -> repo.create(s.withTitle("again"))).isInstanceOf(IllegalStateException.class);
+        assertThat(repo.findById(s.id())).contains(s);
+    }
+
+    @Test
+    void concurrentUpdatesOfOneSessionAllLand() throws Exception {
+        AgentSession s = repo.create(session("david", "2026-09-03T10:00:00Z", null));
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            List<Future<?>> futures = new ArrayList<>();
+            for (int i = 0; i < 40; i++) {
+                String tool = "tool_" + i;
+                futures.add(pool.submit(() -> repo.update(s.id(), x -> x.withActivatedTools(List.of(tool)))));
+                futures.add(pool.submit(() -> repo.update(s.id(), x -> x.withApprovedTool(tool))));
+            }
+            for (Future<?> future : futures) future.get();
+        }
+
+        AgentSession stored = repo.findById(s.id()).orElseThrow();
+        String[] all = IntStream.range(0, 40).mapToObj(i -> "tool_" + i).toArray(String[]::new);
+        assertThat(stored.activatedTools()).containsExactlyInAnyOrder(all);
+        assertThat(stored.approvedTools()).containsExactlyInAnyOrder(all);
+    }
+
+    @Test
+    void updatingAMissingSessionChangesNothing() {
+        assertThat(repo.update(SessionId.random(), x -> x.withTitle("never"))).isEmpty();
     }
 }

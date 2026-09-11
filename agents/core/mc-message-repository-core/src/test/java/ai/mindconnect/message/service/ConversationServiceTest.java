@@ -170,6 +170,20 @@ class ConversationServiceTest {
         public Message save(Message m) { store.add(m); return m; }
 
         @Override
+        public synchronized java.util.Optional<Message> update(ConversationId conversation, MessageId id,
+                                                             java.util.function.UnaryOperator<Message> change) {
+            for (int i = 0; i < store.size(); i++) {
+                Message m = store.get(i);
+                if (m.conversationId().equals(conversation) && m.id().equals(id)) {
+                    Message changed = change.apply(m);
+                    store.set(i, changed);
+                    return java.util.Optional.of(changed);
+                }
+            }
+            return java.util.Optional.empty();
+        }
+
+        @Override
         public List<Message> findByConversation(ConversationId id, PageRequest page) {
             return store.stream()
                     .filter(m -> m.conversationId().equals(id))

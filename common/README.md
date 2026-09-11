@@ -21,6 +21,7 @@ used on its own — pull in just the one you need.
 | `mc-pathaccessor` | Navigate and read/write nested object & JSON paths |
 | `mc-script-mini` | Minimal embeddable script runner |
 | `mc-jdbc` | Tiny JDBC helper: JSONB document tables, typed rows, transactions — no ORM |
+| `mc-file-repo` | The file counterpart: JSON documents read without locks, written atomically, one writer per file across the JVM |
 
 ## Build
 

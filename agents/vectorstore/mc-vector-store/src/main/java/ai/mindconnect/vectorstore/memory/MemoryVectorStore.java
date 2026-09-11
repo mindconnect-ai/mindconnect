@@ -17,6 +17,8 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
 
 /**
  * One store of the memory backend. Persistence is a JSONL file (one chunk per
@@ -24,6 +26,11 @@ import java.util.Map;
  * runs over vectors held on the heap, normalised at load time so cosine
  * similarity is a plain dot product. {@link #unloadIfIdleSince} drops the
  * heap copy — the file stays, the next access reloads.
+ *
+ * <p>Every operation holds one lock. A {@link ReentrantLock} rather than
+ * {@code synchronized}: loading, rewriting the file and scanning every vector
+ * all happen under it, and on Java 21 a virtual thread blocked inside
+ * {@code synchronized} pins its carrier thread for that long.
  */
 final class MemoryVectorStore implements VectorStore {
 
@@ -32,6 +39,7 @@ final class MemoryVectorStore implements VectorStore {
     private final String id;
     private final Path file;
     private final int maxChunks;
+    private final ReentrantLock lock = new ReentrantLock();
 
     /** Loaded chunks by id, vectors normalised; {@code null} = not loaded. */
     private Map<String, VectorChunk> loaded;
@@ -49,71 +57,92 @@ final class MemoryVectorStore implements VectorStore {
     }
 
     @Override
-    public synchronized void upsert(List<VectorChunk> chunks) {
-        Map<String, VectorChunk> current = ensureLoaded();
-        Integer dimension = current.values().stream().findFirst()
-                .map(c -> c.embedding().length).orElse(null);
-        for (VectorChunk chunk : chunks) {
-            if (chunk.embedding() == null || chunk.embedding().length == 0) {
-                throw new IllegalArgumentException("Chunk '" + chunk.id() + "' has no embedding");
+    public void upsert(List<VectorChunk> chunks) {
+        locked(() -> {
+            Map<String, VectorChunk> current = ensureLoaded();
+            Integer dimension = current.values().stream().findFirst()
+                    .map(c -> c.embedding().length).orElse(null);
+            for (VectorChunk chunk : chunks) {
+                if (chunk.embedding() == null || chunk.embedding().length == 0) {
+                    throw new IllegalArgumentException("Chunk '" + chunk.id() + "' has no embedding");
+                }
+                if (dimension == null) {
+                    dimension = chunk.embedding().length;
+                } else if (chunk.embedding().length != dimension) {
+                    throw new IllegalArgumentException("Chunk '" + chunk.id() + "' has dimension "
+                            + chunk.embedding().length + ", store '" + id + "' uses " + dimension);
+                }
+                current.put(chunk.id(), normalised(chunk));
             }
-            if (dimension == null) {
-                dimension = chunk.embedding().length;
-            } else if (chunk.embedding().length != dimension) {
-                throw new IllegalArgumentException("Chunk '" + chunk.id() + "' has dimension "
-                        + chunk.embedding().length + ", store '" + id + "' uses " + dimension);
+            if (current.size() > maxChunks) {
+                throw new IllegalStateException("Vector store '" + id + "' would exceed its memory-backend "
+                        + "limit of " + maxChunks + " chunks — use a server-side backend (pgvector) for "
+                        + "corpora of this size");
             }
-            current.put(chunk.id(), normalised(chunk));
-        }
-        if (current.size() > maxChunks) {
-            throw new IllegalStateException("Vector store '" + id + "' would exceed its memory-backend "
-                    + "limit of " + maxChunks + " chunks — use a server-side backend (pgvector) for "
-                    + "corpora of this size");
-        }
-        persist(current);
-    }
-
-    @Override
-    public synchronized List<SearchHit> search(float[] queryEmbedding, int topK) {
-        Map<String, VectorChunk> current = ensureLoaded();
-        float[] query = normalised(queryEmbedding.clone());
-        List<SearchHit> hits = new ArrayList<>();
-        for (VectorChunk chunk : current.values()) {
-            hits.add(new SearchHit(chunk, dot(query, chunk.embedding())));
-        }
-        hits.sort(Comparator.comparingDouble(SearchHit::score).reversed());
-        return hits.size() > topK ? List.copyOf(hits.subList(0, topK)) : hits;
-    }
-
-    @Override
-    public synchronized void deleteFile(String fileId) {
-        Map<String, VectorChunk> current = ensureLoaded();
-        if (current.values().removeIf(c -> fileId.equals(c.fileId()))) {
             persist(current);
-        }
+            return null;
+        });
     }
 
     @Override
-    public synchronized long chunkCount() {
-        return ensureLoaded().size();
+    public List<SearchHit> search(float[] queryEmbedding, int topK) {
+        return locked(() -> {
+            Map<String, VectorChunk> current = ensureLoaded();
+            float[] query = normalised(queryEmbedding.clone());
+            List<SearchHit> hits = new ArrayList<>();
+            for (VectorChunk chunk : current.values()) {
+                hits.add(new SearchHit(chunk, dot(query, chunk.embedding())));
+            }
+            hits.sort(Comparator.comparingDouble(SearchHit::score).reversed());
+            return hits.size() > topK ? List.copyOf(hits.subList(0, topK)) : hits;
+        });
     }
 
     @Override
-    public synchronized Map<String, Long> listFiles() {
-        Map<String, Long> files = new LinkedHashMap<>();
-        for (VectorChunk chunk : ensureLoaded().values()) {
-            files.merge(chunk.fileId(), 1L, Long::sum);
-        }
-        return files;
+    public void deleteFile(String fileId) {
+        locked(() -> {
+            Map<String, VectorChunk> current = ensureLoaded();
+            if (current.values().removeIf(c -> fileId.equals(c.fileId()))) {
+                persist(current);
+            }
+            return null;
+        });
+    }
+
+    @Override
+    public long chunkCount() {
+        return locked(() -> (long) ensureLoaded().size());
+    }
+
+    @Override
+    public Map<String, Long> listFiles() {
+        return locked(() -> {
+            Map<String, Long> files = new LinkedHashMap<>();
+            for (VectorChunk chunk : ensureLoaded().values()) {
+                files.merge(chunk.fileId(), 1L, Long::sum);
+            }
+            return files;
+        });
     }
 
     /** Drops the heap copy when unused since {@code cutoffMs}; file stays. */
-    synchronized boolean unloadIfIdleSince(long cutoffMs) {
-        if (loaded == null || lastUsedMs >= cutoffMs) {
-            return false;
+    boolean unloadIfIdleSince(long cutoffMs) {
+        return locked(() -> {
+            if (loaded == null || lastUsedMs >= cutoffMs) {
+                return false;
+            }
+            loaded = null;
+            return true;
+        });
+    }
+
+    private <T> T locked(Supplier<T> action) {
+        lock.lock();
+        try {
+            return action.get();
+        } finally {
+            lock.unlock();
         }
-        loaded = null;
-        return true;
     }
 
     // ── loading & persistence ──────────────────────────────────────────────

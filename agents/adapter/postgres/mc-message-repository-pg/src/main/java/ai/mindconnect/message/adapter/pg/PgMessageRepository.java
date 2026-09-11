@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.IntFunction;
+import java.util.function.UnaryOperator;
 
 /**
  * {@link MessageRepository} on Postgres. One row of {@code mc_message} per
@@ -81,6 +82,12 @@ public final class PgMessageRepository implements MessageRepository {
     @Override
     public Message save(Message message) {
         return messages.save(message);
+    }
+
+    /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
+    @Override
+    public Optional<Message> update(ConversationId conversation, MessageId id, UnaryOperator<Message> change) {
+        return messages.update(namespace.value(), id.value(), change);
     }
 
     @Override

@@ -36,7 +36,9 @@ class AgentDetailActionUrlsTest {
 
     /** Renders without a database: the detail header only asks for the session list. */
     private static final AgentSessionRepository NO_SESSIONS = new AgentSessionRepository() {
-        @Override public AgentSession save(AgentSession session) { throw new UnsupportedOperationException(); }
+        @Override public AgentSession create(AgentSession session) { throw new UnsupportedOperationException(); }
+        @Override public Optional<AgentSession> update(SessionId id,
+                java.util.function.UnaryOperator<AgentSession> change) { throw new UnsupportedOperationException(); }
         @Override public Optional<AgentSession> findById(SessionId id) { return Optional.empty(); }
         @Override public List<AgentSession> findByAgent(AgentId agent, UserId user) { return List.of(); }
         @Override public List<AgentSession> findByUser(UserId user) { return List.of(); }

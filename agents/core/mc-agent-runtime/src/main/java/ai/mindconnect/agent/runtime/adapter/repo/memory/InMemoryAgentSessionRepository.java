@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.UnaryOperator;
 
 /** In-memory {@link AgentSessionRepository} — process-lifetime storage, no persistence. */
 public class InMemoryAgentSessionRepository implements AgentSessionRepository {
@@ -28,9 +29,18 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
                     java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()));
 
     @Override
-    public AgentSession save(AgentSession session) {
-        store.put(session.id(), session);
+    public AgentSession create(AgentSession session) {
+        if (store.putIfAbsent(session.id(), session) != null) {
+            throw new IllegalStateException("Session " + session.id().value() + " exists already");
+        }
         return session;
+    }
+
+    /** {@code computeIfPresent} runs the change while holding the entry, so updates of one session take turns. */
+    @Override
+    public Optional<AgentSession> update(SessionId id, UnaryOperator<AgentSession> change) {
+        return Optional.ofNullable(store.computeIfPresent(id, (key, current) ->
+                Objects.requireNonNull(change.apply(current), "update: the change returned null")));
     }
 
     @Override

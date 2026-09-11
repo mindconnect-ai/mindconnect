@@ -27,7 +27,7 @@ class SessionsByUserTest {
                 startedAt, base.completedAt(), base.parentSessionId(), base.parentTurnId(),
                 base.parentToolCallId(), base.activatedTools(), base.attachedFiles(),
                 base.approvedTools(), base.sessionAgents());
-        return repo.save(withTime);
+        return repo.create(withTime);
     }
 
     @Test

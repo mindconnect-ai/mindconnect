@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.common.util.AtomicFiles;
+import ai.mindconnect.filerepo.FileWrites;
+import ai.mindconnect.filerepo.PathLocks;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -22,6 +23,12 @@ import java.util.Optional;
  * {@code <root>/templates} and {@code <root>/instances}, following the same
  * conventions as the agent/workflow stores. Instances are registered on the
  * fly by the tools; templates are managed in the admin UI (or seeded).
+ *
+ * <p>A registry is built wherever vector stores are opened — by the app, by
+ * each tool binding, by an upload — so several instances work on the same
+ * files. Writes take the file's JVM-wide lock ({@link PathLocks}), which is
+ * what lets {@link #registerInstance} decide and write as one step: two
+ * uploads opening the same store register it once.
  */
 public final class FileVectorStoreRegistry {
 
@@ -66,10 +73,20 @@ public final class FileVectorStoreRegistry {
         return read(instancesDir, name, VectorStoreInstance.class);
     }
 
-    /** Registers the instance if unknown; an existing record wins (settings own the store). */
+    /**
+     * Registers the instance if unknown; an existing record wins (settings own the
+     * store). Looking and writing happen under the record's lock, so of two
+     * concurrent registrations of one name exactly one is written and both callers
+     * get it back.
+     */
     public VectorStoreInstance registerInstance(VectorStoreInstance candidate) {
-        return instance(candidate.name()).orElseGet(() -> {
-            write(instancesDir, candidate.name(), candidate);
+        Path file = fileFor(instancesDir, candidate.name());
+        return locked(file, () -> {
+            Optional<VectorStoreInstance> existing = read(instancesDir, candidate.name(), VectorStoreInstance.class);
+            if (existing.isPresent()) {
+                return existing.get();
+            }
+            store(file, candidate);
             log.info("Registered vector store '{}' from template '{}' (scope {})",
                     candidate.name(), candidate.templateName(), candidate.scope());
             return candidate;
@@ -128,19 +145,27 @@ public final class FileVectorStoreRegistry {
     }
 
     private void write(Path dir, String name, Object value) {
-        try {
-            Files.createDirectories(dir);
-            AtomicFiles.write(fileFor(dir, name), out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out, value));
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not write " + fileFor(dir, name), e);
-        }
+        Path file = fileFor(dir, name);
+        locked(file, () -> {
+            store(file, value);
+            return null;
+        });
     }
 
     private void delete(Path dir, String name) {
+        Path file = fileFor(dir, name);
+        locked(file, () -> Files.deleteIfExists(file));
+    }
+
+    private static void store(Path file, Object value) throws IOException {
+        FileWrites.write(file, out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out, value));
+    }
+
+    private static <T> T locked(Path file, PathLocks.Action<T> action) {
         try {
-            Files.deleteIfExists(fileFor(dir, name));
+            return PathLocks.withLock(file, PathLocks.DEFAULT_TIMEOUT, action);
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            throw new UncheckedIOException("Could not write " + file, e);
         }
     }
 

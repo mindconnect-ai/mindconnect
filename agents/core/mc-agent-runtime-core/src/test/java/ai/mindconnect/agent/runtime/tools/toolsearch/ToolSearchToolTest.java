@@ -64,10 +64,14 @@ class ToolSearchToolTest {
     private static AgentSessionRepository sessionRepo(
             Map<SessionId, AgentSession> byId) {
         return new AgentSessionRepository() {
-            @Override public AgentSession save(
+            @Override public AgentSession create(
                     AgentSession session) {
                 byId.put(session.id(), session);
                 return session;
+            }
+            @Override public Optional<AgentSession> update(SessionId id,
+                    java.util.function.UnaryOperator<AgentSession> change) {
+                return Optional.ofNullable(byId.computeIfPresent(id, (key, current) -> change.apply(current)));
             }
             @Override public Optional<AgentSession> findById(SessionId id) {
                 return Optional.ofNullable(byId.get(id));

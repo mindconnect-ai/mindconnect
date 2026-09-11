@@ -28,7 +28,7 @@ class SessionOwnershipTest {
     private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
     private final SessionOwnership ownership = new SessionOwnership(sessions);
 
-    private final AgentSession alices = sessions.save(
+    private final AgentSession alices = sessions.create(
             AgentSession.start(AgentId.of("default-chat"), UserId.of("alice"), ConversationId.random()));
 
     @Test
@@ -40,7 +40,7 @@ class SessionOwnershipTest {
 
     @Test
     void withoutAPrincipalTheRequestRunsAsTheDevUser() {
-        var devs = sessions.save(AgentSession.start(AgentId.of("default-chat"),
+        var devs = sessions.create(AgentSession.start(AgentId.of("default-chat"),
                 UserId.of(SessionOwnership.ANONYMOUS_USER), ConversationId.random()));
         assertThat(SessionOwnership.userIdOf(null)).isEqualTo(SessionOwnership.ANONYMOUS_USER);
         assertThat(ownership.owned(devs.id(), null)).contains(devs);

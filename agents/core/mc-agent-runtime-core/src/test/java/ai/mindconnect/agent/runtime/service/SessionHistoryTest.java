@@ -58,7 +58,11 @@ class SessionHistoryTest {
 
     private AgentSessionService serviceFor(AgentSession session, ConversationManager conversations) {
         AgentSessionRepository sessions = new AgentSessionRepository() {
-            @Override public AgentSession save(AgentSession s) { return s; }
+            @Override public AgentSession create(AgentSession s) { return s; }
+            @Override public Optional<AgentSession> update(SessionId id,
+                    java.util.function.UnaryOperator<AgentSession> change) {
+                return findById(id).map(change);
+            }
             @Override public Optional<AgentSession> findById(SessionId id) {
                 return session.id().equals(id) ? Optional.of(session) : Optional.empty();
             }

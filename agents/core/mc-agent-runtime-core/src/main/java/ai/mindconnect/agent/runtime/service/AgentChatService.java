@@ -429,8 +429,10 @@ public class AgentChatService {
             log.warn("Title generation failed — using user message as fallback: {}", e.getMessage());
             title = userMessage;
         }
-        sessionService.updateTitle(session.id(), title);
-        userChannels.publish(session.userId(), new UserEvent.SessionTitled(session.id(), title));
+        // Only an untitled session takes the generated title: a name the user
+        // gave the chat while the title was being generated stays.
+        AgentSession titled = sessionService.titleIfUntitled(session.id(), title);
+        userChannels.publish(session.userId(), new UserEvent.SessionTitled(session.id(), titled.title()));
     }
 
     // ── Memory ─────────────────────────────────────────────────────────────

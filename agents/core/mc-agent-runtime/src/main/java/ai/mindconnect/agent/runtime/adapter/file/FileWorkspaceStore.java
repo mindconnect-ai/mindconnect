@@ -18,7 +18,7 @@ import java.util.Optional;
  * Directory layout mirrors the three scope types:
  *   {base}/users/{userId}/workspace/
  *   {base}/users/{userId}/agents/{agentId}/workspace/
- *   {base}/users/{userId}/sessions/{sessionId}/workspace/
+ *   {base}/sessions/{sessionId}/workspace/     (beside the session's session.json)
  *
  * Swap for an S3 or JPA implementation without touching any service code.
  */
@@ -137,8 +137,6 @@ public class FileWorkspaceStore implements WorkspaceStore {
                                 .resolve(scope.agentId().value())
                                 .resolve("workspace");
             case SESSION    -> baseDir
-                                .resolve("users")
-                                .resolve(sanitize(scope.userId().value()))
                                 .resolve("sessions")
                                 .resolve(scope.sessionId().value())
                                 .resolve("workspace");

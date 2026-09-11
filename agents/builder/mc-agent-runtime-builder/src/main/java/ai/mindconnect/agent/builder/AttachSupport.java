@@ -154,8 +154,7 @@ final class AttachSupport {
             // Not text to index: the image goes to the model with the next
             // message as an image part, or as that part's placeholder. Shown
             // once; afterwards the model asks for it through view_attachment.
-            sessions.findById(sessionId).ifPresent(session ->
-                    sessions.save(session.withAttachedFiles(List.of(attached))));
+            sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached)));
             activations.activate(sessionId,
                     List.of(ViewAttachmentTool.NAME));
             return stored.name() + " attached — it goes to the model with the next message.";
@@ -193,8 +192,7 @@ final class AttachSupport {
             activations.activate(sessionId, attached.isPdf()
                     ? List.of("vector_search", ViewAttachmentTool.NAME)
                     : List.of("vector_search"));
-            sessions.findById(sessionId).ifPresent(session ->
-                    sessions.save(session.withAttachedFiles(List.of(attached))));
+            sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached)));
             return message;
         } catch (Exception e) {
             throw new IllegalStateException("attachFile failed: " + e.getMessage(), e);

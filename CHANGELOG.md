@@ -107,6 +107,41 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** the CLI's remote mode authenticates with an API token from
   `MC_REMOTE_TOKEN` (`mindconnect.remote.token`) and no longer sends a user id.
 
+- **common:** `mc-file-repo`, the file counterpart of `mc-jdbc` for stores that
+  keep one JSON document per file. `Documents` reads without locking and lets
+  one writer at a time change a file — across the whole JVM, so two store
+  instances on the same directory take turns too — with `create`,
+  `createIfAbsent` and `update(key, change)` for changes that must not
+  overwrite each other. Writing while already holding a write lock fails at
+  once instead of risking a deadlock, a lock that stays taken times out naming
+  its holder, and a second process on the same partition (namespace) of a data
+  directory is refused — processes serving different namespaces share the
+  directory as before. The file session store is the first to use it.
+- **common:** `RecordLog` in `mc-file-repo` — an ordered log of JSON records
+  per parent (the messages of a conversation), one file per record, with an
+  in-memory index of the file names: `append` hands out the next key under
+  the directory's lock, pages read only their records, and a deleted tail's
+  keys are never handed out again.
+- **agents:** `MessageRepository.update(conversation, id, change)` changes a
+  stored message in one step.
+- **common:** `DocumentTable.insert` (writes a new row, `false` when the key
+  exists) and `DocumentTable.update(key, change)`, which reads the row
+  `FOR UPDATE` and writes the change in the same transaction.
+
+### Changed
+
+- **agents:** `AgentSessionRepository` has `create` and `update(id, change)`
+  instead of `save`. A session is changed in one step on the state the store
+  holds, never by writing back a copy read earlier; implementations of the port
+  need the two methods.
+- **agents:** the file persistence keeps a session in one directory,
+  `data/<namespace>/sessions/<sessionId>/` — `session.json`, working memory and
+  the session's workspace files. Sessions stored under the earlier
+  `users/<userId>/sessions/` are not read any more; a warning in the log says
+  where they are. One process serves a namespace: a second process opening the
+  same namespace of the same data directory — the Admin UI while the CLI runs
+  in local mode, say — stops at startup with a message saying so.
+
 ### Removed
 
 - **agents:** the `mc-agent-tools-gmail` module. Gmail is now an MCP server
@@ -157,6 +192,30 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `user_message`, `agent_response` and `last_messages` template variables are
   unchanged. A reviewer handing the answer back unchanged counts as a pass, not
   as a rewrite.
+
+- **agents:** changes to a session no longer overwrite each other. Tool
+  activations from parallel `tool_search` calls, an "allow for this session"
+  answered while tools ran, an attached file, a new title — each read the
+  session, changed its copy and wrote it back, so whichever came last silently
+  dropped what the others had written. The generated title also no longer
+  replaces a name the user gave the chat while it was being generated.
+- **agents:** a message's token count, duration and compressed form no longer
+  overwrite each other when they are set at the same time, and deleting the
+  newest messages of a conversation no longer hands their sequence numbers to
+  the next messages — summaries that covered the deleted range used to claim
+  the new messages as well. With the file persistence a history page now reads
+  only its own messages and appending lists nothing.
+- **agents:** two compactions of the same conversation no longer drop each
+  other's summary. The file persistence kept all summaries in one
+  `summaries.json` that every save read, extended and rewrote; each summary is
+  now its own file under `conversations/<id>/summaries/`. Summaries in the old
+  `summaries.json` are not read any more.
+- **agents:** two uploads into the same chat at the same moment register its
+  vector store once; each could find the store missing and write its own
+  record. The memory vector-store backend no longer blocks a carrier thread
+  while a virtual thread waits for a store that is loading, saving or being
+  searched.
+
 - **agents:** tool calls no longer fail at random when sub-agents run in
   parallel. With the file persistence most stores truncated a file and wrote it
   anew, so a tool task reading the conversation while a sibling task saved a
