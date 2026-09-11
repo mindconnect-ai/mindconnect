@@ -89,4 +89,35 @@ class SystemPromptRendererWorkingDirTest {
                 .contains("on disk at `/home/u/sessions/s1/uploads/spec.docx`")
                 .doesNotContain("from the working directory");
     }
+
+    @Test
+    void anImageIsNamedWithItsPathButNotAsSomethingToSearch() {
+        var image = new ai.mindconnect.agent.runtime.domain.AttachedFile("f1", "shot.png", "image/png", 10,
+                "/home/u/sessions/s1/uploads/shot.png");
+
+        String alone = SystemPromptRenderer.attachedFilesSection(session()
+                .withWorkingDir("/home/u/sessions/s1")
+                .withAttachedFiles(java.util.List.of(image)));
+        assertThat(alone)
+                .contains("- shot.png — `/home/u/sessions/s1/uploads/shot.png`")
+                .contains("i.e. `uploads/shot.png` from the working directory")
+                .contains("not indexed")
+                .doesNotContain("A file without a path");
+
+        // Next to a searchable file it is a line of its own, and stays out of
+        // the list the search sentence talks about.
+        var notes = new ai.mindconnect.agent.runtime.domain.AttachedFile("f2", "notes.md", null, 5,
+                "/home/u/sessions/s1/uploads/notes.md");
+        String both = SystemPromptRenderer.attachedFilesSection(
+                session().withAttachedFiles(java.util.List.of(notes, image)));
+        assertThat(both)
+                .contains("- notes.md (Markdown) — on disk at")
+                .contains("- shot.png — `/home/u/sessions/s1/uploads/shot.png`")
+                .doesNotContain("- shot.png (");
+
+        // An image without a copy on disk has nothing to say here.
+        assertThat(SystemPromptRenderer.attachedFilesSection(session().withAttachedFiles(java.util.List.of(
+                new ai.mindconnect.agent.runtime.domain.AttachedFile("f3", "old.png", "image/png", 10)))))
+                .isEmpty();
+    }
 }

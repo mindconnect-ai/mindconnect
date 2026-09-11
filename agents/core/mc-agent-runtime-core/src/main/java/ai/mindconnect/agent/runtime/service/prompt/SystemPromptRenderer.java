@@ -64,12 +64,16 @@ public final class SystemPromptRenderer {
     static String attachedFilesSection(AgentSession session) {
         if (session == null) return "";
         // Images are not indexed — they travel with the message as image
-        // parts (or their placeholders) and have no business in this list.
+        // parts (or their placeholders), so they stay out of the list that
+        // talks about searching and get their own line below.
         java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> searchable = session.attachedFiles().stream()
                 .filter(f -> !f.isImage())
                 .toList();
+        java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> images = session.attachedFiles().stream()
+                .filter(f -> f.isImage() && f.hasPath())
+                .toList();
         if (searchable.isEmpty()) {
-            return "";
+            return imagesSection(session, images);
         }
         StringBuilder out = new StringBuilder("\n\n## Attached files\n"
                 + "The user attached these files to this conversation:\n");
@@ -90,7 +94,9 @@ public final class SystemPromptRenderer {
             out.append("A file with a path is a file on disk: open it by that path — `file_read` for "
                     + "text and code, `document_outline`, `document_sections`, `read_document` and "
                     + "`grep_document` for PDF and Word — whenever the exact content, the structure or "
-                    + "a passage in context is what the question needs. ");
+                    + "a passage in context is what the question needs. What the file says as a whole, "
+                    + "which sections it has and in which order: open it, never search, because search "
+                    + "ranks fragments by similarity and drops the rest. ");
         }
         out.append("Their content is also indexed for semantic search: `vector_search` with your "
                 + "question (no `store` argument needed) finds passages across all of them, which is "
@@ -99,7 +105,36 @@ public final class SystemPromptRenderer {
             out.append(" A file without a path is NOT on the filesystem: `file_read`, `document_outline`, "
                     + "`read_document`, `grep_document` and `bash` cannot open it, and its name is not a path.");
         }
+        out.append(imagesLines(session, images));
         return out.toString();
+    }
+
+    /** The images' own section, for a chat that attached nothing else. */
+    private static String imagesSection(AgentSession session,
+                                        java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> images) {
+        if (images.isEmpty()) return "";
+        return "\n\n## Attached files" + imagesLines(session, images);
+    }
+
+    /**
+     * Where the attached images are. You see an image in the message itself —
+     * this says where its file is, for the times the question is about the
+     * file rather than the picture: convert it, move it, pass it to a script.
+     */
+    private static String imagesLines(AgentSession session,
+                                      java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> images) {
+        if (images.isEmpty()) return "";
+        StringBuilder out = new StringBuilder("\nThe images the user attached are shown to you in the "
+                + "conversation; each one is also a file on disk:\n");
+        for (var image : images) {
+            out.append("- ").append(image.name()).append(" — `").append(image.path()).append('`');
+            String inWorkingDir = relativeToWorkingDir(session, image.path());
+            if (inWorkingDir != null) {
+                out.append(", i.e. `").append(inWorkingDir).append("` from the working directory");
+            }
+            out.append('\n');
+        }
+        return out.append("Their content is not indexed — `vector_search` does not find them.").toString();
     }
 
     /**

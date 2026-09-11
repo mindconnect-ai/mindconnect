@@ -121,6 +121,27 @@ class SessionFileServiceWorkingDirTest {
         }
     }
 
+    @Test
+    void anImageIsCopiedIntoTheUploadsDirectoryToo() throws Exception {
+        UserId carol = UserId.of("carol");
+        AgentSession session = sessions.create(AgentSession.start(AgentId.random(), carol, ConversationId.random()));
+        byte[] pixels = {(byte) 0x89, 'P', 'N', 'G'};
+
+        var result = service.attach(session.id(), files.save("shot.png", "image/png",
+                new ByteArrayInputStream(pixels)));
+
+        assertThat(result.success()).as(result.message()).isTrue();
+        Path copy = home.sessionDirOf(carol, session.id()).orElseThrow().resolve("uploads").resolve("shot.png");
+        assertThat(copy).as("the file tools list it like any other upload").exists()
+                .hasBinaryContent(pixels);
+        assertThat(sessions.findById(session.id()).orElseThrow().attachedFile("shot.png"))
+                .get().extracting(AttachedFile::path).isEqualTo(copy.toString());
+
+        service.deleteAttachment(session.id(), "shot.png");
+        assertThat(copy).as("detaching takes the copy with it").doesNotExist();
+        assertThat(sessions.findById(session.id()).orElseThrow().attachedFile("shot.png")).isEmpty();
+    }
+
     // ── Stubs ──────────────────────────────────────────────────────────────
 
     /** Enough of a file store to hold bytes and hand them back. */
