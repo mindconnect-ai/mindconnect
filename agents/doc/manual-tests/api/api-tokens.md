@@ -3,7 +3,7 @@ id: api-api-tokens
 area: api
 requires: [server-9099-keycloak]
 duration: ~5 min
-last-verified: never
+last-verified: 2026-09-11 (commit d85ccc8, branch feature/api-auth, runs/2026-09-11-api-tokens)
 ---
 
 # API tokens: create, use, revoke — and only for their owner
