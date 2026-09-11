@@ -22,7 +22,8 @@ Rules:
 
 - **One file = one test case. One directory = one feature area.** A case that
   needs fixtures (agent JSONs, sample files) becomes a directory with
-  `test.md` and `fixtures/`.
+  `test.md` and `fixtures/`. Fixtures several cases of an area share live in
+  `<area>/fixtures/` (e.g. the sample project of `coding/`).
 - **Test cases are stable like code; results never go into the test file** —
   except the `last-verified` stamp (below).
 - Steps use **deterministic references**: exact URLs, exact button labels,
