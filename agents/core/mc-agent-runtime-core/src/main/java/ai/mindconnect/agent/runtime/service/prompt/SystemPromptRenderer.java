@@ -90,7 +90,9 @@ public final class SystemPromptRenderer {
             out.append("A file with a path is a file on disk: open it by that path — `file_read` for "
                     + "text and code, `document_outline`, `document_sections`, `read_document` and "
                     + "`grep_document` for PDF and Word — whenever the exact content, the structure or "
-                    + "a passage in context is what the question needs. ");
+                    + "a passage in context is what the question needs. What the file says as a whole, "
+                    + "which sections it has and in which order: open it, never search, because search "
+                    + "ranks fragments by similarity and drops the rest. ");
         }
         out.append("Their content is also indexed for semantic search: `vector_search` with your "
                 + "question (no `store` argument needed) finds passages across all of them, which is "
