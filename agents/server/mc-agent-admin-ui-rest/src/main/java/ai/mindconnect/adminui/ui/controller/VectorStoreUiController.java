@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.ui.model.UiAction;
@@ -345,6 +346,11 @@ public class VectorStoreUiController {
                 .field(UiField.text("name", "Name", isNew ? null : t.name()).asEditable()
                         .hint(builtIn ? BUILT_IN_NOTE + " Give this copy a name to save it as a template of your own."
                                 : "Unique template name, e.g. knowledge or chat-uploads"))
+                // The version this form was opened with (0 for a new template).
+                // Hidden, but submitted: the save is refused if the template was saved since.
+                .field(UiField.text("version", "Version",
+                                isNew || t.version() == null ? "0" : t.version().toString())
+                        .asEditable().<UiField>hidden())
                 .field(UiField.select("backend", "Backend", t == null ? "memory" : t.backend(), backends)
                         .asEditable()
                         // Switching the backend swaps the backend-config group below.
@@ -396,8 +402,14 @@ public class VectorStoreUiController {
                         backendConfigGroup(body.str("backend"), current)));
     }
 
+    /**
+     * Saves the template form against the version it was opened with. A new
+     * template's form carries 0, so it does not overwrite one that exists under the
+     * same name; an edit that renamed the template finds nothing under the new name
+     * and saves it as a new template, as before.
+     */
     @PostMapping("/templates")
-    public UiPage saveTemplate(@RequestBody Map<String, Object> raw) {
+    public Object saveTemplate(@RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         String name = body.str("name");
         String refusal = saveRefusal(name);
@@ -410,12 +422,28 @@ public class VectorStoreUiController {
         putIfPresent(backendConfig, "password", body.str("password"));
         Map<String, String> metadata = new LinkedHashMap<>();
         putIfPresent(metadata, "description", body.str("description"));
-        stores.registry().saveTemplate(new VectorStoreTemplate(name.trim(),
+        String templateName = name.trim();
+        VectorStoreTemplate template = new VectorStoreTemplate(templateName,
                 body.str("backend") == null ? "memory" : body.str("backend"),
                 backendConfig,
                 body.str("embeddingConfig") == null ? "embeddings" : body.str("embeddingConfig"),
-                body.str("ingestionWorkflow"), metadata));
-        return list("templates").toast(UiToast.success("Template '" + name.trim() + "' saved."));
+                body.str("ingestionWorkflow"), metadata)
+                .withVersion(VersionedForms.version(body));
+        try {
+            stores.registry().saveTemplate(template);
+        } catch (StaleVersionException e) {
+            if (e.expectedVersion() == 0) {
+                return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("A template named '"
+                        + templateName + "' exists already — nothing was saved. Edit that one, or choose "
+                        + "another name.").title("Not saved"));
+            }
+            if (e.storedVersion() != 0) {
+                return VersionedForms.changedMeanwhile("Template '" + templateName + "'");
+            }
+            // Nothing stored under this name: the edit renamed the template — a new one.
+            stores.registry().saveTemplate(template.withVersion(0L));
+        }
+        return list("templates").toast(UiToast.success("Template '" + templateName + "' saved."));
     }
 
     /** Why a template of this name cannot be saved — {@code null} when it can. */

@@ -15,6 +15,9 @@ import java.util.Map;
  * @param embeddingConfig   LlmConfig name for the embedding model
  * @param ingestionWorkflow workflow started by "Ingest file…" (e.g. {@code file-ingestion}); optional
  * @param metadata          free key-values (description, tags, chunking hints)
+ * @param version           the stored version this template was read with — a save with a
+ *                          version is refused once another save came in between;
+ *                          {@code null} saves without that check
  */
 public record VectorStoreTemplate(
         String name,
@@ -22,10 +25,23 @@ public record VectorStoreTemplate(
         Map<String, String> backendConfig,
         String embeddingConfig,
         String ingestionWorkflow,
-        Map<String, String> metadata
+        Map<String, String> metadata,
+        Long version
 ) {
     public VectorStoreTemplate {
         if (backendConfig == null) backendConfig = Map.of();
         if (metadata == null) metadata = Map.of();
+    }
+
+    /** Without a version: the template saves without a version check. */
+    public VectorStoreTemplate(String name, String backend, Map<String, String> backendConfig,
+                               String embeddingConfig, String ingestionWorkflow, Map<String, String> metadata) {
+        this(name, backend, backendConfig, embeddingConfig, ingestionWorkflow, metadata, null);
+    }
+
+    /** This template as read with, or to be saved against, {@code version} — nothing else changes. */
+    public VectorStoreTemplate withVersion(Long version) {
+        return new VectorStoreTemplate(name, backend, backendConfig, embeddingConfig, ingestionWorkflow,
+                metadata, version);
     }
 }

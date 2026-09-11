@@ -65,8 +65,33 @@ public record LlmConfig(
          * applies; see {@link #effectiveCapabilities()}. A declared set, the
          * empty set included, always wins over that default.
          */
-        Set<LlmCapability> capabilities
+        Set<LlmCapability> capabilities,
+        /**
+         * The stored version this config was read with — optimistic locking for
+         * edits made as a whole (the admin form, a REST save). A store saves it only
+         * if it is still the stored version and stores it one higher; {@code null}
+         * saves without that check. See {@code ai.mindconnect.common.Versions}.
+         */
+        Long version
 ) {
+    /** Without a version: the config saves without a version check. */
+    public LlmConfig(LlmConfigId id, String name, LlmProvider provider, String model, String baseUrl,
+                     String apiKey, double defaultTemperature, int maxOutputTokens,
+                     Map<String, Object> additionalParams, Integer contextWindowTokens, boolean isAlias,
+                     String delegatesTo, RetryConfig retry, RateLimitConfig rateLimit, LlmConfigType type,
+                     Set<LlmCapability> capabilities) {
+        this(id, name, provider, model, baseUrl, apiKey, defaultTemperature, maxOutputTokens,
+                additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type,
+                capabilities, null);
+    }
+
+    /** This config as read with, or to be saved against, {@code version} — nothing else changes. */
+    public LlmConfig withVersion(Long version) {
+        return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo,
+                retry, rateLimit, type, capabilities, version);
+    }
+
     /**
      * Normalises the type ({@code null} reads as CHAT) and keeps a declared
      * capability set as an unmodifiable copy in declaration order, so JSON
@@ -134,11 +159,12 @@ public record LlmConfig(
             @JsonProperty("retry")                RetryConfig retry,
             @JsonProperty("rateLimit")            RateLimitConfig rateLimit,
             @JsonProperty("type")                 LlmConfigType type,
-            @JsonProperty("capabilities")         Set<LlmCapability> capabilities) {
+            @JsonProperty("capabilities")         Set<LlmCapability> capabilities,
+            @JsonProperty("version")              Long version) {
         return new LlmConfig(new LlmConfigId(id), name, provider, model, baseUrl, apiKey,
                 defaultTemperature, maxOutputTokens,
                 additionalParams != null ? additionalParams : Map.of(),
-                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
+                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
     }
 
     /**
@@ -268,18 +294,18 @@ public record LlmConfig(
 
     public LlmConfig withContextWindowTokens(Integer contextWindowTokens) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
     }
 
     public LlmConfig withApiKey(String apiKey) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
     }
 
     /** Returns a copy declaring exactly the given capabilities ({@code null}: not declared, the provider's default applies). */
     public LlmConfig withCapabilities(Set<LlmCapability> capabilities) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
     }
 
     /**
@@ -319,7 +345,8 @@ public record LlmConfig(
                 retry,
                 rateLimit,
                 type,
-                capabilities);
+                capabilities,
+                version);
     }
 
     /**

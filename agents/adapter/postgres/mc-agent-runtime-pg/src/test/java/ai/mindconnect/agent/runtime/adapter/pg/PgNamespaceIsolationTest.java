@@ -49,8 +49,7 @@ class PgNamespaceIsolationTest {
     void agentDefinitions() {
         var a = new PgAgentDefinitionRepository(sql, A).initSchema();
         var b = new PgAgentDefinitionRepository(sql, B).initSchema();
-        AgentDefinition d = AgentDefinition.create("web-researcher", "desc", "prompt", "hello", "agent-default");
-        a.save(d);
+        AgentDefinition d = a.save(AgentDefinition.create("web-researcher", "desc", "prompt", "hello", "agent-default"));
 
         assertThat(b.findById(d.id())).isEmpty();
         assertThat(b.findByName("web-researcher")).isEmpty();

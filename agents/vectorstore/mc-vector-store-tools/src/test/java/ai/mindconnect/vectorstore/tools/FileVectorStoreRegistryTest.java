@@ -52,12 +52,13 @@ class FileVectorStoreRegistryTest {
         VectorStoreTemplate template = new VectorStoreTemplate("Chat Uploads", "memory", Map.of(),
                 "embeddings", null, Map.of("description", "per chat"));
 
-        registry.saveTemplate(template);
+        VectorStoreTemplate saved = registry.saveTemplate(template);
         VectorStoreInstance instance = registry.registerInstance(
                 VectorStoreInstance.fromTemplate("docs", template, VectorStoreInstance.Scope.GLOBAL, null));
 
-        assertThat(registry.template("Chat Uploads")).contains(template);
-        assertThat(registry.templates()).containsExactly(template);
+        assertThat(saved.version()).isEqualTo(1L);
+        assertThat(registry.template("Chat Uploads")).contains(saved);
+        assertThat(registry.templates()).containsExactly(saved);
         assertThat(registry.instances(VectorStoreInstance.Scope.GLOBAL, null)).containsExactly(instance);
         registry.deleteInstance("docs");
         assertThat(registry.instance("docs")).isEmpty();

@@ -47,8 +47,8 @@ class PgLlmConfigRepositoryTest {
         assertThat(other.findAll()).isEmpty();
         other.deleteById(config.id());
 
-        assertThat(repo.findById(config.id())).contains(config);
-        assertThat(repo.findAll()).containsExactly(config);
+        assertThat(repo.findById(config.id())).contains(config.withVersion(1L));
+        assertThat(repo.findAll()).containsExactly(config.withVersion(1L));
     }
 
     @Test
@@ -61,8 +61,8 @@ class PgLlmConfigRepositoryTest {
                         ai.mindconnect.llm.domain.LlmCapability.VISION));
         repo.save(config);
 
-        assertThat(repo.findById(config.id())).contains(config);
-        assertThat(repo.findByName("claude")).contains(config);
+        assertThat(repo.findById(config.id())).contains(config.withVersion(1L));
+        assertThat(repo.findByName("claude")).contains(config.withVersion(1L));
     }
 
     @Test
@@ -70,12 +70,12 @@ class PgLlmConfigRepositoryTest {
         LlmConfig first = LlmConfig.lmStudio("local", "qwen", "http://localhost:1234");
         repo.save(first);
         LlmConfig renamed = LlmConfig.fromJson(first.id().value(), "local-qwen", first.provider(), "qwen-2",
-                first.baseUrl(), first.apiKey(), 0.1, 1024, Map.of(), null, false, null, null, null, null, null);
+                first.baseUrl(), first.apiKey(), 0.1, 1024, Map.of(), null, false, null, null, null, null, null, null);
         repo.save(renamed);
 
-        assertThat(repo.findAll()).containsExactly(renamed);
+        assertThat(repo.findAll()).containsExactly(renamed.withVersion(2L));
         assertThat(repo.findByName("local")).isEmpty();
-        assertThat(repo.findByName("local-qwen")).contains(renamed);
+        assertThat(repo.findByName("local-qwen")).contains(renamed.withVersion(2L));
     }
 
     @Test
@@ -87,7 +87,7 @@ class PgLlmConfigRepositoryTest {
 
         assertThat(repo.findAll()).extracting(LlmConfig::name).containsExactly("a-claude", "b-ollama");
         repo.deleteById(b.id());
-        assertThat(repo.findAll()).containsExactly(a);
+        assertThat(repo.findAll()).containsExactly(a.withVersion(1L));
         assertThat(repo.findById(b.id())).isEmpty();
         repo.deleteById(b.id()); // deleting what is gone is not an error
     }

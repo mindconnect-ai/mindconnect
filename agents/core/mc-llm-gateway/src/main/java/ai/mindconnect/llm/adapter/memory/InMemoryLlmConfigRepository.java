@@ -17,7 +17,8 @@ public class InMemoryLlmConfigRepository implements LlmConfigRepository {
 
     @Override
     public void save(LlmConfig config) {
-        store.put(config.id(), config);
+        store.compute(config.id(), (id, current) -> config.withVersion(ai.mindconnect.common.Versions.next(
+                current == null ? null : current.version(), config.version(), "LlmConfig", id.value())));
     }
 
     @Override

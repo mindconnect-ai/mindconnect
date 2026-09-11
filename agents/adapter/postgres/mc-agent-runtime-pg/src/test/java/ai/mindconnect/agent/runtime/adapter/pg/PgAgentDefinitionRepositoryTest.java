@@ -25,14 +25,14 @@ class PgAgentDefinitionRepositoryTest {
     @Test
     void aDefinitionSurvivesTheRoundTrip() {
         AgentDefinition d = def("default-chat");
-        repo.save(d);
-        assertThat(repo.findById(d.id())).contains(d);
+        AgentDefinition saved = repo.save(d);
+        assertThat(saved).isEqualTo(d.withVersion(1L));
+        assertThat(repo.findById(d.id())).contains(saved);
     }
 
     @Test
     void findByNameIgnoresCase() {
-        AgentDefinition d = def("Web-Researcher");
-        repo.save(d);
+        AgentDefinition d = repo.save(def("Web-Researcher"));
 
         assertThat(repo.findByName("web-researcher")).contains(d);
         assertThat(repo.findByName("WEB-RESEARCHER")).contains(d);
@@ -41,10 +41,8 @@ class PgAgentDefinitionRepositoryTest {
 
     @Test
     void findAllListsByNameAndDeleteRemoves() {
-        AgentDefinition b = def("b");
-        AgentDefinition a = def("a");
-        repo.save(b);
-        repo.save(a);
+        AgentDefinition b = repo.save(def("b"));
+        AgentDefinition a = repo.save(def("a"));
 
         assertThat(repo.findAll()).containsExactly(a, b);
         repo.deleteById(a.id());

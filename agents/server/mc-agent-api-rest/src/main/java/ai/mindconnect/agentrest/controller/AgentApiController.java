@@ -103,16 +103,32 @@ public class AgentApiController {
         return agent;
     }
 
-    /** Partial update: absent (null) fields keep their current value. */
+    /**
+     * Partial update: absent (null) fields keep their current value. {@code version},
+     * when given, is the agent's version as read: the update is refused with 409 if the
+     * agent was saved since.
+     */
     public record UpdateAgentRequest(String name, String description, String systemPrompt,
                                      String welcomeMessage, String llmConfigName,
                                      Integer maxIterations, List<String> responseReviewers,
-                                     AgentDefinition.ToolSearchConfig toolSearch) {}
+                                     AgentDefinition.ToolSearchConfig toolSearch, Long version) {
+
+        /** Without a version: the update is applied to the agent as stored. */
+        public UpdateAgentRequest(String name, String description, String systemPrompt,
+                                  String welcomeMessage, String llmConfigName,
+                                  Integer maxIterations, List<String> responseReviewers,
+                                  AgentDefinition.ToolSearchConfig toolSearch) {
+            this(name, description, systemPrompt, welcomeMessage, llmConfigName, maxIterations,
+                    responseReviewers, toolSearch, null);
+        }
+    }
 
     @Operation(tags = "Agents", summary = "Update an agent",
             description = "Partial update — absent (null) fields keep their current value. "
                     + "Covers the same fields as the admin UI's edit form, through the same "
-                    + "AgentRegistryService path.")
+                    + "AgentRegistryService path. Send the agent's `version` as you read it to "
+                    + "have the update refused with 409 when the agent was saved since; without "
+                    + "it the update is applied to the agent as stored.")
     @PutMapping("/agents/{agentId}")
     public AgentDefinition updateAgent(@PathVariable String agentId,
                                        @RequestBody UpdateAgentRequest req) {
@@ -126,7 +142,7 @@ public class AgentApiController {
                 .withMaxIterations(req.maxIterations())
                 .withResponseReviewers(req.responseReviewers())
                 .withToolSearch(req.toolSearch());
-        return registryService.update(AgentId.of(agentId), patch);
+        return registryService.update(AgentId.of(agentId), patch, req.version());
     }
 
     @Operation(tags = "Agents", summary = "Delete an agent")

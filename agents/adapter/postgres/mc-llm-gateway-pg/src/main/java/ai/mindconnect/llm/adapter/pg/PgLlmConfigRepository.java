@@ -53,8 +53,12 @@ public final class PgLlmConfigRepository implements LlmConfigRepository {
     }
 
     @Override
+    /** Checks the version against the row read {@code FOR UPDATE} and stores it one higher, in one transaction. */
     public void save(LlmConfig config) {
-        configs.save(config);
+        configs.compute(namespace.value(), config.id().value(), current ->
+                config.withVersion(ai.mindconnect.common.Versions.next(
+                        current.map(LlmConfig::version).orElse(null), config.version(),
+                        "LlmConfig", config.id().value())));
     }
 
     @Override
