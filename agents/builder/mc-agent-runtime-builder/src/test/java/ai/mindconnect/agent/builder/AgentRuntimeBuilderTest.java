@@ -94,6 +94,59 @@ class AgentRuntimeBuilderTest {
     }
 
     @Test
+    void aRootThatHoldsNoHomeStillLetsAChatChangeItsList() throws Exception {
+        // The admin UI in a container without the server profile: the root is
+        // where projects are, the users' home lives elsewhere, under the data
+        // directory. The chat's own directory never passed the root and must
+        // not have to whenever the list around it changes.
+        java.nio.file.Path root = java.nio.file.Files.createTempDirectory("root");
+        java.nio.file.Path homes = java.nio.file.Files.createTempDirectory("homes");
+        try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))
+                .agentDefinition(demoAgent())
+                .workingDirRoot(root)
+                .usersHome(homes.resolve("{user}").toString())
+                .build()) {
+            var sessions = runtime.sessionService();
+            AgentSession session = runtime.openSession("test-agent", UserId.of("user-5"));
+            String own = session.workingDir();
+            assertThat(java.nio.file.Path.of(own)).startsWith(homes.toRealPath());
+            assertThat(java.nio.file.Path.of(own).startsWith(root.toRealPath()))
+                    .as("the chat's own directory lies outside the root").isFalse();
+
+            java.nio.file.Path project = java.nio.file.Files.createDirectories(root.resolve("proj"));
+            String projectDir = project.toRealPath().toString();
+            AgentSession added = runtime.addDirectory(session.id(), project);
+            assertThat(added.additionalDirs()).containsExactly(projectDir);
+
+            // The chat's Remove button: the same working directory, the list without the one removed.
+            AgentSession removed = sessions.changeWorkingDir(session.id(), added.workingDir(),
+                    added.additionalDirs().stream().filter(d -> !d.equals(projectDir)).toList());
+            assertThat(removed.workingDir()).isEqualTo(own);
+            assertThat(removed.additionalDirs()).isEmpty();
+
+            // In the project, the own directory is on the list — and the list can still change.
+            AgentSession moved = runtime.changeWorkingDir(session.id(), project);
+            assertThat(moved.additionalDirs()).containsExactly(own);
+            java.nio.file.Path other = java.nio.file.Files.createDirectories(root.resolve("other"));
+            AgentSession updated = sessions.changeWorkingDir(session.id(), moved.workingDir(),
+                    java.util.List.of(own, other.toString()));
+            assertThat(updated.workingDir()).isEqualTo(projectDir);
+            assertThat(updated.additionalDirs()).containsExactly(own, other.toRealPath().toString());
+
+            // What the session does not have yet is still held to the root.
+            java.nio.file.Path elsewhere = java.nio.file.Files.createTempDirectory("elsewhere");
+            assertThatThrownBy(() -> sessions.changeWorkingDir(session.id(), projectDir,
+                    java.util.List.of(own, elsewhere.toString())))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
+            assertThatThrownBy(() -> runtime.addDirectory(session.id(), elsewhere))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
+            assertThatThrownBy(() -> runtime.changeWorkingDir(session.id(), elsewhere))
+                    .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
+        }
+    }
+
+    @Test
     void aChatOpenedByAgentIdAloneGetsItsOwnDirectoryToo() throws Exception {
         // The chat UI and the local client open a chat by agent id alone. That
         // must not be the one way in that forgets the chat's own directory.

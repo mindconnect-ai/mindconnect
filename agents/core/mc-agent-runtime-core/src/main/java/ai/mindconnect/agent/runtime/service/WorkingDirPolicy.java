@@ -131,6 +131,21 @@ public final class WorkingDirPolicy {
      * {@code null}.
      */
     public String validate(String workingDir) {
+        return validate(workingDir, java.util.Set.of());
+    }
+
+    /**
+     * Same as {@link #validate(String)}, except that a directory already in
+     * {@code kept} is not held against the root again. Those are the
+     * directories a session has — its working directory, its additional
+     * ones, its own under the users' home — in the form they were recorded
+     * in. The runtime gave a session its own directory, and a root that does
+     * not contain the users' home would otherwise refuse every change to a
+     * list that merely still holds it, the removal of another directory
+     * included. A kept directory still has to exist; one that resolves to
+     * anything but a recorded path is checked like any other.
+     */
+    public String validate(String workingDir, java.util.Collection<String> kept) {
         if (template != null) {
             throw new IllegalStateException("A per-user working-dir root needs forUser(userId) first");
         }
@@ -151,7 +166,7 @@ public final class WorkingDirPolicy {
         } catch (IOException e) {
             throw new IllegalArgumentException("Cannot resolve " + path + ": " + e.getMessage());
         }
-        if (root != null) {
+        if (root != null && !(kept != null && kept.contains(real.toString()))) {
             Path realRoot = realRoot();
             if (!real.startsWith(realRoot)) {
                 throw new IllegalArgumentException("The working directory must lie under " + realRoot

@@ -63,6 +63,33 @@ class WorkingDirPolicyTest {
     }
 
     @Test
+    void aDirectoryTheSessionAlreadyHasIsNotHeldAgainstTheRootAgain() throws Exception {
+        Path inside = Files.createDirectories(tmp.resolve("allowed/project"));
+        Path own = Files.createDirectories(tmp.resolve("home/alice/sessions/s1"));
+        Path outside = Files.createDirectories(tmp.resolve("elsewhere"));
+        var policy = WorkingDirPolicy.within(tmp.resolve("allowed").toString());
+        var kept = java.util.Set.of(own.toRealPath().toString());
+
+        assertThat(policy.validate(own.toString(), kept)).isEqualTo(own.toRealPath().toString());
+        assertThat(policy.validate(inside.toString(), kept)).isEqualTo(inside.toRealPath().toString());
+        assertThatThrownBy(() -> policy.validate(outside.toString(), kept))
+                .as("a directory the session does not have is checked as ever")
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
+        assertThatThrownBy(() -> policy.validate(own.toString()))
+                .as("without it, the same directory is refused")
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("must lie under");
+
+        Path gone = tmp.resolve("gone");
+        assertThatThrownBy(() -> policy.validate(gone.toString(), java.util.Set.of(gone.toString())))
+                .as("a kept directory still has to exist")
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Not a directory");
+        assertThatThrownBy(() -> policy.withChoice(false).validate(own.toString(), kept))
+                .as("and without choice nothing validates")
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mindconnect.working-dirs.choice");
+    }
+
+    @Test
     void aBlankRootMeansUnrestricted() {
         assertThat(WorkingDirPolicy.within(null).root()).isNull();
         assertThat(WorkingDirPolicy.within("").root()).isNull();

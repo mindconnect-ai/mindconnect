@@ -197,14 +197,21 @@ public class AgentSessionService {
      * Moves a session to another working directory and replaces its
      * additional directories in one go — the chat's dialog, the REST
      * endpoint. {@code null} keeps the additional directories as they are.
+     *
+     * <p>Only a directory the session does not have yet is checked against
+     * the root; see {@link #directoriesHeld}. Removing one directory resends
+     * the rest, and the rest must not fail on a check they already passed —
+     * or, for the session's own directory, never had to.
      */
     public AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
         // Clearing counts as a choice too: it would take the chat out of its own directory.
         workingDirPolicy.requireChoice();
         AgentSession session = findSession(sessionId);
         WorkingDirPolicy policy = workingDirPolicy.forUser(session.userId());
-        String dir = policy.validate(workingDir);
-        List<String> extras = additionalDirs == null ? session.additionalDirs() : validateAll(policy, additionalDirs);
+        java.util.Set<String> held = directoriesHeld(session);
+        String dir = policy.validate(workingDir, held);
+        List<String> extras = additionalDirs == null ? session.additionalDirs()
+                : validateAll(policy, additionalDirs, held);
         return sessionRepository.save(session.withWorkingDir(dir)
                 .withAdditionalDirs(keepingOwnDirectory(session, dir, extras)));
     }
@@ -213,19 +220,40 @@ public class AgentSessionService {
     public AgentSession addDirectory(SessionId sessionId, String dir) {
         workingDirPolicy.requireChoice();
         AgentSession session = findSession(sessionId);
-        String validated = workingDirPolicy.forUser(session.userId()).validate(dir);
+        String validated = workingDirPolicy.forUser(session.userId()).validate(dir, directoriesHeld(session));
         if (validated == null) throw new IllegalArgumentException("A directory is required");
         java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(session.additionalDirs());
         merged.add(validated);
         return sessionRepository.save(session.withAdditionalDirs(List.copyOf(merged)));
     }
 
+    /**
+     * The directories a session already has, as recorded: its working
+     * directory, its additional ones and its own under the users' home.
+     * They passed the policy when they were chosen, or were given by the
+     * runtime, which does not ask it — the users' home need not lie under
+     * the root at all.
+     */
+    private java.util.Set<String> directoriesHeld(AgentSession session) {
+        java.util.Set<String> held = new java.util.HashSet<>(session.additionalDirs());
+        if (session.hasWorkingDir()) held.add(session.workingDir());
+        userHome.existingSessionDirOf(session.userId(), session.id())
+                .ifPresent(own -> held.add(own.toString()));
+        return held;
+    }
+
     /** Every directory validated, blanks dropped, duplicates folded, order kept. */
     private static List<String> validateAll(WorkingDirPolicy policy, List<String> dirs) {
+        return validateAll(policy, dirs, java.util.Set.of());
+    }
+
+    /** Same, with the directories the session already has passing without the root check. */
+    private static List<String> validateAll(WorkingDirPolicy policy, List<String> dirs,
+                                            java.util.Set<String> held) {
         if (dirs == null || dirs.isEmpty()) return List.of();
         java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
         for (String d : dirs) {
-            String validated = policy.validate(d);
+            String validated = policy.validate(d, held);
             if (validated != null) out.add(validated);
         }
         return List.copyOf(out);
