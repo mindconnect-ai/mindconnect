@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 
@@ -54,7 +55,7 @@ public class FileTodoListRepository implements TodoListRepository {
         Path file = fileFor(list.sessionId());
         try {
             Files.createDirectories(file.getParent());
-            mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), list);
+            AtomicFiles.write(file, out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out, list));
             log.debug("Saved todo list for session {} ({} items)", list.sessionId(), list.items().size());
             return list;
         } catch (IOException e) {

@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmConfigId;
 
@@ -36,7 +37,7 @@ public class FileLlmConfigRepository implements LlmConfigRepository {
     @Override
     public void save(LlmConfig config) {
         try {
-            objectMapper.writeValue(fileFor(config.id().value()).toFile(), config);
+            AtomicFiles.write(fileFor(config.id().value()), out -> objectMapper.writeValue(out, config));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

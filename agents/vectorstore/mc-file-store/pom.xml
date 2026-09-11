@@ -20,6 +20,11 @@
         object storage (s3) or database backends slot in as sibling modules.</description>
 
     <dependencies>
+        <!-- AtomicFiles: stored files are written whole or not at all. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-common</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-store-core</artifactId>

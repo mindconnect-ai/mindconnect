@@ -19,6 +19,11 @@
         agents only ever handle text. The ingestion pipeline itself is a workflow seed.</description>
 
     <dependencies>
+        <!-- AtomicFiles: stored files are written whole or not at all. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-common</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tool-spi</artifactId>

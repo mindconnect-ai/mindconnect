@@ -13,6 +13,7 @@ import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.taskqueue.TaskContext;
+import ai.mindconnect.taskqueue.TaskFailure;
 import ai.mindconnect.taskqueue.TaskRecord;
 
 import java.util.Optional;
@@ -91,7 +92,18 @@ final class QueuedAgentRoundToolExecutor implements AgentRoundToolExecutor {
         }
         return resultWritten(callId)
                 ? new ToolResult.Running()   // reload-after-wake will see it — never append twice
-                : new ToolResult.Lost("tool task ended " + task.get().status() + " without a result");
+                : new ToolResult.Lost("tool task ended " + task.get().status() + " without a result"
+                        + failureOf(task.get()));
+    }
+
+    /** Why the task failed, as far as the queue recorded it — for the model and for whoever reads the log. */
+    private static String failureOf(TaskRecord task) {
+        TaskFailure failure = task.failure();
+        if (failure == null) return "";
+        String type = failure.type() == null ? null : failure.type().substring(failure.type().lastIndexOf('.') + 1);
+        String message = failure.message() == null ? "" : failure.message();
+        if (message.length() > 300) message = message.substring(0, 300) + "…";
+        return " (" + (type == null ? "" : type + ": ") + message + ")";
     }
 
     private boolean resultWritten(String callId) {

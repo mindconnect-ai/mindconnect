@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 
@@ -40,7 +41,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
         Path file = sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE);
         try {
             Files.createDirectories(file.getParent());
-            mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), memory);
+            AtomicFiles.write(file, out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out, memory));
             log.debug("Saved working memory for session {} ({} tokens)", sessionId, memory.totalTokens());
         } catch (IOException e) {
             log.warn("Failed to save working memory for session {}: {}", sessionId, e.getMessage());
@@ -70,7 +71,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
         Path file = sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE);
         try {
             Files.createDirectories(file.getParent());
-            Files.writeString(file, summary);
+            AtomicFiles.writeString(file, summary);
             log.debug("Saved summary for session {}", sessionId);
         } catch (IOException e) {
             log.warn("Failed to save summary for session {}: {}", sessionId, e.getMessage());

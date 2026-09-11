@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
@@ -49,17 +50,9 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
     public AgentSession save(AgentSession session) {
         Path file = fileFor(session);
         try {
-            Files.createDirectories(file.getParent());
-            // Written beside the target and moved over it in one step: a session is
-            // read while other threads save it (tool tasks, title generation), and a
-            // reader must never see the half-written file.
-            Path tmp = Files.createTempFile(file.getParent(), FILE_NAME + ".", ".tmp");
-            try {
-                objectMapper.writeValue(tmp.toFile(), session);
-                Files.move(tmp, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
-            } finally {
-                Files.deleteIfExists(tmp);
-            }
+            // A session is read while other threads save it (tool tasks, title
+            // generation); a reader must never see the half-written file.
+            AtomicFiles.write(file, out -> objectMapper.writeValue(out, session));
             return session;
         } catch (IOException e) {
             throw new UncheckedIOException(e);

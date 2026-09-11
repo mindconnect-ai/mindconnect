@@ -1,5 +1,6 @@
 package ai.mindconnect.message.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.MessageId;
@@ -62,7 +63,7 @@ public class FileMessageRepository implements MessageRepository {
             Files.createDirectories(dir);
             Path file = fileFor(message);
             boolean isUpdate = Files.exists(file);
-            objectMapper.writeValue(file.toFile(), message);
+            AtomicFiles.write(file, out -> objectMapper.writeValue(out, message));
             if (!isUpdate) {
                 log.fine("Saved new message " + message.id());
             } else {
