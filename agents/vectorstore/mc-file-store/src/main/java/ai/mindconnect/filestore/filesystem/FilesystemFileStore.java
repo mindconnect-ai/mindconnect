@@ -3,6 +3,7 @@ package ai.mindconnect.filestore.filesystem;
 import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.EntityId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -44,8 +45,9 @@ public final class FilesystemFileStore implements FileStore {
         this.root = baseDir.resolve(namespace.value()).resolve("files");
     }
 
+    /** The creator lands in {@code meta.json}; metadata written before creators existed loads without one. */
     @Override
-    public StoredFile save(String name, String contentType, InputStream content) throws IOException {
+    public StoredFile save(String name, String contentType, InputStream content, UserId creator) throws IOException {
         FileId id = FileId.of("file-" + EntityId.randomValue().replace("-", "").substring(0, 20));
         String safeName = Path.of(name == null || name.isBlank() ? "upload.bin" : name)
                 .getFileName().toString().replaceAll("[^A-Za-z0-9._ -]", "_");
@@ -53,7 +55,7 @@ public final class FilesystemFileStore implements FileStore {
         Files.createDirectories(dir);
         Path target = dir.resolve(safeName);
         long size = Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
-        StoredFile file = new StoredFile(id, safeName, contentType, size, Instant.now());
+        StoredFile file = new StoredFile(id, safeName, contentType, size, Instant.now(), creator);
         // The metadata is what makes the upload exist for readers; it lands whole or not at all.
         AtomicFiles.write(dir.resolve("meta.json"), out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out, file));
         return file;

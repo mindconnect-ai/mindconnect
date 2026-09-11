@@ -48,6 +48,10 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-store-pg</artifactId>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user-pg</artifactId>
+        </dependency>
         <!-- the SPI and the filesystem backend, for mindconnect.file-store.backend=filesystem under Postgres -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

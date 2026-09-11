@@ -2,6 +2,7 @@ package ai.mindconnect.filestore.adapter.pg;
 
 import ai.mindconnect.agent.EntityId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -32,6 +33,10 @@ import java.util.Optional;
  */
 public final class PgFileStore implements FileStore {
 
+    /**
+     * The {@code creator} column came later; the {@code ALTER} adds it to a
+     * table created before, whose rows then have no creator.
+     */
     private static final String DDL = """
             CREATE TABLE IF NOT EXISTS mc_file (
                 namespace    TEXT NOT NULL,
@@ -43,9 +48,10 @@ public final class PgFileStore implements FileStore {
                 content      BYTEA NOT NULL,
                 PRIMARY KEY (namespace, id)
             );
+            ALTER TABLE mc_file ADD COLUMN IF NOT EXISTS creator TEXT;
             """;
 
-    private static final String SELECT = "SELECT id, name, content_type, size, created_at FROM mc_file";
+    private static final String SELECT = "SELECT id, name, content_type, size, created_at, creator FROM mc_file";
 
     private final Sql sql;
     private final Namespace namespace;
@@ -59,22 +65,23 @@ public final class PgFileStore implements FileStore {
         this.namespace = Objects.requireNonNull(namespace, "namespace");
     }
 
-    /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */
+    /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}, {@code ADD COLUMN IF NOT EXISTS …}). */
     public PgFileStore initSchema() {
         sql.execute(DDL);
         return this;
     }
 
     @Override
-    public StoredFile save(String name, String contentType, InputStream content) throws IOException {
+    public StoredFile save(String name, String contentType, InputStream content, UserId creator) throws IOException {
         FileId id = FileId.of("file-" + EntityId.randomValue().replace("-", "").substring(0, 20));
         String safeName = Path.of(name == null || name.isBlank() ? "upload.bin" : name)
                 .getFileName().toString().replaceAll("[^A-Za-z0-9._ -]", "_");
         byte[] bytes = content.readAllBytes();
-        StoredFile file = new StoredFile(id, safeName, contentType, bytes.length, Instant.now());
-        sql.update("INSERT INTO mc_file (namespace, id, name, content_type, size, created_at, content) "
-                        + "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                namespace.value(), id.value(), file.name(), file.contentType(), file.size(), file.createdAt(), bytes);
+        StoredFile file = new StoredFile(id, safeName, contentType, bytes.length, Instant.now(), creator);
+        sql.update("INSERT INTO mc_file (namespace, id, name, content_type, size, created_at, content, creator) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                namespace.value(), id.value(), file.name(), file.contentType(), file.size(), file.createdAt(), bytes,
+                creator == null ? null : creator.value());
         return file;
     }
 
@@ -106,7 +113,9 @@ public final class PgFileStore implements FileStore {
 
     private static StoredFile storedFile(Row row) throws SQLException {
         Long size = row.longValue("size");
+        String creator = row.string("creator");
         return new StoredFile(FileId.of(row.string("id")), row.string("name"),
-                row.string("content_type"), size == null ? 0L : size, row.instant("created_at"));
+                row.string("content_type"), size == null ? 0L : size, row.instant("created_at"),
+                creator == null ? null : UserId.of(creator));
     }
 }

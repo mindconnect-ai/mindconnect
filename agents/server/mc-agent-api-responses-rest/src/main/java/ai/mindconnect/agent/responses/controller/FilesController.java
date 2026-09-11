@@ -28,6 +28,10 @@ import java.util.Map;
  * {@code input_image} part of any number of requests. The file lands in the
  * runtime's file store — the same one the chat's uploads use — and is
  * attached to a session only when a request references it.
+ *
+ * <p>An upload is the caller's file. Reading one by id goes through the
+ * backend, which answers only the caller's files (and files stored before
+ * creators were recorded); anything else is not found.
  */
 @RestController
 @RequestMapping("/v1")
@@ -58,7 +62,7 @@ public class FilesController {
 
     @GetMapping(value = "/files/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> get(@PathVariable String id) {
-        return backend.files().get(id)
+        return readable(id)
                 .map(f -> ResponseEntity.ok(toDto(f, null)))
                 .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
                         .body(ResponsesController.error("not_found", "No file with id '" + id + "'.")));
@@ -70,30 +74,32 @@ public class FilesController {
         if (store == null) {
             throw new IllegalStateException("File support is not wired on this server");
         }
-        var stored = fileId(id).flatMap(store::find).orElse(null);
+        // The backend decides whether the caller may read the file; the store only serves the bytes.
+        StoredFile stored = readable(id).orElse(null);
         if (stored == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(ResponsesController.error("not_found", "No file with id '" + id + "'."));
         }
         MediaType type = MediaType.APPLICATION_OCTET_STREAM;
         try {
-            if (stored.contentType() != null) type = MediaType.parseMediaType(stored.contentType());
+            if (stored.mediaType() != null) type = MediaType.parseMediaType(stored.mediaType());
         } catch (RuntimeException ignore) {
             // an odd content type on the record; octet-stream will do
         }
         return ResponseEntity.ok()
                 .contentType(type)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + stored.name() + "\"")
-                .body(new InputStreamResource(store.content(stored.id())));
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + stored.filename() + "\"")
+                .body(new InputStreamResource(store.content(FileId.of(stored.id()))));
     }
 
-    /** The file id, or empty for a value no file id can have — simply not found. */
-    private java.util.Optional<FileId> fileId(String id) {
+    /** The caller's file by id; empty for someone else's, a missing one, or a value no file id can have. */
+    private java.util.Optional<StoredFile> readable(String id) {
         try {
-            return java.util.Optional.of(FileId.of(id));
+            FileId.of(id);
         } catch (IllegalArgumentException e) {
             return java.util.Optional.empty();
         }
+        return backend.files().get(id);
     }
 
     /** OpenAI's file object: {@code id, object, bytes, created_at, filename, purpose}. */

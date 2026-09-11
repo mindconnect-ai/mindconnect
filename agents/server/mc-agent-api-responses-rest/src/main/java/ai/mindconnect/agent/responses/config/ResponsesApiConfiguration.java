@@ -7,6 +7,7 @@ import ai.mindconnect.agent.responses.ResponsesMapper;
 import ai.mindconnect.agent.responses.SessionBinder;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agentrest.auth.CurrentUsers;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -33,19 +34,13 @@ public class ResponsesApiConfiguration {
     private String defaultAgent;
 
     /**
-     * Every request runs as this user until authentication is wired up.
-     * Stated as a property rather than hidden in a constant, so an operator
-     * can see what the API acts as before exposing it.
-     */
-    @Value("${mindconnect.responses.user-id:mc_user}")
-    private String userId;
-
-    /**
-     * The backend, with file support when the host has a file store and the
-     * chat's attach service: an {@code input_file} or {@code input_image}
-     * part lands in the store and on the session the way a chat upload
-     * does — a document is ingested for {@code vector_search}, an image or
-     * PDF goes to the model with the message.
+     * The backend, acting for the authenticated caller of each request
+     * ({@link CurrentUsers}): sessions, responses and files are the caller's
+     * own. With file support when the host has a file store and the chat's
+     * attach service: an {@code input_file} or {@code input_image} part lands
+     * in the store and on the session the way a chat upload does — a document
+     * is ingested for {@code vector_search}, an image or PDF goes to the model
+     * with the message.
      */
     @Bean
     @ConditionalOnMissingBean
@@ -53,9 +48,10 @@ public class ResponsesApiConfiguration {
                                                        AgentSessionService sessions,
                                                        AgentDefinitionRepository agents,
                                                        ConversationManager conversations,
+                                                       CurrentUsers currentUsers,
                                                        org.springframework.beans.factory.ObjectProvider<ai.mindconnect.filestore.FileStore> fileStore,
                                                        org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agentrest.service.SessionFileService> sessionFiles) {
-        var backend = new AgentRuntimeBackend(chat, sessions, agents, conversations, userId);
+        var backend = new AgentRuntimeBackend(chat, sessions, agents, conversations, currentUsers::require);
         var store = fileStore.getIfAvailable();
         var attach = sessionFiles.getIfAvailable();
         if (store != null && attach != null) {

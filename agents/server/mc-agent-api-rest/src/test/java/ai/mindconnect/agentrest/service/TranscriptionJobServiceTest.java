@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -192,12 +193,22 @@ class TranscriptionJobServiceTest {
     }
 
     @Test
-    void theRequesterIsRememberedForTheOwnerCheck() throws Exception {
-        String taskId = service.submit(AUDIO, "speech.webm", "audio/webm",
-                null, null, null, "mc_user").taskId();
+    void theRequesterIsRememberedForTheOwnerCheckAndOwnsTheRecording() throws Exception {
+        TranscriptionJobService.Job job = service.submit(AUDIO, "speech.webm", "audio/webm",
+                null, null, null, UserId.of("alice"));
 
-        assertThat(TranscriptionJobService.requesterOf(queue.get(taskId).orElseThrow()))
-                .contains("mc_user");
+        assertThat(TranscriptionJobService.requesterOf(queue.get(job.taskId()).orElseThrow()))
+                .contains(UserId.of("alice"));
+        assertThat(files.find(FileId.of(job.fileId()))).get()
+                .extracting(StoredFile::creator).isEqualTo(UserId.of("alice"));
+    }
+
+    @Test
+    void aJobOnNobodysBehalfHasNoRequester() throws Exception {
+        String taskId = service.submit(AUDIO, "speech.webm", "audio/webm",
+                null, null, null, null).taskId();
+
+        assertThat(TranscriptionJobService.requesterOf(queue.get(taskId).orElseThrow())).isEmpty();
     }
 
     // ── Stubs ──────────────────────────────────────────────────────────────
@@ -208,12 +219,12 @@ class TranscriptionJobServiceTest {
         private final Map<FileId, StoredFile> meta = new LinkedHashMap<>();
 
         @Override
-        public StoredFile save(String name, String contentType, InputStream content)
+        public StoredFile save(String name, String contentType, InputStream content, UserId creator)
                 throws IOException {
             FileId id = FileId.of("file-" + UUID.randomUUID());
             byte[] bytes = content.readAllBytes();
             stored.put(id, bytes);
-            StoredFile file = new StoredFile(id, name, contentType, bytes.length, Instant.now());
+            StoredFile file = new StoredFile(id, name, contentType, bytes.length, Instant.now(), creator);
             meta.put(id, file);
             return file;
         }

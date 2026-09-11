@@ -42,6 +42,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.tools.base-dir` | user home | Working/base directory for `bash` and the file tools — security-relevant. |
 | `mindconnect.user.id` | app-specific | The user id that owns sessions and data (the CLI ships a hard-coded default). |
 | `mindconnect.remote.url` | _(unset)_ | Points the CLI at a remote agent server instead of local mode. |
+| `mindconnect.remote.token` | _(unset)_ | Bearer token the CLI sends to a remote agent server that requires authentication; also read from `MC_REMOTE_TOKEN`. |
 | `mindconnect.code-exec.*` | — | Sandbox limits for `code_execute`: `runtime`, `network`, `languages`, `memory`, `cpus`, `timeout-seconds`, `idle-seconds`. |
 | `mindconnect.vector-store.*` | — | Vector-store backend: `backend`, `url`, `user`, `password`, `embedding-config` (default `embeddings`). The `memory` backend keeps its files in `<data.base-dir>/<namespace>/vector-stores`. |
 | `mindconnect.file-store.*` | — | File-store backend: `backend`. The `filesystem` backend keeps uploads in `<data.base-dir>/<namespace>/files`. |
@@ -79,11 +80,14 @@ key — they talk to LM Studio at `http://localhost:1234`.
 
 ## Authentication (Admin UI / Keycloak)
 
+See [Authentication](./authentication.md) for what the modes mean.
+
 | Variable | Default | Notes |
 |----------|---------|-------|
-| `MC_AUTH_ENABLED` | `false` | `false` (default) runs the Admin UI without Keycloak. Keycloak login is enabled via the **`keycloak` Spring profile** (which sets this itself) — setting the variable alone is not enough. |
+| `MC_AUTH_ENABLED` | `false` | `false` (default) runs the Admin UI without Keycloak. Keycloak login is enabled via the **`keycloak` Spring profile** (which sets this itself) — setting the variable alone is not enough. The agent server (`mc-agent-api-app`) has no login and is switched on by this variable alone: every request then needs a bearer token. |
 | `MC_DEV_USER` | `mc_user` | Auto-login username used when auth is disabled |
-| `KC_ISSUER_URI` | `http://localhost:8180/realms/mindconnect` | Keycloak realm issuer (only with the `keycloak` profile) |
+| `KC_ISSUER_URI` | `http://localhost:8180/realms/mindconnect` | Keycloak realm issuer — the browser login (only with the `keycloak` profile) and the issuer bearer JWTs on `/api/**` and `/v1/**` are checked against. Agent server: no default; without it only API tokens are accepted. |
+| `MC_JWT_AUDIENCES` | _(empty)_ | Comma-separated; when set, a bearer JWT must carry one of these audiences |
 | `KC_CLIENT_ID` | `mc-admin-ui` | OIDC client id |
 | `KC_CLIENT_SECRET` | _(empty)_ | OIDC client secret, if your client is confidential |
 

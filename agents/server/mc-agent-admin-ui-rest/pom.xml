@@ -44,6 +44,16 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-store</artifactId>
         </dependency>
+        <!-- The profile page: the signed-in user and their personal API tokens -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Semantic UI (from the standalone mc-semantic-ui repo): core
              (model + default TS renderer) + the JSON-viewer and markdown
              extensions (the former mc-semantic-ui-extensions bundle). -->

@@ -25,6 +25,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** the REST API (`/api/**`) and the OpenAI Responses API (`/v1/**`)
+  accept a bearer token once authentication is on: a Keycloak access token,
+  checked against `KC_ISSUER_URI` (`MC_JWT_AUDIENCES` can require an audience),
+  or a personal API token. A user creates API tokens on the new profile page
+  behind the avatar in the admin UI's header; the secret is shown once, only its
+  hash is stored, and a token can be revoked at any time. A request without an
+  accepted token gets `401` with a JSON body saying why. Before, the API only
+  answered to a browser session with a CSRF token — no program could call it on
+  a secured installation; now it takes bearer tokens only, the browser session
+  no longer counts there, and Swagger UI's **Authorize** takes a token for
+  *Try it out*. The agent server (`mc-agent-api-app`) is secured the
+  same way with `MC_AUTH_ENABLED=true`; it had no authentication at all. Users
+  are recorded on sign-in (`<data>/<namespace>/system/users/` or the `mc_user`
+  table). New modules: `mc-user-core`, `mc-user`, `mc-user-pg`,
+  `mc-agent-security`.
 - **agents:** MCP servers as registered tools. An operator registers a server
   under Admin → MCP Servers — a local process, a Docker image or a remote HTTP
   endpoint — tries it out with *Test connection*, and its tools appear in the
@@ -61,6 +76,36 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the tools go of what they hold for it. The tool test bench calls it after
   every test, so testing an MCP tool no longer leaves a connection — or a
   container — behind per click.
+
+### Changed
+
+- **agents:** the REST API answers only with what belongs to the caller.
+  `POST /api/sessions` takes `{agentId}` and the session belongs to the
+  authenticated user — a `userId` in the body is ignored; `GET /api/sessions`
+  lists the caller's sessions and ignores a `userId` parameter. Every
+  `/api/sessions/{id}/…` endpoint, the user stream (`/api/users/me/stream`) and
+  the workspace endpoints answer 404 for another user's data, exactly like for
+  data that does not exist. A client that passed another user's id to act for
+  them has to authenticate as that user instead.
+- **agents:** uploaded files remember who uploaded them (`creator`, a new
+  `mc_file` column added on start). `GET /api/files` lists only the caller's
+  files, only the uploader may delete one, and a file id in a chat message, a
+  session attach or a `/v1` request must be a file the caller may read. Files
+  uploaded before this version have no creator: they stay readable by id but are
+  no longer listed or deletable through the API. Transcription jobs are readable
+  only by whoever submitted them.
+- **agents:** a chat's upload store (`session-…`) answers only to the chat's
+  user. `/api/vector-stores` and the admin UI's vector-store pages no longer
+  list, open, search, fill or delete another user's, and no store can be created
+  under a `session-` name. Ingesting a stored file takes only a file the caller
+  may read, and the admin UI's files tab lists and deletes files by the same
+  rules as `/api/files`.
+- **agents:** the OpenAI Responses API (`/v1`) runs as the authenticated caller
+  instead of the fixed `mindconnect.responses.user-id`, which is removed (without
+  authentication the dev user, `MC_DEV_USER`, takes its place). Another user's
+  response or file answers `404 not_found`.
+- **agents:** the CLI's remote mode authenticates with an API token from
+  `MC_REMOTE_TOKEN` (`mindconnect.remote.token`) and no longer sends a user id.
 
 ### Removed
 

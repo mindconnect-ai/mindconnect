@@ -135,7 +135,9 @@ public final class AdminLayout {
             header.extra(UiLink.of("logout", "/admin/logout", "Logout"));
         }
 
-        header.user(UiHeader.User.of(userName, initials(userName), null));
+        // The avatar leads to the user's own page: who they are signed in as,
+        // and the API tokens they issued.
+        header.user(UiHeader.User.of(userName, initials(userName), "/admin/profile"));
         return header;
     }
 

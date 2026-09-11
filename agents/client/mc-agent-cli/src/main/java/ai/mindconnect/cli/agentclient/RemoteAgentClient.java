@@ -75,21 +75,23 @@ public class RemoteAgentClient implements AgentClient {
 
     // --- RunSessionUseCase ---
 
+    /**
+     * The server opens the session for the user it authenticated, so
+     * {@code userId} — the owner in local mode — is not sent.
+     */
     @Override
     public AgentSession startSession(AgentId agentDefinitionId, UserId userId) {
-        String body = toJson(Map.of(
-                "agentId", agentDefinitionId.value(),
-                "userId", userId.value()));
+        String body = toJson(Map.of("agentId", agentDefinitionId.value()));
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions")
                 .post(RequestBody.create(body, JSON)).build();
         return execute(req, AgentSession.class);
     }
 
+    /** The authenticated user's sessions; {@code userId} is not sent, as for {@link #startSession}. */
     @Override
     public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
-        String url = baseUrl + "/api/sessions?agentId=" + agentDefinitionId.value()
-                + "&userId=" + userId.value();
+        String url = baseUrl + "/api/sessions?agentId=" + agentDefinitionId.value();
         Request req = new Request.Builder().url(url).get().build();
         return execute(req, new TypeReference<>() {
         });

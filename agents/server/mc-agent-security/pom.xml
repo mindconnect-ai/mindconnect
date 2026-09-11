@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-agent-security</artifactId>
+    <name>mc-agent-security</name>
+    <packaging>jar</packaging>
+    <description>
+        Spring Security for the agent apps: bearer authentication of the REST API
+        with a JWT of the identity provider or a personal API token, the caller of
+        a request as a UserId for the REST layer, and the user record kept in step
+        with who signs in. Auto-configured; each app composes its filter chains
+        from these parts.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-api-rest</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-security</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- oidcLogin() of spring-security-test builds an OAuth2AuthenticationToken -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-client</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

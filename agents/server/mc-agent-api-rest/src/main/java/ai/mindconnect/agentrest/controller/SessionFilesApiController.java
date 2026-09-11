@@ -1,6 +1,9 @@
 package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agentrest.auth.CurrentUser;
+import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import io.swagger.v3.oas.annotations.Operation;
@@ -36,6 +39,11 @@ import java.util.Map;
  * the store. The heavy lifting (template, scoped store, ingestion workflow,
  * vector_search activation) lives in {@link ai.mindconnect.agentrest.service.SessionFileService},
  * shared with the chat UI.
+ *
+ * <p>Every endpoint answers only the session's owner — someone else's session
+ * is a 404, like a missing one ({@link SessionAccess}). An upload is stored as
+ * the caller's file, and a file attached by id must be one the caller may
+ * read: attaching puts its content in front of the caller's model.
  */
 @RestController
 @RequestMapping("/api/sessions/{sessionId}/files")
@@ -43,11 +51,14 @@ public class SessionFilesApiController {
 
     private final FileStore fileStore;
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
+    private final SessionAccess sessionAccess;
 
     public SessionFilesApiController(FileStore fileStore,
-                                  ai.mindconnect.agentrest.service.SessionFileService sessionFiles) {
+                                  ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
+                                  SessionAccess sessionAccess) {
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
+        this.sessionAccess = sessionAccess;
     }
 
     /** Upload + attach in one call (multipart {@code file}). */
@@ -57,13 +68,15 @@ public class SessionFilesApiController {
                     + "Responses-API-style.")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<Map<String, Object>> uploadAndAttach(@PathVariable String sessionId,
-                                                               @RequestParam("file") MultipartFile file)
+                                                               @RequestParam("file") MultipartFile file,
+                                                               @CurrentUser UserId caller)
             throws IOException {
+        SessionId id = owned(sessionId, caller);
         StoredFile stored;
         try (InputStream content = file.getInputStream()) {
-            stored = fileStore.save(file.getOriginalFilename(), file.getContentType(), content);
+            stored = fileStore.save(file.getOriginalFilename(), file.getContentType(), content, caller);
         }
-        return ResponseEntity.ok(toResponse(sessionFiles.attach(SessionId.of(sessionId), stored)));
+        return ResponseEntity.ok(toResponse(sessionFiles.attach(id, stored)));
     }
 
     /** Attach a previously uploaded file by id ({@code {"fileId": "file-…"}}). */
@@ -72,14 +85,17 @@ public class SessionFilesApiController {
                     + "store: body {\"fileId\": \"file-…\"}.")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Map<String, Object>> attachExisting(@PathVariable String sessionId,
-                                                              @RequestBody Map<String, String> body) {
+                                                              @RequestBody Map<String, String> body,
+                                                              @CurrentUser UserId caller) {
+        SessionId id = owned(sessionId, caller);
         String fileId = body.get("fileId");
-        StoredFile stored = fileId == null ? null : fileStore.find(FileId.of(fileId)).orElse(null);
+        StoredFile stored = fileId == null ? null
+                : fileStore.find(FileId.of(fileId)).filter(file -> file.readableBy(caller)).orElse(null);
         if (stored == null) {
             return ResponseEntity.badRequest().body(Map.of("error",
                     "Unknown fileId '" + fileId + "' — upload via POST /api/files first."));
         }
-        return ResponseEntity.ok(toResponse(sessionFiles.attach(SessionId.of(sessionId), stored)));
+        return ResponseEntity.ok(toResponse(sessionFiles.attach(id, stored)));
     }
 
     /**
@@ -93,11 +109,13 @@ public class SessionFilesApiController {
                     + "sizeBytes and chunks (searchable chunks; 0 for an image, which goes to "
                     + "the model with the next message instead of into the vector store).")
     @GetMapping
-    public ResponseEntity<List<Map<String, Object>>> listAttachments(@PathVariable String sessionId) {
+    public ResponseEntity<List<Map<String, Object>>> listAttachments(@PathVariable String sessionId,
+                                                                     @CurrentUser UserId caller) {
+        SessionId id = owned(sessionId, caller);
         Map<String, Long> chunksByName = new java.util.HashMap<>();
-        sessionFiles.listAttachments(SessionId.of(sessionId)).forEach((ingestedId, chunks) ->
+        sessionFiles.listAttachments(id).forEach((ingestedId, chunks) ->
                 chunksByName.merge(java.nio.file.Path.of(ingestedId).getFileName().toString(), chunks, Long::sum));
-        var files = sessionFiles.attachments(SessionId.of(sessionId)).stream()
+        var files = sessionFiles.attachments(id).stream()
                 .map(f -> {
                     Map<String, Object> entry = new java.util.LinkedHashMap<>();
                     entry.put("fileId", f.id());
@@ -114,7 +132,7 @@ public class SessionFilesApiController {
     /**
      * Detaches a file from the chat: its chunks leave the session's vector
      * store, so the agent can no longer search it, and the spooled copy goes
-     * with them. The original in the file store is untouched \u2014 it may be
+     * with them. The original in the file store is untouched — it may be
      * attached to other sessions.
      */
     @Operation(tags = "Sessions", summary = "Detach a file from the chat",
@@ -122,9 +140,15 @@ public class SessionFilesApiController {
                     + "spooled copy. The file itself stays in the file store.")
     @DeleteMapping
     public ResponseEntity<Void> detach(@PathVariable String sessionId,
-                                       @RequestParam("file") String fileIdOrName) {
-        sessionFiles.deleteAttachment(SessionId.of(sessionId), fileIdOrName);
+                                       @RequestParam("file") String fileIdOrName,
+                                       @CurrentUser UserId caller) {
+        sessionFiles.deleteAttachment(owned(sessionId, caller), fileIdOrName);
         return ResponseEntity.noContent().build();
+    }
+
+    /** The session's id, once it is known to be the caller's; a 404 for the request otherwise. */
+    private SessionId owned(String sessionId, UserId caller) {
+        return sessionAccess.requireOwned(SessionId.of(sessionId), caller).id();
     }
 
     private static Map<String, Object> toResponse(

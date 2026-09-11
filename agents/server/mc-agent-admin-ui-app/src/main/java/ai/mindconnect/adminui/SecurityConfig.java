@@ -1,5 +1,8 @@
 package ai.mindconnect.adminui;
 
+import ai.mindconnect.agent.security.ApiAuthentication;
+import ai.mindconnect.agent.security.UserRecorder;
+import ai.mindconnect.agent.security.UserRecordingFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -8,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -56,18 +60,27 @@ import java.util.List;
  * the previous {@code localStorage}-based resource-server setup was exposed
  * to.
  *
- * <p>Two filter chains:
+ * <p>Filter chains:
  * <ul>
- *   <li><b>auth enabled</b> ({@code mindconnect.auth.enabled=true}): static
- *       assets are public; everything else requires a logged-in session.
- *       Browser navigations to a protected page are redirected to Keycloak,
- *       but {@code fetch} / XHR calls get a clean {@code 401} so the SPA
- *       can decide for itself when to bounce the user through the login
- *       flow. CSRF is on, with the token shipped via a JavaScript-readable
- *       {@code XSRF-TOKEN} cookie so the SPA can echo it back in the
- *       {@code X-XSRF-TOKEN} header on mutating requests.</li>
+ *   <li><b>auth enabled</b> ({@code mindconnect.auth.enabled=true}), two chains:
+ *     <ul>
+ *       <li>the REST APIs ({@code /api/**}, {@code /v1/**}) — bearer tokens
+ *           only, a Keycloak JWT or a personal API token
+ *           ({@link ApiAuthentication}). The browser session does not count
+ *           here, so there is no CSRF token either; the admin UI's own calls
+ *           go to {@code /admin/**} and {@code /chat/**}. No token: 401 with
+ *           {@code WWW-Authenticate: Bearer} and a JSON body saying why.</li>
+ *       <li>everything else — static assets are public; the rest requires a
+ *           logged-in session. Browser navigations to a protected page are
+ *           redirected to the login page, but {@code fetch} / XHR calls get a
+ *           clean {@code 401} so the SPA can decide for itself when to bounce
+ *           the user through the login flow. CSRF is on, with the token
+ *           shipped via a JavaScript-readable {@code XSRF-TOKEN} cookie so the
+ *           SPA can echo it back in the {@code X-XSRF-TOKEN} header on mutating
+ *           requests. A bearer token counts for nothing here.</li>
+ *     </ul></li>
  *   <li><b>auth disabled</b> (default in local dev without Keycloak): all
- *       permitAll, CSRF off, no OIDC wiring.</li>
+ *       permitAll, CSRF off, no OIDC wiring, every request runs as the dev user.</li>
  * </ul>
  */
 @Configuration
@@ -75,17 +88,24 @@ import java.util.List;
 public class SecurityConfig {
 
     @Bean
+    @Order(1)
+    @ConditionalOnProperty(name = "mindconnect.auth.enabled", havingValue = "true")
+    SecurityFilterChain apiFilterChain(HttpSecurity http, ApiAuthentication api) throws Exception {
+        api.apply(http
+            .securityMatcher("/api/**", "/v1/**")
+            .cors(Customizer.withDefaults())
+            .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+            .headers(headers -> headers.frameOptions(f -> f.sameOrigin())));
+        return http.build();
+    }
+
+    @Bean
+    @Order(2)
     @ConditionalOnProperty(name = "mindconnect.auth.enabled", havingValue = "true")
     SecurityFilterChain securedFilterChain(
             HttpSecurity http,
-            ClientRegistrationRepository clientRegistrations) throws Exception {
-
-        // Spring's default CSRF handler hides the raw token behind a
-        // BREACH-mitigation wrapper that JavaScript can't consume. The
-        // attribute-handler below restores the plain-token behaviour
-        // expected by SPAs that read the cookie and echo it as a header.
-        var csrfHandler = new CsrfTokenRequestAttributeHandler();
-        csrfHandler.setCsrfRequestAttributeName(null);
+            ClientRegistrationRepository clientRegistrations,
+            UserRecorder userRecorder) throws Exception {
 
         // Only remember browser navigations (Accept: text/html) as the
         // post-login return target. Without this, an XHR call that 401s —
@@ -96,8 +116,6 @@ public class SecurityConfig {
         htmlOnlyRequestCache.setRequestMatcher(htmlAcceptMatcher());
 
         http
-            // Cross-origin calls to the REST endpoints, as CorsConfig in
-            // mc-agent-api-rest allows them; a preflight passes without a login.
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/", "/index.html", "/favicon.ico",
@@ -136,7 +154,7 @@ public class SecurityConfig {
             )
             .csrf(csrf -> csrf
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .csrfTokenRequestHandler(csrfHandler)
+                .csrfTokenRequestHandler(plainCsrfTokenHandler())
             )
             // Exception handling: for browser navigations (Accept: text/html)
             // we redirect to the Keycloak login URL, for everything else we
@@ -144,7 +162,9 @@ public class SecurityConfig {
             // without having to follow a 302.
             .exceptionHandling(ex -> ex
                 .authenticationEntryPoint(htmlOrApiEntryPoint())
-            );
+            )
+            // The user record follows who signs in (profile page, API tokens).
+            .addFilterBefore(new UserRecordingFilter(userRecorder), AuthorizationFilter.class);
 
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
@@ -156,7 +176,9 @@ public class SecurityConfig {
     @ConditionalOnProperty(name = "mindconnect.auth.enabled", havingValue = "false", matchIfMissing = true)
     SecurityFilterChain openFilterChain(
             HttpSecurity http,
-            @Value("${mindconnect.auth.dev-user:mc_user}") String devUser) throws Exception {
+            @Value("${mindconnect.auth.dev-user:mc_user}") String devUser,
+            UserRecorder userRecorder) throws Exception {
+        OncePerRequestFilter devUserFilter = devUserFilter(devUser);
         http
             .cors(Customizer.withDefaults())
             .csrf(AbstractHttpConfigurer::disable)
@@ -164,11 +186,25 @@ public class SecurityConfig {
             // No Keycloak in this mode, but the rest of the app still expects an
             // authenticated OidcUser principal (controllers read userId from it).
             // Inject a fixed dev user so behaviour matches the secured chain.
-            .addFilterBefore(devUserFilter(devUser), AuthorizationFilter.class);
+            .addFilterBefore(devUserFilter, AuthorizationFilter.class)
+            // The dev user has a user record too — the profile page needs one.
+            .addFilterBefore(new UserRecordingFilter(userRecorder), AuthorizationFilter.class);
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
         http.headers(headers -> headers.frameOptions(f -> f.sameOrigin()));
         return http.build();
+    }
+
+    /**
+     * Spring's default CSRF handler hides the raw token behind a
+     * BREACH-mitigation wrapper that JavaScript can't consume. The
+     * attribute-handler restores the plain-token behaviour expected by SPAs
+     * that read the cookie and echo it as a header.
+     */
+    private static CsrfTokenRequestAttributeHandler plainCsrfTokenHandler() {
+        var csrfHandler = new CsrfTokenRequestAttributeHandler();
+        csrfHandler.setCsrfRequestAttributeName(null);
+        return csrfHandler;
     }
 
     /**

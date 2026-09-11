@@ -48,6 +48,12 @@ mindconnect:
     url: http://localhost:8080
 ```
 
+A server with authentication switched on also needs a token: set
+`mindconnect.remote.token` (or the environment variable `MC_REMOTE_TOKEN`) and
+the CLI sends it as `Authorization: Bearer <token>` with every request. The
+server works out the user from that token; `mindconnect.user.id` only names
+the owner of local-mode data.
+
 ## Using the CLI
 
 Once you're in a session, just type a message and press Enter to send it to the

@@ -1,5 +1,7 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.dto.TranscriptionJobResponse;
 import ai.mindconnect.agentrest.dto.TranscriptionJobResult;
 import ai.mindconnect.agentrest.service.TranscriptionChannels;
@@ -26,7 +28,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.security.Principal;
 import java.time.Duration;
 import java.util.Optional;
 
@@ -77,13 +78,13 @@ public class TranscriptionApiController {
             @RequestParam(value = "model", required = false) String model,
             @RequestParam(value = "language", required = false) String language,
             @RequestParam(value = "prompt", required = false) String prompt,
-            Principal user) throws IOException {
+            @CurrentUser UserId caller) throws IOException {
         if (file.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
         String filename = file.getOriginalFilename() == null ? "recording.webm" : file.getOriginalFilename();
         TranscriptionJobService.Job job = jobs.submit(file.getBytes(), filename, file.getContentType(),
-                model, language, prompt, user == null ? null : user.getName());
+                model, language, prompt, caller);
 
         log.info("POST /api/transcriptions file=\"{}\" ({} bytes) → job {}, recording {}",
                 filename, file.getSize(), job.taskId(), job.fileId());
@@ -103,14 +104,14 @@ public class TranscriptionApiController {
     public ResponseEntity<TranscriptionJobResult> result(
             @PathVariable String taskId,
             @RequestParam(value = "wait", required = false) Integer wait,
-            Principal user) {
+            @CurrentUser UserId caller) {
         Optional<TaskRecord> found = wait == null || wait <= 0
                 ? jobs.find(taskId)
                 : jobs.await(taskId, Duration.ofSeconds(Math.min(wait, MAX_WAIT_SECONDS)));
         if (found.isEmpty()) return ResponseEntity.notFound().build();
 
         TaskRecord task = found.get();
-        if (!mayRead(task, user)) return ResponseEntity.notFound().build();
+        if (!mayRead(task, caller)) return ResponseEntity.notFound().build();
         return ResponseEntity.ok(describe(task));
     }
 
@@ -123,9 +124,9 @@ public class TranscriptionApiController {
     public ResponseEntity<SseEmitter> events(
             @PathVariable String taskId,
             @RequestParam(value = "afterSeq", required = false) Long afterSeq,
-            Principal user) {
+            @CurrentUser UserId caller) {
         Optional<TaskRecord> found = jobs.find(taskId);
-        if (found.isEmpty() || !mayRead(found.get(), user)) {
+        if (found.isEmpty() || !mayRead(found.get(), caller)) {
             return ResponseEntity.notFound().build();
         }
 
@@ -155,15 +156,12 @@ public class TranscriptionApiController {
     // ── Helpers ────────────────────────────────────────────────────────────
 
     /**
-     * A job recorded a requester when the request carried one. Then only that
-     * requester reads it — an id is a name, not a permission. A job submitted
-     * without a principal (an installation with no login) is readable by
-     * whoever can reach the endpoint, like the rest of this API.
+     * Only the requester reads a job — an id is a name, not a permission. A
+     * job without a recorded requester, submitted on nobody's behalf, stays
+     * readable by whoever can reach the endpoint.
      */
-    private static boolean mayRead(TaskRecord task, Principal user) {
-        Optional<String> requester = TranscriptionJobService.requesterOf(task);
-        if (requester.isEmpty()) return true;
-        return user != null && requester.get().equals(user.getName());
+    private static boolean mayRead(TaskRecord task, UserId caller) {
+        return TranscriptionJobService.requesterOf(task).map(caller::equals).orElse(true);
     }
 
     private TranscriptionJobResult describe(TaskRecord task) {

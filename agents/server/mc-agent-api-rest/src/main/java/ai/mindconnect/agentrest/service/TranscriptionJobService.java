@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -97,16 +98,17 @@ public class TranscriptionJobService {
      *
      * @param configName the LLM config to transcribe with, or {@code null} for
      *                   the default name — an alias is followed
-     * @param userId     who asked, when the request carried a principal;
-     *                   {@code null} on an installation without login
+     * @param requester  who asked: recorded on the job for the owner check and
+     *                   as the creator of the stored recording; {@code null}
+     *                   submits on nobody's behalf, a job anyone may read
      * @return the queued task's id
      */
     public Job submit(byte[] audio, String filename, String contentType,
-                      String configName, String language, String prompt, String userId)
+                      String configName, String language, String prompt, UserId requester)
             throws IOException {
         StoredFile stored;
         try (InputStream content = new java.io.ByteArrayInputStream(audio)) {
-            stored = fileStore.save(filename, contentType, content);
+            stored = fileStore.save(filename, contentType, content, requester);
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -116,7 +118,7 @@ public class TranscriptionJobService {
         if (configName != null) payload.put("configName", configName);
         if (language != null) payload.put("language", language);
         if (prompt != null) payload.put("prompt", prompt);
-        if (userId != null) payload.put("userId", userId);
+        if (requester != null) payload.put("userId", requester.value());
 
         // The id is ours before the queue has it, so "queued" is on the
         // channel before a worker can publish "running". Submitting first and
@@ -174,10 +176,10 @@ public class TranscriptionJobService {
         return fileId == null ? Optional.empty() : Optional.of(String.valueOf(fileId));
     }
 
-    /** Who asked for this job, when the request carried a principal. */
-    public static Optional<String> requesterOf(TaskRecord task) {
+    /** Who asked for this job; empty for a job submitted on nobody's behalf. */
+    public static Optional<UserId> requesterOf(TaskRecord task) {
         Object userId = task.payload().get("userId");
-        return userId == null ? Optional.empty() : Optional.of(String.valueOf(userId));
+        return userId == null ? Optional.empty() : Optional.of(UserId.of(String.valueOf(userId)));
     }
 
     // ── The worker ─────────────────────────────────────────────────────────

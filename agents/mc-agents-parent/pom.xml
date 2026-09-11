@@ -83,6 +83,26 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-user-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-user</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-user-pg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-security</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-task-queue</artifactId>
                 <version>${project.version}</version>
             </dependency>

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.filestore;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.port.out.PartContentReader;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
@@ -27,9 +28,10 @@ class FileStorePartContentReaderTest {
         boolean failReads;
 
         @Override
-        public StoredFile save(String name, String contentType, InputStream content) throws IOException {
+        public StoredFile save(String name, String contentType, InputStream content, UserId creator)
+                throws IOException {
             byte[] data = content.readAllBytes();
-            StoredFile file = new StoredFile(FileId.random(), name, contentType, data.length, Instant.now());
+            StoredFile file = new StoredFile(FileId.random(), name, contentType, data.length, Instant.now(), creator);
             files.put(file.id(), file);
             bytes.put(file.id(), data);
             return file;
