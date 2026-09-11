@@ -2,7 +2,7 @@ package ai.mindconnect.agent.protocol.runtime;
 
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseStatus;
 import ai.mindconnect.agent.protocol.Session;
@@ -12,7 +12,6 @@ import ai.mindconnect.agent.protocol.item.ContentPart;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.protocol.item.Role;
-import ai.mindconnect.common.util.McEnv;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
@@ -21,7 +20,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;

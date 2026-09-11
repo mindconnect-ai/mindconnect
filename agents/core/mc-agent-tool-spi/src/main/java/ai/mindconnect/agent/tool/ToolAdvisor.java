@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.tool;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import java.util.Map;
 import java.util.UUID;

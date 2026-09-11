@@ -1,6 +1,6 @@
 package ai.mindconnect.agentrest.dto;
 
-import ai.mindconnect.agent.service.stream.UserEvent;
+import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 
 import java.util.UUID;
 

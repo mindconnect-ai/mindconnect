@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.builder;
 
 import ai.mindconnect.filestore.FileStore;
-import ai.mindconnect.filestore.pg.PgFileStore;
+import ai.mindconnect.filestore.adapter.pg.PgFileStore;
 import ai.mindconnect.jdbc.Sql;
 
 /**
@@ -16,7 +16,7 @@ final class PostgresFileStore {
 
     static boolean present() {
         try {
-            Class.forName("ai.mindconnect.filestore.pg.PgFileStore");
+            Class.forName("ai.mindconnect.filestore.adapter.pg.PgFileStore");
             return true;
         } catch (ClassNotFoundException e) {
             return false;

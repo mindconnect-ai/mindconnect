@@ -1,6 +1,6 @@
 package ai.mindconnect.demo.agent.simple;
 
-import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 

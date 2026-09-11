@@ -2,9 +2,9 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.AgentFormComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.ui.model.UiPage;
 

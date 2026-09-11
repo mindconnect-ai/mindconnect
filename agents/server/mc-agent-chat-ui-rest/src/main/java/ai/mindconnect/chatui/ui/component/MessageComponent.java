@@ -1,16 +1,16 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice;
+import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 
-import static ai.mindconnect.ui.mvc.UiActions.streaming;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiList;
-import ai.mindconnect.ui.model.UiTrigger;
 
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -56,8 +56,8 @@ public final class MessageComponent {
      * its name.
      */
     String withAttachmentChip(Message m) {
-        var attached = ai.mindconnect.agent.service.prompt.AttachmentNotice.announcedBy(m);
-        var removed = ai.mindconnect.agent.service.prompt.AttachmentNotice.detachedBy(m);
+        var attached = AttachmentNotice.announcedBy(m);
+        var removed = AttachmentNotice.detachedBy(m);
         StringBuilder out = new StringBuilder();
         if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(String.join(", ", attached)).append("*\n\n");
         if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(String.join(", ", removed)).append(" removed*\n\n");
@@ -100,7 +100,7 @@ public final class MessageComponent {
     }
 
     private UiList.Item chatItem(Message m, boolean isUser) {
-        if (ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.insertedBy(m)) {
+        if (ViewAttachmentTool.insertedBy(m)) {
             return reshownItem(m);
         }
         String speaker = isUser ? "You" : agent.name();
@@ -142,7 +142,7 @@ public final class MessageComponent {
      */
     private UiList.Item reshownItem(Message m) {
         Object name = m.metadata() == null ? null
-                : m.metadata().get(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.ATTACHMENT);
+                : m.metadata().get(ViewAttachmentTool.ATTACHMENT);
         String line = icon("repeat") + " *" + markdownSafe(name == null ? "attachment" : name.toString())
                 + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
         return UiList.Item.of(m.id().toString(), "")

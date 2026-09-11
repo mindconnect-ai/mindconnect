@@ -1,14 +1,14 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.domain.StreamEvent;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentRegistryService;
-import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentRegistryService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;

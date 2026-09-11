@@ -1,12 +1,12 @@
 package ai.mindconnect.adminui;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agentrest.service.SessionFileService;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 

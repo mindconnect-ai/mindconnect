@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.pg;
 
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;

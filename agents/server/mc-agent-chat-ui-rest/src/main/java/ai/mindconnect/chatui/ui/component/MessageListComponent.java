@@ -1,23 +1,20 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
-import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPatch;
 
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
-import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 
 /**
  * The main conversation list of a chat page. Renders the message

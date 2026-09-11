@@ -35,6 +35,43 @@ fresh empty one, so nothing has to be moved by hand at release time.
   which obtains and renews its TLS certificates itself, next to Postgres and
   Keycloak.
 
+### Changed
+
+- **agents:** `Namespace` and `AuthenticationInfo` moved from `mc-common`
+  (package `ai.mindconnect.common`) into the new dependency-free module
+  `mc-agent-domain`, package `ai.mindconnect.agent`, together with two new
+  types: `NamespacedId`, the shape every tenant-owned id will take, and
+  `UserId`, which `AuthenticationInfo.userId()` now returns instead of a
+  `String`. Embedders repoint two imports and wrap the user id in
+  `UserId.of(...)`; the agents modules pull the new module in transitively.
+  `mc-common` is tenant-free again, which is what the workflow and taskqueue
+  areas expect from it; its unused `DomainEvent` record went with the move.
+
+- **agents:** the runtime's packages moved one level down, from
+  `ai.mindconnect.agent.{domain,port,service,memory,tools,adapter}` to
+  `ai.mindconnect.agent.runtime.{domain,port,service,memory,tools,adapter}`,
+  so that `ai.mindconnect.agent` itself is left to the shared vocabulary.
+  Unchanged: the tool SPI `ai.mindconnect.agent.tool`, the tool modules
+  `ai.mindconnect.agent.tools.*` and the memory strategies
+  `ai.mindconnect.agent.memory.strategy`. In the same spirit the Postgres
+  file store moved from `ai.mindconnect.filestore.pg` to
+  `ai.mindconnect.filestore.adapter.pg`. Embedders repoint their imports;
+  logger names configured for the old packages (for example
+  `ai.mindconnect.agent.service`) need the `runtime` segment too.
+
+- **agents:** the bundled agents default to OpenAI instead of a local LM
+  Studio server. `agent-default`, the LLM config every shipped agent
+  references, is now an alias that delegates to `openai-default`, so a fresh
+  install works as soon as `OPENAI_API_KEY` is set — which is what most
+  people have — instead of requiring a 120B model on `localhost:1234`.
+  `url-reader` follows suit and no longer needs the local `gemma-reader`
+  model. Repointing the alias (in `agent-default.json` or the Admin UI)
+  moves every bundled agent to another provider at once; `lm-studio-default`
+  still carries the previous local settings. Existing installations are not
+  changed behind your back: a stored `agent-default` that differs from the
+  seed shows up as a pending migration in the Admin UI, and the CLI logs the
+  difference and keeps what it has.
+
 ### Fixed
 
 - **agents:** the admin UI's Logout button no longer ends with "The backend is

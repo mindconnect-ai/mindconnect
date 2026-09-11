@@ -1,7 +1,7 @@
 package ai.mindconnect.message.service;
 
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;

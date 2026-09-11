@@ -4,6 +4,7 @@ import ai.mindconnect.chatui.ui.component.ChatFormComponent;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 import ai.mindconnect.llm.port.in.LlmTranscription;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.slf4j.Logger;
@@ -49,11 +50,11 @@ public class ChatVoiceUiController {
     private static final Logger log = LoggerFactory.getLogger(ChatVoiceUiController.class);
 
     private final ObjectProvider<LlmTranscription> transcription;
-    private final ai.mindconnect.agent.port.out.AgentSessionRepository sessions;
+    private final AgentSessionRepository sessions;
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
 
     public ChatVoiceUiController(ObjectProvider<LlmTranscription> transcription,
-                                 ai.mindconnect.agent.port.out.AgentSessionRepository sessions,
+                                 AgentSessionRepository sessions,
                                  ai.mindconnect.chatui.service.ActiveStreams activeStreams) {
         this.transcription = transcription;
         this.sessions = sessions;

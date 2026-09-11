@@ -1,13 +1,13 @@
 package ai.mindconnect.cli;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.springframework.beans.factory.annotation.Value;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -793,7 +793,7 @@ public class CliRunner implements CommandLineRunner {
      * server's current history is loaded once via {@code client.loadHistory}.
      */
     private int[] parseDeleteMessageRange(String arg,
-                                           ai.mindconnect.agent.domain.AgentSession session,
+                                           AgentSession session,
                                            ai.mindconnect.cli.agentclient.AgentClient client) {
         if (arg == null || arg.isBlank()) return null;
         String s = arg.trim();

@@ -4,6 +4,7 @@ import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import org.junit.jupiter.api.Test;
 
 import java.time.format.DateTimeFormatter;
@@ -43,9 +44,9 @@ class MessageComponentMediaTest {
                 List.of(new ContentPart.Text("[photo.png — image shown again at the assistant's request]"),
                         new ContentPart.Image("f-1", "photo.png", "image/png", 3)), 2)
                 .withMetadata(java.util.Map.of(
-                        ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.INSERTED_BY,
-                        ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME,
-                        ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.ATTACHMENT, "photo.png"));
+                        ViewAttachmentTool.INSERTED_BY,
+                        ViewAttachmentTool.NAME,
+                        ViewAttachmentTool.ATTACHMENT, "photo.png"));
 
         String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(component(m).item());
 

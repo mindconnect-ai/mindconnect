@@ -1,6 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.domain.AttachedFile;
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatFilesUiController;
 

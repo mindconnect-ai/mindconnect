@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.protocol.runtime;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.protocol.Conversation;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.Session;
@@ -18,10 +18,10 @@ import ai.mindconnect.agent.protocol.event.ResponseEvent;
 import ai.mindconnect.agent.protocol.item.ContentPart;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;

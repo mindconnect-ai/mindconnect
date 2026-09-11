@@ -1,17 +1,16 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentPatch;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.domain.AgentSpec;
-import ai.mindconnect.agent.domain.StreamEvent;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentRegistryService;
-import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.agent.service.approval.ApprovalScope;
-import ai.mindconnect.agent.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentPatch;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.AgentSpec;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentRegistryService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
+import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
 import ai.mindconnect.agentrest.dto.CreateAgentRequest;
 import ai.mindconnect.agentrest.dto.StartSessionRequest;
 import ai.mindconnect.agentrest.dto.AttachedFrame;
@@ -19,8 +18,9 @@ import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agentrest.dto.StreamEventFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
@@ -50,14 +50,14 @@ public class AgentApiController {
     private final AgentSessionService sessionService;
     private final AgentChatService chatService;
     private final ai.mindconnect.filestore.FileStore fileStore;
-    private final ai.mindconnect.agent.service.stream.UserChannels userChannels;
+    private final UserChannels userChannels;
     private final ObjectMapper compactMapper;
 
     public AgentApiController(AgentRegistryService registryService,
                             AgentSessionService sessionService,
                             AgentChatService chatService,
                             ai.mindconnect.filestore.FileStore fileStore,
-                            ai.mindconnect.agent.service.stream.UserChannels userChannels,
+                            UserChannels userChannels,
                             ObjectMapper objectMapper) {
         this.registryService = registryService;
         this.sessionService = sessionService;

@@ -1,15 +1,15 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiTable;
 

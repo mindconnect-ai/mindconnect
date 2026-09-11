@@ -1,5 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -60,8 +61,8 @@ class ChatDialogActionUrlsTest {
     @Test
     void removingAnAttachmentKeepsTheRowPlaceholder() throws Exception {
         String out = json(ChatAttachmentsComponent.node(SESSION,
-                List.of(new ai.mindconnect.agent.domain.AttachedFile("f-1", "a.pdf", "application/pdf", 10),
-                        new ai.mindconnect.agent.domain.AttachedFile("f-2", "photo.png", "image/png", 20)),
+                List.of(new AttachedFile("f-1", "a.pdf", "application/pdf", 10),
+                        new AttachedFile("f-2", "photo.png", "image/png", 20)),
                 Map.of("a.pdf", 3L)));
 
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION + "/chat-files?file={id}\"");

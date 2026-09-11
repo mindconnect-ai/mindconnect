@@ -1,16 +1,17 @@
 package ai.mindconnect.agent.memory.strategy;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.service.ContextTokenBudget;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.memory.domain.FullHistoryMemoryConfig;
-import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
-import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
-import ai.mindconnect.agent.port.out.TokenCounter;
-import ai.mindconnect.agent.port.out.LlmMessageMapper;
-import ai.mindconnect.agent.port.out.TokenCounters;
-import ai.mindconnect.common.AuthenticationInfo;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.service.ContextTokenBudget;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.memory.domain.FullHistoryMemoryConfig;
+import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
+import ai.mindconnect.agent.runtime.memory.domain.SummaryPlacement;
+import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
+import ai.mindconnect.agent.runtime.port.out.TokenCounter;
+import ai.mindconnect.agent.runtime.port.out.LlmMessageMapper;
+import ai.mindconnect.agent.runtime.port.out.TokenCounters;
+import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -122,7 +123,7 @@ public class FullHistoryMemoryStrategy implements MemoryStrategy {
     private ContextTokenBudget permissiveBudget(AgentDefinition def) {
         SummarizingWindowConfig synthetic = new SummarizingWindowConfig(
                 1.0, 1.0, false, 1, 1.0, 1.0, false, 1.0,
-                ai.mindconnect.agent.memory.domain.SummaryPlacement.SYSTEM_PROMPT,
+                SummaryPlacement.SYSTEM_PROMPT,
                 cfg.maxHistoryFetch());
         return ContextTokenBudget.resolve(def, synthetic, llmConfigRepository, tokenCounterRegistry);
     }

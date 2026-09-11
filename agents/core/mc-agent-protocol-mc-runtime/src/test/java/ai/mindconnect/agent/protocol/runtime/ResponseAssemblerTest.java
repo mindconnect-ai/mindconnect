@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.protocol.runtime;
 
-import ai.mindconnect.agent.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseStatus;
 import ai.mindconnect.agent.protocol.event.ResponseEvent;

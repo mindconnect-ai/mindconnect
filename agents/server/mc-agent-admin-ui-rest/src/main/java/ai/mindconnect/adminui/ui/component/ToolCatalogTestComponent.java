@@ -5,7 +5,7 @@ import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;

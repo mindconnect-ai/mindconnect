@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.tools.builtin;
 
-import ai.mindconnect.agent.tools.workspace.WorkspaceScope;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
 import ai.mindconnect.agent.tool.Tool;
-import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 
 import java.util.Map;
 import java.util.UUID;

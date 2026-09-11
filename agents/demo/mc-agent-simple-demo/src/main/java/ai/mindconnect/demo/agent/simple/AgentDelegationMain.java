@@ -2,10 +2,10 @@ package ai.mindconnect.demo.agent.simple;
 
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
-import ai.mindconnect.agent.domain.StreamEvent;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 

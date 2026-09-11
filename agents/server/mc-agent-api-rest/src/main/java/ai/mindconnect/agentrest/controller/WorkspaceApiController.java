@@ -1,9 +1,9 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.agent.tools.workspace.WorkspaceScope;
-import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

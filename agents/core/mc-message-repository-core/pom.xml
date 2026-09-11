@@ -25,6 +25,10 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-common</artifactId>
         </dependency>
         <!-- Only the annotations: ContentPart is polymorphic and names its

@@ -1,11 +1,11 @@
 package ai.mindconnect.agent.tools.workflow;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -13,7 +13,7 @@ import ai.mindconnect.agent.tools.workflow.step.AgentInvoker;
 import ai.mindconnect.agent.tools.workflow.step.AgentInvokers;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvoker;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvokers;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;

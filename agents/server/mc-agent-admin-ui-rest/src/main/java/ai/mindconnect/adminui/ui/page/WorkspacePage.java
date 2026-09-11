@@ -2,10 +2,10 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.WorkspaceScopeListComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.tools.workspace.WorkspaceScope;
-import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiSection;

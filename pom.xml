@@ -40,6 +40,7 @@
              that area so an area can move to its own repo wholesale. -->
         <module>mc-java-parent</module>
         <module>agents/mc-agents-parent</module>
+        <module>agents/core/mc-agent-domain</module>
         <module>workflow/mc-workflow-parent</module>
 
         <!-- common -->

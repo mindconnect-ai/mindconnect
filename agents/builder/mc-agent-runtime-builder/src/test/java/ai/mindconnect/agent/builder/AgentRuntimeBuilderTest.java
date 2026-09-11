@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.builder;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.llm.domain.LlmConfig;
 import org.junit.jupiter.api.Test;
 
@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AgentRuntimeBuilderTest {
 
     private static AgentDefinition demoAgent() {
-        return AgentDefinition.create(new ai.mindconnect.common.Namespace("local"),
+        return AgentDefinition.create(new ai.mindconnect.agent.Namespace("local"),
                 "test-agent", "test", "You are a test.", null, "test-llm");
     }
 

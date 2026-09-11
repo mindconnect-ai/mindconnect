@@ -1,6 +1,6 @@
 package ai.mindconnect.agentrest.dto;
 
-import ai.mindconnect.agent.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
 
 import java.util.Map;
 

@@ -40,10 +40,10 @@ The format of a file in
 
 A minimal local config (no key needed):
 
-```json title="llm-configs/agent-default.json"
+```json title="llm-configs/lm-studio-default.json"
 {
-  "id": "00000001-0000-0000-0000-000000000000",
-  "name": "agent-default",
+  "id": "00000001-0000-0000-0000-000000000001",
+  "name": "lm-studio-default",
   "provider": "LM_STUDIO",
   "model": "openai/gpt-oss-120b",
   "baseUrl": "http://localhost:1234",
@@ -52,6 +52,19 @@ A minimal local config (no key needed):
   "maxOutputTokens": 8192,
   "additionalParams": {},
   "contextWindowTokens": 131072
+}
+```
+
+An alias carries no provider settings of its own and just names another
+config. The bundled `agent-default`, which every shipped agent references, is
+one:
+
+```json title="llm-configs/agent-default.json"
+{
+  "id": "00000001-0000-0000-0000-000000000000",
+  "name": "agent-default",
+  "isAlias": true,
+  "delegatesTo": "openai-default"
 }
 ```
 

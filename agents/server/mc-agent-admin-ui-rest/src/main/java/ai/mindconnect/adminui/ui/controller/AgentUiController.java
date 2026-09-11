@@ -8,18 +8,18 @@ import ai.mindconnect.adminui.ui.page.AgentFormPage;
 import ai.mindconnect.adminui.ui.page.AgentListPage;
 import ai.mindconnect.adminui.ui.page.ToolDetailPage;
 import ai.mindconnect.adminui.ui.page.ToolFormPage;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentPatch;
-import ai.mindconnect.agent.domain.AgentSpec;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentPatch;
+import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.tool.AgentTool;
-import ai.mindconnect.common.Page;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.service.AgentRegistryService;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.AgentRegistryService;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.chatui.ui.controller.FormBody;
+import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
@@ -34,7 +34,6 @@ import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -188,7 +187,7 @@ public class AgentUiController {
 
     /**
      * The form's Memory (JSON) field: blank keeps the stored config, content
-     * must parse into a {@link ai.mindconnect.agent.memory.domain.MemoryConfig}
+     * must parse into a {@link MemoryConfig}
      * (the {@code kind} tag picks the strategy, the record validates its
      * ranges).
      *
@@ -199,14 +198,14 @@ public class AgentUiController {
         if (json == null || json.isBlank()) return patch;
         try {
             return patch.withMemoryConfig(objectMapper.readValue(json,
-                    ai.mindconnect.agent.memory.domain.MemoryConfig.class));
+                    MemoryConfig.class));
         } catch (Exception e) {
             throw new IllegalArgumentException("Invalid memory config: " + e.getMessage(), e);
         }
     }
 
     /** The agent form's tool-search checkbox + comma-separated groups field. */
-    private static ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig toolSearchFromForm(FormBody body) {
+    private static AgentDefinition.ToolSearchConfig toolSearchFromForm(FormBody body) {
         boolean enabled = Boolean.TRUE.equals(body.bool("toolSearchEnabled"));
         String raw = body.str("toolSearchGroups");
         java.util.List<String> groups = raw == null || raw.isBlank()
@@ -216,7 +215,7 @@ public class AgentUiController {
                         .filter(g -> !g.isEmpty())
                         .map(g -> g.toLowerCase(java.util.Locale.ROOT))
                         .toList();
-        return new ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig(enabled, groups);
+        return new AgentDefinition.ToolSearchConfig(enabled, groups);
     }
 
     @PostMapping("/{id}/copy")

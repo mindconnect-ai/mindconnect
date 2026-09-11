@@ -1,46 +1,56 @@
 package ai.mindconnect.agent.builder;
 
-import ai.mindconnect.agent.adapter.file.FileAgentDefinitionRepository;
-import ai.mindconnect.agent.adapter.file.FileAgentSessionRepository;
-import ai.mindconnect.agent.adapter.file.FileConversationSummaryRepository;
-import ai.mindconnect.agent.adapter.file.FileTodoListRepository;
-import ai.mindconnect.agent.adapter.file.FileWorkingMemoryRepository;
-import ai.mindconnect.agent.adapter.file.FileWorkspaceStore;
-import ai.mindconnect.agent.adapter.llm.LlmToolResultSummarizer;
-import ai.mindconnect.agent.adapter.token.TokenCounterRegistry;
-import ai.mindconnect.agent.adapter.repo.memory.*;
-import ai.mindconnect.agent.adapter.rule.RuleBasedToolResultSummarizer;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.port.in.AgentTaskRunner;
-import ai.mindconnect.agent.memory.port.in.MemoryStrategyFactory;
-import ai.mindconnect.agent.port.out.PromptContextProvider;
-import ai.mindconnect.agent.port.out.PromptRenderer;
+import ai.mindconnect.agent.runtime.adapter.file.FileAgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
+import ai.mindconnect.agent.runtime.adapter.file.FileConversationSummaryRepository;
+import ai.mindconnect.agent.runtime.adapter.file.FileTodoListRepository;
+import ai.mindconnect.agent.runtime.adapter.file.FileWorkingMemoryRepository;
+import ai.mindconnect.agent.runtime.adapter.file.FileWorkspaceStore;
+import ai.mindconnect.agent.runtime.adapter.llm.LlmToolResultSummarizer;
+import ai.mindconnect.agent.runtime.adapter.file.FileLlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.adapter.repo.memory.*;
+import ai.mindconnect.agent.runtime.adapter.token.TokenCounterRegistry;
+import ai.mindconnect.agent.runtime.adapter.rule.RuleBasedToolResultSummarizer;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
+import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategyFactory;
+import ai.mindconnect.agent.runtime.port.out.PromptContextProvider;
+import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
+import ai.mindconnect.agent.runtime.adapter.filestore.FileStorePartContentReader;
+import ai.mindconnect.agent.runtime.adapter.pg.*;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.port.out.ToolResultSummarizer;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.memory.port.out.ConversationSummaryRepository;
-import ai.mindconnect.agent.port.out.LlmCallTraceRepository;
-import ai.mindconnect.agent.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.memory.port.out.WorkingMemoryRepository;
-import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
+import ai.mindconnect.agent.runtime.port.out.ToolResultSummarizer;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
+import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.port.out.LlmMessageMapper;
+import ai.mindconnect.agent.runtime.port.out.PartContentReader;
+import ai.mindconnect.agent.runtime.service.MessageToLlmMessageMapper;
+import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
+import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
+import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.MapToolEnvironment;
 import ai.mindconnect.agent.tool.SpiToolRegistry;
-import ai.mindconnect.agent.service.StatelessAgentTaskRunner;
-import ai.mindconnect.agent.tools.todo.TodoListService;
+import ai.mindconnect.agent.runtime.service.StatelessAgentTaskRunner;
+import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.agent.tool.ToolRegistryRef;
 import ai.mindconnect.agent.memory.strategy.DefaultMemoryStrategyFactory;
-import ai.mindconnect.agent.service.prompt.AgentMetadataProvider;
-import ai.mindconnect.agent.service.prompt.AgentToolsProvider;
-import ai.mindconnect.agent.service.prompt.CurrentDateProvider;
-import ai.mindconnect.agent.adapter.prompt.PebblePromptRenderer;
-import ai.mindconnect.agent.service.prompt.WorkspaceNotesProvider;
-import ai.mindconnect.agent.port.out.TokenCounters;
-import ai.mindconnect.agent.service.turn.ToolExecutor;
-import ai.mindconnect.common.Namespace;
+import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
+import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
+import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
+import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
+import ai.mindconnect.agent.runtime.service.prompt.WorkspaceNotesProvider;
+import ai.mindconnect.agent.runtime.port.out.TokenCounters;
+import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
@@ -59,6 +69,7 @@ import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.MessageRepository;
+import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import okhttp3.OkHttpClient;
@@ -114,7 +125,7 @@ public final class AgentRuntimeBuilder {
     private String encryptionKey;
     private String toolResultSummarizer = "rule";
     /** null → the default mapper, reading media parts from the runtime's file store. */
-    private ai.mindconnect.agent.port.out.LlmMessageMapper llmMessageMapper;
+    private LlmMessageMapper llmMessageMapper;
     private final Map<String, String> environment = new LinkedHashMap<>();
     private final List<LlmConfig> pendingLlmConfigs = new ArrayList<>();
     private final List<AgentDefinition> pendingAgentDefinitions = new ArrayList<>();
@@ -208,7 +219,7 @@ public final class AgentRuntimeBuilder {
      * calls, results, attachment notices, and image / document parts as
      * content blocks when the model reads them.
      */
-    public AgentRuntimeBuilder llmMessageMapper(ai.mindconnect.agent.port.out.LlmMessageMapper mapper) {
+    public AgentRuntimeBuilder llmMessageMapper(LlmMessageMapper mapper) {
         this.llmMessageMapper = mapper;
         return this;
     }
@@ -295,27 +306,27 @@ public final class AgentRuntimeBuilder {
         // 1. Persistence — file-based rooted at dataDir, Postgres, or purely in-memory.
         WorkspaceStore workspaceStore = inMemory
                 ? new InMemoryWorkspaceStore()
-                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgWorkspaceStore(sql).initSchema()
+                : sql != null ? new PgWorkspaceStore(sql).initSchema()
                 : new FileWorkspaceStore(dataDir);
         WorkingMemoryRepository workingMemoryRepository = inMemory
                 ? new InMemoryWorkingMemoryRepository()
-                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgWorkingMemoryRepository(sql).initSchema()
+                : sql != null ? new PgWorkingMemoryRepository(sql).initSchema()
                 : new FileWorkingMemoryRepository(dataDir);
         ConversationSummaryRepository summaryRepository = inMemory
                 ? new InMemoryConversationSummaryRepository()
-                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgConversationSummaryRepository(sql).initSchema()
+                : sql != null ? new PgConversationSummaryRepository(sql).initSchema()
                 : new FileConversationSummaryRepository(dataDir);
         TodoListRepository todoListRepository = inMemory
                 ? new InMemoryTodoListRepository()
-                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgTodoListRepository(sql).initSchema()
+                : sql != null ? new PgTodoListRepository(sql).initSchema()
                 : new FileTodoListRepository(dataDir);
         AgentDefinitionRepository definitionRepository = inMemory
                 ? new InMemoryAgentDefinitionRepository()
-                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgAgentDefinitionRepository(sql).initSchema()
+                : sql != null ? new PgAgentDefinitionRepository(sql).initSchema()
                 : new FileAgentDefinitionRepository(dataDir, objectMapper);
         AgentSessionRepository sessionRepository = inMemory
                 ? new InMemoryAgentSessionRepository()
-                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgAgentSessionRepository(sql).initSchema()
+                : sql != null ? new PgAgentSessionRepository(sql).initSchema()
                 : new FileAgentSessionRepository(dataDir, objectMapper);
 
         // 2. Messages / conversations.
@@ -389,11 +400,11 @@ public final class AgentRuntimeBuilder {
         ai.mindconnect.filestore.FileStore fileStore = sql != null && PostgresFileStore.present()
                 ? PostgresFileStore.open(sql)
                 : AttachSupport.defaultFileStoreIfPresent(environment);
-        ai.mindconnect.agent.port.out.LlmMessageMapper messageMapper = llmMessageMapper != null
+        LlmMessageMapper messageMapper = llmMessageMapper != null
                 ? llmMessageMapper
-                : new ai.mindconnect.agent.service.MessageToLlmMessageMapper(fileStore != null
-                        ? new ai.mindconnect.agent.adapter.filestore.FileStorePartContentReader(fileStore)
-                        : ai.mindconnect.agent.port.out.PartContentReader.none());
+                : new MessageToLlmMessageMapper(fileStore != null
+                        ? new FileStorePartContentReader(fileStore)
+                        : PartContentReader.none());
         MemoryStrategyFactory memoryStrategyFactory = new DefaultMemoryStrategyFactory(
                 conversationManager, summaryRepository, summarizer, statelessRunner,
                 tokenCounterRegistry, llmConfigRepository, messageMapper);
@@ -425,29 +436,29 @@ public final class AgentRuntimeBuilder {
         ToolExecutor toolExecutor = new ToolExecutor(List.of());
         LlmCallTraceRepository traceRepository = inMemory
                 ? new InMemoryLlmCallTraceRepository()
-                : sql != null ? new ai.mindconnect.agent.adapter.pg.PgLlmCallTraceRepository(sql).initSchema()
-                : new ai.mindconnect.agent.adapter.file.FileLlmCallTraceRepository(dataDir);
-        var approvalStore = new ai.mindconnect.agent.service.approval.ToolApprovalStore();
-        var userChannels = new ai.mindconnect.agent.service.stream.UserChannels();
+                : sql != null ? new PgLlmCallTraceRepository(sql).initSchema()
+                : new FileLlmCallTraceRepository(dataDir);
+        var approvalStore = new ToolApprovalStore();
+        var userChannels = new UserChannels();
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
                 userChannels);
-        var sessionChannels = new ai.mindconnect.agent.service.stream.SessionChannels();
-        var turnWorker = new ai.mindconnect.agent.service.task.AgentTurnWorker(
+        var sessionChannels = new SessionChannels();
+        var turnWorker = new AgentTurnWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, activations,
                 llmChat, traceRepository, sessionChannels,
                 statelessRunner, workingMemoryRepository);
-        var toolWorker = new ai.mindconnect.agent.service.task.ToolCallWorker(
+        var toolWorker = new ToolCallWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, toolRegistry, activations, toolExecutor, sessionChannels,
                 approvalStore, userChannels);
         var taskQueue = new ai.mindconnect.taskqueue.local.LocalTaskQueue(
                 new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
         toolWorker.attach(taskQueue);
-        taskQueue.register(ai.mindconnect.agent.service.task.AgentTurnWorker.TYPE, turnWorker);
-        taskQueue.register(ai.mindconnect.agent.service.task.ToolCallWorker.TYPE, toolWorker);
+        taskQueue.register(AgentTurnWorker.TYPE, turnWorker);
+        taskQueue.register(ToolCallWorker.TYPE, toolWorker);
         AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
                 conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
                 statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor);

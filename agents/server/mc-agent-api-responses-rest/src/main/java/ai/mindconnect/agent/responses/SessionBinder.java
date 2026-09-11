@@ -1,12 +1,12 @@
 package ai.mindconnect.agent.responses;
 
-import ai.mindconnect.common.Namespace;
-import ai.mindconnect.agent.domain.session.SessionAgentRef;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.protocol.Session;
 import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
 import ai.mindconnect.agent.responses.wire.CreateResponseRequest;
-import ai.mindconnect.agent.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
 
 import java.util.UUID;
 

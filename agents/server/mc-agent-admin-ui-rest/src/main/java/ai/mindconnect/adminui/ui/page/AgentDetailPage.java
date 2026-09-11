@@ -4,8 +4,8 @@ import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.AgentDetailComponent;
 import ai.mindconnect.adminui.ui.component.SessionTableComponent;
 import ai.mindconnect.adminui.ui.component.ToolTableComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 

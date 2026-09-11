@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 
@@ -15,7 +15,6 @@ import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiStack;
-import ai.mindconnect.ui.model.UiTrigger;
 
 import java.util.ArrayList;
 import java.util.Comparator;
