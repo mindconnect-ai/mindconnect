@@ -9,7 +9,7 @@ package ai.mindconnect.common;
  * stored, as every save did before versions existed. Seeds, imports and API
  * clients that never read a version keep working that way.
  */
-public final class Versions {
+public class Versions {
 
     private Versions() {
     }
