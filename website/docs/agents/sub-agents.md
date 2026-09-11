@@ -37,14 +37,17 @@ back. Never report success you have not seen.
 
 Everything above the body is optional: without `name` the file name is the
 name, without `model` it runs on the caller's, without `tools` it keeps the
-caller's own. The body is the system prompt. `tools` and `disallowedTools`
-take either form, a comma list or an indented block:
+caller's own — while `tools: []` keeps none. The body is the system prompt.
+`tools` and `disallowedTools` take either form, a comma list or an indented
+block:
 
 ```yaml
 tools:
   - bash
   - file_read
-``` `run_agent` finds them by name,
+```
+
+`run_agent` finds them by name,
 `list_agents` shows them first, and a project agent shadows a registered one
 of the same name for that session.
 

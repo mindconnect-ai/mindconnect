@@ -159,7 +159,9 @@ public final class ProjectAgents {
      * Those items are joined into the comma form, so the flow list and the
      * block list mean the same thing. They have to: reading the block form as
      * an empty value would leave the agent with every tool its caller has,
-     * which is the opposite of what a file naming two tools asks for.
+     * which is the opposite of what a file naming two tools asks for. For the
+     * same reason a blank line between the key and its items, or between two
+     * items, does not end the list.
      */
     private static Map<String, String> frontMatter(String block) {
         Map<String, String> head = new LinkedHashMap<>();
@@ -173,14 +175,24 @@ public final class ProjectAgents {
             String value = line.substring(colon + 1).strip();
             if (value.isEmpty()) {
                 List<String> items = new ArrayList<>();
-                while (i + 1 < lines.length && isSequenceItem(lines[i + 1])) {
-                    items.add(lines[++i].stripLeading().substring(1).strip());
+                for (int next = nextNonBlank(lines, i + 1);
+                     next < lines.length && isSequenceItem(lines[next]);
+                     next = nextNonBlank(lines, i + 1)) {
+                    items.add(lines[next].stripLeading().substring(1).strip());
+                    i = next;
                 }
                 value = String.join(", ", items);
             }
             head.put(key, unquote(value));
         }
         return head;
+    }
+
+    /** The index of the first line from {@code from} on that is not blank; {@code lines.length} when none is. */
+    private static int nextNonBlank(String[] lines, int from) {
+        int at = from;
+        while (at < lines.length && lines[at].isBlank()) at++;
+        return at;
     }
 
     /** A {@code - item} line of a block sequence, indented or not. */
@@ -212,8 +224,13 @@ public final class ProjectAgents {
         return value;
     }
 
+    /**
+     * A front-matter list. {@code null} when the key is absent or has no
+     * value at all — YAML's null, nothing said — and a list, possibly empty,
+     * when it names one: {@code []} is an answer, and the answer is none.
+     */
     private static List<String> listOf(String value) {
-        if (value == null || value.isBlank()) return List.of();
+        if (value == null || value.isBlank()) return null;
         String inner = value.strip();
         if (inner.startsWith("[") && inner.endsWith("]")) {
             inner = inner.substring(1, inner.length() - 1);
@@ -230,7 +247,13 @@ public final class ProjectAgents {
         return value == null || value.isBlank() ? null : value.strip();
     }
 
-    /** An agent a project defines beside its code. */
+    /**
+     * An agent a project defines beside its code.
+     *
+     * @param tools the tools the file names; {@code null} when it has no
+     *              {@code tools} field, which keeps the caller's own — and an
+     *              empty list when it names none, which keeps nothing
+     */
     public record ProjectAgent(String name,
                                String description,
                                String systemPrompt,
@@ -239,16 +262,19 @@ public final class ProjectAgents {
                                String model) {
 
         public ProjectAgent {
-            tools = tools == null ? List.of() : List.copyOf(tools);
+            tools = tools == null ? null : List.copyOf(tools);
             disallowedTools = disallowedTools == null ? List.of() : List.copyOf(disallowedTools);
         }
 
         /**
          * The tools this agent may use: the caller's own, narrowed by the
          * file. {@code disallowedTools} is taken away first, then
-         * {@code tools} keeps what it names; naming none keeps everything the
-         * caller has. A name the caller does not have is not an error and not
-         * a grant — it simply matches nothing.
+         * {@code tools} keeps what it names. A file without {@code tools}
+         * keeps everything the caller has; {@code tools: []} keeps nothing —
+         * reading an empty list as "no restriction" would hand the widest
+         * set to the file that asked for the narrowest. A name the caller
+         * does not have is not an error and not a grant — it simply matches
+         * nothing.
          *
          * <p>Each tool keeps the caller's binding, the approval flag and the
          * result cap included, under an id of its own.
@@ -259,8 +285,8 @@ public final class ProjectAgents {
             for (AgentTool tool : callerTools) {
                 if (!tool.enabled()) continue;
                 if (namedIn(disallowedTools, tool.name())) continue;
-                boolean named = namedIn(tools, tool.name());
-                if (!tools.isEmpty() && !named) continue;
+                boolean named = tools != null && namedIn(tools, tool.name());
+                if (tools != null && !named) continue;
                 // A deferred tool waits for a tool search to activate it, and
                 // a project agent has none — so one the file names by hand is
                 // offered outright, or it could never be reached at all.

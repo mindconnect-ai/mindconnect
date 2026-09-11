@@ -75,7 +75,51 @@ class ProjectAgentsTest {
         assertThat(ProjectAgents.find(project.toString(), "migration-writer")).isPresent();
         var bare = ProjectAgents.find(project.toString(), "bare").orElseThrow();
         assertThat(bare.description()).isEqualTo("no name of its own");
-        assertThat(bare.tools()).as("naming no tools means the caller's own").isEmpty();
+        assertThat(bare.tools()).as("no tools field means the caller's own").isNull();
+    }
+
+    @Test
+    void anEmptyToolsListKeepsNothing() throws Exception {
+        write("flow.md", """
+                ---
+                tools: []
+                ---
+                Think, do not act.
+                """);
+        write("bare-brackets.md", """
+                ---
+                tools: [ ]
+                disallowedTools: []
+                ---
+                Think, do not act.
+                """);
+
+        for (String name : List.of("flow", "bare-brackets")) {
+            var agent = ProjectAgents.find(project.toString(), name).orElseThrow();
+            assertThat(agent.tools()).as(name + " names a list, and the list is empty").isEmpty();
+            assertThat(agent.toolsFrom(CALLER_TOOLS))
+                    .as(name + ": an empty list is the narrowest set, not the widest")
+                    .isEmpty();
+        }
+    }
+
+    @Test
+    void aToolsKeyWithNoValueAtAllSaysNothing() throws Exception {
+        // YAML reads a key without a value as null, not as a list: the same
+        // as leaving the key out.
+        write("unset.md", """
+                ---
+                tools:
+                description: nothing named
+                ---
+                Everything the caller has.
+                """);
+
+        var agent = ProjectAgents.find(project.toString(), "unset").orElseThrow();
+
+        assertThat(agent.tools()).isNull();
+        assertThat(agent.description()).isEqualTo("nothing named");
+        assertThat(agent.toolsFrom(CALLER_TOOLS)).hasSize(CALLER_TOOLS.size());
     }
 
     @Test
@@ -206,6 +250,30 @@ class ProjectAgentsTest {
 
         assertThat(agent.tools()).containsExactly("file_read", "grep");
         assertThat(agent.disallowedTools()).containsExactly("bash");
+        assertThat(agent.toolsFrom(CALLER_TOOLS))
+                .extracting(AgentTool::name).containsExactly("file_read", "grep");
+    }
+
+    @Test
+    void aBlankLineInsideABlockListDoesNotEndIt() throws Exception {
+        // Ending the list at the blank line would leave tools without a
+        // value, and with it every tool the caller has.
+        write("spaced.md", """
+                ---
+                tools:
+
+                  - file_read
+
+                  - grep
+                model: claude-haiku-default
+                ---
+                Read only.
+                """);
+
+        var agent = ProjectAgents.find(project.toString(), "spaced").orElseThrow();
+
+        assertThat(agent.tools()).containsExactly("file_read", "grep");
+        assertThat(agent.model()).as("the next key is read as a key").isEqualTo("claude-haiku-default");
         assertThat(agent.toolsFrom(CALLER_TOOLS))
                 .extracting(AgentTool::name).containsExactly("file_read", "grep");
     }
