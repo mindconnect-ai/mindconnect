@@ -23,6 +23,30 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** MCP servers as registered tools. An operator registers a server
+  under Admin → MCP Servers — a local process, a Docker image or a remote HTTP
+  endpoint — tries it out with *Test connection*, and its tools appear in the
+  tool catalog as `<prefix>_<tool>` (the prefix is fixed once registered, so
+  agent definitions keep working). Secrets can stay out of the registration as
+  `${VAR}` references resolved from the environment when the server starts.
+  Discovered tools are cached on disk, so a restart does not start every server
+  again. Registrations live in `<data>/<namespace>/system/mcp-servers/`, one
+  JSON file per server; a Gmail registration ships disabled. The modules sit in
+  `agents/mcp`.
+- **agents:** tool settings in the admin UI: a tool can be switched off or given
+  a different description for this installation, without touching any agent
+  definition. What an agent definition says about a tool still wins for that
+  agent. Stored in `<data>/<namespace>/system/tool-settings.json`.
+
+### Removed
+
+- **agents:** the `mc-agent-tools-gmail` module. Gmail is now an MCP server
+  registration (bundled, disabled) instead of a tool module of its own; agents
+  that used `gmail_*` tools keep the same names once the registration is
+  enabled.
+
 ### Fixed
 
 - **agents:** tool calls no longer fail at random when sub-agents run in

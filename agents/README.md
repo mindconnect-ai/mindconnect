@@ -50,8 +50,25 @@ the finished `report.md` in the workspace:
 | `mc-llm-gateway` | LLM abstraction — streaming chat, model routing |
 | `mc-message-repository` | Conversation & message storage |
 | `mc-credentials` | Credential storage for tools and providers |
-| `mc-mcp-proxy` | Proxy for Model Context Protocol servers |
-| `mc-agent-tools*` | Built-in tool providers (web, browser, document, todo, gmail) |
+| `mc-agent-tools*` | Built-in tool providers (web, browser, document, todo, workflow) |
+
+### `mcp/` — Model Context Protocol servers as tools
+
+Registered, not compiled in: an operator adds a server in the admin UI and its
+tools join the catalog. Split like the rest of `agents/` — ports in `-core`,
+the in-process implementation beside them — so a gateway can later run on a
+server of its own without the tool side noticing.
+
+| Module | Purpose |
+|--------|---------|
+| `mc-mcp-gateway-core` | Ports and types: `McpGateway`, `McpRegistryAdmin`, `McpCatalog`, `McpServerRegistration`, `McpTarget` |
+| `mc-mcp-gateway-local` | The in-process gateway — registrations on disk, discovery cache, Docker catalog |
+| `mc-mcp-proxy` | Talks to one server over stdio or streamable HTTP, on the official MCP Java SDK |
+| `mc-agent-tools-mcp` | The `MultiToolProvider` that turns every registered server's tools into agent tools |
+| `mc-mcp-gateway-admin-ui-rest` | The `/mcp-gateway` screen, embedded by the admin UI |
+
+Concepts: `mc-sandbox/agents/doc/concepts/21-*`, `22-*`, `23-*`. Manual tests:
+`doc/manual-tests/mcp/`.
 
 ### `adapter/` — alternative implementations of the core ports
 

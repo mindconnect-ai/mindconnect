@@ -18,8 +18,9 @@ is a shared dependency.
 
 `agents/` splits along a core/adapter seam: `-core` modules hold domain and
 ports, their siblings hold the implementations. `core/` are libraries,
-`adapter/postgres/` alternative stores, `springstarter/` the Boot starters,
-`server/` the deployable apps, `client/` the CLI.
+`mcp/` the MCP gateway and its tool provider, `adapter/postgres/` alternative
+stores, `springstarter/` the Boot starters, `server/` the deployable apps,
+`client/` the CLI.
 
 Each area has its own README; read it before working in that area. Deeper
 documentation lives in `website/docs/`.

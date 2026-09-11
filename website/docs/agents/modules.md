@@ -41,8 +41,16 @@ carry the implementations.
 | `mc-agent-tools-web` | HTTP fetch, web search, HTML-to-Markdown. |
 | `mc-agent-tools-web-browser` | Headless-Chromium fetching (Playwright) for JS-rendered sites — separate module because of the ~150 MB Chromium download. |
 | `mc-agent-tools-workflow` | Persisted workflows as agent tools — one tool per workflow, parameters from its input schema. |
-| `mc-agent-tools-gmail` | Gmail tools via an MCP Docker container. |
-| `mc-mcp-proxy` | MCP wrapper on the official Java SDK: spawns/talks to MCP servers, provides `tools/list` and `tools/call`. |
+
+## `mcp/` — MCP servers as registered tools
+
+| Module | Purpose |
+|--------|---------|
+| `mc-mcp-gateway-core` | Ports and types: `McpGateway`, `McpRegistryAdmin`, `McpCatalog`, `McpServerRegistration`, `McpTarget`, `McpServerId`. |
+| `mc-mcp-gateway-local` | The in-process gateway: registrations on disk, discovery cache, Docker MCP catalog. |
+| `mc-mcp-proxy` | One server over stdio or streamable HTTP, on the official MCP Java SDK. |
+| `mc-agent-tools-mcp` | The `MultiToolProvider` that exposes every registered server's tools as agent tools. |
+| `mc-mcp-gateway-admin-ui-rest` | The *MCP Servers* screen, embedded by the admin UI. |
 
 ## `vectorstore/` — the knowledge layer
 
