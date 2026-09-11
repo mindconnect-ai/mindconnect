@@ -34,6 +34,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   directory) beside the absolute one, `glob` says that it returns files and
   never directories — `*` in a directory of sub-directories finds nothing —
   and the bundled `coding-assistant` gets `file_list`, which it was missing.
+- **agents:** `vector_search` no longer claims to be the only way to an
+  attached file. Its description said in capitals that attached files are not
+  on the filesystem, which outweighed both the prompt and the file tools; it
+  now says what search is good for — a passage in a long document, several
+  files at once, a knowledge store — and that a file the prompt names with a
+  path is better opened. The bundled `default-chat` says the same.
 - **agents:** an image attached to a chat is a file like any other. It was
   only recorded on the session and handed to the model with the next message,
   so `file_list` did not show it and no tool could open it; it is now copied
