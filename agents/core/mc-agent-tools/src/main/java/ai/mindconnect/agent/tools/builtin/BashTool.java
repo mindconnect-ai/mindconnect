@@ -87,7 +87,8 @@ public class BashTool implements Tool {
                 + "s, raise `timeout` (up to " + MAX_TIMEOUT_SECONDS + ") for a build or test run. A command "
                 + "that does not return on its own — a dev server, a watcher — must run with "
                 + "`background`: the call returns at once with the pid and a log file to read; end it "
-                + "with process_kill." + extra;
+                + "with process_kill. Never detach a command yourself with `&`, `nohup` or `setsid`: the "
+                + "process would run on out of reach, so such a command is refused." + extra;
     }
 
     @Override
@@ -110,6 +111,16 @@ public class BashTool implements Tool {
         String command = (String) arguments.get("command");
         if (command == null || command.isBlank()) {
             return "Error: command is required";
+        }
+        String detaching = detaches(command);
+        if (detaching != null) {
+            // The shell exits, the process it let go does not: nothing here
+            // waits for it, logs it or can end it — with background=true
+            // neither, since that tracks the shell. Refused before it starts.
+            return "Error: " + detaching + " would leave the process running on its own, outside this call — "
+                    + "no pid, no log, and process_kill could not end it. Start it with background=true instead "
+                    + "(the call returns the pid and a log file). Jobs that finish by themselves may use & as "
+                    + "long as the command waits for them.";
         }
         if (Boolean.parseBoolean(String.valueOf(arguments.getOrDefault("background", "false")))) {
             return startInBackground(command);
@@ -279,6 +290,72 @@ public class BashTool implements Tool {
             + "|tail\\s+-[a-zA-Z]*[fF]\\b"
             + "|watch\\s"
             + ")");
+
+    /**
+     * How the command would let a process go on without it, or {@code null}:
+     * a {@code &} that nothing {@code wait}s for, or {@code nohup},
+     * {@code setsid} or {@code disown} where a command starts. Such a process
+     * outlives the shell this tool watches. Quoted text, {@code &&},
+     * {@code |&} and redirections such as {@code 2>&1} and {@code &>} do not
+     * detach anything. Read off the text, not parsed — when in doubt it lets
+     * the command through.
+     */
+    static String detaches(String command) {
+        boolean inSingle = false, inDouble = false, escaped = false;
+        boolean loneAmpersand = false, waits = false, commandPosition = true;
+        String starter = null;
+        StringBuilder word = new StringBuilder();
+        int n = command.length();
+        for (int i = 0; i <= n; i++) {
+            char c = i < n ? command.charAt(i) : '\n';
+            if (escaped) {
+                escaped = false;
+                word.append(c);
+                continue;
+            }
+            if (inSingle) {
+                if (c == '\'') inSingle = false; else word.append(c);
+                continue;
+            }
+            if (inDouble) {
+                if (c == '\\') escaped = true;
+                else if (c == '"') inDouble = false;
+                else word.append(c);
+                continue;
+            }
+            if (c == '\\') { escaped = true; continue; }
+            if (c == '\'') { inSingle = true; continue; }
+            if (c == '"') { inDouble = true; continue; }
+
+            boolean separator = c == ';' || c == '|' || c == '(' || c == ')' || c == '\n';
+            if (c == '&') {
+                char prev = i > 0 ? command.charAt(i - 1) : ' ';
+                char next = i + 1 < n ? command.charAt(i + 1) : ' ';
+                boolean redirect = prev == '>' || prev == '<' || next == '>';
+                if (!redirect) {
+                    separator = true;
+                    if (prev != '&' && prev != '|' && next != '&') loneAmpersand = true;
+                }
+            }
+            if (separator || Character.isWhitespace(c) || c == '<' || c == '>' || c == '&') {
+                if (word.length() > 0) {
+                    String w = word.toString();
+                    if (w.equals("wait")) waits = true;
+                    if (commandPosition && starter == null
+                            && (w.equals("nohup") || w.equals("setsid") || w.equals("disown"))) {
+                        starter = "`" + w + "`";
+                    }
+                    commandPosition = false;
+                    word.setLength(0);
+                }
+                if (separator) commandPosition = true;
+                continue;
+            }
+            word.append(c);
+        }
+        if (starter != null) return starter;
+        return loneAmpersand && !waits ? "`&`" : null;
+    }
 
     /** Does the command look like one that never returns on its own? Only a guess — an explicit timeout overrides it. */
     static boolean looksLongRunning(String command) {

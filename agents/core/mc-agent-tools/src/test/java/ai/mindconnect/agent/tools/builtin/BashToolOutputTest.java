@@ -37,6 +37,43 @@ class BashToolOutputTest {
     }
 
     @Test
+    void aCommandThatLetsAProcessGoIsRefused_beforeAnythingStarts() {
+        BashTool bash = new BashTool(tmp.toFile());
+
+        // What a model did in a manual run: the server outlived the call, and
+        // process_kill never heard of it.
+        assertThat(bash.execute(Map.of("command", "sleep 41.7 > /dev/null 2>&1 & echo $!")))
+                .startsWith("Error: `&` would leave the process running on its own")
+                .contains("background=true");
+        assertThat(bash.execute(Map.of("command", "sleep 41.7 &", "background", true)))
+                .as("background tracks the shell, which is gone as soon as it has let go")
+                .startsWith("Error: `&`");
+        assertThat(bash.execute(Map.of("command", "nohup sleep 41.7")))
+                .startsWith("Error: `nohup`");
+        assertThat(bash.execute(Map.of("command", "true; setsid sleep 41.7")))
+                .startsWith("Error: `setsid`");
+        assertThat(ProcessHandle.allProcesses()
+                .map(p -> p.info().commandLine().orElse(""))
+                .filter(line -> line.contains("sleep 41.7")))
+                .as("refused before it started").isEmpty();
+    }
+
+    @Test
+    void ampersandsThatDetachNothingStillRun() {
+        BashTool bash = new BashTool(tmp.toFile());
+
+        assertThat(bash.execute(Map.of("command", "true && echo and"))).isEqualTo("and");
+        assertThat(bash.execute(Map.of("command", "echo 'fish & chips'"))).isEqualTo("fish & chips");
+        assertThat(bash.execute(Map.of("command", "echo \"quoted &\" 2>&1"))).isEqualTo("quoted &");
+        assertThat(bash.execute(Map.of("command", "ls /does-not-exist &> /dev/null; echo redirected")))
+                .isEqualTo("redirected");
+        assertThat(bash.execute(Map.of("command", "echo nohup is only an argument here")))
+                .isEqualTo("nohup is only an argument here");
+        assertThat(bash.execute(Map.of("command", "(sleep 0.2; echo one) & (sleep 0.1; echo two) & wait")))
+                .as("jobs the command waits for end with it").contains("one").contains("two");
+    }
+
+    @Test
     void theTimeoutIsPerCall_andWhatWasPrintedComesBackWithTheError() {
         BashTool bash = new BashTool(tmp.toFile());
 

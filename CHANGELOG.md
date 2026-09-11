@@ -247,7 +247,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   directory, so a build error is in the tool result instead of in a file
   nobody reads; `process_kill` ends such
   a process (with everything it spawned) or lists the session's, and
-  whatever still runs when the runtime stops is killed with it.
+  whatever still runs when the runtime stops is killed with it. A command
+  that would let a process go on its own — a `&` nothing waits for,
+  `nohup`, `setsid`, `disown` — is refused and pointed at `background`,
+  since such a process would run on out of the session's reach.
 
 - **agents:** standing instructions in a file, so a project or a user says
   once what would otherwise go in every message. The first of `AGENTS.md`,
