@@ -153,6 +153,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `summaries.json` that every save read, extended and rewrote; each summary is
   now its own file under `conversations/<id>/summaries/`. Summaries in the old
   `summaries.json` are not read any more.
+- **agents:** two uploads into the same chat at the same moment register its
+  vector store once; each could find the store missing and write its own
+  record. The memory vector-store backend no longer blocks a carrier thread
+  while a virtual thread waits for a store that is loading, saving or being
+  searched.
 
 - **agents:** tool calls no longer fail at random when sub-agents run in
   parallel. With the file persistence most stores truncated a file and wrote it

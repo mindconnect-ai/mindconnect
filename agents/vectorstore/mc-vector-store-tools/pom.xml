@@ -19,10 +19,10 @@
         agents only ever handle text. The ingestion pipeline itself is a workflow seed.</description>
 
     <dependencies>
-        <!-- AtomicFiles: stored files are written whole or not at all. -->
+        <!-- FileWrites and PathLocks: registry files are written whole, one writer at a time. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-common</artifactId>
+            <artifactId>mc-file-repo</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
