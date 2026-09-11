@@ -82,7 +82,8 @@ fresh empty one, so nothing has to be moved by hand at release time.
   (package `ai.mindconnect.common`) into the new dependency-free module
   `mc-agent-domain`, package `ai.mindconnect.agent`, together with `UserId`,
   which `AuthenticationInfo.userId()` now returns instead of a `String`.
-  Embedders repoint two imports and wrap the user id in `UserId.of(...)`; the agents modules pull the new module in transitively.
+  Embedders repoint two imports and wrap the user id in `UserId.of(...)`; the
+  agents modules pull the new module in transitively.
   `mc-common` is tenant-free again, which is what the workflow and taskqueue
   areas expect from it; its unused `DomainEvent` record went with the move.
 
