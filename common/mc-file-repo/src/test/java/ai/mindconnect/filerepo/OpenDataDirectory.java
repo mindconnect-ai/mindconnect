@@ -7,7 +7,7 @@ import java.nio.file.Path;
  * of the data directory {@code args[0]}. Exit code 0 when that worked, 3 when it
  * was refused.
  */
-public final class OpenDataDirectory {
+public class OpenDataDirectory {
 
     private OpenDataDirectory() {
     }

@@ -22,7 +22,7 @@ import java.nio.file.StandardCopyOption;
  * {@code .tmp}; {@link #isTemporary} recognises it, and {@link FileRepo}
  * deletes the ones a crash left behind.
  */
-public final class FileWrites {
+public class FileWrites {
 
     /** Writes the content into the stream it is handed; the stream is closed afterwards either way. */
     @FunctionalInterface

@@ -50,7 +50,7 @@ import java.util.stream.Stream;
  * value, nothing else — no model call, no tool, no network. Writing another
  * document from inside one throws {@link NestedWriteException}.
  */
-public final class Documents<K, V> {
+public class Documents<K, V> {
 
     private final FileRepo repo;
     private final Function<K, String> path;
@@ -240,7 +240,7 @@ public final class Documents<K, V> {
 
     // ── builder ─────────────────────────────────────────────────────────────
 
-    public static final class Builder<K, V> {
+    public static class Builder<K, V> {
 
         private final Class<V> type;
         private final Function<K, String> path;

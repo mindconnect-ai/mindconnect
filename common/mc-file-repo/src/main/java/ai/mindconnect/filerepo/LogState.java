@@ -22,7 +22,7 @@ import java.util.stream.Stream;
  * ever handed out. Immutable — a writer publishes a new state, a reader keeps
  * the one it took.
  */
-final class LogState {
+class LogState {
 
     /** The file that keeps the highest key once the records holding it are deleted. */
     static final String SEQUENCE_FILE = ".sequence";

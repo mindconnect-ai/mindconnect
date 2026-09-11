@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * included. Do not open {@value #LOCK_FILE} anywhere else: on POSIX systems
  * closing any channel to the file releases the process's lock on it.
  */
-public final class FileRepo {
+public class FileRepo {
 
     private static final Logger log = LoggerFactory.getLogger(FileRepo.class);
 

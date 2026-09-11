@@ -58,7 +58,7 @@ import java.util.function.UnaryOperator;
  * <p>The function given to {@link #append} and {@link #update} runs under the
  * lock: build the record, nothing else.
  */
-public final class RecordLog<P, R> {
+public class RecordLog<P, R> {
 
     private final FileRepo repo;
     private final Function<P, String> dir;
@@ -325,7 +325,7 @@ public final class RecordLog<P, R> {
 
     // ── builder ─────────────────────────────────────────────────────────────
 
-    public static final class Builder<P, R> {
+    public static class Builder<P, R> {
 
         private final Class<R> type;
         private Function<P, String> dir;

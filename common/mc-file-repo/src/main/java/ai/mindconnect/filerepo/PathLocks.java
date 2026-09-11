@@ -33,7 +33,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * step, so a reader always holds a whole version. {@code ReentrantLock} rather
  * than {@code synchronized} lets a waiting virtual thread unmount from its carrier.
  */
-public final class PathLocks {
+public class PathLocks {
 
     /** The action run under the lock. */
     @FunctionalInterface
@@ -102,7 +102,7 @@ public final class PathLocks {
     }
 
     /** A fair lock that tells who holds it. */
-    private static final class OwnedLock extends ReentrantLock {
+    private static class OwnedLock extends ReentrantLock {
 
         OwnedLock() {
             super(true);
