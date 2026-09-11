@@ -40,6 +40,12 @@ import java.util.Set;
  * config, ingestion workflow) and the store instances created from them.
  * Uses the same {@link VectorStores} resolution the knowledge tools use, so
  * what the UI shows is exactly what the tools do.
+ *
+ * <p>Templates and knowledge bases are shared configuration. A chat's upload
+ * store is its user's alone ({@link ai.mindconnect.agentrest.auth.VectorStoreAccess}):
+ * another user neither sees it listed nor opens, searches, fills or deletes
+ * it. The files tab shows what the Files API gives the signed-in user, and
+ * only a file's uploader deletes it.
  */
 @RestController
 @RequestMapping("/admin/vector-stores")
@@ -51,14 +57,20 @@ public class VectorStoreUiController {
     private final LlmConfigRepository llmConfigs;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService;
+    private final ai.mindconnect.agentrest.auth.CurrentUsers currentUsers;
+    private final ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess;
 
     public VectorStoreUiController(VectorStores stores, LlmConfigRepository llmConfigs,
                                       ai.mindconnect.filestore.FileStore fileStore,
-                                      ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService) {
+                                      ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService,
+                                      ai.mindconnect.agentrest.auth.CurrentUsers currentUsers,
+                                      ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess) {
         this.stores = stores;
         this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
         this.vectorStoreService = vectorStoreService;
+        this.currentUsers = currentUsers;
+        this.storeAccess = storeAccess;
     }
 
     // ── overview page ──────────────────────────────────────────────────────
@@ -102,9 +114,12 @@ public class VectorStoreUiController {
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this store registration? (Data files stay on the backend.)")
                         .dispatch("DELETE", "/admin/vector-stores/stores/{id}"));
+        ai.mindconnect.agent.UserId caller = currentUsers.require();
         Set<String> registered = new LinkedHashSet<>();
         for (VectorStoreInstance i : stores.registry().instances()) {
             registered.add(i.name());
+            // A chat's upload store is its user's: nobody else sees it listed.
+            if (!storeAccess.reachable(i, caller)) continue;
             instances.row(Map.of(
                     "id", i.name(),
                     "name", i.name(),
@@ -117,7 +132,7 @@ public class VectorStoreUiController {
         // era, or created outside the tools) — shown as implicit defaults.
         for (String discovered : stores.discoverStores(
                 stores.templates().get(0).backend(), Map.of())) {
-            if (registered.contains(discovered)) continue;
+            if (registered.contains(discovered) || !storeAccess.reachable(discovered, null, caller)) continue;
             VectorStoreInstance implicit = stores.settingsFor(discovered);
             instances.row(Map.of(
                     "id", discovered,
@@ -141,7 +156,10 @@ public class VectorStoreUiController {
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this file from the file store? (Already-ingested chunks stay.)")
                         .dispatch("DELETE", "/admin/vector-stores/files/{id}"));
+        // What the Files API gives the caller by id: their own files and those
+        // stored before creators were recorded — nobody else's names and ids.
         for (ai.mindconnect.filestore.StoredFile f : fileStore.list()) {
+            if (!f.readableBy(caller)) continue;
             files.row(Map.of(
                     "id", f.id().value(),
                     "fid", f.id().value(),
@@ -234,12 +252,8 @@ public class VectorStoreUiController {
     /** The uploads are stored as the signed-in user's files — the file store records who put them there. */
     @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public UiPage uploadFiles(@org.springframework.web.bind.annotation.RequestParam("vs-files-upload")
-                              List<org.springframework.web.multipart.MultipartFile> uploads,
-                              @org.springframework.security.core.annotation.AuthenticationPrincipal
-                              org.springframework.security.oauth2.core.oidc.user.OidcUser user) {
-        String userId = ai.mindconnect.chatui.service.SessionOwnership.userIdOf(user);
-        ai.mindconnect.agent.UserId creator = userId == null || userId.isBlank()
-                ? null : ai.mindconnect.agent.UserId.of(userId);
+                              List<org.springframework.web.multipart.MultipartFile> uploads) {
+        ai.mindconnect.agent.UserId creator = currentUsers.require();
         for (var upload : uploads) {
             try (var content = upload.getInputStream()) {
                 fileStore.save(upload.getOriginalFilename(), upload.getContentType(), content, creator);
@@ -258,12 +272,8 @@ public class VectorStoreUiController {
      */
     @GetMapping("/files/{id}/content")
     public org.springframework.http.ResponseEntity<org.springframework.core.io.InputStreamResource> downloadStoredFile(
-            @PathVariable String id,
-            @org.springframework.security.core.annotation.AuthenticationPrincipal
-            org.springframework.security.oauth2.core.oidc.user.OidcUser user) throws java.io.IOException {
-        String userId = ai.mindconnect.chatui.service.SessionOwnership.userIdOf(user);
-        ai.mindconnect.agent.UserId caller = userId == null || userId.isBlank()
-                ? null : ai.mindconnect.agent.UserId.of(userId);
+            @PathVariable String id) throws java.io.IOException {
+        ai.mindconnect.agent.UserId caller = currentUsers.require();
         var file = fileStore.find(ai.mindconnect.filestore.FileId.of(id))
                 .filter(f -> f.readableBy(caller)).orElse(null);
         if (file == null) {
@@ -277,9 +287,14 @@ public class VectorStoreUiController {
                 .body(new org.springframework.core.io.InputStreamResource(fileStore.content(file.id())));
     }
 
+    /** Only the uploader deletes a file — the Files API's rule; a file without a creator stays. */
     @DeleteMapping("/files/{id}")
     public UiPage deleteStoredFile(@PathVariable String id) throws java.io.IOException {
-        fileStore.delete(ai.mindconnect.filestore.FileId.of(id));
+        var fileId = ai.mindconnect.filestore.FileId.of(id);
+        if (fileStore.find(fileId).filter(f -> f.createdBy(currentUsers.require())).isEmpty()) {
+            return list("files").toast(UiToast.error("Only the user who uploaded a file can delete it."));
+        }
+        fileStore.delete(fileId);
         return list("files");
     }
 
@@ -446,6 +461,9 @@ public class VectorStoreUiController {
     public UiPage createStore(@RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         String name = body.str("name");
+        if (ai.mindconnect.agentrest.auth.VectorStoreAccess.isChatStoreName(name)) {
+            return list("stores").toast(UiToast.error(ai.mindconnect.agentrest.auth.VectorStoreAccess.RESERVED_NAME));
+        }
         if (name != null && !name.isBlank()) {
             stores.open(name.trim(), body.str("template"), VectorStoreInstance.Scope.GLOBAL, null);
         }
@@ -454,7 +472,8 @@ public class VectorStoreUiController {
 
     @GetMapping("/stores/{name}")
     public UiPage storeDetail(@PathVariable String name) {
-        return storeDetail(name, null, null, null);
+        UiPage refused = refuseForeignStore(name);
+        return refused != null ? refused : storeDetail(name, null, null, null);
     }
 
     private UiPage storeDetail(String name, String lastQuery, UiNode searchResult) {
@@ -535,6 +554,8 @@ public class VectorStoreUiController {
     public UiPage upload(@PathVariable String name,
                          @org.springframework.web.bind.annotation.RequestParam("vs-upload")
                          List<org.springframework.web.multipart.MultipartFile> files) {
+        UiPage refused = refuseForeignStore(name);
+        if (refused != null) return refused;
         StringBuilder message = new StringBuilder();
         for (var file : files) {
             String fileName = file.getOriginalFilename() == null ? "upload.bin" : file.getOriginalFilename();
@@ -549,6 +570,8 @@ public class VectorStoreUiController {
 
     @PostMapping("/stores/{name}/search")
     public UiPage search(@PathVariable String name, @RequestBody Map<String, Object> raw) {
+        UiPage refused = refuseForeignStore(name);
+        if (refused != null) return refused;
         var body = new FormBody(raw);
         String query = body.str("query");
         if (query == null || query.isBlank()) {
@@ -607,14 +630,29 @@ public class VectorStoreUiController {
     @DeleteMapping("/stores/{name}/files")
     public UiPage deleteFile(@PathVariable String name,
                              @org.springframework.web.bind.annotation.RequestParam("file") String fileId) {
+        UiPage refused = refuseForeignStore(name);
+        if (refused != null) return refused;
         stores.openWith(stores.settingsFor(name)).deleteFile(fileId);
         return storeDetail(name, null, (UiNode) null);
     }
 
     @DeleteMapping("/stores/{name}")
     public UiPage deleteStore(@PathVariable String name) {
+        UiPage refused = refuseForeignStore(name);
+        if (refused != null) return refused;
         stores.registry().deleteInstance(name);
         return list("stores");
+    }
+
+    /**
+     * The store overview with a "no such store" note when {@code name} is
+     * another user's chat upload store; null when the caller may reach it.
+     */
+    private UiPage refuseForeignStore(String name) {
+        if (storeAccess.reachable(name, stores.registry().instance(name).orElse(null), currentUsers.require())) {
+            return null;
+        }
+        return list("stores").toast(UiToast.error("There is no store '" + name + "'."));
     }
 
     // ── helpers ────────────────────────────────────────────────────────────

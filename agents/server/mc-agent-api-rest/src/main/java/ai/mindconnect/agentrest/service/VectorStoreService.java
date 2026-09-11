@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -164,11 +165,16 @@ public class VectorStoreService {
         return DirectIngestion.ingest(vs, vs.openWith(instance), storeName, safeName, text);
     }
 
-    /** Like {@link #ingestUpload}, for a file already in the {@link FileStore}. */
-    public String ingestStoredFile(String storeName, String fileId) throws IOException {
+    /**
+     * Like {@link #ingestUpload}, for a file already in the {@link FileStore}
+     * that {@code reader} may read ({@link StoredFile#readableBy}). Anyone
+     * else's file is reported like a missing one: ingesting it would put its
+     * content into a store the reader can search.
+     */
+    public String ingestStoredFile(String storeName, String fileId, UserId reader) throws IOException {
         FileStore fs = fileStoreProvider.getIfAvailable();
         if (fs == null) throw new NotConfiguredException("File store");
-        StoredFile stored = fs.find(FileId.of(fileId)).orElseThrow(() ->
+        StoredFile stored = fs.find(FileId.of(fileId)).filter(file -> file.readableBy(reader)).orElseThrow(() ->
                 new IllegalArgumentException("No such file: " + fileId));
         try (InputStream content = fs.content(stored.id())) {
             return ingestUpload(storeName, stored.name(), content);

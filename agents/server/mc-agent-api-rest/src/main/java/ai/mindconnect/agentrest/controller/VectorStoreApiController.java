@@ -1,5 +1,8 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agentrest.auth.CurrentUser;
+import ai.mindconnect.agentrest.auth.VectorStoreAccess;
 import ai.mindconnect.agentrest.service.NotConfiguredException;
 import ai.mindconnect.agentrest.service.VectorStoreService;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
@@ -7,6 +10,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -16,6 +20,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.List;
@@ -25,10 +30,17 @@ import java.util.Map;
  * External REST API for vector stores — a thin shell over
  * {@link VectorStoreService}, which the admin UI uses too: template and store
  * CRUD, text search, chunk upsert, and document ingestion.
+ *
+ * <p>Templates and knowledge bases are shared configuration, open to every
+ * authenticated caller. A chat's upload store is its user's alone
+ * ({@link VectorStoreAccess}): for anyone else it is not listed, and reading,
+ * filling, searching or deleting it answers 404 — like a store that does not
+ * exist. Ingestion takes only a file the caller may read.
  */
 @Tag(name = "Vector Stores", description = "Templates (backend + embedding policy), store "
-        + "instances, document ingestion, chunk upsert and semantic search. 503 when "
-        + "vector stores are not configured in this application.")
+        + "instances, document ingestion, chunk upsert and semantic search. A chat's upload "
+        + "store (session-…) answers only to the chat's user. 503 when vector stores are not "
+        + "configured in this application.")
 @RestController
 @RequestMapping("/api/vector-stores")
 public class VectorStoreApiController {
@@ -45,9 +57,11 @@ public class VectorStoreApiController {
                                      String text, Map<String, String> metadata) {}
 
     private final VectorStoreService service;
+    private final VectorStoreAccess access;
 
-    public VectorStoreApiController(VectorStoreService service) {
+    public VectorStoreApiController(VectorStoreService service, VectorStoreAccess access) {
         this.service = service;
+        this.access = access;
     }
 
     /** The capability isn't configured in this host application. */
@@ -89,16 +103,18 @@ public class VectorStoreApiController {
 
     // ── Stores ─────────────────────────────────────────────────────────────
 
-    @Operation(summary = "List store instances")
+    @Operation(summary = "List store instances",
+            description = "The knowledge bases, and of the chat upload stores only the caller's own.")
     @GetMapping("/stores")
-    public List<VectorStoreInstance> listStores() {
-        return service.instances();
+    public List<VectorStoreInstance> listStores(@CurrentUser UserId caller) {
+        return service.instances().stream().filter(store -> access.reachable(store, caller)).toList();
     }
 
     @Operation(summary = "Get a store instance")
     @GetMapping("/stores/{name}")
-    public ResponseEntity<VectorStoreInstance> getStore(@PathVariable String name) {
+    public ResponseEntity<VectorStoreInstance> getStore(@PathVariable String name, @CurrentUser UserId caller) {
         return service.instance(name)
+                .filter(store -> access.reachable(store, caller))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -106,10 +122,12 @@ public class VectorStoreApiController {
     /** Registers (and creates on first use) a GLOBAL store from a template. */
     @Operation(summary = "Create a store",
             description = "Registers (and creates on first use) a GLOBAL store from a "
-                    + "template; the template's settings are copied onto the store.")
+                    + "template; the template's settings are copied onto the store. Names starting "
+                    + "with session- belong to chat upload stores and are refused (400).")
     @PostMapping("/stores")
     public ResponseEntity<VectorStoreInstance> createStore(@RequestBody CreateStoreRequest request) {
-        if (request.name() == null || request.name().isBlank()) {
+        if (request.name() == null || request.name().isBlank()
+                || VectorStoreAccess.isChatStoreName(request.name())) {
             return ResponseEntity.badRequest().build();
         }
         return service.createStore(request.name(), request.template())
@@ -121,7 +139,8 @@ public class VectorStoreApiController {
     @Operation(summary = "Delete a store registration",
             description = "Removes the registration; data files stay on the backend.")
     @DeleteMapping("/stores/{name}")
-    public ResponseEntity<Void> deleteStore(@PathVariable String name) {
+    public ResponseEntity<Void> deleteStore(@PathVariable String name, @CurrentUser UserId caller) {
+        requireReachable(name, caller);
         service.deleteStore(name);
         return ResponseEntity.noContent().build();
     }
@@ -138,15 +157,18 @@ public class VectorStoreApiController {
             description = "Pushes a file from the file store (see POST /api/files) through "
                     + "the store's ingestion path — the template's ingestion workflow when "
                     + "configured, built-in extraction + chunking otherwise. Same path as "
-                    + "the admin UI's store-page upload.")
+                    + "the admin UI's store-page upload. The file must be one the caller may "
+                    + "read; any other id answers 404.")
     @PostMapping("/stores/{name}/ingest")
     public ResponseEntity<IngestResult> ingest(@PathVariable String name,
-                                               @RequestBody IngestRequest request) throws IOException {
+                                               @RequestBody IngestRequest request,
+                                               @CurrentUser UserId caller) throws IOException {
         if (request.fileId() == null || request.fileId().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
+        requireReachable(name, caller);
         try {
-            String summary = service.ingestStoredFile(name, request.fileId());
+            String summary = service.ingestStoredFile(name, request.fileId(), caller);
             return ResponseEntity.ok(new IngestResult(request.fileId(), summary));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
@@ -159,10 +181,11 @@ public class VectorStoreApiController {
                     + "as one chunk; id defaults to \"{fileId}:{uuid}\".")
     @PostMapping("/stores/{name}/chunks")
     public ResponseEntity<VectorStoreService.UpsertedChunk> upsertChunk(
-            @PathVariable String name, @RequestBody UpsertChunkRequest request) {
+            @PathVariable String name, @RequestBody UpsertChunkRequest request, @CurrentUser UserId caller) {
         if (request.text() == null || request.text().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
+        requireReachable(name, caller);
         return ResponseEntity.ok(service.upsertChunk(name, request.id(), request.fileId(),
                 request.ordinal(), request.text(), request.metadata()));
     }
@@ -175,11 +198,20 @@ public class VectorStoreApiController {
                     + "the topK most similar chunks with scores (cosine similarity).")
     @PostMapping("/stores/{name}/search")
     public ResponseEntity<List<VectorStoreService.Hit>> search(@PathVariable String name,
-                                                               @RequestBody SearchRequest request) {
+                                                               @RequestBody SearchRequest request,
+                                                               @CurrentUser UserId caller) {
         if (request.query() == null || request.query().isBlank()) {
             return ResponseEntity.badRequest().build();
         }
+        requireReachable(name, caller);
         int topK = request.topK() == null || request.topK() <= 0 ? 5 : request.topK();
         return ResponseEntity.ok(service.search(name, request.query(), topK, 0));
+    }
+
+    /** A 404 for the request when the store is a chat's upload store that is not the caller's. */
+    private void requireReachable(String name, UserId caller) {
+        if (!access.reachable(name, service.instance(name).orElse(null), caller)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No such store");
+        }
     }
 }

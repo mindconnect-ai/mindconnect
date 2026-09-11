@@ -73,6 +73,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   uploaded before this version have no creator: they stay readable by id but are
   no longer listed or deletable through the API. Transcription jobs are readable
   only by whoever submitted them.
+- **agents:** a chat's upload store (`session-…`) answers only to the chat's
+  user. `/api/vector-stores` and the admin UI's vector-store pages no longer
+  list, open, search, fill or delete another user's, and no store can be created
+  under a `session-` name. Ingesting a stored file takes only a file the caller
+  may read, and the admin UI's files tab lists and deletes files by the same
+  rules as `/api/files`.
 - **agents:** the OpenAI Responses API (`/v1`) runs as the authenticated caller
   instead of the fixed `mindconnect.responses.user-id`, which is removed (without
   authentication the dev user, `MC_DEV_USER`, takes its place). Another user's

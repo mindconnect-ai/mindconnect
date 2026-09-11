@@ -87,9 +87,15 @@ the user's workspace files, uploaded files, transcriptions, and the responses
 of the Responses API. Somebody else's id is answered exactly like an id that
 does not exist — `404` — so an id seen in a URL or a log opens nothing.
 
-The configuration of the installation — agents, LLM configs, vector stores,
-workflows, MCP servers — is open to every authenticated user. Roles are not
-part of this yet.
+The configuration of the installation — agents, LLM configs, knowledge-base
+vector stores, workflows, MCP servers — is open to every authenticated user.
+Roles are not part of this yet.
+
+A chat's upload store (`session-…`) is not configuration: it holds what one
+user attached to one chat. The vector-store API and the Admin UI's vector-store
+pages neither list it for anyone else nor let them search, fill or delete it,
+and no store can be created under such a name. Ingesting a stored file into
+any store takes only a file the caller may read.
 
 ## The CLI
 

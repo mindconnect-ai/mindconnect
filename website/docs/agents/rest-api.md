@@ -56,8 +56,9 @@ Every user-scoped resource — a session and everything under
 transcription job — belongs to the authenticated caller, and a request for
 someone else's answers 404, exactly like one for an id that does not exist.
 No request names its user: a `userId` an older client still sends is ignored.
-Agents, LLM configs, vector stores and workflows are shared configuration,
-open to every authenticated caller.
+Agents, LLM configs, knowledge-base vector stores and workflows are shared
+configuration, open to every authenticated caller; a chat's upload store
+(`session-…`) answers only to the chat's user.
 
 ## OpenAI Responses API
 
