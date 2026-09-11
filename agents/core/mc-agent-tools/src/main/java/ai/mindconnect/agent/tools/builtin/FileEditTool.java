@@ -4,7 +4,7 @@ import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -116,10 +116,19 @@ public class FileEditTool implements Tool {
             return "Error: " + relative + " is a binary file.";
         }
         String content;
+        Charset charset;
         try {
-            content = Files.readString(target, StandardCharsets.UTF_8);
+            FileWalks.Decoded decoded = FileWalks.readText(target);
+            content = decoded.text();
+            charset = decoded.charset();
         } catch (IOException e) {
             return "Error reading file: " + e.getMessage();
+        }
+        // A Windows file keeps its CRLF: the model writes \n, the passage is
+        // looked for and written back with the file's own line separator.
+        if (content.contains("\r\n")) {
+            oldString = crlf(oldString);
+            newString = crlf(newString);
         }
 
         int occurrences = count(content, oldString);
@@ -131,7 +140,7 @@ public class FileEditTool implements Tool {
             if (tolerant == null) {
                 return "Error: old_string was not found in " + relative + ". It must match the file exactly, "
                         + "whitespace and line breaks included — read the file with file_read and copy the passage."
-                        + closestPassage(content, oldString);
+                        + closestPassage(lf(content), lf(oldString));
             }
             if (tolerant.count() > 1 && !replaceAll) {
                 return "Error: old_string (with whitespace differences forgiven) occurs " + tolerant.count()
@@ -148,14 +157,29 @@ public class FileEditTool implements Tool {
                     : content.replaceFirst(java.util.regex.Pattern.quote(oldString),
                             java.util.regex.Matcher.quoteReplacement(newString));
         }
+        if (!charset.newEncoder().canEncode(changed)) {
+            return "Error: " + relative + " is " + charset.name() + " text and new_string has characters that "
+                    + "encoding cannot hold. Use only characters the file's encoding has.";
+        }
         try {
-            Files.writeString(target, changed, StandardCharsets.UTF_8);
+            // Written back in the encoding it was read in: a Latin-1 file stays Latin-1.
+            Files.writeString(target, changed, charset);
         } catch (IOException e) {
             return "Error writing file: " + e.getMessage();
         }
         String header = (replaceAll && occurrences > 1 ? "Replaced " + occurrences + " occurrences in " : "Edited ")
                 + roots.display(target) + "\n";
-        return header + unifiedDiff(roots.display(target), content, changed);
+        return header + unifiedDiff(roots.display(target), lf(content), lf(changed));
+    }
+
+    /** {@code text} with every line break as CRLF. */
+    private static String crlf(String text) {
+        return lf(text).replace("\n", "\r\n");
+    }
+
+    /** {@code text} with every CRLF as a bare line feed. */
+    private static String lf(String text) {
+        return text.replace("\r\n", "\n");
     }
 
     /**
@@ -206,16 +230,19 @@ public class FileEditTool implements Tool {
      * A match of the passage with whitespace forgiven: every line compared
      * with leading and trailing whitespace stripped, the file's own
      * indentation kept on the replacement. Only whole lines — a passage that
-     * starts mid-line has no indentation to get wrong.
+     * starts mid-line has no indentation to get wrong. Occurrences do not
+     * overlap, as with an exact match; a file with CRLF line breaks is
+     * compared without them and written back with CRLF throughout.
      */
-    record Tolerant(List<String> fileLines, List<String> oldLines, List<Integer> starts, boolean trailingNewline) {
+    record Tolerant(List<String> fileLines, List<String> oldLines, List<Integer> starts, boolean trailingNewline,
+                    String lineSeparator) {
         int count() {
             return starts.size();
         }
 
         static Tolerant find(String content, String oldString) {
-            List<String> fileLines = lines(content);
-            List<String> oldLines = lines(oldString);
+            List<String> fileLines = lines(lf(content));
+            List<String> oldLines = lines(lf(oldString));
             while (!oldLines.isEmpty() && oldLines.get(oldLines.size() - 1).isBlank()) {
                 oldLines = oldLines.subList(0, oldLines.size() - 1);
             }
@@ -227,8 +254,10 @@ public class FileEditTool implements Tool {
                     if (!fileLines.get(i + k).strip().equals(oldLines.get(k).strip())) continue outer;
                 }
                 starts.add(i);
+                i += oldLines.size() - 1; // the next occurrence starts after this one
             }
-            return starts.isEmpty() ? null : new Tolerant(fileLines, oldLines, starts, content.endsWith("\n"));
+            return starts.isEmpty() ? null : new Tolerant(fileLines, oldLines, starts, content.endsWith("\n"),
+                    content.contains("\r\n") ? "\r\n" : "\n");
         }
 
         String apply(String content, String newString, boolean all) {
@@ -237,11 +266,11 @@ public class FileEditTool implements Tool {
             int i = 0;
             for (int start : use) {
                 while (i < start) out.add(fileLines.get(i++));
-                out.addAll(reindented(newString, fileLines.subList(start, start + oldLines.size()), oldLines));
+                out.addAll(reindented(lf(newString), fileLines.subList(start, start + oldLines.size()), oldLines));
                 i += oldLines.size();
             }
             while (i < fileLines.size()) out.add(fileLines.get(i++));
-            return String.join("\n", out) + (trailingNewline ? "\n" : "");
+            return String.join(lineSeparator, out) + (trailingNewline ? lineSeparator : "");
         }
 
         /**

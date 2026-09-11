@@ -348,4 +348,38 @@ class VectorToolsTest {
                 .contains("podman");
         assertThat(embeddedWith).containsOnly("openai-embeddings");
     }
+
+    /**
+     * vector_ingest_file reads where the other file tools read: the working
+     * directory by relative path, an additional directory by absolute path,
+     * and nothing outside them. The file id is the path as the caller gave it.
+     */
+    @Test
+    void ingestFileReachesTheSessionsDirectoriesAndNothingElse() throws Exception {
+        Path project = java.nio.file.Files.createDirectories(dir.resolve("project"));
+        Path lib = java.nio.file.Files.createDirectories(dir.resolve("lib"));
+        Path secret = java.nio.file.Files.createDirectories(dir.resolve("secret"));
+        java.nio.file.Files.writeString(project.resolve("notes.md"), "podman is a container engine\n");
+        java.nio.file.Files.writeString(lib.resolve("guide.md"), "the finance guide\n");
+        java.nio.file.Files.writeString(secret.resolve("key.md"), "the secret key\n");
+        ToolCallScope scope = new ToolCallScope(UserId.of("alice"), null, null,
+                project.toString(), List.of(lib.toString()));
+        Tool ingest = tool(new VectorIngestFileTool.Factory(), scope);
+
+        String guide = lib.resolve("guide.md").toString();
+        assertThat(ingest.execute(Map.of("path", guide, "store", "kb")))
+                .as("an additional directory, by absolute path")
+                .startsWith("Stored 1 chunk(s) for file '" + guide + "' in store 'kb'");
+        assertThat(ingest.execute(Map.of("path", "notes.md", "store", "kb")))
+                .startsWith("Stored 1 chunk(s) for file 'notes.md' in store 'kb'");
+        assertThat(ingest.execute(Map.of("path", secret.resolve("key.md").toString(), "store", "kb")))
+                .startsWith("Error: path is outside the allowed directories (");
+        assertThat(ingest.execute(Map.of("path", "../secret/key.md", "store", "kb")))
+                .startsWith("Error: path is outside the allowed directories (");
+        assertThat(ingest.execute(Map.of("path", "missing.md", "store", "kb")))
+                .isEqualTo("Error: no such file: missing.md");
+
+        assertThat(tool(new VectorTools.SearchFactory()).execute(Map.of("store", "kb", "query", "finance")))
+                .contains("the finance guide").contains(guide).doesNotContain("secret");
+    }
 }

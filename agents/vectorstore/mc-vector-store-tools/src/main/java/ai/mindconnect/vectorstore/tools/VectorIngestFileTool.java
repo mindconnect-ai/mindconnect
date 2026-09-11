@@ -2,6 +2,7 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
@@ -16,23 +17,24 @@ import java.util.Map;
 /**
  * {@code vector_ingest_file}: path in, searchable store content out — the
  * one-call ingestion for workflows ({@code glob → ForEach → vector_ingest_file}).
- * Reads the file relative to the tools base directory, extracts text (via the
- * document reader when {@code mc-agent-tools-document} is on the classpath —
- * docx/pdf/markdown — else plain UTF-8), chunks OpenAI-style (800/400) and
- * embeds into the store, replacing previous chunks of the same path. A chat's
- * upload store follows the same rule as for the other knowledge tools
+ * Reads the file from the session's directories — relative to the working
+ * directory, or absolute into an additional one, the sandbox every file tool
+ * shares — extracts text (via the document reader when
+ * {@code mc-agent-tools-document} is on the classpath — docx/pdf/markdown —
+ * else plain UTF-8), chunks OpenAI-style (800/400) and embeds into the store,
+ * replacing previous chunks of the same path. A chat's upload store follows
+ * the same rule as for the other knowledge tools
  * ({@link VectorTools#refusedStore}).
  */
 public final class VectorIngestFileTool implements Tool {
 
     private final VectorStores stores;
-    private final String baseDir;
+    private final FileRoots roots;
     private final ToolCallScope callScope;
 
-    VectorIngestFileTool(VectorStores stores, String baseDir, ToolCallScope callScope) {
+    VectorIngestFileTool(VectorStores stores, FileRoots roots, ToolCallScope callScope) {
         this.stores = stores;
-        this.baseDir = baseDir == null || baseDir.isBlank()
-                ? System.getProperty("user.home") : baseDir;
+        this.roots = roots;
         this.callScope = callScope;
     }
 
@@ -54,7 +56,8 @@ public final class VectorIngestFileTool implements Tool {
         schema.put("type", "object");
         schema.put("properties", Map.of(
                 "path", Map.of("type", "string", "format", "path",
-                        "description", "File path relative to the tools base directory."),
+                        "description", "File path relative to the working directory, or absolute into one "
+                                + "of the session's directories."),
                 "store", Map.of("type", "string", "description", "Vector store name."),
                 "template", Map.of("type", "string", "description",
                         "Template for creating the store if it does not exist (default: 'default').")));
@@ -73,16 +76,15 @@ public final class VectorIngestFileTool implements Tool {
         if (denied != null) {
             return denied;
         }
-        Path base = Path.of(baseDir).toAbsolutePath().normalize();
-        Path file = base.resolve(relative).normalize();
-        if (!file.startsWith(base)) {
-            return "Error: path escapes the base directory.";
+        Path file = roots.resolve(relative).orElse(null);
+        if (file == null) {
+            return roots.outsideError(relative);
         }
         if (!Files.isRegularFile(file)) {
             return "Error: no such file: " + relative;
         }
         try {
-            String text = extractText(base, file);
+            String text = extractText(file);
             String template = arguments.get("template") instanceof String t && !t.isBlank() ? t : null;
             // The chat's own upload store is registered as the chat's, owned by its user.
             SessionId ownChat = VectorTools.ownChatStore(storeName, callScope);
@@ -98,11 +100,14 @@ public final class VectorIngestFileTool implements Tool {
 
     /**
      * Document extraction when the document module is present (sections keep
-     * their headings as context); plain UTF-8 otherwise.
+     * their headings as context); plain UTF-8 otherwise. The reader names the
+     * document relative to a directory: the working directory when the file
+     * is in it, else the file's own directory.
      */
-    private static String extractText(Path base, Path file) throws Exception {
+    private String extractText(Path file) throws Exception {
         try {
             Class.forName("ai.mindconnect.agent.tools.document.DocumentReader");
+            Path base = file.startsWith(roots.base()) ? roots.base() : file.getParent();
             return DocumentExtraction.sectionsAsText(base, file);
         } catch (ClassNotFoundException e) {
             return Files.readString(file, StandardCharsets.UTF_8);
@@ -137,9 +142,10 @@ public final class VectorIngestFileTool implements Tool {
         }
 
         @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-            // The session's working directory is where the files are.
-            return new VectorIngestFileTool(stores,
-                    scope != null && scope.hasWorkingDir() ? scope.workingDir() : baseDir, scope);
+            // The session's directories are where the files are; without a session, the configured default.
+            String fallback = baseDir == null || baseDir.isBlank() ? System.getProperty("user.home") : baseDir;
+            FileRoots roots = scope == null ? FileRoots.of(Path.of(fallback)) : scope.fileRoots(fallback);
+            return new VectorIngestFileTool(stores, roots, scope);
         }
     }
 }

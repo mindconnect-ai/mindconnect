@@ -5,9 +5,7 @@ import ai.mindconnect.agent.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,7 +16,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -41,10 +38,11 @@ public class GrepTool implements Tool {
     /** A matching line longer than this is cut in the output. */
     static final int MAX_LINE_CHARS = 500;
     static final int MAX_CONTEXT = 10;
-    private static final long TIMEOUT_MS = 60_000L;
+    static final long TIMEOUT_MS = 60_000L;
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final long timeoutMs;
 
     public GrepTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -52,8 +50,14 @@ public class GrepTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public GrepTool(FileRoots roots) {
+        this(roots, TIMEOUT_MS);
+    }
+
+    /** With a time budget of its own — for tests that should not wait a minute. */
+    GrepTool(FileRoots roots, long timeoutMs) {
         this.roots = roots;
         this.baseDir = roots.base();
+        this.timeoutMs = timeoutMs;
     }
 
     @Override
@@ -133,7 +137,7 @@ public class GrepTool implements Tool {
         }
 
         List<Path> files = new ArrayList<>();
-        long deadline = System.currentTimeMillis() + TIMEOUT_MS;
+        long deadline = System.currentTimeMillis() + timeoutMs;
         boolean[] timedOut = {false};
         if (Files.isDirectory(start)) {
             PathMatcher filter = nameFilter;
@@ -185,16 +189,24 @@ public class GrepTool implements Tool {
             }
             if (FileWalks.isBinary(file)) continue;
             List<String> lines;
-            try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-                lines = reader.lines().toList();
-            } catch (IOException | java.io.UncheckedIOException e) {
-                continue; // not UTF-8, not ours
+            try {
+                lines = FileWalks.readText(file).text().lines().toList();
+            } catch (IOException e) {
+                continue; // unreadable, not ours
             }
             boolean any = false;
             int lastPrinted = -1;
             for (int i = 0; i < lines.size(); i++) {
-                Matcher m = pattern.matcher(lines.get(i));
-                if (!m.find()) continue;
+                // A backtracking pattern can spend minutes on one line: the
+                // line itself watches the clock while the matcher reads it.
+                boolean found;
+                try {
+                    found = pattern.matcher(new TimedText(lines.get(i), deadline)).find();
+                } catch (TimeUp e) {
+                    timedOut[0] = true;
+                    break outer;
+                }
+                if (!found) continue;
                 if (!any) {
                     filesWithMatches++;
                     any = true;
@@ -228,14 +240,69 @@ public class GrepTool implements Tool {
                 matches, filesWithMatches, timedOut[0] ? " (timed out)" : "");
         if (matches == 0) {
             return "No matches for '" + patternText + "' in " + relative
-                    + (timedOut[0] ? "\n[Search timed out after " + TIMEOUT_MS / 1000 + "s — narrow path or glob.]" : "");
+                    + (timedOut[0] ? "\n[Search timed out after " + timeoutText()
+                    + " — narrow path or glob, or simplify the pattern.]" : "");
         }
         StringBuilder head = new StringBuilder();
         head.append(filesOnly ? "Files with matches: " : "Matches: ").append(matches);
         if (!filesOnly) head.append(" in ").append(filesWithMatches).append(" file(s)");
         if (capped) head.append(" (stopped at ").append(limit).append(" — narrow the pattern, path or glob, or raise limit)");
-        if (timedOut[0]) head.append(" — search timed out after ").append(TIMEOUT_MS / 1000).append("s, results are partial");
+        if (timedOut[0]) head.append(" — search timed out after ").append(timeoutText()).append(", results are partial");
         return head.append('\n').append(out).toString().stripTrailing();
+    }
+
+    private String timeoutText() {
+        return timeoutMs >= 1000 ? timeoutMs / 1000 + "s" : timeoutMs + "ms";
+    }
+
+    /** Thrown out of the matcher when the search's time is up or its thread is interrupted. */
+    private static final class TimeUp extends RuntimeException {
+        TimeUp() {
+            super(null, null, false, false);
+        }
+    }
+
+    /**
+     * A line that checks the deadline and the interrupt flag while the
+     * matcher reads it — every few thousand characters, so a pattern that
+     * backtracks without end is stopped mid-match instead of after it.
+     */
+    private static final class TimedText implements CharSequence {
+        private static final int CHECK_EVERY = 4_096;
+        private final CharSequence text;
+        private final long deadline;
+        private int reads;
+
+        TimedText(CharSequence text, long deadline) {
+            this.text = text;
+            this.deadline = deadline;
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (++reads >= CHECK_EVERY) {
+                reads = 0;
+                if (System.currentTimeMillis() > deadline || Thread.currentThread().isInterrupted()) {
+                    throw new TimeUp();
+                }
+            }
+            return text.charAt(index);
+        }
+
+        @Override
+        public int length() {
+            return text.length();
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new TimedText(text.subSequence(start, end), deadline);
+        }
+
+        @Override
+        public String toString() {
+            return text.toString();
+        }
     }
 
     private static String cut(String line) {

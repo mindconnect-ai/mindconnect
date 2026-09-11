@@ -144,4 +144,57 @@ class FileEditToolTest {
         assertThat(edit.execute(Map.of("path", "app.ts", "old_string", "nothing like this anywhere zzz", "new_string", "x")))
                 .doesNotContain("closest passage");
     }
+
+    @Test
+    void aCrlfFileStaysCrlf_whetherThePassageMatchesExactlyOrWithWhitespaceForgiven() throws Exception {
+        Files.writeString(tmp.resolve("t.txt"), "a\r\nb\r\nc\r\n");
+        FileEditTool edit = new FileEditTool(tmp);
+
+        String out = edit.execute(Map.of("path", "t.txt", "old_string", "b\nc", "new_string", "B\nC"));
+
+        assertThat(out).startsWith("Edited t.txt\n").contains("-b\n-c\n+B\n+C").doesNotContain("\r");
+        assertThat(Files.readString(tmp.resolve("t.txt"))).isEqualTo("a\r\nB\r\nC\r\n");
+
+        Files.writeString(tmp.resolve("Svc.java"), "class Svc {\r\n    void run() {\r\n        go();\r\n    }\r\n}\r\n");
+        assertThat(edit.execute(Map.of("path", "Svc.java",
+                "old_string", "void run() {\n  go();\n}",
+                "new_string", "void run() {\n  prepare();\n  go();\n}"))).startsWith("Edited Svc.java");
+        assertThat(Files.readString(tmp.resolve("Svc.java")))
+                .as("the forgiving match writes CRLF throughout, no doubled CR")
+                .isEqualTo("class Svc {\r\n    void run() {\r\n        prepare();\r\n        go();\r\n    }\r\n}\r\n");
+    }
+
+    @Test
+    void replaceAllWithWhitespaceForgiven_countsAndReplacesOnlyOccurrencesThatDoNotOverlap() throws Exception {
+        Files.writeString(tmp.resolve("t.txt"), "  x\n  x\n  x\n");
+        FileEditTool edit = new FileEditTool(tmp);
+
+        assertThat(edit.execute(Map.of("path", "t.txt", "old_string", "x\nx", "new_string", "y\ny", "replace_all", true)))
+                .startsWith("Edited t.txt\n");
+        assertThat(Files.readString(tmp.resolve("t.txt"))).isEqualTo("  y\n  y\n  x\n");
+
+        Files.writeString(tmp.resolve("t.txt"), "  x\n  x\n  x\n  x\n");
+        assertThat(edit.execute(Map.of("path", "t.txt", "old_string", "x\nx", "new_string", "y\ny", "replace_all", true)))
+                .startsWith("Replaced 2 occurrences in t.txt\n");
+        assertThat(Files.readString(tmp.resolve("t.txt"))).isEqualTo("  y\n  y\n  y\n  y\n");
+    }
+
+    @Test
+    void aLatin1FileIsEditedAndWrittenBackInLatin1() throws Exception {
+        var latin1 = java.nio.charset.StandardCharsets.ISO_8859_1;
+        Path file = tmp.resolve("messages_de.properties");
+        Files.write(file, "label.size=Größe\nlabel.color=Farbe\n".getBytes(latin1));
+        FileEditTool edit = new FileEditTool(tmp);
+
+        assertThat(edit.execute(Map.of("path", "messages_de.properties",
+                "old_string", "label.color=Farbe", "new_string", "label.color=Füllfarbe")))
+                .startsWith("Edited messages_de.properties\n");
+        assertThat(Files.readAllBytes(file)).isEqualTo("label.size=Größe\nlabel.color=Füllfarbe\n".getBytes(latin1));
+
+        assertThat(edit.execute(Map.of("path", "messages_de.properties",
+                "old_string", "label.size=Größe", "new_string", "label.price=€")))
+                .startsWith("Error: messages_de.properties is ISO-8859-1 text");
+        assertThat(Files.readAllBytes(file)).as("nothing written")
+                .isEqualTo("label.size=Größe\nlabel.color=Füllfarbe\n".getBytes(latin1));
+    }
 }

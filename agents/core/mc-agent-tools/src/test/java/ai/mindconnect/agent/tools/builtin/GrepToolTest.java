@@ -77,4 +77,31 @@ class GrepToolTest {
                 .startsWith("Error: path is outside the allowed directories");
         assertThat(grep.execute(Map.of())).isEqualTo("Error: pattern is required");
     }
+
+    @Test
+    void aBacktrackingPatternIsStoppedByTheDeadline_inTheMiddleOfAMatch() throws Exception {
+        Files.writeString(tmp.resolve("words.txt"), "a".repeat(40) + "\n");
+        GrepTool grep = new GrepTool(FileRoots.of(tmp), 200);
+
+        // A bounded repetition escapes the JDK's loop memoisation: without a
+        // deadline inside the match this line keeps a thread busy for hours.
+        long started = System.nanoTime();
+        String out = grep.execute(Map.of("pattern", "(\\w+){1,40}x"));
+        long tookMs = (System.nanoTime() - started) / 1_000_000;
+
+        assertThat(out).isEqualTo("No matches for '(\\w+){1,40}x' in .\n"
+                + "[Search timed out after 200ms — narrow path or glob, or simplify the pattern.]");
+        assertThat(tookMs).as("stopped near the deadline, not after the match").isLessThan(10_000);
+    }
+
+    @Test
+    void latin1TextIsSearched_aFileWithNulBytesIsNot() throws Exception {
+        Files.write(tmp.resolve("messages_de.properties"),
+                "label.size=Größe\n".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        Files.write(tmp.resolve("blob.bin"), "Größe\0".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));
+        GrepTool grep = new GrepTool(tmp);
+
+        assertThat(grep.execute(Map.of("pattern", "Größe")))
+                .isEqualTo("Matches: 1 in 1 file(s)\nmessages_de.properties:1: label.size=Größe");
+    }
 }
