@@ -2,7 +2,7 @@ package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
-import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 
 abstract class WorkspaceToolFactory implements ToolFactory {
     protected WorkspaceStore workspaceStore;

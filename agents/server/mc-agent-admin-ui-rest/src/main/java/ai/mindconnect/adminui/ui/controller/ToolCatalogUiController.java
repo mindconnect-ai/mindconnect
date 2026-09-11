@@ -11,11 +11,11 @@ import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.chatui.ui.controller.FormBody;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -74,7 +74,7 @@ public class ToolCatalogUiController {
         // the registry. They are agent functions, so they join the "Agents"
         // rubric. (putIfAbsent so a registry entry would win, though today
         // there is no overlap.)
-        for (var def : ai.mindconnect.agent.service.AgentChatService.inlineToolDefinitions()) {
+        for (var def : AgentChatService.inlineToolDefinitions()) {
             byName.putIfAbsent(def.name(), entryFromDefinition(def));
         }
 

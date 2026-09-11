@@ -28,4 +28,4 @@ mindconnect:
     level:
       ai.mindconnect: INFO
       ai.mindconnect.message.adapter: WARN
-      ai.mindconnect.agent.service.token: INFO
+      ai.mindconnect.agent.runtime.adapter.token: INFO

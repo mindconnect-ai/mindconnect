@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolRegistry;

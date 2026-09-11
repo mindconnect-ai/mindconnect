@@ -1,9 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiLink;

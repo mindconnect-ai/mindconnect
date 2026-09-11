@@ -1,9 +1,9 @@
 package ai.mindconnect.agent.builder.lmstudio;
 
 import ai.mindconnect.agent.builder.AgentRuntime;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
-import ai.mindconnect.agent.memory.domain.SummaryPlacement;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
+import ai.mindconnect.agent.runtime.memory.domain.SummaryPlacement;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 

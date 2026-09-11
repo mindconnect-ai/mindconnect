@@ -1,7 +1,7 @@
 package ai.mindconnect.cli;
 
-import ai.mindconnect.agent.adapter.config.DefaultAgentRuntimeConfig;
-import ai.mindconnect.agent.adapter.config.TodoToolsConfig;
+import ai.mindconnect.agent.runtime.adapter.config.DefaultAgentRuntimeConfig;
+import ai.mindconnect.agent.runtime.adapter.config.TodoToolsConfig;
 import ai.mindconnect.message.adapter.file.MessageRepositoryConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

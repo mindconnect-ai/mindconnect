@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;

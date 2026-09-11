@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
-import ai.mindconnect.agent.service.stream.UserChannels;
+import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.channel.Subscription;
 import com.fasterxml.jackson.core.JsonProcessingException;

@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.tools.builtin;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.Tool;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.Namespace;
 
 import java.util.List;

@@ -1,17 +1,16 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
-import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
-import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;
@@ -121,7 +120,7 @@ public final class AgentDetailComponent implements UiComponent {
     /** The effective strategy kind, plus the compression switch where it exists. */
     private String memorySummary() {
         var config = agent.effectiveMemoryConfig();
-        if (config instanceof ai.mindconnect.agent.memory.domain.SummarizingWindowConfig sw) {
+        if (config instanceof SummarizingWindowConfig sw) {
             return config.kind() + " (tool-result compression "
                     + (sw.compressToolResults() ? "on" : "off") + ")";
         }

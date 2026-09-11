@@ -74,9 +74,9 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       `Namespace`, `NamespacedId`, `UserId`, `AuthenticationInfo`. Dependency-free. A type
       is admitted only when two modules that do not depend on each other need it; every
       other id record lives in the module that owns its entity
-    - `mc-agent-runtime-core` / `mc-agent-runtime`: execution engine (turn loop, tool
-      dispatch, sub-agent calls, approvals) / its adapters (file & in-memory repos,
-      Pebble prompt renderer, tokenizer)
+    - `mc-agent-runtime-core` / `mc-agent-runtime` (packages `ai.mindconnect.agent.runtime.*`):
+      execution engine (turn loop, tool dispatch, sub-agent calls, approvals) / its adapters
+      (file & in-memory repos, Pebble prompt renderer, tokenizer)
     - `mc-agent-memory-strategies`: working-memory strategies (window, summarizing window, auto-compact)
     - `mc-llm-gateway-core` / `mc-llm-gateway`: LLM abstraction ports / provider adapters + routing
     - `mc-message-repository-core` / `mc-message-repository`: conversation & message storage

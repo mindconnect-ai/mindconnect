@@ -1,14 +1,14 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.adapter.repo.memory.InMemoryAgentSessionRepository;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.domain.SessionStatus;
-import ai.mindconnect.agent.service.stream.UserChannels;
-import ai.mindconnect.agent.service.stream.UserEvent;
-import ai.mindconnect.agent.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.SessionStatus;
+import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.runtime.service.stream.UserEvent;
+import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskSubmission;

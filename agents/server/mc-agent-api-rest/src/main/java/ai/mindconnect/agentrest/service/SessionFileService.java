@@ -1,11 +1,12 @@
 package ai.mindconnect.agentrest.service;
 
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.domain.AttachedFile;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
+import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import ai.mindconnect.vectorstore.tools.DirectIngestion;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
@@ -132,7 +133,7 @@ public class SessionFileService {
         DynamicToolActivations activations = activationsProvider.getIfAvailable();
         if (activations != null) {
             activations.activate(sessionId,
-                    List.of(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME));
+                    List.of(ViewAttachmentTool.NAME));
         }
     }
 

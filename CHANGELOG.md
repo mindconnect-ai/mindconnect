@@ -47,6 +47,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `mc-common` is tenant-free again, which is what the workflow and taskqueue
   areas expect from it; its unused `DomainEvent` record went with the move.
 
+- **agents:** the runtime's packages moved one level down, from
+  `ai.mindconnect.agent.{domain,port,service,memory,tools,adapter}` to
+  `ai.mindconnect.agent.runtime.{domain,port,service,memory,tools,adapter}`,
+  so that `ai.mindconnect.agent` itself is left to the shared vocabulary.
+  Unchanged: the tool SPI `ai.mindconnect.agent.tool`, the tool modules
+  `ai.mindconnect.agent.tools.*` and the memory strategies
+  `ai.mindconnect.agent.memory.strategy`. In the same spirit the Postgres
+  file store moved from `ai.mindconnect.filestore.pg` to
+  `ai.mindconnect.filestore.adapter.pg`. Embedders repoint their imports;
+  logger names configured for the old packages (for example
+  `ai.mindconnect.agent.service`) need the `runtime` segment too.
+
 ### Fixed
 
 - **agents:** the admin UI's Logout button no longer ends with "The backend is

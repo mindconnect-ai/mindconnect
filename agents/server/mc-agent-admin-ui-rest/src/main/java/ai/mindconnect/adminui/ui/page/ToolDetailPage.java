@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.ToolDetailComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.ui.model.UiPage;

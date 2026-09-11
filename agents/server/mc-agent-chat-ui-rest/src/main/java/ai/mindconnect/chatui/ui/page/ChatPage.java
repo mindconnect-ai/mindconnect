@@ -3,10 +3,11 @@ package ai.mindconnect.chatui.ui.page;
 import ai.mindconnect.chatui.ui.component.ChatFormComponent;
 import ai.mindconnect.chatui.ui.component.MessageListComponent;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiSection;
@@ -86,8 +87,8 @@ public final class ChatPage {
         this.messages = new MessageListComponent(session.id(), agent, history, memory, subAgentTree)
                 .withSessionTitle(session.title())
                 .withCustomPrompt(session.mainAgent()
-                        .filter(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
-                        .map(a -> ((ai.mindconnect.agent.domain.session.SessionAgentRef) a)
+                        .filter(a -> a instanceof SessionAgentRef)
+                        .map(a -> ((SessionAgentRef) a)
                                 .hasPromptOverride())
                         .orElse(false))
                 .withParentSession(session.parentSessionId());
@@ -124,7 +125,7 @@ public final class ChatPage {
         // back to. An inline session agent's id resolves to nothing, so the
         // link would land on an agent page for an agent that does not exist.
         boolean registryAgent = session.mainAgent()
-                .map(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
+                .map(a -> a instanceof SessionAgentRef)
                 .orElse(true);
         if (registryAgent) {
             String back = links.backHref(session.agentDefinitionId(), session.id());
