@@ -140,10 +140,12 @@ with prefix `gmail` turns its `search_emails` into `gmail_search_emails`.
 
 - **Try before you save.** *Test connection* starts the server once and lists its tools.
 - **Suggestions.** With `MC_MCP_CATALOG_ENABLED=true` the screen searches Docker's MCP
-  catalog and prefills a registration, required secrets included.
-- **Secrets stay in the environment.** A value in `env` or `headers` may read
-  `${MY_TOKEN}` or `${MY_TOKEN:fallback}`; it is resolved when the server starts and
-  never written to the registration.
+  catalog and prefills a registration; required secrets arrive as `${NAME}`
+  placeholders to replace with the value.
+- **Values are used as entered.** A value in `env` or `headers` — an API key, say —
+  is stored in the registration and sent as it is. `${NAME}` is reserved for
+  variables of the signed-in user; until users can set them, a registration that
+  uses one does not start. The environment of the server process is never read.
 - **The prefix is fixed** once a server is registered: agents bind the tool names it
   produces. Register a new server to use a different one.
 - **Storage:** one JSON file per server under

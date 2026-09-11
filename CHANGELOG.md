@@ -29,8 +29,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   under Admin → MCP Servers — a local process, a Docker image or a remote HTTP
   endpoint — tries it out with *Test connection*, and its tools appear in the
   tool catalog as `<prefix>_<tool>` (the prefix is fixed once registered, so
-  agent definitions keep working). Secrets can stay out of the registration as
-  `${VAR}` references resolved from the environment when the server starts.
+  agent definitions keep working). Values in `env` and `headers` are used as
+  entered; a `${NAME}` placeholder is refused until users can set their own
+  variables — the environment of the server process is never read.
   Discovered tools are cached on disk, so a restart does not start every server
   again. Registrations live in `<data>/<namespace>/system/mcp-servers/`, one
   JSON file per server; a Gmail registration ships disabled. The modules sit in

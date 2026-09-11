@@ -12,10 +12,11 @@ import java.util.regex.Pattern;
  * registering is an operator's job, and who gets to <em>see</em> which tools
  * becomes a filter over this set later, not a second set.
  *
- * <p>Credentials are part of the target — an environment value, ideally a
- * {@code ${VAR}} reference resolved when the server starts, or a mounted
- * directory. A reference to a credential store (§8) replaces that once the
- * store exists.
+ * <p>Credentials are part of the target — a value in {@code env} or
+ * {@code headers}, stored as entered, or a mounted directory. A
+ * {@code ${NAME}} placeholder is reserved for variables of the calling user and
+ * refused until users have them; the environment of this process is never a
+ * source.
  *
  * @param id              stable identifier
  * @param displayName     name for humans; falls back to the id when blank
