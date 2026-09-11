@@ -86,14 +86,15 @@ public final class SystemPromptRenderer {
             }
             out.append('\n');
         }
-        out.append("Their content is indexed for semantic search. To answer anything about them, "
-                + "call `vector_search` with your question (no `store` argument needed) and read the "
-                + "returned chunks.");
         if (anyOnDisk) {
-            out.append(" A file with a path is also a file on disk — `file_read`, `document_outline`, "
-                    + "`read_document`, `grep_document` and `bash` open it by that path, for the parts "
-                    + "a search does not surface.");
+            out.append("A file with a path is a file on disk: open it by that path — `file_read` for "
+                    + "text and code, `document_outline`, `document_sections`, `read_document` and "
+                    + "`grep_document` for PDF and Word — whenever the exact content, the structure or "
+                    + "a passage in context is what the question needs. ");
         }
+        out.append("Their content is also indexed for semantic search: `vector_search` with your "
+                + "question (no `store` argument needed) finds passages across all of them, which is "
+                + "the way into a long document and the only way to a file without a path.");
         if (searchable.stream().anyMatch(f -> !f.hasPath())) {
             out.append(" A file without a path is NOT on the filesystem: `file_read`, `document_outline`, "
                     + "`read_document`, `grep_document` and `bash` cannot open it, and its name is not a path.");

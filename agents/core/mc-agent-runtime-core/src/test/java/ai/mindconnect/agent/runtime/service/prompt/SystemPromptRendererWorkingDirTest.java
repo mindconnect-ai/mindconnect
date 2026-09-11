@@ -58,7 +58,7 @@ class SystemPromptRendererWorkingDirTest {
         assertThat(both)
                 .contains("- spec.docx (Word document) — on disk at `/home/u/sessions/s1/uploads/spec.docx`")
                 .contains("- notes.md (Markdown)\n")
-                .contains("A file with a path is also a file on disk")
+                .contains("A file with a path is a file on disk: open it by that path")
                 .contains("A file without a path is NOT on the filesystem");
 
         String onlyOnDisk = SystemPromptRenderer.attachedFilesSection(
