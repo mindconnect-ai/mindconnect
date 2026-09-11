@@ -110,4 +110,44 @@ class WorkingDirPolicyTest {
         assertThat(WorkingDirPolicy.expand("$HOME/src")).isEqualTo(Path.of(home, "src"));
         assertThat(WorkingDirPolicy.expand("/opt/x")).isEqualTo(Path.of("/opt/x"));
     }
+
+    @Test
+    void withoutChoiceNoDirectoryValidates_andNothingStaysNothing() throws Exception {
+        Path project = Files.createDirectories(tmp.resolve("project"));
+        var policy = WorkingDirPolicy.within(tmp.toString()).withChoice(false);
+
+        assertThat(policy.allowsChoice()).isFalse();
+        assertThatThrownBy(() -> policy.validate(project.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mindconnect.working-dirs.choice");
+        assertThat(policy.validate(null)).as("no directory is not a choice").isNull();
+        assertThat(policy.validate(" ")).isNull();
+    }
+
+    @Test
+    void aUsersPolicyKeepsTheSwitch_andTurningItOnAgainChangesNothingElse() throws Exception {
+        var template = WorkingDirPolicy.within(tmp + "/home/{user}").withChoice(false);
+
+        var alice = template.forUser("alice");
+        assertThat(alice.allowsChoice()).isFalse();
+        assertThat(alice.root()).isEqualTo(tmp.resolve("home/alice"));
+
+        var open = template.withChoice(true);
+        assertThat(open.allowsChoice()).isTrue();
+        assertThat(open.isPerUser()).isTrue();
+        assertThat(open.withChoice(true)).as("nothing to change").isSameAs(open);
+    }
+
+    @Test
+    void withoutChoiceTheBrowserShowsAndCreatesNothing() throws Exception {
+        Files.createDirectories(tmp.resolve("somewhere"));
+        var browser = new WorkingDirBrowser(WorkingDirPolicy.within(tmp.toString()).withChoice(false));
+
+        assertThatThrownBy(() -> browser.list("alice", tmp.toString()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mindconnect.working-dirs.choice");
+        assertThatThrownBy(() -> browser.create("alice", tmp.toString(), "new-folder"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(tmp.resolve("new-folder")).doesNotExist();
+    }
 }

@@ -285,6 +285,15 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `tools` and `disallowedTools` may be written as a comma list or as an
   indented YAML block.
 
+- **agents:** a `server` profile for running the apps on a server several
+  users share, and the two switches it sets. `mindconnect.tools.disabled`
+  lists tools the installation does not offer at all — they leave every
+  catalog, an agent that names one goes without it, and tool settings cannot
+  switch it back on; the profile turns off `bash` and `process_kill`, which
+  nothing confines to a chat's directory. `mindconnect.working-dirs.choice:
+  false` takes away the choice of a chat's directories: no folder button, the
+  directory endpoints refuse, and every chat works in its own directory under
+  the user's home. A deleted chat's own directory is now removed with it.
 ### Changed
 
 - **agents:** an upload's copy for ingestion goes into the session's own

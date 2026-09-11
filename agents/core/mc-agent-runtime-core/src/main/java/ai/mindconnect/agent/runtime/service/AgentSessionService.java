@@ -199,6 +199,8 @@ public class AgentSessionService {
      * endpoint. {@code null} keeps the additional directories as they are.
      */
     public AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
+        // Clearing counts as a choice too: it would take the chat out of its own directory.
+        workingDirPolicy.requireChoice();
         AgentSession session = findSession(sessionId);
         WorkingDirPolicy policy = workingDirPolicy.forUser(session.userId());
         String dir = policy.validate(workingDir);
@@ -209,6 +211,7 @@ public class AgentSessionService {
 
     /** Adds one directory to a session's additional directories ({@code /add-dir}). */
     public AgentSession addDirectory(SessionId sessionId, String dir) {
+        workingDirPolicy.requireChoice();
         AgentSession session = findSession(sessionId);
         String validated = workingDirPolicy.forUser(session.userId()).validate(dir);
         if (validated == null) throw new IllegalArgumentException("A directory is required");
@@ -229,6 +232,11 @@ public class AgentSessionService {
     }
 
     /** The policy sessions' working directories are checked against (per-user roots still need {@code forUser}). */
+    /** May users choose a chat's directories here, or does every chat work in its own? */
+    public boolean workingDirChoice() {
+        return workingDirPolicy.allowsChoice();
+    }
+
     public WorkingDirPolicy workingDirPolicy() {
         return workingDirPolicy;
     }
@@ -394,7 +402,31 @@ public class AgentSessionService {
         todoListRepository.deleteBySession(sessionId);
         approvalStore.deleteForSession(sessionId);
         sessionRepository.deleteById(sessionId);
+        deleteOwnDirectory(session);
         log.info("Deleted session {} and associated data", sessionId);
+    }
+
+    /**
+     * The chat's own directory under the user's home goes with it — its
+     * uploads, notes and logs are nobody else's, and on a server they would
+     * otherwise pile up. Only that directory: one the user chose is theirs
+     * and is never touched. Links inside are removed, not followed.
+     */
+    private void deleteOwnDirectory(AgentSession session) {
+        userHome.existingSessionDirOf(session.userId(), session.id()).ifPresent(dir -> {
+            try (var paths = java.nio.file.Files.walk(dir)) {
+                paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                    try {
+                        java.nio.file.Files.deleteIfExists(path);
+                    } catch (java.io.IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                });
+            } catch (java.io.IOException | java.io.UncheckedIOException e) {
+                log.warn("The directory of deleted session {} could not be removed entirely: {}",
+                        session.id(), e.getMessage());
+            }
+        });
     }
 
     public int deleteMessages(SessionId sessionId, int fromSeq, int toSeq) {

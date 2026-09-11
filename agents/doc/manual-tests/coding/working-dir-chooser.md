@@ -16,6 +16,8 @@ chat's working directory and additional directories, and the choice reaches
 ## Preconditions
 
 - Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- The `server` profile is not active — it removes the folder button and
+  `bash` (see `coding/server-profile.md`; otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model (otherwise: SKIPPED)
 - `mindconnect.tools.working-dir-root` is unset (the app's default is the
   home directory). Step 9 needs a root that does not contain `/tmp`; with a

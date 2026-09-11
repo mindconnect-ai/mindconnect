@@ -17,6 +17,11 @@ import java.nio.file.Path;
  * first use, and sees nothing of anyone else's. Such a policy answers
  * nothing until {@link #forUser} names the user.
  *
+ * <p>On a server shared by several users the choice can be taken away
+ * altogether ({@code mindconnect.working-dirs.choice: false}, see
+ * {@link #withChoice}): then no directory validates, and every chat works in
+ * the directory of its own the runtime gives it.
+ *
  * <p>A path comes in as the user typed it ({@code ~/src/app}, {@code .},
  * {@code ../other}) and leaves as an absolute, normalised, real path — the
  * one the tools sandbox against, so a symlink into a forbidden place is
@@ -27,17 +32,42 @@ public final class WorkingDirPolicy {
     /** The placeholder in a root that stands for the user's id. */
     public static final String USER_PLACEHOLDER = "{user}";
 
+    /** What {@link #validate} says to a directory while choosing one is switched off. */
+    static final String CHOICE_OFF = "Choosing a working directory is switched off here "
+            + "(mindconnect.working-dirs.choice); every chat works in its own directory";
+
     private final Path root;
     private final String template;
+    private final boolean choice;
 
-    private WorkingDirPolicy(Path root, String template) {
+    private WorkingDirPolicy(Path root, String template, boolean choice) {
         this.root = root;
         this.template = template;
+        this.choice = choice;
     }
 
     /** Any existing directory goes. */
     public static WorkingDirPolicy unrestricted() {
-        return new WorkingDirPolicy(null, null);
+        return new WorkingDirPolicy(null, null, true);
+    }
+
+    /**
+     * The same policy with the user's choice of a directory allowed or not.
+     * Without it nothing validates; the directory a runtime assigns a chat
+     * itself is not a choice and does not pass through here.
+     */
+    public WorkingDirPolicy withChoice(boolean allowed) {
+        return allowed == choice ? this : new WorkingDirPolicy(root, template, allowed);
+    }
+
+    /** May a user choose a chat's directories? */
+    public boolean allowsChoice() {
+        return choice;
+    }
+
+    /** Throws what {@link #validate} would for any directory when choosing one is switched off. */
+    public void requireChoice() {
+        if (!choice) throw new IllegalArgumentException(CHOICE_OFF);
     }
 
     /**
@@ -47,8 +77,8 @@ public final class WorkingDirPolicy {
      */
     public static WorkingDirPolicy within(String root) {
         if (root == null || root.isBlank()) return unrestricted();
-        if (root.contains(USER_PLACEHOLDER)) return new WorkingDirPolicy(null, root.trim());
-        return new WorkingDirPolicy(expand(root).toAbsolutePath().normalize(), null);
+        if (root.contains(USER_PLACEHOLDER)) return new WorkingDirPolicy(null, root.trim(), true);
+        return new WorkingDirPolicy(expand(root).toAbsolutePath().normalize(), null, true);
     }
 
     /** Is the root per user — does it still need {@link #forUser}? */
@@ -72,7 +102,7 @@ public final class WorkingDirPolicy {
         } catch (IOException e) {
             throw new IllegalStateException("Cannot create the working-dir root " + userRoot + ": " + e.getMessage(), e);
         }
-        return new WorkingDirPolicy(userRoot, null);
+        return new WorkingDirPolicy(userRoot, null, choice);
     }
 
     /** The root as configured, or {@code null} when unrestricted (or still a per-user template). */
@@ -105,6 +135,7 @@ public final class WorkingDirPolicy {
             throw new IllegalStateException("A per-user working-dir root needs forUser(userId) first");
         }
         if (workingDir == null || workingDir.isBlank()) return null;
+        requireChoice();
         Path path;
         try {
             path = expand(workingDir.trim()).toAbsolutePath().normalize();

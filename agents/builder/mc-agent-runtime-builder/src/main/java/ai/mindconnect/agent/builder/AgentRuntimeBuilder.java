@@ -265,6 +265,23 @@ public final class AgentRuntimeBuilder {
                         Path.of(environment.get("dataBaseDir")).resolve(namespace));
     }
 
+    /**
+     * Tools this runtime does not offer, whatever an agent names — on a
+     * shared server {@code bash} and {@code process_kill}, which nothing
+     * confines to a chat's directory.
+     */
+    public AgentRuntimeBuilder disabledTools(String... toolNames) {
+        return property("disabledTools", String.join(",", toolNames));
+    }
+
+    /**
+     * Whether a user may choose a session's directories. Off, every session
+     * works in its own directory under the users' home and nothing else.
+     */
+    public AgentRuntimeBuilder workingDirChoice(boolean allowed) {
+        return property("workingDirChoice", Boolean.toString(allowed));
+    }
+
     public AgentRuntimeBuilder tavilyApiKey(String key) {
         return property("tavilyApiKey", key);
     }
@@ -448,7 +465,8 @@ public final class AgentRuntimeBuilder {
             PostgresWorkflows.register(env, workflows);
         }
         environment.forEach(env::string);
-        ToolRegistry toolRegistry = new SpiToolRegistry(env.build());
+        ToolRegistry toolRegistry = ai.mindconnect.agent.tool.ConfiguredToolRegistry.of(
+                new SpiToolRegistry(env.build()), environment.get("disabledTools"));
         registryRef.set(toolRegistry);
 
         // 6. Turn pipeline + chat service — the turn runs as an agent.turn
@@ -466,7 +484,8 @@ public final class AgentRuntimeBuilder {
         var userHome = userHomeOf(environment, namespaceName);
         String workingDirRoot = environment.getOrDefault("workingDirRoot", "");
         var workingDirPolicy = ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
-                workingDirRoot.isBlank() ? userHome.template() : workingDirRoot);
+                workingDirRoot.isBlank() ? userHome.template() : workingDirRoot)
+                .withChoice(!"false".equalsIgnoreCase(environment.getOrDefault("workingDirChoice", "true")));
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,

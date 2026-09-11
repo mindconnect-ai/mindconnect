@@ -97,6 +97,12 @@ public final class ChatPage {
                 .withWorkingDir(session.workingDir());
     }
 
+    /** Whether the composer offers the choice of the chat's directories. */
+    public ChatPage withDirChoice(boolean allowed) {
+        this.chatForm.withDirChoice(allowed);
+        return this;
+    }
+
     /** Hands the host's links to the components that render them. */
     public ChatPage withHostLinks(ai.mindconnect.chatui.ui.ChatHostLinks links) {
         var overflow = overflowMenu(links == null

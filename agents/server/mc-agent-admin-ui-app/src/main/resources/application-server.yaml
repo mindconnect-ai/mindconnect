@@ -1,0 +1,28 @@
+# Running on a server that several users share. Activate with
+#   --spring.profiles.active=server
+# and add the "keycloak" profile for login: --spring.profiles.active=server,keycloak
+#
+# The defaults of this app are for one person on their own machine. Here nobody
+# gets a shell as the server's account, nobody browses the server's file system,
+# and every chat keeps its files in a directory of its own under its user's home
+# (mindconnect.users.home, by default <data.base-dir>/<namespace>/home/{user}).
+mindconnect:
+  tools:
+    # Not offered at all, whatever an agent names or an admin switches on.
+    # bash runs as this process — with its environment, its API keys, the whole
+    # file system — and nothing confines it to a chat's directory.
+    disabled: ${MC_TOOLS_DISABLED:bash,process_kill}
+    # Empty: every user's root is their own home, so nobody leaves their tree.
+    working-dir-root: ${MC_WORKING_DIR_ROOT:}
+    # Where the file tools look when they run outside any chat (the admin's tool
+    # test) — not the home directory of the account the server runs as.
+    base-dir: ${MC_TOOLS_BASE_DIR:${mindconnect.data.base-dir}/tools}
+  working-dirs:
+    # Users do not point a chat at a directory: no folder button, no directory
+    # endpoints. Each chat works in its own directory, where its uploads are.
+    choice: false
+  agent:
+    instructions:
+      # ~/.mindconnect would be the service account's, the same file for everyone.
+      # Point it at a path with {user} in it for one AGENTS.md per user, or leave it off.
+      user-dir: ${MC_INSTRUCTIONS_USER_DIR:off}

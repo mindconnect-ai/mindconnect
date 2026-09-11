@@ -114,6 +114,60 @@ class AgentRuntimeBuilderTest {
     }
 
     @Test
+    void withoutChoiceEveryChatWorksInItsOwnDirectory_andNoOtherIsTaken() throws Exception {
+        // A shared server: nobody points a chat at the server's file system.
+        try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))
+                .agentDefinition(demoAgent())
+                .workingDirChoice(false)
+                .build()) {
+            AgentSession session = runtime.openSession("test-agent", UserId.of("user-3"));
+            assertThat(session.hasWorkingDir()).as("the chat's own directory is not a choice").isTrue();
+
+            java.nio.file.Path project = java.nio.file.Files.createDirectories(
+                    java.nio.file.Path.of(session.workingDir()).getParent().getParent().resolve("project"));
+            assertThatThrownBy(() -> runtime.changeWorkingDir(session.id(), project))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("mindconnect.working-dirs.choice");
+            assertThatThrownBy(() -> runtime.addDirectory(session.id(), project))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> runtime.sessionService().changeWorkingDir(session.id(), null, null))
+                    .as("clearing it would take the chat out of its own directory")
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThatThrownBy(() -> runtime.openSession("test-agent", UserId.of("user-3"), project))
+                    .isInstanceOf(IllegalArgumentException.class);
+            assertThat(runtime.sessionService().workingDirChoice()).isFalse();
+        }
+    }
+
+    @Test
+    void deletingAChatRemovesItsOwnDirectory_butNothingTheUserChose() throws Exception {
+        try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))
+                .agentDefinition(demoAgent())
+                .build()) {
+            AgentSession own = runtime.openSession("test-agent", UserId.of("user-4"));
+            java.nio.file.Path ownDir = java.nio.file.Path.of(own.workingDir());
+            java.nio.file.Files.writeString(java.nio.file.Files.createDirectories(ownDir.resolve("uploads"))
+                    .resolve("notes.md"), "mine");
+
+            java.nio.file.Path project = java.nio.file.Files.createDirectories(
+                    ownDir.getParent().getParent().resolve("keep-me"));
+            java.nio.file.Files.writeString(project.resolve("AGENTS.md"), "stays");
+            java.nio.file.Files.createSymbolicLink(ownDir.resolve("link-to-project"), project);
+            AgentSession chosen = runtime.openSession("test-agent", UserId.of("user-4"), project);
+
+            runtime.sessionService().deleteSession(own.id());
+            runtime.sessionService().deleteSession(chosen.id());
+
+            assertThat(ownDir).doesNotExist();
+            assertThat(project.resolve("AGENTS.md"))
+                    .as("a link inside the chat's directory is removed, not followed; a chosen directory is never touched")
+                    .exists();
+        }
+    }
+
+    @Test
     void switchingTheModelKeepsTheSessionsDirectories() throws Exception {
         try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
                 .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))

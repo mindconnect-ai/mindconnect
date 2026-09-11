@@ -169,7 +169,8 @@ public class ChatFilesUiController {
                         sessionId, agent == null ? null : agent.id(), false)
                 .withModelLabel(agent == null ? null : agent.llmConfigName())
                 .withAttachmentCount(sessionFiles.attachments(sessionId).size())
-                .withWorkingDir(session == null ? null : session.workingDir());
+                .withWorkingDir(session == null ? null : session.workingDir())
+                .withDirChoice(sessionService.workingDirChoice());
         return form.reset();
     }
 }

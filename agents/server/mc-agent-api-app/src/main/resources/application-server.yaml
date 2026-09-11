@@ -1,0 +1,28 @@
+# Running on a server that several users share. Activate with
+#   --spring.profiles.active=server
+#
+# The agent server is often started on a developer's machine, where its defaults
+# fit. On a shared server nobody gets a shell as the server's account, nobody
+# browses the server's file system, and every session keeps its files in a
+# directory of its own under its user's home (mindconnect.users.home, by default
+# <data.base-dir>/<namespace>/home/{user}).
+mindconnect:
+  tools:
+    # Not offered at all, whatever an agent names or an admin switches on.
+    # bash runs as this process — with its environment, its API keys, the whole
+    # file system — and nothing confines it to a session's directory.
+    disabled: ${MC_TOOLS_DISABLED:bash,process_kill}
+    # Empty: every user's root is their own home, so nobody leaves their tree.
+    working-dir-root: ${MC_WORKING_DIR_ROOT:}
+    # Where the file tools look when they run outside any session — not the
+    # home directory of the account the server runs as.
+    base-dir: ${MC_TOOLS_BASE_DIR:${mindconnect.data.base-dir:data}/tools}
+  working-dirs:
+    # POST /api/sessions takes no workingDir, PUT /api/sessions/{id}/working-dir
+    # and GET /api/directories refuse. Each session works in its own directory.
+    choice: false
+  agent:
+    instructions:
+      # ~/.mindconnect would be the service account's, the same file for everyone.
+      # Point it at a path with {user} in it for one AGENTS.md per user, or leave it off.
+      user-dir: ${MC_INSTRUCTIONS_USER_DIR:off}

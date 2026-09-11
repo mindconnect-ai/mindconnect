@@ -57,6 +57,7 @@ public final class WorkingDirBrowser {
             throw new IllegalArgumentException("Not a folder name: " + n
                     + " — one plain name, no slashes, not starting with a dot");
         }
+        policy.requireChoice();
         WorkingDirPolicy user = policy.forUser(userId);
         Path root = user.realRoot();
         String base = parent == null || parent.isBlank()
@@ -82,6 +83,7 @@ public final class WorkingDirBrowser {
      * lies outside the root.
      */
     public Listing list(String userId, String path) {
+        policy.requireChoice();
         WorkingDirPolicy user = policy.forUser(userId);
         // The real root: validate() answers real paths, and the way up is found by comparing against it.
         Path root = user.realRoot();

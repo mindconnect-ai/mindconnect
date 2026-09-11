@@ -193,6 +193,7 @@ public class DefaultAgentRuntimeConfig {
                                Namespace namespace,
                                @Value("${mindconnect.tools.tavily-api-key:}") String tavilyApiKey,
                                @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir,
+                               @Value("${mindconnect.tools.disabled:}") String disabledTools,
                                @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
                                @Value("${mindconnect.code-exec.runtime:auto}") String codeExecRuntime,
                                @Value("${mindconnect.code-exec.network:none}") String codeExecNetwork,
@@ -257,13 +258,21 @@ public class DefaultAgentRuntimeConfig {
         // behind the very startup that is waiting for the first round. The
         // listener below starts it once the context is up.
         SpiToolRegistry registry = SpiToolRegistry.deferred(hostBacked(env, applicationContext));
+        // What this installation does not offer at all (mindconnect.tools.disabled)
+        // is taken away beneath the operator's decisions, so no tool setting and
+        // no agent definition can bring it back.
+        ToolRegistry offered = ai.mindconnect.agent.tool.ConfiguredToolRegistry.of(registry, disabledTools);
+        if (offered instanceof ai.mindconnect.agent.tool.ConfiguredToolRegistry configured) {
+            org.slf4j.LoggerFactory.getLogger(DefaultAgentRuntimeConfig.class)
+                    .info("Tools switched off by configuration: {}", configured.disabled());
+        }
         // What the operator decided lies over what the classpath offers. No
         // repository means no decisions: then this is the plain registry and
         // a host without the settings store behaves exactly as before.
         ai.mindconnect.agent.tool.ToolRepository settings = toolRepository.getIfAvailable();
         ToolRegistry effective = settings == null
-                ? registry
-                : new ai.mindconnect.agent.tool.OverlayToolRegistry(registry, settings);
+                ? offered
+                : new ai.mindconnect.agent.tool.OverlayToolRegistry(offered, settings);
         // The effective one: tool_search reads this reference, and it must not
         // offer the model a tool an operator switched off.
         registryRef.set(effective);
@@ -285,13 +294,12 @@ public class DefaultAgentRuntimeConfig {
         // singleton is built — which is the property that matters here. The
         // warm-up itself only ever runs once, however often the event comes.
         return event -> {
-            // The bean handed in may be the operator's overlay; the warm-up
-            // belongs to the registry underneath it. Without this unwrap the
-            // instanceof below would not match and no provider would ever bind.
-            ai.mindconnect.agent.tool.ToolRegistry inner =
-                    toolRegistry instanceof ai.mindconnect.agent.tool.OverlayToolRegistry overlay
-                            ? overlay.source()
-                            : toolRegistry;
+            // The bean handed in may be decorated — the operator's overlay, the
+            // configuration's cut — and the warm-up belongs to the registry at
+            // the bottom. Without this unwrap the instanceof below would not
+            // match and no provider would ever bind.
+            ai.mindconnect.agent.tool.ToolRegistry inner = toolRegistry;
+            while (inner.source() != inner) inner = inner.source();
             if (inner instanceof SpiToolRegistry spi) spi.warmUp();
         };
     }
@@ -393,12 +401,17 @@ public class DefaultAgentRuntimeConfig {
     ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy(
             @Value("${mindconnect.tools.working-dir-root:}") String workingDirRoot,
             @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir,
+            @Value("${mindconnect.working-dirs.choice:true}") boolean workingDirChoice,
             ai.mindconnect.agent.runtime.service.UserHome userHome) {
+        // Off on a shared server: then no user picks a directory, and every chat
+        // works in the one of its own the users' home gives it.
         if (workingDirRoot != null && !workingDirRoot.isBlank()) {
-            return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(workingDirRoot);
+            return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(workingDirRoot)
+                    .withChoice(workingDirChoice);
         }
         return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
-                userHome.isConfigured() ? userHome.template() : baseDir);
+                userHome.isConfigured() ? userHome.template() : baseDir)
+                .withChoice(workingDirChoice);
     }
 
     /** The directories a user may pick a working directory from — the policy's tree, nothing beyond. */

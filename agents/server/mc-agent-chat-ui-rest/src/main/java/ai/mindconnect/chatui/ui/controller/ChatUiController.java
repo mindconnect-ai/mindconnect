@@ -388,6 +388,7 @@ public class ChatUiController {
                 .withModelLabel(agent.llmConfigName())
                 .withAttachmentCount(sessionFiles.attachments(session.id()).size())
                 .withWorkingDir(session.workingDir())
+                .withDirChoice(sessionService.workingDirChoice())
                 .reset();
     }
 
@@ -807,6 +808,7 @@ public class ChatUiController {
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks);
+        page.withDirChoice(sessionService.workingDirChoice());
         // Every render hands the SPA this session's stream — whether or not
         // a turn is running. That is the whole point: a client with nothing
         // to listen to cannot find out that someone else started a turn, so

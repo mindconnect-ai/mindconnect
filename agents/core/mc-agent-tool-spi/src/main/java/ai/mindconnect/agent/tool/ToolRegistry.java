@@ -69,4 +69,11 @@ public interface ToolRegistry {
      * for a session that never used a tool. Default: nothing is held.
      */
     default void releaseSession(SessionId sessionId) { }
+
+    /**
+     * The registry this one decorates, or itself when it decorates nothing.
+     * What belongs to the registry at the bottom — the warm-up of
+     * {@link SpiToolRegistry} — is reached by following this down.
+     */
+    default ToolRegistry source() { return this; }
 }
