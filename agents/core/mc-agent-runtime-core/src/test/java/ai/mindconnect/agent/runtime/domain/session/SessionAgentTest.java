@@ -28,14 +28,14 @@ class SessionAgentTest {
     @Test
     void inlineAgentBindsEveryToolItNames() {
         var agent = InlineSessionAgent.of("Chat", "be helpful", "gpt",
-                List.of("workspace_read", "todo_write"), true);
+                List.of("file_read", "todo_write"), true);
 
         // A tool binding no longer points back at its agent — a tool call
         // learns the agent from its ToolCallScope.
         assertThat(agent.tools()).hasSize(2);
         assertThat(agent.tools()).extracting(t -> t.id()).doesNotHaveDuplicates();
         assertThat(agent.tools()).extracting(t -> t.name())
-                .containsExactly("workspace_read", "todo_write");
+                .containsExactly("file_read", "todo_write");
     }
 
     @Test
@@ -80,6 +80,23 @@ class SessionAgentTest {
             assertThat(json).contains("\"kind\":\"" + (agent instanceof InlineSessionAgent ? "inline" : "ref") + "\"");
             assertThat(JSON.readValue(json, SessionAgent.class)).isEqualTo(agent);
         }
+    }
+
+    @Test
+    void anInlineAgentsRosterSurvivesJson_andOneWrittenWithoutItHasNone() throws Exception {
+        var plain = InlineSessionAgent.of("helper", "help", "gpt", List.of("run_agent"), false);
+        var withRoster = new InlineSessionAgent(plain.id(), true, "helper", "help", "gpt",
+                plain.tools(), plain.toolSearch(), List.of("explorer"));
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(withRoster), SessionAgent.class)).isEqualTo(withRoster);
+
+        // Every inline agent stored before the roster travelled with it.
+        String legacy = """
+                {"kind":"inline","id":"%s","main":true,"label":"Chat","systemPrompt":"p",
+                 "llmConfigName":"gpt","tools":[],"toolSearch":{"enabled":false,"groups":[]}}
+                """.formatted(UUID.randomUUID());
+        var restored = (InlineSessionAgent) JSON.readValue(legacy, SessionAgent.class);
+        assertThat(restored.callableAgents()).as("no roster, no restriction").isEmpty();
     }
 
     @Test

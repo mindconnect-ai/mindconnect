@@ -163,11 +163,14 @@ public class ChatFilesUiController {
      * what was true before the upload until the page is reloaded.
      */
     private UiPatch.Operation attachmentCountRefresh(SessionId sessionId) {
-        var agent = sessions.findById(sessionId).map(agentResolver::resolve).orElse(null);
+        var session = sessions.findById(sessionId).orElse(null);
+        var agent = session == null ? null : agentResolver.resolve(session);
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         sessionId, agent == null ? null : agent.id(), false)
                 .withModelLabel(agent == null ? null : agent.llmConfigName())
-                .withAttachmentCount(sessionFiles.attachments(sessionId).size());
+                .withAttachmentCount(sessionFiles.attachments(sessionId).size())
+                .withWorkingDir(session == null ? null : session.workingDir())
+                .withDirChoice(sessionService.workingDirChoice());
         return form.reset();
     }
 }

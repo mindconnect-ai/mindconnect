@@ -25,11 +25,14 @@ Always available; no API keys required.
 |------|-------------|-------|
 | `get_current_datetime` | Returns the current date and time in ISO-8601 with timezone. | — |
 | `list_agents` | Lists the agents with their names and descriptions. | — |
-| `bash` | Executes a bash command in the configured working directory. | Working dir (config) |
-| `file_read` | Reads a plain-text file (path relative to the base directory). | Base dir (config) |
-| `file_write` | Writes a file, creating parent directories as needed. | Base dir (config) |
-| `file_list` | Lists files and directories under a path. | Base dir (config) |
-| `glob` | Finds files by name pattern, newest first. | Base dir (config) |
+| `bash` | Runs a bash command in the session's working directory; output drained as it comes, capped at 30,000 characters; `timeout` per call (default 120 s, max 600); a timed-out or cancelled command is killed with everything it spawned. `background` starts a server or watcher detached, watches it for three seconds and returns its pid, whether it is still running or already exited with which code, the log so far, and the log file (`logs/` in the session's directory). | Working dir |
+| `process_kill` | Ends a background process of this session by pid, with everything it spawned; without a pid lists them. Whatever still runs when the runtime stops is killed with it. | — |
+| `file_read` | Reads a text file with numbered lines, `cat -n` style; `offset` and `limit` page through a long one (2,000 lines or 20,000 characters per call); refuses binary files. | Working dir |
+| `file_edit` | Replaces one exact passage (`old_string` → `new_string`, unique unless `replace_all`) and returns a unified diff. Indentation the model got wrong is forgiven when the passage is otherwise unique, the file's own kept; a passage that is not there is answered with the closest one, numbered. | Working dir |
+| `file_write` | Writes a whole file, creating parent directories as needed. | Working dir |
+| `file_list` | Lists files and directories under a path. | Working dir |
+| `glob` | Finds files by name pattern, newest first. | Working dir |
+| `grep` | Searches file contents for a regular expression under a directory or in one file, `file:line: text`, with `glob`, `ignore_case`, `context`, `files_only` and a result cap; binary files and build directories skipped. | Working dir |
 | `fetch_tool_result` | Reloads the full content of a tool result evicted from the live context. | — |
 
 ## Orchestration tools (`mc-agent-runtime-core`)
@@ -41,21 +44,46 @@ Always available; no API keys required.
 | `tool_search` | Lets the agent find and activate its *deferred* tools on demand. | The agent's `toolSearch` config |
 | `view_attachment` | Shows an attached image or PDF to the model again — as a message of its own in the running turn, since media goes with a message in its own turn only. Activated for a session when an image or PDF is attached; see [images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts). | — |
 
-The file tools resolve paths against a **base directory**
-(`mindconnect.tools.base-dir`). It defaults to the **user home** — in the Admin
-UI too (its `mindconnect.data.base-dir: ./data` is a different property that
-only controls where *stored data* lives, not the file tools).
+The file tools resolve paths against the session's **working directory** —
+the directory the user is in. The CLI sets it to the directory it was
+launched in and changes it with `/cd`; the chat has a folder button on its
+composer that names the directory and opens a chooser; the REST API takes `workingDir` on
+`POST /api/sessions` and `PUT /api/sessions/{id}/working-dir`. The model is
+told where it is in the system prompt, `bash` runs there, `glob` searches it
+from `.`, and a sub-agent called from the session inherits it.
 
-## Workspace tools (`mc-agent-tools`)
+A session can reach **additional directories** beside its working directory
+— a library checked out next to the project, a data folder — by absolute
+path (`/add-dir` in the CLI, *Additional directories* in the chat's chooser,
+`additionalDirs` on the API). Relative paths always mean the working
+directory; anything outside the working directory and the additional ones
+is refused with an error naming the allowed directories.
 
-The shared file area agents use to exchange work (see
-[workspace & collaboration](./workspace.md)). No keys required.
+The chat's **chooser** works like the operating system's folder dialog:
+one path field, the folders inside it to step into (and *Up*), and *Use
+this folder* takes what the field says — typed or clicked, empty for the
+server's default. It browses the server's tree under
+`mindconnect.tools.working-dir-root` and nothing beyond it. The additional
+directories are listed under the folders with a *Remove* each, and *Add
+this folder* adds the field's path as one more. *New folder* creates a
+directory inside the one shown and steps into it. On a multi-user server give the root a
+`{user}` placeholder (`/srv/mindconnect/users/{user}`): each user then picks
+from, and works in, a tree of their own.
 
-| Tool | Description |
-|------|-------------|
-| `workspace_write` | Writes (or overwrites) a file in a workspace scope. |
-| `workspace_read` | Reads a file from a workspace scope. |
-| `workspace_list` | Lists files available in a workspace scope. |
+**Every session has a directory of its own.** A session opened without a
+working directory works in it: `sessions/<session-id>` under the user's
+home (`mindconnect.users.home`, by default `<data.base-dir>/<namespace>/home/{user}`). The
+files attached to a chat are put in its `uploads/` for the file tools —
+the system prompt names each file's path — and when the user moves the
+session to a project, the session's own directory stays reachable as an
+additional directory. On a server a working directory must lie under
+`mindconnect.tools.working-dir-root`, by default the user's home; the CLI
+sets that root to `/` and works where it was launched.
+
+A session with no directory at all — one written before 0.5.2, a runtime
+without a users' home — falls back to the tool's own `baseDir` override,
+then the **base directory** (`mindconnect.tools.base-dir`), which defaults
+to the **user home** of the process.
 
 ## Web tools (`mc-agent-tools-web`)
 

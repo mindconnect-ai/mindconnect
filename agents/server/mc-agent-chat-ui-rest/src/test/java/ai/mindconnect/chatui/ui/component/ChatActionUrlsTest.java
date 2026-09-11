@@ -49,6 +49,17 @@ class ChatActionUrlsTest {
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/chat/stream\"");
     }
 
+    @Test
+    void theFolderButtonIsOnlyThereWhereUsersMayChooseADirectory() throws Exception {
+        String dirsDialog = "\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/dirs-dialog\"";
+
+        assertThat(json(new ChatFormComponent(SESSION, AGENT).render())).contains(dirsDialog);
+        assertThat(json(new ChatFormComponent(SESSION, AGENT).withDirChoice(false).render()))
+                .as("a shared server: every chat works in its own directory")
+                .doesNotContain(dirsDialog)
+                .contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/chat/stream\"");
+    }
+
     /**
      * Send is an ordinary request. Streaming it back to whoever pressed it is
      * exactly what stopped a second client from seeing anything: a stream that

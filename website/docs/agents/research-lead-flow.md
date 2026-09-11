@@ -6,8 +6,8 @@ sidebar_position: 3
 # Example: the research-lead flow
 
 A `research-lead` agent decomposes a question, spawns `web-researcher`
-sub-agents in parallel, has a `verifier` check the findings, and writes the
-final answer to the shared workspace.
+sub-agents in parallel, has a `verifier` check the findings, and answers
+with one cited report.
 
 ![Research-lead flow](/img/agents/research-lead-flow.svg)
 
@@ -19,7 +19,7 @@ final answer to the shared workspace.
    database; each runs `web_search` in its own session (page reading is
    delegated to `url-reader`, see below).
 4. **Verify** — a `verifier` confirms or refutes the findings.
-5. **Report** — `workspace_write` produces `report.md`.
+5. **Report** — the verified findings become one Markdown report, the answer.
 
 ## One level deeper: web-researcher → url-reader
 

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.io.IOException;
@@ -12,9 +13,16 @@ import java.util.stream.Stream;
 public class FileListTool implements Tool {
 
     private final Path baseDir;
+    private final FileRoots roots;
 
     public FileListTool(Path baseDir) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+        this(FileRoots.of(baseDir));
+    }
+
+    /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
+    public FileListTool(FileRoots roots) {
+        this.roots = roots;
+        this.baseDir = roots.base();
     }
 
     @Override
@@ -49,10 +57,9 @@ public class FileListTool implements Tool {
         String relative = ToolPaths.normalise(raw, baseDir);
         if (relative.isBlank()) relative = ".";
 
-        Path target = baseDir.resolve(relative).normalize();
-        if (!target.startsWith(baseDir)) {
-            return "Error: path is outside the allowed base directory ("
-                    + baseDir + "). Requested: " + raw;
+        Path target = roots.resolve(relative).orElse(null);
+        if (target == null) {
+            return roots.outsideError(raw);
         }
         if (!Files.exists(target)) {
             return "Error: path does not exist: " + relative;

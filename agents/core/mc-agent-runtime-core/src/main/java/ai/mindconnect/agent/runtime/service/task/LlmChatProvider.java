@@ -9,6 +9,7 @@ import ai.mindconnect.agent.runtime.domain.TraceContext;
 import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
+import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
 import ai.mindconnect.agent.runtime.service.prompt.SystemPromptRenderer;
 import ai.mindconnect.agent.runtime.service.round.LlmAnswer;
 import ai.mindconnect.agent.runtime.service.round.LlmProvider;
@@ -76,11 +77,13 @@ public final class LlmChatProvider implements LlmProvider {
     /** Nullable — no repository, no tracing. */
     private final LlmCallTraceRepository traceRepository;
     private final TraceContext traceContext;
+    private final InstructionFiles instructions;
 
     public LlmChatProvider(LlmChat llmChat, AgentDefinition def, AgentSession session,
                            MemoryStrategy memoryStrategy, PromptRenderer promptRenderer,
                            Consumer<StreamEvent> stream,
-                           LlmCallTraceRepository traceRepository, TraceContext traceContext) {
+                           LlmCallTraceRepository traceRepository, TraceContext traceContext,
+                           InstructionFiles instructions) {
         this.llmChat = llmChat;
         this.def = def;
         this.session = session;
@@ -89,6 +92,7 @@ public final class LlmChatProvider implements LlmProvider {
         this.stream = stream;
         this.traceRepository = traceRepository;
         this.traceContext = traceContext;
+        this.instructions = instructions;
     }
 
     @Override
@@ -128,7 +132,8 @@ public final class LlmChatProvider implements LlmProvider {
         AuthenticationInfo auth = AuthenticationInfo.of(session.userId());
         List<LlmMessage> window = new ArrayList<>();
         window.add(LlmMessage.system(
-                SystemPromptRenderer.render(promptRenderer, memoryStrategy, def, session, auth)));
+                SystemPromptRenderer.render(promptRenderer, memoryStrategy, def, session, auth,
+                        instructions)));
         window.addAll(memoryStrategy.buildWindow(def, session, auth, history));
         return window;
     }

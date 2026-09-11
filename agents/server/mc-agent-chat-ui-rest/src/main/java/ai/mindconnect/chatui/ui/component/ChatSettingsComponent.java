@@ -29,7 +29,6 @@ public final class ChatSettingsComponent implements UiComponent {
     /** What a chat can do before anyone configures anything. */
     public static final List<String> DEFAULT_TOOLS = List.of(
             "list_agents", "run_agent", "run_agents",
-            "workspace_read", "workspace_write", "workspace_list",
             "todo_read", "todo_write");
 
     private final SessionId sessionId;

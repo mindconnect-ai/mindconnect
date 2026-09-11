@@ -48,6 +48,20 @@
       "name": "bash",
       "description": "Executes a read-only bash command (grep, rg, find) to locate code.",
       "enabled": true
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000224",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000022",
+      "name": "file_edit",
+      "description": "Replaces one exact passage of a text file with another and returns a unified diff; read the file first.",
+      "enabled": true
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000225",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000022",
+      "name": "grep",
+      "description": "Searches file contents for a regular expression under a directory, like grep -rn; glob narrows the files.",
+      "enabled": true
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",

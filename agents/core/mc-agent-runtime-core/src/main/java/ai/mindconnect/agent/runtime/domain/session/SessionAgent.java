@@ -18,7 +18,7 @@ import ai.mindconnect.agent.AgentId;
  *
  * <p>It does carry an {@link #id()} all the same. Three things key off an
  * agent id and would otherwise have nothing to work with: the
- * {@code AGENT_USER} workspace scope, the {@code agentDefinitionId} stamped
+ * {@code agentDefinitionId} stamped
  * onto every message, and the conversation's participant.
  *
  * <p>A session holds a list of these with exactly one {@link #main()} — one
@@ -31,7 +31,7 @@ import ai.mindconnect.agent.AgentId;
 })
 public sealed interface SessionAgent permits InlineSessionAgent, SessionAgentRef {
 
-    /** Stable id: workspace scope, message attribution, participant. */
+    /** Stable id: message attribution, participant. */
     AgentId id();
 
     /** Exactly one per session drives the turn. */

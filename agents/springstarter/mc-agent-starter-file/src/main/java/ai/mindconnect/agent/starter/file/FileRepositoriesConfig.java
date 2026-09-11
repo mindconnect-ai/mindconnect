@@ -7,14 +7,12 @@ import ai.mindconnect.agent.runtime.adapter.file.FileConversationSummaryReposito
 import ai.mindconnect.agent.runtime.adapter.file.FileLlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.adapter.file.FileWorkspaceStore;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.runtime.adapter.file.FileToolRepository;
 import ai.mindconnect.agent.tool.ToolRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,11 +50,6 @@ public class FileRepositoriesConfig {
     @Bean
     ToolRepository toolRepository(Path agentStorageDir, Namespace namespace) {
         return new FileToolRepository(agentStorageDir, namespace);
-    }
-
-    @Bean
-    WorkspaceStore workspaceStore(Path agentStorageDir, Namespace namespace) {
-        return new FileWorkspaceStore(agentStorageDir, namespace);
     }
 
     @Bean

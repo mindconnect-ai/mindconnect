@@ -9,6 +9,7 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.cli.agentclient.AgentClient;
+import ai.mindconnect.cli.agentclient.LocalAgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -124,7 +125,7 @@ public class CliRunner implements CommandLineRunner {
                 }
 
                 if (input.equals("/new")) {
-                    session = client.startSession(selectedAgent.id(), userId);
+                    session = client.startSession(selectedAgent.id(), userId, launchDir(client));
                     stateStore.save(CliState.activeSession(selectedAgent.id().value(), session.id().value()));
                     printSessionHeader(selectedAgent, session);
                     printHistory(session, client);
@@ -183,6 +184,42 @@ public class CliRunner implements CommandLineRunner {
                     continue;
                 }
 
+                if (input.equals("/add-dir") || input.startsWith("/add-dir ")) {
+                    String dir = input.length() > 8 ? input.substring(8).trim() : "";
+                    if (dir.isEmpty()) {
+                        System.out.println("[Usage: /add-dir <dir> — lets the tools reach that directory by absolute path]");
+                        continue;
+                    }
+                    try {
+                        java.util.List<String> dirs = new java.util.ArrayList<>(session.additionalDirs());
+                        dirs.add(DirectoryArgument.resolve(dir, session.workingDir()));
+                        session = client.changeWorkingDir(session.id(), session.workingDir(), dirs);
+                        printDirectories(session);
+                    } catch (Exception e) {
+                        System.out.println("[/add-dir failed: " + rootMessage(e) + "]");
+                    }
+                    continue;
+                }
+
+                if (input.equals("/dirs")) {
+                    printDirectories(session);
+                    continue;
+                }
+
+                if (input.equals("/cd") || input.startsWith("/cd ")) {
+                    String dir = input.length() > 3 ? input.substring(3).trim() : "";
+                    try {
+                        session = client.changeWorkingDir(session.id(),
+                                dir.isEmpty() ? null : DirectoryArgument.resolve(dir, session.workingDir()));
+                        System.out.println(session.hasWorkingDir()
+                                ? "[Working directory: " + session.workingDir() + "]"
+                                : "[Working directory cleared — the tools use the runtime's default.]");
+                    } catch (Exception e) {
+                        System.out.println("[/cd failed: " + rootMessage(e) + "]");
+                    }
+                    continue;
+                }
+
                 if (input.startsWith("/message ")) {
                     String arg = input.substring("/message ".length()).trim();
                     try {
@@ -230,7 +267,7 @@ public class CliRunner implements CommandLineRunner {
                                              UserId userId, AgentClient client) {
         List<AgentSession> sessions = client.listSessions(agent.id(), userId);
         if (sessions.isEmpty()) {
-            return client.startSession(agent.id(), userId);
+            return client.startSession(agent.id(), userId, launchDir(client));
         }
 
         while (true) {
@@ -263,14 +300,14 @@ public class CliRunner implements CommandLineRunner {
 
             try {
                 int idx = Integer.parseInt(input);
-                if (idx == 0) return client.startSession(agent.id(), userId);
+                if (idx == 0) return client.startSession(agent.id(), userId, launchDir(client));
                 if (idx >= 1 && idx <= current.size()) {
                     return current.get(idx - 1);
                 }
             } catch (NumberFormatException ignored) {}
 
             System.out.println("[Invalid selection, starting new session.]");
-            return client.startSession(agent.id(), userId);
+            return client.startSession(agent.id(), userId, launchDir(client));
         }
     }
 
@@ -307,8 +344,37 @@ public class CliRunner implements CommandLineRunner {
         return title + "  [" + date + "]  " + session.id().value().substring(0, 8) + "…";
     }
 
+    /**
+     * Where a new session works: the directory the CLI was launched in — in
+     * local mode, where that directory is on this machine. A remote server
+     * has its own filesystem; there the session takes the server's default.
+     */
+    private static String launchDir(AgentClient client) {
+        return client instanceof LocalAgentClient ? System.getProperty("user.dir") : null;
+    }
+
+    private static String rootMessage(Throwable t) {
+        Throwable cause = t;
+        while (cause.getCause() != null && cause.getCause() != cause) cause = cause.getCause();
+        return cause.getMessage() == null ? cause.toString() : cause.getMessage();
+    }
+
+    /** The session's directories, as the header and {@code /dirs} show them. */
+    private static void printDirectories(AgentSession session) {
+        if (session.hasWorkingDir()) {
+            System.out.println("[Working directory: " + session.workingDir() + " — change with /cd <dir>]");
+        } else if (!session.additionalDirs().isEmpty()) {
+            System.out.println("[No working directory — the tools use the runtime's default; set one with /cd <dir>]");
+        }
+        if (!session.additionalDirs().isEmpty()) {
+            System.out.println("[Also reachable by absolute path: " + String.join(", ", session.additionalDirs())
+                    + " — extend with /add-dir <dir>]");
+        }
+    }
+
     private void printSessionHeader(AgentDefinition agent, AgentSession session) {
         System.out.println("\n[Session: " + sessionLabel(session) + "]");
+        printDirectories(session);
         System.out.println("Type /back, /sessions, /tools, /tool-calls, /messages, /history, /memory, /compress, /quit or /help.");
     }
 
@@ -1340,6 +1406,9 @@ public class CliRunner implements CommandLineRunner {
         System.out.println("  /delete-message last-<n>       — delete the last <n> messages");
         System.out.println("  /memory                        — show full context: system prompt + current window + token usage");
         System.out.println("  /compress   — compress all messages into summary, clear working memory");
+        System.out.println("  /cd <dir>   — change the session's working directory (/cd alone clears it)");
+        System.out.println("  /add-dir <dir> — let the tools reach another directory by absolute path");
+        System.out.println("  /dirs       — show the session's working and additional directories");
         System.out.println("  /new        — start a new session (keep agent)");
         System.out.println("  /sessions   — list and switch to another session");
         System.out.println("  /back       — return to agent selection");

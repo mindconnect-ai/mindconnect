@@ -13,7 +13,6 @@ import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepositor
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
@@ -29,7 +28,6 @@ import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
 import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
-import ai.mindconnect.agent.runtime.service.prompt.WorkspaceNotesProvider;
 import ai.mindconnect.agent.runtime.adapter.token.TokenCounterRegistry;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.Namespace;
@@ -139,11 +137,6 @@ public class DefaultAgentRuntimeConfig {
     }
 
     @Bean
-    PromptContextProvider workspaceNotesProvider(WorkspaceStore workspaceStore) {
-        return new WorkspaceNotesProvider(workspaceStore);
-    }
-
-    @Bean
     PromptRenderer promptRenderer(List<PromptContextProvider> providers) {
         return new PebblePromptRenderer(providers);
     }
@@ -196,11 +189,11 @@ public class DefaultAgentRuntimeConfig {
                                DynamicToolActivations dynamicToolActivations,
                                AgentSessionRepository sessionRepository,
                                MessageRepository messageRepository,
-                               WorkspaceStore workspaceStore,
                                TodoListService todoListService,
                                Namespace namespace,
                                @Value("${mindconnect.tools.tavily-api-key:}") String tavilyApiKey,
                                @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir,
+                               @Value("${mindconnect.tools.disabled:}") String disabledTools,
                                @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
                                @Value("${mindconnect.code-exec.runtime:auto}") String codeExecRuntime,
                                @Value("${mindconnect.code-exec.network:none}") String codeExecNetwork,
@@ -234,7 +227,6 @@ public class DefaultAgentRuntimeConfig {
                 .service(DynamicToolActivations.class, dynamicToolActivations)
                 .service(AgentSessionRepository.class, sessionRepository)
                 .service(MessageRepository.class, messageRepository)
-                .service(WorkspaceStore.class, workspaceStore)
                 .service(TodoListService.class, todoListService)
                 .string("defaultBaseDir", baseDir)
                 // The data directory: workflows and memory vector stores live in <dataBaseDir>/<namespace>/.
@@ -266,13 +258,21 @@ public class DefaultAgentRuntimeConfig {
         // behind the very startup that is waiting for the first round. The
         // listener below starts it once the context is up.
         SpiToolRegistry registry = SpiToolRegistry.deferred(hostBacked(env, applicationContext));
+        // What this installation does not offer at all (mindconnect.tools.disabled)
+        // is taken away beneath the operator's decisions, so no tool setting and
+        // no agent definition can bring it back.
+        ToolRegistry offered = ai.mindconnect.agent.tool.ConfiguredToolRegistry.of(registry, disabledTools);
+        if (offered instanceof ai.mindconnect.agent.tool.ConfiguredToolRegistry configured) {
+            org.slf4j.LoggerFactory.getLogger(DefaultAgentRuntimeConfig.class)
+                    .info("Tools switched off by configuration: {}", configured.disabled());
+        }
         // What the operator decided lies over what the classpath offers. No
         // repository means no decisions: then this is the plain registry and
         // a host without the settings store behaves exactly as before.
         ai.mindconnect.agent.tool.ToolRepository settings = toolRepository.getIfAvailable();
         ToolRegistry effective = settings == null
-                ? registry
-                : new ai.mindconnect.agent.tool.OverlayToolRegistry(registry, settings);
+                ? offered
+                : new ai.mindconnect.agent.tool.OverlayToolRegistry(offered, settings);
         // The effective one: tool_search reads this reference, and it must not
         // offer the model a tool an operator switched off.
         registryRef.set(effective);
@@ -294,13 +294,12 @@ public class DefaultAgentRuntimeConfig {
         // singleton is built — which is the property that matters here. The
         // warm-up itself only ever runs once, however often the event comes.
         return event -> {
-            // The bean handed in may be the operator's overlay; the warm-up
-            // belongs to the registry underneath it. Without this unwrap the
-            // instanceof below would not match and no provider would ever bind.
-            ai.mindconnect.agent.tool.ToolRegistry inner =
-                    toolRegistry instanceof ai.mindconnect.agent.tool.OverlayToolRegistry overlay
-                            ? overlay.source()
-                            : toolRegistry;
+            // The bean handed in may be decorated — the operator's overlay, the
+            // configuration's cut — and the warm-up belongs to the registry at
+            // the bottom. Without this unwrap the instanceof below would not
+            // match and no provider would ever bind.
+            ai.mindconnect.agent.tool.ToolRegistry inner = toolRegistry;
+            while (inner.source() != inner) inner = inner.source();
             if (inner instanceof SpiToolRegistry spi) spi.warmUp();
         };
     }
@@ -353,6 +352,75 @@ public class DefaultAgentRuntimeConfig {
         return new AgentRegistryService(definitionRepository);
     }
 
+    /**
+     * Each user's directory on this server: {@code mindconnect.users.home},
+     * a path with {@code {user}} in it, by default {@code <data-dir>/<namespace>/home/{user}}.
+     * A session opened without a working directory works in its own
+     * directory under there, and its uploads are put there for the file
+     * tools. Blank turns it off — sessions then have no directory of their own.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.service.UserHome userHome(
+            @Value("${mindconnect.users.home:#{null}}") String usersHome,
+            @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
+            Namespace namespace) {
+        if (usersHome == null) {
+            return ai.mindconnect.agent.runtime.service.UserHome.under(
+                    java.nio.file.Path.of(dataBaseDir).resolve(namespace.value()).toAbsolutePath());
+        }
+        return ai.mindconnect.agent.runtime.service.UserHome.of(usersHome);
+    }
+
+    /**
+     * Where a user's own standing instructions live: an {@code AGENTS.md},
+     * {@code PROMPT.md} or {@code CLAUDE.md} that holds in every project,
+     * beside the project's own file in its working directory.
+     *
+     * <p>Unset means {@code ~/.mindconnect}, which is right for a desktop:
+     * one person, one home, beside what the launcher keeps there. A server
+     * runs as one service account, so that same path would be one file for
+     * everybody — put {@code {user}} in the value and each user gets a
+     * directory of their own, e.g. {@code /srv/mindconnect/users/{user}}.
+     * {@code off} drops the user scope, leaving only the project's file.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles(
+            @Value("${mindconnect.agent.instructions.user-dir:}") String userDir) {
+        return ai.mindconnect.agent.runtime.service.prompt.InstructionFiles.of(userDir);
+    }
+
+    /**
+     * Where a session may work: under {@code mindconnect.tools.working-dir-root}
+     * when set, else in the user's own home; without one, under the tools'
+     * base directory — a server must not let a user point the file tools at
+     * any directory its process can read. A root with {@code {user}} in it
+     * gives every user a root of their own. The CLI sets the root to
+     * {@code /}: one user, their own machine.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy(
+            @Value("${mindconnect.tools.working-dir-root:}") String workingDirRoot,
+            @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir,
+            @Value("${mindconnect.working-dirs.choice:true}") boolean workingDirChoice,
+            ai.mindconnect.agent.runtime.service.UserHome userHome) {
+        // Off on a shared server: then no user picks a directory, and every chat
+        // works in the one of its own the users' home gives it.
+        if (workingDirRoot != null && !workingDirRoot.isBlank()) {
+            return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(workingDirRoot)
+                    .withChoice(workingDirChoice);
+        }
+        return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
+                userHome.isConfigured() ? userHome.template() : baseDir)
+                .withChoice(workingDirChoice);
+    }
+
+    /** The directories a user may pick a working directory from — the policy's tree, nothing beyond. */
+    @Bean
+    ai.mindconnect.agent.runtime.service.WorkingDirBrowser workingDirBrowser(
+            ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy) {
+        return new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(workingDirPolicy);
+    }
+
     @Bean
     AgentSessionService agentSessionService(AgentDefinitionRepository definitionRepository,
                                              AgentSessionRepository sessionRepository,
@@ -361,10 +429,12 @@ public class DefaultAgentRuntimeConfig {
                                              ConversationSummaryRepository conversationSummaryRepository,
                                              TodoListRepository todoListRepository,
                                              ToolApprovalStore approvalStore,
-                                             UserChannels userChannels) {
+                                             UserChannels userChannels,
+                                             ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy,
+                                             ai.mindconnect.agent.runtime.service.UserHome userHome) {
         return new AgentSessionService(definitionRepository, sessionRepository,
                 conversationManager, workingMemoryRepository, conversationSummaryRepository,
-                todoListRepository, approvalStore, userChannels);
+                todoListRepository, approvalStore, userChannels, workingDirPolicy, userHome);
     }
 
     /**
@@ -405,11 +475,12 @@ public class DefaultAgentRuntimeConfig {
                                     LlmCallTraceRepository llmCallTraceRepository,
                                     SessionChannels sessionChannels,
                                     AgentTaskRunner agentTaskRunner,
-                                    WorkingMemoryRepository workingMemoryRepository) {
+                                    WorkingMemoryRepository workingMemoryRepository,
+                                    ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles) {
         return new AgentTurnWorker(conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, dynamicToolActivations,
                 llmChat, llmCallTraceRepository, sessionChannels,
-                agentTaskRunner, workingMemoryRepository);
+                agentTaskRunner, workingMemoryRepository, instructionFiles);
     }
 
     @Bean
@@ -440,10 +511,12 @@ public class DefaultAgentRuntimeConfig {
                                       UserChannels userChannels,
                                       LocalTaskQueue taskQueue,
                                       ToolApprovalStore approvalStore,
-                                      ExecutorService turnExecutor) {
+                                      ExecutorService turnExecutor,
+                                      ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles) {
         return new AgentChatService(sessionService, definitionRepository, conversationManager,
                 memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                agentTaskRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor);
+                agentTaskRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
+                instructionFiles);
     }
 
     /**

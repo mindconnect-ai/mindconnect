@@ -57,11 +57,15 @@ class VectorToolsTest {
 
     @BeforeEach
     void setUp() {
-        env = new ToolEnvironment() {
+        env = environment(FAKE_EMBEDDINGS, FAKE_CONFIGS);
+    }
+
+    private ToolEnvironment environment(LlmEmbeddings embeddings, LlmConfigRepository configs) {
+        return new ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
-                if (type == LlmEmbeddings.class) return Optional.of((T) FAKE_EMBEDDINGS);
-                if (type == LlmConfigRepository.class) return Optional.of((T) FAKE_CONFIGS);
+                if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
+                if (type == LlmConfigRepository.class) return Optional.of((T) configs);
                 if (type == Namespace.class) return Optional.of((T) new Namespace("test"));
                 return Optional.empty();
             }
@@ -306,5 +310,76 @@ class VectorToolsTest {
                 .execute(Map.of("path", "doc.txt", "store", alicesStore)))
                 .contains("Stored");
         assertThat(stores().registry().instance(alicesStore).orElseThrow().owner()).isEqualTo("alice");
+    }
+
+    @Test
+    void aStoreEmbedsWithTheConfigAnAliasPointsAt() {
+        // "embeddings" is an alias on a server that points it at OpenAI. The
+        // alias record names no model, URL or key; handed to the endpoint as
+        // it is, every upload failed while testing its target succeeded.
+        List<String> embeddedWith = new java.util.ArrayList<>();
+        LlmEmbeddings concreteOnly = (config, texts) -> {
+            if (config.isAlias()) {
+                throw new IllegalStateException("embedded with the alias itself: " + config.name());
+            }
+            embeddedWith.add(config.name());
+            return FAKE_EMBEDDINGS.embed(config, texts);
+        };
+        LlmConfigRepository aliased = new LlmConfigRepository() {
+            @Override public Optional<LlmConfig> findById(LlmConfigId id) { return Optional.empty(); }
+            @Override public Optional<LlmConfig> findByName(String name) {
+                return switch (name) {
+                    case "embeddings" -> Optional.of(LlmConfig.alias("embeddings", "openai-embeddings"));
+                    case "openai-embeddings" -> Optional.of(
+                            LlmConfig.lmStudio("openai-embeddings", "text-embedding-3-small", "http://unused"));
+                    default -> Optional.empty();
+                };
+            }
+            @Override public List<LlmConfig> findAll() { return List.of(); }
+            @Override public void save(LlmConfig config) { }
+            @Override public void deleteById(LlmConfigId id) { }
+        };
+        env = environment(concreteOnly, aliased);
+
+        assertThat(tool(new VectorTools.UpsertFactory()).execute(Map.of("store", "kb", "file_id", "doc1",
+                "chunks", List.of(Map.of("text", "podman is a container engine")))))
+                .contains("Stored 1 chunk(s)");
+        assertThat(tool(new VectorTools.SearchFactory()).execute(Map.of("store", "kb", "query", "container")))
+                .contains("podman");
+        assertThat(embeddedWith).containsOnly("openai-embeddings");
+    }
+
+    /**
+     * vector_ingest_file reads where the other file tools read: the working
+     * directory by relative path, an additional directory by absolute path,
+     * and nothing outside them. The file id is the path as the caller gave it.
+     */
+    @Test
+    void ingestFileReachesTheSessionsDirectoriesAndNothingElse() throws Exception {
+        Path project = java.nio.file.Files.createDirectories(dir.resolve("project"));
+        Path lib = java.nio.file.Files.createDirectories(dir.resolve("lib"));
+        Path secret = java.nio.file.Files.createDirectories(dir.resolve("secret"));
+        java.nio.file.Files.writeString(project.resolve("notes.md"), "podman is a container engine\n");
+        java.nio.file.Files.writeString(lib.resolve("guide.md"), "the finance guide\n");
+        java.nio.file.Files.writeString(secret.resolve("key.md"), "the secret key\n");
+        ToolCallScope scope = new ToolCallScope(UserId.of("alice"), null, null,
+                project.toString(), List.of(lib.toString()));
+        Tool ingest = tool(new VectorIngestFileTool.Factory(), scope);
+
+        String guide = lib.resolve("guide.md").toString();
+        assertThat(ingest.execute(Map.of("path", guide, "store", "kb")))
+                .as("an additional directory, by absolute path")
+                .startsWith("Stored 1 chunk(s) for file '" + guide + "' in store 'kb'");
+        assertThat(ingest.execute(Map.of("path", "notes.md", "store", "kb")))
+                .startsWith("Stored 1 chunk(s) for file 'notes.md' in store 'kb'");
+        assertThat(ingest.execute(Map.of("path", secret.resolve("key.md").toString(), "store", "kb")))
+                .startsWith("Error: path is outside the allowed directories (");
+        assertThat(ingest.execute(Map.of("path", "../secret/key.md", "store", "kb")))
+                .startsWith("Error: path is outside the allowed directories (");
+        assertThat(ingest.execute(Map.of("path", "missing.md", "store", "kb")))
+                .isEqualTo("Error: no such file: missing.md");
+
+        assertThat(tool(new VectorTools.SearchFactory()).execute(Map.of("store", "kb", "query", "finance")))
+                .contains("the finance guide").contains(guide).doesNotContain("secret");
     }
 }

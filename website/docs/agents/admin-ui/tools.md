@@ -24,7 +24,7 @@ agent's detail view and add the tools it's allowed to call (e.g. `web_search`,
 Tools range from filesystem (`file_read`, `glob`, `bash`), documents
 (`read_document`, `grep_document`), web (`web_search`, `web_read`,
 `web_read_browser`), orchestration (`run_agent`, `run_agents`, `todo_write`),
-workspace (`workspace_read/write/list`), to integrations like Gmail.
+to integrations like Gmail.
 
 Want to add your own? See [Creating a tool](../creating-a-tool.md) under
 Concepts for how to build and register a custom tool.

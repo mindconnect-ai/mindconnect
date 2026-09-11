@@ -67,6 +67,30 @@ final class SubAgentCalls {
         this.sessionChannels = sessionChannels;
     }
 
+    /**
+     * A project's agent as a session agent. Its tools are the caller's own,
+     * narrowed by the file: it can take away, never add. Tool search stays
+     * off for the same reason — an agent that could look up further tools
+     * would be widening the set through the back door. Without a model of
+     * its own it runs on the caller's.
+     *
+     * <p>The roster is the caller's too. A project agent that inherits
+     * {@code run_agent} would otherwise have an empty roster, which reads as
+     * "anyone": a caller limited to one explorer could reach every agent in
+     * the registry by way of a file in the repository. A caller without a
+     * roster passes none on, so nothing is taken away either.
+     */
+    static ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent inlineFor(
+            ai.mindconnect.agent.runtime.service.agents.ProjectAgents.ProjectAgent agent, AgentDefinition caller) {
+        var tools = agent.toolsFrom(caller == null ? java.util.List.of() : caller.tools());
+        String model = agent.model() != null ? agent.model()
+                : (caller == null ? null : caller.llmConfigName());
+        var roster = caller == null ? java.util.List.<String>of() : caller.effectiveCallableAgents();
+        return new ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent(
+                ai.mindconnect.agent.AgentId.random(), true, agent.name(), agent.systemPrompt(), model, tools,
+                AgentDefinition.ToolSearchConfig.OFF, roster);
+    }
+
     void attach(TaskQueue queue) {
         this.queue = queue;
     }
@@ -109,11 +133,20 @@ final class SubAgentCalls {
         if (message == null || message.isBlank()) {
             return "Error: message is required";
         }
+        // An agent the project defines beside its code, in the directory the
+        // user picked. It answers before the registry and outside the
+        // roster: the roster curates the registry, and this is not in it —
+        // it comes from the same directory whose instructions the caller is
+        // already following. What it may do is bounded elsewhere, by the
+        // caller's own tools.
+        var projectAgent = ai.mindconnect.agent.runtime.service.agents.ProjectAgents
+                .find(parentSession.workingDir(), agentName).orElse(null);
+
         // The roster is a permission, not a display filter: an agent that
         // cannot see a name in list_agents cannot reach it by knowing the name
         // from somewhere else either. Refused by its own word rather than as
         // "not found", so a trace says which of the two it was.
-        if (caller != null && !caller.mayCall(agentName)) {
+        if (projectAgent == null && caller != null && !caller.mayCall(agentName)) {
             return "Error: agent '" + agentName + "' is not available to you. "
                     + "Available: " + String.join(", ", caller.effectiveCallableAgents());
         }
@@ -135,20 +168,38 @@ final class SubAgentCalls {
                 .findFirst().orElse(null);
 
         if (subSession == null) {
-            AgentDefinition target;
+            AgentDefinition target = null;
+            ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent inline = null;
             try {
-                target = definitionRepository.findAll().stream()
-                        .filter(a -> a.name().equalsIgnoreCase(agentName))
-                        .findFirst()
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                "No agent named '" + agentName + "'"));
+                if (projectAgent != null) {
+                    inline = inlineFor(projectAgent, caller);
+                } else {
+                    target = definitionRepository.findAll().stream()
+                            .filter(a -> a.name().equalsIgnoreCase(agentName))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalArgumentException(
+                                    "No agent named '" + agentName + "'"));
+                }
             } catch (Exception e) {
                 log.warn("Failed to resolve sub-agent '{}': {}", agentName, e.getMessage());
                 return "Error: " + e.getMessage();
             }
             try {
-                subSession = sessionService.openChat(target.id(), parentSession.userId(),
-                        parentSession.id(), parentTurnId, toolCallId);
+                // A sub-agent works where its parent works: the user's
+                // project, not the runtime's default directory.
+                subSession = inline != null
+                        ? sessionService.openSubChat(inline, parentSession.userId(),
+                                parentSession.id(), parentTurnId, toolCallId, parentSession.workingDir(),
+                                parentSession.additionalDirs())
+                        : sessionService.openChat(target.id(), parentSession.userId(),
+                                parentSession.id(), parentTurnId, toolCallId, parentSession.workingDir(),
+                                parentSession.additionalDirs());
+                if (target == null) {
+                    // The definition the session amounts to — the same path
+                    // the turn worker will take when it runs it.
+                    target = new ai.mindconnect.agent.runtime.service.SessionAgentResolver(definitionRepository)
+                            .resolve(subSession);
+                }
             } catch (Exception e) {
                 log.warn("Failed to open sub-session for '{}': {}", agentName, e.getMessage());
                 parentStream.accept(new StreamEvent.SubAgentError(cardId, agentName, e.getMessage()));

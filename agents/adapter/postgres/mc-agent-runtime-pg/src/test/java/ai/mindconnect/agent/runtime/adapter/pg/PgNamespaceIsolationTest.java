@@ -14,7 +14,6 @@ import ai.mindconnect.agent.runtime.domain.TraceId;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.tools.todo.TodoList;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
@@ -42,7 +41,7 @@ class PgNamespaceIsolationTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.fresh("mc_agent_definition", "mc_agent_session", "mc_conversation_summary",
-                "mc_working_memory", "mc_todo_list", "mc_llm_call_trace", "mc_workspace_file");
+                "mc_working_memory", "mc_todo_list", "mc_llm_call_trace");
     }
 
     @Test
@@ -150,23 +149,5 @@ class PgNamespaceIsolationTest {
         assertThat(a.findBySession(session)).containsExactly(child);
         assertThat(a.findDescendants(root)).containsExactly(child);
         assertThat(a.findHeadersByConversation(conversation)).hasSize(1);
-    }
-
-    @Test
-    void workspaceFiles() {
-        var a = new PgWorkspaceStore(sql, A).initSchema();
-        var b = new PgWorkspaceStore(sql, B).initSchema();
-        WorkspaceScope scope = WorkspaceScope.user(DAVID);
-        a.write(scope, "notes.md", "mine");
-
-        assertThat(b.exists(scope, "notes.md")).isFalse();
-        assertThat(b.read(scope, "notes.md")).isEmpty();
-        assertThat(b.sizeOf(scope, "notes.md")).isEmpty();
-        assertThat(b.list(scope)).isEmpty();
-        b.delete(scope, "notes.md");
-        b.write(scope, "notes.md", "theirs");
-
-        assertThat(a.read(scope, "notes.md")).contains("mine");
-        assertThat(b.read(scope, "notes.md")).contains("theirs");
     }
 }

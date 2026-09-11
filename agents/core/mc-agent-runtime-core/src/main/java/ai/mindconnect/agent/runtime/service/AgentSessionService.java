@@ -53,7 +53,11 @@ public class AgentSessionService {
     private final TodoListRepository todoListRepository;
     private final ToolApprovalStore approvalStore;
     private final UserChannels userChannels;
+    private final WorkingDirPolicy workingDirPolicy;
+    /** Where a session's own directory lives — none when the runtime has no users' home. */
+    private final UserHome userHome;
 
+    /** Without a working-directory policy: any existing directory may become a session's. */
     public AgentSessionService(AgentDefinitionRepository definitionRepository,
                                 AgentSessionRepository sessionRepository,
                                 ConversationManager conversationManager,
@@ -62,6 +66,38 @@ public class AgentSessionService {
                                 TodoListRepository todoListRepository,
                                 ToolApprovalStore approvalStore,
                                 UserChannels userChannels) {
+        this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
+                summaryRepository, todoListRepository, approvalStore, userChannels,
+                WorkingDirPolicy.unrestricted());
+    }
+
+    public AgentSessionService(AgentDefinitionRepository definitionRepository,
+                                AgentSessionRepository sessionRepository,
+                                ConversationManager conversationManager,
+                                WorkingMemoryRepository workingMemoryRepository,
+                                ConversationSummaryRepository summaryRepository,
+                                TodoListRepository todoListRepository,
+                                ToolApprovalStore approvalStore,
+                                UserChannels userChannels,
+                                WorkingDirPolicy workingDirPolicy) {
+        this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
+                summaryRepository, todoListRepository, approvalStore, userChannels,
+                workingDirPolicy, UserHome.none());
+    }
+
+    /** The full constructor: with the users' home a session's own directory lives in. */
+    public AgentSessionService(AgentDefinitionRepository definitionRepository,
+                                AgentSessionRepository sessionRepository,
+                                ConversationManager conversationManager,
+                                WorkingMemoryRepository workingMemoryRepository,
+                                ConversationSummaryRepository summaryRepository,
+                                TodoListRepository todoListRepository,
+                                ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore approvalStore,
+                                ai.mindconnect.agent.runtime.service.stream.UserChannels userChannels,
+                                WorkingDirPolicy workingDirPolicy,
+                                UserHome userHome) {
+        this.workingDirPolicy = workingDirPolicy == null ? WorkingDirPolicy.unrestricted() : workingDirPolicy;
+        this.userHome = userHome == null ? UserHome.none() : userHome;
         this.definitionRepository = definitionRepository;
         this.sessionRepository = sessionRepository;
         this.conversationManager = conversationManager;
@@ -75,9 +111,164 @@ public class AgentSessionService {
     /**
      * Opens a brand-new top-level chat session for the given agent: creates
      * a conversation with USER/AGENT participants and persists the session.
+     * No directory is named, so it works in its own — the same as every chat
+     * that does not choose one, however it is opened.
      */
     public AgentSession openChat(AgentId agentDefinitionId, UserId userId) {
-        return openChat(agentDefinitionId, userId, null, null, null);
+        return openChat(agentDefinitionId, userId, (String) null);
+    }
+
+    /**
+     * Opens a top-level chat session that works in {@code workingDir} — the
+     * directory the user launched the CLI in, the project the chat is
+     * about. Validated by the {@link WorkingDirPolicy}: it has to exist and,
+     * where a root is configured, lie under it. {@code null} for none.
+     */
+    public AgentSession openChat(AgentId agentDefinitionId, UserId userId, String workingDir) {
+        return openChat(agentDefinitionId, userId, workingDir, List.of());
+    }
+
+    /**
+     * Same, with additional directories the session may reach by absolute
+     * path beside its working directory. Each is validated like the
+     * working directory.
+     */
+    public AgentSession openChat(AgentId agentDefinitionId, UserId userId,
+                                 String workingDir, List<String> additionalDirs) {
+        WorkingDirPolicy policy = workingDirPolicy.forUser(userId);
+        String dir = policy.validate(workingDir);
+        List<String> extras = validateAll(policy, additionalDirs);
+        return inOwnDirectoryWhenNone(openChat(agentDefinitionId, userId, null, null, null, dir, extras));
+    }
+
+    /**
+     * A session opened without a working directory works in its own: a
+     * directory under the user's home, created here, where its uploads land
+     * and its scratch files go. Nothing changes for a session that chose a
+     * directory, or when the runtime has no users' home.
+     */
+    private AgentSession inOwnDirectoryWhenNone(AgentSession session) {
+        if (session.hasWorkingDir()) return session;
+        return userHome.sessionDirOf(session.userId(), session.id())
+                .map(own -> change(session.id(), stored -> stored.withWorkingDir(own.toString())))
+                .orElse(session);
+    }
+
+    /** A session's own directory — where its uploads are — when the runtime has a users' home. */
+    public java.util.Optional<java.nio.file.Path> sessionDir(SessionId sessionId) {
+        AgentSession session = findSession(sessionId);
+        return userHome.sessionDirOf(session.userId(), session.id());
+    }
+
+    /** The users' home this runtime keeps session directories under; may be unconfigured. */
+    public UserHome userHome() {
+        return userHome;
+    }
+
+    /**
+     * A session that moves away from its own directory keeps it reachable:
+     * the uploads and scratch files in there must not vanish from the tools
+     * because the user opened a project. Only a directory that exists is
+     * kept — a session that never had one gets nothing added.
+     */
+    private List<String> keepingOwnDirectory(AgentSession session, String newDir, List<String> extras) {
+        return userHome.existingSessionDirOf(session.userId(), session.id())
+                .map(java.nio.file.Path::toString)
+                .filter(own -> !own.equals(newDir) && !extras.contains(own))
+                .map(own -> {
+                    List<String> merged = new java.util.ArrayList<>(extras);
+                    merged.add(own);
+                    return List.copyOf(merged);
+                })
+                .orElse(extras);
+    }
+
+    /**
+     * Moves a session to another working directory — {@code /cd} in the CLI,
+     * the settings dialog in the chat. Validated like at open; {@code null}
+     * or blank clears it, so the tools fall back to the configured default.
+     * Sub-agents already running keep the directory they were spawned with.
+     */
+    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir) {
+        return changeWorkingDir(sessionId, workingDir, null);
+    }
+
+    /**
+     * Moves a session to another working directory and replaces its
+     * additional directories in one go — the chat's dialog, the REST
+     * endpoint. {@code null} keeps the additional directories as they are.
+     *
+     * <p>Only a directory the session does not have yet is checked against
+     * the root; see {@link #directoriesHeld}. Removing one directory resends
+     * the rest, and the rest must not fail on a check they already passed —
+     * or, for the session's own directory, never had to.
+     */
+    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
+        // Clearing counts as a choice too: it would take the chat out of its own directory.
+        workingDirPolicy.requireChoice();
+        AgentSession session = findSession(sessionId);
+        WorkingDirPolicy policy = workingDirPolicy.forUser(session.userId());
+        java.util.Set<String> held = directoriesHeld(session);
+        String dir = policy.validate(workingDir, held);
+        List<String> extras = additionalDirs == null ? session.additionalDirs()
+                : validateAll(policy, additionalDirs, held);
+        return change(sessionId, stored -> stored.withWorkingDir(dir)
+                .withAdditionalDirs(keepingOwnDirectory(stored, dir, extras)));
+    }
+
+    /** Adds one directory to a session's additional directories ({@code /add-dir}). */
+    public AgentSession addDirectory(SessionId sessionId, String dir) {
+        workingDirPolicy.requireChoice();
+        AgentSession session = findSession(sessionId);
+        String validated = workingDirPolicy.forUser(session.userId()).validate(dir, directoriesHeld(session));
+        if (validated == null) throw new IllegalArgumentException("A directory is required");
+        return change(sessionId, stored -> {
+            java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(stored.additionalDirs());
+            merged.add(validated);
+            return stored.withAdditionalDirs(List.copyOf(merged));
+        });
+    }
+
+    /**
+     * The directories a session already has, as recorded: its working
+     * directory, its additional ones and its own under the users' home.
+     * They passed the policy when they were chosen, or were given by the
+     * runtime, which does not ask it — the users' home need not lie under
+     * the root at all.
+     */
+    private java.util.Set<String> directoriesHeld(AgentSession session) {
+        java.util.Set<String> held = new java.util.HashSet<>(session.additionalDirs());
+        if (session.hasWorkingDir()) held.add(session.workingDir());
+        userHome.existingSessionDirOf(session.userId(), session.id())
+                .ifPresent(own -> held.add(own.toString()));
+        return held;
+    }
+
+    /** Every directory validated, blanks dropped, duplicates folded, order kept. */
+    private static List<String> validateAll(WorkingDirPolicy policy, List<String> dirs) {
+        return validateAll(policy, dirs, java.util.Set.of());
+    }
+
+    /** Same, with the directories the session already has passing without the root check. */
+    private static List<String> validateAll(WorkingDirPolicy policy, List<String> dirs,
+                                            java.util.Set<String> held) {
+        if (dirs == null || dirs.isEmpty()) return List.of();
+        java.util.LinkedHashSet<String> out = new java.util.LinkedHashSet<>();
+        for (String d : dirs) {
+            String validated = policy.validate(d, held);
+            if (validated != null) out.add(validated);
+        }
+        return List.copyOf(out);
+    }
+
+    /** The policy sessions' working directories are checked against (per-user roots still need {@code forUser}). */
+    /** May users choose a chat's directories here, or does every chat work in its own? */
+    public boolean workingDirChoice() {
+        return workingDirPolicy.allowsChoice();
+    }
+
+    public WorkingDirPolicy workingDirPolicy() {
+        return workingDirPolicy;
     }
 
     /**
@@ -95,6 +286,19 @@ public class AgentSessionService {
     public AgentSession openChat(AgentId agentDefinitionId, UserId userId,
                                   SessionId parentSessionId, ChatTurnId parentTurnId,
                                   String parentToolCallId) {
+        return openChat(agentDefinitionId, userId, parentSessionId, parentTurnId, parentToolCallId,
+                null, List.of());
+    }
+
+    /**
+     * Same, with the directories the session starts in — for a sub-agent the
+     * parent's, so it works where the user works. Already validated: a
+     * parent's directories were checked when the parent got them.
+     */
+    public AgentSession openChat(AgentId agentDefinitionId, UserId userId,
+                                  SessionId parentSessionId, ChatTurnId parentTurnId,
+                                  String parentToolCallId, String workingDir,
+                                  List<String> additionalDirs) {
         AgentDefinition def = definitionRepository.findById(agentDefinitionId)
                 .orElseThrow(() -> DomainException.notFound("AgentDefinition", agentDefinitionId.toString()));
 
@@ -107,7 +311,9 @@ public class AgentSessionService {
                 ConversationType.USER_AGENT, participants);
 
         AgentSession session = AgentSession.startSubAgent(agentDefinitionId, userId,
-                conversationId, parentSessionId, parentTurnId, parentToolCallId);
+                conversationId, parentSessionId, parentTurnId, parentToolCallId)
+                .withWorkingDir(workingDir)
+                .withAdditionalDirs(additionalDirs);
         AgentSession saved = sessionRepository.create(session);
         // A sub-agent's session is the parent turn's business, not news for
         // the user's session list.
@@ -119,12 +325,39 @@ public class AgentSessionService {
     }
 
     /**
+     * Opens a sub-session for an agent the registry has never heard of — a
+     * project's own, defined in a file beside its code. Same as the
+     * sub-agent {@code openChat} above, except the definition travels with
+     * the session instead of being looked up by id, because there is
+     * nothing to look up.
+     */
+    public AgentSession openSubChat(ai.mindconnect.agent.runtime.domain.session.SessionAgent agent,
+                                    UserId userId, SessionId parentSessionId, ChatTurnId parentTurnId,
+                                    String parentToolCallId, String workingDir,
+                                    List<String> additionalDirs) {
+        ConversationId conversationId = ConversationId.random();
+        List<Participant> participants = List.of(
+                Participant.user(conversationId, userId, userId.value()),
+                Participant.agent(conversationId, agent.id(), agent.label())
+        );
+        conversationManager.createConversation(conversationId, "Chat with " + agent.label(),
+                ConversationType.USER_AGENT, participants);
+
+        AgentSession session = AgentSession.startSubAgent(agent.id(), userId,
+                conversationId, parentSessionId, parentTurnId, parentToolCallId)
+                .withWorkingDir(workingDir)
+                .withAdditionalDirs(additionalDirs)
+                .withSessionAgents(List.of(agent));
+        return sessionRepository.create(session);
+    }
+
+    /**
      * Opens a chat for a session agent — either an inline one the user
      * assembled from a model and some tools, or a reference to a registry
      * agent with this chat's overrides.
      *
      * <p>{@code agentDefinitionId} is set to the session agent's id either
-     * way, so the workspace scope, the message attribution and the
+     * way, so the message attribution and the
      * conversation participant keep working unchanged. For an inline agent
      * that id resolves to nothing in the registry — which is the point: the
      * chat is not findable under any agent, because it belongs to none.
@@ -141,7 +374,7 @@ public class AgentSessionService {
         AgentSession session = AgentSession
                 .start(agent.id(), userId, conversationId)
                 .withSessionAgents(List.of(agent));
-        AgentSession saved = sessionRepository.create(session);
+        AgentSession saved = inOwnDirectoryWhenNone(sessionRepository.create(session));
         userChannels.publish(userId, new UserEvent
                 .SessionStarted(saved.id(), agent.id()));
         return saved;
@@ -152,12 +385,12 @@ public class AgentSessionService {
      * attaching the chat to a registry agent.
      *
      * <p>{@code agentDefinitionId} moves with the agent. It is the id the
-     * session is listed under and the key its workspace is filed by, and both
+     * session is listed under, and both
      * should describe the agent the chat actually runs — a chat detached from
      * "Poet" has no business still appearing under {@code ?agentId=Poet}.
      * The messages written so far keep the old id, which is right: they were
      * said by that agent. What the new agent does not inherit is the previous
-     * one's workspace — a different agent, a different memory.
+     * one's memory — a different agent, a different memory.
      */
     public AgentSession replaceSessionAgent(SessionId sessionId,
                                             SessionAgent agent) {
@@ -199,7 +432,31 @@ public class AgentSessionService {
         todoListRepository.deleteBySession(sessionId);
         approvalStore.deleteForSession(sessionId);
         sessionRepository.deleteById(sessionId);
+        deleteOwnDirectory(session);
         log.info("Deleted session {} and associated data", sessionId);
+    }
+
+    /**
+     * The chat's own directory under the user's home goes with it — its
+     * uploads, notes and logs are nobody else's, and on a server they would
+     * otherwise pile up. Only that directory: one the user chose is theirs
+     * and is never touched. Links inside are removed, not followed.
+     */
+    private void deleteOwnDirectory(AgentSession session) {
+        userHome.existingSessionDirOf(session.userId(), session.id()).ifPresent(dir -> {
+            try (var paths = java.nio.file.Files.walk(dir)) {
+                paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                    try {
+                        java.nio.file.Files.deleteIfExists(path);
+                    } catch (java.io.IOException e) {
+                        throw new java.io.UncheckedIOException(e);
+                    }
+                });
+            } catch (java.io.IOException | java.io.UncheckedIOException e) {
+                log.warn("The directory of deleted session {} could not be removed entirely: {}",
+                        session.id(), e.getMessage());
+            }
+        });
     }
 
     public int deleteMessages(SessionId sessionId, int fromSeq, int toSeq) {

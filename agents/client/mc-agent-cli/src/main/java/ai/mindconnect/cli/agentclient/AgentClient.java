@@ -39,6 +39,21 @@ public interface AgentClient {
 
     AgentSession startSession(AgentId agentDefinitionId, UserId userId);
 
+    /**
+     * Same, with the directory the session works in — where the CLI was
+     * launched — or {@code null} for the runtime's default.
+     */
+    AgentSession startSession(AgentId agentDefinitionId, UserId userId, String workingDir);
+
+    /** Moves a session to another working directory ({@code null} clears it); {@code /cd}. */
+    AgentSession changeWorkingDir(SessionId sessionId, String workingDir);
+
+    /**
+     * Same, and replaces the additional directories the session may reach by
+     * absolute path ({@code /add-dir}); {@code null} keeps them as they are.
+     */
+    AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs);
+
     List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId);
 
     List<Message> loadHistory(SessionId sessionId);

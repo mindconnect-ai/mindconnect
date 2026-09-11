@@ -10,7 +10,7 @@ import java.util.List;
  * A session bound to an agent from the registry, optionally with a different
  * model or tool selection for this chat alone.
  *
- * <p>{@link #id()} is the agent's own id, so the workspace and the messages
+ * <p>{@link #id()} is the agent's own id, so the messages
  * stay with the agent and {@code ?agentId=} keeps finding these sessions.
  *
  * <p>The system prompt used to be excluded here, on the grounds that a ref

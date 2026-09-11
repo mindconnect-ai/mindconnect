@@ -14,6 +14,10 @@ import java.util.Locale;
  * image part, a PDF as a document part, everything else through the vector
  * store and {@code vector_search}.
  *
+ * <p>{@code path} is where a copy of the file lies on disk for the file
+ * tools — in the session's own directory — or {@code null} when there is
+ * none (an image, or a session without a directory).
+ *
  * <p>Sessions written before this record existed stored bare names; such an
  * entry reads as a file with no id, and is announced but never sent inline.
  */
@@ -21,23 +25,42 @@ public record AttachedFile(
         String id,
         String name,
         String mediaType,
-        long sizeBytes
+        long sizeBytes,
+        String path
 ) {
     @JsonCreator
     public AttachedFile(@JsonProperty("id") String id,
                         @JsonProperty("name") String name,
                         @JsonProperty("mediaType") String mediaType,
-                        @JsonProperty("sizeBytes") long sizeBytes) {
+                        @JsonProperty("sizeBytes") long sizeBytes,
+                        @JsonProperty("path") String path) {
         this.id = id;
         this.name = name;
         this.mediaType = mediaType;
         this.sizeBytes = sizeBytes;
+        this.path = path == null || path.isBlank() ? null : path;
+    }
+
+    /** A file with no copy on disk. */
+    public AttachedFile(String id, String name, String mediaType, long sizeBytes) {
+        this(id, name, mediaType, sizeBytes, null);
+    }
+
+    /** The same file, with its copy on disk at {@code path}. */
+    public AttachedFile withPath(String path) {
+        return new AttachedFile(id, name, mediaType, sizeBytes, path);
+    }
+
+    /** Has the file a copy on disk the file tools can read? */
+    @JsonIgnore
+    public boolean hasPath() {
+        return path != null;
     }
 
     /** A legacy entry — a session that stored only the file's name. */
     @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
     public static AttachedFile named(String name) {
-        return new AttachedFile(null, name, null, 0);
+        return new AttachedFile(null, name, null, 0, null);
     }
 
     /**

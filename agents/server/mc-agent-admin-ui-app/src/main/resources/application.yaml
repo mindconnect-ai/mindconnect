@@ -52,6 +52,10 @@ mindconnect:
     dev-user: ${MC_DEV_USER:mc_user}
   tools:
     tavily-api-key: ${TAVILY_API_KEY:}
+    # The admin app on your own machine is a one-user app: a session may work
+    # anywhere under your home. On a server set MC_WORKING_DIR_ROOT to the
+    # users' tree — /srv/mindconnect/home/{user} — so nobody leaves their own.
+    working-dir-root: ${MC_WORKING_DIR_ROOT:${user.home}}
   mcp:
     # MCP servers this installation starts itself. A "process" target runs a
     # command, a "docker" target a container — both with the rights of this

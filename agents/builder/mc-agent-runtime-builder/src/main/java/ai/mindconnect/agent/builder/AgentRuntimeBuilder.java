@@ -5,7 +5,6 @@ import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.adapter.file.FileWorkspaceStore;
 import ai.mindconnect.agent.runtime.adapter.llm.LlmToolResultSummarizer;
 import ai.mindconnect.agent.runtime.adapter.file.FileLlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.*;
@@ -33,7 +32,6 @@ import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
-import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
@@ -47,7 +45,6 @@ import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
 import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
-import ai.mindconnect.agent.runtime.service.prompt.WorkspaceNotesProvider;
 import ai.mindconnect.agent.runtime.port.out.TokenCounters;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.Namespace;
@@ -240,6 +237,51 @@ public final class AgentRuntimeBuilder {
         return property("defaultBaseDir", dir.toString());
     }
 
+    /**
+     * The root a session's working directory must lie under (default: the
+     * tools' base directory). {@code Path.of("/")} lets a session work
+     * anywhere — right for one user on their own machine, not for a server.
+     */
+    public AgentRuntimeBuilder workingDirRoot(Path root) {
+        return property("workingDirRoot", root.toString());
+    }
+
+    /**
+     * Where each user's directory lives — a path with {@code {user}} in it.
+     * A session opened without a working directory works in its own
+     * directory under there, and its uploads are put there for the file
+     * tools. By default {@code <dataDir>/<namespace>/home/{user}}.
+     */
+    public AgentRuntimeBuilder usersHome(String template) {
+        return property("usersHome", template);
+    }
+
+    /** The users' home for an environment: {@code usersHome} when set, else under the namespace's data directory. */
+    static ai.mindconnect.agent.runtime.service.UserHome userHomeOf(Map<String, String> environment, String namespace) {
+        String template = environment.get("usersHome");
+        return template != null && !template.isBlank()
+                ? ai.mindconnect.agent.runtime.service.UserHome.of(template)
+                : ai.mindconnect.agent.runtime.service.UserHome.under(
+                        Path.of(environment.get("dataBaseDir")).resolve(namespace));
+    }
+
+    /**
+     * Tools this runtime does not offer, whatever an agent names — on a
+     * shared server {@code bash} and {@code process_kill}, which nothing
+     * confines to a chat's directory.
+     */
+    public AgentRuntimeBuilder disabledTools(String... toolNames) {
+        return property("disabledTools", String.join(",", toolNames));
+    }
+
+    /**
+     * Whether a user may choose a session's directories. Off, every session
+     * works in its own directory under the users' home and nothing else.
+     */
+    public AgentRuntimeBuilder workingDirChoice(boolean allowed) {
+        return property("workingDirChoice", Boolean.toString(allowed));
+    }
+
     public AgentRuntimeBuilder tavilyApiKey(String key) {
         return property("tavilyApiKey", key);
     }
@@ -304,10 +346,6 @@ public final class AgentRuntimeBuilder {
         // 1. Persistence — file-based rooted at dataDir, Postgres, or purely in-memory;
         //    every store is bound to the one namespace this runtime runs in.
         Namespace namespace = new Namespace(namespaceName);
-        WorkspaceStore workspaceStore = inMemory
-                ? new InMemoryWorkspaceStore()
-                : sql != null ? new PgWorkspaceStore(sql, namespace).initSchema()
-                : new FileWorkspaceStore(dataDir, namespace);
         WorkingMemoryRepository workingMemoryRepository = inMemory
                 ? new InMemoryWorkingMemoryRepository()
                 : sql != null ? new PgWorkingMemoryRepository(sql, namespace).initSchema()
@@ -387,7 +425,7 @@ public final class AgentRuntimeBuilder {
         TokenCounters tokenCounterRegistry = new TokenCounterRegistry();
         List<PromptContextProvider> promptProviders = List.of(
                 new CurrentDateProvider(), new AgentMetadataProvider(),
-                new AgentToolsProvider(), new WorkspaceNotesProvider(workspaceStore));
+                new AgentToolsProvider());
         PromptRenderer promptRenderer = new PebblePromptRenderer(promptProviders);
         AgentTaskRunner statelessRunner = new StatelessAgentTaskRunner(
                 definitionRepository, llmChat, resolveDefaultLlmConfigName(), promptRenderer);
@@ -416,7 +454,6 @@ public final class AgentRuntimeBuilder {
                 .service(AgentSessionRepository.class, sessionRepository)
                 .service(MessageRepository.class, messageRepository)
                 .service(ai.mindconnect.message.port.in.ConversationManager.class, conversationManager)
-                .service(WorkspaceStore.class, workspaceStore)
                 .service(TodoListService.class, todoListService)
                 .service(ToolRegistryRef.class, registryRef)
                 .service(DynamicToolActivations.class, activations)
@@ -428,7 +465,8 @@ public final class AgentRuntimeBuilder {
             PostgresWorkflows.register(env, workflows);
         }
         environment.forEach(env::string);
-        ToolRegistry toolRegistry = new SpiToolRegistry(env.build());
+        ToolRegistry toolRegistry = ai.mindconnect.agent.tool.ConfiguredToolRegistry.of(
+                new SpiToolRegistry(env.build()), environment.get("disabledTools"));
         registryRef.set(toolRegistry);
 
         // 6. Turn pipeline + chat service — the turn runs as an agent.turn
@@ -441,16 +479,26 @@ public final class AgentRuntimeBuilder {
                 : new FileLlmCallTraceRepository(dataDir, namespace);
         var approvalStore = new ToolApprovalStore();
         var userChannels = new UserChannels();
+        // Where a session may work: under workingDirRoot when set, else in the
+        // user's own home — the same rule the Spring apps apply.
+        var userHome = userHomeOf(environment, namespaceName);
+        String workingDirRoot = environment.getOrDefault("workingDirRoot", "");
+        var workingDirPolicy = ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
+                workingDirRoot.isBlank() ? userHome.template() : workingDirRoot)
+                .withChoice(!"false".equalsIgnoreCase(environment.getOrDefault("workingDirChoice", "true")));
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
-                userChannels);
+                userChannels, workingDirPolicy, userHome);
         var sessionChannels = new SessionChannels();
+        // Where a user's own standing instructions live; see InstructionFiles.
+        var instructionFiles = ai.mindconnect.agent.runtime.service.prompt.InstructionFiles.of(
+                environment.getOrDefault("instructionsUserDir", ""));
         var turnWorker = new AgentTurnWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, activations,
                 llmChat, traceRepository, sessionChannels,
-                statelessRunner, workingMemoryRepository);
+                statelessRunner, workingMemoryRepository, instructionFiles);
         var toolWorker = new ToolCallWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, toolRegistry, activations, toolExecutor, sessionChannels,
@@ -464,7 +512,8 @@ public final class AgentRuntimeBuilder {
         taskQueue.register(ToolCallWorker.TYPE, toolWorker);
         AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
                 conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor);
+                statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
+                instructionFiles);
 
         // 7. Seed configs, agents, workflows.
         for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);

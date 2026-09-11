@@ -38,5 +38,5 @@ exists (concept 15, step 2).
 | `mc-agent-tools-code` | 32 jars (whole runtime: spring-context, jackson, pebble, jtokkit, message repository, llm gateway, event bus …) | **7** |
 
 Switched today: `mc-agent-tools-web`, `-gmail`, `-code`, `-document`,
-`-web-browser`, `mc-vector-store-tools`. Still on the runtime: `mc-agent-tools`
-(workspace), `-todo` (todo domain), `-workflow` (invokes agents).
+`-web-browser`, `mc-vector-store-tools`. Still on the runtime: `-todo` (todo
+domain), `-workflow` (invokes agents).

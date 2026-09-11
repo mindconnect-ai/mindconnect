@@ -64,6 +64,7 @@ public class AgentApiController {
     private final UserChannels userChannels;
     private final SessionAccess sessionAccess;
     private final ObjectMapper compactMapper;
+    private final ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser;
 
     public AgentApiController(AgentRegistryService registryService,
                             AgentSessionService sessionService,
@@ -71,7 +72,13 @@ public class AgentApiController {
                             ai.mindconnect.filestore.FileStore fileStore,
                             UserChannels userChannels,
                             SessionAccess sessionAccess,
-                            ObjectMapper objectMapper) {
+                            ObjectMapper objectMapper,
+                            @org.springframework.lang.Nullable
+                            ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser) {
+        // A host that defines no browser gets one over the session service's
+        // policy — the same tree, without a bean to declare.
+        this.dirBrowser = dirBrowser != null ? dirBrowser
+                : new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(sessionService.workingDirPolicy());
         this.registryService = registryService;
         this.sessionService = sessionService;
         this.chatService = chatService;
@@ -91,8 +98,7 @@ public class AgentApiController {
     // ── Agent CRUD ──────────────────────────────────────────────────────────
 
     @Operation(tags = "Agents", summary = "Create an agent",
-            description = "Creates an agent with the default workspace tools "
-                    + "(workspace_read/write/list) pre-registered.")
+            description = "Creates an agent; it starts with no tools.")
     @PostMapping("/agents")
     public AgentDefinition createAgent(@RequestBody CreateAgentRequest req) {
         log.info("POST /api/agents name={}", req.name());
@@ -201,10 +207,45 @@ public class AgentApiController {
                     + "{agentId} — a userId still sent by an older client is ignored.")
     @PostMapping("/sessions")
     public AgentSession startSession(@RequestBody StartSessionRequest req, @CurrentUser UserId caller) {
-        log.info("POST /api/sessions agentId={} user={}", req.agentId(), caller);
-        AgentSession session = sessionService.openChat(AgentId.of(req.agentId()), caller);
+        log.info("POST /api/sessions agentId={} user={} workingDir={}",
+                req.agentId(), caller, req.workingDir());
+        AgentSession session = sessionService.openChat(
+                AgentId.of(req.agentId()), caller, req.workingDir(), req.additionalDirs());
         log.info("Session started: {}", session.id());
         return session;
+    }
+
+    @Operation(tags = "Sessions", summary = "List the directories the caller may work in",
+            description = "One level of the server's tree under `mindconnect.tools.working-dir-root` "
+                    + "(the caller's own root when it carries `{user}`): the directory at `path`, its "
+                    + "parent, its sub-directories. Without `path`, the root. 400 when `path` lies "
+                    + "outside the root or is no directory.")
+    @GetMapping("/directories")
+    public ai.mindconnect.agent.runtime.service.WorkingDirBrowser.Listing listDirectories(
+            @RequestParam(required = false) String path, @CurrentUser UserId caller) {
+        return dirBrowser.list(caller.value(), path);
+    }
+
+    @Operation(tags = "Sessions", summary = "Change a session's working directory",
+            description = "Moves the session to another directory: the file tools' base directory, "
+                    + "named in the prompt from the next turn on. Body `{\"workingDir\": \"/path\", "
+                    + "\"additionalDirs\": [\"/other\"]}`; a null or blank workingDir clears it, an absent "
+                    + "additionalDirs keeps the current ones, an empty list clears them. 400 when a "
+                    + "directory does not exist or lies outside `mindconnect.tools.working-dir-root`; "
+                    + "404 when the session is not the caller's.")
+    @PutMapping("/sessions/{sessionId}/working-dir")
+    public AgentSession changeWorkingDir(@PathVariable String sessionId,
+                                         @RequestBody Map<String, Object> body,
+                                         @CurrentUser UserId caller) {
+        SessionId id = owned(sessionId, caller);
+        Object dir = body == null ? null : body.get("workingDir");
+        String workingDir = dir == null ? null : dir.toString();
+        List<String> additionalDirs = null;
+        if (body != null && body.get("additionalDirs") instanceof List<?> raw) {
+            additionalDirs = raw.stream().filter(java.util.Objects::nonNull).map(Object::toString).toList();
+        }
+        log.info("PUT /api/sessions/{}/working-dir workingDir={} additionalDirs={}", id, workingDir, additionalDirs);
+        return sessionService.changeWorkingDir(id, workingDir, additionalDirs);
     }
 
     @Operation(tags = "Sessions", summary = "List the caller's sessions for an agent")

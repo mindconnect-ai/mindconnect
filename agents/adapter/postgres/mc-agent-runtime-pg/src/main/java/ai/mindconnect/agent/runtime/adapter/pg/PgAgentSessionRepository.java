@@ -29,8 +29,8 @@ import java.util.function.UnaryOperator;
  * matches it.
  *
  * <p>{@link #deleteById} removes the session row only. The file store deletes
- * the session's whole directory, taking working memory, todo list and
- * workspace files with it; here those live in their own tables and their own
+ * the session's whole directory, taking working memory and todo list
+ * with it; here those live in their own tables and their own
  * repositories, and the caller that ends a session deletes them there.
  */
 public final class PgAgentSessionRepository implements AgentSessionRepository {

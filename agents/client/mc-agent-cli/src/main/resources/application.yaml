@@ -20,8 +20,13 @@ mindconnect:
     base-dir: data/workspaces
   tools:
     tavily-api-key: ${TAVILY_API_KEY:}
-    # Working directory for bash, file_list, file_read, file_write (defaults to user home)
+    # Default base directory for bash, file_list, file_read, file_write when a
+    # session has no working directory of its own (defaults to user home).
     base-dir: ${user.home}
+    # A session's working directory — where the CLI was launched, or /cd — may
+    # be anywhere: one user, their own machine. A server keeps this under
+    # its tools base-dir.
+    working-dir-root: /
   # Uncomment to use remote agent server
   # remote:
   #   url: http://localhost:8080

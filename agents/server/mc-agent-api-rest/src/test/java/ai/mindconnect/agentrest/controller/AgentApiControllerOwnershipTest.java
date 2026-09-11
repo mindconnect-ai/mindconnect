@@ -75,7 +75,7 @@ class AgentApiControllerOwnershipTest {
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
                 sessionService, chat, new FilesystemFileStore(dir, new Namespace("test")), userChannels,
-                new SessionAccess(sessions), new ObjectMapper());
+                new SessionAccess(sessions), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }
 
@@ -177,7 +177,7 @@ class AgentApiControllerOwnershipTest {
         final List<String> calls = new CopyOnWriteArrayList<>();
 
         RecordingChatService(AgentSessionService sessions) {
-            super(sessions, null, null, null, null, null, null, null, null, null, null, null);
+            super(sessions, null, null, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

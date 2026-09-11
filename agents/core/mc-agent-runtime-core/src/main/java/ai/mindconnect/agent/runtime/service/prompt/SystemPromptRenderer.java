@@ -8,9 +8,11 @@ import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.AuthenticationInfo;
 
 /**
- * Builds the full system prompt the LLM sees: the agent's rendered template
- * followed by the memory strategy's optional addendum (e.g. compressed
- * conversation summaries).
+ * Builds the full system prompt the LLM sees: the agent's rendered template,
+ * the memory strategy's optional addendum (e.g. compressed conversation
+ * summaries), then the sections the runtime adds itself — where the session
+ * works, the user's standing instructions, what the project asks of an agent
+ * working there, and which files are attached to the chat.
  */
 public final class SystemPromptRenderer {
 
@@ -20,11 +22,37 @@ public final class SystemPromptRenderer {
                                 MemoryStrategy strategy,
                                 AgentDefinition def,
                                 AgentSession session,
-                                AuthenticationInfo auth) {
+                                AuthenticationInfo auth,
+                                InstructionFiles instructions) {
         String rendered = renderer.render(def.systemPrompt(), def, session, auth);
         String addendum = strategy.systemPromptAddendum(def, session);
         String prompt = (addendum == null || addendum.isEmpty()) ? rendered : rendered + addendum;
-        return prompt + attachedFilesSection(session);
+        return prompt + workingDirSection(session)
+                + instructions.userSection(session) + instructions.projectSection(session)
+                + attachedFilesSection(session);
+    }
+
+    /**
+     * Names the session's working directory, so the model knows where it is
+     * — what {@code .} means, where relative paths land, where {@code bash}
+     * runs — without probing for it. Rendered fresh every round: a
+     * {@code /cd} shows up on the next turn.
+     */
+    static String workingDirSection(AgentSession session) {
+        if (session == null || (!session.hasWorkingDir() && session.additionalDirs().isEmpty())) return "";
+        StringBuilder out = new StringBuilder("\n\n## Working directory\n");
+        if (session.hasWorkingDir()) {
+            out.append("You are working in `").append(session.workingDir()).append("`. Relative paths in the "
+                    + "file tools resolve against it, `bash` runs in it, and `.` means this directory.");
+        }
+        if (!session.additionalDirs().isEmpty()) {
+            out.append(session.hasWorkingDir() ? " You may also use these directories, by absolute path:"
+                    : "You may use these directories, by absolute path:");
+            for (String dir : session.additionalDirs()) {
+                out.append("\n- `").append(dir).append('`');
+            }
+        }
+        return out.toString();
     }
 
     /**
@@ -37,22 +65,35 @@ public final class SystemPromptRenderer {
         if (session == null) return "";
         // Images are not indexed — they travel with the message as image
         // parts (or their placeholders) and have no business in this list.
-        java.util.List<String> searchable = session.attachedFiles().stream()
+        java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> searchable = session.attachedFiles().stream()
                 .filter(f -> !f.isImage())
-                .map(AttachedFile::name)
                 .toList();
         if (searchable.isEmpty()) {
             return "";
         }
         StringBuilder out = new StringBuilder("\n\n## Attached files\n"
                 + "The user attached these files to this conversation:\n");
-        for (String file : searchable) {
-            out.append("- ").append(file).append(" (").append(AttachmentNotice.kind(file)).append(")\n");
+        boolean anyOnDisk = false;
+        for (var file : searchable) {
+            out.append("- ").append(file.name()).append(" (").append(AttachmentNotice.kind(file.name())).append(")");
+            if (file.hasPath()) {
+                out.append(" — on disk at `").append(file.path()).append('`');
+                anyOnDisk = true;
+            }
+            out.append('\n');
         }
-        return out.append("Their content is indexed for semantic search. To answer anything about them, "
+        out.append("Their content is indexed for semantic search. To answer anything about them, "
                 + "call `vector_search` with your question (no `store` argument needed) and read the "
-                + "returned chunks. They are NOT files on the filesystem: `file_read`, `document_outline`, "
-                + "`read_document`, `grep_document` and `bash` cannot open them, and a file name is not a path.")
-                .toString();
+                + "returned chunks.");
+        if (anyOnDisk) {
+            out.append(" A file with a path is also a file on disk — `file_read`, `document_outline`, "
+                    + "`read_document`, `grep_document` and `bash` open it by that path, for the parts "
+                    + "a search does not surface.");
+        }
+        if (searchable.stream().anyMatch(f -> !f.hasPath())) {
+            out.append(" A file without a path is NOT on the filesystem: `file_read`, `document_outline`, "
+                    + "`read_document`, `grep_document` and `bash` cannot open it, and its name is not a path.");
+        }
+        return out.toString();
     }
 }

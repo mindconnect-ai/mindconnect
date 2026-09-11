@@ -143,6 +143,47 @@ fresh empty one, so nothing has to be moved by hand at release time.
   checks, and `compute(key, change)` in `Documents` and `DocumentTable`: decide
   on the stored document, or its absence, and write — under one lock.
 
+- **agents:** a session has a working directory. `AgentSession.workingDir`
+  is the directory the user is in — the CLI sets it to where it was
+  launched (local mode) and changes it with `/cd` (a relative path taken
+  from the session's current directory), the chat's composer
+  has a folder button that names it and opens a chooser, `POST /api/sessions` takes
+  `workingDir` and `PUT /api/sessions/{id}/working-dir` changes it, an
+  embedding calls `AgentRuntime.openSession(agent, user, path)`. The
+  file-rooted tools (`file_*`, `glob`, `bash`, the document tools,
+  `vector_ingest_file`) take it as their base directory ahead of a tool's
+  `baseDir` override and the configured default; the system prompt names
+  it; a sub-agent called from the session inherits it. `glob` searches a
+  working directory from `.` and no longer requires `path` there. The
+  directory must exist and, on a server, lie under the new
+  `mindconnect.tools.working-dir-root` (default: `mindconnect.tools.base-dir`;
+  the CLI sets `/`). Sessions written before read as having none, so
+  nothing changes for them.
+
+- **agents:** a session can reach additional directories beside its working
+  directory (`AgentSession.additionalDirs`): `/add-dir` and `/dirs` in the
+  CLI, *Additional directories* in the chat's chooser, `additionalDirs` on
+  `POST /api/sessions` and `PUT /api/sessions/{id}/working-dir`,
+  `AgentRuntime.addDirectory` in an embedding. Relative paths keep meaning
+  the working directory; an absolute path into an additional directory is
+  allowed, anything outside the session's directories is refused with an
+  error naming them. `FileRoots` in `mc-agent-tool-spi` is the one sandbox
+  check the file, glob and document tools and `vector_ingest_file` now share
+  (`ToolCallScope.fileRoots`), and each of those tools takes a `FileRoots`
+  beside its `Path` constructor.
+
+- **agents:** the chat's folder button opens a directory chooser that works
+  like the operating system's: one path field, the folders inside to step
+  into, *Use this folder* takes what the field says. It browses the server's
+  tree under `mindconnect.tools.working-dir-root` and nothing beyond it; the
+  additional directories are listed beneath with a *Remove* each and an
+  *Add this folder*. `GET /api/directories?path=` is the same listing over REST,
+  over the caller's own tree, and `PUT /api/sessions/{id}/working-dir` changes
+  a session of theirs — like every session endpoint, someone else's answers 404. The
+  root may carry `{user}` (`/srv/mindconnect/users/{user}`): then every
+  user has a root of their own, created on first use, and picks from and
+  works in that tree only — the way to run this on a multi-user server.
+
 ### Changed
 
 - **agents:** `AgentSessionRepository` has `create` and `update(id, change)`
@@ -157,6 +198,126 @@ fresh empty one, so nothing has to be moved by hand at release time.
   same namespace of the same data directory — the Admin UI while the CLI runs
   in local mode, say — stops at startup with a message saying so.
 
+- **agents:** every user has a directory on the server, and every session
+  one of its own. `mindconnect.users.home` (default `<data.base-dir>/<namespace>/home/{user}`)
+  is where a user's directories live; a session opened without a working
+  directory works in `sessions/<id>` under it, the files attached to a chat
+  are put in that directory's `uploads/` — the system prompt names each
+  file's path, so `file_read`, the document tools and `bash` open them —
+  and when the session moves to a project, or a file is attached while it
+  works in one, its own directory stays
+  reachable as an additional directory. The users' home is also the
+  default root a working directory must lie under
+  (`mindconnect.tools.working-dir-root`), so the chat's chooser opens in
+  the user's own tree. An embedding sets it with
+  `AgentRuntimeBuilder.usersHome`. Sessions written before keep working as
+  they did: none of them gets a directory after the fact. A user id with
+  characters other than letters, digits, `.`, `-` and `_` gets a short hash
+  on its directory name, so two such ids never share a home.
+
+- **agents:** `AttachedFile.path` — where the copy of an attached file lies
+  on disk, when there is one; `ToolCallScope.runWith` binds a scope to the
+  running thread, and a workflow tool-call step resolves its tools in that
+  scope, so an ingestion workflow runs against the session's own files.
+
+- **agents:** a bundled `coding-assistant` agent beside `default-chat`: it
+  works in the project chosen with the chat's folder button — `grep` and
+  `glob` to orient, `file_read` with line numbers, `file_edit` for exact
+  changes, `file_write` for new files, `bash` (with approval) for the build
+  and tests, `todo_write` for the plan, and the `explorer` sub-agent for a
+  sweep of an unfamiliar codebase. Forty tool rounds per turn, auto-compact
+  memory.
+
+- **agents:** two file tools for editing code: `file_edit` replaces one
+  exact passage of a file (`old_string` → `new_string`; the passage must
+  be unique unless `replace_all`) and returns a unified diff of the
+  change, and `grep` searches file contents for a regular expression under
+  a directory or in one file — `file:line: text`, newest files first, with
+  `glob`, `ignore_case`, `context` and `files_only`, binary files and build
+  directories skipped, results capped. `file_edit` forgives indentation the
+  model got wrong when the passage is otherwise unique and keeps the
+  file's own, and answers a passage that is not there with the closest
+  one, numbered, so the next attempt copies what the file really says. `file_read` now numbers its lines
+  `cat -n` style and pages through a long file with `offset` and `limit`
+  (2,000 lines or 20,000 characters per call, and it says where to
+  continue); a binary file is refused with a pointer to the document
+  tools. Text in ISO-8859-1 is read as well — `file_edit` writes it back in
+  that encoding — CRLF line endings are kept, and `grep` stops a runaway
+  regular expression at its time limit. The bundled `default-chat`, `code-analyst`, `explorer`, `verifier`
+  and `file-finder` agents get the new tools.
+
+- **agents:** `bash` takes a `timeout` (seconds, default 120, max 600) and
+  caps its output at 30,000 characters, keeping the head and counting the
+  rest. With `background` it starts a command that is not meant to return
+  — a dev server, a watcher — watches it for three seconds and answers
+  with the pid, whether it still runs or already exited with which code,
+  the log so far and the log file under `logs/` in the session's
+  directory, so a build error is in the tool result instead of in a file
+  nobody reads; `process_kill` ends such
+  a process (with everything it spawned) or lists the session's, and
+  whatever still runs when the runtime stops is killed with it. A command
+  that would let a process go on its own — a `&` nothing waits for,
+  `nohup`, `setsid`, `disown` — is refused and pointed at `background`,
+  since such a process would run on out of the session's reach. Heredoc
+  bodies and `#` comments do not count for that check, and a call returns
+  once its shell exits even when a child it started still holds the output.
+
+- **agents:** standing instructions in a file, so a project or a user says
+  once what would otherwise go in every message. The first of `AGENTS.md`,
+  `PROMPT.md` or `CLAUDE.md` is read from two places: the user's instructions
+  directory, which holds in every project, and the session's working
+  directory, which holds while working there and comes last in the prompt so
+  it has the final word. The user's directory is `~/.mindconnect` by default,
+  which suits a desktop; a server sets
+  `mindconnect.agent.instructions.user-dir` to a path with `{user}` in it so
+  each user gets their own, or to `off` to drop the scope.
+  Both go in as their own section, read fresh every round and cut at 20,000
+  characters. `AGENTS.md` comes first because it is an open specification read
+  by a couple of dozen coding tools, so a repository that already has one
+  works here without adding a file. For the project only the working directory
+  itself is searched, not its parents.
+
+- **agents:** `run_agent` now tells the model which agents it can actually
+  reach — the project's own first, then the caller's roster — instead of
+  naming the same three in every prompt. The old description advertised
+  `web-researcher`, `file-finder` and `explorer` to every agent, including
+  ones whose roster held none of them, and never mentioned a project's own.
+  The bundled `coding-assistant` also gains `list_agents`, which it was
+  missing.
+
+- **agents:** a project can bring its own sub-agents, in
+  `.mindconnect/agents/` in the working directory: one Markdown file each,
+  front matter for `name`, `description`, `tools`, `disallowedTools` and
+  `model`, the body as the system prompt. `run_agent` resolves them by name
+  ahead of the registry, `list_agents` shows them first. Their tools are the
+  caller's own narrowed by the file, never widened, each keeping the approval
+  the caller's binding gives it, so a repository cannot hand itself a shell.
+  `tools: []` gives the agent none, and it may call only the agents its
+  caller may.
+  `tools` and `disallowedTools` may be written as a comma list or as an
+  indented YAML block.
+
+- **agents:** a `server` profile for running the apps on a server several
+  users share, and the two switches it sets. `mindconnect.tools.disabled`
+  lists tools the installation does not offer at all — they leave every
+  catalog, an agent that names one goes without it, and tool settings cannot
+  switch it back on; the profile turns off `bash` and `process_kill`, which
+  nothing confines to a chat's directory. `mindconnect.working-dirs.choice:
+  false` takes away the choice of a chat's directories: no folder button, the
+  directory endpoints refuse, and every chat works in its own directory under
+  the user's home. A deleted chat's own directory is now removed with it.
+### Changed
+
+- **agents:** an upload's copy for ingestion goes into the session's own
+  directory instead of `vector-store-uploads/` under the tools base
+  directory — the user's home, on most machines.
+
+- **agents:** the Admin UI app lets a session work anywhere under the
+  user's home by default (`mindconnect.tools.working-dir-root` set to
+  `${user.home}` in its yaml, `MC_WORKING_DIR_ROOT` to override) — it is a
+  one-user app on a developer's machine; the users' home stays the default
+  root for the API app and for any host that does not set the property.
+
 ### Removed
 
 - **agents:** the `mc-agent-tools-gmail` module. Gmail is now an MCP server
@@ -164,8 +325,26 @@ fresh empty one, so nothing has to be moved by hand at release time.
   that used `gmail_*` tools keep the same names once the registration is
   enabled.
 
+- **agents:** the workspace tools are gone — `workspace_read`, `workspace_write`,
+  `workspace_list`, their three scopes (session, agent + user, user), the
+  `WorkspaceStore` port with its file, in-memory and Postgres stores, the
+  *Workspace* dialog in the admin UI, `GET /api/workspaces/…`, and the
+  `user_notes` / `user_profile` prompt variables the notes provider filled
+  from them. A session's working directory and the file tools are where an
+  agent reads and writes files now; a newly created agent starts with no
+  tools instead of the three. The `mc_workspace_file` table is left in place
+  in an existing Postgres database — drop it by hand when nothing needs the
+  files any more. The bundled `research-lead` answers with its report
+  instead of saving `report.md`.
+
 ### Fixed
 
+- **agents:** a document attached to a chat is ingested again when its
+  vector store's embedding config is an alias, as the bundled `embeddings`
+  can be. The alias went to the embeddings endpoint as it was — with no
+  model, URL or key — so every upload failed, while testing the config it
+  points at succeeded. A failed attachment is now also written to the log;
+  until now its reason only showed in the chat's toast.
 - **agents:** knowing another user's chat session id is no longer enough to
   act in that chat. Most chat endpoints already checked the owner; sending a
   message, regenerating a reply, cancelling a turn, attaching, removing or
@@ -240,6 +419,25 @@ fresh empty one, so nothing has to be moved by hand at release time.
   unreadable summaries file is no longer overwritten with just the newest
   summary. A tool task that does fail is logged, and the tool result names the
   reason.
+
+- **agents:** the LLM-config form no longer fails with a 500 while a base
+  URL for LM Studio is being typed: a host without a scheme is taken as
+  `http://`, and what is not a URL yet reads as an unreachable server in
+  the model catalog instead of an exception.
+
+- **agents:** switching a chat's model or agent in the *Model & tools*
+  dialog no longer drops the chat's working directory and additional
+  directories: the file tools went back to the server's default directory
+  after a switch, and the model started searching the wrong tree.
+
+- **agents:** `bash` no longer reports a false timeout for a command that
+  prints more than the pipe holds (about 64 KB): the output is drained
+  while the command runs instead of after it finished, which it never did
+  once the pipe was full.
+
+- **agents:** stopping a turn, or a timeout, now ends what a `bash` command
+  started, not just the shell: `bash -c "npm run dev"` left npm and the
+  node server running on their port after the shell was killed.
 
 ## [0.7.0] - 2026-09-11
 
