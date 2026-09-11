@@ -1,6 +1,5 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.common.util.EnvVarResolver;
 import ai.mindconnect.mcp.gateway.McpGatewayException;
 import ai.mindconnect.mcp.gateway.McpTarget;
 import ai.mindconnect.mcp.proxy.DockerSpawnBuilder;
@@ -11,9 +10,9 @@ import ai.mindconnect.mcp.proxy.McpStdioSpawn;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Translates a {@link McpTarget} — how an operator described a server — into
@@ -21,6 +20,9 @@ import java.util.Map;
  * both vocabularies.
  */
 final class McpTargetEndpoints {
+
+    /** {@code ${NAME}} or {@code ${NAME:default}} — the name is group 1. */
+    private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{([^}:]+)(?::[^}]*)?}");
 
     /** Container CLI to run {@link McpTarget.Docker} with; null when none was found. */
     private final String containerBinary;
@@ -31,16 +33,17 @@ final class McpTargetEndpoints {
 
     /**
      * @throws McpGatewayException when the target cannot be run here at all —
-     *         no container runtime, or a mount whose host path is missing.
-     *         Both are configuration problems, and both are worth saying out
-     *         loud rather than letting the container fail cryptically.
+     *         no container runtime, a mount whose host path is missing, or a
+     *         value that uses a variable. All are configuration problems, and
+     *         all are worth saying out loud rather than letting the server fail
+     *         cryptically.
      */
     McpEndpoint toEndpoint(McpTarget target) {
         return switch (target) {
             case McpTarget.Docker docker -> dockerSpawn(docker);
             case McpTarget.Process process -> processSpawn(process);
             case McpTarget.Http http ->
-                    new McpHttpEndpoint(http.url(), resolve(http.headers(), "header"), null, null);
+                    new McpHttpEndpoint(http.url(), literal(http.headers(), "header"), null, null);
         };
     }
 
@@ -58,7 +61,7 @@ final class McpTargetEndpoints {
             }
             builder.mount(host.toString(), mount.containerPath());
         }
-        for (Map.Entry<String, String> e : resolve(docker.env(), "environment variable").entrySet()) {
+        for (Map.Entry<String, String> e : literal(docker.env(), "environment variable").entrySet()) {
             builder.env(e.getKey(), e.getValue());
         }
         for (String flag : docker.runFlags()) {
@@ -75,48 +78,42 @@ final class McpTargetEndpoints {
         return new McpStdioSpawn(
                 executable,
                 process.command().subList(1, process.command().size()),
-                resolve(process.env(), "environment variable"),
+                literal(process.env(), "environment variable"),
                 null,
                 null);
     }
 
     /**
-     * Expands {@code ${VAR}} / {@code ${VAR:default}} in the <em>values</em> of
-     * an env or header map, so a registration can name where a secret lives
-     * instead of carrying it.
+     * The values of an env or header map exactly as registered.
      *
-     * <p>Here and nowhere else. This is the last moment before the value is
-     * handed to the transport, so the secret never reaches the registration
-     * file, the discovery cache, a form or a log — which is the whole point
-     * of the indirection.
+     * <p>A value may carry a {@code ${NAME}} placeholder — the syntax stays
+     * storable, so registrations need no rewrite later — but nothing resolves it
+     * yet. A placeholder will resolve from the calling user's own variables and
+     * from nowhere else; until users have variables, it is refused here, before
+     * anything starts.
+     *
+     * <p>Never from the environment of this process. {@code /mcp-gateway} asks
+     * for a login, not an admin role, so a header reading
+     * {@code ${MC_POSTGRES_PASSWORD}} would hand any signed-in user the database
+     * password at a URL of their choosing.
      *
      * <p>Values only, never keys, and only these two maps: the image, the
-     * command and the URL stay literal. A registration is data, not a
-     * template language — the same line {@link #expandHome} draws. The URL in
-     * particular must stay literal because {@code McpTarget.Http} checks its
-     * scheme when the registration is built, and a placeholder cannot be
-     * checked.
+     * command and the URL are literal anyway. A registration is data, not a
+     * template language — the same line {@link #expandHome} draws.
      *
-     * @throws McpGatewayException naming the field and the missing variable —
-     *         never a value
+     * @throws McpGatewayException naming the field and the variable — never the
+     *         value, which may carry a secret around the placeholder
      */
-    private static Map<String, String> resolve(Map<String, String> values, String what) {
-        if (values.isEmpty()) {
-            return values;
-        }
-        // Ordered: env becomes -e flags, and a spawn should be the same
-        // command line on every start.
-        Map<String, String> resolved = new LinkedHashMap<>();
+    private static Map<String, String> literal(Map<String, String> values, String what) {
         for (Map.Entry<String, String> e : values.entrySet()) {
-            try {
-                resolved.put(e.getKey(), EnvVarResolver.resolve(e.getValue()));
-            } catch (RuntimeException failure) {
-                throw new McpGatewayException(
-                        what + " '" + e.getKey() + "' cannot be resolved: " + failure.getMessage(),
-                        failure);
+            Matcher placeholder = PLACEHOLDER.matcher(e.getValue() == null ? "" : e.getValue());
+            if (placeholder.find()) {
+                throw new McpGatewayException(what + " '" + e.getKey() + "' uses the variable ${"
+                        + placeholder.group(1) + "}, but variables resolve only from a user's own "
+                        + "variables, and there are none yet — enter the value itself");
             }
         }
-        return Collections.unmodifiableMap(resolved);
+        return values;
     }
 
     /**

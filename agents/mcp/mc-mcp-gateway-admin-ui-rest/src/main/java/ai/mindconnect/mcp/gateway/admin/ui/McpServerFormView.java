@@ -107,9 +107,9 @@ final class McpServerFormView {
                         {"type":"docker","image":"…","mounts":[{"hostPath":"~/x","containerPath":"/x"}],"env":{}}
                         {"type":"process","command":["npx","-y","…"],"env":{}}
                         A remote server needs https unless it runs on this machine.
-                        Secrets belong in the environment, not here: a value in "env" or "headers"
-                        may read ${MY_TOKEN} or ${MY_TOKEN:fallback} and is resolved when the
-                        server is started."""));
+                        A value in "env" or "headers" is stored and sent as entered. ${NAME} is
+                        reserved for variables of the signed-in user, which do not exist yet —
+                        a registration that uses one cannot start."""));
 
         form.action(UiAction.secondary("probe", "Test connection").icon("flash")
                         .dispatch("POST", actionBase() + "/probe", FORM_ID))

@@ -26,55 +26,51 @@ class McpTargetEndpointsTest {
     private static final String UNSET = "MC_TEST_VARIABLE_THAT_IS_NEVER_SET";
 
     @Test
-    void an_env_value_may_name_an_environment_variable_instead_of_carrying_the_secret() {
-        McpStdioSpawn spawn = (McpStdioSpawn) endpoints.toEndpoint(new McpTarget.Docker(
-                "mcp/github", List.of(),
-                Map.of("GITHUB_TOKEN", "${" + UNSET + ":s3cret}"),
-                List.of(), List.of()));
-
-        assertThat(spawn.args()).containsSubsequence("-e", "GITHUB_TOKEN=s3cret");
-    }
-
-    @Test
-    void a_real_variable_is_read_from_the_environment() {
-        McpStdioSpawn spawn = (McpStdioSpawn) endpoints.toEndpoint(new McpTarget.Docker(
-                "mcp/github", List.of(), Map.of("SEEN_PATH", "${PATH}"), List.of(), List.of()));
-
-        assertThat(spawn.args()).containsSubsequence("-e", "SEEN_PATH=" + System.getenv("PATH"));
-    }
-
-    @Test
-    void a_missing_variable_fails_by_name_before_anything_is_started() {
+    void a_variable_in_an_env_value_is_refused_by_field_and_name_before_anything_starts() {
         assertThatThrownBy(() -> endpoints.toEndpoint(new McpTarget.Docker(
                 "mcp/github", List.of(), Map.of("GITHUB_TOKEN", "${" + UNSET + "}"),
                 List.of(), List.of())))
                 .isInstanceOf(McpGatewayException.class)
                 .hasMessageContaining("GITHUB_TOKEN")   // which field
-                .hasMessageContaining(UNSET);           // and which variable
+                .hasMessageContaining(UNSET)            // which variable
+                .hasMessageContaining("user's own variables");
     }
 
     @Test
-    void headers_are_resolved_the_same_way() {
-        McpHttpEndpoint endpoint = (McpHttpEndpoint) endpoints.toEndpoint(new McpTarget.Http(
+    void the_environment_of_this_process_is_never_read() {
+        // PATH is set everywhere: expanding it would prove the process environment
+        // is a source — and a signed-in user could read ${MC_POSTGRES_PASSWORD}
+        // the same way, into a header sent to a URL of their choosing.
+        assertThatThrownBy(() -> endpoints.toEndpoint(new McpTarget.Docker(
+                "mcp/github", List.of(), Map.of("SEEN_PATH", "${PATH}"), List.of(), List.of())))
+                .isInstanceOf(McpGatewayException.class)
+                .hasMessageContaining("${PATH}");
+    }
+
+    @Test
+    void a_default_does_not_make_a_variable_acceptable() {
+        assertThatThrownBy(() -> endpoints.toEndpoint(new McpTarget.Process(
+                List.of("/bin/echo", "hi"), Map.of("TOKEN", "${" + UNSET + ":plain}"))))
+                .isInstanceOf(McpGatewayException.class)
+                .hasMessageContaining(UNSET);
+    }
+
+    @Test
+    void a_variable_in_a_header_is_refused_without_repeating_the_value() {
+        assertThatThrownBy(() -> endpoints.toEndpoint(new McpTarget.Http(
                 URI.create("https://mcp.example.com/mcp"),
-                Map.of("Authorization", "Bearer ${" + UNSET + ":abc123}")));
-
-        assertThat(endpoint.headers()).containsEntry("Authorization", "Bearer abc123");
+                Map.of("Authorization", "Bearer s3cret-part ${" + UNSET + "}"))))
+                .isInstanceOf(McpGatewayException.class)
+                .hasMessageContaining("Authorization")
+                .hasMessageContaining(UNSET)
+                .hasMessageNotContaining("s3cret-part");
     }
 
     @Test
-    void a_process_env_is_resolved_too() {
-        McpStdioSpawn spawn = (McpStdioSpawn) endpoints.toEndpoint(new McpTarget.Process(
-                List.of("/bin/echo", "hi"), Map.of("TOKEN", "${" + UNSET + ":plain}")));
-
-        assertThat(spawn.env()).containsEntry("TOKEN", "plain");
-    }
-
-    @Test
-    void only_values_are_expanded_never_keys_and_never_the_image() {
-        // A registration is data, not a template language. The narrow rule is
-        // the point: the image and the command stay literal, and so does a key
-        // that happens to look like a placeholder.
+    void a_placeholder_in_a_key_or_the_image_stays_literal() {
+        // A registration is data, not a template language. Only values are
+        // checked: the image stays literal, and so does a key that happens to
+        // look like a placeholder.
         McpStdioSpawn spawn = (McpStdioSpawn) endpoints.toEndpoint(new McpTarget.Docker(
                 "mcp/${" + UNSET + "}", List.of(),
                 Map.of("${" + UNSET + "}", "value"), List.of(), List.of()));
