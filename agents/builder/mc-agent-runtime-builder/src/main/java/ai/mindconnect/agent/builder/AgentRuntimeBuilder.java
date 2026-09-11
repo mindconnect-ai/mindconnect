@@ -457,6 +457,8 @@ public final class AgentRuntimeBuilder {
                 approvalStore, userChannels);
         var taskQueue = new ai.mindconnect.taskqueue.local.LocalTaskQueue(
                 new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
+        // A failed task would otherwise leave no trace but a tool result saying so.
+        taskQueue.addListener(ai.mindconnect.taskqueue.LoggingTaskListener.failuresOnly());
         toolWorker.attach(taskQueue);
         taskQueue.register(AgentTurnWorker.TYPE, turnWorker);
         taskQueue.register(ToolCallWorker.TYPE, toolWorker);

@@ -1,5 +1,6 @@
 package ai.mindconnect.filestore.filesystem;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.EntityId;
 import ai.mindconnect.filestore.FileId;
@@ -53,7 +54,8 @@ public final class FilesystemFileStore implements FileStore {
         Path target = dir.resolve(safeName);
         long size = Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
         StoredFile file = new StoredFile(id, safeName, contentType, size, Instant.now());
-        MAPPER.writerWithDefaultPrettyPrinter().writeValue(dir.resolve("meta.json").toFile(), file);
+        // The metadata is what makes the upload exist for readers; it lands whole or not at all.
+        AtomicFiles.write(dir.resolve("meta.json"), out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out, file));
         return file;
     }
 

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.AgentId;
 
@@ -36,7 +37,7 @@ public class FileAgentDefinitionRepository implements AgentDefinitionRepository 
     @Override
     public AgentDefinition save(AgentDefinition def) {
         try {
-            objectMapper.writeValue(fileFor(def.id().value()).toFile(), def);
+            AtomicFiles.write(fileFor(def.id().value()), out -> objectMapper.writeValue(out, def));
             return def;
         } catch (IOException e) {
             throw new UncheckedIOException(e);

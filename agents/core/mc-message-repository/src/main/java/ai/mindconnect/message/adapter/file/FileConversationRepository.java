@@ -1,5 +1,6 @@
 package ai.mindconnect.message.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.ConversationId;
 
@@ -47,7 +48,7 @@ public class FileConversationRepository implements ConversationRepository {
         Path file = fileFor(conversation.id());
         try {
             Files.createDirectories(file.getParent());
-            objectMapper.writeValue(file.toFile(), conversation);
+            AtomicFiles.write(file, out -> objectMapper.writeValue(out, conversation));
             return conversation;
         } catch (IOException e) {
             throw new UncheckedIOException(e);

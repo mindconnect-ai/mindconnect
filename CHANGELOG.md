@@ -23,6 +23,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **agents:** tool calls no longer fail at random when sub-agents run in
+  parallel. With the file persistence most stores truncated a file and wrote it
+  anew, so a tool task reading the conversation while a sibling task saved a
+  message found an empty file and ended with "tool call was interrupted before
+  completion: tool task ended FAILED without a result". Every file store now
+  writes into a temporary file and moves it into place in one step, and an
+  unreadable summaries file is no longer overwritten with just the newest
+  summary. A tool task that does fail is logged, and the tool result names the
+  reason.
+
 ## [0.7.0] - 2026-09-11
 
 ### Added

@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -129,7 +130,7 @@ public final class FileVectorStoreRegistry {
     private void write(Path dir, String name, Object value) {
         try {
             Files.createDirectories(dir);
-            MAPPER.writerWithDefaultPrettyPrinter().writeValue(fileFor(dir, name).toFile(), value);
+            AtomicFiles.write(fileFor(dir, name), out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out, value));
         } catch (IOException e) {
             throw new UncheckedIOException("Could not write " + fileFor(dir, name), e);
         }

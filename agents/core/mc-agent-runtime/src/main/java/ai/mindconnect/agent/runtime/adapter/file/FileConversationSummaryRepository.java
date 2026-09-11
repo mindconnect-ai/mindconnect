@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.ConversationId;
 
@@ -43,16 +44,18 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
     public void save(ConversationSummary summary) {
         Path file = fileFor(summary.conversationId());
         try {
-            Files.createDirectories(file.getParent());
-            List<ConversationSummary> existing = load(file);
+            // Read strictly: rewriting the file from a list that failed to load
+            // would replace every earlier summary with just this one.
+            List<ConversationSummary> existing = Files.exists(file) ? read(file) : new ArrayList<>();
             existing.add(summary);
             existing.sort(Comparator.comparingInt(ConversationSummary::fromSequenceNum));
-            mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), existing);
+            AtomicFiles.write(file, out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out, existing));
             log.debug("Saved summary {} for conversation {} (seq {}-{})",
                     summary.id(), summary.conversationId(),
                     summary.fromSequenceNum(), summary.toSequenceNum());
         } catch (IOException e) {
-            log.warn("Failed to save summary for conversation {}: {}", summary.conversationId(), e.getMessage());
+            log.warn("Failed to save summary for conversation {} (existing summaries left untouched): {}",
+                    summary.conversationId(), e.getMessage());
         }
     }
 
@@ -82,17 +85,20 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
                 .resolve(FILE_NAME);
     }
 
-    /** Summaries written before the namespace was recorded take it from the conversation asked for. */
+    /** For reading: an unreadable file counts as no summaries, the turn goes on without them. */
     private List<ConversationSummary> load(Path file) {
         if (!Files.exists(file)) return new ArrayList<>();
         try {
-            List<ConversationSummary> list = mapper.readerFor(LIST_TYPE)
-                    .readValue(file.toFile());
-            list.sort(Comparator.comparingInt(ConversationSummary::fromSequenceNum));
-            return new ArrayList<>(list);
+            return read(file);
         } catch (IOException e) {
             log.warn("Failed to read summaries from {}: {}", file, e.getMessage());
             return new ArrayList<>();
         }
+    }
+
+    private List<ConversationSummary> read(Path file) throws IOException {
+        List<ConversationSummary> list = mapper.readerFor(LIST_TYPE).readValue(file.toFile());
+        list.sort(Comparator.comparingInt(ConversationSummary::fromSequenceNum));
+        return new ArrayList<>(list);
     }
 }

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
@@ -45,7 +46,7 @@ public class FileWorkspaceStore implements WorkspaceStore {
     public void write(WorkspaceScope scope, String filename, String content) {
         Path file = scopeDir(scope).resolve(filename);
         try {
-            Files.writeString(file, content);
+            AtomicFiles.writeString(file, content);
             log.debug("WorkspaceStore.write: {}", file);
         } catch (IOException e) {
             log.warn("WorkspaceStore.write failed for {}: {}", file, e.getMessage());
@@ -111,6 +112,8 @@ public class FileWorkspaceStore implements WorkspaceStore {
             return stream
                     .filter(p -> !Files.isDirectory(p))
                     .map(p -> p.getFileName().toString())
+                    // a write in progress: AtomicFiles' temporary file beside the target
+                    .filter(name -> !(name.startsWith(".") && name.endsWith(".tmp")))
                     .sorted()
                     .toList();
         } catch (IOException e) {

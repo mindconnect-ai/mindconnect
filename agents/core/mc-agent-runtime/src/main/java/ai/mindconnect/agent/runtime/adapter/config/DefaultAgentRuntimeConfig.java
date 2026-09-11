@@ -368,6 +368,8 @@ public class DefaultAgentRuntimeConfig {
     @Bean(destroyMethod = "close")
     LocalTaskQueue taskQueue(AgentTurnWorker agentTurnWorker, ToolCallWorker toolCallWorker) {
         LocalTaskQueue queue = new LocalTaskQueue(new InMemoryTaskStore());
+        // A failed task is otherwise visible only in the task dialog, and only while it is recent.
+        queue.addListener(ai.mindconnect.taskqueue.LoggingTaskListener.failuresOnly());
         toolCallWorker.attach(queue);                       // awaits sub-agent turns
         queue.register(AgentTurnWorker.TYPE, agentTurnWorker);
         queue.register(ToolCallWorker.TYPE, toolCallWorker);

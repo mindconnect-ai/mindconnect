@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
@@ -72,7 +73,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
         Path file = turnDir.resolve(filenameFor(trace));
         try {
             Files.createDirectories(turnDir);
-            mapper.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), trace);
+            AtomicFiles.write(file, out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out, trace));
             log.debug("Saved LLM trace {} for turn {} ({} ms, {} prompt + {} completion tokens)",
                     trace.id(), trace.context().turnId(), trace.durationMs(),
                     trace.promptTokens(), trace.completionTokens());
