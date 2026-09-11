@@ -51,7 +51,7 @@ public class GrepDocumentTool implements Tool {
 
     @Override
     public String description() {
-        return "On the filesystem only — a file the user attached to this chat has no path, use vector_search for it. " +
+        return "Opens a file on the filesystem. A file the user attached to this chat is one too when the prompt names a path for it — pass that path; without a path it is not on the filesystem and vector_search is the way to it. " +
                "Searches inside a single long document (PDF or Word .docx) for a regex pattern. " +
                "Returns each match with `[page N]` and the surrounding lines, so you can locate " +
                "specific clauses or terms without reading the whole file.\n" +

@@ -78,6 +78,10 @@ public final class SystemPromptRenderer {
             out.append("- ").append(file.name()).append(" (").append(AttachmentNotice.kind(file.name())).append(")");
             if (file.hasPath()) {
                 out.append(" — on disk at `").append(file.path()).append('`');
+                String inWorkingDir = relativeToWorkingDir(session, file.path());
+                if (inWorkingDir != null) {
+                    out.append(", i.e. `").append(inWorkingDir).append("` from the working directory");
+                }
                 anyOnDisk = true;
             }
             out.append('\n');
@@ -95,5 +99,22 @@ public final class SystemPromptRenderer {
                     + "`read_document`, `grep_document` and `bash` cannot open it, and its name is not a path.");
         }
         return out.toString();
+    }
+
+    /**
+     * The file's path as the tools take it here: relative to the session's
+     * working directory, which is what a model types after reading this
+     * section. Null when the session works elsewhere — then the absolute
+     * path is the only one that works.
+     */
+    private static String relativeToWorkingDir(AgentSession session, String path) {
+        if (path == null || !session.hasWorkingDir()) return null;
+        try {
+            java.nio.file.Path base = java.nio.file.Path.of(session.workingDir()).toAbsolutePath().normalize();
+            java.nio.file.Path file = java.nio.file.Path.of(path).toAbsolutePath().normalize();
+            return file.startsWith(base) && !file.equals(base) ? base.relativize(file).toString() : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 }
