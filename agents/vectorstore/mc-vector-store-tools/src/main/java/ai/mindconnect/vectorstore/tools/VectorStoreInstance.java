@@ -53,9 +53,12 @@ public record VectorStoreInstance(
                 template.metadata(), scope, scopeRef, owner, Instant.now());
     }
 
-    /** This instance, recorded as belonging to {@code owner}. */
-    public VectorStoreInstance withOwner(String owner) {
+    /**
+     * This instance as the upload store of chat {@code scopeRef}, belonging to
+     * {@code owner}; its backend settings stay as they were.
+     */
+    public VectorStoreInstance asChatStore(String scopeRef, String owner) {
         return new VectorStoreInstance(name, templateName, backend, backendConfig, embeddingConfig,
-                ingestionWorkflow, metadata, scope, scopeRef, owner, createdAt);
+                ingestionWorkflow, metadata, Scope.SESSION, scopeRef, owner, createdAt);
     }
 }

@@ -143,6 +143,13 @@ public final class VectorTools {
                             ? callScope.agentId().value() : null;
                     case GLOBAL -> null;
                 };
+                // The chat's own upload store is registered as the chat's whatever
+                // scope was asked for — otherwise its owner is never recorded.
+                SessionId ownChat = ownChatStore(storeName, callScope);
+                if (ownChat != null) {
+                    scope = VectorStoreInstance.Scope.SESSION;
+                    scopeRef = ownChat.value();
+                }
                 // A session-scoped store is the chat's user's, like an upload store.
                 String owner = scope == VectorStoreInstance.Scope.SESSION
                         && callScope != null && callScope.userId() != null
@@ -292,10 +299,11 @@ public final class VectorTools {
      * it; otherwise the model could create {@code session-<other>} itself and
      * read what lands there later.
      *
-     * <p>A call made for nobody in particular — a workflow started from the
-     * workflow admin or the REST API runs as the {@code workflow} user — owns
-     * no chat and reaches none. The upload pipeline runs its ingestion on
-     * behalf of the chat's user.
+     * <p>Only a call made in a chat acts for a user. A call outside any chat —
+     * a workflow started from the workflow admin or the REST API — reaches no
+     * chat's store, whatever user id it carries: such runs resolve their tools
+     * as a fixed {@code workflow} user, and a real account may have that name.
+     * The upload pipeline runs its ingestion with the chat's scope.
      *
      * @return the tool's error text, or {@code null} when access is fine
      */
@@ -307,10 +315,23 @@ public final class VectorTools {
             return null;
         }
         if (registered != null && registered.owner() != null) {
-            UserId user = callScope == null ? null : callScope.userId();
+            UserId user = callScope == null || callScope.sessionId() == null ? null : callScope.userId();
             return user != null && registered.owner().equals(user.value()) ? null : refusal(storeName);
         }
         return ownChat(storeName, registered, callScope) ? null : refusal(storeName);
+    }
+
+    /** The chat whose own upload store {@code storeName} is — the call's session or its root — or null. */
+    static SessionId ownChatStore(String storeName, ToolCallScope scope) {
+        if (scope == null) {
+            return null;
+        }
+        for (SessionId session : new SessionId[]{scope.sessionId(), scope.rootSessionId()}) {
+            if (session != null && storeName.equals(sessionStoreName(session))) {
+                return session;
+            }
+        }
+        return null;
     }
 
     /** Whether the call runs in the chat the store is named or registered for, or in a sub-agent of it. */

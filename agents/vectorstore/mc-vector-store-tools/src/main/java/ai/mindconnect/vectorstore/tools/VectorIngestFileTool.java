@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
@@ -83,7 +84,12 @@ public final class VectorIngestFileTool implements Tool {
         try {
             String text = extractText(base, file);
             String template = arguments.get("template") instanceof String t && !t.isBlank() ? t : null;
-            var store = stores.open(storeName, template, VectorStoreInstance.Scope.GLOBAL, null);
+            // The chat's own upload store is registered as the chat's, owned by its user.
+            SessionId ownChat = VectorTools.ownChatStore(storeName, callScope);
+            var store = ownChat == null
+                    ? stores.open(storeName, template, VectorStoreInstance.Scope.GLOBAL, null)
+                    : stores.open(storeName, template, VectorStoreInstance.Scope.SESSION, ownChat.value(),
+                            callScope.userId() == null ? null : callScope.userId().value());
             return DirectIngestion.ingest(stores, store, storeName, relative, text);
         } catch (Exception e) {
             return "Error: vector_ingest_file failed for '" + relative + "': " + e.getMessage();

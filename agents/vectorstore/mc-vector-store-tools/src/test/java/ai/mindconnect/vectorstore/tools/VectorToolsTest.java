@@ -180,6 +180,10 @@ class VectorToolsTest {
         assertThat(tool(new VectorTools.UpsertFactory(), ToolCallScope.detached(UserId.of("workflow")))
                 .execute(chunk(bobsStore, "x", "planted")))
                 .startsWith("Error:").contains("another chat's uploads");
+        // Not even when it carries the owner's user id: only a call in a chat acts for a user.
+        assertThat(tool(new VectorTools.SearchFactory(), ToolCallScope.detached(UserId.of("bob")))
+                .execute(Map.of("store", bobsStore, "query", "finance")))
+                .startsWith("Error:").contains("another chat's uploads");
 
         // Alice, from her own chat: search, upsert and delete are refused ...
         ToolCallScope alice = chat("alice", SessionId.random());
@@ -218,8 +222,8 @@ class VectorToolsTest {
 
     /**
      * An upload store registered before owners were recorded is reachable
-     * from its own chat only — until the upload pipeline opens it for that chat
-     * again and records the chat's user.
+     * from its own chat only — until its chat writes to it again, through the
+     * upload pipeline or a tool, and the chat's user is recorded as its owner.
      */
     @Test
     void anUploadStoreWithoutOwnerIsReachableFromItsOwnChatUntilItGetsOne() {
@@ -227,21 +231,61 @@ class VectorToolsTest {
         String oldStore = "session-" + oldChat.value();
         stores().open(oldStore, null, VectorStoreInstance.Scope.SESSION, oldChat.value());
 
-        assertThat(tool(new VectorTools.UpsertFactory(), chat("carol", oldChat))
-                .execute(chunk(oldStore, "notes", "container notes")))
-                .contains("Stored 1 chunk(s)");
         assertThat(tool(new VectorTools.SearchFactory(), chat("carol", oldChat))
                 .execute(Map.of("query", "container")))
-                .contains("container notes");
+                .contains("No results");
         assertThat(tool(new VectorTools.SearchFactory(), chat("carol", SessionId.random()))
                 .execute(Map.of("store", oldStore, "query", "container")))
                 .startsWith("Error:");
 
-        stores().open(oldStore, null, VectorStoreInstance.Scope.SESSION, oldChat.value(), "carol");
+        // Its own chat writes to it: the store is claimed for the chat's user.
+        assertThat(tool(new VectorTools.UpsertFactory(), chat("carol", oldChat))
+                .execute(chunk(oldStore, "notes", "container notes")))
+                .contains("Stored 1 chunk(s)");
+        assertThat(stores().registry().instance(oldStore).orElseThrow().owner()).isEqualTo("carol");
 
         assertThat(tool(new VectorTools.SearchFactory(), chat("carol", SessionId.random()))
                 .execute(Map.of("store", oldStore, "query", "container")))
                 .contains("container notes");
+    }
+
+    /**
+     * A chat's own store is the chat's however it came about: a tool writing
+     * into it before any upload registers it so, and the upload pipeline claims
+     * a store registered under the chat's name with another scope — but never
+     * one that already has an owner or belongs to another chat.
+     */
+    @Test
+    void aChatsOwnStoreIsRegisteredAsTheChatsWhoeverCreatesIt() {
+        SessionId davesChat = SessionId.random();
+        String davesStore = "session-" + davesChat.value();
+        assertThat(tool(new VectorTools.UpsertFactory(), chat("dave", davesChat))
+                .execute(chunk(davesStore, "early", "container notes")))
+                .contains("Stored 1 chunk(s)");
+        VectorStoreInstance registered = stores().registry().instance(davesStore).orElseThrow();
+        assertThat(registered.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
+        assertThat(registered.scopeRef()).isEqualTo(davesChat.value());
+        assertThat(registered.owner()).isEqualTo("dave");
+        assertThat(tool(new VectorTools.SearchFactory(), chat("dave", SessionId.random()))
+                .execute(Map.of("store", davesStore, "query", "container")))
+                .contains("container notes");
+
+        // Registered under the chat's name as GLOBAL: the chat's pipeline claims it.
+        SessionId erinsChat = SessionId.random();
+        String erinsStore = "session-" + erinsChat.value();
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "erin");
+        VectorStoreInstance claimed = stores().registry().instance(erinsStore).orElseThrow();
+        assertThat(claimed.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
+        assertThat(claimed.scopeRef()).isEqualTo(erinsChat.value());
+        assertThat(claimed.owner()).isEqualTo("erin");
+        // An owned store is not claimed again, and nobody claims another chat's name.
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "mallory");
+        assertThat(stores().registry().instance(erinsStore).orElseThrow().owner()).isEqualTo("erin");
+        String franksStore = "session-" + SessionId.random().value();
+        stores().open(franksStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(franksStore, null, VectorStoreInstance.Scope.SESSION, SessionId.random().value(), "mallory");
+        assertThat(stores().registry().instance(franksStore).orElseThrow().owner()).isNull();
     }
 
     @Test
@@ -254,5 +298,13 @@ class VectorToolsTest {
                 .startsWith("Error:").contains("another chat's uploads");
         assertThat(ingest.execute(Map.of("path", "doc.txt", "store", "kb")))
                 .contains("Stored");
+
+        // Its own chat's store, written before any upload, is registered as that chat's.
+        SessionId alicesChat = SessionId.random();
+        String alicesStore = "session-" + alicesChat.value();
+        assertThat(tool(new VectorIngestFileTool.Factory(), chat("alice", alicesChat))
+                .execute(Map.of("path", "doc.txt", "store", alicesStore)))
+                .contains("Stored");
+        assertThat(stores().registry().instance(alicesStore).orElseThrow().owner()).isEqualTo("alice");
     }
 }

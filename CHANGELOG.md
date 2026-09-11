@@ -77,10 +77,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   ran such a workflow as a tool; `vector_ingest_file` did not check at all. A
   workflow run as an agent tool now runs its tool steps for the calling user
   and session, the upload pipeline ingests on behalf of the chat's user, and a
-  run for nobody reaches no chat's store. A sub-agent's `vector_search`
+  run outside any chat reaches no chat's store, whatever user it runs as. A sub-agent's `vector_search`
   without a store searches the uploads of the chat that started it. Upload
   stores from before this change record their owner the next time their chat
-  uploads a file; until then only that chat reaches them.
+  writes to them; until then only that chat reaches them.
 
 - **agents:** coming back to the chat no longer lands in a different
   conversation. The chat opened whichever conversation had been started

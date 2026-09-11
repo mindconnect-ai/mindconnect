@@ -96,12 +96,15 @@ itself, in another chat of the same user, in a sub-agent the chat started
 workflow run on the user's behalf — the upload pipeline runs its ingestion
 workflow that way, and a workflow used as an agent tool runs its tool steps for
 the calling user and session. Everything else is refused, including a workflow
-started from the workflow admin or `/api/workflows/{id}/run`, which runs for
-nobody in particular. Knowledge bases (`GLOBAL` and `AGENT` stores) stay open.
+started from the workflow admin or `/api/workflows/{id}/run`: a run outside any
+chat reaches no chat's store, whatever user it runs as. Knowledge bases
+(`GLOBAL` and `AGENT` stores) stay open.
 
 A `session-…` name nobody registered yet, and an upload store from before
 owners were recorded, is reachable from its own chat only; the latter records
-its owner the next time the chat uploads a file.
+its owner the next time its chat writes to it, by an upload or a tool call. A
+tool writing into its own chat's store before any upload registers it as that
+chat's, owned by its user.
 
 ## The file store
 
