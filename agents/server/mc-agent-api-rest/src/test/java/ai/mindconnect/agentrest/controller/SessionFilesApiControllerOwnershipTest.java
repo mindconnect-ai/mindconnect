@@ -84,7 +84,7 @@ class SessionFilesApiControllerOwnershipTest {
     }
 
     private String session(String owner) {
-        AgentSession session = sessions.save(AgentSession.start(AgentId.of("default-chat"), UserId.of(owner),
+        AgentSession session = sessions.create(AgentSession.start(AgentId.of("default-chat"), UserId.of(owner),
                 ConversationId.random()));
         return session.id().value();
     }
