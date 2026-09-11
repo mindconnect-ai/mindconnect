@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.UnaryOperator;
 
 /**
  * {@link AgentSessionRepository} on Postgres: one row of {@code mc_agent_session}
@@ -66,8 +67,17 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
-    public AgentSession save(AgentSession session) {
-        return sessions.save(session);
+    public AgentSession create(AgentSession session) {
+        if (!sessions.insert(session)) {
+            throw new IllegalStateException("Session " + session.id().value() + " exists already");
+        }
+        return session;
+    }
+
+    /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
+    @Override
+    public Optional<AgentSession> update(SessionId id, UnaryOperator<AgentSession> change) {
+        return sessions.update(namespace.value(), id.value(), change);
     }
 
     @Override

@@ -67,8 +67,8 @@ class PgNamespaceIsolationTest {
         AgentSession parent = AgentSession.start(AgentId.random(), DAVID, ConversationId.random());
         AgentSession child = new AgentSession(SessionId.random(), parent.agentDefinitionId(), DAVID,
                 ConversationId.random(), "t", SessionStatus.ACTIVE, Instant.now(), null, parent.id(), null, null);
-        a.save(parent);
-        a.save(child);
+        a.create(parent);
+        a.create(child);
 
         assertThat(b.findById(parent.id())).isEmpty();
         assertThat(b.findByUser(DAVID)).isEmpty();

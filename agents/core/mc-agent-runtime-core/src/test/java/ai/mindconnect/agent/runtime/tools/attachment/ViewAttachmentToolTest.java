@@ -153,7 +153,13 @@ class ViewAttachmentToolTest {
     private static final class Sessions implements AgentSessionRepository {
         AgentSession session;
 
-        @Override public AgentSession save(AgentSession s) { session = s; return s; }
+        @Override public AgentSession create(AgentSession s) { session = s; return s; }
+        @Override public Optional<AgentSession> update(SessionId id,
+                                                       java.util.function.UnaryOperator<AgentSession> change) {
+            Optional<AgentSession> changed = findById(id).map(change);
+            changed.ifPresent(s -> session = s);
+            return changed;
+        }
         @Override public Optional<AgentSession> findById(SessionId id) {
             return Optional.ofNullable(session).filter(s -> s.id().equals(id));
         }

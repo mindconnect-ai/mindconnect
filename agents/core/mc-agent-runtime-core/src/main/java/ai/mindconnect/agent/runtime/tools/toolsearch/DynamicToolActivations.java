@@ -33,8 +33,9 @@ public final class DynamicToolActivations {
         if (sessionId == null || toolNames.isEmpty()) {
             return;
         }
-        sessions.findById(sessionId).ifPresent(session ->
-                sessions.save(session.withActivatedTools(toolNames)));
+        sessions.update(sessionId, session -> session.activatedTools().containsAll(toolNames)
+                ? session
+                : session.withActivatedTools(toolNames));
     }
 
     /** The names activated for this session; empty set when none (or unknown session). */

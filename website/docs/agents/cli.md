@@ -103,7 +103,13 @@ In local mode the CLI persists under one root, `mindconnect.data.base-dir`
 - `data/system/agents` — agent definitions
 - `data/system/llm-configs` — LLM configs
 - `data/conversations/<conversationId>/` — conversation history, incl. `traces/`
-- `data/users/<userId>/sessions/<sessionId>/workspace` — workspace files
+- `data/<namespace>/sessions/<sessionId>/` — a session: `session.json`, its
+  working memory and its `workspace` files
+- `data/<namespace>/users/<userId>/workspace` — the user's own workspace files
+
+One process serves a namespace: a second process opening the same namespace of
+the same data directory (the Admin UI, say, while the CLI runs in local mode)
+stops at startup with a message saying so.
 
 The user id defaults to `mindconnect.user.id` from `application.yaml` — override
 it to keep data per user.

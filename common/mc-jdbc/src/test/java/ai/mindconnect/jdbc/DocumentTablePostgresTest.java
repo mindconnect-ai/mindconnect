@@ -4,10 +4,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Round trips against a real Postgres; skipped when none is reachable. */
 class DocumentTablePostgresTest {
@@ -121,6 +126,50 @@ class DocumentTablePostgresTest {
                 "WHERE namespace = ? ORDER BY name", "ns");
         assertThat(headers).containsExactly(
                 new Header(a.id(), "a", Kind.CHAT), new Header(b.id(), "b", Kind.CHAT));
+    }
+
+    @Test
+    void insertWritesANewRowOnly() {
+        Thing t = thing("ns", "one");
+
+        assertThat(things.insert(t)).isTrue();
+        assertThat(things.insert(new Thing(t.id(), "ns", "other", Kind.TOOL, t.createdAt(), List.of()))).isFalse();
+        assertThat(things.findById(t.id())).contains(t);
+    }
+
+    @Test
+    void concurrentUpdatesOfOneRowAllLand() throws Exception {
+        Thing t = thing("ns", "counter");
+        things.save(new Thing(t.id(), t.namespace(), t.name(), t.kind(), t.createdAt(), List.of()));
+
+        try (ExecutorService pool = Executors.newFixedThreadPool(8)) {
+            List<Future<?>> futures = new ArrayList<>();
+            for (int i = 0; i < 50; i++) {
+                String tag = "tag-" + i;
+                futures.add(pool.submit(() -> things.update(t.id(), x -> withTag(x, tag))));
+            }
+            for (Future<?> future : futures) future.get();
+        }
+
+        assertThat(things.findById(t.id()).orElseThrow().tags()).hasSize(50).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void updateOfAMissingRowIsEmptyAndAChangedKeyIsRefused() {
+        assertThat(things.update(UUID.randomUUID(), x -> withTag(x, "never"))).isEmpty();
+
+        Thing t = thing("ns", "one");
+        things.save(t);
+        assertThatThrownBy(() -> things.update(t.id(),
+                x -> new Thing(UUID.randomUUID(), x.namespace(), x.name(), x.kind(), x.createdAt(), x.tags())))
+                .isInstanceOf(JdbcException.class);
+        assertThat(things.findAll()).containsExactly(t);
+    }
+
+    private static Thing withTag(Thing t, String tag) {
+        List<String> tags = new ArrayList<>(t.tags());
+        tags.add(tag);
+        return new Thing(t.id(), t.namespace(), t.name(), t.kind(), t.createdAt(), tags);
     }
 
     @Test

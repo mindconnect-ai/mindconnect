@@ -28,6 +28,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 /**
  * CRUD operations on {@link AgentSession} — opening new chats, looking up,
@@ -107,7 +108,7 @@ public class AgentSessionService {
 
         AgentSession session = AgentSession.startSubAgent(agentDefinitionId, userId,
                 conversationId, parentSessionId, parentTurnId, parentToolCallId);
-        AgentSession saved = sessionRepository.save(session);
+        AgentSession saved = sessionRepository.create(session);
         // A sub-agent's session is the parent turn's business, not news for
         // the user's session list.
         if (parentSessionId == null) {
@@ -140,7 +141,7 @@ public class AgentSessionService {
         AgentSession session = AgentSession
                 .start(agent.id(), userId, conversationId)
                 .withSessionAgents(List.of(agent));
-        AgentSession saved = sessionRepository.save(session);
+        AgentSession saved = sessionRepository.create(session);
         userChannels.publish(userId, new UserEvent
                 .SessionStarted(saved.id(), agent.id()));
         return saved;
@@ -160,13 +161,7 @@ public class AgentSessionService {
      */
     public AgentSession replaceSessionAgent(SessionId sessionId,
                                             SessionAgent agent) {
-        AgentSession session = findSession(sessionId);
-        AgentSession moved = new AgentSession(session.id(), agent.id(),
-                session.userId(), session.conversationId(), session.title(), session.status(),
-                session.startedAt(), session.completedAt(), session.parentSessionId(),
-                session.parentTurnId(), session.parentToolCallId(), session.activatedTools(),
-                session.attachedFiles(), session.approvedTools(), List.of(agent));
-        return sessionRepository.save(moved);
+        return change(sessionId, session -> session.withSessionAgent(agent));
     }
 
     public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
@@ -216,13 +211,20 @@ public class AgentSessionService {
         return count;
     }
 
-    /**
-     * Sets the title of the given session. Used by the title-generation flow
-     * after the first user/agent exchange completes.
-     */
+    /** Sets the title of the given session — the user renaming the chat. */
     public AgentSession updateTitle(SessionId sessionId, String title) {
-        AgentSession session = findSession(sessionId);
-        return sessionRepository.save(session.withTitle(title));
+        return change(sessionId, session -> session.withTitle(title));
+    }
+
+    /**
+     * Sets {@code title} unless the session has one by now — the title generator
+     * after the first exchange, which must not overwrite a name the user gave the
+     * chat while the title was being generated.
+     *
+     * @return the session as stored, with whichever title it has
+     */
+    public AgentSession titleIfUntitled(SessionId sessionId, String title) {
+        return change(sessionId, session -> session.title() == null ? session.withTitle(title) : session);
     }
 
     /**
@@ -231,8 +233,18 @@ public class AgentSessionService {
      * see {@link AgentSession#approvedTools()}.
      */
     public AgentSession approveToolForSession(SessionId sessionId, String toolName) {
-        AgentSession session = findSession(sessionId);
-        return sessionRepository.save(session.withApprovedTool(toolName));
+        return change(sessionId, session -> session.approvedTools().contains(toolName)
+                ? session
+                : session.withApprovedTool(toolName));
+    }
+
+    /**
+     * Applies {@code change} to the stored session in one step, so a change made
+     * meanwhile by another thread — a tool activation, an attached file — is kept.
+     */
+    private AgentSession change(SessionId sessionId, UnaryOperator<AgentSession> change) {
+        return sessionRepository.update(sessionId, change)
+                .orElseThrow(() -> DomainException.notFound("AgentSession", sessionId.toString()));
     }
 
     /** The sub-sessions spawned from {@code parentSessionId} by run_agent calls. */

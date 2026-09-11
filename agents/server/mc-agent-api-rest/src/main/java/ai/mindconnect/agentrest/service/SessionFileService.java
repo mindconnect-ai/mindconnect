@@ -127,8 +127,7 @@ public class SessionFileService {
                 }
             }
         }
-        sessions.findById(sessionId).ifPresent(session ->
-                sessions.save(session.withoutAttachedFile(fileName)));
+        sessions.update(sessionId, session -> session.withoutAttachedFile(fileName));
     }
 
     /**
@@ -151,11 +150,9 @@ public class SessionFileService {
             // next message as an image part — or as that part's placeholder
             // when the model does not read images. Recorded on the session,
             // nothing else to do.
-            if (sessions.findById(sessionId).isEmpty()) {
+            if (sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached))).isEmpty()) {
                 return new AttachResult(stored, null, false, stored.name() + ": unknown session " + sessionId);
             }
-            sessions.findById(sessionId).ifPresent(session ->
-                    sessions.save(session.withAttachedFiles(List.of(attached))));
             activateViewer(sessionId);
             return new AttachResult(stored, null, true,
                     stored.name() + " attached — it goes to the model with your next message.");
@@ -228,8 +225,7 @@ public class SessionFileService {
             if (attached.isPdf()) activateViewer(sessionId);
             // Announce the file in the system prompt (rendered fresh each
             // round) so the model actually reaches for vector_search.
-            sessions.findById(sessionId).ifPresent(session ->
-                    sessions.save(session.withAttachedFiles(List.of(attached))));
+            sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached)));
             return new AttachResult(stored, storeName, true,
                     stored.name() + " attached — the agent can now search it.");
         } catch (Exception e) {

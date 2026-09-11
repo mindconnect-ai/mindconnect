@@ -59,7 +59,24 @@ fresh empty one, so nothing has to be moved by hand at release time.
   once instead of risking a deadlock, a lock that stays taken times out naming
   its holder, and a second process on the same partition (namespace) of a data
   directory is refused — processes serving different namespaces share the
-  directory as before. The file stores do not use it yet.
+  directory as before. The file session store is the first to use it.
+- **common:** `DocumentTable.insert` (writes a new row, `false` when the key
+  exists) and `DocumentTable.update(key, change)`, which reads the row
+  `FOR UPDATE` and writes the change in the same transaction.
+
+### Changed
+
+- **agents:** `AgentSessionRepository` has `create` and `update(id, change)`
+  instead of `save`. A session is changed in one step on the state the store
+  holds, never by writing back a copy read earlier; implementations of the port
+  need the two methods.
+- **agents:** the file persistence keeps a session in one directory,
+  `data/<namespace>/sessions/<sessionId>/` — `session.json`, working memory and
+  the session's workspace files. Sessions stored under the earlier
+  `users/<userId>/sessions/` are not read any more; a warning in the log says
+  where they are. One process serves a namespace: a second process opening the
+  same namespace of the same data directory — the Admin UI while the CLI runs
+  in local mode, say — stops at startup with a message saying so.
 
 ### Removed
 
@@ -111,6 +128,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `user_message`, `agent_response` and `last_messages` template variables are
   unchanged. A reviewer handing the answer back unchanged counts as a pass, not
   as a rewrite.
+
+- **agents:** changes to a session no longer overwrite each other. Tool
+  activations from parallel `tool_search` calls, an "allow for this session"
+  answered while tools ran, an attached file, a new title — each read the
+  session, changed its copy and wrote it back, so whichever came last silently
+  dropped what the others had written. The generated title also no longer
+  replaces a name the user gave the chat while it was being generated.
+
 - **agents:** tool calls no longer fail at random when sub-agents run in
   parallel. With the file persistence most stores truncated a file and wrote it
   anew, so a tool task reading the conversation while a sibling task saved a

@@ -17,11 +17,10 @@ import java.nio.file.Path;
 import java.util.Optional;
 
 /**
- * Stores internal session data under:
- *   {base}/users/{userId}/sessions/{sessionId}/working-memory.json
- *   {base}/users/{userId}/sessions/{sessionId}/summary.md
- *
- * No in-memory index needed — userId is taken from {@link AuthenticationInfo}.
+ * Stores internal session data in the session's directory, beside its
+ * {@code session.json}:
+ *   {base}/sessions/{sessionId}/working-memory.json
+ *   {base}/sessions/{sessionId}/summary.md
  */
 public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
@@ -38,7 +37,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public void save(SessionId sessionId, AuthenticationInfo auth, WorkingMemory memory) {
-        Path file = sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE);
+        Path file = sessionDir(sessionId).resolve(MEMORY_FILE);
         try {
             Files.createDirectories(file.getParent());
             AtomicFiles.write(file, out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out, memory));
@@ -50,7 +49,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public Optional<WorkingMemory> findBySession(SessionId sessionId, AuthenticationInfo auth) {
-        Path file = sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE);
+        Path file = sessionDir(sessionId).resolve(MEMORY_FILE);
         if (!Files.exists(file)) return Optional.empty();
         try {
             return Optional.of(mapper.readValue(file.toFile(), WorkingMemory.class));
@@ -62,13 +61,13 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public void delete(SessionId sessionId, AuthenticationInfo auth) {
-        deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(MEMORY_FILE));
-        deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE));
+        deleteFile(sessionDir(sessionId).resolve(MEMORY_FILE));
+        deleteFile(sessionDir(sessionId).resolve(SUMMARY_FILE));
     }
 
     @Override
     public void saveSummary(SessionId sessionId, AuthenticationInfo auth, String summary) {
-        Path file = sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE);
+        Path file = sessionDir(sessionId).resolve(SUMMARY_FILE);
         try {
             Files.createDirectories(file.getParent());
             AtomicFiles.writeString(file, summary);
@@ -80,7 +79,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public Optional<String> loadSummary(SessionId sessionId, AuthenticationInfo auth) {
-        Path file = sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE);
+        Path file = sessionDir(sessionId).resolve(SUMMARY_FILE);
         if (!Files.exists(file)) return Optional.empty();
         try {
             String content = Files.readString(file).strip();
@@ -93,15 +92,13 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     @Override
     public void deleteSummary(SessionId sessionId, AuthenticationInfo auth) {
-        deleteFile(sessionDir(auth.userId().value(), sessionId).resolve(SUMMARY_FILE));
+        deleteFile(sessionDir(sessionId).resolve(SUMMARY_FILE));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private Path sessionDir(String userId, SessionId sessionId) {
+    private Path sessionDir(SessionId sessionId) {
         return baseDir
-                .resolve("users")
-                .resolve(sanitize(userId))
                 .resolve("sessions")
                 .resolve(sessionId.value());
     }
@@ -112,9 +109,5 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
         } catch (IOException e) {
             log.warn("Failed to delete {}: {}", file, e.getMessage());
         }
-    }
-
-    private static String sanitize(String value) {
-        return value.replaceAll("[^a-zA-Z0-9_\\-]", "_");
     }
 }

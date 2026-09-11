@@ -1,9 +1,12 @@
 package ai.mindconnect.jdbc;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 /**
@@ -23,6 +26,8 @@ import java.util.stream.Collectors;
  *
  * configs.createSchema();                 // CREATE TABLE IF NOT EXISTS …
  * configs.save(config);                   // upsert on id
+ * configs.insert(config);                 // false when the id exists
+ * configs.update(id, c -> c.withName(n)); // SELECT … FOR UPDATE, change, write — one transaction
  * configs.findById(id);
  * configs.find("WHERE name = ?", name);   // the tail after FROM <table>
  * configs.find("ORDER BY name");
@@ -58,6 +63,7 @@ public final class DocumentTable<T> {
     private final List<Index> indexes;
     private final RowMapper<T> mapper;
     private final String upsert;
+    private final String insert;
 
     private DocumentTable(Builder<T> b) {
         this.sql = b.sql;
@@ -69,6 +75,7 @@ public final class DocumentTable<T> {
         this.indexes = List.copyOf(b.indexes);
         this.mapper = row -> row.json("doc", type);
         this.upsert = buildUpsert();
+        this.insert = buildInsert();
     }
 
     public static <T> Builder<T> of(Class<T> type) {
@@ -181,6 +188,64 @@ public final class DocumentTable<T> {
 
     /** Insert or, if a row with this id exists, replace its columns and document. */
     public T save(T entity) {
+        sql.update(upsert, params(entity));
+        return entity;
+    }
+
+    /**
+     * Inserts the row of a new entity; when a row with its key exists already,
+     * nothing is written.
+     *
+     * @return whether the row was inserted
+     */
+    public boolean insert(T entity) {
+        return sql.update(insert, params(entity)) > 0;
+    }
+
+    /**
+     * Reads the row {@code FOR UPDATE}, applies {@code change} and writes the
+     * result, in one transaction: concurrent updates of the same row take turns,
+     * each applied to what the one before wrote. Returning the instance it was
+     * given writes nothing. {@code change} runs while the row is locked — build
+     * the new value, nothing else; it must not change the key.
+     *
+     * @return the changed entity, or empty when there is no such row
+     */
+    public Optional<T> update(Object idValue, UnaryOperator<T> change) {
+        requireNoPartition("update");
+        return update(select("WHERE " + id.name() + " = ? FOR UPDATE"), change, idValue);
+    }
+
+    /** {@link #update(Object, UnaryOperator)} for a table with a {@link Builder#partitionKey partition key}. */
+    public Optional<T> update(Object partitionValue, Object idValue, UnaryOperator<T> change) {
+        requirePartition("update");
+        return update(select(whereKey() + " FOR UPDATE"), change, partitionValue, idValue);
+    }
+
+    private Optional<T> update(String selectForUpdate, UnaryOperator<T> change, Object... key) {
+        return sql.inTransaction(tx -> {
+            Optional<T> current = tx.queryOne(selectForUpdate, mapper, key);
+            if (current.isEmpty()) {
+                return Optional.<T>empty();
+            }
+            T changed = Objects.requireNonNull(change.apply(current.get()), "update: the change returned null");
+            if (changed != current.get()) {
+                if (!sameKey(current.get(), changed)) {
+                    throw new JdbcException("update() must not change the key of the " + table
+                            + " row " + Arrays.toString(key));
+                }
+                tx.update(upsert, params(changed));
+            }
+            return Optional.of(changed);
+        });
+    }
+
+    private boolean sameKey(T a, T b) {
+        return Objects.equals(id.value().apply(a), id.value().apply(b))
+                && (partition == null || Objects.equals(partition.value().apply(a), partition.value().apply(b)));
+    }
+
+    private Object[] params(T entity) {
         int keys = partition == null ? 1 : 2;
         Object[] params = new Object[columns.size() + keys + 1];
         if (partition != null) params[0] = partition.value().apply(entity);
@@ -189,8 +254,7 @@ public final class DocumentTable<T> {
             params[i + keys] = columns.get(i).value().apply(entity);
         }
         params[params.length - 1] = sql.json().jsonb(entity);
-        sql.update(upsert, params);
-        return entity;
+        return params;
     }
 
     public boolean deleteById(Object idValue) {
@@ -251,22 +315,35 @@ public final class DocumentTable<T> {
         }
     }
 
-    private String buildUpsert() {
+    private String insertInto() {
         List<String> names = keyNames();
         columns.forEach(c -> names.add(c.name()));
         String placeholders = names.stream().map(n -> "?").collect(Collectors.joining(", "));
+        return "INSERT INTO " + table + " (" + String.join(", ", names) + ", updated_at, doc) VALUES ("
+                + placeholders + ", now(), ?) ON CONFLICT (" + String.join(", ", keyNames()) + ")";
+    }
+
+    private String buildUpsert() {
         String updates = columns.stream()
                 .map(c -> c.name() + " = EXCLUDED." + c.name())
                 .collect(Collectors.joining(", "));
-        return "INSERT INTO " + table + " (" + String.join(", ", names) + ", updated_at, doc) VALUES ("
-                + placeholders + ", now(), ?) ON CONFLICT (" + String.join(", ", keyNames()) + ") DO UPDATE SET "
+        return insertInto() + " DO UPDATE SET "
                 + (updates.isEmpty() ? "" : updates + ", ")
                 + "updated_at = now(), doc = EXCLUDED.doc";
+    }
+
+    private String buildInsert() {
+        return insertInto() + " DO NOTHING";
     }
 
     /** The statement {@link #save} runs — visible so a test or a reader can check it. */
     public String upsertSql() {
         return upsert;
+    }
+
+    /** The statement {@link #insert} runs. */
+    public String insertSql() {
+        return insert;
     }
 
     // ── builder ─────────────────────────────────────────────────────────────
