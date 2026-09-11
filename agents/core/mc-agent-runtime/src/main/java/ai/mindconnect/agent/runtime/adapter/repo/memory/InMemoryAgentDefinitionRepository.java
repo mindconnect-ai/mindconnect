@@ -17,8 +17,8 @@ public class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
 
     @Override
     public AgentDefinition save(AgentDefinition definition) {
-        store.put(definition.id(), definition);
-        return definition;
+        return store.compute(definition.id(), (id, current) -> definition.withVersion(ai.mindconnect.common.Versions.next(
+                current == null ? null : current.version(), definition.version(), "AgentDefinition", id.value())));
     }
 
     @Override

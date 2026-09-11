@@ -131,8 +131,9 @@ public class InitialDataLoader {
         try {
             JsonNode storedNode  = objectMapper.valueToTree(stored);
             JsonNode incomingNode = objectMapper.valueToTree(incoming);
-            // Strip timestamp fields that are expected to differ
-            for (String field : List.of("createdAt", "updatedAt")) {
+            // Strip the fields that are expected to differ: timestamps, and the
+            // version, which counts saves — a seed never carries one.
+            for (String field : List.of("createdAt", "updatedAt", "version")) {
                 ((com.fasterxml.jackson.databind.node.ObjectNode) storedNode).remove(field);
                 ((com.fasterxml.jackson.databind.node.ObjectNode) incomingNode).remove(field);
             }

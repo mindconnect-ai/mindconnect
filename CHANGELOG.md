@@ -127,6 +127,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **common:** `DocumentTable.insert` (writes a new row, `false` when the key
   exists) and `DocumentTable.update(key, change)`, which reads the row
   `FOR UPDATE` and writes the change in the same transaction.
+- **agents:** saving an agent, an LLM config or a vector-store template from a
+  form that was opened before someone else saved it is refused instead of
+  silently overwriting the other change. Agent definitions, LLM configs and
+  templates carry a `version` that every save raises; the admin UI forms send
+  the version they were opened with and answer a stale save with "was changed
+  by someone else in the meantime — your changes were not saved", keeping the
+  form on screen. Over REST the check is opt-in: send the `version` you read
+  (in the body of `POST /api/llm-configs`, `POST /api/vector-stores/templates`,
+  `PUT /api/agents/{id}`) to get `409 Conflict` for a stale save; without it a
+  save overwrites as before. A new template no longer replaces an existing one
+  of the same name, and adding, editing or removing an agent's tool no longer
+  drops a tool changed at the same time.
+- **common:** `Versions` and `StaleVersionException` in `mc-common` for such
+  checks, and `compute(key, change)` in `Documents` and `DocumentTable`: decide
+  on the stored document, or its absence, and write — under one lock.
 
 ### Changed
 

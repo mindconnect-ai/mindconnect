@@ -240,6 +240,51 @@ public final class DocumentTable<T> {
         });
     }
 
+    /**
+     * Reads the row — empty when there is none — lets {@code change} decide what to
+     * store, and writes that: an existing row {@code FOR UPDATE} in one transaction,
+     * a missing one by insert. When another writer inserts the row in between, the
+     * change runs again on that row. For a save that depends on what is stored,
+     * whether or not anything is — a version check, say.
+     *
+     * @return what is stored afterwards
+     */
+    public T compute(Object idValue, Function<Optional<T>, T> change) {
+        requireNoPartition("compute");
+        return compute(change, () -> update(idValue, current -> change.apply(Optional.of(current))), idValue);
+    }
+
+    /** {@link #compute(Object, Function)} for a table with a {@link Builder#partitionKey partition key}. */
+    public T compute(Object partitionValue, Object idValue, Function<Optional<T>, T> change) {
+        requirePartition("compute");
+        return compute(change, () -> update(partitionValue, idValue, current -> change.apply(Optional.of(current))),
+                partitionValue, idValue);
+    }
+
+    private T compute(Function<Optional<T>, T> change, java.util.function.Supplier<Optional<T>> updateExisting,
+                      Object... key) {
+        for (int attempt = 0; attempt < 3; attempt++) {
+            Optional<T> updated = updateExisting.get();
+            if (updated.isPresent()) {
+                return updated.get();
+            }
+            T created = Objects.requireNonNull(change.apply(Optional.empty()), "compute: the change returned null");
+            Object[] createdKey = partition == null
+                    ? new Object[]{id.value().apply(created)}
+                    : new Object[]{partition.value().apply(created), id.value().apply(created)};
+            if (!Arrays.equals(createdKey, key)) {
+                throw new JdbcException("compute() must create the " + table + " row " + Arrays.toString(key)
+                        + ", not " + Arrays.toString(createdKey));
+            }
+            if (insert(created)) {
+                return created;
+            }
+            // Inserted by another writer meanwhile: apply the change to that row.
+        }
+        throw new JdbcException("compute() on " + table + " row " + Arrays.toString(key)
+                + " kept losing the race to insert it");
+    }
+
     private boolean sameKey(T a, T b) {
         return Objects.equals(id.value().apply(a), id.value().apply(b))
                 && (partition == null || Objects.equals(partition.value().apply(a), partition.value().apply(b)));

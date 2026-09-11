@@ -97,6 +97,11 @@ public final class AgentFormComponent implements UiComponent {
         var form = UiForm.of(id(), null)
                 .field(UiField.text("name", "Name", isNew ? null : agent.name())
                         .asEditable().asRequired())
+                // The version this form was opened with. Hidden, but submitted like
+                // every named input: the save is refused if the agent was saved since.
+                .field(UiField.text("version", "Version",
+                                isNew || agent.version() == null ? "0" : agent.version().toString())
+                        .asEditable().<UiField>hidden())
                 .field(UiField.text("description", "Description", isNew ? null : agent.description())
                         .asEditable())
                 // The rubric this agent is filed under in the list. A choice
