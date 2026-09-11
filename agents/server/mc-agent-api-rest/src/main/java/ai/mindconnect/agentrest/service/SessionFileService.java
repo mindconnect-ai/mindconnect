@@ -165,7 +165,21 @@ public class SessionFileService {
         }
     }
 
+    /**
+     * Attaches a stored file to the session: an image is recorded, anything
+     * else is copied into the session's directory and ingested into its
+     * vector store. A failure comes back as the result — the chat shows it as
+     * a toast — and is logged, since the toast is gone once it fades.
+     */
     public AttachResult attach(SessionId sessionId, StoredFile stored) {
+        AttachResult result = ingest(sessionId, stored);
+        if (!result.success()) {
+            log.warn("Attaching '{}' to session {} failed: {}", stored.name(), sessionId.value(), result.message());
+        }
+        return result;
+    }
+
+    private AttachResult ingest(SessionId sessionId, StoredFile stored) {
         AttachedFile attached = new AttachedFile(stored.id().value(), stored.name(), stored.contentType(), stored.size());
         var sessionOpt = sessions.findById(sessionId);
         if (sessionOpt.isEmpty()) {
@@ -275,6 +289,7 @@ public class SessionFileService {
             return new AttachResult(stored, storeName, true,
                     stored.name() + " attached — the agent can now search it.");
         } catch (Exception e) {
+            log.debug("Attaching '{}' to session {} threw", stored.name(), sessionId.value(), e);
             return new AttachResult(stored, storeName, false,
                     stored.name() + ": " + e.getMessage());
         }

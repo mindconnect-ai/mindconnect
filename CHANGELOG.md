@@ -327,6 +327,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** a document attached to a chat is ingested again when its
+  vector store's embedding config is an alias, as the bundled `embeddings`
+  can be. The alias went to the embeddings endpoint as it was — with no
+  model, URL or key — so every upload failed, while testing the config it
+  points at succeeded. A failed attachment is now also written to the log;
+  until now its reason only showed in the chat's toast.
 - **agents:** knowing another user's chat session id is no longer enough to
   act in that chat. Most chat endpoints already checked the owner; sending a
   message, regenerating a reply, cancelling a turn, attaching, removing or

@@ -206,10 +206,15 @@ public final class VectorStores {
 
     // ── embedding ──────────────────────────────────────────────────────────
 
-    /** Embeds with the instance's own embedding LlmConfig. */
+    /**
+     * Embeds with the instance's own embedding LlmConfig — through an alias to
+     * the config behind it: an alias record names no model, URL or key, and
+     * a store pointed at {@code embeddings} must follow wherever that name is
+     * pointed.
+     */
     public List<float[]> embedFor(String storeName, List<String> texts) {
         String configName = settingsFor(storeName).embeddingConfig();
-        LlmConfig config = configs.findByName(configName)
+        LlmConfig config = configs.findResolvedByName(configName)
                 .orElseThrow(() -> new IllegalStateException("No LlmConfig named '" + configName
                         + "' (store '" + storeName + "') — create one pointing at an "
                         + "embedding model, e.g. LM Studio's text-embedding-nomic-embed-text-v1.5"));
