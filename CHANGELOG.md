@@ -145,7 +145,8 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 - **agents:** a session has a working directory. `AgentSession.workingDir`
   is the directory the user is in — the CLI sets it to where it was
-  launched (local mode) and changes it with `/cd`, the chat's composer
+  launched (local mode) and changes it with `/cd` (a relative path taken
+  from the session's current directory), the chat's composer
   has a folder button that names it and opens a chooser, `POST /api/sessions` takes
   `workingDir` and `PUT /api/sessions/{id}/working-dir` changes it, an
   embedding calls `AgentRuntime.openSession(agent, user, path)`. The
@@ -167,7 +168,7 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the working directory; an absolute path into an additional directory is
   allowed, anything outside the session's directories is refused with an
   error naming them. `FileRoots` in `mc-agent-tool-spi` is the one sandbox
-  check the file, glob and document tools now share
+  check the file, glob and document tools and `vector_ingest_file` now share
   (`ToolCallScope.fileRoots`), and each of those tools takes a `FileRoots`
   beside its `Path` constructor.
 
@@ -176,7 +177,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   into, *Use this folder* takes what the field says. It browses the server's
   tree under `mindconnect.tools.working-dir-root` and nothing beyond it; the
   additional directories are listed beneath with a *Remove* each and an
-  *Add this folder*. `GET /api/directories?userId=&path=` is the same listing over REST. The
+  *Add this folder*. `GET /api/directories?userId=&path=` is the same listing over REST;
+  with login on, it and `PUT /api/sessions/{id}/working-dir` act only for the
+  logged-in user. The
   root may carry `{user}` (`/srv/mindconnect/users/{user}`): then every
   user has a root of their own, created on first use, and picks from and
   works in that tree only — the way to run this on a multi-user server.
@@ -201,13 +204,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
   directory works in `sessions/<id>` under it, the files attached to a chat
   are put in that directory's `uploads/` — the system prompt names each
   file's path, so `file_read`, the document tools and `bash` open them —
-  and when the session moves to a project its own directory stays
+  and when the session moves to a project, or a file is attached while it
+  works in one, its own directory stays
   reachable as an additional directory. The users' home is also the
   default root a working directory must lie under
   (`mindconnect.tools.working-dir-root`), so the chat's chooser opens in
   the user's own tree. An embedding sets it with
   `AgentRuntimeBuilder.usersHome`. Sessions written before keep working as
-  they did: none of them gets a directory after the fact.
+  they did: none of them gets a directory after the fact. A user id with
+  characters other than letters, digits, `.`, `-` and `_` gets a short hash
+  on its directory name, so two such ids never share a home.
 
 - **agents:** `AttachedFile.path` — where the copy of an attached file lies
   on disk, when there is one; `ToolCallScope.runWith` binds a scope to the
@@ -235,7 +241,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `cat -n` style and pages through a long file with `offset` and `limit`
   (2,000 lines or 20,000 characters per call, and it says where to
   continue); a binary file is refused with a pointer to the document
-  tools. The bundled `default-chat`, `code-analyst`, `explorer`, `verifier`
+  tools. Text in ISO-8859-1 is read as well — `file_edit` writes it back in
+  that encoding — CRLF line endings are kept, and `grep` stops a runaway
+  regular expression at its time limit. The bundled `default-chat`, `code-analyst`, `explorer`, `verifier`
   and `file-finder` agents get the new tools.
 
 - **agents:** `bash` takes a `timeout` (seconds, default 120, max 600) and
@@ -250,7 +258,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   whatever still runs when the runtime stops is killed with it. A command
   that would let a process go on its own — a `&` nothing waits for,
   `nohup`, `setsid`, `disown` — is refused and pointed at `background`,
-  since such a process would run on out of the session's reach.
+  since such a process would run on out of the session's reach. Heredoc
+  bodies and `#` comments do not count for that check, and a call returns
+  once its shell exits even when a child it started still holds the output.
 
 - **agents:** standing instructions in a file, so a project or a user says
   once what would otherwise go in every message. The first of `AGENTS.md`,
@@ -282,6 +292,8 @@ fresh empty one, so nothing has to be moved by hand at release time.
   ahead of the registry, `list_agents` shows them first. Their tools are the
   caller's own narrowed by the file, never widened, each keeping the approval
   the caller's binding gives it, so a repository cannot hand itself a shell.
+  `tools: []` gives the agent none, and it may call only the agents its
+  caller may.
   `tools` and `disallowedTools` may be written as a comma list or as an
   indented YAML block.
 
