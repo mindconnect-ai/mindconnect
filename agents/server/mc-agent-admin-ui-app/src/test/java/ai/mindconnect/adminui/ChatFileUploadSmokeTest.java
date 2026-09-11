@@ -7,6 +7,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agentrest.service.SessionFileService;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.chatui.service.SessionOwnership;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -103,9 +104,12 @@ class ChatFileUploadSmokeTest {
         assumeTrue(embeddingsUp(),
                 "LM Studio is not running at " + LM_STUDIO + " or no embeddings model is loaded");
 
-        // Any seeded agent will do — the upload path is agent-agnostic.
+        // Any seeded agent will do — the upload path is agent-agnostic. The
+        // session has to be the caller's: the chat endpoints refuse anyone
+        // else's, and with authentication off every request runs as the dev
+        // user.
         AgentDefinition agent = agents.findAll().stream().findFirst().orElseThrow();
-        AgentSession session = sessionService.openChat(agent.id(), UserId.of("upload-tester"));
+        AgentSession session = sessionService.openChat(agent.id(), UserId.of(SessionOwnership.ANONYMOUS_USER));
 
         String text = "Mindconnect upload smoke test.\n"
                 + "The secret ingredient of the test soup is paprika.\n".repeat(40);
