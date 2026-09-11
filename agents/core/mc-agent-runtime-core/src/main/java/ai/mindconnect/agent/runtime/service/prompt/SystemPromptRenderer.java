@@ -8,9 +8,11 @@ import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.AuthenticationInfo;
 
 /**
- * Builds the full system prompt the LLM sees: the agent's rendered template
- * followed by the memory strategy's optional addendum (e.g. compressed
- * conversation summaries).
+ * Builds the full system prompt the LLM sees: the agent's rendered template,
+ * the memory strategy's optional addendum (e.g. compressed conversation
+ * summaries), then the sections the runtime adds itself — where the session
+ * works, the user's standing instructions, what the project asks of an agent
+ * working there, and which files are attached to the chat.
  */
 public final class SystemPromptRenderer {
 
@@ -20,11 +22,14 @@ public final class SystemPromptRenderer {
                                 MemoryStrategy strategy,
                                 AgentDefinition def,
                                 AgentSession session,
-                                AuthenticationInfo auth) {
+                                AuthenticationInfo auth,
+                                InstructionFiles instructions) {
         String rendered = renderer.render(def.systemPrompt(), def, session, auth);
         String addendum = strategy.systemPromptAddendum(def, session);
         String prompt = (addendum == null || addendum.isEmpty()) ? rendered : rendered + addendum;
-        return prompt + workingDirSection(session) + attachedFilesSection(session);
+        return prompt + workingDirSection(session)
+                + instructions.userSection(session) + instructions.projectSection(session)
+                + attachedFilesSection(session);
     }
 
     /**

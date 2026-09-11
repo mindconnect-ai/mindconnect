@@ -364,6 +364,24 @@ public class DefaultAgentRuntimeConfig {
     }
 
     /**
+     * Where a user's own standing instructions live: an {@code AGENTS.md},
+     * {@code PROMPT.md} or {@code CLAUDE.md} that holds in every project,
+     * beside the project's own file in its working directory.
+     *
+     * <p>Unset means {@code ~/.mindconnect}, which is right for a desktop:
+     * one person, one home, beside what the launcher keeps there. A server
+     * runs as one service account, so that same path would be one file for
+     * everybody — put {@code {user}} in the value and each user gets a
+     * directory of their own, e.g. {@code /srv/mindconnect/users/{user}}.
+     * {@code off} drops the user scope, leaving only the project's file.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles(
+            @Value("${mindconnect.agent.instructions.user-dir:}") String userDir) {
+        return ai.mindconnect.agent.runtime.service.prompt.InstructionFiles.of(userDir);
+    }
+
+    /**
      * Where a session may work: under {@code mindconnect.tools.working-dir-root}
      * when set, else in the user's own home; without one, under the tools'
      * base directory — a server must not let a user point the file tools at
@@ -444,11 +462,12 @@ public class DefaultAgentRuntimeConfig {
                                     LlmCallTraceRepository llmCallTraceRepository,
                                     SessionChannels sessionChannels,
                                     AgentTaskRunner agentTaskRunner,
-                                    WorkingMemoryRepository workingMemoryRepository) {
+                                    WorkingMemoryRepository workingMemoryRepository,
+                                    ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles) {
         return new AgentTurnWorker(conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, dynamicToolActivations,
                 llmChat, llmCallTraceRepository, sessionChannels,
-                agentTaskRunner, workingMemoryRepository);
+                agentTaskRunner, workingMemoryRepository, instructionFiles);
     }
 
     @Bean
@@ -479,10 +498,12 @@ public class DefaultAgentRuntimeConfig {
                                       UserChannels userChannels,
                                       LocalTaskQueue taskQueue,
                                       ToolApprovalStore approvalStore,
-                                      ExecutorService turnExecutor) {
+                                      ExecutorService turnExecutor,
+                                      ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles) {
         return new AgentChatService(sessionService, definitionRepository, conversationManager,
                 memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                agentTaskRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor);
+                agentTaskRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
+                instructionFiles);
     }
 
     /**

@@ -249,6 +249,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
   a process (with everything it spawned) or lists the session's, and
   whatever still runs when the runtime stops is killed with it.
 
+- **agents:** standing instructions in a file, so a project or a user says
+  once what would otherwise go in every message. The first of `AGENTS.md`,
+  `PROMPT.md` or `CLAUDE.md` is read from two places: the user's instructions
+  directory, which holds in every project, and the session's working
+  directory, which holds while working there and comes last in the prompt so
+  it has the final word. The user's directory is `~/.mindconnect` by default,
+  which suits a desktop; a server sets
+  `mindconnect.agent.instructions.user-dir` to a path with `{user}` in it so
+  each user gets their own, or to `off` to drop the scope.
+  Both go in as their own section, read fresh every round and cut at 20,000
+  characters. `AGENTS.md` comes first because it is an open specification read
+  by a couple of dozen coding tools, so a repository that already has one
+  works here without adding a file. For the project only the working directory
+  itself is searched, not its parents.
+
 ### Changed
 
 - **agents:** an upload's copy for ingestion goes into the session's own

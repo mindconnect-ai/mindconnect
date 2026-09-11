@@ -25,6 +25,7 @@ import ai.mindconnect.agent.runtime.service.round.TurnMessage;
 import ai.mindconnect.agent.runtime.service.round.TurnOutcome;
 import ai.mindconnect.agent.runtime.service.round.Usage;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
+import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
 import ai.mindconnect.agent.runtime.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
@@ -96,6 +97,7 @@ public final class AgentTurnWorker implements TaskWorker {
     private final SessionChannels sessionChannels;
     private final AgentTaskRunner agentTaskRunner;
     private final WorkingMemoryRepository workingMemoryRepository;
+    private final InstructionFiles instructions;
 
     public AgentTurnWorker(ConversationManager conversationManager,
                            AgentDefinitionRepository definitionRepository,
@@ -108,7 +110,8 @@ public final class AgentTurnWorker implements TaskWorker {
                            LlmCallTraceRepository traceRepository,
                            SessionChannels sessionChannels,
                            AgentTaskRunner agentTaskRunner,
-                           WorkingMemoryRepository workingMemoryRepository) {
+                           WorkingMemoryRepository workingMemoryRepository,
+                           InstructionFiles instructions) {
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
         this.sessionService = sessionService;
@@ -121,6 +124,7 @@ public final class AgentTurnWorker implements TaskWorker {
         this.sessionChannels = sessionChannels;
         this.agentTaskRunner = agentTaskRunner;
         this.workingMemoryRepository = workingMemoryRepository;
+        this.instructions = instructions;
     }
 
     /**
@@ -258,7 +262,8 @@ public final class AgentTurnWorker implements TaskWorker {
 
         LlmChatProvider llm = new LlmChatProvider(llmChat, def, session, memoryStrategy,
                 promptRenderer, stream, traceRepository,
-                new TraceContext(conversationId, session.id(), turnId, parentTurnId, depth, def.name()));
+                new TraceContext(conversationId, session.id(), turnId, parentTurnId, depth, def.name()),
+                instructions);
 
         // Turn-level policy as advisors around each round: the reviewer chain
         // rewrites an ANSWERED outcome before persistence.
@@ -374,7 +379,7 @@ public final class AgentTurnWorker implements TaskWorker {
                                            AgentSession session, AuthenticationInfo auth) {
         try {
             WorkingMemory stats = WorkingMemoryBuilder.build(
-                    promptRenderer, memoryStrategy, def, session, auth);
+                    promptRenderer, memoryStrategy, def, session, auth, instructions);
             workingMemoryRepository.save(session.id(), auth, stats);
         } catch (Exception e) {
             log.warn("Failed to save working memory for session {}: {}", session.id(), e.getMessage());

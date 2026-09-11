@@ -55,11 +55,69 @@ override an earlier one. The built-in providers:
 | `CurrentDateProvider` | `current_date`, `current_datetime`, `current_time` |
 | `AgentMetadataProvider` | `agent_name`, `agent_id`, `user_id`, `session_id` |
 | `AgentToolsProvider` | `tools` |
-| `WorkspaceNotesProvider` | `user_notes`, `user_profile` |
 | `TodoListPromptContextProvider` | `todos`, `todo_list_md` |
 
 Use `snake_case` keys, prefer simple types (strings, numbers, lists, maps), and
 put `null` for absent values so `{% if x %}` blocks behave intuitively.
+
+## Sections the runtime appends
+
+After the agent's template and the memory strategy's addendum, the runtime
+appends sections of its own. They are rendered fresh on every round, so a
+change shows up on the next turn without touching the agent.
+
+| Section | When | What it says |
+|---------|------|--------------|
+| `## Working directory` | the session has one, or has additional directories | Where relative paths resolve, where `bash` runs, which further directories may be reached by absolute path |
+| `## User instructions` | the user's instructions directory holds one of the files below | The user's standing instructions, verbatim |
+| `## Project instructions` | the working directory holds one of them | The project's own instructions, verbatim |
+| `## Attached files` | files are attached to the chat | Their names, kinds and on-disk paths, and how to search them |
+
+### Instruction files
+
+Standing instructions are written once in a file instead of in every
+message. They are read from two places:
+
+- **the user's**, in the directory named by
+  `mindconnect.agent.instructions.user-dir`. Holds in every project.
+- **the project's**, in the session's working directory. Holds while the
+  session works there, and comes after the user's in the prompt, so the more
+  specific one has the last word.
+
+In both places the first of these file names that exists is read:
+
+1. **`AGENTS.md`** — an open specification since 2025, stewarded by the Linux
+   Foundation's Agentic AI Foundation and read by a couple of dozen coding
+   tools. A repository that already has one needs nothing new here.
+2. **`PROMPT.md`** — for a project that wants a file of its own.
+3. **`CLAUDE.md`** — so a repository set up for Claude Code is not left silent.
+
+Only one of them is read per place, not all three: a repository carrying two
+usually says the same thing twice. For the project, only the working directory
+itself is searched, not its parents — that directory is the one the user picked
+with the chat's folder button, so reading from it is something they asked for.
+Content beyond 20,000 characters is cut, with a line saying so.
+
+#### One directory, or one per user
+
+`mindconnect.agent.instructions.user-dir` decides which. Unset it means
+`~/.mindconnect`, beside what the launcher keeps there, which is what a
+desktop wants: one person, one home.
+
+A server runs as a single service account, so that same path would be one
+file for everybody. Put `{user}` in the value and each user gets a directory
+of their own:
+
+```yaml
+mindconnect:
+  agent:
+    instructions:
+      user-dir: /srv/mindconnect/users/{user}
+```
+
+The user id fills the placeholder and may name one directory only: an id
+carrying a separator or `..` is refused rather than allowed to climb out.
+`off` as the value drops the user scope, leaving only the project's file.
 
 ## Adding your own variable
 

@@ -84,6 +84,7 @@ public class AgentChatService {
     private final TaskQueue queue;
     private final ToolApprovalStore approvalStore;
     private final ExecutorService turnExecutor;
+    private final ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions;
 
     public AgentChatService(AgentSessionService sessionService,
                             AgentDefinitionRepository definitionRepository,
@@ -96,7 +97,8 @@ public class AgentChatService {
                             UserChannels userChannels,
                             TaskQueue queue,
                             ToolApprovalStore approvalStore,
-                            ExecutorService turnExecutor) {
+                            ExecutorService turnExecutor,
+                            ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions) {
         this.sessionService = sessionService;
         this.definitionRepository = definitionRepository;
         this.conversationManager = conversationManager;
@@ -109,6 +111,7 @@ public class AgentChatService {
         this.queue = queue;
         this.approvalStore = approvalStore;
         this.turnExecutor = turnExecutor;
+        this.instructions = instructions;
     }
 
     /**
@@ -447,7 +450,7 @@ public class AgentChatService {
         AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
         return WorkingMemoryBuilder.build(promptRenderer, memoryStrategyFactory.create(def),
-                def, session, auth);
+                def, session, auth, instructions);
     }
 
     /**
@@ -467,7 +470,8 @@ public class AgentChatService {
 
         if (!result.isEmpty()) {
             try {
-                WorkingMemory stats = WorkingMemoryBuilder.build(promptRenderer, strategy, def, session, auth);
+                WorkingMemory stats = WorkingMemoryBuilder.build(promptRenderer, strategy, def, session,
+                        auth, instructions);
                 workingMemoryRepository.save(session.id(), auth, stats);
             } catch (Exception e) {
                 log.warn("Failed to save working memory after compression: {}", e.getMessage());

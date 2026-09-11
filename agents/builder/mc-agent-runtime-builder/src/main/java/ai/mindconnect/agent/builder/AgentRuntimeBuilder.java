@@ -472,11 +472,14 @@ public final class AgentRuntimeBuilder {
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
                 userChannels, workingDirPolicy, userHome);
         var sessionChannels = new SessionChannels();
+        // Where a user's own standing instructions live; see InstructionFiles.
+        var instructionFiles = ai.mindconnect.agent.runtime.service.prompt.InstructionFiles.of(
+                environment.getOrDefault("instructionsUserDir", ""));
         var turnWorker = new AgentTurnWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, activations,
                 llmChat, traceRepository, sessionChannels,
-                statelessRunner, workingMemoryRepository);
+                statelessRunner, workingMemoryRepository, instructionFiles);
         var toolWorker = new ToolCallWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, toolRegistry, activations, toolExecutor, sessionChannels,
@@ -490,7 +493,8 @@ public final class AgentRuntimeBuilder {
         taskQueue.register(ToolCallWorker.TYPE, toolWorker);
         AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
                 conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor);
+                statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
+                instructionFiles);
 
         // 7. Seed configs, agents, workflows.
         for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);
