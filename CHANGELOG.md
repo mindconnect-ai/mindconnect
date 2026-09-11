@@ -148,6 +148,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the next messages — summaries that covered the deleted range used to claim
   the new messages as well. With the file persistence a history page now reads
   only its own messages and appending lists nothing.
+- **agents:** two compactions of the same conversation no longer drop each
+  other's summary. The file persistence kept all summaries in one
+  `summaries.json` that every save read, extended and rewrote; each summary is
+  now its own file under `conversations/<id>/summaries/`. Summaries in the old
+  `summaries.json` are not read any more.
 
 - **agents:** tool calls no longer fail at random when sub-agents run in
   parallel. With the file persistence most stores truncated a file and wrote it
