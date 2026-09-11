@@ -222,6 +222,26 @@ public record AgentSession(
                 dirs == null ? java.util.List.of() : java.util.List.copyOf(dirs));
     }
 
+    /**
+     * This session able to reach one more directory by absolute path —
+     * appended to the additional directories unless the session reaches it
+     * already: it is the working directory or one of the additional ones, or
+     * lies inside one of them. An absolute, validated path.
+     */
+    public AgentSession withAdditionalDir(String dir) {
+        if (dir == null || dir.isBlank() || reaches(dir)) return this;
+        java.util.List<String> merged = new java.util.ArrayList<>(additionalDirs);
+        merged.add(dir);
+        return withAdditionalDirs(merged);
+    }
+
+    /** Is {@code dir} the working directory or an additional one, or inside one of them? */
+    private boolean reaches(String dir) {
+        java.nio.file.Path path = java.nio.file.Path.of(dir);
+        if (workingDir != null && path.startsWith(java.nio.file.Path.of(workingDir))) return true;
+        return additionalDirs.stream().anyMatch(d -> path.startsWith(java.nio.file.Path.of(d)));
+    }
+
     public java.util.List<String> attachedFileNames() {
         return attachedFiles.stream().map(AttachedFile::name).toList();
     }

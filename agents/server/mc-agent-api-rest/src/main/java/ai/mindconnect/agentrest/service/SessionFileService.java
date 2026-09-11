@@ -284,8 +284,17 @@ public class SessionFileService {
             }
             if (attached.isPdf()) activateViewer(sessionId);
             // Announce the file in the system prompt (rendered fresh each
-            // round) so the model actually reaches for vector_search.
-            sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached)));
+            // round) so the model actually reaches for vector_search. The
+            // prompt names the copy's path, so the file tools must be able to
+            // open it: a session working in a project gets its own directory
+            // (the uploads' parent) as an additional directory — a no-op when
+            // it works in there already. Both in one change, under the lock.
+            AttachedFile recorded = attached;
+            java.util.Optional<String> ownDir = copy.map(c -> c.getParent().getParent().toString());
+            sessions.update(sessionId, current -> {
+                AgentSession updated = current.withAttachedFiles(List.of(recorded));
+                return ownDir.map(updated::withAdditionalDir).orElse(updated);
+            });
             return new AttachResult(stored, storeName, true,
                     stored.name() + " attached — the agent can now search it.");
         } catch (Exception e) {

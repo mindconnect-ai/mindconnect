@@ -83,6 +83,24 @@ class AgentSessionWorkingDirTest {
     }
 
     @Test
+    void oneMoreDirectoryIsAddedOnce_andNotWhenTheSessionReachesItAlready() {
+        AgentSession s = session().withWorkingDir("/work").withAdditionalDirs(java.util.List.of("/lib"));
+
+        AgentSession added = s.withAdditionalDir("/home/u/sessions/1");
+        assertThat(added.additionalDirs()).containsExactly("/lib", "/home/u/sessions/1");
+        assertThat(added.withAdditionalDir("/home/u/sessions/1").additionalDirs())
+                .as("no duplicates").containsExactly("/lib", "/home/u/sessions/1");
+        assertThat(s.withAdditionalDir("/work")).as("the working directory itself").isSameAs(s);
+        assertThat(s.withAdditionalDir("/work/sessions/1")).as("inside the working directory").isSameAs(s);
+        assertThat(s.withAdditionalDir("/lib/sub")).as("inside an additional directory").isSameAs(s);
+        assertThat(s.withAdditionalDir("/workshop").additionalDirs())
+                .as("a path prefix, not a string prefix").containsExactly("/lib", "/workshop");
+        assertThat(s.withAdditionalDir(null)).isSameAs(s);
+        assertThat(session().withAdditionalDir("/own").additionalDirs())
+                .as("a session without a working directory").containsExactly("/own");
+    }
+
+    @Test
     void theHeaderViewIsUntouched() {
         // A header is a list row: the working directory is not part of it.
         AgentSession s = new AgentSession(SessionId.random(), AgentId.random(), UserId.of("u"),

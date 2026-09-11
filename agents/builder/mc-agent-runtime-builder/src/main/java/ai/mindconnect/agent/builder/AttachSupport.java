@@ -209,7 +209,16 @@ final class AttachSupport {
             activations.activate(sessionId, attached.isPdf()
                     ? List.of("vector_search", ViewAttachmentTool.NAME)
                     : List.of("vector_search"));
-            sessions.update(sessionId, session -> session.withAttachedFiles(List.of(attached)));
+            // The prompt names the copy's path, so the file tools must reach
+            // it: a session working in a project gets its own directory (the
+            // uploads' parent) as an additional one — a no-op when it works
+            // in there already. Recorded in one change, under the store's lock.
+            var recorded = attached;
+            Optional<String> ownDir = copy.map(c -> c.getParent().getParent().toString());
+            sessions.update(sessionId, current -> {
+                var updated = current.withAttachedFiles(List.of(recorded));
+                return ownDir.map(updated::withAdditionalDir).orElse(updated);
+            });
             return message;
         } catch (Exception e) {
             throw new IllegalStateException("attachFile failed: " + e.getMessage(), e);
