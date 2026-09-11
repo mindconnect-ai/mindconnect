@@ -45,7 +45,7 @@ public class ReadDocumentTool implements Tool {
 
     @Override
     public String description() {
-        return "On the filesystem only — a file the user attached to this chat has no path, use vector_search for it. " +
+        return "Opens a file on the filesystem. A file the user attached to this chat is one too when the prompt names a path for it — pass that path; without a path it is not on the filesystem and vector_search is the way to it. " +
                "Reads a specific page range from a long document (PDF or Word .docx). Returns " +
                "the text with `[page N]` markers so you can cite exact pages back to the user.\n" +
                "Always use `document_outline` FIRST to see how many pages exist and where the " +

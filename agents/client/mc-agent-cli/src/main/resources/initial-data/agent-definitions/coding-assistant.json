@@ -38,6 +38,15 @@
       "needsApproval": false
     },
     {
+      "id": "00000003-0000-0000-0000-000000000910",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000013",
+      "name": "file_list",
+      "description": "Lists what a directory holds, sub-directories included — where glob only finds files.",
+      "enabled": true,
+      "deferred": false,
+      "needsApproval": false
+    },
+    {
       "id": "00000003-0000-0000-0000-000000000902",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000013",
       "name": "file_read",

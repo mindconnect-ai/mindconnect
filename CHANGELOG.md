@@ -23,6 +23,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Fixed
+
+- **agents:** a file attached to a chat is findable on disk, not just by
+  search. The document tools said in their own description that an attached
+  file "has no path, use vector_search for it" — it has one since the chat
+  keeps its uploads in its own directory, and a model follows the tool's
+  description over the prompt, so it never opened the file. The prompt now
+  also names the path the tools take (`uploads/<name>` from the working
+  directory) beside the absolute one, `glob` says that it returns files and
+  never directories — `*` in a directory of sub-directories finds nothing —
+  and the bundled `coding-assistant` gets `file_list`, which it was missing.
+
 ## [0.8.0] - 2026-09-11
 
 ### Added

@@ -58,11 +58,35 @@ class SystemPromptRendererWorkingDirTest {
         assertThat(both)
                 .contains("- spec.docx (Word document) — on disk at `/home/u/sessions/s1/uploads/spec.docx`")
                 .contains("- notes.md (Markdown)\n")
-                .contains("A file with a path is also a file on disk")
+                .contains("A file with a path is a file on disk: open it by that path")
                 .contains("A file without a path is NOT on the filesystem");
 
         String onlyOnDisk = SystemPromptRenderer.attachedFilesSection(
                 session().withAttachedFiles(java.util.List.of(onDisk)));
         assertThat(onlyOnDisk).doesNotContain("NOT on the filesystem");
+    }
+
+    @Test
+    void anUploadInTheChatsOwnDirectoryIsNamedTheWayTheToolsTakeIt() {
+        // The model types what the prompt shows, and `uploads/spec.docx` is
+        // what file_read, document_outline and grep_document want here.
+        var upload = new ai.mindconnect.agent.runtime.domain.AttachedFile("f1", "spec.docx", null, 10,
+                "/home/u/sessions/s1/uploads/spec.docx");
+
+        String inOwnDir = SystemPromptRenderer.attachedFilesSection(session()
+                .withWorkingDir("/home/u/sessions/s1")
+                .withAttachedFiles(java.util.List.of(upload)));
+        assertThat(inOwnDir)
+                .contains("on disk at `/home/u/sessions/s1/uploads/spec.docx`")
+                .contains("i.e. `uploads/spec.docx` from the working directory");
+
+        // A chat working in a project keeps the absolute path — the short one
+        // would point somewhere else.
+        String inProject = SystemPromptRenderer.attachedFilesSection(session()
+                .withWorkingDir("/home/u/project")
+                .withAttachedFiles(java.util.List.of(upload)));
+        assertThat(inProject)
+                .contains("on disk at `/home/u/sessions/s1/uploads/spec.docx`")
+                .doesNotContain("from the working directory");
     }
 }

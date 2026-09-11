@@ -91,7 +91,10 @@ public class GlobTool implements Tool {
                 : "`pattern` is required; `path` is a sub-directory of the working directory " +
                   baseDir + " and defaults to the working directory itself.\n";
         return "Finds files by name pattern under a given directory. Returns paths newest first " +
-               "(sorted by modification time). Pure path matching — does NOT read file contents; " +
+               "(sorted by modification time). Files only — a directory never appears in the " +
+               "result, so `*` in a directory that holds only sub-directories (a chat's " +
+               "`uploads/`, say) finds nothing: use `**/*` to look inside them, or file_list " +
+               "to see what a directory holds. Pure path matching — does NOT read file contents; " +
                "use grep for that.\n" +
                where +
                "Pattern examples:\n" +

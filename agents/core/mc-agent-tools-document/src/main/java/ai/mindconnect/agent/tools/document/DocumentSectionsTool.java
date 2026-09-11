@@ -46,7 +46,7 @@ public final class DocumentSectionsTool implements Tool {
 
     @Override
     public String description() {
-        return "On the filesystem only — a file the user attached to this chat has no path, use vector_search for it. " +
+        return "Opens a file on the filesystem. A file the user attached to this chat is one too when the prompt names a path for it — pass that path; without a path it is not on the filesystem and vector_search is the way to it. " +
                "Splits a document (PDF, Word .docx, text/markdown) into its sections — one per " +
                "heading, each with its exact content — and returns them as a JSON array: " +
                "{\"path\", \"sectionCount\", \"sections\": [{\"index\", \"level\", \"title\", \"content\"}]}. " +
