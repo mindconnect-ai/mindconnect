@@ -1,6 +1,7 @@
 package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpTool;
@@ -15,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -114,7 +114,6 @@ final class McpDiscoveryCache {
     private void write(McpServerId serverId, List<McpTool> tools) {
         Path file = fileFor(serverId);
         try {
-            Files.createDirectories(file.getParent());
             CacheFile content = new CacheFile();
             content.fetchedAt = Instant.now().toString();
             content.tools = new ArrayList<>(tools.size());
@@ -125,9 +124,7 @@ final class McpDiscoveryCache {
                 cached.inputSchema = tool.inputSchema();
                 content.tools.add(cached);
             }
-            Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            MAPPER.writeValue(tmp.toFile(), content);
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            AtomicFiles.write(file, out -> MAPPER.writeValue(out, content));
             log.info("MCP discovery: cached {} tool(s) for '{}'", tools.size(), serverId);
         } catch (IOException e) {
             // A cache that cannot be written is a slow start-up, not a failure.

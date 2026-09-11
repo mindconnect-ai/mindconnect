@@ -1,6 +1,7 @@
 package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,7 +13,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -100,11 +100,8 @@ public final class FileMcpServerRepository implements McpServerRepository {
     public void save(McpServerRegistration registration) {
         Path file = fileFor(registration.id());
         try {
-            Files.createDirectories(file.getParent());
-            Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            MAPPER.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(),
-                    McpRegistrationJson.write(registration, JsonNodeFactory.instance));
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            AtomicFiles.write(file, out -> MAPPER.writerWithDefaultPrettyPrinter().writeValue(out,
+                    McpRegistrationJson.write(registration, JsonNodeFactory.instance)));
             log.info("MCP registration '{}' saved to {}", registration.id(), file);
         } catch (IOException e) {
             throw new UncheckedIOException("cannot save MCP registration '" + registration.id() + "'", e);

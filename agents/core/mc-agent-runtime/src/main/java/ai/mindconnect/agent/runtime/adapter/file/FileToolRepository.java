@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.adapter.file;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.ToolRepository;
 import ai.mindconnect.agent.tool.ToolSettings;
+import ai.mindconnect.common.util.AtomicFiles;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -12,7 +13,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -108,12 +108,9 @@ public final class FileToolRepository implements ToolRepository {
                 Files.deleteIfExists(file);   // back to the shipped state
                 return;
             }
-            Files.createDirectories(file.getParent());
             ObjectNode root = MAPPER.createObjectNode();
             all.forEach((name, settings) -> root.set(name, write(settings)));
-            Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
-            MAPPER.writeValue(tmp.toFile(), root);
-            Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            AtomicFiles.write(file, out -> MAPPER.writeValue(out, root));
         } catch (IOException e) {
             throw new UncheckedIOException("cannot write tool settings " + file, e);
         }
