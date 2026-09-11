@@ -10,8 +10,10 @@ The Admin UI and the CLI ship almost the same set of agent definitions
 extra, `summarizer`. They're loaded on first start and you can edit or add to
 them.
 
-An agent is *system prompt + LLM config + tools*. Most reference the
-[`agent-default`](./llm-configs-reference.md) LLM config (local LM Studio) out of the box.
+An agent is *system prompt + LLM config + tools*. All of them reference the
+[`agent-default`](./llm-configs-reference.md) LLM config, an alias that
+delegates to `openai-default` out of the box — repoint the alias and every
+bundled agent follows.
 
 ## Assistants & orchestrators
 

@@ -59,6 +59,19 @@ fresh empty one, so nothing has to be moved by hand at release time.
   logger names configured for the old packages (for example
   `ai.mindconnect.agent.service`) need the `runtime` segment too.
 
+- **agents:** the bundled agents default to OpenAI instead of a local LM
+  Studio server. `agent-default`, the LLM config every shipped agent
+  references, is now an alias that delegates to `openai-default`, so a fresh
+  install works as soon as `OPENAI_API_KEY` is set — which is what most
+  people have — instead of requiring a 120B model on `localhost:1234`.
+  `url-reader` follows suit and no longer needs the local `gemma-reader`
+  model. Repointing the alias (in `agent-default.json` or the Admin UI)
+  moves every bundled agent to another provider at once; `lm-studio-default`
+  still carries the previous local settings. Existing installations are not
+  changed behind your back: a stored `agent-default` that differs from the
+  seed shows up as a pending migration in the Admin UI, and the CLI logs the
+  difference and keeps what it has.
+
 ### Fixed
 
 - **agents:** the admin UI's Logout button no longer ends with "The backend is

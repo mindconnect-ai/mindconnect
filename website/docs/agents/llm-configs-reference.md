@@ -28,16 +28,19 @@ resolve from environment variables), see
 | `azure-openai-default` | Azure OpenAI | deployment `gpt-4o` | `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` |
 | `gemini-default` | Google Gemini | `gemini-2.0-flash` | `GEMINI_API_KEY` |
 | `lm-studio-default` | LM Studio (local) | `openai/gpt-oss-120b` | none — local server at `http://localhost:1234` |
-| `agent-default` | LM Studio (local) | `openai/gpt-oss-120b` | none — the default most agents use |
+| `gemma-reader` | LM Studio (local) | `google/gemma-4-e4b` | none — a small local model for page-reading sub-agents, `GEMMA_MODEL` to override |
+| `agent-default` | alias → `openai-default` | — | whatever the target needs; the default every bundled agent uses |
 | `embeddings` | LM Studio (local), `EMBEDDING` | `text-embedding-nomic-embed-text-v1.5` | none — `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL` to override |
 | `openai-embeddings` | OpenAI, `EMBEDDING` | `text-embedding-3-small` | `OPENAI_API_KEY`, `OPENAI_EMBEDDING_MODEL` |
 
 :::info `agent-default` is the default
-Most bundled agents reference **`agent-default`**, which points at a local
-**LM Studio** server. That means the agents run fully locally out of the box —
-no API key required — as long as LM Studio is serving a model on
-`http://localhost:1234`. Switch an agent to a cloud provider by changing its
-`llmConfigName` (e.g. to `claude-default`) and setting the matching API key.
+Every bundled agent references **`agent-default`**. It is an alias, not a
+provider config of its own: out of the box it delegates to `openai-default`,
+so the agents work as soon as `OPENAI_API_KEY` is set. To move all of them to
+another provider at once, repoint the alias — edit `delegatesTo` in
+`agent-default.json` or in the Admin UI (for example to `claude-default`, or
+to `lm-studio-default` for a fully local setup). To move a single agent,
+change its `llmConfigName` instead.
 :::
 
 ## Anatomy of a config
@@ -87,8 +90,9 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export OPENAI_API_KEY=sk-...
 ```
 
-Local providers (`lm-studio-default`, `agent-default`) need no key — just a
-running LM Studio instance.
+Local providers (`lm-studio-default`, `gemma-reader`, `embeddings`) need no
+key — just a running LM Studio instance. `agent-default` needs whatever its
+target needs: `OPENAI_API_KEY` as shipped.
 
 ## Adding your own
 

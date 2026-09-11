@@ -18,11 +18,11 @@ vom `verifier` gegenchecken lässt und einen zitierten Markdown-Report nach
    `research-lead`, `planner`, `explorer`, `code-analyst`, `document-analyst`, `verifier`.
 
 2. **Modell prüfen (WICHTIG).** `research-lead` nutzt `llmConfigName: "agent-default"`,
-   und `agent-default` zeigt aktuell auf **LM_STUDIO** (lokal). Komplexe Orchestrierung
-   mit striktem Tool-Calling ist mit einem starken Modell deutlich zuverlässiger.
-   Für die Demo empfohlen: in der Admin-UI das LLM-Config `agent-default` temporär auf
-   ein starkes Modell zeigen lassen (Claude/OpenAI), ODER in `research-lead.json`
-   `"llmConfigName"` auf `"claude-default"` bzw. `"openai-default"` setzen und neu starten.
+   und `agent-default` ist ein Alias, der auf **`openai-default`** zeigt — es braucht
+   also `OPENAI_API_KEY` im Environment. Komplexe Orchestrierung mit striktem
+   Tool-Calling ist mit einem starken Modell deutlich zuverlässiger; wer Claude
+   nehmen will, lässt den Alias in der Admin-UI auf `claude-default` zeigen ODER
+   setzt in `research-lead.json` `"llmConfigName"` auf `"claude-default"` und startet neu.
    → Probier den Ablauf EINMAL vorher durch, bevor du live gehst.
 
 3. **Smoke-Test**: Öffne einen Chat mit `research-lead`, tippe den Hauptprompt (unten),
