@@ -43,6 +43,7 @@ public final class ChatShellComponent implements UiComponent {
     private final java.util.Map<AgentId, String> agentIcons;
     private java.util.Set<SessionId> running = java.util.Set.of();
     private java.util.Set<SessionId> waiting = java.util.Set.of();
+    private java.util.Set<SessionId> unseen = java.util.Set.of();
 
     public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
                               String agentName, UiNode content) {
@@ -83,6 +84,18 @@ public final class ChatShellComponent implements UiComponent {
     public static final String BADGE_NEEDS_INPUT = "needs input";
     /** The row badge of a chat with a turn in flight. */
     public static final String BADGE_RUNNING = "running";
+    /** The row badge of a chat started elsewhere that this browser has not had on screen yet. */
+    public static final String BADGE_NEW = "new";
+
+    /**
+     * Which conversations were started elsewhere — in another tab, over the
+     * REST API — since this browser began, and have not been opened here.
+     * Their rows say {@value #BADGE_NEW} until they are.
+     */
+    public ChatShellComponent withUnseen(java.util.Set<SessionId> unseen) {
+        this.unseen = unseen == null ? java.util.Set.of() : unseen;
+        return this;
+    }
 
     @Override
     public String id() {
@@ -126,15 +139,25 @@ public final class ChatShellComponent implements UiComponent {
         SessionId activeId = active == null ? null : active.id();
         for (AgentSessionHeader s : sessions) {
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
-            String badge = waiting.contains(s.id()) ? BADGE_NEEDS_INPUT
-                    : running.contains(s.id()) ? BADGE_RUNNING
-                    : ago(s.startedAt());
+            String badge = badge(s, waiting, running, unseen);
             menu.item(UiMenuItem.link("chat-" + s.id().value(), label, "/chat/sessions/" + s.id().value())
                     .icon(iconFor(s))
                     .badge(badge)
                     .selected(s.id().equals(activeId)));
         }
         return menu;
+    }
+
+    /**
+     * What a row says in place of its age, most urgent first: an answer is
+     * waited for, a turn is in flight, the chat has not been opened here yet.
+     */
+    static String badge(AgentSessionHeader s, java.util.Set<SessionId> waiting,
+                        java.util.Set<SessionId> running, java.util.Set<SessionId> unseen) {
+        if (waiting.contains(s.id())) return BADGE_NEEDS_INPUT;
+        if (running.contains(s.id())) return BADGE_RUNNING;
+        if (unseen.contains(s.id())) return BADGE_NEW;
+        return ago(s.startedAt());
     }
 
     /** The icon of the agent this conversation belongs to, or the generic one. */

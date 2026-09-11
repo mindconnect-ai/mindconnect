@@ -59,6 +59,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and `vector_delete_file` tools refuse the upload store of any other chat
   session, so the model cannot be talked into reading another user's
   attachments by naming their store.
+
+- **agents:** coming back to the chat no longer lands in a different
+  conversation. The chat opened whichever conversation had been started
+  last — in another tab, over the REST API — so returning through the
+  *Chat* menu entry, or a page that re-requested `/chat`, jumped away from
+  the one you were working in. It now opens the conversation this browser
+  session last had on screen, while it still exists. A conversation started
+  elsewhere since then shows up in the chat list at once, marked *new* until
+  you open it.
+
 - **agents:** a response reviewer follows its own rules again when the user's
   message is itself an instruction. The reviewer received the user's words as
   its own prompt, so "Antworte exakt mit: Hallo Welt" often made it answer

@@ -124,9 +124,8 @@ public class ChatUiController {
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
         // Headers for the sidebar; only the chat being shown is loaded whole.
         var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)));
-        var latest = sessions.isEmpty()
-                ? java.util.Optional.<AgentSession>empty()
-                : sessionRepository.findById(sessions.get(0).id());
+        var latest = ChatLanding.pick(sessions, lastShownChat())
+                .flatMap(sessionRepository::findById);
         if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
             // tabs opening at once would each leave an empty chat behind. The
@@ -345,13 +344,50 @@ public class ChatUiController {
     // ── Building the shell ──────────────────────────────────────────────────
 
     /** The chat app shell: history left, agent and title on top, conversation. */
+    /** The browser session's note of the chat it last had on screen. */
+    static final String LAST_SHOWN_CHAT = "mc.chat.lastShown";
+
+    /**
+     * The chat this browser session last had on screen, or {@code null}.
+     * Kept in the HTTP session rather than on the chat: it is where this
+     * browser was, not something about the conversation.
+     */
+    private static SessionId lastShownChat() {
+        var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        Object value = attributes == null ? null : attributes.getAttribute(LAST_SHOWN_CHAT,
+                org.springframework.web.context.request.RequestAttributes.SCOPE_SESSION);
+        return value instanceof String id ? SessionId.of(id) : null;
+    }
+
+    /** The browser session's record of the chats it has had on screen, and since when. */
+    static final String SEEN_CHATS = "mc.chat.seen";
+
+    /**
+     * Notes the chat about to be shown — so coming back to the chat lands on
+     * it again, and so it no longer counts as new — and returns what this
+     * browser session has now seen, for marking the chats started elsewhere.
+     */
+    private static SeenChats rememberShown(SessionId sessionId) {
+        var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attributes == null) return SeenChats.from(java.time.Instant.now()).withShown(sessionId);
+        int session = org.springframework.web.context.request.RequestAttributes.SCOPE_SESSION;
+        attributes.setAttribute(LAST_SHOWN_CHAT, sessionId.value(), session);
+        Object stored = attributes.getAttribute(SEEN_CHATS, session);
+        SeenChats seen = (stored instanceof SeenChats known ? known : SeenChats.from(java.time.Instant.now()))
+                .withShown(sessionId);
+        attributes.setAttribute(SEEN_CHATS, seen, session);
+        return seen;
+    }
+
     private UiPage shell(AgentSession session,
                          List<? extends AgentSessionHeader> sessions) {
+        var seen = rememberShown(session.id());
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
                 sessions, session, agent.name(), chat.renderContent(), agentIcons())
                 .withActivity(runningSessions(sessions), waitingSessions(sessions))
+                .withUnseen(seen.unseen(sessions))
                 .render();
         var page = UiPage.of("/chat/sessions/" + session.id().value(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.

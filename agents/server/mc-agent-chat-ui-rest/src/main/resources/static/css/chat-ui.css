@@ -320,6 +320,14 @@
     color: var(--sui-warning, #b45309);
     font-weight: 600;
 }
+/* A chat started elsewhere that this browser has not opened yet. */
+#chat-menu li.sui-menu-item.is-new .sui-menu-badge {
+    color: var(--sui-success, #15803d);
+    font-weight: 600;
+}
+#chat-menu li.sui-menu-item.is-new .sui-menu-label {
+    font-weight: 600;
+}
 
 /* The row's own badge steps aside so the two never overlap. */
 #chat-menu li.sui-menu-item:hover .sui-menu-badge,
