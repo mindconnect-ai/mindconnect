@@ -45,7 +45,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   types, so a `findById(AgentId)` refuses a `SessionId` at compile time. Id
   values are lower-case, file-name-safe strings: a readable `web-researcher`
   is as valid as a UUID. In JSON an id is still its plain string.
-  `MessageRepository.findById` takes the conversation next to the message id.
+  `AgentTool` no longer points back at its agent: the `agentDefinitionId`
+  field is gone, `AgentTool.of(name, …)` takes no agent id, and older agent
+  files that still carry the field load as before.
 
 - **agents:** the namespace is no longer part of any domain object, id, port
   or service, and `AuthenticationInfo` carries only the user and roles.
@@ -62,11 +64,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
   On Postgres every `mc_*` table carries a `namespace` column in its primary
   key and the workflow tables a `partition_key`, and pgvector tables are named
   `vs_<namespace>__<store>`; there is no migration, so drop the `mc_*` tables
-  of an existing database before starting this version. The REST API loses
-  its `namespace` parameters (the query parameter on the agent endpoints and
-  the field in the body of `POST /api/sessions`), agent JSON its `namespace`
-  field, and factories such as `LlmConfig.lmStudio(...)`, `AgentTool.of(...)`
-  and `AgentDefinition.create(...)` their namespace argument.
+  of an existing database before starting this version (existing `vs_*`
+  stores are not picked up either). The REST API loses its `namespace`
+  parameters — the query parameter of the agent endpoints and of
+  `GET /api/sessions`, and the field in the bodies of `POST /api/agents` and
+  `POST /api/sessions` — agent, session and conversation JSON lose their
+  `namespace` field, `AgentDefinition.create(...)` its namespace argument, and
+  the property `mindconnect.agent.stateless.namespace` is gone.
 
 - **agents:** the protocol (`mc-agent-protocol`) no longer names a tenant:
   `Sessions.open(agentName)` and `Conversations.create()` lose their
@@ -77,8 +81,8 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** `Namespace` and `AuthenticationInfo` moved from `mc-common`
   (package `ai.mindconnect.common`) into the new dependency-free module
   `mc-agent-domain`, package `ai.mindconnect.agent`, together with `UserId`,
-  which `AuthenticationInfo.userId()` now returns instead of a `String`. Embedders repoint two imports and wrap the user id in
-  `UserId.of(...)`; the agents modules pull the new module in transitively.
+  which `AuthenticationInfo.userId()` now returns instead of a `String`.
+  Embedders repoint two imports and wrap the user id in `UserId.of(...)`; the agents modules pull the new module in transitively.
   `mc-common` is tenant-free again, which is what the workflow and taskqueue
   areas expect from it; its unused `DomainEvent` record went with the move.
 
