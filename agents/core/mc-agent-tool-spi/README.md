@@ -4,26 +4,24 @@ What a tool IS and how it gets bound — extracted from `mc-agent-runtime` so
 the tool modules stop depending on an entire agent runtime to implement one
 interface. Concept: [15-module-split](../../doc/architecture/concepts/15-module-split.md).
 
+Everything lives in one package, `ai.mindconnect.agent.tool`:
+
 ```
-ai.mindconnect.agent.port.in
-  Tool                 name · description · parameter schema · execute(args)
-  ToolFactory          binds an AgentTool config into a Tool for one call scope
-  ToolRegistry         what exists, per namespace
-  ToolAdvisor          the filter chain around every invocation
-  ToolEnvironment      configuration strings and services a factory may ask for
-  ToolCallScope        namespace · user · session · agent of one invocation
-  MultiToolProvider    one factory, several tools
-
-ai.mindconnect.agent.domain
-  AgentTool            how an agent configures a tool (enabled, overrides)
-
-ai.mindconnect.agent.service
-  SpiToolRegistry      ServiceLoader-based registry over the factories
-  ToolRegistryRef · AliasTool · PinnedParamsTool · MapToolEnvironment
+Tool                 name · description · parameter schema · execute(args)
+ToolFactory          binds an AgentTool config into a Tool for one call scope
+ToolRegistry         what exists, per namespace
+ToolAdvisor          the filter chain around every invocation
+ToolEnvironment      configuration strings and services a factory may ask for
+ToolCallScope        namespace · user · session · agent of one invocation
+MultiToolProvider    one factory, several tools
+AgentTool            how an agent configures a tool (enabled, overrides)
+SpiToolRegistry      ServiceLoader-based registry over the factories
+ToolRegistryRef · AliasTool · PinnedParamsTool · MapToolEnvironment
 ```
 
-Dependencies: `mc-common` and `slf4j-api`. Package names are unchanged, so
-nothing had to adjust an import — only the POMs changed.
+Dependencies: `mc-agent-domain`, `mc-common` and `slf4j-api`. The runtime
+itself sits above this module in `ai.mindconnect.agent.runtime.*`; the tool
+modules never import from there.
 
 ## What is deliberately NOT here
 
