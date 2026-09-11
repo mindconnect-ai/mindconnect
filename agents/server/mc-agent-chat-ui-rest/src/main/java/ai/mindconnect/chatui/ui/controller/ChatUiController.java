@@ -124,9 +124,8 @@ public class ChatUiController {
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
         // Headers for the sidebar; only the chat being shown is loaded whole.
         var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)));
-        var latest = sessions.isEmpty()
-                ? java.util.Optional.<AgentSession>empty()
-                : sessionRepository.findById(sessions.get(0).id());
+        var latest = ChatLanding.pick(sessions, lastShownChat())
+                .flatMap(sessionRepository::findById);
         if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
             // tabs opening at once would each leave an empty chat behind. The
@@ -345,8 +344,33 @@ public class ChatUiController {
     // ── Building the shell ──────────────────────────────────────────────────
 
     /** The chat app shell: history left, agent and title on top, conversation. */
+    /** The browser session's note of the chat it last had on screen. */
+    static final String LAST_SHOWN_CHAT = "mc.chat.lastShown";
+
+    /**
+     * The chat this browser session last had on screen, or {@code null}.
+     * Kept in the HTTP session rather than on the chat: it is where this
+     * browser was, not something about the conversation.
+     */
+    private static SessionId lastShownChat() {
+        var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        Object value = attributes == null ? null : attributes.getAttribute(LAST_SHOWN_CHAT,
+                org.springframework.web.context.request.RequestAttributes.SCOPE_SESSION);
+        return value instanceof String id ? SessionId.of(id) : null;
+    }
+
+    /** Notes the chat about to be shown, so coming back to the chat lands on it again. */
+    private static void rememberShown(SessionId sessionId) {
+        var attributes = org.springframework.web.context.request.RequestContextHolder.getRequestAttributes();
+        if (attributes != null) {
+            attributes.setAttribute(LAST_SHOWN_CHAT, sessionId.value(),
+                    org.springframework.web.context.request.RequestAttributes.SCOPE_SESSION);
+        }
+    }
+
     private UiPage shell(AgentSession session,
                          List<? extends AgentSessionHeader> sessions) {
+        rememberShown(session.id());
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
