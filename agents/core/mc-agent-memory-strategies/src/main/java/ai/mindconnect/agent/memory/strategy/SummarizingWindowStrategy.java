@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.memory.strategy;
 
+import ai.mindconnect.message.domain.MessageId;
+import ai.mindconnect.message.domain.ConversationId;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.service.ContextTokenBudget;
@@ -31,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -132,7 +134,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
         // actually receives — buildWindow injects them into the prompt
         // (placement-dependent), getWindowMessages used to omit them.
         List<ConversationSummary> summaries =
-                summaryRepository.findByConversationId(session.conversationId());
+                summaryRepository.findByConversation(session.conversationId());
         List<WorkingMemory.WorkingMemoryMessage> messages =
                 new ArrayList<>(SummaryWindowMessages.render(summaries, budget.counter()));
         for (Message m : windowed) {
@@ -156,7 +158,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
     public String systemPromptAddendum(AgentDefinition def, AgentSession session) {
         if (cfg.summaryPlacement() != SummaryPlacement.SYSTEM_PROMPT) return "";
         List<ConversationSummary> summaries =
-                summaryRepository.findByConversationId(session.conversationId());
+                summaryRepository.findByConversation(session.conversationId());
         if (summaries.isEmpty()) return "";
         StringBuilder sb = new StringBuilder("\n\n## Earlier conversation (summarized)");
         appendSummaryBody(sb, summaries);
@@ -170,7 +172,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
      */
     private String renderSummariesAsUserMessage(AgentSession session) {
         List<ConversationSummary> summaries =
-                summaryRepository.findByConversationId(session.conversationId());
+                summaryRepository.findByConversation(session.conversationId());
         if (summaries.isEmpty()) return "";
         StringBuilder sb = new StringBuilder(
                 "This session is being continued from a previous conversation that ran out of context. "
@@ -238,7 +240,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
         List<Message> toolResults = sorted.stream()
                 .filter(m -> m.type() == MessageType.TOOL_RESULT)
                 .toList();
-        Set<UUID> keepFull = toolResults.stream()
+        Set<MessageId> keepFull = toolResults.stream()
                 .skip(Math.max(0, toolResults.size() - KEEP_RECENT_RESULTS))
                 .map(Message::id)
                 .collect(java.util.stream.Collectors.toSet());
@@ -301,7 +303,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
      * compressed (e.g. from before tool-result compression was introduced).
      * No caller in the current codebase; kept for future maintenance flows.
      */
-    public int compressUncompressedToolResults(AgentDefinition def, UUID conversationId,
+    public int compressUncompressedToolResults(AgentDefinition def, ConversationId conversationId,
                                                List<Message> toolResults) {
         if (toolResults.isEmpty()) return 0;
         ContextTokenBudget budget = budget(def);
@@ -318,7 +320,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
      * quality. No caller in the current codebase; kept for future debug flows.
      */
     @SuppressWarnings("unchecked")
-    public int recompressAllToolResults(AgentDefinition def, UUID conversationId,
+    public int recompressAllToolResults(AgentDefinition def, ConversationId conversationId,
                                         List<Message> toolResults) {
         ContextTokenBudget budget = budget(def);
         TokenCounter counter = budget.counter();
@@ -331,7 +333,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
                 if (rawResult == null) continue;
                 String stub = toolResultSummarizer.summarize(toolName, rawResult);
                 int compressedTokens = counter.countText(stub);
-                conversationManager.compressMessage(conversationId, m.id(), stub, compressedTokens);
+                conversationManager.compressMessage(m.conversationId(), m.id(), stub, compressedTokens);
                 log.info("Re-compressed tool result message {} (tool={})", m.id(), toolName);
                 count++;
             } catch (Exception e) {
@@ -415,7 +417,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
     }
 
     @SuppressWarnings("unchecked")
-    private boolean compressOneToolResult(UUID conversationId, Message m,
+    private boolean compressOneToolResult(ConversationId conversationId, Message m,
                                           TokenCounter counter, int threshold) {
         try {
             if (m.compressed()) return false;
@@ -428,7 +430,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
 
             String stub = toolResultSummarizer.summarize(toolName, rawResult);
             int compressedTokens = counter.countText(stub);
-            conversationManager.compressMessage(conversationId, m.id(), stub, compressedTokens);
+            conversationManager.compressMessage(m.conversationId(), m.id(), stub, compressedTokens);
             log.debug("Compressed tool result message {} (~{} → ~{} tokens, threshold={})",
                     m.id(), rawTokens, compressedTokens, threshold);
             return true;
@@ -465,7 +467,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
     }
 
     private Set<Integer> summarizedSequenceNumbers(AgentSession session) {
-        return summaryRepository.findByConversationId(session.conversationId())
+        return summaryRepository.findByConversation(session.conversationId())
                 .stream()
                 .flatMapToInt(s -> IntStream.rangeClosed(s.fromSequenceNum(), s.toSequenceNum()))
                 .boxed()
@@ -481,7 +483,7 @@ public class SummarizingWindowStrategy implements MemoryStrategy {
         for (Message m : messages) {
             switch (m.type()) {
                 case CHAT -> {
-                    String role = m.senderId().equals(def.id()) ? "Agent" : "User";
+                    String role = m.senderId().equals(def.id().value()) ? "Agent" : "User";
                     transcript.append(role).append(": ").append(m.content()).append("\n");
                 }
                 case TOOL_CALL -> transcript.append("[tool call]\n");

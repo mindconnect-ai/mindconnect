@@ -4,7 +4,7 @@ import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.ui.model.UiList;
 
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.previewOf;
 
@@ -19,17 +19,17 @@ public final class MemoryMasterListComponent implements UiComponent {
     /** Pseudo-seq used as the master-list id for the system prompt row. */
     public static final int SYS_PROMPT_SEQ = -1;
 
-    private final UUID sessionId;
+    private final SessionId sessionId;
     private final WorkingMemory memory;
 
-    public MemoryMasterListComponent(UUID sessionId, WorkingMemory memory) {
+    public MemoryMasterListComponent(SessionId sessionId, WorkingMemory memory) {
         this.sessionId = sessionId;
         this.memory = memory;
     }
 
     @Override
     public String id() {
-        return "mem-list-" + sessionId;
+        return "mem-list-" + sessionId.value();
     }
 
     @Override
@@ -59,6 +59,6 @@ public final class MemoryMasterListComponent implements UiComponent {
     }
 
     private String itemHref(int seq) {
-        return "/admin/api/sessions/" + sessionId + "/memory?seq=" + seq;
+        return "/admin/api/sessions/" + sessionId.value() + "/memory?seq=" + seq;
     }
 }

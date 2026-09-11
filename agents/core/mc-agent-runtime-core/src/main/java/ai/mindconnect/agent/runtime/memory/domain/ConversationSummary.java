@@ -1,7 +1,8 @@
 package ai.mindconnect.agent.runtime.memory.domain;
 
+import ai.mindconnect.message.domain.ConversationId;
+
 import java.time.Instant;
-import java.util.UUID;
 
 /**
  * Represents a summarized range of messages in a conversation.
@@ -14,22 +15,21 @@ import java.util.UUID;
  * covering messages after the last summarized sequence number.
  */
 public record ConversationSummary(
-        UUID id,
-        UUID conversationId,
+        ConversationSummaryId id,
+        ConversationId conversationId,
         int fromSequenceNum,   // inclusive
         int toSequenceNum,     // inclusive
         int messageCount,
         String content,
         Instant createdAt
 ) {
-    public static ConversationSummary create(UUID conversationId,
+    public static ConversationSummary create(ConversationId conversationId,
                                              int fromSequenceNum,
                                              int toSequenceNum,
                                              int messageCount,
                                              String content) {
         return new ConversationSummary(
-                UUID.randomUUID(),
-                conversationId,
+                ConversationSummaryId.random(), conversationId,
                 fromSequenceNum,
                 toSequenceNum,
                 messageCount,
@@ -37,6 +37,7 @@ public record ConversationSummary(
                 Instant.now()
         );
     }
+
 
     /** Returns true if the given sequence number falls within this summary's range. */
     public boolean covers(int sequenceNum) {

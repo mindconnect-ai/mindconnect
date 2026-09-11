@@ -1,15 +1,14 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.Namespace;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -20,10 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ListAgentsToolTest {
 
-    private static final Namespace NS = new Namespace("local");
-
     private static AgentDefinition agent(String name, List<String> roster) {
-        return new AgentDefinition(UUID.randomUUID(), NS, name, name + " does things",
+        return new AgentDefinition(AgentId.random(), name, name + " does things",
                 null, null, "prompt", null, "cfg", 5, null, AgentDefinitionStatus.ACTIVE,
                 List.of(), List.of(), roster, null, null, null);
     }
@@ -32,14 +29,14 @@ class ListAgentsToolTest {
     private static AgentDefinitionRepository repo(List<AgentDefinition> all) {
         return new AgentDefinitionRepository() {
             @Override public AgentDefinition save(AgentDefinition d) { return d; }
-            @Override public Optional<AgentDefinition> findById(UUID id) {
+            @Override public Optional<AgentDefinition> findById(AgentId id) {
                 return all.stream().filter(a -> a.id().equals(id)).findFirst();
             }
-            @Override public Optional<AgentDefinition> findByName(Namespace ns, String name) {
+            @Override public Optional<AgentDefinition> findByName(String name) {
                 return all.stream().filter(a -> a.name().equals(name)).findFirst();
             }
-            @Override public List<AgentDefinition> findByNamespace(Namespace ns) { return all; }
-            @Override public void deleteById(UUID id) { }
+            @Override public List<AgentDefinition> findAll() { return all; }
+            @Override public void deleteById(AgentId id) { }
         };
     }
 
@@ -49,7 +46,7 @@ class ListAgentsToolTest {
         var all = List.of(planner, agent("web-researcher", null),
                 agent("verifier", null), agent("title-generator", null));
 
-        String out = new ListAgentsTool(repo(all), NS, planner.id()).execute(Map.of());
+        String out = new ListAgentsTool(repo(all), planner.id()).execute(Map.of());
 
         assertThat(out).contains("web-researcher").contains("verifier");
         assertThat(out).doesNotContain("title-generator");
@@ -63,7 +60,7 @@ class ListAgentsToolTest {
         var assistant = agent("general", List.of());
         var all = List.of(assistant, agent("web-researcher", null), agent("title-generator", null));
 
-        String out = new ListAgentsTool(repo(all), NS, assistant.id()).execute(Map.of());
+        String out = new ListAgentsTool(repo(all), assistant.id()).execute(Map.of());
 
         assertThat(out).contains("general").contains("web-researcher").contains("title-generator");
     }
@@ -77,15 +74,15 @@ class ListAgentsToolTest {
     void anUnknownOrAbsentCallerIsNotARestriction() {
         var all = List.of(agent("web-researcher", null), agent("title-generator", null));
 
-        assertThat(new ListAgentsTool(repo(all), NS, UUID.randomUUID()).execute(Map.of()))
+        assertThat(new ListAgentsTool(repo(all), AgentId.random()).execute(Map.of()))
                 .contains("web-researcher").contains("title-generator");
-        assertThat(new ListAgentsTool(repo(all), NS).execute(Map.of()))
+        assertThat(new ListAgentsTool(repo(all)).execute(Map.of()))
                 .contains("web-researcher").contains("title-generator");
     }
 
     @Test
     void anEmptyNamespaceSaysSoRatherThanReturningNothing() {
-        assertThat(new ListAgentsTool(repo(List.of()), NS).execute(Map.of()))
+        assertThat(new ListAgentsTool(repo(List.of())).execute(Map.of()))
                 .startsWith("No agents found");
     }
 }

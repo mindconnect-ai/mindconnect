@@ -1,30 +1,36 @@
 package ai.mindconnect.message.port.in;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Conversation;
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ConversationHistory;
 import ai.mindconnect.message.domain.ConversationType;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.Participant;
 import ai.mindconnect.message.domain.ParticipantType;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 public interface ConversationManager {
 
-    Conversation createConversation(Namespace namespace, String topic,
+    /**
+     * Creates the conversation {@code id}; the caller draws the id first
+     * ({@code ConversationId.random()}) because the participants
+     * it hands in are keyed by it.
+     */
+    Conversation createConversation(ConversationId id, String topic,
                                     ConversationType type, List<Participant> participants);
 
-    Optional<Conversation> findById(UUID conversationId);
+    Optional<Conversation> findById(ConversationId id);
 
-    List<Conversation> listByNamespace(Namespace namespace, PageRequest page);
+    List<Conversation> list(PageRequest page);
 
-    List<Message> loadHistory(UUID conversationId, PageRequest page);
+    List<Message> loadHistory(ConversationId conversation, PageRequest page);
 
     /**
      * The WHOLE conversation as a typed {@link ConversationHistory} — the
@@ -32,7 +38,7 @@ public interface ConversationManager {
      * complete history is the requirement, so the completeness contract is
      * visible in the type.
      */
-    ConversationHistory loadCompleteHistory(UUID conversationId);
+    ConversationHistory loadCompleteHistory(ConversationId conversation);
 
     /**
      * Adds a message to a conversation, tagged with the agent chat-turn
@@ -44,8 +50,8 @@ public interface ConversationManager {
      * {@code null} is allowed for messages that originate outside an agent
      * turn (broadcasts, test fixtures, etc.).
      */
-    Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
-                                     MessageType type, String content, UUID turnId);
+    Message addMessageToConversation(ConversationId conversation, String senderId, ParticipantType senderType,
+                                     MessageType type, String content, ChatTurnId turnId);
 
     /**
      * Same, with metadata. The tool/approval types REQUIRE their pairing keys
@@ -53,8 +59,8 @@ public interface ConversationManager {
      * {@link MessageType}): the runtime derives open calls and pending
      * approvals from metadata, never by parsing content.
      */
-    Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
-                                     MessageType type, String content, UUID turnId, Integer run,
+    Message addMessageToConversation(ConversationId conversation, String senderId, ParticipantType senderType,
+                                     MessageType type, String content, ChatTurnId turnId, Integer run,
                                      java.util.Map<String, Object> metadata);
 
     /**
@@ -62,8 +68,8 @@ public interface ConversationManager {
      * and files sent with it. The record's {@code content} is derived from the
      * text parts, so the text-only readers see the message as before.
      */
-    Message addMessageToConversation(UUID conversationId, UUID senderId, ParticipantType senderType,
-                                     MessageType type, List<ContentPart> parts, UUID turnId, Integer run,
+    Message addMessageToConversation(ConversationId conversation, String senderId, ParticipantType senderType,
+                                     MessageType type, List<ContentPart> parts, ChatTurnId turnId, Integer run,
                                      java.util.Map<String, Object> metadata);
 
     /**
@@ -71,19 +77,19 @@ public interface ConversationManager {
      * The original content is preserved; {@code stub} is what the LLM sees in
      * subsequent turns via {@link ai.mindconnect.message.domain.Message#compressedContent()}.
      */
-    void compressMessage(UUID conversationId, UUID messageId, String stub, Integer compressedTokenCount);
+    void compressMessage(ConversationId conversation, MessageId message, String stub, Integer compressedTokenCount);
 
     /**
      * Updates the estimated token count for an existing message.
      * No-op if the message is not found.
      */
-    void updateTokenCount(UUID conversationId, UUID messageId, int tokenCount);
+    void updateTokenCount(ConversationId conversation, MessageId message, int tokenCount);
 
     /**
      * Records the wall-clock duration that produced this message, in milliseconds.
      * No-op if the message is not found.
      */
-    void updateDurationMs(UUID conversationId, UUID messageId, long durationMs);
+    void updateDurationMs(ConversationId conversation, MessageId message, long durationMs);
 
     /**
      * Permanently deletes all messages in the conversation whose sequenceNum
@@ -91,5 +97,5 @@ public interface ConversationManager {
      *
      * @return number of messages deleted
      */
-    int deleteMessages(UUID conversationId, int fromSeq, int toSeq);
+    int deleteMessages(ConversationId conversation, int fromSeq, int toSeq);
 }

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.service;
 
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.MediaTypes;
@@ -90,7 +91,7 @@ public class MessageToLlmMessageMapper implements LlmMessageMapper {
         for (Message m : messages) {
             switch (m.type()) {
                 case CHAT -> {
-                    boolean assistant = m.senderId().equals(def.id());
+                    boolean assistant = m.senderId().equals(def.id().value());
                     String text = guard(textForModel(m, def, session), budget, m.sequenceNum(), "CHAT");
                     if (assistant) {
                         result.add(LlmMessage.assistant(text));
@@ -132,7 +133,7 @@ public class MessageToLlmMessageMapper implements LlmMessageMapper {
 
     /** The text of the message as the model reads it — notices ahead of a user's text. */
     private static String textForModel(Message m, AgentDefinition def, AgentSession session) {
-        if (m.type() != MessageType.CHAT || m.senderId().equals(def.id())) return m.content();
+        if (m.type() != MessageType.CHAT || m.senderId().equals(def.id().value())) return m.content();
         return AttachmentNotice.forModel(m, session);
     }
 
@@ -205,7 +206,7 @@ public class MessageToLlmMessageMapper implements LlmMessageMapper {
 
     /** The media as a content block, or null when the store no longer has it. */
     private LlmContent inline(ContentPart.Media part) {
-        PartContentReader.Content content = partContentReader.read(part.fileId()).orElse(null);
+        PartContentReader.Content content = partContentReader.read(FileId.of(part.fileId())).orElse(null);
         if (content == null || content.bytes() == null) {
             log.warn("Media part {} ({}) is not readable — sending a placeholder", part.fileId(), part.name());
             return null;

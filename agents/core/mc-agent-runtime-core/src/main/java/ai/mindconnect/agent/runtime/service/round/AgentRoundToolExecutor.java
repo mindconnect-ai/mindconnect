@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.service.round;
 
-import java.util.UUID;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Executes tool calls — asynchronously. {@link #execute} only starts and
@@ -24,8 +25,8 @@ public interface AgentRoundToolExecutor {
      * crash — only idempotency here keeps a non-repeatable tool from running
      * twice.
      */
-    void execute(String requestId, UUID sessionId, ToolCalls.Call call);
+    void execute(String requestId, SessionId sessionId, ToolCalls.Call call);
 
     /** The state of a started execution. */
-    ToolResult result(UUID sessionId, String callId);
+    ToolResult result(SessionId sessionId, String callId);
 }

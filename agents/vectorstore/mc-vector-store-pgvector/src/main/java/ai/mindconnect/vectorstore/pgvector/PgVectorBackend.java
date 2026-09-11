@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * pgvector backend: each store is one table ({@code vs_<storeId>}) with an
+ * pgvector backend: each store is one table ({@code vs_<namespace>__<storeId>}) with an
  * HNSW cosine index, so different stores can carry different embedding
  * dimensions.
  *
@@ -42,7 +42,7 @@ public final class PgVectorBackend implements VectorStoreBackend {
 
     @Override
     public VectorStore open(String storeId, Map<String, String> config) {
-        return new PgVectorStore(dataSource(config), storeId);
+        return new PgVectorStore(dataSource(config), namespace(config), storeId);
     }
 
     @Override
@@ -51,17 +51,29 @@ public final class PgVectorBackend implements VectorStoreBackend {
         if (url == null || url.isBlank()) {
             return List.of();
         }
+        String prefix = PgVectorStore.tablePrefix(namespace(config));
         List<String> stores = new java.util.ArrayList<>();
         try (var connection = dataSource(config).getConnection();
              var rs = connection.getMetaData().getTables(null, null, "vs_%", new String[]{"TABLE"})) {
             while (rs.next()) {
-                stores.add(rs.getString("TABLE_NAME").substring(3));
+                String table = rs.getString("TABLE_NAME");
+                if (table.startsWith(prefix)) {
+                    stores.add(table.substring(prefix.length()));
+                }
             }
         } catch (java.sql.SQLException e) {
             return List.of();
         }
         java.util.Collections.sort(stores);
         return stores;
+    }
+
+    private static String namespace(Map<String, String> config) {
+        String namespace = config == null ? null : config.get("namespace");
+        if (namespace == null || namespace.isBlank()) {
+            throw new IllegalArgumentException("pgvector backend requires the 'namespace' config key");
+        }
+        return namespace;
     }
 
     private static DataSource dataSource(Map<String, String> config) {

@@ -20,4 +20,11 @@
         backends register. No dependencies — an adapter implements this, a
         consumer depends on this and nothing else.
     </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-domain</artifactId>
+        </dependency>
+    </dependencies>
 </project>

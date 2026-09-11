@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
@@ -7,13 +9,12 @@ import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.common.DomainException;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -26,29 +27,30 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class SessionAgentResolverTest {
 
-    private static final Namespace NS = new Namespace("local");
-
-    private final Map<UUID, AgentDefinition> registry = new ConcurrentHashMap<>();
+    private final Map<AgentId, AgentDefinition> registry = new ConcurrentHashMap<>();
     private final SessionAgentResolver resolver = new SessionAgentResolver(new Repo());
 
     private class Repo implements AgentDefinitionRepository {
         @Override public AgentDefinition save(AgentDefinition d) { registry.put(d.id(), d); return d; }
-        @Override public Optional<AgentDefinition> findById(UUID id) { return Optional.ofNullable(registry.get(id)); }
-        @Override public List<AgentDefinition> findByNamespace(Namespace ns) { return List.copyOf(registry.values()); }
-        @Override public Optional<AgentDefinition> findByName(Namespace ns, String name) {
-            return registry.values().stream().filter(d -> d.name().equals(name)).findFirst();
+        @Override public Optional<AgentDefinition> findById(AgentId id) { return Optional.ofNullable(registry.get(id)); }
+        @Override public List<AgentDefinition> findAll() {
+            return registry.values().stream().toList();
         }
-        @Override public void deleteById(UUID id) { registry.remove(id); }
+        @Override public Optional<AgentDefinition> findByName(String name) {
+            return registry.values().stream()
+                    .filter(d -> d.name().equals(name)).findFirst();
+        }
+        @Override public void deleteById(AgentId id) { registry.remove(id); }
     }
 
     private AgentDefinition registered(String name, String llm) {
-        var def = AgentDefinition.create(NS, name, "d", "the agent's own prompt", "hi", llm);
+        var def = AgentDefinition.create(name, "d", "the agent's own prompt", "hi", llm);
         registry.put(def.id(), def);
         return def;
     }
 
-    private static AgentSession sessionFor(UUID agentId) {
-        return AgentSession.start(agentId, NS, "alice", UUID.randomUUID());
+    private static AgentSession sessionFor(AgentId agentId) {
+        return AgentSession.start(agentId, UserId.of("alice"), ConversationId.random());
     }
 
     @Test
@@ -59,7 +61,7 @@ class SessionAgentResolverTest {
 
     @Test
     void anUnknownAgentIsReportedAsNotFound() {
-        assertThatThrownBy(() -> resolver.resolve(sessionFor(UUID.randomUUID())))
+        assertThatThrownBy(() -> resolver.resolve(sessionFor(AgentId.random())))
                 .isInstanceOf(DomainException.class);
     }
 
@@ -113,7 +115,7 @@ class SessionAgentResolverTest {
 
     @Test
     void aRefToAnAgentThatWasDeletedFailsLoudly() {
-        UUID gone = UUID.randomUUID();
+        AgentId gone = AgentId.random();
         var session = sessionFor(gone)
                 .withSessionAgents(List.of(new SessionAgentRef(gone, true, "Gone", null, null, null)));
 

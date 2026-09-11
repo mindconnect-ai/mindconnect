@@ -11,7 +11,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.message.domain.ChatTurnId;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
 import static ai.mindconnect.chatui.ui.SessionUiCommons.previewOf;
@@ -30,15 +31,15 @@ import static ai.mindconnect.chatui.ui.SessionUiCommons.previewOf;
  */
 public final class TraceMasterListComponent implements UiComponent {
 
-    private final UUID sessionId;
-    private final Map<UUID, List<LlmCallTrace>> byTurn;
+    private final SessionId sessionId;
+    private final Map<ChatTurnId, List<LlmCallTrace>> byTurn;
     private final List<Message> history;
-    private final UUID selectedTurnId;
+    private final ChatTurnId selectedTurnId;
 
-    public TraceMasterListComponent(UUID sessionId,
-                                     Map<UUID, List<LlmCallTrace>> byTurn,
+    public TraceMasterListComponent(SessionId sessionId,
+                                     Map<ChatTurnId, List<LlmCallTrace>> byTurn,
                                      List<Message> history,
-                                     UUID selectedTurnId) {
+                                     ChatTurnId selectedTurnId) {
         this.sessionId = sessionId;
         this.byTurn = byTurn;
         this.history = history;
@@ -47,7 +48,7 @@ public final class TraceMasterListComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "traces-list-" + sessionId;
+        return "traces-list-" + sessionId.value();
     }
 
     @Override
@@ -62,7 +63,7 @@ public final class TraceMasterListComponent implements UiComponent {
         }
 
         // Index messages by turnId once for fast lookup.
-        Map<UUID, List<Message>> messagesByTurn = new LinkedHashMap<>();
+        Map<ChatTurnId, List<Message>> messagesByTurn = new LinkedHashMap<>();
         for (Message m : history) {
             if (m.turnId() != null) {
                 messagesByTurn.computeIfAbsent(m.turnId(), k -> new ArrayList<>()).add(m);
@@ -70,7 +71,7 @@ public final class TraceMasterListComponent implements UiComponent {
         }
 
         for (var entry : byTurn.entrySet()) {
-            UUID turnId = entry.getKey();
+            ChatTurnId turnId = entry.getKey();
             List<LlmCallTrace> turnTraces = entry.getValue();
             LlmCallTrace first = turnTraces.get(0);
 
@@ -96,10 +97,10 @@ public final class TraceMasterListComponent implements UiComponent {
             String agentPreview = agentResponsePreview(messagesByTurn.get(turnId));
             String desc = "You: " + userPreview + "\nAgent: " + agentPreview;
 
-            list.item(UiList.Item.of("trace-turn-" + turnId, label)
+            list.item(UiList.Item.of("trace-turn-" + turnId.value(), label)
                     .description(desc)
-                    .dispatch("GET", "/admin/api/sessions/" + sessionId
-                            + "/traces?turnId=" + turnId));
+                    .dispatch("GET", "/admin/api/sessions/" + sessionId.value()
+                            + "/traces?turnId=" + turnId.value()));
         }
         return list;
     }

@@ -9,7 +9,11 @@ import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
@@ -23,7 +27,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -38,9 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class UserStreamTest {
 
-    private static final Namespace NS = new Namespace("local");
-    private static final UUID AGENT_ID = UUID.randomUUID();
-    private static final UUID ALICE_SESSION = UUID.randomUUID();
+    private static final AgentId AGENT_ID = AgentId.random();
+    private static final SessionId ALICE_SESSION = SessionId.random();
 
     private LocalTaskQueue queue;
     private TaskMonitor monitor;
@@ -83,11 +85,11 @@ class UserStreamTest {
             return TaskOutcome.done("ok");
         });
         var definitions = new InMemoryAgentDefinitionRepository();
-        definitions.save(new AgentDefinition(AGENT_ID, NS, "Scout", "A test agent",
+        definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
                 "assistants", "bot", "prompt", null, "cfg", 5, null,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
         var sessions = new InMemoryAgentSessionRepository();
-        sessions.save(new AgentSession(ALICE_SESSION, AGENT_ID, NS, "alice", UUID.randomUUID(),
+        sessions.save(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"), ConversationId.random(),
                 "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
                 null, null, null, null, null, null, null));
         monitor = new TaskMonitor(queue, sessions, definitions);
@@ -122,7 +124,7 @@ class UserStreamTest {
         stream.attach(emitter, "alice");
 
         String id = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE,
-                Map.of(AgentTurnWorker.SESSION_ID, ALICE_SESSION.toString(), AgentTurnWorker.DEPTH, 0)));
+                Map.of(AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0)));
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
         assertThat(emitter.patchArrived.await(5, TimeUnit.SECONDS)).isTrue();
 
@@ -140,14 +142,14 @@ class UserStreamTest {
         stream.attach(alice, "alice");
         stream.attach(bob, "bob");
 
-        UUID turn = UUID.randomUUID();
-        userChannels.publish("alice", new UserEvent.TurnStarted(ALICE_SESSION, turn));
+        ChatTurnId turn = ChatTurnId.random();
+        userChannels.publish(UserId.of("alice"), new UserEvent.TurnStarted(ALICE_SESSION, turn));
         assertThat(alice.userArrived.await(5, TimeUnit.SECONDS)).isTrue();
 
         String frame = alice.frames.stream().filter(f -> f.contains("event:user")).findFirst().orElseThrow();
         assertThat(frame).contains("\"type\":\"turn_started\"");
-        assertThat(frame).contains("\"sessionId\":\"" + ALICE_SESSION + "\"");
-        assertThat(frame).contains("\"turnId\":\"" + turn + "\"");
+        assertThat(frame).contains("\"sessionId\":\"" + ALICE_SESSION.value() + "\"");
+        assertThat(frame).contains("\"turnId\":\"" + turn.value() + "\"");
         assertThat(bob.frames).noneMatch(f -> f.contains("event:user"));
     }
 }

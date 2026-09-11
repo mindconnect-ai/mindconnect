@@ -39,9 +39,8 @@ A port is a plain interface — for example:
 ```java
 public interface AgentSessionRepository {
     AgentSession save(AgentSession session);
-    Optional<AgentSession> findById(UUID id);
-    List<AgentSession> findByAgentDefinitionId(UUID agentDefinitionId,
-                                               Namespace namespace, String userId);
+    Optional<AgentSession> findById(SessionId id);
+    List<AgentSession> findByAgent(AgentId agentDefinitionId, UserId userId);
     // …
 }
 ```
@@ -50,10 +49,16 @@ public interface AgentSessionRepository {
 
 In the Spring apps the file adapters come from the **`mc-agent-starter-file`**
 starter (`agents/springstarter/`), all rooted at one directory
-(`mindconnect.data.base-dir`, default `data/`). The LLM-config repository is
+(`mindconnect.data.base-dir`, default `data/`) and, below it, the namespace
+the process runs in (`mindconnect.namespace`, default `local`) — so the data
+of a default install lives under `data/local/`. The LLM-config repository is
 wrapped in an `EncryptingLlmConfigRepository` when the app has an
 `EncryptionHelper`, and LLM call traces live under `conversations/` with a
 `mindconnect.agent.trace.max-per-session` retention cap (default 50).
+
+Every adapter — file or Postgres — is bound to that one namespace when it is
+built. Nothing above the repositories names a namespace; a process serves
+exactly one.
 
 This makes the runtime zero-dependency: it boots and persists with nothing but a
 writable folder — no database, no migrations, ideal for local development and
@@ -110,7 +115,8 @@ Each domain object is one row: the whole object as a **JSONB document**, with
 the few values a query filters, sorts or lists by as ordinary columns beside
 it — the id, a namespace, a name, a sequence number, a timestamp. The document
 is the truth and the columns are the index; both are written in the same
-statement. A document in the database is the same JSON the file adapter would
+statement. The namespace column is part of every primary key and every query,
+so two processes bound to different namespaces can share one database. A document in the database is the same JSON the file adapter would
 have written, rendered by the application's `ObjectMapper`.
 
 The tables are named `mc_agent_definition`, `mc_agent_session`,

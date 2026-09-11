@@ -1,29 +1,36 @@
 package ai.mindconnect.agent.runtime.service.stream;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.channel.Channel;
+import ai.mindconnect.message.domain.ChatTurnId;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class UserChannelsTest {
 
+    private static final UserId ALICE = UserId.of("alice");
+    private static final UserId BOB = UserId.of("bob");
+
     private final UserChannels channels = new UserChannels();
-    private final UUID session = UUID.randomUUID();
-    private final UUID turn = UUID.randomUUID();
+    private final SessionId session = SessionId.random();
+    private final ChatTurnId turn = ChatTurnId.random();
 
     @Test
     void eventsReachOnlyTheirUsersStream() {
         List<Channel.Event<UserEvent>> alice = new CopyOnWriteArrayList<>();
         List<Channel.Event<UserEvent>> bob = new CopyOnWriteArrayList<>();
-        channels.subscribe("alice", 0, alice::add);
-        channels.subscribe("bob", 0, bob::add);
+        channels.subscribe(ALICE, 0, alice::add);
+        channels.subscribe(BOB, 0, bob::add);
 
-        channels.publish("alice", new UserEvent.TurnStarted(session, turn));
-        channels.publish("alice", new UserEvent.TurnFinished(session, turn, UserEvent.TurnOutcome.COMPLETED));
+        channels.publish(ALICE, new UserEvent.TurnStarted(session, turn));
+        channels.publish(ALICE, new UserEvent.TurnFinished(session, turn, UserEvent.TurnOutcome.COMPLETED));
 
         awaitSize(alice, 2);
         assertThat(alice.get(0).value()).isInstanceOf(UserEvent.TurnStarted.class);
@@ -34,13 +41,13 @@ class UserChannelsTest {
 
     @Test
     void afterSeqReplaysTheBufferedTailThenContinuesLive() {
-        channels.publish("alice", new UserEvent.SessionStarted(session, UUID.randomUUID()));
-        channels.publish("alice", new UserEvent.TurnStarted(session, turn));
-        long cursor = channels.lastSeq("alice") - 1;   // "I saw the session start"
+        channels.publish(ALICE, new UserEvent.SessionStarted(session, AgentId.random()));
+        channels.publish(ALICE, new UserEvent.TurnStarted(session, turn));
+        long cursor = channels.lastSeq(ALICE) - 1;   // "I saw the session start"
 
         List<Channel.Event<UserEvent>> seen = new CopyOnWriteArrayList<>();
-        channels.subscribe("alice", cursor, seen::add);
-        channels.publish("alice", new UserEvent.SessionTitled(session, "Hello"));
+        channels.subscribe(ALICE, cursor, seen::add);
+        channels.publish(ALICE, new UserEvent.SessionTitled(session, "Hello"));
 
         awaitSize(seen, 2);
         assertThat(seen.get(0).value()).isInstanceOf(UserEvent.TurnStarted.class);
@@ -49,9 +56,17 @@ class UserChannelsTest {
 
     @Test
     void aSessionWithoutAnOwnerIsNotAnnounced() {
+        List<Channel.Event<UserEvent>> alice = new CopyOnWriteArrayList<>();
+        channels.subscribe(ALICE, 0, alice::add);
+
+        // No owner: dropped silently, nobody's stream moves.
         channels.publish(null, new UserEvent.TurnStarted(session, turn));
-        channels.publish("", new UserEvent.TurnStarted(session, turn));
-        assertThat(channels.lastSeq("")).isZero();
+
+        assertThat(channels.lastSeq(ALICE)).isZero();
+        assertThat(alice).isEmpty();
+        // A blank owner used to be the other way to say "nobody"; the typed id
+        // refuses to exist, so it can no longer reach the channel at all.
+        assertThatThrownBy(() -> UserId.of("")).isInstanceOf(IllegalArgumentException.class);
     }
 
     private static void awaitSize(List<?> list, int size) {

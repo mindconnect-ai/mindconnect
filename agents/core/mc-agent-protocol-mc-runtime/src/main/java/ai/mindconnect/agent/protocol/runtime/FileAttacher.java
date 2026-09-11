@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.protocol.runtime;
 
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Attaches an already-stored file to a session — in the Mindconnect runtime:
@@ -18,5 +18,5 @@ import java.util.UUID;
 public interface FileAttacher {
 
     /** Attaches {@code file} to {@code sessionId}; returns a human-readable status. */
-    String attach(UUID sessionId, ai.mindconnect.filestore.StoredFile file);
+    String attach(SessionId sessionId, ai.mindconnect.filestore.StoredFile file);
 }

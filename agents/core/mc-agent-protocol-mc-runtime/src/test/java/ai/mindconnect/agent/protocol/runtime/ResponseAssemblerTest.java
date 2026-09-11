@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.protocol.runtime;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseStatus;
@@ -48,7 +49,7 @@ class ResponseAssemblerTest {
     @Test
     void subAgentBecomesAgentCallPair() {
         UUID taskId = UUID.randomUUID();
-        UUID subSession = UUID.randomUUID();
+        SessionId subSession = SessionId.random();
         assembler.accept(new StreamEvent.SubAgentStarted(taskId, "researcher", 1, subSession, "find X"));
         assembler.accept(new StreamEvent.SubAgentDone(taskId, "researcher", subSession, "X found"));
         assembler.accept(new StreamEvent.Token("done"));
@@ -58,7 +59,7 @@ class ResponseAssemblerTest {
 
         ConversationItem.AgentCall call = (ConversationItem.AgentCall) items.get(0);
         assertThat(call.agentName()).isEqualTo("researcher");
-        assertThat(call.childResponseId()).isEqualTo(subSession.toString());
+        assertThat(call.childResponseId()).isEqualTo(subSession.value());
         ConversationItem.FunctionCallOutput output = (ConversationItem.FunctionCallOutput) items.get(1);
         assertThat(output.callId()).isEqualTo(call.callId());
         assertThat(output.output()).isEqualTo("X found");

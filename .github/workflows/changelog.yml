@@ -41,14 +41,17 @@ jobs:
           # nothing to someone deciding whether to upgrade — asking for an
           # entry there would train people to ignore this check, which is the
           # one failure mode that matters.
-          USER_FACING=$(echo "$CHANGED" \
-            | grep -E '^(agents|workflow|taskqueue|common)/.*/src/main/.*\.java$' || true)
+          USER_FACING=$(grep -E '^(agents|workflow|taskqueue|common)/.*/src/main/.*\.java$' <<< "$CHANGED" || true)
 
           if [ -z "$USER_FACING" ]; then
             echo "No shipped code changed — no entry needed."
             exit 0
           fi
-          if echo "$CHANGED" | grep -qx 'CHANGELOG.md'; then
+          # A here-string, not `echo | grep -q`: grep -q stops reading at the
+          # first match, and with pipefail the echo still writing into the
+          # closed pipe fails the test. CHANGELOG.md sorts near the top, so a
+          # large PR that updated it was reported as not having done so.
+          if grep -qx 'CHANGELOG.md' <<< "$CHANGED"; then
             echo "CHANGELOG.md was updated."
             exit 0
           fi

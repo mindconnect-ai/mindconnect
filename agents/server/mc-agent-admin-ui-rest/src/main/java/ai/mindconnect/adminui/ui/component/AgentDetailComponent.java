@@ -16,7 +16,9 @@ import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiSection;
 
-import java.util.UUID;
+import ai.mindconnect.agent.EntityId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.tool.AgentToolId;
 
 /**
  * Tabbed detail view for a single agent: Details / Tools / Sessions.
@@ -54,7 +56,7 @@ public final class AgentDetailComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "agent-section-" + agent.id();
+        return "agent-section-" + agent.id().value();
     }
 
     @Override
@@ -62,8 +64,10 @@ public final class AgentDetailComponent implements UiComponent {
         var details = buildDetailsTab();
 
         // selectedRow applies only to whichever section it was deep-linked for.
-        UUID selectedToolId = parseUuid("tools".equals(initialSection) ? selectedRowId : null);
-        UUID selectedSessId = parseUuid("sessions".equals(initialSection) ? selectedRowId : null);
+        AgentToolId selectedToolId = "tools".equals(initialSection) && isIdValue(selectedRowId)
+                ? AgentToolId.of(selectedRowId) : null;
+        SessionId selectedSessId = "sessions".equals(initialSection) && isIdValue(selectedRowId)
+                ? SessionId.of(selectedRowId) : null;
 
         var toolTable    = new ToolTableComponent(agent, selectedToolId).render();
         var sessionTable = new SessionTableComponent(agent, userId, sessionRepository, selectedSessId).render();
@@ -85,7 +89,7 @@ public final class AgentDetailComponent implements UiComponent {
     }
 
     private UiDetail buildDetailsTab() {
-        return UiDetail.of("agent-detail-" + agent.id(), agent.name())
+        return UiDetail.of("agent-detail-" + agent.id().value(), agent.name())
                 .field(UiField.text("name", "Name", agent.name()))
                 .field(UiField.text("description", "Description", agent.description()))
                 // Capitalised like the list heading it corresponds to — this
@@ -102,13 +106,13 @@ public final class AgentDetailComponent implements UiComponent {
                 .field(UiField.number("maxIterations", "Max Iterations", agent.maxIterations()))
                 .field(UiField.text("memory", "Memory", memorySummary()))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
-                        .onClick(trigger(on(AgentUiController.class).editForm(agent.id()))))
+                        .onClick(trigger(on(AgentUiController.class).editForm(agent.id().value()))))
                 // No back link: "Agents" in the sidebar is the way back now —
                 // a link squeezed between the buttons just read as a third,
                 // differently-styled action.
                 .action(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete agent '" + agent.name() + "'?")
-                        .onClick(trigger(on(AgentUiController.class).delete(agent.id()))));
+                        .onClick(trigger(on(AgentUiController.class).delete(agent.id().value()))));
     }
 
     /** The roster, or the word for having none — which means all of them. */
@@ -127,9 +131,8 @@ public final class AgentDetailComponent implements UiComponent {
         return config.kind();
     }
 
-    private static UUID parseUuid(String s) {
-        if (s == null) return null;
-        try { return UUID.fromString(s); }
-        catch (IllegalArgumentException e) { return null; }
+    /** Whether a deep-linked row is a well-formed id value; anything else selects nothing. */
+    private static boolean isIdValue(String s) {
+        return s != null && EntityId.VALUE.matcher(s).matches();
     }
 }

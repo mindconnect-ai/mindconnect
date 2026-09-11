@@ -1,9 +1,9 @@
 package ai.mindconnect.agent.runtime.memory.port.out;
 
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
+import ai.mindconnect.message.domain.ConversationId;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Persists and retrieves {@link ConversationSummary} records for a conversation.
@@ -14,12 +14,9 @@ public interface ConversationSummaryRepository {
     /** Saves a new summary (never updates — summaries are immutable once created). */
     void save(ConversationSummary summary);
 
-    /**
-     * Returns all summaries for the given conversation,
-     * ordered by {@code fromSequenceNum} ascending.
-     */
-    List<ConversationSummary> findByConversationId(UUID conversationId);
+    /** All summaries of the conversation, ordered by {@code fromSequenceNum} ascending. */
+    List<ConversationSummary> findByConversation(ConversationId conversation);
 
-    /** Deletes all summaries for the given conversation (e.g. on session reset). */
-    void deleteByConversationId(UUID conversationId);
+    /** Deletes all summaries of the conversation (e.g. on session reset). */
+    void deleteByConversation(ConversationId conversation);
 }

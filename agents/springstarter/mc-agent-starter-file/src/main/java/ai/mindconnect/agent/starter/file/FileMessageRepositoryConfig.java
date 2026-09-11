@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.file;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.adapter.file.FileConversationRepository;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.message.port.out.ConversationRepository;
@@ -26,12 +27,12 @@ public class FileMessageRepositoryConfig {
     }
 
     @Bean
-    ConversationRepository conversationRepository(Path messageStorageDir, ObjectMapper objectMapper) {
-        return new FileConversationRepository(messageStorageDir, objectMapper);
+    ConversationRepository conversationRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
+        return new FileConversationRepository(messageStorageDir, objectMapper, namespace);
     }
 
     @Bean
-    MessageRepository messageRepository(Path messageStorageDir, ObjectMapper objectMapper) {
-        return new FileMessageRepository(messageStorageDir, objectMapper);
+    MessageRepository messageRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
+        return new FileMessageRepository(messageStorageDir, objectMapper, namespace);
     }
 }

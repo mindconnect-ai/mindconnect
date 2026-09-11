@@ -177,7 +177,7 @@ public final class CodeExecuteToolFactory implements ToolFactory {
      * otherwise. Sanitised because it becomes a directory name.
      */
     private static String sessionKey(ToolCallScope scope) {
-        String raw = scope != null && scope.sessionId() != null ? scope.sessionId().toString() : "shared";
+        String raw = scope != null && scope.sessionId() != null ? scope.sessionId().value() : "shared";
         return raw.replaceAll("[^A-Za-z0-9_-]", "-");
     }
 }

@@ -1,17 +1,15 @@
 package ai.mindconnect.agent.runtime.domain;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
 import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
-import ai.mindconnect.agent.Namespace;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 public record AgentDefinition(
-        UUID id,
-        Namespace namespace,
+        AgentId id,
         String name,
         String description,
         /**
@@ -53,7 +51,7 @@ public record AgentDefinition(
         /**
          * The other agents this one may see and call, by name — the roster it
          * delegates to. {@code null} or empty means no restriction: it sees
-         * every agent in its namespace, which is what an agent that was never
+         * every agent, which is what an agent that was never
          * given a roster has always done.
          *
          * <p>Governs both halves of delegating, because half of it would be
@@ -88,14 +86,18 @@ public record AgentDefinition(
         icon = normalisedName(icon);
     }
 
-    /** Trim, fold case, and read blank as absent — for the two machine names. */
+    /**
+     * Trim, fold case, and read blank as absent — for the two machine names.
+     */
     private static String normalisedName(String value) {
         if (value == null) return null;
         String v = value.trim().toLowerCase(java.util.Locale.ROOT);
         return v.isEmpty() ? null : v;
     }
 
-    /** Tool-search switch + registry-group filter, stored with the agent. */
+    /**
+     * Tool-search switch + registry-group filter, stored with the agent.
+     */
     public record ToolSearchConfig(boolean enabled, List<String> groups) {
         public ToolSearchConfig {
             if (groups == null) groups = List.of();
@@ -104,51 +106,65 @@ public record AgentDefinition(
         public static final ToolSearchConfig OFF = new ToolSearchConfig(false, List.of());
     }
 
-    /** Pre-tool-search constructor: search disabled. */
-    public AgentDefinition(UUID id, Namespace namespace, String name, String description,
+    /**
+     * Pre-tool-search constructor: search disabled.
+     */
+    public AgentDefinition(AgentId id, String name, String description,
                            String systemPrompt, String welcomeMessage, String llmConfigName,
                            int maxIterations, MemoryConfig memoryConfig, AgentDefinitionStatus status,
                            List<AgentTool> tools, List<String> responseReviewers,
                            Instant createdAt, Instant updatedAt) {
-        this(id, namespace, name, description, null, null, systemPrompt, welcomeMessage, llmConfigName,
+        this(id, name, description, null, null, systemPrompt, welcomeMessage, llmConfigName,
                 maxIterations, memoryConfig, status, tools, responseReviewers, null, null,
                 createdAt, updatedAt);
     }
 
-    /** Never {@code null}: older agents without the field read as OFF. */
+    /**
+     * Never {@code null}: older agents without the field read as OFF.
+     */
     public ToolSearchConfig toolSearchOrOff() {
         return toolSearch == null ? ToolSearchConfig.OFF : toolSearch;
     }
 
-    public static AgentDefinition create(Namespace namespace, String name, String description,
+    public static AgentDefinition create(String name, String description,
                                          String systemPrompt, String welcomeMessage,
                                          String llmConfigName) {
         Instant now = Instant.now();
-        return new AgentDefinition(UUID.randomUUID(), namespace, name, description,
+        return new AgentDefinition(AgentId.random(), name, description,
                 systemPrompt, welcomeMessage, llmConfigName,
                 10, SummarizingWindowConfig.DEFAULT,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), now, now);
     }
 
-    /** Returns the configured memory config, or the system default if none is set. */
+    /**
+     * Returns the configured memory config, or the system default if none is set.
+     */
     public MemoryConfig effectiveMemoryConfig() {
         return memoryConfig != null ? memoryConfig : SummarizingWindowConfig.DEFAULT;
     }
 
-    /** Returns the configured reviewers list, or empty if none is set. */
+    /**
+     * Returns the configured reviewers list, or empty if none is set.
+     */
     public List<String> effectiveResponseReviewers() {
         return responseReviewers != null ? responseReviewers : List.of();
     }
 
-    /** The default rubric for an agent that names none — matches the tool registry's. */
+    /**
+     * The default rubric for an agent that names none — matches the tool registry's.
+     */
     public static final String DEFAULT_GROUP = "general";
 
-    /** Never {@code null} or blank: an agent filed under nothing is filed under general. */
+    /**
+     * Never {@code null} or blank: an agent filed under nothing is filed under general.
+     */
     public String groupOrDefault() {
         return group == null || group.isBlank() ? DEFAULT_GROUP : group;
     }
 
-    /** The icon an agent gets when it names none — it still has to read as an agent. */
+    /**
+     * The icon an agent gets when it names none — it still has to read as an agent.
+     */
     public static final String DEFAULT_ICON = "bot";
 
     /**
@@ -160,7 +176,9 @@ public record AgentDefinition(
         return icon == null || icon.isBlank() ? DEFAULT_ICON : icon;
     }
 
-    /** The roster as a list, empty when the agent may reach everything. */
+    /**
+     * The roster as a list, empty when the agent may reach everything.
+     */
     public List<String> effectiveCallableAgents() {
         return callableAgents != null ? callableAgents : List.of();
     }
@@ -180,57 +198,65 @@ public record AgentDefinition(
         return agentName != null && roster.stream().anyMatch(agentName::equalsIgnoreCase);
     }
 
-    /** Replaces the roster of agents this one may see and call. */
+    /**
+     * Replaces the roster of agents this one may see and call.
+     */
     public AgentDefinition withCallableAgents(List<String> callableAgents) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
-    /** Replaces the Lucide icon name (see {@link #icon()}). */
+    /**
+     * Replaces the Lucide icon name (see {@link #icon()}).
+     */
     public AgentDefinition withIcon(String icon) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
-    /** Refiles the agent under another rubric. */
+    /**
+     * Refiles the agent under another rubric.
+     */
     public AgentDefinition withGroup(String group) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
-    /** Replaces the tool-search setting (see {@link ToolSearchConfig}). */
+    /**
+     * Replaces the tool-search setting (see {@link ToolSearchConfig}).
+     */
     public AgentDefinition withToolSearch(ToolSearchConfig toolSearch) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition withMemoryConfig(MemoryConfig memoryConfig) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig, status, tools, responseReviewers,
                 callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition withTools(List<AgentTool> tools) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition withBasicFields(String name, String description, String systemPrompt,
                                            String welcomeMessage, String llmConfigName) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
-    public AgentDefinition withBasicFields(Namespace namespace, String name, String description,
+    public AgentDefinition withBasicFields(String name, String description,
                                            String systemPrompt, String welcomeMessage,
                                            String llmConfigName, List<String> responseReviewers) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
@@ -242,18 +268,18 @@ public record AgentDefinition(
      * so callers that don't care about iterations don't have to think
      * about a sensible default.
      */
-    public AgentDefinition withBasicFields(Namespace namespace, String name, String description,
+    public AgentDefinition withBasicFields(String name, String description,
                                            String systemPrompt, String welcomeMessage,
                                            String llmConfigName, int maxIterations,
                                            List<String> responseReviewers) {
-        return new AgentDefinition(id, namespace, name, description, group, icon, systemPrompt, welcomeMessage,
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
                 status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now());
     }
 
     public AgentDefinition asCopy() {
         Instant now = Instant.now();
-        return new AgentDefinition(UUID.randomUUID(), namespace, name + "-copy", description, group, icon,
+        return new AgentDefinition(AgentId.random(), name + "-copy", description, group, icon,
                 systemPrompt, welcomeMessage, llmConfigName, maxIterations, memoryConfig,
                 AgentDefinitionStatus.ACTIVE, List.of(), responseReviewers, callableAgents, toolSearch, now, now);
     }

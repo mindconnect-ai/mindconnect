@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000022",
-  "namespace": {
-    "value": "local"
-  },
   "name": "code-analyst",
   "description": "Read-only deep-analysis sub-agent. Given specific files or a subsystem, reads the code and explains how it works, traces a flow, or answers a precise technical question with evidence (file:line citations). Call via run_agent when you need understanding, not just location.",
   "group": "sub-agents",

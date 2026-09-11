@@ -1,9 +1,11 @@
 package ai.mindconnect.agent.tool;
 
+import ai.mindconnect.agent.EntityId;
+
+import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Reference from an {@code AgentDefinition} to a tool the agent is allowed to use.
@@ -11,7 +13,9 @@ import java.util.UUID;
  * <p>An {@code AgentTool} is intentionally a thin pointer: it carries only the
  * tool's global name plus optional agent-specific overrides. It does <strong>not</strong>
  * encode where the tool comes from (built-in, MCP, workflow, …) — that's the job
- * of the tool registry/resolver.
+ * of the tool registry/resolver. Nor does it point back at its agent: the
+ * definition that lists the binding knows which agent it is, and a tool call
+ * learns it from its {@link ToolCallScope}.
  *
  * <h2>{@link #overrides()}</h2>
  * Agent-level configuration that the tool implementation may consult. Examples:
@@ -20,14 +24,14 @@ import java.util.UUID;
  *   <li>{@code callTimeout}, {@code requireConfirmation} (planned, not yet read in v0)</li>
  * </ul>
  *
- * <p>The legacy fields {@code toolType}, {@code toolConfig} and {@code inputSchema}
- * have been removed. Older persisted JSON containing those keys is tolerated via
- * {@link JsonIgnoreProperties} so existing agent files keep loading.
+ * <p>The legacy fields {@code toolType}, {@code toolConfig}, {@code inputSchema}
+ * and {@code agentDefinitionId} have been removed. Older persisted JSON containing
+ * those keys is tolerated via {@link JsonIgnoreProperties} so existing agent files
+ * keep loading.
  */
-@JsonIgnoreProperties(ignoreUnknown = true)
 public record AgentTool(
-        UUID id,
-        UUID agentDefinitionId,
+        /** The binding's own id; unique within its agent. */
+        AgentToolId id,
         String name,
         String description,
         Map<String, Object> overrides,
@@ -60,43 +64,61 @@ public record AgentTool(
         Integer maxResultChars
 ) {
     public AgentTool {
+        if (id == null) throw new IllegalArgumentException("An agent tool needs an id");
         if (overrides == null) overrides = Map.of();
     }
 
-    /** Pre-maxResultChars constructor: no per-tool result cap. */
-    public AgentTool(UUID id, UUID agentDefinitionId, String name, String description,
-                     Map<String, Object> overrides, boolean enabled, boolean deferred,
-                     boolean needsApproval) {
-        this(id, agentDefinitionId, name, description, overrides, enabled, deferred,
-                needsApproval, null);
-    }
-
-    /** Pre-needsApproval constructor: the tool runs unasked. */
-    public AgentTool(UUID id, UUID agentDefinitionId, String name, String description,
-                     Map<String, Object> overrides, boolean enabled, boolean deferred) {
-        this(id, agentDefinitionId, name, description, overrides, enabled, deferred, false, null);
-    }
-
-    /** Pre-deferred-flag constructor: tool is always offered (deferred = false). */
-    public AgentTool(UUID id, UUID agentDefinitionId, String name, String description,
-                     Map<String, Object> overrides, boolean enabled) {
-        this(id, agentDefinitionId, name, description, overrides, enabled, false, false, null);
+    /** A binding with the default flags: enabled, offered up front, unasked, uncapped. */
+    public AgentTool(AgentToolId id, String name, String description, Map<String, Object> overrides) {
+        this(id, name, description, overrides, true, false, false, null);
     }
 
     /** Minimal reference: just a tool name, no overrides, enabled. */
-    public static AgentTool of(UUID agentDefinitionId, String name) {
-        return of(agentDefinitionId, name, null, Map.of());
+    public static AgentTool of(String name) {
+        return of(name, null, Map.of());
     }
 
     /** Reference with a human-readable description but no overrides. */
-    public static AgentTool of(UUID agentDefinitionId, String name, String description) {
-        return of(agentDefinitionId, name, description, Map.of());
+    public static AgentTool of(String name, String description) {
+        return of(name, description, Map.of());
     }
 
     /** Reference with agent-level overrides (e.g. {@code baseDir}). */
-    public static AgentTool of(UUID agentDefinitionId, String name,
+    public static AgentTool of(String name,
                                String description, Map<String, Object> overrides) {
-        return new AgentTool(UUID.randomUUID(), agentDefinitionId, name, description,
-                overrides == null ? Map.of() : Map.copyOf(overrides), true);
+        return new AgentTool(AgentToolId.random(), name, description,
+                overrides == null ? Map.of() : Map.copyOf(overrides));
+    }
+
+    /**
+     * The persisted shape of a binding, lenient where a hand-written file is:
+     * a missing id gets a fresh one, missing flags take their defaults. Older
+     * files carry an {@code agentDefinitionId}; it is ignored.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public record Json(String id, String name, String description, Map<String, Object> overrides,
+                       Boolean enabled, Boolean deferred, Boolean needsApproval, Integer maxResultChars) {
+
+        public AgentTool toTool() {
+            return new AgentTool(
+                    AgentToolId.of(id == null ? EntityId.randomValue() : id),
+                    name, description, overrides,
+                    enabled == null || enabled,
+                    deferred != null && deferred,
+                    needsApproval != null && needsApproval,
+                    maxResultChars);
+        }
+    }
+
+    public Json toJson() {
+        return new Json(id.value(), name, description, overrides, enabled, deferred, needsApproval, maxResultChars);
+    }
+
+    public static List<AgentTool> fromJson(List<Json> tools) {
+        return tools == null ? List.of() : tools.stream().map(t -> t.toTool()).toList();
+    }
+
+    public static List<Json> toJson(List<AgentTool> tools) {
+        return tools == null ? List.of() : tools.stream().map(AgentTool::toJson).toList();
     }
 }

@@ -21,7 +21,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 
 /**
  * Speaking into the chat instead of typing. The composer's microphone records
@@ -68,10 +69,11 @@ public class ChatVoiceUiController {
      * than replaces.
      */
     @PostMapping(value = "/transcribe", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<UiPatch> transcribe(@PathVariable UUID sessionId,
+    public ResponseEntity<UiPatch> transcribe(@PathVariable("sessionId") String sessionIdValue,
                                               @RequestParam("audio") MultipartFile audio,
                                               @RequestParam(value = "message", required = false) String typed,
                                               @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         // Someone else's session is not found here, exactly as it is not found
         // anywhere else in the chat — dictation is no way around that.
         if (!ownsSession(sessionId, user)) {
@@ -118,10 +120,10 @@ public class ChatVoiceUiController {
     }
 
     /** The session belongs to whoever is asking — the chat's own rule. */
-    private boolean ownsSession(UUID sessionId, OidcUser user) {
+    private boolean ownsSession(SessionId sessionId, OidcUser user) {
         String userId = user == null ? "mc_user" : user.getPreferredUsername();
         return sessions.findById(sessionId)
-                .filter(session -> userId.equals(session.userId()))
+                .filter(session -> UserId.of(userId).equals(session.userId()))
                 .isPresent();
     }
 
@@ -130,8 +132,8 @@ public class ChatVoiceUiController {
      * chat page asks to decide between the composer and the status row, asked
      * of the same registry.
      */
-    private boolean isStreaming(UUID sessionId) {
-        return activeStreams.findHandle("msg-list-" + sessionId).isPresent();
+    private boolean isStreaming(SessionId sessionId) {
+        return activeStreams.findHandle("msg-list-" + sessionId.value()).isPresent();
     }
 
     /** What was typed, then what was said — with one space between them. */

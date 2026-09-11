@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000001",
-  "namespace": {
-    "value": "local"
-  },
   "name": "tool-summarizer",
   "description": "Compresses large tool results after the first LLM turn",
   "group": "utilities",

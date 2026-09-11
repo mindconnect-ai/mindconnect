@@ -1,8 +1,5 @@
 {
   "id": "00000002-0000-0000-0000-000000000012",
-  "namespace": {
-    "value": "local"
-  },
   "name": "default-chat",
   "description": "The agent a chat runs on when you did not start it from one. Runs commands, reads files and documents, and delegates web research and file hunting to two specialists.",
   "group": "assistants",
@@ -155,7 +152,7 @@
       "id": "00000003-0000-0000-0000-000000000011",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
       "name": "list_agents",
-      "description": "Lists all available agents in the current namespace.",
+      "description": "Lists all available agents.",
       "enabled": true,
       "deferred": false,
       "needsApproval": false

@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.port.out;
 
+import ai.mindconnect.filestore.FileId;
+
 import java.util.Optional;
 
 /**
@@ -14,8 +16,12 @@ import java.util.Optional;
  */
 public interface PartContentReader {
 
-    /** The file's bytes and media type, or empty when the id is unknown or the file is gone. */
-    Optional<Content> read(String fileId);
+    /**
+     * The file's bytes and media type, or empty when the id is unknown or the
+     * file is gone. The id is built from the conversation's tenant and the
+     * part's value — a value alone must not be enough to reach a file.
+     */
+    Optional<Content> read(FileId fileId);
 
     /** What a read hands back. {@code mediaType} may be null when the store did not record one. */
     record Content(byte[] bytes, String mediaType) {}

@@ -1,6 +1,5 @@
 package ai.mindconnect.adminui.ui.controller;
 
-
 import ai.mindconnect.adminui.ui.page.MemoryPage;
 import ai.mindconnect.adminui.ui.page.TodosPage;
 import ai.mindconnect.adminui.ui.page.TracesPage;
@@ -17,7 +16,9 @@ import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 import ai.mindconnect.ui.model.UiPage;
@@ -31,7 +32,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/admin/api")
@@ -67,7 +67,6 @@ public class SessionUiController {
                              AgentSessionRepository sessionRepository,
                              TodoListService todoListService,
                              WorkspaceStore workspaceStore,
-                             Namespace defaultNamespace,
                              ObjectMapper objectMapper,
                              LlmCallTraceRepository traceRepository,
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
@@ -96,7 +95,7 @@ public class SessionUiController {
      * chat page underneath is never re-rendered, so scroll position and
      * stream state survive; × and backdrop close client-side.
      */
-    private ResponseEntity<UiPatch> sessionDialog(UUID sessionId, String title, UiPage inner) {
+    private ResponseEntity<UiPatch> sessionDialog(SessionId sessionId, String title, UiPage inner) {
         var dlg = ai.mindconnect.ui.model.UiDialog.of(title, null, inner.getNode());
         dlg.setId("session-dialog");
         dlg.withCssClass("sui-dialog--wide");
@@ -112,7 +111,7 @@ public class SessionUiController {
      */
 
     /** Working memory, or null when the snapshot cannot be built. */
-    private WorkingMemory safeMemorySnapshot(UUID sessionId) {
+    private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
             return chatService.memorySnapshot(sessionId);
         } catch (Exception e) {
@@ -122,9 +121,10 @@ public class SessionUiController {
     }
 
     @GetMapping("/sessions/{sessionId}/memory")
-    public ResponseEntity<?> getMemory(@PathVariable UUID sessionId,
+    public ResponseEntity<?> getMemory(@PathVariable("sessionId") String sessionIdValue,
                                         @RequestParam(value = "seq", required = false) Integer seq,
                                         @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         var memory = safeMemorySnapshot(sessionId);
         if (memory == null) {
             return ResponseEntity.status(503).body("Working memory unavailable for this session");
@@ -149,7 +149,8 @@ public class SessionUiController {
      * page in place.
      */
     @PostMapping("/sessions/{sessionId}/memory/compress")
-    public ResponseEntity<?> compressMemory(@PathVariable UUID sessionId) {
+    public ResponseEntity<?> compressMemory(@PathVariable("sessionId") String sessionIdValue) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         try {
             chatService.compressMemory(sessionId);
         } catch (Exception e) {
@@ -172,9 +173,12 @@ public class SessionUiController {
      * that swaps only the detail pane to show that turn's roundtrips.
      */
     @GetMapping("/sessions/{sessionId}/traces")
-    public ResponseEntity<?> getTraces(@PathVariable UUID sessionId,
-                                        @RequestParam(value = "turnId", required = false) UUID turnId,
+    public ResponseEntity<?> getTraces(@PathVariable("sessionId") String sessionIdValue,
+                                        @RequestParam(value = "turnId", required = false) String turnIdValue,
                                         @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        ChatTurnId turnId = turnIdValue == null || turnIdValue.isBlank()
+                ? null : ChatTurnId.of(turnIdValue);
         if (traceRepository == null) {
             return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
         }
@@ -184,11 +188,11 @@ public class SessionUiController {
         // each session we know the conversationId, so we read traces and
         // history straight from those known paths — no scanning every
         // conversation directory on disk.
-        List<UUID> sessionIds = collectSessionTree(sessionId);
+        List<SessionId> sessionIds = collectSessionTree(sessionId);
         List<LlmCallTrace> traces = new java.util.ArrayList<>();
-        for (UUID sid : sessionIds) {
+        for (SessionId sid : sessionIds) {
             try {
-                UUID convId = sessionRepository.findById(sid)
+                ConversationId convId = sessionRepository.findById(sid)
                         .map(s -> s.conversationId()).orElse(null);
                 if (convId == null) continue;
                 traces.addAll(traceRepository.findByConversation(convId));
@@ -202,7 +206,7 @@ public class SessionUiController {
         // History needs to span every session in the tree so the trace UI
         // can show TOOL_RESULT messages alongside their tool calls.
         List<Message> combinedHistory = new java.util.ArrayList<>();
-        for (UUID sid : sessionIds) {
+        for (SessionId sid : sessionIds) {
             try {
                 combinedHistory.addAll(sessionService.loadHistory(sid));
             } catch (Exception e) {
@@ -231,8 +235,9 @@ public class SessionUiController {
      * via {@code todo_list_md} in its prompt context.
      */
     @GetMapping("/sessions/{sessionId}/todos")
-    public ResponseEntity<?> getTodos(@PathVariable UUID sessionId,
+    public ResponseEntity<?> getTodos(@PathVariable("sessionId") String sessionIdValue,
                                       @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         return sessionRepository.findById(sessionId)
                 .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> {
@@ -249,9 +254,9 @@ public class SessionUiController {
      * the operator sees the empty state immediately.
      */
     @DeleteMapping("/sessions/{sessionId}/todos")
-    public ResponseEntity<?> clearTodos(@PathVariable UUID sessionId) {
-        todoListService.clear(sessionId);
-        return getTodos(sessionId, false);
+    public ResponseEntity<?> clearTodos(@PathVariable("sessionId") String sessionIdValue) {
+        todoListService.clear(SessionId.of(sessionIdValue));
+        return getTodos(sessionIdValue, false);
     }
 
     // ── workspace page ─────────────────────────────────────────────────────
@@ -261,8 +266,9 @@ public class SessionUiController {
      * each with a file listing, sizes, and view/download links per file.
      */
     @GetMapping("/sessions/{sessionId}/workspace")
-    public ResponseEntity<?> getWorkspace(@PathVariable UUID sessionId,
+    public ResponseEntity<?> getWorkspace(@PathVariable("sessionId") String sessionIdValue,
                                           @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
         return sessionRepository.findById(sessionId)
                 .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> {
@@ -282,11 +288,11 @@ public class SessionUiController {
      */
     @GetMapping("/sessions/{sessionId}/workspace/{scope}/file")
     public ResponseEntity<byte[]> downloadWorkspaceFile(
-            @PathVariable UUID sessionId,
+            @PathVariable("sessionId") String sessionIdValue,
             @PathVariable String scope,
             @RequestParam("name") String name,
             @RequestParam(value = "download", defaultValue = "false") boolean download) {
-        var sessionOpt = sessionRepository.findById(sessionId);
+        var sessionOpt = sessionRepository.findById(SessionId.of(sessionIdValue));
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
 
@@ -349,21 +355,21 @@ public class SessionUiController {
 
     /**
      * Walks the parent/child session tree rooted at {@code rootSessionId}
-     * via {@link AgentSessionRepository#findByParentSessionId(UUID)} and
+     * via {@link AgentSessionRepository#findByParentSession(SessionId)} and
      * returns every session id encountered (root first, then BFS through
      * sub-agents). Stays cheap because session.json files are tiny.
      */
-    private List<UUID> collectSessionTree(UUID rootSessionId) {
-        List<UUID> ordered = new java.util.ArrayList<>();
-        java.util.ArrayDeque<UUID> frontier = new java.util.ArrayDeque<>();
-        java.util.Set<UUID> visited = new java.util.HashSet<>();
+    private List<SessionId> collectSessionTree(SessionId rootSessionId) {
+        List<SessionId> ordered = new java.util.ArrayList<>();
+        java.util.ArrayDeque<SessionId> frontier = new java.util.ArrayDeque<>();
+        java.util.Set<SessionId> visited = new java.util.HashSet<>();
         frontier.add(rootSessionId);
         while (!frontier.isEmpty()) {
-            UUID current = frontier.poll();
+            SessionId current = frontier.poll();
             if (!visited.add(current)) continue;
             ordered.add(current);
             try {
-                for (var sub : sessionRepository.findByParentSessionId(current)) {
+                for (var sub : sessionRepository.findByParentSession(current)) {
                     frontier.add(sub.id());
                 }
             } catch (Exception e) {

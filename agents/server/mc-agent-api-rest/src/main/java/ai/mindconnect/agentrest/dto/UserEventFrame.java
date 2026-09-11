@@ -2,7 +2,7 @@ package ai.mindconnect.agentrest.dto;
 
 import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 
-import java.util.UUID;
+import ai.mindconnect.agent.EntityId;
 
 /**
  * One frame of the user stream ({@code GET /api/users/{userId}/stream}): a
@@ -50,7 +50,7 @@ public record UserEventFrame(long seq, String type, String sessionId, String tur
         };
     }
 
-    private static String str(UUID id) {
-        return id == null ? null : id.toString();
+    private static String str(EntityId id) {
+        return id == null ? null : id.value();
     }
 }

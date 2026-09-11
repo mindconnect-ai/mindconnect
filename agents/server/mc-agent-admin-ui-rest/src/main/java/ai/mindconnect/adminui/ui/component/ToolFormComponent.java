@@ -7,6 +7,7 @@ import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.llm.domain.ToolDefinition;
@@ -55,7 +56,7 @@ public final class ToolFormComponent implements UiComponent {
 
     @Override
     public String id() {
-        return tool == null ? "tool-new-" + agent.id() : "tool-" + tool.id();
+        return tool == null ? "tool-new-" + agent.id().value() : "tool-" + tool.id().value();
     }
 
     @Override
@@ -106,7 +107,7 @@ public final class ToolFormComponent implements UiComponent {
 
         Object schema = null;
         if (!isNew) {
-            var resolved = toolRegistry.resolve(tool, agent.namespace(), null, null);
+            var resolved = toolRegistry.resolve(tool, ToolCallScope.detached(null));
             if (resolved.isPresent()) {
                 schema = resolved.get().parametersSchema();
             } else if (inlineDefs.containsKey(tool.name())) {
@@ -159,14 +160,14 @@ public final class ToolFormComponent implements UiComponent {
                                 + "applies. For lossless shrinking use the memory strategy's "
                                 + "tool-result compression instead"));
 
-        String backHref = "/admin/agents/" + agent.id() + "?section=tools"
-                + (isNew ? "" : "&row=" + tool.id());
+        String backHref = "/admin/agents/" + agent.id().value() + "?section=tools"
+                + (isNew ? "" : "&row=" + tool.id().value());
 
         form.action(UiAction.primary("save", "Save").icon("save")
                         .onClick(isNew
-                                ? trigger(on(AgentUiController.class).addTool(agent.id(), null, null), id())
+                                ? trigger(on(AgentUiController.class).addTool(agent.id().value(), null, null), id())
                                 : trigger(on(AgentUiController.class)
-                                          .updateTool(agent.id(), tool.id(), null, null), id())))
+                                          .updateTool(agent.id().value(), tool.id().value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel")
                         .dispatch("GET", backHref))
                 .link(UiLink.of("back", backHref, "← Back to Agent"));

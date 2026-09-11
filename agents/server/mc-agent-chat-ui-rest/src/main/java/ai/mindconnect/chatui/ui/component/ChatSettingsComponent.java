@@ -14,7 +14,8 @@ import ai.mindconnect.ui.model.UiFieldGroup;
 import ai.mindconnect.ui.model.UiSection;
 
 import java.util.List;
-import java.util.UUID;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Model and tools for one chat, as a dialog over the running conversation.
@@ -31,29 +32,29 @@ public final class ChatSettingsComponent implements UiComponent {
             "workspace_read", "workspace_write", "workspace_list",
             "todo_read", "todo_write");
 
-    private final UUID sessionId;
+    private final SessionId sessionId;
     private final List<LlmConfig> llmConfigs;
     private final List<AgentDefinition> agents;
     private final List<String> toolNames;
     private final String currentLlmConfigName;
     private final List<String> currentTools;
     private final boolean toolSearchOn;
-    private final UUID currentAgentId;
+    private final AgentId currentAgentId;
     /** What this chat runs on today — the agent's prompt, or its own override. */
     private final String currentSystemPrompt;
 
-    public ChatSettingsComponent(UUID sessionId, List<LlmConfig> llmConfigs,
+    public ChatSettingsComponent(SessionId sessionId, List<LlmConfig> llmConfigs,
                                  List<AgentDefinition> agents, List<String> toolNames,
                                  String currentLlmConfigName, List<String> currentTools,
-                                 boolean toolSearchOn, UUID currentAgentId) {
+                                 boolean toolSearchOn, AgentId currentAgentId) {
         this(sessionId, llmConfigs, agents, toolNames, currentLlmConfigName, currentTools,
                 toolSearchOn, currentAgentId, null);
     }
 
-    public ChatSettingsComponent(UUID sessionId, List<LlmConfig> llmConfigs,
+    public ChatSettingsComponent(SessionId sessionId, List<LlmConfig> llmConfigs,
                                  List<AgentDefinition> agents, List<String> toolNames,
                                  String currentLlmConfigName, List<String> currentTools,
-                                 boolean toolSearchOn, UUID currentAgentId,
+                                 boolean toolSearchOn, AgentId currentAgentId,
                                  String currentSystemPrompt) {
         this.currentSystemPrompt = currentSystemPrompt;
         this.sessionId = sessionId;
@@ -68,7 +69,7 @@ public final class ChatSettingsComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "chat-settings-" + sessionId;
+        return "chat-settings-" + sessionId.value();
     }
 
     @Override
@@ -80,7 +81,7 @@ public final class ChatSettingsComponent implements UiComponent {
 
         List<UiField.Option> agentOptions = new java.util.ArrayList<>();
         agentOptions.add(UiField.Option.of("", "— no agent: model and tools below —"));
-        agents.forEach(a -> agentOptions.add(UiField.Option.of(a.id().toString(), a.name())));
+        agents.forEach(a -> agentOptions.add(UiField.Option.of(a.id().value(), a.name())));
 
         List<UiField.Option> toolOptions = toolNames.stream()
                 .map(n -> UiField.Option.of(n, n))
@@ -113,7 +114,7 @@ public final class ChatSettingsComponent implements UiComponent {
 
         var agentTab = UiFieldGroup.of(id() + "-g-agent", null)
                 .field(UiField.select("agentId", "…or an agent",
-                                currentAgentId == null ? "" : currentAgentId.toString(), agentOptions)
+                                currentAgentId == null ? "" : currentAgentId.value(), agentOptions)
                         .asEditable()
                         .hint("Takes over prompt, model and tools — the fields on the other tab "
                                 + "stop applying"));
@@ -125,7 +126,7 @@ public final class ChatSettingsComponent implements UiComponent {
         return UiForm.of(id(), "Chat settings")
                 .content(tabs)
                 .action(UiAction.primary("apply", "Apply").icon("save")
-                        .onClick(trigger(on(ChatUiController.class).applySettings(sessionId, null, null), id())))
+                        .onClick(trigger(on(ChatUiController.class).applySettings(sessionId.value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel")
                         .onClick(trigger(on(ChatUiController.class).closeDialog())));
     }

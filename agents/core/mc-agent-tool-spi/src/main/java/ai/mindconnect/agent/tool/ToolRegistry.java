@@ -1,21 +1,26 @@
 package ai.mindconnect.agent.tool;
 
 import ai.mindconnect.agent.tool.AgentTool;
-import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
 
+/**
+ * Turns an agent's tool bindings into runnable {@link Tool}s for one call.
+ *
+ * <p>Every resolution takes the {@link ToolCallScope} of that call — user,
+ * session, agent — as one value.
+ */
 public interface ToolRegistry {
-    Optional<Tool> resolve(AgentTool agentTool, Namespace namespace, String userId, UUID sessionId);
 
-    default List<Tool> resolveAll(List<AgentTool> agentTools, Namespace namespace, String userId, UUID sessionId) {
+    Optional<Tool> resolve(AgentTool agentTool, ToolCallScope scope);
+
+    default List<Tool> resolveAll(List<AgentTool> agentTools, ToolCallScope scope) {
         return agentTools.stream()
                 .filter(AgentTool::enabled)
-                .map(t -> resolve(t, namespace, userId, sessionId))
+                .map(t -> resolve(t, scope))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .toList();

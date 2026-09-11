@@ -48,7 +48,7 @@ public final class LoggingContext implements AutoCloseable {
     }
 
     /** Sets sessionId, conversationId and agentName for the duration of the block. */
-    public static LoggingContext session(UUID sessionId, UUID conversationId, String agentName) {
+    public static LoggingContext session(Object sessionId, Object conversationId, String agentName) {
         return push(
                 SESSION_ID, sessionId != null ? sessionId.toString() : null,
                 CONVERSATION_ID, conversationId != null ? conversationId.toString() : null,

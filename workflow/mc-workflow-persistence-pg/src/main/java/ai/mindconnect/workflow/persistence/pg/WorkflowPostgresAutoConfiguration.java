@@ -50,12 +50,14 @@ public class WorkflowPostgresAutoConfiguration {
     }
 
     @Bean
-    WorkflowDataRepository workflowDataRepository(DataSource dataSource) {
-        return new PgWorkflowDataRepository(Sql.of(dataSource)).initSchema();
+    WorkflowDataRepository workflowDataRepository(DataSource dataSource,
+                                                  @Value("${mindconnect.namespace:local}") String partition) {
+        return new PgWorkflowDataRepository(Sql.of(dataSource), partition).initSchema();
     }
 
     @Bean
-    WorkflowInstanceRepository workflowInstanceRepository(DataSource dataSource) {
-        return new PgWorkflowInstanceRepository(Sql.of(dataSource)).initSchema();
+    WorkflowInstanceRepository workflowInstanceRepository(DataSource dataSource,
+                                                          @Value("${mindconnect.namespace:local}") String partition) {
+        return new PgWorkflowInstanceRepository(Sql.of(dataSource), partition).initSchema();
     }
 }

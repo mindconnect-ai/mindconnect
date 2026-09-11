@@ -1,5 +1,8 @@
 package ai.mindconnect.message.adapter.memory;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.MessageId;
+
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.port.out.MessageRepository;
@@ -7,7 +10,6 @@ import ai.mindconnect.message.port.out.MessageRepository;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.IntFunction;
 
@@ -29,7 +31,7 @@ public class InMemoryMessageRepository implements MessageRepository {
     }
 
     @Override
-    public List<Message> findByConversationId(UUID conversationId, PageRequest page) {
+    public List<Message> findByConversation(ConversationId conversationId, PageRequest page) {
         return store.stream()
                 .filter(m -> m.conversationId().equals(conversationId))
                 .sorted(Comparator.comparingInt(Message::sequenceNum))
@@ -39,10 +41,8 @@ public class InMemoryMessageRepository implements MessageRepository {
     }
 
     @Override
-    public Optional<Message> findById(UUID conversationId, UUID messageId) {
-        return store.stream()
-                .filter(m -> m.conversationId().equals(conversationId) && m.id().equals(messageId))
-                .findFirst();
+    public Optional<Message> findById(ConversationId conversation, MessageId id) {
+        return store.stream().filter(m -> m.conversationId().equals(conversation) && m.id().equals(id)).findFirst();
     }
 
     /**
@@ -51,7 +51,7 @@ public class InMemoryMessageRepository implements MessageRepository {
      * and that is what needs guarding.
      */
     @Override
-    public synchronized Message append(UUID conversationId, IntFunction<Message> create) {
+    public synchronized Message append(ConversationId conversationId, IntFunction<Message> create) {
         int next = store.stream()
                 .filter(m -> m.conversationId().equals(conversationId))
                 .mapToInt(Message::sequenceNum)
@@ -60,7 +60,7 @@ public class InMemoryMessageRepository implements MessageRepository {
     }
 
     @Override
-    public void deleteBySequenceRange(UUID conversationId, int fromSeq, int toSeq) {
+    public void deleteBySequenceRange(ConversationId conversationId, int fromSeq, int toSeq) {
         store.removeIf(m -> m.conversationId().equals(conversationId)
                 && m.sequenceNum() >= fromSeq && m.sequenceNum() <= toSeq);
     }

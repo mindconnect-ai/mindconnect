@@ -22,6 +22,9 @@ mindconnect:
   # Where everything is stored: "file" under data.base-dir (default), or
   # "postgres" — every repository in the database, tables created on start.
   persistence: ${MC_PERSISTENCE:file}
+  # The namespace this process runs in: file data under data.base-dir/<namespace>,
+  # a namespace key column in Postgres. One process serves one namespace.
+  namespace: ${MC_NAMESPACE:local}
   postgres:
     url: ${MC_POSTGRES_URL:jdbc:postgresql://localhost:5432/mindconnect}
     username: ${MC_POSTGRES_USER:}

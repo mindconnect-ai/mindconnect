@@ -24,7 +24,7 @@ Always available; no API keys required.
 | Tool | Description | Needs |
 |------|-------------|-------|
 | `get_current_datetime` | Returns the current date and time in ISO-8601 with timezone. | — |
-| `list_agents` | Lists the agents in the current namespace with their names and descriptions. | — |
+| `list_agents` | Lists the agents with their names and descriptions. | — |
 | `bash` | Executes a bash command in the configured working directory. | Working dir (config) |
 | `file_read` | Reads a plain-text file (path relative to the base directory). | Base dir (config) |
 | `file_write` | Writes a file, creating parent directories as needed. | Base dir (config) |

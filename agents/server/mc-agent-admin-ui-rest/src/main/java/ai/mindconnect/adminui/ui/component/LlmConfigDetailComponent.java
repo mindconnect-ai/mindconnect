@@ -21,7 +21,7 @@ public final class LlmConfigDetailComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "llm-config-detail-" + config.id();
+        return "llm-config-detail-" + config.id().value();
     }
 
     @Override
@@ -54,12 +54,12 @@ public final class LlmConfigDetailComponent implements UiComponent {
                         config.rateLimit() == null ? "Unlimited"
                                 : String.valueOf(config.rateLimit().maxConcurrentRequests())))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
-                        .dispatch("GET", "/admin/api/llm-configs/" + config.id() + "/edit"))
+                        .dispatch("GET", "/admin/api/llm-configs/" + config.id().value() + "/edit"))
                 .action(UiAction.secondary("test", "Test").icon("flash")
-                        .dispatch("GET", "/admin/api/llm-configs/" + config.id() + "/test"))
+                        .dispatch("GET", "/admin/api/llm-configs/" + config.id().value() + "/test"))
                 .action(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete config '" + config.name() + "'?")
-                        .dispatch("DELETE", "/admin/api/llm-configs/" + config.id()))
+                        .dispatch("DELETE", "/admin/api/llm-configs/" + config.id().value()))
                 .link(UiLink.of("back", "/admin/llm-configs", "← Back to LLM Configs"));
         // Provider parameters straight from the catalog — the detail view
         // shows exactly the fields the selected provider understands.

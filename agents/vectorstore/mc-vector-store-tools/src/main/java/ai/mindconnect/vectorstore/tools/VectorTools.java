@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
@@ -129,9 +130,9 @@ public final class VectorTools {
                 };
                 String scopeRef = switch (scope) {
                     case SESSION -> callScope != null && callScope.sessionId() != null
-                            ? callScope.sessionId().toString() : null;
-                    case AGENT -> callScope != null && callScope.agentDefinitionId() != null
-                            ? callScope.agentDefinitionId().toString() : null;
+                            ? callScope.sessionId().value() : null;
+                    case AGENT -> callScope != null && callScope.agentId() != null
+                            ? callScope.agentId().value() : null;
                     case GLOBAL -> null;
                 };
                 VectorStore store = stores.open(storeName, str(arguments, "template"), scope, scopeRef);
@@ -148,8 +149,8 @@ public final class VectorTools {
     record SearchTool(VectorStores stores, ToolCallScope callScope) implements Tool {
 
         /** The chat session's upload store — where attached files land. */
-        static String sessionStoreName(java.util.UUID sessionId) {
-            return "session-" + sessionId;
+        static String sessionStoreName(SessionId sessionId) {
+            return "session-" + sessionId.value();
         }
 
         @Override public String name() { return "vector_search"; }

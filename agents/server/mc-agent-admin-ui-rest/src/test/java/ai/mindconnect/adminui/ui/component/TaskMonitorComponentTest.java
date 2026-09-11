@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.ui.component;
 import ai.mindconnect.adminui.service.TaskMonitor;
 import ai.mindconnect.adminui.service.TaskMonitor.Snapshot;
 import ai.mindconnect.adminui.service.TaskMonitor.TaskView;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.taskqueue.TaskFailure;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
@@ -13,7 +14,6 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,10 +26,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class TaskMonitorComponentTest {
 
     private static final Instant NOW = Instant.parse("2026-09-06T10:00:00Z");
-    private static final UUID SESSION = UUID.randomUUID();
+    private static final SessionId SESSION = SessionId.random();
 
     private static TaskRecord queued(String id, String type, String parent) {
-        return TaskRecord.queued(id, TaskSubmission.of(type, Map.of("sessionId", SESSION.toString()))
+        return TaskRecord.queued(id, TaskSubmission.of(type, Map.of("sessionId", SESSION.value()))
                 .withParent(parent));
     }
 

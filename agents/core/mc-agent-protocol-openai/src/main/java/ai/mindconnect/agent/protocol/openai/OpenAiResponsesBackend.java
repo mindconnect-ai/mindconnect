@@ -42,7 +42,7 @@ import java.util.function.Consumer;
  * var backend = new OpenAiResponsesBackend(apiKey)
  *         .register(PseudoAgent.of("assistant", "gpt-5-mini", "Be brief.")
  *                 .withHostedTool("web_search"));
- * Session s = backend.open("demo", "assistant");
+ * Session s = backend.openSessionForAgent("assistant");
  * Response r = backend.create(ResponseRequest.text(s.id(), "What happened today?"));
  * </pre>
  *
@@ -100,22 +100,22 @@ public final class OpenAiResponsesBackend {
 
     // Convenience delegates for the common calls:
 
-    public Session openSessionForAgent(String namespace, String agentName) { return sessionsApi.open(namespace, agentName); }
+    public Session openSessionForAgent(String agentName) { return sessionsApi.open(agentName); }
 
     public Response create(ResponseRequest request) { return responsesApi.create(request); }
 
     private final Sessions sessionsApi = new Sessions() {
 
         @Override
-        public Session open(String namespace, String agentName) {
+        public Session open(String agentName) {
             PseudoAgent agent = requireAgent(agentName);
             JsonNode conv = http.post("/conversations", Map.of());
-            return bind(namespace, conv.path("id").asText(), agent);
+            return bind(conv.path("id").asText(), agent);
         }
 
         @Override
         public Session openOn(String conversationId, String agentName) {
-            return bind("default", conversationId, requireAgent(agentName));
+            return bind(conversationId, requireAgent(agentName));
         }
 
         @Override
@@ -175,16 +175,16 @@ public final class OpenAiResponsesBackend {
     private final Conversations conversationsApi = new Conversations() {
 
     @Override
-    public Conversation create(String namespace) {
+    public Conversation create() {
         JsonNode n = http.post("/conversations", Map.of());
-        return new Conversation(n.path("id").asText(), namespace,
+        return new Conversation(n.path("id").asText(),
                 Instant.ofEpochSecond(n.path("created_at").asLong()));
     }
 
     @Override
     public Optional<Conversation> get(String conversationId) {
         JsonNode n = http.get("/conversations/" + conversationId);
-        return Optional.of(new Conversation(conversationId, "default",
+        return Optional.of(new Conversation(conversationId,
                 Instant.ofEpochSecond(n.path("created_at").asLong())));
     }
 
@@ -305,7 +305,7 @@ public final class OpenAiResponsesBackend {
                     + targetName + "'. Available: "
                     + String.join(", ", parentState.agent().agentTools()), true);
         }
-        Session childSession = sessionsApi.open(parentState.session().namespace(), targetName);
+        Session childSession = sessionsApi.open(targetName);
         try {
             Response child = createLogical(sessions.get(childSession.id()),
                     ResponseRequest.text(childSession.id(), message), depth + 1);
@@ -385,8 +385,8 @@ public final class OpenAiResponsesBackend {
 
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    private Session bind(String namespace, String conversationId, PseudoAgent agent) {
-        Session session = new Session("sess_" + UUID.randomUUID(), namespace,
+    private Session bind(String conversationId, PseudoAgent agent) {
+        Session session = new Session("sess_" + UUID.randomUUID(),
                 conversationId, agent.name(), Instant.now());
         sessions.put(session.id(), new SessionState(session, agent));
         return session;

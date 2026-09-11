@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.service.task;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
@@ -37,7 +40,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -118,20 +120,20 @@ public final class ToolCallWorker implements TaskWorker {
     }
 
     /** The task id of a call — deterministic, so dispatch is idempotent and the parent can derive it. */
-    public static String taskIdFor(UUID turnId, String callId) {
-        return "task_tool_" + turnId + "_" + callId;
+    public static String taskIdFor(ChatTurnId turnId, String callId) {
+        return "task_tool_" + turnId.value() + "_" + callId;
     }
 
     /** One call as a submission. {@code depth} is the PARENT turn's depth, {@code run} its loop run. */
-    public static TaskSubmission submission(UUID turnId, int run, UUID sessionId, int depth,
+    public static TaskSubmission submission(ChatTurnId turnId, int run, SessionId sessionId, int depth,
                                             ToolCalls.Call call) {
         Map<String, Object> payload = new HashMap<>();
         payload.put(CALL_ID, call.callId());
         payload.put(TOOL_NAME, call.name());
         payload.put(ARGUMENTS, call.arguments());
-        payload.put(TURN_ID, turnId.toString());
+        payload.put(TURN_ID, turnId.value());
         payload.put(RUN, run);
-        payload.put(SESSION_ID, sessionId.toString());
+        payload.put(SESSION_ID, sessionId.value());
         payload.put(DEPTH, depth);
         // priority = depth + 1: a tool overtakes queued root turns, so the
         // parked parent that waits for it never starves behind fresh work.
@@ -145,8 +147,8 @@ public final class ToolCallWorker implements TaskWorker {
     @Override
     @SuppressWarnings("unchecked")
     public TaskOutcome execute(TaskContext ctx) {
-        UUID turnId = UUID.fromString(string(ctx, TURN_ID));
-        UUID sessionId = UUID.fromString(string(ctx, SESSION_ID));
+        ChatTurnId turnId = ChatTurnId.of(string(ctx, TURN_ID));
+        SessionId sessionId = SessionId.of(string(ctx, SESSION_ID));
         String callId = string(ctx, CALL_ID);
         String toolName = string(ctx, TOOL_NAME);
         int depth = ((Number) ctx.task().payload().getOrDefault(DEPTH, 0)).intValue();
@@ -169,8 +171,7 @@ public final class ToolCallWorker implements TaskWorker {
             TokenCounter tokenCounter = memoryStrategy.resolveTokenCounter(def);
             Consumer<StreamEvent> stream = sessionChannels.publisherFor(session.id(), turnId, run);
             ConversationMessageLog messageLog = new ConversationMessageLog(
-                    conversationManager, UUID.randomUUID() /* user sender — see follow-up task */,
-                    def.id(), turnId, run, tokenCounter);
+                    conversationManager, session.userId().value(), def.id(), turnId, run, tokenCounter);
 
             // THE GATE (Claude-style): approval is checked HERE, right before
             // execution — not planned ahead by the round. A gated call is
@@ -265,17 +266,22 @@ public final class ToolCallWorker implements TaskWorker {
             Boolean decision = ApprovalNotifications
                     .decision(notification);
             if (decision != null) {
-                approvalStore.delete(callId);
+                // The card lives in the root chat, and the store is keyed by it.
+                approvalStore.delete(sessionService.rootSession(session.id()).id(), callId);
                 return decision ? Gate.PROCEED : Gate.DENIED;
             }
         }
         boolean flagged = def.tools().stream()
                 .anyMatch(t -> toolName.equals(t.name()) && t.enabled() && t.needsApproval());
-        if (!flagged || sessionService.isToolApproved(session.id(), toolName)) {
-            approvalStore.delete(callId);   // no stale card outlives the decision
+        if (!flagged) {
+            // Only a flagged call ever registers a card — no session lookups for the rest.
             return Gate.PROCEED;
         }
         AgentSession root = sessionService.rootSession(session.id());
+        if (sessionService.isToolApproved(session.id(), toolName)) {
+            approvalStore.delete(root.id(), callId);   // no stale card outlives the decision
+            return Gate.PROCEED;
+        }
         var entry = new ToolApproval(
                 ctx.task().id(), callId, toolName, approvalContent(toolName, arguments),
                 session.id(), root.id(), ctx.task().id(), java.time.Instant.now());
@@ -311,7 +317,7 @@ public final class ToolCallWorker implements TaskWorker {
                                      Map<String, Object> arguments) {
         try {
             var rootHistory = conversationManager.loadCompleteHistory(root.conversationId());
-            UUID rootTurnId = rootHistory.currentTurnId().orElse(null);
+            ChatTurnId rootTurnId = rootHistory.currentTurnId().orElse(null);
             if (rootTurnId == null) return;
             sessionChannels.publisherFor(root.id(), rootTurnId, rootHistory.currentRun())
                     .accept(new StreamEvent.ApprovalRequested(
@@ -330,7 +336,7 @@ public final class ToolCallWorker implements TaskWorker {
         SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session);
         ToolExecutor.Context toolContext = new ToolExecutor.Context(
                 stream, session.conversationId(), def.id(), tokenCounter,
-                session.namespace(), session.userId(), session.id());
+                session.userId(), session.id());
         return toolExecutor.execute(new ToolCall(callId, toolName, arguments),
                 tools.liveTool(toolName), toolContext).resultText();
     }
@@ -363,7 +369,7 @@ public final class ToolCallWorker implements TaskWorker {
                 + "\n… [output truncated after " + limit + " characters]";
     }
 
-    private boolean resultExists(UUID conversationId, String callId) {
+    private boolean resultExists(ConversationId conversationId, String callId) {
         return conversationManager.loadHistory(conversationId, new PageRequest(0, Integer.MAX_VALUE))
                 .stream()
                 .anyMatch(m -> m.type() == MessageType.TOOL_RESULT

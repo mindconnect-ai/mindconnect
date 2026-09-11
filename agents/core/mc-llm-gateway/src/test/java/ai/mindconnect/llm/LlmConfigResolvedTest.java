@@ -1,19 +1,19 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.*;
 
 class LlmConfigResolvedTest {
 
     private static LlmConfig config(String model, String baseUrl, String apiKey) {
-        return new LlmConfig(UUID.randomUUID(), "test", LlmProvider.OPENAI,
+        return new LlmConfig(LlmConfigId.random(), "test", LlmProvider.OPENAI,
                 model, baseUrl, apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 

@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service.task;
 
+import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.service.InlineAgentTools;
@@ -12,7 +14,6 @@ import ai.mindconnect.llm.domain.ToolDefinition;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * One turn's toolset — resolved PER CALL, not captured per turn: a
@@ -47,7 +48,7 @@ public final class SessionTools implements ToolDefinitionProvider {
         List<AgentTool> refs = dynamicToolActivations.effectiveRefs(def, session.id()).stream()
                 .filter(ref -> toolName.equals(ref.name()))
                 .toList();
-        return toolRegistry.resolveAll(refs, session.namespace(), session.userId(), session.id());
+        return toolRegistry.resolveAll(refs, scope());
     }
 
     /** The executable tools of this moment — configured plus search-activated. */
@@ -58,11 +59,11 @@ public final class SessionTools implements ToolDefinitionProvider {
                 .filter(ref -> !InlineAgentTools.RUN_AGENT.equals(ref.name())
                         && !InlineAgentTools.RUN_AGENTS.equals(ref.name()))
                 .toList();
-        return toolRegistry.resolveAll(refs, session.namespace(), session.userId(), session.id());
+        return toolRegistry.resolveAll(refs, scope());
     }
 
     @Override
-    public List<ToolDefinition> toolDefinitions(UUID sessionId) {
+    public List<ToolDefinition> toolDefinitions(SessionId sessionId) {
         List<ToolDefinition> defs = new ArrayList<>(liveTools().stream()
                 .map(t -> ToolDefinition.of(t.name(), t.description(), t.parametersSchema()))
                 .toList());
@@ -72,6 +73,11 @@ public final class SessionTools implements ToolDefinitionProvider {
     }
 
     /** Whether {@code toolName} is one of the inline delegation tools this agent enables. */
+    /** Who is calling, for the factories and advisors: this session, its user, this agent. */
+    private ToolCallScope scope() {
+        return new ToolCallScope(session.userId(), session.id(), def.id());
+    }
+
     public boolean isInline(String toolName) {
         return (InlineAgentTools.RUN_AGENT.equals(toolName)
                 || InlineAgentTools.RUN_AGENTS.equals(toolName)) && enabled(toolName);

@@ -54,7 +54,7 @@ public final class LlmConfigTestComponent implements UiComponent {
     }
 
     @Override
-    public String id() { return "llm-test-" + config.id(); }
+    public String id() { return "llm-test-" + config.id().value(); }
 
     public String title() { return "Test " + config.name(); }
 
@@ -72,7 +72,7 @@ public final class LlmConfigTestComponent implements UiComponent {
                                 ? "Embedded into a vector — the result shows dimension and first values."
                                 : "Sent as a single user-turn (no system prompt, no tools)."))
                 .action(UiAction.primary("send", embedding ? "Embed" : "Send").icon("send")
-                        .dispatch("POST", "/admin/api/llm-configs/" + config.id() + "/test", id()))
+                        .dispatch("POST", "/admin/api/llm-configs/" + config.id().value() + "/test", id()))
                 // Close only removes the overlay (a tiny remove-patch) — never a
                 // page reload, so the page state behind the dialog survives.
                 .action(UiAction.secondary("close", "Close").icon("close")
@@ -98,7 +98,7 @@ public final class LlmConfigTestComponent implements UiComponent {
                 .dropText("Drop an audio file here or")
                 .hint("Sent to the transcription endpoint as it is — the transcript comes back below. "
                         + "WebM, WAV, MP3, M4A, OGG and FLAC all work.")
-                .uploadTo("/admin/api/llm-configs/" + config.id() + "/test-audio");
+                .uploadTo("/admin/api/llm-configs/" + config.id().value() + "/test-audio");
 
         // Speaking instead of uploading: the button's trigger runs in the
         // browser (INVOKE → the handler registered in audio-recorder.js),
@@ -107,7 +107,7 @@ public final class LlmConfigTestComponent implements UiComponent {
         // microphone — or one that was denied it — says so in the status line
         // and the drop zone still works.
         var record = ai.mindconnect.ui.model.UiTrigger.invoke("mc-record-audio");
-        record.setUrl("/admin/api/llm-configs/" + config.id() + "/test-audio");
+        record.setUrl("/admin/api/llm-configs/" + config.id().value() + "/test-audio");
 
         var actions = UiForm.of(id(), null)
                 .action(UiAction.primary("record", "Record").icon("mic").onClick(record))

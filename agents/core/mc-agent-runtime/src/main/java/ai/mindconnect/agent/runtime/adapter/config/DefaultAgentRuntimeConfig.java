@@ -74,8 +74,6 @@ public class DefaultAgentRuntimeConfig {
      * Resolves a named {@link AgentDefinition} by task name first;
      * falls back to the globally configured default LLM config if none is found.
      * <p>
-     * Optional property: {@code mindconnect.agent.stateless.namespace} (default: {@code local})
-     * <p>
      * {@code mindconnect.agent.stateless.llm-config-name} is optional at startup — the service
      * starts without it. If it is absent and a task name does not resolve to an
      * {@link AgentDefinition}, an {@link IllegalStateException}
@@ -86,15 +84,13 @@ public class DefaultAgentRuntimeConfig {
             AgentDefinitionRepository definitionRepository,
             LlmChat llmChat,
             PromptRenderer promptRenderer,
-            @Value("${mindconnect.agent.stateless.namespace:local}") String namespaceName,
             @Value("${mindconnect.agent.stateless.llm-config-name:}") String defaultLlmConfigName) {
-        Namespace namespace = new Namespace(namespaceName);
         String configName = defaultLlmConfigName.isBlank() ? null : defaultLlmConfigName;
         if (configName == null) {
             log.warn("mindconnect.agent.stateless.llm-config-name not configured — " +
                     "stateless tasks will only work if a matching AgentDefinition exists");
         }
-        return new StatelessAgentTaskRunner(definitionRepository, llmChat, namespace, configName, promptRenderer);
+        return new StatelessAgentTaskRunner(definitionRepository, llmChat, configName, promptRenderer);
     }
 
     /**
@@ -202,10 +198,10 @@ public class DefaultAgentRuntimeConfig {
                                MessageRepository messageRepository,
                                WorkspaceStore workspaceStore,
                                TodoListService todoListService,
+                               Namespace namespace,
                                @Value("${mindconnect.tools.tavily-api-key:}") String tavilyApiKey,
                                @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir,
                                @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
-                               @Value("${mindconnect.workflow-admin.dir:data/workflows}") String workflowDir,
                                @Value("${mindconnect.code-exec.runtime:auto}") String codeExecRuntime,
                                @Value("${mindconnect.code-exec.network:none}") String codeExecNetwork,
                                @Value("${mindconnect.code-exec.languages:}") String codeExecLanguages,
@@ -216,7 +212,6 @@ public class DefaultAgentRuntimeConfig {
                                org.springframework.beans.factory.ObjectProvider<ai.mindconnect.llm.port.in.LlmEmbeddings> llmEmbeddings,
                                org.springframework.beans.factory.ObjectProvider<LlmConfigRepository> llmConfigRepository,
                                @Value("${mindconnect.vector-store.backend:memory}") String vectorStoreBackend,
-                               @Value("${mindconnect.vector-store.dir:data/vector-stores}") String vectorStoreDir,
                                @Value("${mindconnect.vector-store.url:}") String vectorStoreUrl,
                                @Value("${mindconnect.vector-store.user:}") String vectorStoreUser,
                                @Value("${mindconnect.vector-store.password:}") String vectorStorePassword,
@@ -232,6 +227,8 @@ public class DefaultAgentRuntimeConfig {
         var registryRef = new ai.mindconnect.agent.tool.ToolRegistryRef();
         MapToolEnvironment env = MapToolEnvironment.builder()
                 .service(AgentDefinitionRepository.class, definitionRepository)
+                // The namespace the stores are bound to — for tools that open stores of their own (vector, workflow).
+                .service(Namespace.class, namespace)
                 .service(ai.mindconnect.agent.tool.ToolRegistryRef.class, registryRef)
                 .service(DynamicToolActivations.class, dynamicToolActivations)
                 .service(AgentSessionRepository.class, sessionRepository)
@@ -239,11 +236,9 @@ public class DefaultAgentRuntimeConfig {
                 .service(WorkspaceStore.class, workspaceStore)
                 .service(TodoListService.class, todoListService)
                 .string("defaultBaseDir", baseDir)
+                // The data directory: workflows and memory vector stores live in <dataBaseDir>/<namespace>/.
                 .string("dataBaseDir", dataBaseDir)
                 .string("tavilyApiKey", tavilyApiKey)
-                // Same directory the embedded workflow admin manages; read by the
-                // workflow tool provider (mc-agent-tools-workflow) when present.
-                .string("workflowDir", workflowDir)
                 // Container-based code execution (mc-agent-tools-code); the
                 // factory falls back to sensible defaults for blank values.
                 .string("codeExecRuntime", codeExecRuntime)
@@ -259,7 +254,6 @@ public class DefaultAgentRuntimeConfig {
                 .serviceIfPresent(ai.mindconnect.llm.port.in.LlmEmbeddings.class, llmEmbeddings.getIfAvailable())
                 .serviceIfPresent(LlmConfigRepository.class, llmConfigRepository.getIfAvailable())
                 .string("vectorStoreBackend", vectorStoreBackend)
-                .string("vectorStoreDir", vectorStoreDir)
                 .string("vectorStoreUrl", vectorStoreUrl)
                 .string("vectorStoreUser", vectorStoreUser)
                 .string("vectorStorePassword", vectorStorePassword)

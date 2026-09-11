@@ -33,8 +33,8 @@ final class PostgresWorkflows {
         }
     }
 
-    static WorkflowDataRepository open(Sql sql) {
-        return new PgWorkflowDataRepository(sql).initSchema();
+    static WorkflowDataRepository open(Sql sql, String partition) {
+        return new PgWorkflowDataRepository(sql, partition).initSchema();
     }
 
     /** The workflow tools and the attach support find the store here instead of opening files. */

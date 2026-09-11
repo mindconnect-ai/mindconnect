@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
@@ -109,7 +110,7 @@ public class TranscriptionJobService {
         }
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("fileId", stored.id());
+        payload.put("fileId", stored.id().value());
         payload.put("filename", filename);
         if (contentType != null) payload.put("contentType", contentType);
         if (configName != null) payload.put("configName", configName);
@@ -126,7 +127,7 @@ public class TranscriptionJobService {
         queue.submit(TaskSubmission.of(TYPE, payload).withId(taskId).withMaxAttempts(MAX_ATTEMPTS));
 
         log.info("Transcription job {} queued ({} bytes, file {})", taskId, audio.length, stored.id());
-        return new Job(taskId, stored.id());
+        return new Job(taskId, stored.id().value());
     }
 
     /** A queued job: the task to follow, and the recording it reads. */
@@ -206,7 +207,7 @@ public class TranscriptionJobService {
     private TaskOutcome transcribe(TaskContext ctx) throws Exception {
         String taskId = ctx.task().id();
         Map<String, Object> payload = ctx.task().payload();
-        String fileId = string(payload, "fileId");
+        FileId fileId = FileId.of(string(payload, "fileId"));
         channels.publish(taskId, TranscriptionEvent.status("running"));
 
         LlmTranscription speech = transcription.getIfAvailable();

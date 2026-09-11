@@ -2,7 +2,7 @@ package ai.mindconnect.agent;
 
 public record Namespace(String value) {
 
-    public static final Namespace DEFAULT = new Namespace("default");
+    public static final Namespace DEFAULT = new Namespace("local");
 
     public Namespace {
         if (value == null || value.isBlank()) {

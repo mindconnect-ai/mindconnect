@@ -1,11 +1,9 @@
 package ai.mindconnect.agent.runtime.domain;
 
 import ai.mindconnect.llm.domain.LlmCallEvent;
-import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Persisted record of one LLM provider call as observed from the
@@ -18,8 +16,8 @@ import java.util.UUID;
  * conversation id with {@code parentTurnId} pointing back at the parent.
  */
 public record LlmCallTrace(
-        /** Stable id for this trace, unique across the system. */
-        UUID id,
+        /** Stable id for this trace; carries the tenant, taken from the session it was recorded in. */
+        TraceId id,
         TraceContext context,
         Instant startedAt,
         long durationMs,
@@ -45,12 +43,11 @@ public record LlmCallTrace(
         Integer errorStatus,
         /** Error body (provider JSON or exception message) if the call failed, else null. */
         String errorBody
-) implements LlmCallTraceHeader {
+) implements ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader {
 
-    /** Convenience constructor: combines a gateway {@link LlmCallEvent} with the runtime context. */
     public static LlmCallTrace of(TraceContext context, LlmCallEvent event) {
         return new LlmCallTrace(
-                UUID.randomUUID(),
+                TraceId.random(),
                 context,
                 event.startedAt(),
                 event.durationMs(),

@@ -4,10 +4,12 @@ import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.message.domain.ConversationHistory;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 
@@ -22,7 +24,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -82,17 +83,15 @@ final class LmStudioSupport {
     static AgentRuntime runtime(String agentName, String systemPrompt,
                                 MemoryConfig memoryConfig, List<AgentTool> tools) {
         String model = loadedToolModel();
-        // "local" is the builder's default namespace — openSession looks there.
-        AgentDefinition base = AgentDefinition.create(new Namespace("local"), agentName,
+        AgentDefinition base = AgentDefinition.create(agentName,
                 "integration test agent", systemPrompt, null, "it-llm");
-        AgentDefinition def = new AgentDefinition(base.id(), base.namespace(), base.name(),
+        AgentDefinition def = new AgentDefinition(base.id(), base.name(),
                 base.description(), base.group(), base.icon(), base.systemPrompt(), base.welcomeMessage(),
                 base.llmConfigName(),
                 base.maxIterations(), memoryConfig != null ? memoryConfig : base.memoryConfig(),
                 base.status(),
-                tools.stream().map(t -> new AgentTool(t.id(), base.id(), t.name(), t.description(),
-                        t.overrides(), t.enabled(), t.deferred(), t.needsApproval(), t.maxResultChars()))
-                        .toList(),
+                // A binding no longer names its agent: the definition lists it.
+                List.copyOf(tools),
                 base.responseReviewers(), base.callableAgents(), base.toolSearch(),
                 base.createdAt(), base.updatedAt());
         return AgentRuntimeBuilder.useInMemoryPersistence()
@@ -102,12 +101,12 @@ final class LmStudioSupport {
     }
 
     static AgentTool tool(String name, boolean needsApproval) {
-        return new AgentTool(UUID.randomUUID(), null, name, null, Map.of(), true, false, needsApproval);
+        return new AgentTool(AgentToolId.random(), name, null, Map.of(), true, false, needsApproval, null);
     }
 
     // ── conversation helpers ────────────────────────────────────────────────
 
-    static ConversationHistory history(AgentRuntime runtime, UUID conversationId) {
+    static ConversationHistory history(AgentRuntime runtime, ConversationId conversationId) {
         return runtime.conversationManager().loadCompleteHistory(conversationId);
     }
 
@@ -116,7 +115,7 @@ final class LmStudioSupport {
     }
 
     /** Polls the conversation until {@code condition} holds; false on timeout. */
-    static boolean await(AgentRuntime runtime, UUID conversationId,
+    static boolean await(AgentRuntime runtime, ConversationId conversationId,
                          Predicate<ConversationHistory> condition, Duration timeout) {
         long deadline = System.nanoTime() + timeout.toNanos();
         while (System.nanoTime() < deadline) {
@@ -137,7 +136,7 @@ final class LmStudioSupport {
      * tool task there) — nothing about them is a conversation message.
      */
     static ToolApproval openApproval(
-            AgentRuntime runtime, UUID rootSessionId) {
+            AgentRuntime runtime, SessionId rootSessionId) {
         var open = runtime.approvalStore().openForRoot(rootSessionId);
         return open.isEmpty() ? null : open.get(0);
     }

@@ -3,7 +3,7 @@ id: memory-auto-compact-eviction
 area: memory
 requires: [server-9091, lm-studio-tool-model]
 duration: ~8 min
-last-verified: never
+last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
 ---
 
 # Auto-compact tool-result eviction: old results become fetchable stubs

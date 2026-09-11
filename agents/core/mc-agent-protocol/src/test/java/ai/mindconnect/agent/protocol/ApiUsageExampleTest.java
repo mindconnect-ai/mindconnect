@@ -39,7 +39,7 @@ class ApiUsageExampleTest {
     void simpleBlockingChat() {
         // The request is thin on purpose: prompt, model, server-side tools and
         // memory all come from the agent the session is bound to.
-        Session session = sessions.open("local", "travel-assistant");
+        Session session = sessions.open("travel-assistant");
 
         Response response = responses.create(
                 ResponseRequest.text(session.id(), "Find me a hotel in Lisbon for next weekend"));
@@ -57,7 +57,7 @@ class ApiUsageExampleTest {
 
     @Test
     void streamingWithLiveTokens() {
-        Session session = sessions.open("acme", "travel-assistant");
+        Session session = sessions.open("travel-assistant");
 
         Response started = responses.create(
                 ResponseRequest.text(session.id(), "Write a short Lisbon itinerary")
@@ -82,7 +82,7 @@ class ApiUsageExampleTest {
 
     @Test
     void approvalFlow_turnEndsAndResumes() {
-        Session session = sessions.open("local", "ops-agent");
+        Session session = sessions.open("ops-agent");
 
         // The agent wants to call a tool that an advisor gates behind approval:
         // the response ENDS — no parked thread, state is just the conversation.
@@ -106,7 +106,7 @@ class ApiUsageExampleTest {
 
     @Test
     void clientSideTool_openAiStyle() {
-        Session session = sessions.open("acme", "travel-assistant");
+        Session session = sessions.open("travel-assistant");
 
         // The client declares a function it executes ITSELF (OpenAI mechanic).
         ToolDefinition localLookup = new ToolDefinition(
@@ -131,7 +131,7 @@ class ApiUsageExampleTest {
 
     @Test
     void followSubAgents_flatStreamsRecursiveProtocol() {
-        Session session = sessions.open("acme", "research-lead");
+        Session session = sessions.open("research-lead");
 
         Response root = responses.create(
                 ResponseRequest.text(session.id(), "Compare vector databases").inBackground());
@@ -159,7 +159,7 @@ class ApiUsageExampleTest {
 
     @Test
     void conversationIsTheDurableTruth() {
-        Session session = sessions.open("acme", "travel-assistant");
+        Session session = sessions.open("travel-assistant");
         responses.create(ResponseRequest.text(session.id(), "Hi!"));
 
         // Everything any response ever produced is in the conversation's log —

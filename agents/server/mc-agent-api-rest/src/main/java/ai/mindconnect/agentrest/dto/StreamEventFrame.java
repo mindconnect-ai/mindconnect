@@ -85,7 +85,7 @@ public record StreamEventFrame(String type, String text, String toolName,
                     new StreamEventFrame("sub_agent_started", s.input(), null, null, null, null,
                             null, null, null, null, null,
                             s.taskId().toString(), s.agentName(), s.depth(), null,
-                            s.subSessionId() != null ? s.subSessionId().toString() : null, null);
+                            s.subSessionId() != null ? s.subSessionId().value() : null, null);
             case StreamEvent.SubAgentEvent se ->
                     new StreamEventFrame("sub_agent_event", null, null, null, null, null,
                             null, null, null, null, null,
@@ -94,7 +94,7 @@ public record StreamEventFrame(String type, String text, String toolName,
                     new StreamEventFrame("sub_agent_done", null, null, null, null, null,
                             null, null, sd.finalText(), null, null,
                             sd.taskId().toString(), sd.agentName(), null, null,
-                            sd.subSessionId().toString(), null);
+                            sd.subSessionId().value(), null);
             case StreamEvent.ApprovalRequested ar ->
                     new StreamEventFrame("approval_requested", null, ar.toolName(),
                             ar.arguments(), null, null,
@@ -104,7 +104,7 @@ public record StreamEventFrame(String type, String text, String toolName,
                             // subSessionId=originSessionId, error=toolTaskId, text=callId.
                             ar.requestId(), null, null,
                             ar.toolTaskId(),
-                            ar.originSessionId() == null ? null : ar.originSessionId().toString(),
+                            ar.originSessionId() == null ? null : ar.originSessionId().value(),
                             null)
                             .withText(ar.callId());
             case StreamEvent.SubAgentError sErr ->

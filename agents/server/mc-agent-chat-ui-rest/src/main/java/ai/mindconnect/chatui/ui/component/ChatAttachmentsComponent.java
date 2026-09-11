@@ -15,7 +15,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * The chat page's attached-files panel: file name, what it is, how it
@@ -35,7 +35,7 @@ public final class ChatAttachmentsComponent {
      * @param files  the session's attached files, in attach order
      * @param chunks ingested file id → searchable chunks, for the files that were indexed
      */
-    public static UiNode node(UUID sessionId, List<AttachedFile> files, Map<String, Long> chunks) {
+    public static UiNode node(SessionId sessionId, List<AttachedFile> files, Map<String, Long> chunks) {
         var panel = UiStack.of("chat-attachments").gap(4);
         if (files.isEmpty()) {
             return panel;
@@ -50,7 +50,7 @@ public final class ChatAttachmentsComponent {
                 .rowAction(UiAction.danger("remove", "Remove").icon("remove")
                         .confirm("Remove this file from the conversation?")
                         .onClick(trigger(on(ChatFilesUiController.class)
-                                .remove(sessionId, ROW_ID.toString()))));
+                                .remove(sessionId.value(), ROW_ID.toString()))));
         for (AttachedFile f : files) {
             table.row(Map.of(
                     "id", java.net.URLEncoder.encode(f.name(), java.nio.charset.StandardCharsets.UTF_8),

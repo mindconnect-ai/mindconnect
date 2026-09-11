@@ -39,6 +39,41 @@ class DocumentTableSqlTest {
                 """);
     }
 
+    private final DocumentTable<Thing> tenantThings = DocumentTable.of(Thing.class)
+            .table("mc_tenant_thing")
+            .partitionKey("namespace", "TEXT", Thing::namespace)
+            .id("id", "TEXT", t -> t.id().toString())
+            .column("name", "TEXT", Thing::name)
+            .build(Sql.of(null));
+
+    @Test
+    void aPartitionKeyMakesTheKeyAPair() {
+        assertThat(tenantThings.ddl()).isEqualTo("""
+                CREATE TABLE IF NOT EXISTS mc_tenant_thing (
+                    namespace TEXT NOT NULL,
+                    id TEXT NOT NULL,
+                    name TEXT,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    doc JSONB NOT NULL,
+                    PRIMARY KEY (namespace, id)
+                );
+                ALTER TABLE mc_tenant_thing ADD COLUMN IF NOT EXISTS name TEXT;
+                """);
+        assertThat(tenantThings.upsertSql()).isEqualTo(
+                "INSERT INTO mc_tenant_thing (namespace, id, name, updated_at, doc) VALUES (?, ?, ?, now(), ?) "
+                + "ON CONFLICT (namespace, id) DO UPDATE SET name = EXCLUDED.name, "
+                + "updated_at = now(), doc = EXCLUDED.doc");
+        assertThat(tenantThings.columnList()).isEqualTo("namespace, id, name, updated_at");
+    }
+
+    @Test
+    void theSingleAndPairedKeyFormsRefuseTheWrongTable() {
+        assertThatThrownBy(() -> tenantThings.findById("x"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("namespace");
+        assertThatThrownBy(() -> things.findById("acme", "x"))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("single-column");
+    }
+
     @Test
     void upsertReplacesColumnsAndDocumentOnConflict() {
         assertThat(things.upsertSql()).isEqualTo(

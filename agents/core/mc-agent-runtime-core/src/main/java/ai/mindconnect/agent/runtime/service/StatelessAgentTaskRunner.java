@@ -4,7 +4,6 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.port.in.LlmChat;
@@ -19,7 +18,7 @@ import java.util.Map;
  * <p>
  * Resolution order for each task:
  * <ol>
- *   <li>Look up an {@link AgentDefinition} by name in the configured namespace.
+ *   <li>Look up an {@link AgentDefinition} by name.
  *       Uses its {@code llmConfigName} and {@code systemPrompt}.</li>
  *   <li>Fall back to the globally configured default stateless agent
  *       ({@code mindconnect.agent.stateless.llm-config-id}).</li>
@@ -39,18 +38,15 @@ public class StatelessAgentTaskRunner implements AgentTaskRunner {
 
     private final AgentDefinitionRepository definitionRepository;
     private final LlmChat chatUseCase;
-    private final Namespace namespace;
     private final String defaultLlmConfigName;
     private final PromptRenderer promptRenderer;
 
     public StatelessAgentTaskRunner(AgentDefinitionRepository definitionRepository,
                                     LlmChat chatUseCase,
-                                    Namespace namespace,
                                     String defaultLlmConfigName,
                                     PromptRenderer promptRenderer) {
         this.definitionRepository = definitionRepository;
         this.chatUseCase = chatUseCase;
-        this.namespace = namespace;
         this.defaultLlmConfigName = defaultLlmConfigName;
         this.promptRenderer = promptRenderer;
     }
@@ -108,7 +104,7 @@ public class StatelessAgentTaskRunner implements AgentTaskRunner {
     }
 
     private ResolvedAgent resolve(String task) {
-        return definitionRepository.findByName(namespace, task)
+        return definitionRepository.findByName(task)
                 .map(d -> {
                     log.debug("Task '{}' resolved to AgentDefinition '{}'", task, d.name());
                     return new ResolvedAgent(d, d.name(), d.llmConfigName(), d.systemPrompt());

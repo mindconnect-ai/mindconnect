@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.tools.workflow;
 
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.ToolCallScope;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
@@ -13,7 +16,6 @@ import ai.mindconnect.agent.tools.workflow.step.AgentInvoker;
 import ai.mindconnect.agent.tools.workflow.step.AgentInvokers;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvoker;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvokers;
-import ai.mindconnect.agent.Namespace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -40,15 +42,14 @@ public class McAgentWorkflowStepsAutoConfiguration {
     @Bean
     AgentInvoker workflowAgentInvoker(AgentSessionService sessionService,
                                       AgentChatService chatService,
-                                      AgentDefinitionRepository definitionRepository,
-                                      Namespace defaultNamespace) {
+                                      AgentDefinitionRepository definitionRepository) {
         AgentInvoker invoker = new AgentInvoker() {
             @Override
             public String call(String agentName, String message) {
-                AgentDefinition def = definitionRepository.findByName(defaultNamespace, agentName)
+                AgentDefinition def = definitionRepository.findByName(agentName)
                         .orElseThrow(() -> new IllegalArgumentException(
-                                "No agent named '" + agentName + "' in namespace '" + defaultNamespace.value() + "'"));
-                AgentSession session = sessionService.openChat(def.id(), defaultNamespace, WORKFLOW_USER);
+                                "No agent named '" + agentName + "'"));
+                AgentSession session = sessionService.openChat(def.id(), UserId.of(WORKFLOW_USER));
                 ChatTurnHandle handle = chatService.submitChat(session.id(), message, event -> { });
                 try {
                     return handle.result().get();
@@ -73,13 +74,13 @@ public class McAgentWorkflowStepsAutoConfiguration {
                 String description = str(spec.get("description"));
                 String llmConfigName = str(spec.get("llmConfigName"));
 
-                AgentDefinition base = definitionRepository.findByName(defaultNamespace, name)
+                AgentDefinition base = definitionRepository.findByName(name)
                         .map(existing -> existing.withBasicFields(name,
                                 description != null ? description : existing.description(),
                                 systemPrompt != null ? systemPrompt : existing.systemPrompt(),
                                 existing.welcomeMessage(),
                                 llmConfigName != null ? llmConfigName : existing.llmConfigName()))
-                        .orElseGet(() -> AgentDefinition.create(defaultNamespace, name,
+                        .orElseGet(() -> AgentDefinition.create(name,
                                 description, systemPrompt, null, llmConfigName));
 
                 java.util.List<ai.mindconnect.agent.tool.AgentTool> tools = new java.util.ArrayList<>();
@@ -97,8 +98,8 @@ public class McAgentWorkflowStepsAutoConfiguration {
                             overrides.putIfAbsent("tool", alias);
                         }
                         tools.add(new ai.mindconnect.agent.tool.AgentTool(
-                                java.util.UUID.randomUUID(), base.id(), toolName,
-                                str(toolMap.get("description")), overrides, true, false));
+                                ai.mindconnect.agent.tool.AgentToolId.random(), toolName,
+                                str(toolMap.get("description")), overrides));
                     }
                 }
                 definitionRepository.save(base.withTools(tools));
@@ -116,13 +117,13 @@ public class McAgentWorkflowStepsAutoConfiguration {
     }
 
     @Bean
-    ToolInvoker workflowToolInvoker(ToolRegistry toolRegistry, Namespace defaultNamespace) {
+    ToolInvoker workflowToolInvoker(ToolRegistry toolRegistry) {
         ToolInvoker invoker = new ToolInvoker() {
             @Override
             public String call(String toolName, java.util.Map<String, Object> arguments) {
                 Tool tool = toolRegistry
-                        .resolve(AgentTool.of(java.util.UUID.randomUUID(), toolName),
-                                defaultNamespace, WORKFLOW_USER, null)
+                        .resolve(AgentTool.of(toolName),
+                                ToolCallScope.detached(UserId.of(WORKFLOW_USER)))
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "No tool named '" + toolName + "' is resolvable"
                                 + " (known: " + toolRegistry.knownToolNames() + ")"));

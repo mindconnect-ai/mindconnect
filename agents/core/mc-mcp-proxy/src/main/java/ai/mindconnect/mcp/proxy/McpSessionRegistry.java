@@ -7,7 +7,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Iterator;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -41,7 +40,7 @@ public final class McpSessionRegistry implements AutoCloseable {
     /** Default cadence at which the idle-sweep runs. */
     public static final Duration DEFAULT_SWEEP_INTERVAL = Duration.ofMinutes(5);
 
-    private record Key(UUID sessionId, String providerKey) {}
+    private record Key(String sessionId, String providerKey) {}
 
     private static final class Entry {
         final McpConnection connection;
@@ -83,7 +82,7 @@ public final class McpSessionRegistry implements AutoCloseable {
      * <p>Thread-safe but not lock-free: connections are created under a
      * per-key lock to avoid double-spawn on first hit.
      */
-    public McpConnection getOrOpen(UUID sessionId, String providerKey, McpStdioSpawn spawn) {
+    public McpConnection getOrOpen(String sessionId, String providerKey, McpStdioSpawn spawn) {
         Key key = new Key(sessionId, providerKey);
         Entry existing = cache.get(key);
         if (existing != null && existing.connection.isHealthy()) {
@@ -113,7 +112,7 @@ public final class McpSessionRegistry implements AutoCloseable {
     }
 
     /** Close + evict every cached connection for the given session. */
-    public void closeSession(UUID sessionId) {
+    public void closeSession(String sessionId) {
         Iterator<Map.Entry<Key, Entry>> it = cache.entrySet().iterator();
         while (it.hasNext()) {
             Map.Entry<Key, Entry> e = it.next();

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.tools.todo;
 
+import ai.mindconnect.agent.SessionId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,7 @@ public class TodoListService {
      * Returns the current list for {@code sessionId}, or an empty list if none
      * has been saved yet.
      */
-    public TodoList load(UUID sessionId) {
+    public TodoList load(SessionId sessionId) {
         return repository.findBySession(sessionId).orElseGet(() -> TodoList.empty(sessionId));
     }
 
@@ -41,7 +42,7 @@ public class TodoListService {
      * Re-numbers {@code order} sequentially, validates the IN_PROGRESS-single
      * invariant, and stamps {@code updatedAt}.
      */
-    public TodoList replace(UUID sessionId, List<TodoItem> items) {
+    public TodoList replace(SessionId sessionId, List<TodoItem> items) {
         if (sessionId == null) throw new IllegalArgumentException("sessionId is required");
         if (items == null) throw new IllegalArgumentException("items is required");
 
@@ -65,7 +66,7 @@ public class TodoListService {
     }
 
     /** Drops the session's todo list. Idempotent. */
-    public void clear(UUID sessionId) {
+    public void clear(SessionId sessionId) {
         repository.deleteBySession(sessionId);
     }
 }

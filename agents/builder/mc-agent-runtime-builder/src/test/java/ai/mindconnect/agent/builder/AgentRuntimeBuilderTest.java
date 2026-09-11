@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.builder;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -16,8 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class AgentRuntimeBuilderTest {
 
     private static AgentDefinition demoAgent() {
-        return AgentDefinition.create(new ai.mindconnect.agent.Namespace("local"),
-                "test-agent", "test", "You are a test.", null, "test-llm");
+        return AgentDefinition.create("test-agent", "test", "You are a test.", null, "test-llm");
     }
 
     @Test
@@ -28,10 +28,10 @@ class AgentRuntimeBuilderTest {
                 .build()) {
 
             assertThat(runtime.llmConfigs().findByName("test-llm")).isPresent();
-            assertThat(runtime.agentDefinitions().findByName(runtime.namespace(), "test-agent"))
+            assertThat(runtime.agentDefinitions().findByName("test-agent"))
                     .isPresent();
 
-            AgentSession session = runtime.openSession("test-agent", "user-1");
+            AgentSession session = runtime.openSession("test-agent", UserId.of("user-1"));
             assertThat(session.id()).isNotNull();
             assertThat(runtime.sessionService()).isNotNull();
         }
@@ -40,7 +40,7 @@ class AgentRuntimeBuilderTest {
     @Test
     void unknownAgentFailsWithAClearMessage() {
         try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence().build()) {
-            assertThatThrownBy(() -> runtime.openSession("nope", "u"))
+            assertThatThrownBy(() -> runtime.openSession("nope", UserId.of("u")))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("nope");
         }
@@ -54,7 +54,7 @@ class AgentRuntimeBuilderTest {
         // endpoint: store, template, session store — then "no text content".
         try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence().build()) {
             runtime.agentDefinitions().save(demoAgent());
-            AgentSession session = runtime.openSession("test-agent", "u");
+            AgentSession session = runtime.openSession("test-agent", UserId.of("u"));
 
             String message = runtime.attachFile(session.id(), "empty.md",
                     new java.io.ByteArrayInputStream(new byte[0]));

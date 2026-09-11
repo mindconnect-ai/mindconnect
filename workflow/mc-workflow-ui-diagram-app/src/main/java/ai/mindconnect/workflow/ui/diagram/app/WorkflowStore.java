@@ -28,14 +28,16 @@ import java.util.Set;
 public class WorkflowStore {
 
     /**
-     * Where saved workflows are written. Relative path; resolved against the
-     * JVM's working directory, which for {@code mvn spring-boot:run} is the
+     * The data directory saved workflows are written under, in
+     * {@code <DATA_DIR>/<PARTITION>/workflows}. Relative path; resolved against
+     * the JVM's working directory, which for {@code mvn spring-boot:run} is the
      * module root ({@code workflow/mc-workflow-ui-diagram-app/}).
      */
-    private static final Path SAVE_DIR = Path.of("workflows");
+    private static final Path DATA_DIR = Path.of("data");
+    private static final String PARTITION = "default";
 
     private final Map<String, WorkflowData> workflows = new LinkedHashMap<>();
-    private final FileWorkflowDataRepository fileRepo = new FileWorkflowDataRepository(SAVE_DIR);
+    private final FileWorkflowDataRepository fileRepo = new FileWorkflowDataRepository(DATA_DIR, PARTITION);
 
     @PostConstruct
     void load() {
@@ -89,7 +91,7 @@ public class WorkflowStore {
             throw new IllegalArgumentException("No workflow named '" + name + "'");
         }
         fileRepo.save(name, wf);
-        Path target = SAVE_DIR.resolve(name + ".json");
+        Path target = DATA_DIR.resolve(PARTITION).resolve("workflows").resolve(name + ".json");
         log.info("Saved workflow {} to {}", name, target.toAbsolutePath());
         return target;
     }

@@ -1,5 +1,8 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
@@ -12,10 +15,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * The files an agent wrote, per workspace scope. A scope is a place, and the
@@ -55,15 +58,15 @@ public class WorkspaceApiController {
             description = "The scratch space of one conversation — what the agent wrote while "
                     + "answering. Agent and user are taken from the session.")
     @GetMapping("/session/{sessionId}/files")
-    public List<WorkspaceFile> sessionFiles(@PathVariable UUID sessionId) {
-        return list(sessionScope(sessionId));
+    public List<WorkspaceFile> sessionFiles(@PathVariable String sessionId) {
+        return list(sessionScope(SessionId.of(sessionId)));
     }
 
     @Operation(tags = "Workspaces", summary = "Read a file from a session's workspace")
     @GetMapping(value = "/session/{sessionId}/files/{name}", produces = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<String> sessionFile(@PathVariable UUID sessionId,
+    public ResponseEntity<String> sessionFile(@PathVariable String sessionId,
                                               @PathVariable String name) {
-        return read(sessionScope(sessionId), name);
+        return read(sessionScope(SessionId.of(sessionId)), name);
     }
 
     // ── Agent + user scope ──────────────────────────────────────────────────
@@ -71,16 +74,16 @@ public class WorkspaceApiController {
     @Operation(tags = "Workspaces", summary = "Files in an agent's workspace for one user",
             description = "What this agent keeps about this user across conversations.")
     @GetMapping("/agent/{agentId}/user/{userId}/files")
-    public List<WorkspaceFile> agentFiles(@PathVariable UUID agentId, @PathVariable String userId) {
-        return list(WorkspaceScope.agentUser(agentId, userId));
+    public List<WorkspaceFile> agentFiles(@PathVariable String agentId, @PathVariable String userId) {
+        return list(WorkspaceScope.agentUser(AgentId.of(agentId), UserId.of(userId)));
     }
 
     @Operation(tags = "Workspaces", summary = "Read a file from an agent's workspace")
     @GetMapping(value = "/agent/{agentId}/user/{userId}/files/{name}",
             produces = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<String> agentFile(@PathVariable UUID agentId, @PathVariable String userId,
+    public ResponseEntity<String> agentFile(@PathVariable String agentId, @PathVariable String userId,
                                             @PathVariable String name) {
-        return read(WorkspaceScope.agentUser(agentId, userId), name);
+        return read(WorkspaceScope.agentUser(AgentId.of(agentId), UserId.of(userId)), name);
     }
 
     // ── User scope ──────────────────────────────────────────────────────────
@@ -89,18 +92,18 @@ public class WorkspaceApiController {
             description = "The user's space, shared by every agent that works for them.")
     @GetMapping("/user/{userId}/files")
     public List<WorkspaceFile> userFiles(@PathVariable String userId) {
-        return list(WorkspaceScope.user(userId));
+        return list(WorkspaceScope.user(UserId.of(userId)));
     }
 
     @Operation(tags = "Workspaces", summary = "Read a file from a user's workspace")
     @GetMapping(value = "/user/{userId}/files/{name}", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> userFile(@PathVariable String userId, @PathVariable String name) {
-        return read(WorkspaceScope.user(userId), name);
+        return read(WorkspaceScope.user(UserId.of(userId)), name);
     }
 
     // ── The two things every scope does ─────────────────────────────────────
 
-    private WorkspaceScope sessionScope(UUID sessionId) {
+    private WorkspaceScope sessionScope(SessionId sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
         return WorkspaceScope.session(session.agentDefinitionId(), session.userId(), session.id());
     }

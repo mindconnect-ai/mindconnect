@@ -13,7 +13,7 @@ import java.time.Instant;
  */
 public interface LlmCallTraceHeader {
 
-    java.util.UUID id();
+    ai.mindconnect.agent.runtime.domain.TraceId id();
 
     TraceContext context();
 

@@ -1,11 +1,12 @@
 package ai.mindconnect.agent.runtime.service.stream;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.channel.Channel;
+import ai.mindconnect.message.domain.ChatTurnId;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -13,9 +14,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionChannelsTest {
 
     private final SessionChannels channels = new SessionChannels();
-    private final UUID session = UUID.randomUUID();
-    private final UUID turnA = UUID.randomUUID();
-    private final UUID turnB = UUID.randomUUID();
+    private final SessionId session = SessionId.random();
+    private final ChatTurnId turnA = ChatTurnId.random();
+    private final ChatTurnId turnB = ChatTurnId.random();
 
     @Test
     void publisherStampsTurnCoordinatesOnEveryEvent() {

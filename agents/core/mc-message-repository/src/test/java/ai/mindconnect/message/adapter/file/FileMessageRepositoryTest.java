@@ -1,5 +1,8 @@
 package ai.mindconnect.message.adapter.file;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Message;
@@ -25,8 +28,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class FileMessageRepositoryTest {
 
-    private final UUID conversation = UUID.randomUUID();
-    private final UUID sender = UUID.randomUUID();
+    private final ConversationId conversation = ConversationId.random();
+    private final String sender = UUID.randomUUID().toString();
     private final ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
 
     @TempDir
@@ -36,7 +39,7 @@ class FileMessageRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        repo = new FileMessageRepository(dir, json);
+        repo = new FileMessageRepository(dir, json, new Namespace("test"));
     }
 
     @Test
@@ -65,21 +68,22 @@ class FileMessageRepositoryTest {
 
     @Test
     void aFileWrittenBeforePartsExistedStillLoads() throws Exception {
-        UUID id = UUID.randomUUID();
-        Path messages = dir.resolve("conversations").resolve(conversation.toString()).resolve("messages");
+        String id = UUID.randomUUID().toString();
+        Path messages = dir.resolve("test").resolve("conversations").resolve(conversation.value()).resolve("messages");
         Files.createDirectories(messages);
         Files.writeString(messages.resolve("1_" + id + ".json"), """
                 {"id":"%s","conversationId":"%s","senderId":"%s","senderType":"USER",
                  "recipientId":null,"type":"CHAT","content":"legacy text","metadata":{},
                  "sequenceNum":1,"sentAt":1.7E9,"compressed":false,"compressedContent":null,
                  "tokenCount":3,"compressedTokenCount":null,"durationMs":null,"turnId":null,"run":null}
-                """.formatted(id, conversation, sender));
+                """.formatted(id, conversation.value(), sender));
 
-        List<Message> history = repo.findByConversationId(conversation, new PageRequest(0, 10));
+        List<Message> history = repo.findByConversation(conversation, new PageRequest(0, 10));
 
         assertThat(history).hasSize(1);
         Message m = history.get(0);
         assertThat(m.content()).isEqualTo("legacy text");
+        assertThat(m.id()).isEqualTo(MessageId.of(id));
         assertThat(m.parts()).isNull();
         assertThat(m.partsOrText()).containsExactly(new ContentPart.Text("legacy text"));
     }

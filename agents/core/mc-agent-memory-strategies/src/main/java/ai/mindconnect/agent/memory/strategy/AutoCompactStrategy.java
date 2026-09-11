@@ -109,7 +109,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
         // prompt when SYSTEM_PROMPT). Either way, surface them to the admin
         // UI so operators see why the live window is "empty" after compress.
         List<ConversationSummary> summaries =
-                summaryRepository.findByConversationId(session.conversationId());
+                summaryRepository.findByConversation(session.conversationId());
 
         List<WorkingMemory.WorkingMemoryMessage> messages =
                 new ArrayList<>(SummaryWindowMessages.render(summaries, counter));
@@ -134,7 +134,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
     public String systemPromptAddendum(AgentDefinition def, AgentSession session) {
         if (cfg.summaryPlacement() != SummaryPlacement.SYSTEM_PROMPT) return "";
         List<ConversationSummary> summaries =
-                summaryRepository.findByConversationId(session.conversationId());
+                summaryRepository.findByConversation(session.conversationId());
         if (summaries.isEmpty()) return "";
         StringBuilder sb = new StringBuilder("\n\n## Earlier conversation (summarized)");
         appendSummaryBody(sb, summaries);
@@ -292,14 +292,15 @@ public class AutoCompactStrategy implements MemoryStrategy {
      */
     private Message asEvictionStub(Message m) {
         int origTokens = originalTokens(m);
-        String stub = "[Tool result evicted from context — id=" + m.id()
+        // The bare value: fetch_tool_result reads it back as a message id of this conversation.
+        String stub = "[Tool result evicted from context — id=" + m.id().value()
                 + ", originally ~" + origTokens + " tokens. "
                 + "Call the `fetch_tool_result` tool with this id to reload the full content.]";
         return m.withCompressed(stub, stub.length() / 4);  // rough token estimate for accounting
     }
 
     private Set<Integer> summarizedSequenceNumbers(AgentSession session) {
-        return summaryRepository.findByConversationId(session.conversationId())
+        return summaryRepository.findByConversation(session.conversationId())
                 .stream()
                 .flatMapToInt(s -> IntStream.rangeClosed(s.fromSequenceNum(), s.toSequenceNum()))
                 .boxed()
@@ -322,7 +323,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
 
     private String renderSummariesAsUserMessage(AgentSession session) {
         List<ConversationSummary> summaries =
-                summaryRepository.findByConversationId(session.conversationId());
+                summaryRepository.findByConversation(session.conversationId());
         if (summaries.isEmpty()) return "";
         StringBuilder sb = new StringBuilder(
                 "This session is being continued from a previous conversation that ran out of context. "
@@ -346,7 +347,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
         for (Message m : messages) {
             switch (m.type()) {
                 case CHAT -> {
-                    String role = m.senderId().equals(def.id()) ? "Agent" : "User";
+                    String role = m.senderId().equals(def.id().value()) ? "Agent" : "User";
                     transcript.append(role).append(": ").append(m.content()).append("\n");
                 }
                 case TOOL_CALL -> transcript.append("[tool call]\n");

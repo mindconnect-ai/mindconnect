@@ -25,7 +25,7 @@ and Delete), **Tools (n)** and **Sessions**.
 
 The agent form lets you set:
 
-- **Name**, **Namespace** and description.
+- **Name** and description.
 - **System prompt** — the agent's role and instructions — and an optional
   **Welcome Message**.
 - **LLM Config** — which model it uses, picked from your

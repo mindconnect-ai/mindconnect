@@ -1,12 +1,13 @@
 package ai.mindconnect.agent.runtime.service.stream;
 
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.Subscription;
 
 import java.time.Duration;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
@@ -52,7 +53,7 @@ public final class SessionChannels {
      * Where a turn execution publishes — resolved per call, so it survives
      * suspensions. The envelope stamps every event with its origin.
      */
-    public Consumer<StreamEvent> publisherFor(UUID sessionId, UUID turnId, int run) {
+    public Consumer<StreamEvent> publisherFor(SessionId sessionId, ChatTurnId turnId, int run) {
         return event -> channel(sessionId).publish(new SessionEvent(turnId, run, event));
     }
 
@@ -61,7 +62,7 @@ public final class SessionChannels {
      * {@code afterSeq} from the buffer, then continue live. The event's
      * {@code seq} is the cursor for the next reconnect.
      */
-    public Subscription subscribe(UUID sessionId, long afterSeq,
+    public Subscription subscribe(SessionId sessionId, long afterSeq,
                                   Consumer<Channel.Event<SessionEvent>> consumer) {
         return channel(sessionId).subscribe(afterSeq, consumer);
     }
@@ -72,7 +73,7 @@ public final class SessionChannels {
      * what the sub-agent mirror wants: the events of one execution, not the
      * session's history.
      */
-    public Subscription subscribeTurn(UUID sessionId, UUID turnId,
+    public Subscription subscribeTurn(SessionId sessionId, ChatTurnId turnId,
                                       Consumer<StreamEvent> consumer) {
         Channel<SessionEvent> channel = channel(sessionId);
         return channel.subscribe(channel.lastSeq(),
@@ -81,20 +82,20 @@ public final class SessionChannels {
     }
 
     /** The newest sequence the session has seen (0 when nothing happened). */
-    public long lastSeq(UUID sessionId) {
+    public long lastSeq(SessionId sessionId) {
         return channel(sessionId).lastSeq();
     }
 
     /** The oldest sequence still in the buffer — everything before it is gone. */
-    public long earliestBufferedSeq(UUID sessionId) {
+    public long earliestBufferedSeq(SessionId sessionId) {
         return channel(sessionId).earliestBufferedSeq();
     }
 
-    private Channel<SessionEvent> channel(UUID sessionId) {
+    private Channel<SessionEvent> channel(SessionId sessionId) {
         return registry.channel(id(sessionId));
     }
 
-    private static String id(UUID sessionId) {
-        return "session_" + sessionId;
+    private static String id(SessionId sessionId) {
+        return "session_" + sessionId.value();
     }
 }

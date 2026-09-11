@@ -16,6 +16,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
  * ISO dates, unknown properties ignored so a row written by a newer version
  * still reads on an older one.
  */
+
 public final class Json {
 
     private final ObjectMapper mapper;

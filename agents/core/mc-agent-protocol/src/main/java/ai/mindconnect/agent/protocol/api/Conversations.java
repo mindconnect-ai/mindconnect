@@ -14,7 +14,7 @@ import java.util.Optional;
  */
 public interface Conversations {
 
-    Conversation create(String namespace);
+    Conversation create();
 
     Optional<Conversation> get(String conversationId);
 

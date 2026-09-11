@@ -11,8 +11,8 @@ public record AttachedFrame(String type, long firstBufferedSeq, long latestSeq,
                             String liveTurnId, Integer liveRun) {
 
     public static AttachedFrame of(long firstBufferedSeq, long latestSeq,
-                                   java.util.UUID liveTurnId, Integer liveRun) {
+                                   ai.mindconnect.message.domain.ChatTurnId liveTurnId, Integer liveRun) {
         return new AttachedFrame("attached", firstBufferedSeq, latestSeq,
-                liveTurnId == null ? null : liveTurnId.toString(), liveRun);
+                liveTurnId == null ? null : liveTurnId.value(), liveRun);
     }
 }

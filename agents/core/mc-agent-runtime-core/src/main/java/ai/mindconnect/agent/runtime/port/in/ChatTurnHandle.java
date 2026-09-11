@@ -1,8 +1,9 @@
 package ai.mindconnect.agent.runtime.port.in;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.TurnStatus;
+import ai.mindconnect.message.domain.ChatTurnId;
 
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -18,9 +19,9 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface ChatTurnHandle {
 
-    UUID id();
+    ChatTurnId id();
 
-    UUID sessionId();
+    SessionId sessionId();
 
     /** Current lifecycle status of the turn. */
     TurnStatus status();

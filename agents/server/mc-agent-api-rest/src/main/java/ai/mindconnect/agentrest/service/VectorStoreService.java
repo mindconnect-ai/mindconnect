@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.vectorstore.VectorChunk;
@@ -167,7 +168,7 @@ public class VectorStoreService {
     public String ingestStoredFile(String storeName, String fileId) throws IOException {
         FileStore fs = fileStoreProvider.getIfAvailable();
         if (fs == null) throw new NotConfiguredException("File store");
-        StoredFile stored = fs.find(fileId).orElseThrow(() ->
+        StoredFile stored = fs.find(FileId.of(fileId)).orElseThrow(() ->
                 new IllegalArgumentException("No such file: " + fileId));
         try (InputStream content = fs.content(stored.id())) {
             return ingestUpload(storeName, stored.name(), content);

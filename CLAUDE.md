@@ -71,9 +71,16 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
   - `mc-agents-parent/` — the area parent POM
   - `core/` — libraries (no runnable apps)
     - `mc-agent-domain`: the area's shared vocabulary, package `ai.mindconnect.agent` —
-      `Namespace`, `NamespacedId`, `UserId`, `AuthenticationInfo`. Dependency-free. A type
-      is admitted only when two modules that do not depend on each other need it; every
-      other id record lives in the module that owns its entity
+      `Namespace`, `EntityId`, `UserId`, `AuthenticationInfo`, plus `AgentId` and
+      `SessionId` because the tool SPI needs them. Depends on `jackson-annotations` only. A
+      type is admitted only when two modules that do not depend on each other need it; every
+      other id record (`ConversationId`, `MessageId`, `LlmConfigId`, `FileId`, `AgentToolId`,
+      …) lives in the module that owns its entity. Every entity is addressed by such a record
+      — `record XId(String value) implements EntityId` — never by a bare `UUID` or `String`;
+      in JSON an id is its plain value. Ids, domain objects, ports and services carry no
+      namespace: persistence adapters (File, Pg, the file-store and vector-store backends)
+      are bound to one namespace in their constructor or config, and the Spring starters set
+      it from `mindconnect.namespace` — one process serves one namespace
     - `mc-agent-runtime-core` / `mc-agent-runtime` (packages `ai.mindconnect.agent.runtime.*`):
       execution engine (turn loop, tool dispatch, sub-agent calls, approvals) / its adapters
       (file & in-memory repos, Pebble prompt renderer, tokenizer)

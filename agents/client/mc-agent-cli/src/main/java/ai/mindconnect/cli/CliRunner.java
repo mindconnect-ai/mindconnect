@@ -1,5 +1,9 @@
 package ai.mindconnect.cli;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
@@ -7,7 +11,6 @@ import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.cli.agentclient.AgentClient;
 import ai.mindconnect.cli.agentclient.LocalClientFactory;
 import ai.mindconnect.cli.agentclient.RemoteClientFactory;
-import ai.mindconnect.agent.Namespace;
 import org.springframework.beans.factory.annotation.Value;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -19,7 +22,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.Scanner;
-import java.util.UUID;
 
 @Component
 public class CliRunner implements CommandLineRunner {
@@ -53,7 +55,8 @@ public class CliRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         Scanner scanner = new Scanner(System.in);
-        Namespace namespace = new Namespace("local");
+        // The typed user id for this run; the field keeps the configured string.
+        UserId userId = UserId.of(this.userId);
 
         printBanner();
 
@@ -77,12 +80,12 @@ public class CliRunner implements CommandLineRunner {
 
         // Resume "where the user was" from the persisted CLI state. Falls back gracefully
         // if the stored agent or session no longer exists (e.g. deleted between runs).
-        Resume resume = resolveResume(stateStore.load(), namespace, userId, client);
+        Resume resume = resolveResume(stateStore.load(), userId, client);
 
         while (true) {
             AgentDefinition selectedAgent = resume.agent != null
                     ? resume.agent
-                    : selectAgent(scanner, namespace, client);
+                    : selectAgent(scanner, client);
             if (selectedAgent == null) break;
 
             AgentSession session;
@@ -90,8 +93,8 @@ public class CliRunner implements CommandLineRunner {
                 session = resume.session;
                 System.out.println("[Resumed session " + sessionLabel(session) + "]");
             } else {
-                stateStore.save(CliState.sessionList(selectedAgent.id()));
-                session = pickOrStartSession(scanner, selectedAgent, namespace, userId, client);
+                stateStore.save(CliState.sessionList(selectedAgent.id().value()));
+                session = pickOrStartSession(scanner, selectedAgent, userId, client);
                 if (session == null) {
                     resume = Resume.none();
                     stateStore.save(CliState.agentList());
@@ -100,7 +103,7 @@ public class CliRunner implements CommandLineRunner {
             }
             // Resume hint consumed — subsequent loop iterations behave normally.
             resume = Resume.none();
-            stateStore.save(CliState.activeSession(selectedAgent.id(), session.id()));
+            stateStore.save(CliState.activeSession(selectedAgent.id().value(), session.id().value()));
 
             printSessionHeader(selectedAgent, session);
             printHistory(session, client);
@@ -121,18 +124,18 @@ public class CliRunner implements CommandLineRunner {
                 }
 
                 if (input.equals("/new")) {
-                    session = client.startSession(selectedAgent.id(), namespace, userId);
-                    stateStore.save(CliState.activeSession(selectedAgent.id(), session.id()));
+                    session = client.startSession(selectedAgent.id(), userId);
+                    stateStore.save(CliState.activeSession(selectedAgent.id().value(), session.id().value()));
                     printSessionHeader(selectedAgent, session);
                     printHistory(session, client);
                     continue;
                 }
 
                 if (input.equals("/sessions")) {
-                    AgentSession picked = pickSession(scanner, selectedAgent, namespace, userId, client);
+                    AgentSession picked = pickSession(scanner, selectedAgent, userId, client);
                     if (picked != null) {
                         session = picked;
-                        stateStore.save(CliState.activeSession(selectedAgent.id(), session.id()));
+                        stateStore.save(CliState.activeSession(selectedAgent.id().value(), session.id().value()));
                         printSessionHeader(selectedAgent, session);
                         printHistory(session, client);
                     }
@@ -224,14 +227,14 @@ public class CliRunner implements CommandLineRunner {
     }
 
     private AgentSession pickOrStartSession(Scanner scanner, AgentDefinition agent,
-                                             Namespace namespace, String userId, AgentClient client) {
-        List<AgentSession> sessions = client.listSessions(agent.id(), namespace, userId);
+                                             UserId userId, AgentClient client) {
+        List<AgentSession> sessions = client.listSessions(agent.id(), userId);
         if (sessions.isEmpty()) {
-            return client.startSession(agent.id(), namespace, userId);
+            return client.startSession(agent.id(), userId);
         }
 
         while (true) {
-            List<AgentSession> current = client.listSessions(agent.id(), namespace, userId);
+            List<AgentSession> current = client.listSessions(agent.id(), userId);
             System.out.println("\nSessions for " + agent.name() + ":");
             System.out.println("  0) [New session]");
             for (int i = 0; i < current.size(); i++) {
@@ -260,20 +263,20 @@ public class CliRunner implements CommandLineRunner {
 
             try {
                 int idx = Integer.parseInt(input);
-                if (idx == 0) return client.startSession(agent.id(), namespace, userId);
+                if (idx == 0) return client.startSession(agent.id(), userId);
                 if (idx >= 1 && idx <= current.size()) {
                     return current.get(idx - 1);
                 }
             } catch (NumberFormatException ignored) {}
 
             System.out.println("[Invalid selection, starting new session.]");
-            return client.startSession(agent.id(), namespace, userId);
+            return client.startSession(agent.id(), userId);
         }
     }
 
     private AgentSession pickSession(Scanner scanner, AgentDefinition agent,
-                                      Namespace namespace, String userId, AgentClient client) {
-        List<AgentSession> sessions = client.listSessions(agent.id(), namespace, userId);
+                                      UserId userId, AgentClient client) {
+        List<AgentSession> sessions = client.listSessions(agent.id(), userId);
         if (sessions.isEmpty()) {
             System.out.println("[No sessions found.]");
             return null;
@@ -301,7 +304,7 @@ public class CliRunner implements CommandLineRunner {
     private String sessionLabel(AgentSession session) {
         String date = DATE_FMT.format(session.startedAt());
         String title = session.title() != null ? session.title() : "(untitled)";
-        return title + "  [" + date + "]  " + session.id().toString().substring(0, 8) + "…";
+        return title + "  [" + date + "]  " + session.id().value().substring(0, 8) + "…";
     }
 
     private void printSessionHeader(AgentDefinition agent, AgentSession session) {
@@ -356,7 +359,7 @@ public class CliRunner implements CommandLineRunner {
     private void renderHistory(AgentSession session, AgentClient client,
                                 List<Message> history, Integer pairLimit) {
         if (history.isEmpty()) {
-            String welcome = client.findAgent(session.namespace(), session.agentDefinitionId())
+            String welcome = client.findAgent(session.agentDefinitionId())
                     .map(AgentDefinition::welcomeMessage).orElse(null);
             if (welcome != null && !welcome.isBlank()) {
                 System.out.println("\nAgent:\n" + welcome);
@@ -423,8 +426,8 @@ public class CliRunner implements CommandLineRunner {
         System.out.println("── End of history ───────────────────────");
     }
 
-    private AgentDefinition selectAgent(Scanner scanner, Namespace namespace, AgentClient client) {
-        List<AgentDefinition> agents = client.listAgents(namespace);
+    private AgentDefinition selectAgent(Scanner scanner, AgentClient client) {
+        List<AgentDefinition> agents = client.listAgents();
         System.out.println("\nAvailable agents:");
         for (int i = 0; i < agents.size(); i++) {
             System.out.println("  " + (i + 1) + ") " + agents.get(i).name()
@@ -444,7 +447,7 @@ public class CliRunner implements CommandLineRunner {
         } catch (NumberFormatException ignored) {}
 
         System.out.println("[Invalid selection, please try again.]");
-        return selectAgent(scanner, namespace, client);
+        return selectAgent(scanner, client);
     }
 
     private void streamAgentResponse(AgentSession session, String userMessage, AgentClient client) {
@@ -641,7 +644,7 @@ public class CliRunner implements CommandLineRunner {
      * uninterruptibly — we never block on stdin, so the next user prompt after
      * the stream finishes still works as before.
      */
-    private Thread startCancelWatcher(UUID sessionId, AgentClient client,
+    private Thread startCancelWatcher(SessionId sessionId, AgentClient client,
                                        java.util.concurrent.atomic.AtomicBoolean streamDone,
                                        java.util.concurrent.atomic.AtomicBoolean cancelSent) {
         Thread t = new Thread(() -> {
@@ -880,7 +883,6 @@ public class CliRunner implements CommandLineRunner {
                 .findFirst().orElse("");
     }
 
-
     private void printBanner() {
         System.out.println("╔══════════════════════════════════════╗");
         System.out.println("║     Mindconnect Agent CLI  v0.1      ║");
@@ -924,7 +926,7 @@ public class CliRunner implements CommandLineRunner {
 
         // Each TOOL_CALL message wraps {"toolCalls":[{id,name,arguments}, ...]}.
         // Flatten into one entry per individual tool call, preserving conversation order.
-        record Entry(int seq, java.util.UUID resultMessageId, String time, String toolName,
+        record Entry(int seq, ai.mindconnect.message.domain.MessageId resultMessageId, String time, String toolName,
                      java.util.Map<String, Object> arguments, String result, Long durationMs) {}
         java.util.List<Entry> entries = new java.util.ArrayList<>();
         com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
@@ -945,7 +947,7 @@ public class CliRunner implements CommandLineRunner {
                     ai.mindconnect.message.domain.Message resultMsg = id != null ? resultsByCallId.get(id) : null;
                     String resultText = "(no result yet)";
                     int seq = m.sequenceNum();
-                    java.util.UUID resultMessageId = null;
+                    ai.mindconnect.message.domain.MessageId resultMessageId = null;
                     Long durationMs = null;
                     if (resultMsg != null) {
                         seq = resultMsg.sequenceNum();
@@ -1168,7 +1170,7 @@ public class CliRunner implements CommandLineRunner {
     }
 
     private void printTools(AgentDefinition agent, AgentClient client) {
-        AgentDefinition fresh = client.findAgent(agent.namespace(), agent.id()).orElse(agent);
+        AgentDefinition fresh = client.findAgent(agent.id()).orElse(agent);
         if (fresh.tools() == null || fresh.tools().isEmpty()) {
             System.out.println("[No tools configured for this agent.]");
             return;
@@ -1256,7 +1258,7 @@ public class CliRunner implements CommandLineRunner {
             // Metadata header as pretty JSON (no content fields here)
             java.util.Map<String, Object> meta = new java.util.LinkedHashMap<>();
             meta.put("id",                   msg.id());
-            meta.put("conversationId",       msg.conversationId());
+            meta.put("conversationId",       msg.conversationId().value());
             meta.put("senderId",             msg.senderId());
             meta.put("senderType",           msg.senderType());
             meta.put("recipientId",          msg.recipientId());
@@ -1354,11 +1356,11 @@ public class CliRunner implements CommandLineRunner {
         static Resume none() { return new Resume(null, null); }
     }
 
-    private Resume resolveResume(CliState state, Namespace namespace, String userId, AgentClient client) {
+    private Resume resolveResume(CliState state, UserId userId, AgentClient client) {
         if (state == null || state.view() == CliState.View.AGENT_LIST || state.lastAgentId() == null) {
             return Resume.none();
         }
-        Optional<AgentDefinition> agentOpt = client.findAgent(namespace, state.lastAgentId());
+        Optional<AgentDefinition> agentOpt = client.findAgent(AgentId.of(state.lastAgentId()));
         if (agentOpt.isEmpty()) {
             // Stale agent — reset and fall back to the main menu.
             stateStore.save(CliState.agentList());
@@ -1368,9 +1370,9 @@ public class CliRunner implements CommandLineRunner {
         if (state.view() == CliState.View.SESSION_LIST || state.lastSessionId() == null) {
             return new Resume(agent, null);
         }
-        UUID wantedId = state.lastSessionId();
-        AgentSession session = client.listSessions(agent.id(), namespace, userId).stream()
-                .filter(s -> s.id().equals(wantedId))
+        String wantedId = state.lastSessionId();
+        AgentSession session = client.listSessions(agent.id(), userId).stream()
+                .filter(s -> s.id().value().equals(wantedId))
                 .findFirst()
                 .orElse(null);
         if (session == null) {

@@ -37,9 +37,14 @@ public final class PgVectorStore implements VectorStore {
 
     private volatile boolean tableReady;
 
-    public PgVectorStore(DataSource dataSource, String id) {
+    /** {@code vs_<namespace>__}: every table of one namespace starts with it. */
+    static String tablePrefix(String namespace) {
+        return "vs_" + namespace.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_") + "__";
+    }
+
+    public PgVectorStore(DataSource dataSource, String namespace, String id) {
         this.id = id;
-        this.table = "vs_" + id.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
+        this.table = tablePrefix(namespace) + id.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_]", "_");
         this.dataSource = dataSource;
     }
 

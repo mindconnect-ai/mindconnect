@@ -10,7 +10,7 @@ var backend = new AgentRuntimeBackend(runtime.chatService(), runtime.sessionServ
         runtime.agentDefinitions(), runtime.conversationManager(), "user-1")
         .withFiles(runtime.fileStore(), runtime::attachStored);   // optional: Files surface
 
-Session s = backend.open("default", "travel-assistant");
+Session s = backend.open("travel-assistant");
 Response r = backend.create(ResponseRequest.text(s.id(), "Find me a hotel in Lisbon"));
 r.output();        // FunctionCall/Output pairs, AgentCall pairs, final Message
 r.outputText();    // the answer

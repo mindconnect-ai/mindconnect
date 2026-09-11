@@ -119,7 +119,7 @@ public final class ChatPage {
 
         if (session.parentSessionId() != null) {
             items.add(ai.mindconnect.ui.model.UiMenuItem.link("parent", "Parent session",
-                    "/chat/sessions/" + session.parentSessionId()).icon("arrow-up"));
+                    "/chat/sessions/" + session.parentSessionId().value()).icon("arrow-up"));
         }
         // Only a chat that references a registry agent has an agent to go
         // back to. An inline session agent's id resolves to nothing, so the
@@ -193,13 +193,13 @@ public final class ChatPage {
      * Files land in the session's vector store via the ingestion workflow,
      * and vector_search activates for the session.
      */
-    public static ai.mindconnect.ui.model.UiUpload attachZone(java.util.UUID sessionId) {
+    public static ai.mindconnect.ui.model.UiUpload attachZone(ai.mindconnect.agent.SessionId sessionId) {
         return ai.mindconnect.ui.model.UiUpload
                 .of("chat-attach", null)
                 .multiple()
                 .dropText("Attach files (searchable by the agent)")
                 .buttonLabel("Attach…")
-                .uploadTo("/chat/api/sessions/" + sessionId + "/chat-files");
+                .uploadTo("/chat/api/sessions/" + sessionId.value() + "/chat-files");
     }
 
     /**
@@ -215,16 +215,16 @@ public final class ChatPage {
         // No attachment strip above the input: the files live behind the "+",
         // which carries their count. A panel that is empty most of the time
         // should not take a row away from the conversation.
-        var chatPanel = UiSection.of("chat-panel-" + session.id(), null)
+        var chatPanel = UiSection.of("chat-panel-" + session.id().value(), null)
                 .section("messages", null,
                         ai.mindconnect.ui.model.UiScrollPane
-                                .of("chat-scroll-" + session.id(), messages.render())
+                                .of("chat-scroll-" + session.id().value(), messages.render())
                                 .stickToLatest(true))
                 .section("input",    null, chatForm.render());
 
         // Stable class so the stylesheet can size the conversation without
         // reaching for the session id.
-        return UiSection.of("session-" + session.id(), null)
+        return UiSection.of("session-" + session.id().value(), null)
                 .section("chat", null, chatPanel)
                 .withCssClass("chat-conversation");
     }
@@ -235,7 +235,7 @@ public final class ChatPage {
     }
 
     public UiPage render() {
-        var page = UiPage.of("/chat/sessions/" + session.id(), renderContent());
+        var page = UiPage.of("/chat/sessions/" + session.id().value(), renderContent());
         if (activeStreams != null && !activeStreams.isEmpty()) {
             page.setActiveStreams(activeStreams);
         }

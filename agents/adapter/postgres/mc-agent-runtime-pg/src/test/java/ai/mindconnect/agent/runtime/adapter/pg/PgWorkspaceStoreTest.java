@@ -1,28 +1,35 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.nio.charset.StandardCharsets;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PgWorkspaceStoreTest {
 
-    private final UUID agent = UUID.randomUUID();
-    private final UUID session = UUID.randomUUID();
+    private static final Namespace NS = new Namespace("test");
+    private static final UserId DAVID = UserId.of("david");
+    private static final UserId EVE = UserId.of("eve");
+
+    private final AgentId agent = AgentId.random();
+    private final SessionId session = SessionId.random();
     private PgWorkspaceStore store;
 
     @BeforeEach
     void setUp() {
-        store = new PgWorkspaceStore(TestDb.fresh("mc_workspace_file")).initSchema();
+        store = new PgWorkspaceStore(TestDb.fresh("mc_workspace_file"), NS).initSchema();
     }
 
     @Test
     void aFileIsWrittenReadListedAndDeletedWithinItsScope() {
-        WorkspaceScope scope = WorkspaceScope.session(agent, "david", session);
+        WorkspaceScope scope = WorkspaceScope.session(agent, DAVID, session);
         store.write(scope, "notes.md", "# Notes\n\n");
         store.write(scope, "a.txt", "a");
 
@@ -45,15 +52,15 @@ class PgWorkspaceStoreTest {
 
     @Test
     void theThreeScopesOfOneUserDoNotSeeEachOther() {
-        store.write(WorkspaceScope.user("david"), "f.txt", "user");
-        store.write(WorkspaceScope.agentUser(agent, "david"), "f.txt", "agent-user");
-        store.write(WorkspaceScope.session(agent, "david", session), "f.txt", "session");
-        store.write(WorkspaceScope.user("eve"), "f.txt", "eve");
+        store.write(WorkspaceScope.user(DAVID), "f.txt", "user");
+        store.write(WorkspaceScope.agentUser(agent, DAVID), "f.txt", "agent-user");
+        store.write(WorkspaceScope.session(agent, DAVID, session), "f.txt", "session");
+        store.write(WorkspaceScope.user(EVE), "f.txt", "eve");
 
-        assertThat(store.read(WorkspaceScope.user("david"), "f.txt")).contains("user");
-        assertThat(store.read(WorkspaceScope.agentUser(agent, "david"), "f.txt")).contains("agent-user");
-        assertThat(store.read(WorkspaceScope.session(agent, "david", session), "f.txt")).contains("session");
-        assertThat(store.read(WorkspaceScope.session(agent, "david", UUID.randomUUID()), "f.txt")).isEmpty();
-        assertThat(store.list(WorkspaceScope.user("eve"))).containsExactly("f.txt");
+        assertThat(store.read(WorkspaceScope.user(DAVID), "f.txt")).contains("user");
+        assertThat(store.read(WorkspaceScope.agentUser(agent, DAVID), "f.txt")).contains("agent-user");
+        assertThat(store.read(WorkspaceScope.session(agent, DAVID, session), "f.txt")).contains("session");
+        assertThat(store.read(WorkspaceScope.session(agent, DAVID, SessionId.random()), "f.txt")).isEmpty();
+        assertThat(store.list(WorkspaceScope.user(EVE))).containsExactly("f.txt");
     }
 }

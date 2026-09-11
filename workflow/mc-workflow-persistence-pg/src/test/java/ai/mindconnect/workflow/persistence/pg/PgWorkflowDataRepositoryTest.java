@@ -13,7 +13,7 @@ class PgWorkflowDataRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        repo = new PgWorkflowDataRepository(TestDb.fresh("mc_workflow")).initSchema();
+        repo = new PgWorkflowDataRepository(TestDb.fresh("mc_workflow"), "test").initSchema();
     }
 
     private static WorkflowData workflow(String name) {

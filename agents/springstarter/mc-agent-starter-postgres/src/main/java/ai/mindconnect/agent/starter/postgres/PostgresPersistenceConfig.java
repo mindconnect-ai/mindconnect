@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.postgres;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.adapter.pg.PgAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgConversationSummaryRepository;
@@ -82,6 +83,16 @@ public class PostgresPersistenceConfig {
         return new HikariDataSource(config);
     }
 
+    /**
+     * The one namespace this JVM runs in ({@code mindconnect.namespace}, default
+     * {@code local}). Every repository is bound to it when it is built; nothing
+     * above the repositories names it.
+     */
+    @Bean
+    Namespace mindconnectNamespace(@Value("${mindconnect.namespace:local}") String namespace) {
+        return new Namespace(namespace);
+    }
+
     @Bean
     Sql mindconnectSql(DataSource mindconnectDataSource, ObjectMapper objectMapper) {
         return Sql.of(mindconnectDataSource, new Json(objectMapper));
@@ -90,52 +101,52 @@ public class PostgresPersistenceConfig {
     // ── agent runtime ───────────────────────────────────────────────────────
 
     @Bean
-    AgentDefinitionRepository agentDefinitionRepository(Sql mindconnectSql) {
-        return new PgAgentDefinitionRepository(mindconnectSql).initSchema();
+    AgentDefinitionRepository agentDefinitionRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgAgentDefinitionRepository(mindconnectSql, namespace).initSchema();
     }
 
     @Bean
-    AgentSessionRepository agentSessionRepository(Sql mindconnectSql) {
-        return new PgAgentSessionRepository(mindconnectSql).initSchema();
+    AgentSessionRepository agentSessionRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgAgentSessionRepository(mindconnectSql, namespace).initSchema();
     }
 
     @Bean
     LlmCallTraceRepository llmCallTraceRepository(
-            Sql mindconnectSql,
+            Sql mindconnectSql, Namespace namespace,
             @Value("${mindconnect.agent.trace.max-per-session:50}") int maxPerConversation) {
-        return new PgLlmCallTraceRepository(mindconnectSql, maxPerConversation).initSchema();
+        return new PgLlmCallTraceRepository(mindconnectSql, maxPerConversation, namespace).initSchema();
     }
 
     @Bean
-    TodoListRepository todoListRepository(Sql mindconnectSql) {
-        return new PgTodoListRepository(mindconnectSql).initSchema();
+    TodoListRepository todoListRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgTodoListRepository(mindconnectSql, namespace).initSchema();
     }
 
     @Bean
-    ConversationSummaryRepository conversationSummaryRepository(Sql mindconnectSql) {
-        return new PgConversationSummaryRepository(mindconnectSql).initSchema();
+    ConversationSummaryRepository conversationSummaryRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgConversationSummaryRepository(mindconnectSql, namespace).initSchema();
     }
 
     @Bean
-    WorkingMemoryRepository workingMemoryRepository(Sql mindconnectSql) {
-        return new PgWorkingMemoryRepository(mindconnectSql).initSchema();
+    WorkingMemoryRepository workingMemoryRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgWorkingMemoryRepository(mindconnectSql, namespace).initSchema();
     }
 
     @Bean
-    WorkspaceStore workspaceStore(Sql mindconnectSql) {
-        return new PgWorkspaceStore(mindconnectSql).initSchema();
+    WorkspaceStore workspaceStore(Sql mindconnectSql, Namespace namespace) {
+        return new PgWorkspaceStore(mindconnectSql, namespace).initSchema();
     }
 
     // ── messages ────────────────────────────────────────────────────────────
 
     @Bean
-    ConversationRepository conversationRepository(Sql mindconnectSql) {
-        return new PgConversationRepository(mindconnectSql).initSchema();
+    ConversationRepository conversationRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgConversationRepository(mindconnectSql, namespace).initSchema();
     }
 
     @Bean
-    MessageRepository messageRepository(Sql mindconnectSql) {
-        return new PgMessageRepository(mindconnectSql).initSchema();
+    MessageRepository messageRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgMessageRepository(mindconnectSql, namespace).initSchema();
     }
 
     // ── files ───────────────────────────────────────────────────────────────
@@ -146,25 +157,25 @@ public class PostgresPersistenceConfig {
      * may well keep its records in Postgres and its files on a volume.
      */
     @Bean
-    FileStore fileStore(Sql mindconnectSql,
+    FileStore fileStore(Sql mindconnectSql, Namespace namespace,
                         @Value("${mindconnect.file-store.backend:postgres}") String backend,
-                        @Value("${mindconnect.file-store.dir:data/files}") String dir) {
+                        @Value("${mindconnect.data.base-dir:data}") String baseDir) {
         if ("postgres".equals(backend)) {
-            return new PgFileStore(mindconnectSql).initSchema();
+            return new PgFileStore(mindconnectSql, namespace).initSchema();
         }
         return FileStoreBackend.byType(backend)
                 .orElseThrow(() -> new IllegalStateException("No file-store backend '" + backend
                         + "' on the classpath (available: "
                         + FileStoreBackend.discover().stream().map(FileStoreBackend::type).toList() + ")"))
-                .open(Map.of("dir", dir));
+                .open(Map.of("baseDir", baseDir, "namespace", namespace.value()));
     }
 
     // ── llm ─────────────────────────────────────────────────────────────────
 
     /** Encrypted at rest exactly as the file store is: the decorator does not care where the rows live. */
     @Bean
-    LlmConfigRepository llmConfigRepository(Sql mindconnectSql, EncryptionHelper encryptionHelper) {
+    LlmConfigRepository llmConfigRepository(Sql mindconnectSql, Namespace namespace, EncryptionHelper encryptionHelper) {
         return new EncryptingLlmConfigRepository(
-                new PgLlmConfigRepository(mindconnectSql).initSchema(), encryptionHelper);
+                new PgLlmConfigRepository(mindconnectSql, namespace).initSchema(), encryptionHelper);
     }
 }

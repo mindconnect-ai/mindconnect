@@ -1,5 +1,9 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.MessageId;
+
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -11,7 +15,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Re-hydrates a previously evicted tool result by message id.
@@ -31,11 +34,11 @@ public class FetchToolResultTool implements Tool {
 
     private final MessageRepository messageRepository;
     private final AgentSessionRepository sessionRepository;
-    private final UUID sessionId;
+    private final SessionId sessionId;
 
     public FetchToolResultTool(MessageRepository messageRepository,
                                AgentSessionRepository sessionRepository,
-                               UUID sessionId) {
+                               SessionId sessionId) {
         this.messageRepository = messageRepository;
         this.sessionRepository = sessionRepository;
         this.sessionId = sessionId;
@@ -72,25 +75,25 @@ public class FetchToolResultTool implements Tool {
         String idStr = (String) arguments.get("id");
         if (idStr == null || idStr.isBlank()) return "Error: id is required";
 
-        UUID messageId;
-        try {
-            messageId = UUID.fromString(idStr.trim());
-        } catch (IllegalArgumentException e) {
-            return "Error: id is not a valid UUID: " + idStr;
-        }
-
         Optional<AgentSession> sess = sessionRepository.findById(sessionId);
         if (sess.isEmpty()) return "Error: session not found";
-        UUID conversationId = sess.get().conversationId();
+        ConversationId conversationId = sess.get().conversationId();
+
+        MessageId messageId;
+        try {
+            messageId = MessageId.of(idStr.trim());
+        } catch (IllegalArgumentException e) {
+            return "Error: id is not a valid message id: " + idStr;
+        }
 
         Optional<Message> msg = messageRepository.findById(conversationId, messageId);
         if (msg.isEmpty()) {
             log.warn("fetch_tool_result: message {} not found in conversation {}", messageId, conversationId);
-            return "Error: no message with id " + messageId + " in this session";
+            return "Error: no message with id " + messageId.value() + " in this session";
         }
         Message m = msg.get();
         if (m.type() != MessageType.TOOL_RESULT) {
-            return "Error: message " + messageId + " is not a tool result (type=" + m.type() + ")";
+            return "Error: message " + messageId.value() + " is not a tool result (type=" + m.type() + ")";
         }
         return m.content();
     }

@@ -79,7 +79,7 @@ public final class ToolCallHistory {
 
                 boolean isSubAgent = "run_agent".equals(toolName) || "run_agents".equals(toolName);
                 boolean failed     = result != null && result.startsWith("Error:");
-                String key = callId.isEmpty() ? ("task-hist-" + m.id()) : callId;
+                String key = callId.isEmpty() ? ("task-hist-" + m.id().value()) : callId;
 
                 // Sub-agent call WITH a persisted result → done. Prefer the
                 // recursively-built nested tree (child sessions found by
@@ -109,7 +109,7 @@ public final class ToolCallHistory {
                 }
 
                 String body = TaskCardComponent.taskCardBody(argsByCallId.get(callId), result);
-                String nodeId = "task-hist-" + m.id();
+                String nodeId = "task-hist-" + m.id().value();
                 byCallId.put(key, List.of(TaskCardComponent.historic(nodeId, header, body)));
             } catch (Exception ignored) {}
         }

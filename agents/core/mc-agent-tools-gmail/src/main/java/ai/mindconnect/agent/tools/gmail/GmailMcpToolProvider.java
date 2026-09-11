@@ -124,7 +124,7 @@ public final class GmailMcpToolProvider implements MultiToolProvider {
                 sub.description(),
                 sub.inputSchema(),
                 registry,
-                scope.sessionId(),
+                scope.sessionId() == null ? null : scope.sessionId().value(),
                 PROVIDER_KEY,
                 GmailMcpToolProvider::spawn));
     }

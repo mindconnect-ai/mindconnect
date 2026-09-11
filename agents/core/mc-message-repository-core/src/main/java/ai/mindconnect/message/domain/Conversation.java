@@ -1,14 +1,10 @@
 package ai.mindconnect.message.domain;
 
-import ai.mindconnect.agent.Namespace;
-
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 public record Conversation(
-        UUID id,
-        Namespace namespace,
+        ConversationId id,
         String topic,
         ConversationType type,
         ConversationStatus status,
@@ -16,10 +12,21 @@ public record Conversation(
         Instant createdAt,
         Instant updatedAt
 ) {
-    public static Conversation create(Namespace namespace, String topic,
+    /**
+     * A new, open conversation under an id the caller chose — the participants
+     * carry that id already, which is why the caller and not this factory
+     * draws it ({@code ConversationId.random()}).
+     */
+    public static Conversation create(ConversationId id, String topic,
                                        ConversationType type, List<Participant> participants) {
+        for (Participant p : participants) {
+            if (!p.conversationId().equals(id)) {
+                throw new IllegalArgumentException(
+                        "Participant " + p.id() + " does not belong to conversation " + id);
+            }
+        }
         Instant now = Instant.now();
-        return new Conversation(UUID.randomUUID(), namespace, topic, type,
-                ConversationStatus.OPEN, participants, now, now);
+        return new Conversation(id, topic, type, ConversationStatus.OPEN, participants, now, now);
     }
+
 }

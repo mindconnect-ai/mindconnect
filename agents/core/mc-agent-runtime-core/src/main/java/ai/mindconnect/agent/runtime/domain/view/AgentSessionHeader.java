@@ -2,10 +2,12 @@ package ai.mindconnect.agent.runtime.domain.view;
 
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.UserId;
 
 import java.time.Instant;
-import java.util.UUID;
 
 /**
  * A session as a list shows it: every scalar of {@link AgentSession}, none
@@ -19,15 +21,14 @@ import java.util.UUID;
  */
 public interface AgentSessionHeader {
 
-    UUID id();
+    SessionId id();
 
-    UUID agentDefinitionId();
+    AgentId agentDefinitionId();
 
-    Namespace namespace();
 
-    String userId();
+    UserId userId();
 
-    UUID conversationId();
+    ConversationId conversationId();
 
     String title();
 
@@ -37,5 +38,5 @@ public interface AgentSessionHeader {
 
     Instant completedAt();
 
-    UUID parentSessionId();
+    SessionId parentSessionId();
 }

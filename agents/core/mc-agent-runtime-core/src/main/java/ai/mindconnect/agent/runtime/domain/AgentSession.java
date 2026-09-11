@@ -1,20 +1,22 @@
 package ai.mindconnect.agent.runtime.domain;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.SessionId;
+
+import ai.mindconnect.agent.AgentId;
+
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.UserId;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Instant;
-import java.util.UUID;
 
 public record AgentSession(
-        UUID id,
-        UUID agentDefinitionId,
-        Namespace namespace,
-        String userId,
-        UUID conversationId,
+        SessionId id,
+        AgentId agentDefinitionId,
+        UserId userId,
+        ConversationId conversationId,
         String title,
         SessionStatus status,
         Instant startedAt,
@@ -24,14 +26,14 @@ public record AgentSession(
          * another session, the id of that parent session. {@code null}
          * for top-level (user-initiated) sessions.
          */
-        UUID parentSessionId,
+        SessionId parentSessionId,
         /**
          * If this session was spawned by a {@code run_agent} call, the
          * id of the parent's chat-turn that triggered the spawn.
          * {@code null} for top-level sessions. Lets the trace UI link
          * back to the exact roundtrip in the parent's history.
          */
-        UUID parentTurnId,
+        ChatTurnId parentTurnId,
         /**
          * If this session was spawned by a {@code run_agent} call, the
          * {@code tool_call_id} of the parent's TOOL_CALL message that
@@ -78,8 +80,8 @@ public record AgentSession(
          * <p>A list because a session will eventually host several agents
          * talking to each other; today anything but one entry is a bug.
          */
-        java.util.List<SessionAgent> sessionAgents
-) implements AgentSessionHeader {
+        java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> sessionAgents
+) implements ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader {
     public AgentSession {
         if (activatedTools == null) activatedTools = java.util.List.of();
         if (attachedFiles == null) attachedFiles = java.util.List.of();
@@ -91,7 +93,7 @@ public record AgentSession(
         // nothing, so every turn would fail with a confusing notFound.
         if (!sessionAgents.isEmpty()) {
             long mains = sessionAgents.stream()
-                    .filter(SessionAgent::main).count();
+                    .filter(ai.mindconnect.agent.runtime.domain.session.SessionAgent::main).count();
             if (mains != 1) {
                 throw new IllegalArgumentException(
                         "A session needs exactly one main agent, found " + mains);
@@ -100,22 +102,22 @@ public record AgentSession(
     }
 
     /** Pre-activatedTools constructor: nothing activated. */
-    public AgentSession(UUID id, UUID agentDefinitionId, Namespace namespace, String userId,
-                        UUID conversationId, String title, SessionStatus status,
-                        Instant startedAt, Instant completedAt, UUID parentSessionId,
-                        UUID parentTurnId, String parentToolCallId) {
-        this(id, agentDefinitionId, namespace, userId, conversationId, title, status,
+    public AgentSession(SessionId id, AgentId agentDefinitionId, UserId userId,
+                        ConversationId conversationId, String title, SessionStatus status,
+                        Instant startedAt, Instant completedAt, SessionId parentSessionId,
+                        ChatTurnId parentTurnId, String parentToolCallId) {
+        this(id, agentDefinitionId, userId, conversationId, title, status,
                 startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
                 java.util.List.of(), java.util.List.of(), java.util.Set.of(), java.util.List.of());
     }
 
     /** Pre-approvedTools constructor: nothing approved yet. */
-    public AgentSession(UUID id, UUID agentDefinitionId, Namespace namespace, String userId,
-                        UUID conversationId, String title, SessionStatus status,
-                        Instant startedAt, Instant completedAt, UUID parentSessionId,
-                        UUID parentTurnId, String parentToolCallId,
+    public AgentSession(SessionId id, AgentId agentDefinitionId, UserId userId,
+                        ConversationId conversationId, String title, SessionStatus status,
+                        Instant startedAt, Instant completedAt, SessionId parentSessionId,
+                        ChatTurnId parentTurnId, String parentToolCallId,
                         java.util.List<String> activatedTools, java.util.List<AttachedFile> attachedFiles) {
-        this(id, agentDefinitionId, namespace, userId, conversationId, title, status,
+        this(id, agentDefinitionId, userId, conversationId, title, status,
                 startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
                 activatedTools, attachedFiles, java.util.Set.of(), java.util.List.of());
     }
@@ -124,7 +126,7 @@ public record AgentSession(
     public AgentSession withApprovedTool(String toolName) {
         java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(approvedTools);
         merged.add(toolName);
-        return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
+        return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, activatedTools, attachedFiles, java.util.Set.copyOf(merged), sessionAgents);
     }
@@ -133,7 +135,7 @@ public record AgentSession(
     public AgentSession withActivatedTools(java.util.Collection<String> names) {
         java.util.LinkedHashSet<String> merged = new java.util.LinkedHashSet<>(activatedTools);
         merged.addAll(names);
-        return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
+        return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, java.util.List.copyOf(merged), attachedFiles, approvedTools, sessionAgents);
     }
@@ -147,14 +149,14 @@ public record AgentSession(
         java.util.LinkedHashMap<String, AttachedFile> merged = new java.util.LinkedHashMap<>();
         for (AttachedFile f : attachedFiles) merged.put(f.name(), f);
         for (AttachedFile f : files) merged.put(f.name(), f);
-        return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
+        return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, activatedTools, java.util.List.copyOf(merged.values()), approvedTools, sessionAgents);
     }
 
     /** This session without the attached file of the given name. */
     public AgentSession withoutAttachedFile(String name) {
-        return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
+        return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, activatedTools,
                 attachedFiles.stream().filter(f -> !f.name().equals(name)).toList(), approvedTools, sessionAgents);
@@ -173,24 +175,26 @@ public record AgentSession(
     /** Jackson deserialisation — unknown legacy fields (compressionWatermark, lastCompressedAt) are silently ignored. */
     @JsonCreator
     public static AgentSession fromJson(
-            @JsonProperty("id")                UUID id,
-            @JsonProperty("agentDefinitionId") UUID agentDefinitionId,
-            @JsonProperty("namespace")         Namespace namespace,
+            @JsonProperty("id")                String id,
+            @JsonProperty("agentDefinitionId") String agentDefinitionId,
             @JsonProperty("userId")            String userId,
-            @JsonProperty("conversationId")    UUID conversationId,
+            @JsonProperty("conversationId")    String conversationId,
             @JsonProperty("title")             String title,
             @JsonProperty("status")            SessionStatus status,
             @JsonProperty("startedAt")         Instant startedAt,
             @JsonProperty("completedAt")       Instant completedAt,
-            @JsonProperty("parentSessionId")   UUID parentSessionId,
-            @JsonProperty("parentTurnId")      UUID parentTurnId,
+            @JsonProperty("parentSessionId")   String parentSessionId,
+            @JsonProperty("parentTurnId")      String parentTurnId,
             @JsonProperty("parentToolCallId")  String parentToolCallId,
             @JsonProperty("activatedTools")    java.util.List<String> activatedTools,
             @JsonProperty("attachedFiles")     java.util.List<AttachedFile> attachedFiles,
             @JsonProperty("approvedTools")     java.util.Set<String> approvedTools,
-            @JsonProperty("sessionAgents")     java.util.List<SessionAgent> sessionAgents) {
-        return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
-                title, status, startedAt, completedAt, parentSessionId, parentTurnId,
+            @JsonProperty("sessionAgents")     java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> sessionAgents) {
+        return new AgentSession(new SessionId(id), new AgentId(agentDefinitionId),
+                new UserId(userId), new ConversationId(conversationId),
+                title, status, startedAt, completedAt,
+                parentSessionId == null ? null : new SessionId(parentSessionId),
+                parentTurnId == null ? null : new ChatTurnId(parentTurnId),
                 parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
     }
 
@@ -199,24 +203,23 @@ public record AgentSession(
      * session agents existed (then {@link #agentDefinitionId} is the whole
      * story, exactly as before).
      */
-    public java.util.Optional<SessionAgent> mainAgent() {
+    public java.util.Optional<ai.mindconnect.agent.runtime.domain.session.SessionAgent> mainAgent() {
         return sessionAgents.stream()
-                .filter(SessionAgent::main)
+                .filter(ai.mindconnect.agent.runtime.domain.session.SessionAgent::main)
                 .findFirst();
     }
 
     /** This session with its agents replaced. */
     public AgentSession withSessionAgents(
-            java.util.List<SessionAgent> agents) {
-        return new AgentSession(id, agentDefinitionId, namespace, userId, conversationId,
+            java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> agents) {
+        return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, activatedTools, attachedFiles, approvedTools, agents);
     }
 
     /** Top-level session — no parent linkage. */
-    public static AgentSession start(UUID agentDefinitionId, Namespace namespace,
-                                     String userId, UUID conversationId) {
-        return startSubAgent(agentDefinitionId, namespace, userId, conversationId, null, null, null);
+    public static AgentSession start(AgentId agentDefinitionId, UserId userId, ConversationId conversationId) {
+        return startSubAgent(agentDefinitionId, userId, conversationId, null, null, null);
     }
 
     /**
@@ -226,29 +229,29 @@ public record AgentSession(
      * session back to the specific TOOL_CALL message in the parent's
      * history that spawned it — keeps parallel sub-agents addressable.
      */
-    public static AgentSession startSubAgent(UUID agentDefinitionId, Namespace namespace,
-                                              String userId, UUID conversationId,
-                                              UUID parentSessionId, UUID parentTurnId,
+    public static AgentSession startSubAgent(AgentId agentDefinitionId, UserId userId,
+                                              ConversationId conversationId,
+                                              SessionId parentSessionId, ChatTurnId parentTurnId,
                                               String parentToolCallId) {
-        return new AgentSession(UUID.randomUUID(), agentDefinitionId, namespace,
+        return new AgentSession(SessionId.random(), agentDefinitionId,
                 userId, conversationId, null, SessionStatus.ACTIVE, Instant.now(), null,
                 parentSessionId, parentTurnId, parentToolCallId);
     }
 
     public AgentSession withTitle(String title) {
-        return new AgentSession(id, agentDefinitionId, namespace, userId,
+        return new AgentSession(id, agentDefinitionId, userId,
                 conversationId, title, status, startedAt, completedAt,
                 parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
     }
 
     public AgentSession complete() {
-        return new AgentSession(id, agentDefinitionId, namespace, userId,
+        return new AgentSession(id, agentDefinitionId, userId,
                 conversationId, title, SessionStatus.COMPLETED, startedAt, Instant.now(),
                 parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
     }
 
     public AgentSession error() {
-        return new AgentSession(id, agentDefinitionId, namespace, userId,
+        return new AgentSession(id, agentDefinitionId, userId,
                 conversationId, title, SessionStatus.ERROR, startedAt, Instant.now(),
                 parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
     }

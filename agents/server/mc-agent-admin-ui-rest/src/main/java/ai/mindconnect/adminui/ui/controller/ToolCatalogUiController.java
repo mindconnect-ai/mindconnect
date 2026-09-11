@@ -9,7 +9,7 @@ import ai.mindconnect.adminui.ui.page.ToolListPage;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.ui.model.UiDialog;
@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Read-only catalog of all tools the runtime can provide. Mirrors the
@@ -43,15 +42,13 @@ public class ToolCatalogUiController {
     private static final Logger log = LoggerFactory.getLogger(ToolCatalogUiController.class);
 
     private final ToolRegistry toolRegistry;
-    private final Namespace defaultNamespace;
     private final ToolTestService toolTestService;
     private final AdminLayoutFactory layoutFactory;
 
-    public ToolCatalogUiController(ToolRegistry toolRegistry, Namespace defaultNamespace,
+    public ToolCatalogUiController(ToolRegistry toolRegistry,
                                  ToolTestService toolTestService,
                                  AdminLayoutFactory layoutFactory) {
         this.toolRegistry = toolRegistry;
-        this.defaultNamespace = defaultNamespace;
         this.toolTestService = toolTestService;
         this.layoutFactory = layoutFactory;
     }
@@ -111,8 +108,8 @@ public class ToolCatalogUiController {
     public ai.mindconnect.ui.model.UiPatch runTest(@PathVariable String name,
                                                    @RequestBody Map<String, Object> raw) {
         String argsJson = new FormBody(raw).str("arguments");
-        var agentTool = AgentTool.of(new UUID(0, 0), name);
-        ToolTestService.Result result = toolTestService.test(defaultNamespace, agentTool, argsJson);
+        var agentTool = AgentTool.of(name);
+        ToolTestService.Result result = toolTestService.test(agentTool, argsJson);
         return toolTestDialog(name, argsJson, result);
     }
 
@@ -136,7 +133,7 @@ public class ToolCatalogUiController {
     private ai.mindconnect.ui.model.UiPatch toolTestDialog(String name, String previousJson,
                                                            ToolTestService.Result result) {
         var component = new ToolCatalogTestComponent(
-                name, defaultNamespace, toolRegistry, previousJson, result);
+                name, toolRegistry, previousJson, result);
         UiDialog dialog = UiDialog.of(component.title(), null, component.render());
         dialog.setId("tool-test-dialog");
         return ai.mindconnect.ui.model.UiPatch.of()
@@ -160,10 +157,10 @@ public class ToolCatalogUiController {
      * a row, just without schema details.
      */
     private ToolCatalogComponent.Entry describe(String group, String name) {
-        AgentTool ref = AgentTool.of(UUID.randomUUID(), name);
+        AgentTool ref = AgentTool.of(name);
         Object overrides = toolRegistry.overridesSchema(name);
         try {
-            var resolved = toolRegistry.resolve(ref, defaultNamespace, null, null);
+            var resolved = toolRegistry.resolve(ref, ToolCallScope.detached(null));
             if (resolved.isPresent()) {
                 Tool tool = resolved.get();
                 return new ToolCatalogComponent.Entry(group, name, tool.description(),

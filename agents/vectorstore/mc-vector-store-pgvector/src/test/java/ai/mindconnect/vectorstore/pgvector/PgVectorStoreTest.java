@@ -39,7 +39,7 @@ class PgVectorStoreTest {
 
         String storeId = "it_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
         VectorStore store = new PgVectorBackend().open(storeId, Map.of(
-                "url", URL, "user", USER, "password", PASSWORD));
+                "url", URL, "user", USER, "password", PASSWORD, "namespace", "test"));
 
         store.upsert(List.of(
                 new VectorChunk("a", "f1", 0, "alpha text", Map.of("k", "v"), new float[]{1f, 0f, 0f}),
@@ -73,7 +73,7 @@ class PgVectorStoreTest {
         ds.setPassword(PASSWORD);
 
         String storeId = "it_ds_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
-        VectorStore store = new PgVectorStore(ds, storeId);
+        VectorStore store = new PgVectorStore(ds, "test", storeId);
 
         store.upsert(List.of(
                 new VectorChunk("x", "f1", 0, "x text", Map.of(), new float[]{1f, 0f}),
@@ -83,5 +83,20 @@ class PgVectorStoreTest {
         assertThat(store.listFiles()).containsEntry("f1", 2L);
         store.deleteFile("f1");
         assertThat(store.chunkCount()).isZero();
+    }
+
+    @Test
+    void storesOfTwoNamespacesDoNotMix() {
+        assumeTrue(reachable(), "no pgvector database reachable — skipping");
+
+        String storeId = "it_ns_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        Map<String, String> a = Map.of("url", URL, "user", USER, "password", PASSWORD, "namespace", "test");
+        Map<String, String> b = Map.of("url", URL, "user", USER, "password", PASSWORD, "namespace", "other");
+        new PgVectorBackend().open(storeId, a).upsert(List.of(
+                new VectorChunk("x", "f1", 0, "x text", Map.of(), new float[]{1f, 0f})));
+
+        assertThat(new PgVectorBackend().open(storeId, b).chunkCount()).isZero();
+        assertThat(new PgVectorBackend().listStores(a)).contains(storeId);
+        assertThat(new PgVectorBackend().listStores(b)).doesNotContain(storeId);
     }
 }

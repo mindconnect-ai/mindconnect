@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
 import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
 import org.slf4j.Logger;
@@ -26,8 +27,8 @@ public class FileWorkspaceStore implements WorkspaceStore {
 
     private final Path baseDir;
 
-    public FileWorkspaceStore(Path baseDir) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+    public FileWorkspaceStore(Path baseDir, Namespace namespace) {
+        this.baseDir = baseDir.resolve(namespace.value()).toAbsolutePath().normalize();
     }
 
     /** Exposes the base directory so the file-based impl can hand paths to agents via system prompt. */
@@ -124,19 +125,19 @@ public class FileWorkspaceStore implements WorkspaceStore {
         return switch (scope.type()) {
             case USER       -> baseDir
                                 .resolve("users")
-                                .resolve(sanitize(scope.userId()))
+                                .resolve(sanitize(scope.userId().value()))
                                 .resolve("workspace");
             case AGENT_USER -> baseDir
                                 .resolve("users")
-                                .resolve(sanitize(scope.userId()))
+                                .resolve(sanitize(scope.userId().value()))
                                 .resolve("agents")
-                                .resolve(scope.agentId().toString())
+                                .resolve(scope.agentId().value())
                                 .resolve("workspace");
             case SESSION    -> baseDir
                                 .resolve("users")
-                                .resolve(sanitize(scope.userId()))
+                                .resolve(sanitize(scope.userId().value()))
                                 .resolve("sessions")
-                                .resolve(scope.sessionId().toString())
+                                .resolve(scope.sessionId().value())
                                 .resolve("workspace");
         };
     }

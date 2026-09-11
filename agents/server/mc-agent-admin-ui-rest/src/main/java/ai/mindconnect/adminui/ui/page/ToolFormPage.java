@@ -31,8 +31,8 @@ public final class ToolFormPage extends AdminPage {
     @Override
     public UiPage render() {
         String url = tool == null
-                ? "/admin/agents/" + agent.id() + "/tools/new"
-                : "/admin/agents/" + agent.id() + "/tools/" + tool.id() + "/edit";
+                ? "/admin/agents/" + agent.id().value() + "/tools/new"
+                : "/admin/agents/" + agent.id().value() + "/tools/" + tool.id().value() + "/edit";
         return UiPage.of(url,
                 new ToolFormComponent(agent, tool, toolRegistry).render());
     }

@@ -3,8 +3,10 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -12,15 +14,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * One-shot execution of an {@link AgentTool} with admin-supplied JSON
  * arguments. Powers the "Test" button on the tool-detail page so an
  * admin can verify a tool's wiring without going through an agent.
  *
- * <p>Each test runs in a synthetic session ({@code sessionId =
- * randomUUID()}, {@code userId = "admin-test"}). Session-scoped tools
+ * <p>Each test runs in a synthetic session (a random {@code sessionId},
+ * {@code userId = "admin-test"}). Session-scoped tools
  * (todo_write, workspace_write, …) therefore write into an isolated
  * scratch session that's never reused — no risk of polluting a real
  * conversation. The session directory is left on disk for inspection;
@@ -46,16 +47,15 @@ public class ToolTestService {
      * the UI renders both success and failure shapes from the same record.
      */
     public Result test(AgentDefinition agent, AgentTool agentTool, String argumentsJson) {
-        return test(agent.namespace(), agentTool, argumentsJson);
+        return test(agentTool, argumentsJson);
     }
 
     /**
-     * Namespace-based variant for testing a tool without an agent context —
-     * used by the top-level tool catalog, where there is no owning agent.
-     * The agent is only ever needed for its {@link Namespace}, so this is the
-     * real implementation and the agent-based overload delegates here.
+     * Tests a tool without an agent context — used by the top-level tool
+     * catalog, where there is no owning agent. This is the real
+     * implementation; the agent-based overload delegates here.
      */
-    public Result test(Namespace namespace, AgentTool agentTool, String argumentsJson) {
+    public Result test(AgentTool agentTool, String argumentsJson) {
         long t0 = System.currentTimeMillis();
         Map<String, Object> args;
         try {
@@ -65,8 +65,7 @@ public class ToolTestService {
                     System.currentTimeMillis() - t0);
         }
 
-        var resolved = toolRegistry.resolve(agentTool, namespace,
-                TEST_USER_ID, UUID.randomUUID());
+        var resolved = toolRegistry.resolve(agentTool, new ToolCallScope(UserId.of(TEST_USER_ID), SessionId.random(), null));
         if (resolved.isEmpty()) {
             return Result.error("Tool '" + agentTool.name()
                     + "' could not be resolved (missing factory or unavailable)?",

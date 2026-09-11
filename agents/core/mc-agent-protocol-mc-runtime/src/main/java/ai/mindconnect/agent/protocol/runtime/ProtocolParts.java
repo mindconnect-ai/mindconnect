@@ -22,7 +22,7 @@ final class ProtocolParts {
     /** The domain part for a stored image. */
     static ai.mindconnect.message.domain.ContentPart image(ai.mindconnect.filestore.StoredFile stored) {
         return new ai.mindconnect.message.domain.ContentPart.Image(
-                stored.id(), stored.name(), stored.contentType(), stored.size());
+                stored.id().value(), stored.name(), stored.contentType(), stored.size());
     }
 
     /**

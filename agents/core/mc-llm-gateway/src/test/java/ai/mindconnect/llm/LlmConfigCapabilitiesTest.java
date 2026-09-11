@@ -1,5 +1,6 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
@@ -8,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -24,7 +24,7 @@ class LlmConfigCapabilitiesTest {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static LlmConfig config(LlmProvider provider, Set<LlmCapability> capabilities) {
-        return new LlmConfig(UUID.randomUUID(), "test", provider,
+        return new LlmConfig(LlmConfigId.random(), "test", provider,
                 "some-model", "https://example", "key", 0.7, 4096, Map.of(), null,
                 false, null, null, null, null, capabilities);
     }
@@ -119,9 +119,11 @@ class LlmConfigCapabilitiesTest {
                  "provider":"ANTHROPIC","model":"claude-sonnet-4-6","apiKey":"k",
                  "defaultTemperature":0.7,"maxOutputTokens":8192}
                 """;
-        LlmConfig cfg = JSON.readValue(legacy, LlmConfig.class);
+        LlmConfig cfg = JSON.readerFor(LlmConfig.class)
+                .readValue(legacy);
         assertThat(cfg.declaresCapabilities()).isFalse();
         assertThat(cfg.supports(LlmCapability.VISION)).isTrue();
         assertThat(cfg.name()).isEqualTo("claude-default");
+        assertThat(cfg.id()).isEqualTo(LlmConfigId.of("00000001-0000-0000-0000-000000000002"));
     }
 }

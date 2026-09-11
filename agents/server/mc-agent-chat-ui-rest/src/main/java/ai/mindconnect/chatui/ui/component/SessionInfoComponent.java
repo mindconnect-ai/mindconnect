@@ -50,13 +50,13 @@ public final class SessionInfoComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "session-info-" + session.id();
+        return "session-info-" + session.id().value();
     }
 
     @Override
     public UiDetail render() {
         return UiDetail.of(id(), "Session Info")
-                .field(UiField.text("sessionId", "Session ID", session.id().toString()))
+                .field(UiField.text("sessionId", "Session ID", session.id().value()))
                 .field(UiField.text("agent",     "Agent",      agent.name()))
                 .link(llmConfigLink())
                 .field(UiField.text("status",    "Status",

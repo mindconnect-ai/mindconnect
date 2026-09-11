@@ -4,7 +4,6 @@ import ai.mindconnect.agent.runtime.adapter.config.DefaultAgentRuntimeConfig;
 import ai.mindconnect.agent.runtime.adapter.config.TodoToolsConfig;
 import ai.mindconnect.adminui.config.InfrastructureConfig;
 import ai.mindconnect.adminui.config.LlmConfig;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.adapter.file.MessageRepositoryConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
@@ -32,11 +31,5 @@ public class AdminUiApplication {
     public static void main(String[] args) {
         SpringApplication.run(AdminUiApplication.class, args);
     }
-
-    @Bean
-    Namespace namespace() {
-        return new Namespace("local");
-    }
-
 
 }

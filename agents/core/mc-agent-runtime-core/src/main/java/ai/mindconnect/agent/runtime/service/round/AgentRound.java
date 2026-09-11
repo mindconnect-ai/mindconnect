@@ -1,12 +1,13 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * One turn of the agent loop's crank — one call, one round.
@@ -56,7 +57,7 @@ public class AgentRound {
      * @param requestId identifies the whole turn (the user's request); also the
      *                  name under which the ports publish their events
      */
-    public RoundOutcome execute(String requestId, UUID sessionId, List<Message> history,
+    public RoundOutcome execute(String requestId, SessionId sessionId, List<Message> history,
                                 Cancellation cancellation) {
         ToolCalls toolCalls = ToolCalls.of(ToolCalls.episode(history));
         return toolCalls.allDone()
@@ -64,7 +65,7 @@ public class AgentRound {
                 : advanceCalls(requestId, sessionId, toolCalls);
     }
 
-    private RoundOutcome askModel(String requestId, UUID sessionId, List<Message> history,
+    private RoundOutcome askModel(String requestId, SessionId sessionId, List<Message> history,
                                   Cancellation cancellation) {
         LlmAnswer answer = llm.ask(requestId, sessionId, history,
                 toolDefinitions.toolDefinitions(sessionId), cancellation);
@@ -78,7 +79,7 @@ public class AgentRound {
         return callsRequested ? RoundOutcome.Outcome.CALLS_REQUESTED : RoundOutcome.Outcome.ANSWERED;
     }
 
-    private RoundOutcome advanceCalls(String requestId, UUID sessionId, ToolCalls toolCalls) {
+    private RoundOutcome advanceCalls(String requestId, SessionId sessionId, ToolCalls toolCalls) {
         List<TurnMessage> added = new ArrayList<>();
         List<String> running = new ArrayList<>();
         boolean advanced = false;
@@ -114,7 +115,7 @@ public class AgentRound {
     }
 
     /** Collect a result. {@code null} means: still running, the next round asks again. */
-    private TurnMessage collect(UUID sessionId, ToolCalls.Call call) {
+    private TurnMessage collect(SessionId sessionId, ToolCalls.Call call) {
         return switch (agentRoundToolExecutor.result(sessionId, call.callId())) {
             case ToolResult.Finished finished ->
                     TurnMessage.toolResult(call.callId(), call.name(), finished.output(), finished.failed())

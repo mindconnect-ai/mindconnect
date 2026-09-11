@@ -1,9 +1,10 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.llm.domain.ToolDefinition;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Which tools this session is offered. Resolved per round, not per turn — a
@@ -11,5 +12,5 @@ import java.util.UUID;
  */
 public interface ToolDefinitionProvider {
 
-    List<ToolDefinition> toolDefinitions(UUID sessionId);
+    List<ToolDefinition> toolDefinitions(SessionId sessionId);
 }

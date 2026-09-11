@@ -1,25 +1,31 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.message.domain.ConversationId;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * {@link AgentSessionRepository} on Postgres: one row of {@code mc_agent_session}
- * per session, with the keys every listing filters by — definition, namespace,
- * user, parent — and the start time they sort by, newest first.
+ * per session, keyed by {@code (namespace, id)}, with the keys every listing
+ * filters by — definition, user, parent — and the start time they sort by,
+ * newest first. The repository is bound to one namespace and every statement
+ * matches it.
  *
  * <p>{@link #deleteById} removes the session row only. The file store deletes
  * the session's whole directory, taking working memory, todo list and
@@ -29,28 +35,28 @@ import java.util.UUID;
 public final class PgAgentSessionRepository implements AgentSessionRepository {
 
     private final DocumentTable<AgentSession> sessions;
+    private final Namespace namespace;
 
-    public PgAgentSessionRepository(DataSource dataSource) {
-        this(Sql.of(dataSource));
+    public PgAgentSessionRepository(DataSource dataSource, Namespace namespace) {
+        this(Sql.of(dataSource), namespace);
     }
 
-    public PgAgentSessionRepository(Sql sql) {
+    public PgAgentSessionRepository(Sql sql, Namespace namespace) {
+        this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.sessions = DocumentTable.of(AgentSession.class)
                 .table("mc_agent_session")
-                .id("id", "UUID", AgentSession::id)
-                .column("agent_definition_id", "UUID", AgentSession::agentDefinitionId)
-                .requiredColumn("namespace", "TEXT", s -> s.namespace().value())
-                .column("user_id", "TEXT", AgentSession::userId)
-                .column("parent_session_id", "UUID", AgentSession::parentSessionId)
+                .partitionKey("namespace", "TEXT", s -> namespace.value())
+                .id("id", "TEXT", s -> s.id().value())
+                .column("agent_definition_id", "TEXT", s -> s.agentDefinitionId().value())
+                .column("user_id", "TEXT", s -> s.userId().value())
+                .column("parent_session_id", "TEXT", s -> s.parentSessionId() == null ? null : s.parentSessionId().value())
                 .column("started_at", "TIMESTAMPTZ", AgentSession::startedAt)
-                // What the sidebar shows — kept as columns so a list of
-                // sessions never deserializes a session.
-                .column("conversation_id", "UUID", AgentSession::conversationId)
+                .column("conversation_id", "TEXT", s -> s.conversationId().value())
                 .column("title", "TEXT", AgentSession::title)
                 .column("status", "TEXT", AgentSession::status)
                 .column("completed_at", "TIMESTAMPTZ", AgentSession::completedAt)
                 .index("namespace", "user_id", "started_at")
-                .index("parent_session_id")
+                .index("namespace", "parent_session_id")
                 .build(sql);
     }
 
@@ -65,54 +71,59 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
     }
 
     @Override
-    public Optional<AgentSession> findById(UUID id) {
-        return sessions.findById(id);
+    public Optional<AgentSession> findById(SessionId id) {
+        return sessions.findById(namespace.value(), id.value());
     }
 
     @Override
-    public List<AgentSession> findByAgentDefinitionId(UUID agentDefinitionId, Namespace namespace, String userId) {
-        return sessions.find("WHERE agent_definition_id = ? AND namespace = ? AND user_id = ? "
+    public List<AgentSession> findByAgent(AgentId agent, UserId user) {
+        return sessions.find("WHERE namespace = ? AND agent_definition_id = ? AND user_id = ? "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                agentDefinitionId, namespace.value(), userId);
+                namespace.value(), agent.value(), user.value());
     }
 
-    /** Top-level sessions only — sub-agent sessions are reached through {@link #findByParentSessionId}. */
+    /** Top-level sessions only — sub-agent sessions are reached through {@link #findByParentSession}. */
     @Override
-    public List<AgentSession> findByUser(Namespace namespace, String userId) {
+    public List<AgentSession> findByUser(UserId user) {
         return sessions.find("WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                namespace.value(), userId);
+                namespace.value(), user.value());
     }
 
     /** Headers from the columns alone: the sidebar's list without a single document read. */
     @Override
-    public List<Header> findHeadersByUser(Namespace namespace, String userId) {
+    public List<Header> findHeadersByUser(UserId user) {
         return sessions.select(PgAgentSessionRepository::header,
                 "WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                namespace.value(), userId);
+                namespace.value(), user.value());
     }
 
     /** {@link AgentSessionHeader} built from the row — every scalar of a session, none of its collections. */
-    public record Header(UUID id, UUID agentDefinitionId, Namespace namespace, String userId,
-                         UUID conversationId, String title, SessionStatus status,
-                         Instant startedAt, Instant completedAt, UUID parentSessionId)
+    public record Header(SessionId id, AgentId agentDefinitionId, UserId userId,
+                         ConversationId conversationId, String title, SessionStatus status,
+                         Instant startedAt, Instant completedAt, SessionId parentSessionId)
             implements AgentSessionHeader { }
 
     private static Header header(Row row) throws SQLException {
-        return new Header(row.uuid("id"), row.uuid("agent_definition_id"), new Namespace(row.string("namespace")),
-                row.string("user_id"), row.uuid("conversation_id"), row.string("title"),
-                row.enumValue("status", SessionStatus.class), row.instant("started_at"),
-                row.instant("completed_at"), row.uuid("parent_session_id"));
+        String parent = row.string("parent_session_id");
+        return new Header(SessionId.of(row.string("id")),
+                AgentId.of(row.string("agent_definition_id")),
+                UserId.of(row.string("user_id")),
+                ConversationId.of(row.string("conversation_id")),
+                row.string("title"), row.enumValue("status", SessionStatus.class),
+                row.instant("started_at"), row.instant("completed_at"),
+                parent == null ? null : SessionId.of(parent));
     }
 
     @Override
-    public List<AgentSession> findByParentSessionId(UUID parentSessionId) {
-        return sessions.find("WHERE parent_session_id = ? ORDER BY started_at NULLS LAST, id", parentSessionId);
+    public List<AgentSession> findByParentSession(SessionId parent) {
+        return sessions.find("WHERE namespace = ? AND parent_session_id = ? ORDER BY started_at NULLS LAST, id",
+                namespace.value(), parent.value());
     }
 
     @Override
-    public void deleteById(UUID id) {
-        sessions.deleteById(id);
+    public void deleteById(SessionId id) {
+        sessions.deleteById(namespace.value(), id.value());
     }
 }

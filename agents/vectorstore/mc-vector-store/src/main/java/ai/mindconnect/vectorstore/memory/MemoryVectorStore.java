@@ -2,6 +2,7 @@ package ai.mindconnect.vectorstore.memory;
 
 import ai.mindconnect.vectorstore.VectorChunk;
 import ai.mindconnect.vectorstore.VectorStore;
+import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.BufferedWriter;
@@ -124,14 +125,20 @@ final class MemoryVectorStore implements VectorStore {
         }
         Map<String, VectorChunk> chunks = new LinkedHashMap<>();
         if (Files.exists(file)) {
-            try {
-                for (String line : Files.readAllLines(file, StandardCharsets.UTF_8)) {
-                    if (line.isBlank()) continue;
-                    VectorChunk chunk = MAPPER.readValue(line, VectorChunk.class);
+            // A sequence of JSON objects, whatever the whitespace between and
+            // inside them: the file is written one chunk per line, but a copy
+            // someone pretty-printed to read it must load all the same.
+            try (MappingIterator<VectorChunk> it = MAPPER.readerFor(VectorChunk.class).readValues(file.toFile())) {
+                while (it.hasNext()) {
+                    VectorChunk chunk = it.next();
                     chunks.put(chunk.id(), normalised(chunk));
                 }
             } catch (IOException e) {
                 throw new UncheckedIOException("Could not load vector store file " + file, e);
+            } catch (RuntimeException e) {
+                // The iterator reports broken JSON unchecked; it is still an unreadable file.
+                throw new UncheckedIOException("Could not load vector store file " + file,
+                        e.getCause() instanceof IOException io ? io : new IOException(e.getMessage(), e));
             }
         }
         loaded = chunks;

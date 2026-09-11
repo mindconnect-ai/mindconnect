@@ -1,18 +1,23 @@
 package ai.mindconnect.agent.runtime.service;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.port.out.PartContentReader;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmContent;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.MessageRole;
+import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ContentPart;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -38,18 +43,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class MessageToLlmMessageMapperTest {
 
-    private static final UUID AGENT = UUID.randomUUID();
-    private static final UUID CONVERSATION = UUID.randomUUID();
+    private static final AgentId AGENT = AgentId.random();
+    private static final ConversationId CONVERSATION = ConversationId.random();
 
-    private final Map<String, PartContentReader.Content> files = new HashMap<>();
+    // Keyed by the typed file id a part references.
+    private final Map<FileId, PartContentReader.Content> files = new HashMap<>();
     private final PartContentReader reader = id -> Optional.ofNullable(files.get(id));
     private final MessageToLlmMessageMapper mapper = new MessageToLlmMessageMapper(reader);
 
-    private final AgentDefinition def = new AgentDefinition(AGENT, new Namespace("test"), "a", "d",
+    private final AgentDefinition def = new AgentDefinition(AGENT, "a", "d",
             null, null, "prompt", null, "cfg", 5, null, AgentDefinitionStatus.ACTIVE,
             List.of(), List.of(), null, null, null, null);
-    private final AgentSession session = new AgentSession(UUID.randomUUID(), CONVERSATION, Namespace.DEFAULT,
-            "user", AGENT, "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
+    private final AgentSession session = new AgentSession(SessionId.random(), AGENT, UserId.of("user"),
+            CONVERSATION, "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
             List.of(), List.of());
     private final ContextTokenBudget budget = new ContextTokenBudget(text -> text.length() / 4, 8192, 8192, 8192);
 
@@ -60,18 +66,23 @@ class MessageToLlmMessageMapperTest {
         return LlmConfig.claude("cfg", "claude-sonnet-4-6", "k").withCapabilities(Set.of(capabilities));
     }
 
-    private static Message user(int seq, UUID turnId, List<ContentPart> parts) {
-        return Message.of(CONVERSATION, UUID.randomUUID(), ParticipantType.USER, MessageType.CHAT, parts, seq)
+    private static ChatTurnId turn() {
+        return ChatTurnId.random();
+    }
+
+    private static Message user(int seq, ChatTurnId turnId, List<ContentPart> parts) {
+        return Message.of(CONVERSATION, UUID.randomUUID().toString(), ParticipantType.USER, MessageType.CHAT, parts, seq)
                 .withTurnId(turnId);
     }
 
-    private static Message agent(int seq, UUID turnId, String text) {
-        return Message.of(CONVERSATION, AGENT, ParticipantType.AGENT, MessageType.CHAT, text, seq)
+    private static Message agent(int seq, ChatTurnId turnId, String text) {
+        // An agent's message carries the bare agent id as its sender.
+        return Message.of(CONVERSATION, AGENT.value(), ParticipantType.AGENT, MessageType.CHAT, text, seq)
                 .withTurnId(turnId);
     }
 
     private void stored(String id, String bytes, String mediaType) {
-        files.put(id, new PartContentReader.Content(bytes.getBytes(StandardCharsets.UTF_8), mediaType));
+        files.put(FileId.of(id), new PartContentReader.Content(bytes.getBytes(StandardCharsets.UTF_8), mediaType));
     }
 
     private static String base64(String s) {
@@ -80,7 +91,7 @@ class MessageToLlmMessageMapperTest {
 
     @Test
     void textOnlyMessagesAreOneTextBlockEachWhateverTheTarget() {
-        UUID turn = UUID.randomUUID();
+        ChatTurnId turn = turn();
         List<Message> history = List.of(
                 user(1, turn, ContentPart.text("hi")),
                 agent(2, turn, "hello"));
@@ -95,7 +106,7 @@ class MessageToLlmMessageMapperTest {
     @Test
     void anImageInTheCurrentTurnGoesInlineToAVisionModel() {
         stored("f-1", "PNG", "image/png");
-        UUID turn = UUID.randomUUID();
+        ChatTurnId turn = turn();
         Message m = user(1, turn, List.of(new ContentPart.Text("what is this?"), PHOTO));
 
         List<LlmMessage> out = mapper.toMessages(List.of(m), def, session, budget, target(LlmCapability.VISION));
@@ -110,7 +121,7 @@ class MessageToLlmMessageMapperTest {
     @Test
     void aDocumentGoesInlineOnlyToADocumentReadingModel() {
         stored("f-2", "PDF", "application/pdf");
-        Message m = user(1, UUID.randomUUID(), List.of(new ContentPart.Text("summarise"), SPEC));
+        Message m = user(1, turn(), List.of(new ContentPart.Text("summarise"), SPEC));
 
         List<LlmMessage> docs = mapper.toMessages(List.of(m), def, session, budget, target(LlmCapability.DOCUMENTS));
         List<LlmMessage> vision = mapper.toMessages(List.of(m), def, session, budget, target(LlmCapability.VISION));
@@ -127,7 +138,7 @@ class MessageToLlmMessageMapperTest {
     @Test
     void aModelThatDoesNotReadImagesGetsThePlaceholder() {
         stored("f-1", "PNG", "image/png");
-        Message m = user(1, UUID.randomUUID(), List.of(new ContentPart.Text("look"), PHOTO));
+        Message m = user(1, turn(), List.of(new ContentPart.Text("look"), PHOTO));
 
         List<LlmMessage> noCaps = mapper.toMessages(List.of(m), def, session, budget, target());
         List<LlmMessage> noTarget = mapper.toMessages(List.of(m), def, session, budget, null);
@@ -143,7 +154,7 @@ class MessageToLlmMessageMapperTest {
     @Test
     void anImageFromAnEarlierTurnIsNotResent() {
         stored("f-1", "PNG", "image/png");
-        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        ChatTurnId first = turn(), second = turn();
         List<Message> history = List.of(
                 user(1, first, List.of(new ContentPart.Text("what is this?"), PHOTO)),
                 agent(2, first, "a cat"),
@@ -159,7 +170,7 @@ class MessageToLlmMessageMapperTest {
     @Test
     void thePlaceholderNamesTheViewerToolWhenTheSessionHasIt() {
         stored("f-1", "PNG", "image/png");
-        UUID first = UUID.randomUUID(), second = UUID.randomUUID();
+        ChatTurnId first = turn(), second = turn();
         List<Message> history = List.of(
                 user(1, first, List.of(new ContentPart.Text("what is this?"), PHOTO)),
                 agent(2, first, "a cat"),
@@ -174,7 +185,7 @@ class MessageToLlmMessageMapperTest {
     @Test
     void aMessageInsertedWithinTheCurrentTurnStillGoesInline() {
         stored("f-1", "PNG", "image/png");
-        UUID turn = UUID.randomUUID();
+        ChatTurnId turn = turn();
         // The runtime appended the image on the user's behalf, in the same
         // turn as the user's question: it is current, it goes inline.
         List<Message> history = List.of(
@@ -188,7 +199,7 @@ class MessageToLlmMessageMapperTest {
 
     @Test
     void aFileTheStoreNoLongerHasBecomesAPlaceholderNotAnError() {
-        Message m = user(1, UUID.randomUUID(), List.of(new ContentPart.Text("look"), PHOTO));
+        Message m = user(1, turn(), List.of(new ContentPart.Text("look"), PHOTO));
 
         List<LlmMessage> out = mapper.toMessages(List.of(m), def, session, budget, target(LlmCapability.VISION));
 
@@ -201,7 +212,7 @@ class MessageToLlmMessageMapperTest {
         stored("f-1", "PNG", "image/png");
         ContentPart.Image huge = new ContentPart.Image("f-1", "huge.png", "image/png",
                 MessageToLlmMessageMapper.MAX_INLINE_BYTES + 1);
-        Message m = user(1, UUID.randomUUID(), List.of(new ContentPart.Text("look"), huge));
+        Message m = user(1, turn(), List.of(new ContentPart.Text("look"), huge));
 
         List<LlmMessage> out = mapper.toMessages(List.of(m), def, session, budget, target(LlmCapability.VISION));
 
@@ -211,7 +222,7 @@ class MessageToLlmMessageMapperTest {
 
     @Test
     void modelTextNamesTheMediaOnOneLineEach() {
-        Message m = user(1, UUID.randomUUID(), List.of(new ContentPart.Text("look"), PHOTO, SPEC));
+        Message m = user(1, turn(), List.of(new ContentPart.Text("look"), PHOTO, SPEC));
 
         assertThat(mapper.modelText(m, def, session)).isEqualTo(
                 "look\n[image attached: photo.png (image/png, 3 B)]\n[document attached: spec.pdf (application/pdf, 3 B)]");
@@ -220,11 +231,11 @@ class MessageToLlmMessageMapperTest {
 
     @Test
     void theStoredTextIsWhatTheUserTypedAndTheNoticeStillLeadsIt() {
-        Message m = user(1, UUID.randomUUID(), List.of(new ContentPart.Text("what does it say?"), PHOTO))
+        Message m = user(1, turn(), List.of(new ContentPart.Text("what does it say?"), PHOTO))
                 .withMetadata(Map.of(AttachmentNotice.ATTACHMENTS,
                         List.of("notes.md")));
-        AgentSession withNotes = new AgentSession(session.id(), CONVERSATION, Namespace.DEFAULT,
-                "user", AGENT, "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
+        AgentSession withNotes = new AgentSession(session.id(), AGENT, UserId.of("user"),
+                CONVERSATION, "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
                 List.of(), List.of(AttachedFile.named("notes.md")));
 
         List<LlmMessage> out = mapper.toMessages(List.of(m), def, withNotes, budget, target());

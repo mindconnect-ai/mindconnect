@@ -7,7 +7,7 @@ import ai.mindconnect.ui.model.UiList;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * The agent's checklist for the current session — same items the LLM
@@ -25,17 +25,17 @@ public final class TodoListComponent implements UiComponent {
             .ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(ZoneId.systemDefault());
 
-    private final UUID sessionId;
+    private final SessionId sessionId;
     private final TodoList list;
 
-    public TodoListComponent(UUID sessionId, TodoList list) {
+    public TodoListComponent(SessionId sessionId, TodoList list) {
         this.sessionId = sessionId;
         this.list = list;
     }
 
     @Override
     public String id() {
-        return "todo-list-" + sessionId;
+        return "todo-list-" + sessionId.value();
     }
 
     @Override

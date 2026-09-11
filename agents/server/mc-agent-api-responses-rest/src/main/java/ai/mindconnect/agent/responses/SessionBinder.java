@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.responses;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.protocol.Session;
@@ -8,7 +8,6 @@ import ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend;
 import ai.mindconnect.agent.responses.wire.CreateResponseRequest;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 
-import java.util.UUID;
 
 /**
  * Finds the session a request belongs to, and makes it run what the request
@@ -26,19 +25,17 @@ public final class SessionBinder {
     private final AgentRuntimeBackend backend;
     private final AgentSessionService sessions;
     private final AgentDefinitionRepository agents;
-    private final Namespace namespace;
 
     public SessionBinder(AgentRuntimeBackend backend, AgentSessionService sessions,
-                         AgentDefinitionRepository agents, Namespace namespace) {
+                         AgentDefinitionRepository agents) {
         this.backend = backend;
         this.sessions = sessions;
         this.agents = agents;
-        this.namespace = namespace;
     }
 
     public Session bind(CreateResponseRequest request, ModelResolver.Resolution resolution) {
         Session session = existing(request).orElseGet(
-                () -> backend.sessions().open(namespace.value(), resolution.agentName()));
+                () -> backend.sessions().open(resolution.agentName()));
 
         if (resolution.overridesModel()) {
             applyModelOverride(session, resolution);
@@ -74,11 +71,11 @@ public final class SessionBinder {
      * agents it may call, and only the model moves.
      */
     private void applyModelOverride(Session session, ModelResolver.Resolution resolution) {
-        var definition = agents.findByName(namespace, resolution.agentName()).orElseThrow(
+        var definition = agents.findByName(resolution.agentName()).orElseThrow(
                 () -> new IllegalStateException("The default agent '" + resolution.agentName()
                         + "' does not exist; a request naming an llm-config has nothing to run on."));
 
-        sessions.replaceSessionAgent(UUID.fromString(session.id()),
+        sessions.replaceSessionAgent(SessionId.of(session.id()),
                 new SessionAgentRef(definition.id(), true, definition.name(),
                         resolution.llmConfigOverride(), null, null, null));
     }

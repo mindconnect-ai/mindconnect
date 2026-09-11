@@ -1,10 +1,10 @@
 package ai.mindconnect.agent.tool;
 
+
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -26,8 +26,7 @@ class RequiredParamsToolTest {
     };
 
     private static AgentTool binding(Map<String, Object> overrides) {
-        return new AgentTool(UUID.randomUUID(), UUID.randomUUID(), "web_read", null,
-                overrides, true, false, false, null);
+        return new AgentTool(AgentToolId.random(), "web_read", null, overrides);
     }
 
     @Test

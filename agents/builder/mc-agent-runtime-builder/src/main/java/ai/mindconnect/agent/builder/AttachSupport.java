@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.builder;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
@@ -13,7 +14,6 @@ import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Implements {@link AgentRuntime#attachFile} — the embedded twin of the
@@ -36,20 +36,24 @@ final class AttachSupport {
     private final AgentSessionRepository sessions;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final ai.mindconnect.vectorstore.tools.VectorStores stores;
-    /** The host's workflow store when it has one (Postgres); null means the file store under {@code workflowDir}. */
+    /** The host's workflow store when it has one (Postgres); null means the file store under {@code <dataBaseDir>/<namespace>/workflows}. */
     private final ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows;
+    /** The namespace the runtime's stores are bound to; the fallback workflow store opens in it too. */
+    private final ai.mindconnect.agent.Namespace namespace;
 
     private AttachSupport(Map<String, String> environment, DynamicToolActivations activations,
                           AgentSessionRepository sessions,
                           ai.mindconnect.filestore.FileStore fileStore,
                           ai.mindconnect.vectorstore.tools.VectorStores stores,
-                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows) {
+                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
+                          ai.mindconnect.agent.Namespace namespace) {
         this.environment = environment;
         this.activations = activations;
         this.sessions = sessions;
         this.fileStore = fileStore;
         this.stores = stores;
         this.workflows = workflows;
+        this.namespace = namespace;
     }
 
     /** Null when the optional file/vector modules are not on the classpath. */
@@ -59,14 +63,15 @@ final class AttachSupport {
                                          LlmEmbeddings embeddings,
                                          LlmConfigRepository llmConfigs,
                                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
-                                         ai.mindconnect.filestore.FileStore hostFileStore) {
+                                         ai.mindconnect.filestore.FileStore hostFileStore,
+                                         ai.mindconnect.agent.Namespace namespace) {
         try {
             Class.forName("ai.mindconnect.filestore.FileStoreBackend");
             Class.forName("ai.mindconnect.vectorstore.tools.VectorStores");
         } catch (ClassNotFoundException e) {
             return null;
         }
-        return create(environment, activations, sessions, embeddings, llmConfigs, workflows, hostFileStore);
+        return create(environment, activations, sessions, embeddings, llmConfigs, workflows, hostFileStore, namespace);
     }
 
     /**
@@ -74,22 +79,23 @@ final class AttachSupport {
      * is on the classpath, {@code null} otherwise — the builder feeds it to
      * the message mapper before any tool support exists.
      */
-    static ai.mindconnect.filestore.FileStore defaultFileStoreIfPresent(Map<String, String> environment) {
+    static ai.mindconnect.filestore.FileStore defaultFileStoreIfPresent(Map<String, String> environment,
+                                                                        ai.mindconnect.agent.Namespace namespace) {
         try {
             Class.forName("ai.mindconnect.filestore.filesystem.FilesystemFileStoreBackend");
         } catch (ClassNotFoundException e) {
             return null;
         }
-        return openDefaultFileStore(environment);
+        return openDefaultFileStore(environment, namespace);
     }
 
     /** Separate method so the backend type is only linked once the guard passed. */
-    private static ai.mindconnect.filestore.FileStore openDefaultFileStore(Map<String, String> environment) {
+    private static ai.mindconnect.filestore.FileStore openDefaultFileStore(Map<String, String> environment,
+                                                                           ai.mindconnect.agent.Namespace namespace) {
         return ai.mindconnect.filestore.FileStoreBackend
                 .byType(environment.getOrDefault("fileStoreBackend", "filesystem"))
                 .orElseThrow()
-                .open(Map.of("dir", environment.getOrDefault("fileStoreDir",
-                        environment.get("dataBaseDir") + "/files")));
+                .open(Map.of("baseDir", environment.get("dataBaseDir"), "namespace", namespace.value()));
     }
 
     /** Separate method so optional types are only linked once the guard passed. */
@@ -99,13 +105,15 @@ final class AttachSupport {
                                         LlmEmbeddings embeddings,
                                         LlmConfigRepository llmConfigs,
                                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows,
-                                        ai.mindconnect.filestore.FileStore hostFileStore) {
-        var fileStore = hostFileStore != null ? hostFileStore : openDefaultFileStore(environment);
+                                        ai.mindconnect.filestore.FileStore hostFileStore,
+                                        ai.mindconnect.agent.Namespace namespace) {
+        var fileStore = hostFileStore != null ? hostFileStore : openDefaultFileStore(environment, namespace);
         var env = new ai.mindconnect.agent.tool.ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) llmConfigs);
+                if (type == ai.mindconnect.agent.Namespace.class) return Optional.of((T) namespace);
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {
@@ -117,10 +125,10 @@ final class AttachSupport {
         if (stores == null) {
             return null;
         }
-        return new AttachSupport(environment, activations, sessions, fileStore, stores, workflows);
+        return new AttachSupport(environment, activations, sessions, fileStore, stores, workflows, namespace);
     }
 
-    String attach(UUID sessionId, String fileName, InputStream content) {
+    String attach(SessionId sessionId, String fileName, InputStream content) {
         try {
             return attachStored(sessionId, fileStore.save(fileName, null, content));
         } catch (Exception e) {
@@ -139,9 +147,9 @@ final class AttachSupport {
      * for callers that upload first (protocol {@code Files.upload}) and
      * reference later ({@code Document(FileId)} content parts).
      */
-    String attachStored(UUID sessionId, ai.mindconnect.filestore.StoredFile stored) {
+    String attachStored(SessionId sessionId, ai.mindconnect.filestore.StoredFile stored) {
         var attached = new AttachedFile(
-                stored.id(), stored.name(), stored.contentType(), stored.size());
+                stored.id().value(), stored.name(), stored.contentType(), stored.size());
         if (attached.isImage()) {
             // Not text to index: the image goes to the model with the next
             // message as an image part, or as that part's placeholder. Shown
@@ -153,7 +161,7 @@ final class AttachSupport {
             return stored.name() + " attached — it goes to the model with the next message.";
         }
         try {
-            String storeName = "session-" + sessionId;
+            String storeName = "session-" + sessionId.value();
             var template = stores.template("chat-uploads").orElseGet(() -> {
                 var created = new ai.mindconnect.vectorstore.tools.VectorStoreTemplate(
                         "chat-uploads", environment.getOrDefault("vectorStoreBackend", "memory"),
@@ -164,13 +172,13 @@ final class AttachSupport {
             });
             var store = stores.open(storeName, template.name(),
                     ai.mindconnect.vectorstore.tools.VectorStoreInstance.Scope.SESSION,
-                    sessionId.toString());
+                    sessionId.value());
             var instance = stores.settingsFor(storeName);
 
             String message;
             if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()
                     && workflowModulesPresent()) {
-                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows);
+                message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, workflows, namespace.value());
             } else {
                 String text = new String(fileStore.content(stored.id()).readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
@@ -205,7 +213,8 @@ final class AttachSupport {
                           ai.mindconnect.vectorstore.tools.VectorStoreInstance instance,
                           ai.mindconnect.filestore.StoredFile stored,
                           ai.mindconnect.filestore.FileStore fileStore,
-                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository hostWorkflows) throws Exception {
+                          ai.mindconnect.workflow.persistence.port.WorkflowDataRepository hostWorkflows,
+                          String partition) throws Exception {
             java.nio.file.Path base = java.nio.file.Path.of(
                     environment.getOrDefault("defaultBaseDir", System.getProperty("user.home")));
             java.nio.file.Path dir = base.resolve("vector-store-uploads").resolve(instance.name());
@@ -217,10 +226,10 @@ final class AttachSupport {
             }
             var workflows = hostWorkflows != null ? hostWorkflows
                     : new ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository(
-                            java.nio.file.Path.of(environment.get("workflowDir")));
+                            java.nio.file.Path.of(environment.get("dataBaseDir")), partition);
             var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
-                            + "' not found in " + environment.get("workflowDir")));
+                            + "' not found in the workflow store"));
             var report = new ai.mindconnect.workflow.admin.run.WorkflowRunService(null)
                     .run(workflow, Map.of("file", base.relativize(target).toString(),
                             "store", instance.name()));

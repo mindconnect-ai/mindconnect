@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service;
 
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.message.domain.ContentPart;
@@ -32,7 +34,6 @@ import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.runtime.service.turn.LocalChatTurnHandle;
 import ai.mindconnect.agent.runtime.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.AuthenticationInfo;
-import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.llm.domain.ToolDefinition;
 import ai.mindconnect.message.port.in.ConversationManager;
@@ -127,7 +128,7 @@ public class AgentChatService {
      * handle's future resolves with the final answer once the task is
      * terminal (title generation included, matching the old behaviour).
      */
-    public ChatTurnHandle submitChat(UUID sessionId, String userMessage,
+    public ChatTurnHandle submitChat(SessionId sessionId, String userMessage,
                                      Consumer<StreamEvent> eventHandler) {
         return submitChat(sessionId, ContentPart.text(userMessage), eventHandler);
     }
@@ -138,7 +139,7 @@ public class AgentChatService {
      * since the last turn ride along as parts of their own (images, PDFs)
      * or as a notice (everything else); see {@link AttachmentParts}.
      */
-    public ChatTurnHandle submitChat(UUID sessionId, List<ContentPart> parts,
+    public ChatTurnHandle submitChat(SessionId sessionId, List<ContentPart> parts,
                                      Consumer<StreamEvent> eventHandler) {
         AgentSession session = sessionService.findSession(sessionId);
         AgentDefinition def = effectiveDefinition(session);
@@ -147,7 +148,7 @@ public class AgentChatService {
         boolean isFirstMessage = conversationManager
                 .loadHistory(session.conversationId(), new PageRequest(0, 1)).isEmpty();
 
-        UUID turnId = UUID.randomUUID();
+        ChatTurnId turnId = ChatTurnId.random();
 
         // A new turn can only start when the previous one is over — any open
         // approval cards of that turn are moot now (cancelled mid-wait).
@@ -166,7 +167,7 @@ public class AgentChatService {
                 : conversationManager.loadCompleteHistory(session.conversationId()).messages();
         List<String> attached = AttachmentNotice.unannounced(session, history);
         List<String> detached = AttachmentNotice.unannouncedRemovals(session, history);
-        AgentTurnWorker.appendUserMessage(conversationManager, session.conversationId(),
+        AgentTurnWorker.appendUserMessage(conversationManager, session.conversationId(), session.userId(),
                 AttachmentParts.withAttachments(parts, session, attached), turnId, tokenCounter,
                 AttachmentNotice.metadata(attached, detached));
 
@@ -187,10 +188,10 @@ public class AgentChatService {
      * <p>The user's stream hears the turn begin and end here — the one place
      * every top-level turn passes through, whichever client submitted it.
      */
-    private ChatTurnHandle startTurn(AgentSession session, UUID turnId, int run,
+    private ChatTurnHandle startTurn(AgentSession session, ChatTurnId turnId, int run,
                                      Consumer<StreamEvent> eventHandler,
                                      java.util.function.UnaryOperator<String> afterCompletion) {
-        UUID sessionId = session.id();
+        SessionId sessionId = session.id();
         var subscription = sessionChannels.subscribeTurn(sessionId, turnId, eventHandler);
         String taskId = queue.submit(AgentTurnWorker.submission(turnId, run, sessionId, 0, null));
         userChannels.publish(session.userId(), new UserEvent.TurnStarted(sessionId, turnId));
@@ -219,7 +220,7 @@ public class AgentChatService {
      * {@code sessionId}. Best-effort: a session that cannot be read is not
      * announced, and the operation that raised the event is not affected.
      */
-    private void announce(UUID sessionId, UserEvent event) {
+    private void announce(SessionId sessionId, UserEvent event) {
         try {
             userChannels.publish(sessionService.findSession(sessionId).userId(), event);
         } catch (RuntimeException e) {
@@ -233,13 +234,14 @@ public class AgentChatService {
      * later — or reattaches after a restart — reads the still-unanswered ones
      * here and shows their cards.
      */
-    public List<ToolApproval> openApprovals(UUID rootSessionId) {
+    public List<ToolApproval> openApprovals(SessionId rootSessionId) {
         return approvalStore.openForRoot(rootSessionId);
     }
 
     /**
      * The human's answer to an approval card — Deny, Allow once, or Allow for
-     * this session. The card's identity is the {@code callId}; everything
+     * this session. The card's identity is its chat and the {@code callId} —
+     * the provider's id alone is unique only within one response; everything
      * else comes from the {@link ToolApprovalStore} entry, the ONE truth for
      * the open question. The decision travels as a task NOTIFICATION to the
      * parked tool task, which re-runs its gate on wake: an explicit
@@ -251,14 +253,15 @@ public class AgentChatService {
      * on the tool task and continues on its ORIGINAL stream the moment the
      * tool finishes (or reports the denial).
      *
-     * @return false when no entry exists for {@code callId} or its task is
+     * @return false when this chat has no open question {@code callId} or its task is
      *         gone — a stale card; the caller just refreshes, which drops it
      */
-    public boolean answerApproval(UUID rootSessionId, String callId, boolean approved,
+    public boolean answerApproval(SessionId rootSessionId, String callId, boolean approved,
                                   ApprovalScope scope) {
-        ToolApproval open = approvalStore.find(callId).orElse(null);
+        ToolApproval open = approvalStore.find(rootSessionId, callId).orElse(null);
         if (open == null) {
-            log.warn("No open approval for call {} — stale card, nothing to answer", callId);
+            log.warn("No open approval for call {} in session {} — stale card, nothing to answer",
+                    callId, rootSessionId);
             return false;
         }
         if (approved && scope == ApprovalScope.SESSION
@@ -272,7 +275,7 @@ public class AgentChatService {
                 if (!open.toolName().equals(other.toolName())) continue;
                 queue.notify(other.toolTaskId(),
                         ApprovalNotifications.approvalGranted());
-                approvalStore.delete(other.callId());
+                approvalStore.delete(rootSessionId, other.callId());
                 log.info("Session approval of '{}' released parked call {} as well",
                         open.toolName(), other.callId());
             }
@@ -280,7 +283,7 @@ public class AgentChatService {
         boolean delivered = queue.notify(open.toolTaskId(), approved
                 ? ApprovalNotifications.approvalGranted()
                 : ApprovalNotifications.approvalDenied());
-        approvalStore.delete(callId);
+        approvalStore.delete(rootSessionId, callId);
         if (!delivered) {
             log.warn("Approval for call {} could not be delivered — task {} is gone (restart/cancel)",
                     callId, open.toolTaskId());
@@ -307,7 +310,7 @@ public class AgentChatService {
      * gap; the client refreshes from the persisted history instead of
      * trusting the tail.
      */
-    public record Attachment(Subscription subscription, UUID liveTurnId, Integer liveRun,
+    public record Attachment(Subscription subscription, ChatTurnId liveTurnId, Integer liveRun,
                              long firstBufferedSeq, long latestSeq) {
     }
 
@@ -318,11 +321,11 @@ public class AgentChatService {
      * everything it missed that the ring buffer still holds, the running
      * turn's partial included.
      */
-    public Attachment attach(UUID sessionId, long afterSeq,
+    public Attachment attach(SessionId sessionId, long afterSeq,
                              Consumer<Channel.Event<SessionEvent>> consumer) {
         AgentSession session = sessionService.findSession(sessionId);
         var history = conversationManager.loadCompleteHistory(session.conversationId());
-        UUID liveTurnId = history.currentTurnId()
+        ChatTurnId liveTurnId = history.currentTurnId()
                 .filter(turnId -> queue
                         .get(AgentTurnWorker.taskIdFor(turnId, history.currentRun()))
                         .filter(task -> !task.status().terminal())
@@ -335,7 +338,7 @@ public class AgentChatService {
                 liveTurnId == null ? null : history.currentRun(), firstBuffered, latest);
     }
 
-    public boolean cancelChat(UUID sessionId) {
+    public boolean cancelChat(SessionId sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
         var history = conversationManager.loadCompleteHistory(session.conversationId());
         boolean cancelled = history.currentTurnId()
@@ -375,7 +378,7 @@ public class AgentChatService {
             TurnMessage stub = TurnMessage.toolResult(call.callId(), call.name(),
                     "Cancelled by user before the tool finished", true);
             conversationManager.addMessageToConversation(
-                    session.conversationId(), session.agentDefinitionId(), stub.senderType(),
+                    session.conversationId(), session.agentDefinitionId().value(), stub.senderType(),
                     stub.type(), stub.content(), turn.turnId(), history.currentRun(),
                     stub.metadata());
             log.info("Cancel stub written for open call {} ({})", call.callId(), call.name());
@@ -437,7 +440,7 @@ public class AgentChatService {
      * Always built fresh — the persisted snapshot may be stale after
      * retroactive tool-result compression.
      */
-    public WorkingMemory memorySnapshot(UUID sessionId) {
+    public WorkingMemory memorySnapshot(SessionId sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
         AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
@@ -452,7 +455,7 @@ public class AgentChatService {
      *
      * @return number of messages that were compressed
      */
-    public int compressMemory(UUID sessionId) {
+    public int compressMemory(SessionId sessionId) {
         AgentSession session = sessionService.findSession(sessionId);
         AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
@@ -472,7 +475,7 @@ public class AgentChatService {
     }
 
     private static AuthenticationInfo authFor(AgentSession session) {
-        return AuthenticationInfo.of(UserId.of(session.userId()), session.namespace());
+        return AuthenticationInfo.of(session.userId());
     }
 
     /**

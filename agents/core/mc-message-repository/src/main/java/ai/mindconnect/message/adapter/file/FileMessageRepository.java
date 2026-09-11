@@ -1,5 +1,9 @@
 package ai.mindconnect.message.adapter.file;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.message.domain.MessageId;
+
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.port.out.MessageRepository;
@@ -11,7 +15,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.IntFunction;
 import java.util.logging.Logger;
@@ -46,8 +49,8 @@ public class FileMessageRepository implements MessageRepository {
     private final Path baseDir;
     private final ObjectMapper objectMapper;
 
-    public FileMessageRepository(Path messageStorageDir, ObjectMapper objectMapper) {
-        this.baseDir = messageStorageDir.resolve("conversations").toAbsolutePath();
+    public FileMessageRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
+        this.baseDir = messageStorageDir.resolve(namespace.value()).resolve("conversations").toAbsolutePath();
         this.objectMapper = objectMapper;
         log.info("MessageRepository storage: " + this.baseDir);
     }
@@ -72,20 +75,14 @@ public class FileMessageRepository implements MessageRepository {
     }
 
     @Override
-    public List<Message> findByConversationId(UUID conversationId, PageRequest page) {
+    public List<Message> findByConversation(ConversationId conversationId, PageRequest page) {
         Path dir = messagesDir(conversationId);
         if (!Files.exists(dir)) return List.of();
         try (var stream = Files.list(dir)) {
             return stream
                     .filter(p -> p.toString().endsWith(".json"))
                     .sorted()
-                    .map(p -> {
-                        try {
-                            return objectMapper.readValue(p.toFile(), Message.class);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    })
+                    .map(p -> read(p, conversationId))
                     .skip(page.offset())
                     .limit(page.size())
                     .toList();
@@ -95,30 +92,24 @@ public class FileMessageRepository implements MessageRepository {
     }
 
     @Override
-    public Optional<Message> findById(UUID conversationId, UUID messageId) {
+    public Optional<Message> findById(ConversationId conversationId, MessageId id) {
         Path dir = messagesDir(conversationId);
         if (!Files.exists(dir)) return Optional.empty();
         // Use glob to match "*_{messageId}.json" — avoids full directory scan
         PathMatcher matcher = dir.getFileSystem()
-                .getPathMatcher("glob:**/*_" + messageId + ".json");
+                .getPathMatcher("glob:**/*_" + id.value() + ".json");
         try (var stream = Files.list(dir)) {
             return stream
                     .filter(matcher::matches)
                     .findFirst()
-                    .map(p -> {
-                        try {
-                            return objectMapper.readValue(p.toFile(), Message.class);
-                        } catch (IOException e) {
-                            throw new UncheckedIOException(e);
-                        }
-                    });
+                    .map(p -> read(p, conversationId));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     @Override
-    public Message append(UUID conversationId, IntFunction<Message> create) {
+    public Message append(ConversationId conversationId, IntFunction<Message> create) {
         ReentrantLock lock = appendLocks[Math.floorMod(conversationId.hashCode(), APPEND_LOCKS)];
         lock.lock();
         try {
@@ -133,7 +124,7 @@ public class FileMessageRepository implements MessageRepository {
      * Read from the file names, which carry it zero-padded in front, so
      * this costs a directory listing and opens nothing.
      */
-    private int maxSequenceNum(UUID conversationId) {
+    private int maxSequenceNum(ConversationId conversationId) {
         Path dir = messagesDir(conversationId);
         if (!Files.exists(dir)) return 0;
         try (var stream = Files.list(dir)) {
@@ -158,7 +149,7 @@ public class FileMessageRepository implements MessageRepository {
     }
 
     @Override
-    public void deleteBySequenceRange(UUID conversationId, int fromSeq, int toSeq) {
+    public void deleteBySequenceRange(ConversationId conversationId, int fromSeq, int toSeq) {
         Path dir = messagesDir(conversationId);
         if (!Files.exists(dir)) return;
         try (var stream = Files.list(dir)) {
@@ -181,12 +172,22 @@ public class FileMessageRepository implements MessageRepository {
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private Path messagesDir(UUID conversationId) {
-        return baseDir.resolve(conversationId.toString()).resolve("messages");
+    private Path messagesDir(ConversationId conversationId) {
+        return baseDir.resolve(conversationId.value()).resolve("messages");
     }
 
     private Path fileFor(Message message) {
-        String name = String.format("%010d_%s.json", message.sequenceNum(), message.id());
+        String name = String.format("%010d_%s.json", message.sequenceNum(), message.id().value());
         return messagesDir(message.conversationId()).resolve(name);
+    }
+
+    /** A message written before the namespace was recorded takes it from the conversation asked for. */
+    private Message read(Path file, ConversationId conversationId) {
+        try {
+            return objectMapper.readerFor(Message.class)
+                    .readValue(file.toFile());
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 }

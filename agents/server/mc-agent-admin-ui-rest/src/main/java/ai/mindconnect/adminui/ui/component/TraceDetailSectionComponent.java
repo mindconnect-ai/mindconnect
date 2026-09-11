@@ -13,7 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
+import ai.mindconnect.message.domain.ChatTurnId;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 
@@ -75,7 +75,7 @@ public final class TraceDetailSectionComponent implements UiComponent {
                 continue;
             }
 
-            UUID parent = t.context() != null ? t.context().parentTurnId() : null;
+            ChatTurnId parent = t.context() != null ? t.context().parentTurnId() : null;
             if (pending != null && !Objects.equals(pending.parentTurnId, parent)) {
                 detail.section(pending.containerId, null, pending.toCollapsibleSection(resultsByCallId));
                 pending = null;
@@ -114,13 +114,13 @@ public final class TraceDetailSectionComponent implements UiComponent {
 
     /** Accumulator for one collapsible run of consecutive sub-agent roundtrips. */
     private static final class SubAgentGroup {
-        final UUID parentTurnId;
+        final ChatTurnId parentTurnId;
         final String agentLabel;
         final String containerId;
         final List<LlmCallTrace> traces = new ArrayList<>();
         final List<Integer> indices = new ArrayList<>();
 
-        SubAgentGroup(UUID parentTurnId, String agentLabel, String containerId) {
+        SubAgentGroup(ChatTurnId parentTurnId, String agentLabel, String containerId) {
             this.parentTurnId = parentTurnId;
             this.agentLabel = agentLabel;
             this.containerId = containerId;

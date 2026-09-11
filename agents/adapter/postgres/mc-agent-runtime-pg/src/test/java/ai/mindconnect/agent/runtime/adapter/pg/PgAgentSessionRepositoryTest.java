@@ -3,30 +3,33 @@ package ai.mindconnect.agent.runtime.adapter.pg;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class PgAgentSessionRepositoryTest {
 
-    private static final Namespace NS = new Namespace("default");
-    private static final UUID AGENT = UUID.randomUUID();
+    private static final Namespace NS = new Namespace("test");
+    private static final AgentId AGENT = AgentId.random();
 
     private PgAgentSessionRepository repo;
 
     @BeforeEach
     void setUp() {
-        repo = new PgAgentSessionRepository(TestDb.fresh("mc_agent_session")).initSchema();
+        repo = new PgAgentSessionRepository(TestDb.fresh("mc_agent_session"), NS).initSchema();
     }
 
-    private static AgentSession session(String user, String startedAt, UUID parent) {
-        return new AgentSession(UUID.randomUUID(), AGENT, NS, user, UUID.randomUUID(), "t",
+    private static AgentSession session(String user, String startedAt, SessionId parent) {
+        return new AgentSession(SessionId.random(), AGENT, UserId.of(user), ConversationId.random(), "t",
                 SessionStatus.ACTIVE, startedAt == null ? null : Instant.parse(startedAt), null, parent, null, null);
     }
 
@@ -48,10 +51,10 @@ class PgAgentSessionRepositoryTest {
         AgentSession someoneElse = session("eve", "2026-09-05T00:00:00Z", null);
         for (AgentSession s : List.of(oldest, child, undated, newest, someoneElse)) repo.save(s);
 
-        assertThat(repo.findByUser(NS, "david")).containsExactly(newest, oldest, undated);
-        assertThat(repo.findByAgentDefinitionId(AGENT, NS, "david")).containsExactly(child, newest, oldest, undated);
-        assertThat(repo.findByAgentDefinitionId(UUID.randomUUID(), NS, "david")).isEmpty();
-        assertThat(repo.findByParentSessionId(newest.id())).containsExactly(child);
+        assertThat(repo.findByUser(UserId.of("david"))).containsExactly(newest, oldest, undated);
+        assertThat(repo.findByAgent(AGENT, UserId.of("david"))).containsExactly(child, newest, oldest, undated);
+        assertThat(repo.findByAgent(AgentId.random(), UserId.of("david"))).isEmpty();
+        assertThat(repo.findByParentSession(newest.id())).containsExactly(child);
     }
 
     @Test
@@ -62,14 +65,14 @@ class PgAgentSessionRepositoryTest {
         repo.save(b);
         repo.save(session("david", "2026-09-02T00:00:00Z", a.id()));
 
-        var headers = repo.findHeadersByUser(NS, "david");
+        var headers = repo.findHeadersByUser(UserId.of("david"));
         assertThat(headers).hasSize(2);
         assertThat(headers).extracting(AgentSessionHeader::id).containsExactly(a.id(), b.id());
         var h = headers.get(0);
         assertThat(h).isInstanceOf(PgAgentSessionRepository.Header.class);
-        assertThat(List.of(h.agentDefinitionId(), h.namespace(), h.userId(), h.conversationId(), h.title(),
+        assertThat(List.of(h.agentDefinitionId(), h.userId(), h.conversationId(), h.title(),
                 h.status(), h.startedAt()))
-                .containsExactly(a.agentDefinitionId(), a.namespace(), a.userId(), a.conversationId(), a.title(),
+                .containsExactly(a.agentDefinitionId(), a.userId(), a.conversationId(), a.title(),
                         a.status(), a.startedAt());
         assertThat(h.completedAt()).isNull();
         assertThat(h.parentSessionId()).isNull();

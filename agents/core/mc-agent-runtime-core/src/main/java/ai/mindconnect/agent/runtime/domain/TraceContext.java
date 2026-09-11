@@ -1,6 +1,9 @@
 package ai.mindconnect.agent.runtime.domain;
 
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
+
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
 
 /**
  * Identifies the agent-runtime context that issued an LLM call: which
@@ -18,10 +21,12 @@ import java.util.UUID;
  * @param agentName     display name of the agent issuing the call, for UI
  */
 public record TraceContext(
-        UUID conversationId,
-        UUID sessionId,
-        UUID turnId,
-        UUID parentTurnId,
+        ConversationId conversationId,
+        SessionId sessionId,
+        ChatTurnId turnId,
+        ChatTurnId parentTurnId,
         int depth,
         String agentName
-) {}
+) {
+
+}

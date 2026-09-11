@@ -171,8 +171,10 @@ for itself.
 | Property | Default | Notes |
 |----------|---------|-------|
 | `mindconnect.vector-store.backend` | `memory` | Backend type (`memory`, `pgvector`, or your own). |
-| `mindconnect.vector-store.dir` | `data/vector-stores` | `memory` backend: store files. |
 | `mindconnect.vector-store.url` / `.user` / `.password` | — | `pgvector` backend connection. |
 | `mindconnect.vector-store.embedding-config` | `embeddings` | Name of the `EMBEDDING` LLM config. |
 | `mindconnect.file-store.backend` | `filesystem` | File-store backend type. |
-| `mindconnect.file-store.dir` | `data/files` | `filesystem` backend root. |
+
+The `memory` vector-store backend and the `filesystem` file store keep their
+files next to everything else of the namespace: `<mindconnect.data.base-dir>/<mindconnect.namespace>/vector-stores`
+and `…/files` (default `data/local/vector-stores`, `data/local/files`).

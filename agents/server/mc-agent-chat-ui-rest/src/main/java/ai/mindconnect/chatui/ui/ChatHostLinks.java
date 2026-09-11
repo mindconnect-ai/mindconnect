@@ -1,7 +1,9 @@
 package ai.mindconnect.chatui.ui;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+
 import java.util.List;
-import java.util.UUID;
 
 /**
  * The links a host application contributes to the chat surface.
@@ -24,12 +26,12 @@ public interface ChatHostLinks {
     record ToolLink(String id, String label, String icon, String url) {}
 
     /** Where "back" leads, or {@code null} for no back action. */
-    default String backHref(UUID agentId, UUID sessionId) {
+    default String backHref(AgentId agentId, SessionId sessionId) {
         return null;
     }
 
     /** Dialogs the host offers over the running conversation (memory, traces, …). */
-    default List<ToolLink> sessionTools(UUID sessionId) {
+    default List<ToolLink> sessionTools(SessionId sessionId) {
         return List.of();
     }
 

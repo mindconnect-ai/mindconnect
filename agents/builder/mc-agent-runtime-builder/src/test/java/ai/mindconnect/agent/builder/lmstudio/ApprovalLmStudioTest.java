@@ -1,11 +1,13 @@
 package ai.mindconnect.agent.builder.lmstudio;
 
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 
@@ -15,7 +17,6 @@ import org.junit.jupiter.api.Timeout;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static ai.mindconnect.agent.builder.lmstudio.LmStudioSupport.*;
@@ -43,7 +44,7 @@ class ApprovalLmStudioTest {
     }
 
     private record Chat(AgentRuntime runtime, AgentChatService service, AgentSession session,
-                        UUID conversationId) implements AutoCloseable {
+                        ConversationId conversationId) implements AutoCloseable {
         @Override public void close() {
             runtime.close();
         }
@@ -53,7 +54,7 @@ class ApprovalLmStudioTest {
         AgentRuntime runtime = runtime("approver", ROBOT_PROMPT, null, List.of(
                 tool("it_echo", true),
                 tool("it_slow", false)));
-        AgentSession session = runtime.openSession("approver", "tester");
+        AgentSession session = runtime.openSession("approver", UserId.of("tester"));
         return new Chat(runtime, runtime.chatService(), session, session.conversationId());
     }
 

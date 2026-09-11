@@ -21,8 +21,10 @@ import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;
 import ai.mindconnect.message.port.in.ConversationManager;
@@ -45,7 +47,7 @@ import java.util.function.Consumer;
  * <pre>
  * var backend = new AgentRuntimeBackend(chatService, sessionService,
  *         definitionRepository, conversationManager, "user-1");
- * Session s = backend.open("default", "travel-assistant");
+ * Session s = backend.open("travel-assistant");
  * Response r = backend.create(ResponseRequest.text(s.id(), "Hi!"));
  * </pre>
  *
@@ -53,7 +55,7 @@ import java.util.function.Consumer;
  * ({@link #sessions()}, {@link #responses()}, {@link #conversations()})
  * because the interfaces' {@code get} methods collide on one class.
  *
- * <p>v1 mapping notes: ids are the runtime's UUIDs as strings; responses are
+ * <p>v1 mapping notes: ids are the runtime's id values as strings; responses are
  * tracked in-memory (a restart forgets them — the conversation keeps the
  * durable truth); {@code Conversations.items} maps the legacy Message format
  * lossily until items are stored natively (concept 9).
@@ -64,13 +66,14 @@ public final class AgentRuntimeBackend {
     private final AgentSessionService sessionService;
     private final AgentDefinitionRepository definitions;
     private final ConversationManager conversationManager;
-    private final String userId;
+    private final UserId userId;
 
     private final Map<String, ResponseAssembler> assemblers = new ConcurrentHashMap<>();
     private final Map<String, ChatTurnHandle> handles = new ConcurrentHashMap<>();
 
     private ai.mindconnect.filestore.FileStore fileStore;
     private FileAttacher fileAttacher;
+
 
     public AgentRuntimeBackend(AgentChatService chat, AgentSessionService sessionService,
                                AgentDefinitionRepository definitions,
@@ -79,7 +82,7 @@ public final class AgentRuntimeBackend {
         this.sessionService = sessionService;
         this.definitions = definitions;
         this.conversationManager = conversationManager;
-        this.userId = userId;
+        this.userId = UserId.of(userId);
     }
 
     /**
@@ -104,19 +107,18 @@ public final class AgentRuntimeBackend {
 
     public Files files() { return filesApi; }
 
-    public Session open(String namespace, String agentName) { return sessionsApi.open(namespace, agentName); }
+    public Session open(String agentName) { return sessionsApi.open(agentName); }
 
     public Response create(ResponseRequest request) { return responsesApi.create(request); }
 
     private final Sessions sessionsApi = new Sessions() {
 
         @Override
-        public Session open(String namespace, String agentName) {
-            Namespace ns = new Namespace(namespace);
-            AgentDefinition def = definitions.findByName(ns, agentName)
+        public Session open(String agentName) {
+            AgentDefinition def = definitions.findByName(agentName)
                     .orElseThrow(() -> new RuntimeBackendException(
-                            "No agent named '" + agentName + "' in namespace '" + namespace + "'"));
-            AgentSession session = sessionService.openChat(def.id(), ns, userId);
+                            "No agent named '" + agentName + "'"));
+            AgentSession session = sessionService.openChat(def.id(), userId);
             return toProtocol(session, agentName);
         }
 
@@ -130,7 +132,7 @@ public final class AgentRuntimeBackend {
         @Override
         public Optional<Session> get(String sessionId) {
             try {
-                AgentSession session = sessionService.findSession(UUID.fromString(sessionId));
+                AgentSession session = sessionService.findSession(SessionId.of(sessionId));
                 String agentName = definitions.findById(session.agentDefinitionId())
                         .map(AgentDefinition::name).orElse("unknown");
                 return Optional.of(toProtocol(session, agentName));
@@ -140,8 +142,8 @@ public final class AgentRuntimeBackend {
         }
 
         private Session toProtocol(AgentSession session, String agentName) {
-            return new Session(session.id().toString(), session.namespace().value(),
-                    session.conversationId().toString(), agentName, session.startedAt());
+            return new Session(session.id().value(),
+                    session.conversationId().value(), agentName, session.startedAt());
         }
     };
 
@@ -153,19 +155,19 @@ public final class AgentRuntimeBackend {
                 throw new RuntimeBackendException("clientTools are not supported by the "
                         + "runtime backend yet — register tools on the agent definition");
             }
-            AgentSession session = sessionService.findSession(UUID.fromString(request.sessionId()));
+            AgentSession session = sessionService.findSession(SessionId.of(request.sessionId()));
             String agentName = definitions.findById(session.agentDefinitionId())
                     .map(AgentDefinition::name).orElse("unknown");
 
             String responseId = "resp_" + UUID.randomUUID();
             ResponseAssembler assembler = new ResponseAssembler(responseId,
-                    session.conversationId().toString(), request.sessionId(), agentName);
+                    session.conversationId().value(), request.sessionId(), agentName);
             assemblers.put(responseId, assembler);
 
             ChatTurnHandle handle = chat.submitChat(
-                    UUID.fromString(request.sessionId()), prepareInput(request), assembler::accept);
+                    session.id(), prepareInput(request), assembler::accept);
             handles.put(responseId, handle);
-            assembler.addMetadata("mc.turnId", handle.id().toString());
+            assembler.addMetadata("mc.turnId", handle.id().value());
             handle.result().whenComplete((text, ex) -> {
                 if (ex instanceof CancellationException
                         || ex != null && ex.getCause() instanceof CancellationException) {
@@ -225,7 +227,7 @@ public final class AgentRuntimeBackend {
                 throw new RuntimeBackendException("The runtime backend currently accepts exactly "
                         + "one user message as input (approvals come with the native item store)");
             }
-            UUID sessionId = UUID.fromString(request.sessionId());
+            SessionId sessionId = SessionId.of(request.sessionId());
             StringBuilder text = new StringBuilder();
             List<ai.mindconnect.message.domain.ContentPart> media = new java.util.ArrayList<>();
             for (ContentPart part : message.content()) {
@@ -250,12 +252,12 @@ public final class AgentRuntimeBackend {
             return List.copyOf(parts);
         }
 
-        private void attachDocument(UUID sessionId, ContentPart.Document doc) {
+        private void attachDocument(SessionId sessionId, ContentPart.Document doc) {
             fileAttacher.attach(sessionId, resolve(doc.source(), doc.name()));
         }
 
         /** The stored image, attached to the session (recorded, viewer activated — never ingested). */
-        private ai.mindconnect.filestore.StoredFile attachImage(UUID sessionId, ContentPart.Image image) {
+        private ai.mindconnect.filestore.StoredFile attachImage(SessionId sessionId, ContentPart.Image image) {
             var stored = resolve(image.source(), inlineImageName(image.source()));
             fileAttacher.attach(sessionId, stored);
             return stored;
@@ -277,7 +279,7 @@ public final class AgentRuntimeBackend {
         private ai.mindconnect.filestore.StoredFile resolve(ContentPart.MediaSource source, String name) {
             requireFiles();
             return switch (source) {
-                case ContentPart.MediaSource.FileId f -> fileStore.find(f.fileId())
+                case ContentPart.MediaSource.FileId f -> fileStore.find(ai.mindconnect.filestore.FileId.of(f.fileId()))
                         .orElseThrow(() -> new RuntimeBackendException(
                                 "Unknown file id " + f.fileId() + " — upload via files() first"));
                 case ContentPart.MediaSource.Inline in -> storeInline(name, in);
@@ -313,12 +315,12 @@ public final class AgentRuntimeBackend {
         @Override
         public Optional<StoredFile> get(String fileId) {
             requireFiles();
-            return fileStore.find(fileId).map(AgentRuntimeBackend::toProtocolFile);
+            return fileStore.find(ai.mindconnect.filestore.FileId.of(fileId)).map(AgentRuntimeBackend::toProtocolFile);
         }
     };
 
     private static StoredFile toProtocolFile(ai.mindconnect.filestore.StoredFile stored) {
-        return new StoredFile(stored.id(), stored.name(), stored.contentType(), stored.size());
+        return new StoredFile(stored.id().value(), stored.name(), stored.contentType(), stored.size());
     }
 
     private void requireFiles() {
@@ -332,15 +334,15 @@ public final class AgentRuntimeBackend {
     private final Conversations conversationsApi = new Conversations() {
 
         @Override
-        public Conversation create(String namespace) {
+        public Conversation create() {
             throw new RuntimeBackendException("Standalone conversations are not supported yet — "
                     + "the runtime creates the conversation when a session opens");
         }
 
         @Override
         public Optional<Conversation> get(String conversationId) {
-            return conversationManager.findById(UUID.fromString(conversationId))
-                    .map(c -> new Conversation(c.id().toString(), c.namespace().value(), c.createdAt()));
+            return conversationManager.findById(ConversationId.of(conversationId))
+                    .map(c -> new Conversation(c.id().value(), c.createdAt()));
         }
 
         @Override
@@ -352,7 +354,7 @@ public final class AgentRuntimeBackend {
         @Override
         public List<ConversationItemRecord> items(String conversationId, long afterSeq, int limit) {
             List<Message> history = conversationManager.loadHistory(
-                    UUID.fromString(conversationId), new PageRequest(0, 1000));
+                    ConversationId.of(conversationId), new PageRequest(0, 1000));
             return history.stream()
                     .filter(m -> m.sequenceNum() > afterSeq)
                     .limit(limit)
@@ -369,11 +371,11 @@ public final class AgentRuntimeBackend {
                         ? ai.mindconnect.agent.protocol.item.Role.USER
                         : ai.mindconnect.agent.protocol.item.Role.ASSISTANT, m);
                 case TOOL_CALL -> new ConversationItem.FunctionCall(
-                        m.id().toString(), "tool_calls", Map.of("_raw", content));
-                case TOOL_RESULT -> new ConversationItem.FunctionCallOutput(m.id().toString(), content, false);
+                        m.id().value(), "tool_calls", Map.of("_raw", content));
+                case TOOL_RESULT -> new ConversationItem.FunctionCallOutput(m.id().value(), content, false);
                 default -> ConversationItem.Message.assistant(content);
             };
-            return new ConversationItemRecord(m.id().toString(), m.sequenceNum(), item);
+            return new ConversationItemRecord(m.id().value(), m.sequenceNum(), item);
         }
     };
 }

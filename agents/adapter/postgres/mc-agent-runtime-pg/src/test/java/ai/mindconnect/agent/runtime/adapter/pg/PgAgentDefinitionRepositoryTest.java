@@ -9,47 +9,45 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PgAgentDefinitionRepositoryTest {
 
-    private static final Namespace NS = new Namespace("default");
+    private static final Namespace NS = new Namespace("test");
 
     private PgAgentDefinitionRepository repo;
 
     @BeforeEach
     void setUp() {
-        repo = new PgAgentDefinitionRepository(TestDb.fresh("mc_agent_definition")).initSchema();
+        repo = new PgAgentDefinitionRepository(TestDb.fresh("mc_agent_definition"), NS).initSchema();
     }
 
-    private static AgentDefinition def(Namespace ns, String name) {
-        return AgentDefinition.create(ns, name, "desc", "You are " + name, "hello", "agent-default");
+    private static AgentDefinition def(String name) {
+        return AgentDefinition.create(name, "desc", "You are " + name, "hello", "agent-default");
     }
 
     @Test
     void aDefinitionSurvivesTheRoundTrip() {
-        AgentDefinition d = def(NS, "default-chat");
+        AgentDefinition d = def("default-chat");
         repo.save(d);
         assertThat(repo.findById(d.id())).contains(d);
     }
 
     @Test
-    void findByNameIgnoresCaseAndStaysInTheNamespace() {
-        AgentDefinition d = def(NS, "Web-Researcher");
+    void findByNameIgnoresCase() {
+        AgentDefinition d = def("Web-Researcher");
         repo.save(d);
-        repo.save(def(new Namespace("other"), "web-researcher"));
 
-        assertThat(repo.findByName(NS, "web-researcher")).contains(d);
-        assertThat(repo.findByName(NS, "WEB-RESEARCHER")).contains(d);
-        assertThat(repo.findByName(new Namespace("nobody"), "web-researcher")).isEmpty();
+        assertThat(repo.findByName("web-researcher")).contains(d);
+        assertThat(repo.findByName("WEB-RESEARCHER")).contains(d);
+        assertThat(repo.findByName("nobody")).isEmpty();
     }
 
     @Test
-    void findByNamespaceListsByNameAndDeleteRemoves() {
-        AgentDefinition b = def(NS, "b");
-        AgentDefinition a = def(NS, "a");
+    void findAllListsByNameAndDeleteRemoves() {
+        AgentDefinition b = def("b");
+        AgentDefinition a = def("a");
         repo.save(b);
         repo.save(a);
-        repo.save(def(new Namespace("other"), "c"));
 
-        assertThat(repo.findByNamespace(NS)).containsExactly(a, b);
+        assertThat(repo.findAll()).containsExactly(a, b);
         repo.deleteById(a.id());
-        assertThat(repo.findByNamespace(NS)).containsExactly(b);
+        assertThat(repo.findAll()).containsExactly(b);
     }
 }

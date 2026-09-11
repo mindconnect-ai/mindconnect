@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.service.task;
 
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
@@ -13,7 +16,6 @@ import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskRecord;
 
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * The round's {@link AgentRoundToolExecutor} on the
@@ -49,16 +51,16 @@ final class QueuedAgentRoundToolExecutor implements AgentRoundToolExecutor {
     private final AgentSessionService sessionService;
     private final AgentDefinition def;
     private final AgentSession session;
-    private final UUID turnId;
+    private final ChatTurnId turnId;
     private final int run;
-    private final UUID conversationId;
+    private final ConversationId conversationId;
     private final int depth;
 
     QueuedAgentRoundToolExecutor(TaskContext ctx, ConversationManager conversationManager,
                                  AgentSessionService sessionService,
                                  AgentDefinition def,
                                  AgentSession session,
-                                 UUID turnId, int run, UUID conversationId, int depth) {
+                                 ChatTurnId turnId, int run, ConversationId conversationId, int depth) {
         this.ctx = ctx;
         this.conversationManager = conversationManager;
         this.sessionService = sessionService;
@@ -71,12 +73,12 @@ final class QueuedAgentRoundToolExecutor implements AgentRoundToolExecutor {
     }
 
     @Override
-    public void execute(String requestId, UUID sessionId, ToolCalls.Call call) {
+    public void execute(String requestId, SessionId sessionId, ToolCalls.Call call) {
         ctx.submitChild(ToolCallWorker.submission(turnId, run, sessionId, depth, call));
     }
 
     @Override
-    public ToolResult result(UUID sessionId, String callId) {
+    public ToolResult result(SessionId sessionId, String callId) {
         String taskId = ToolCallWorker.taskIdFor(turnId, callId);
         Optional<TaskRecord> task = ctx.children().stream()
                 .filter(child -> child.id().equals(taskId))

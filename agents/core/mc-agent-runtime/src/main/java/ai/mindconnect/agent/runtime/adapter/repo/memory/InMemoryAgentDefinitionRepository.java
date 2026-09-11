@@ -1,19 +1,19 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.AgentId;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.Namespace;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** In-memory {@link AgentDefinitionRepository} — process-lifetime storage, no persistence. */
 public class InMemoryAgentDefinitionRepository implements AgentDefinitionRepository {
 
-    private final Map<UUID, AgentDefinition> store = new ConcurrentHashMap<>();
+    private final Map<AgentId, AgentDefinition> store = new ConcurrentHashMap<>();
 
     @Override
     public AgentDefinition save(AgentDefinition definition) {
@@ -22,24 +22,24 @@ public class InMemoryAgentDefinitionRepository implements AgentDefinitionReposit
     }
 
     @Override
-    public Optional<AgentDefinition> findById(UUID id) {
+    public Optional<AgentDefinition> findById(AgentId id) {
         return Optional.ofNullable(store.get(id));
     }
 
     @Override
-    public List<AgentDefinition> findByNamespace(Namespace namespace) {
-        return store.values().stream().filter(d -> d.namespace().equals(namespace)).toList();
+    public List<AgentDefinition> findAll() {
+        return store.values().stream().toList();
     }
 
     @Override
-    public Optional<AgentDefinition> findByName(Namespace namespace, String name) {
+    public Optional<AgentDefinition> findByName(String name) {
         return store.values().stream()
-                .filter(d -> d.namespace().equals(namespace) && d.name().equals(name))
+                .filter(d -> d.name().equals(name))
                 .findFirst();
     }
 
     @Override
-    public void deleteById(UUID id) {
+    public void deleteById(AgentId id) {
         store.remove(id);
     }
 }

@@ -16,7 +16,8 @@ import ai.mindconnect.ui.model.UiNode;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * The chat's own app shell, nested inside whatever shell the host provides:
@@ -39,9 +40,9 @@ public final class ChatShellComponent implements UiComponent {
     private final AgentSession active;
     private final String agentName;
     private final UiNode content;
-    private final java.util.Map<UUID, String> agentIcons;
-    private java.util.Set<UUID> running = java.util.Set.of();
-    private java.util.Set<UUID> waiting = java.util.Set.of();
+    private final java.util.Map<AgentId, String> agentIcons;
+    private java.util.Set<SessionId> running = java.util.Set.of();
+    private java.util.Set<SessionId> waiting = java.util.Set.of();
 
     public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
                               String agentName, UiNode content) {
@@ -57,7 +58,7 @@ public final class ChatShellComponent implements UiComponent {
      */
     public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
                               String agentName, UiNode content,
-                              java.util.Map<UUID, String> agentIcons) {
+                              java.util.Map<AgentId, String> agentIcons) {
         this.sessions = sessions;
         this.active = active;
         this.agentName = agentName;
@@ -72,7 +73,7 @@ public final class ChatShellComponent implements UiComponent {
      * renders the current state; the user stream keeps it current after
      * that (see chat-ui.js).
      */
-    public ChatShellComponent withActivity(java.util.Set<UUID> running, java.util.Set<UUID> waiting) {
+    public ChatShellComponent withActivity(java.util.Set<SessionId> running, java.util.Set<SessionId> waiting) {
         this.running = running == null ? java.util.Set.of() : running;
         this.waiting = waiting == null ? java.util.Set.of() : waiting;
         return this;
@@ -122,13 +123,13 @@ public final class ChatShellComponent implements UiComponent {
                 .onClick(trigger(on(ChatUiController.class).createSession(null))));
         menu.item(UiMenuItem.divider());
 
-        UUID activeId = active == null ? null : active.id();
+        SessionId activeId = active == null ? null : active.id();
         for (AgentSessionHeader s : sessions) {
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
             String badge = waiting.contains(s.id()) ? BADGE_NEEDS_INPUT
                     : running.contains(s.id()) ? BADGE_RUNNING
                     : ago(s.startedAt());
-            menu.item(UiMenuItem.link("chat-" + s.id(), label, "/chat/sessions/" + s.id())
+            menu.item(UiMenuItem.link("chat-" + s.id().value(), label, "/chat/sessions/" + s.id().value())
                     .icon(iconFor(s))
                     .badge(badge)
                     .selected(s.id().equals(activeId)));
@@ -138,7 +139,7 @@ public final class ChatShellComponent implements UiComponent {
 
     /** The icon of the agent this conversation belongs to, or the generic one. */
     private String iconFor(AgentSessionHeader s) {
-        UUID agentId = s.agentDefinitionId();
+        AgentId agentId = s.agentDefinitionId();
         String icon = agentId == null ? null : agentIcons.get(agentId);
         return icon == null ? AgentDefinition.DEFAULT_ICON : icon;
     }

@@ -13,7 +13,6 @@ The format of a file in
 ```json title="agent-definitions/research-lead.json"
 {
   "id": "00000002-0000-0000-0000-000000000025",
-  "namespace": { "value": "local" },
   "name": "research-lead",
   "description": "Research orchestrator. Breaks a question into sub-topics…",
   "systemPrompt": "You are a research lead. …",
@@ -33,7 +32,7 @@ The format of a file in
       "id": "00000003-0000-0000-0000-000000000250",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000025",
       "name": "list_agents",
-      "description": "Lists all available agents in the current namespace.",
+      "description": "Lists all available agents.",
       "enabled": true
     }
   ],
@@ -47,7 +46,6 @@ The format of a file in
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | UUID | Stable identifier. Use a fresh UUID for a new agent. |
-| `namespace` | object | Tenant scope, e.g. `{ "value": "local" }`. Identity is `name` + namespace. |
 | `name` | string | Unique agent name; referenced by `run_agent("<name>", …)`. |
 | `description` | string | Short summary shown in lists and to orchestrators. |
 | `systemPrompt` | string | The agent's role and instructions. Supports template vars like `{{ current_date }}`. |

@@ -3,7 +3,7 @@ id: approval-parallel-resume
 area: approval
 requires: [server-9091, lm-studio-parallel-toolcall-model]
 duration: ~5 min
-last-verified: 2026-08-27 (working tree at 3d8313c, runs/2026-08-27-parallel-approval — OpenAI gpt-5.4-mini, scripted execution)
+last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
 ---
 
 # Answering a card while another tool still runs: no second execution

@@ -52,6 +52,7 @@ public final class DocumentTable<T> {
     private final Sql sql;
     private final Class<T> type;
     private final String table;
+    private final Column<T> partition;
     private final Column<T> id;
     private final List<Column<T>> columns;
     private final List<Index> indexes;
@@ -62,6 +63,7 @@ public final class DocumentTable<T> {
         this.sql = b.sql;
         this.type = b.type;
         this.table = b.table;
+        this.partition = b.partition;
         this.id = b.id;
         this.columns = List.copyOf(b.columns);
         this.indexes = List.copyOf(b.indexes);
@@ -75,19 +77,27 @@ public final class DocumentTable<T> {
 
     // ── schema ──────────────────────────────────────────────────────────────
 
-    /** The DDL {@link #createSchema} runs, for reading or for a migration script. */
+    /** The DDL {@link #createSchema()} runs, for reading or for a migration script. */
     public String ddl() {
         StringBuilder out = new StringBuilder();
         out.append("CREATE TABLE IF NOT EXISTS ").append(table).append(" (\n");
-        out.append("    ").append(id.name()).append(' ').append(id.type()).append(" PRIMARY KEY,\n");
+        if (partition == null) {
+            out.append("    ").append(id.name()).append(' ').append(id.type()).append(" PRIMARY KEY,\n");
+        } else {
+            out.append("    ").append(partition.name()).append(' ').append(partition.type()).append(" NOT NULL,\n");
+            out.append("    ").append(id.name()).append(' ').append(id.type()).append(" NOT NULL,\n");
+        }
         for (Column<T> c : columns) {
             out.append("    ").append(c.name()).append(' ').append(c.type());
             if (c.required()) out.append(" NOT NULL");
             out.append(",\n");
         }
         out.append("    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),\n");
-        out.append("    doc JSONB NOT NULL\n");
-        out.append(");\n");
+        out.append("    doc JSONB NOT NULL");
+        if (partition != null) {
+            out.append(",\n    PRIMARY KEY (").append(partition.name()).append(", ").append(id.name()).append(')');
+        }
+        out.append("\n);\n");
         for (Column<T> c : columns) {
             out.append("ALTER TABLE ").append(table).append(" ADD COLUMN IF NOT EXISTS ")
                .append(c.name()).append(' ').append(c.type()).append(";\n");
@@ -100,6 +110,7 @@ public final class DocumentTable<T> {
         return out.toString();
     }
 
+    /** Creates the table if missing, adds a declared column an older table lacks, and creates the indexes. */
     public void createSchema() {
         sql.execute(ddl());
     }
@@ -107,7 +118,14 @@ public final class DocumentTable<T> {
     // ── reading ─────────────────────────────────────────────────────────────
 
     public Optional<T> findById(Object idValue) {
+        requireNoPartition("findById");
         return sql.queryOne(select("WHERE " + id.name() + " = ?"), mapper, idValue);
+    }
+
+    /** For a table with a {@link Builder#partitionKey partition key}: the row with this key pair. */
+    public Optional<T> findById(Object partitionValue, Object idValue) {
+        requirePartition("findById");
+        return sql.queryOne(select(whereKey()), mapper, partitionValue, idValue);
     }
 
     /** {@code tail} is everything after {@code FROM <table>}: WHERE, ORDER BY, LIMIT — or empty. */
@@ -132,7 +150,11 @@ public final class DocumentTable<T> {
         return count(tail, params) > 0;
     }
 
-    /** Maps a {@code doc} column to {@code T}, for a statement written by hand against {@link Sql}. */
+    /**
+     * Maps a {@code doc} column to {@code T}, for a statement written by hand against {@link Sql}.
+     * On a table with a partition key the statement selects the partition column too, which
+     * fills in a document that lacks the field.
+     */
     public RowMapper<T> mapper() {
         return mapper;
     }
@@ -149,8 +171,7 @@ public final class DocumentTable<T> {
 
     /** The columns {@link #select} reads: id, the declared ones, {@code updated_at}. */
     public String columnList() {
-        List<String> names = new ArrayList<>();
-        names.add(id.name());
+        List<String> names = keyNames();
         columns.forEach(c -> names.add(c.name()));
         names.add("updated_at");
         return String.join(", ", names);
@@ -160,10 +181,12 @@ public final class DocumentTable<T> {
 
     /** Insert or, if a row with this id exists, replace its columns and document. */
     public T save(T entity) {
-        Object[] params = new Object[columns.size() + 2];
-        params[0] = id.value().apply(entity);
+        int keys = partition == null ? 1 : 2;
+        Object[] params = new Object[columns.size() + keys + 1];
+        if (partition != null) params[0] = partition.value().apply(entity);
+        params[keys - 1] = id.value().apply(entity);
         for (int i = 0; i < columns.size(); i++) {
-            params[i + 1] = columns.get(i).value().apply(entity);
+            params[i + keys] = columns.get(i).value().apply(entity);
         }
         params[params.length - 1] = sql.json().jsonb(entity);
         sql.update(upsert, params);
@@ -171,7 +194,14 @@ public final class DocumentTable<T> {
     }
 
     public boolean deleteById(Object idValue) {
+        requireNoPartition("deleteById");
         return sql.update("DELETE FROM " + table + " WHERE " + id.name() + " = ?", idValue) > 0;
+    }
+
+    /** For a table with a {@link Builder#partitionKey partition key}: deletes the row with this key pair. */
+    public boolean deleteById(Object partitionValue, Object idValue) {
+        requirePartition("deleteById");
+        return sql.update("DELETE FROM " + table + " " + whereKey(), partitionValue, idValue) > 0;
     }
 
     /** {@code tail} must start with WHERE — a delete without one is a bug, so it is refused. */
@@ -193,19 +223,43 @@ public final class DocumentTable<T> {
     }
 
     private String select(String tail) {
-        return "SELECT doc FROM " + table + " " + tail;
+        String read = partition == null ? "doc" : partition.name() + ", doc";
+        return "SELECT " + read + " FROM " + table + " " + tail;
+    }
+
+    private List<String> keyNames() {
+        List<String> names = new ArrayList<>();
+        if (partition != null) names.add(partition.name());
+        names.add(id.name());
+        return names;
+    }
+
+    private String whereKey() {
+        return "WHERE " + partition.name() + " = ? AND " + id.name() + " = ?";
+    }
+
+    private void requirePartition(String method) {
+        if (partition == null) {
+            throw new IllegalStateException(table + " has a single-column key; call " + method + "(id)");
+        }
+    }
+
+    private void requireNoPartition(String method) {
+        if (partition != null) {
+            throw new IllegalStateException(table + " is keyed by (" + partition.name() + ", " + id.name()
+                    + "); call " + method + "(" + partition.name() + ", id)");
+        }
     }
 
     private String buildUpsert() {
-        List<String> names = new ArrayList<>();
-        names.add(id.name());
+        List<String> names = keyNames();
         columns.forEach(c -> names.add(c.name()));
         String placeholders = names.stream().map(n -> "?").collect(Collectors.joining(", "));
         String updates = columns.stream()
                 .map(c -> c.name() + " = EXCLUDED." + c.name())
                 .collect(Collectors.joining(", "));
         return "INSERT INTO " + table + " (" + String.join(", ", names) + ", updated_at, doc) VALUES ("
-                + placeholders + ", now(), ?) ON CONFLICT (" + id.name() + ") DO UPDATE SET "
+                + placeholders + ", now(), ?) ON CONFLICT (" + String.join(", ", keyNames()) + ") DO UPDATE SET "
                 + (updates.isEmpty() ? "" : updates + ", ")
                 + "updated_at = now(), doc = EXCLUDED.doc";
     }
@@ -222,6 +276,7 @@ public final class DocumentTable<T> {
         private final Class<T> type;
         private Sql sql;
         private String table;
+        private Column<T> partition;
         private Column<T> id;
         private final List<Column<T>> columns = new ArrayList<>();
         private final List<Index> indexes = new ArrayList<>();
@@ -238,6 +293,17 @@ public final class DocumentTable<T> {
         /** The primary key: column name, SQL type, and how to read it off the object. */
         public Builder<T> id(String name, String sqlType, Function<T, Object> value) {
             this.id = new Column<>(name, sqlType, true, value);
+            return this;
+        }
+
+        /**
+         * A leading key column, so that the primary key is {@code (partition, id)} and
+         * the same id may occur once per partition — a tenant column, typically. With
+         * it, {@link #findById(Object, Object)} and {@link #deleteById(Object, Object)}
+         * take both values, and the single-argument forms refuse to guess.
+         */
+        public Builder<T> partitionKey(String name, String sqlType, Function<T, Object> value) {
+            this.partition = new Column<>(name, sqlType, true, value);
             return this;
         }
 

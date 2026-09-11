@@ -12,7 +12,7 @@ import ai.mindconnect.ui.model.UiPatch;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
 
@@ -72,13 +72,13 @@ public final class MessageListComponent implements UiComponent {
         SubAgentTreeProvider NONE = (id, running, in, out) -> List.of();
     }
 
-    private final UUID sessionId;
+    private final SessionId sessionId;
     private final AgentDefinition agent;
     private final List<Message> history;
     private final WorkingMemory memory;
     private final SubAgentTreeProvider subAgentTree;
     /** Set when this session was spawned by a parent (sub-agent session) — drives the header link. */
-    private UUID parentSessionId;
+    private SessionId parentSessionId;
     /** This conversation's title, when it has one — the header's subject. */
     private String sessionTitle;
     /** Whether this chat replaced its agent's system prompt with its own. */
@@ -92,12 +92,12 @@ public final class MessageListComponent implements UiComponent {
 
 
 
-    public MessageListComponent(UUID sessionId, AgentDefinition agent,
+    public MessageListComponent(SessionId sessionId, AgentDefinition agent,
                                 List<Message> history, WorkingMemory memory) {
         this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE);
     }
 
-    public MessageListComponent(UUID sessionId, AgentDefinition agent,
+    public MessageListComponent(SessionId sessionId, AgentDefinition agent,
                                 List<Message> history, WorkingMemory memory,
                                 SubAgentTreeProvider subAgentTree) {
         this.sessionId = sessionId;
@@ -136,7 +136,7 @@ public final class MessageListComponent implements UiComponent {
      * link. Pass {@code null} (the default) for top-level, user-initiated
      * sessions. Returns {@code this} for fluent chaining.
      */
-    public MessageListComponent withParentSession(UUID parentSessionId) {
+    public MessageListComponent withParentSession(SessionId parentSessionId) {
         this.parentSessionId = parentSessionId;
         return this;
     }
@@ -165,7 +165,7 @@ public final class MessageListComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "msg-list-" + sessionId;
+        return "msg-list-" + sessionId.value();
     }
 
     @Override

@@ -37,12 +37,12 @@ public final class LlmConfigListComponent implements UiComponent {
                     ? "alias → " + c.delegatesTo()
                     : (c.provider() != null ? c.provider().name() : "?") + " · " + c.model();
             list.item(
-                UiList.Item.of(c.id().toString(), c.name())
+                UiList.Item.of(c.id().value(), c.name())
                     .description(description)
-                    .href("/admin/llm-configs/" + c.id())
+                    .href("/admin/llm-configs/" + c.id().value())
                     .action(UiAction.danger("delete", "Delete").icon("delete")
                             .confirm("Delete config '" + c.name() + "'?")
-                            .dispatch("DELETE", "/admin/api/llm-configs/" + c.id()))
+                            .dispatch("DELETE", "/admin/api/llm-configs/" + c.id().value()))
             );
         }
         return list;

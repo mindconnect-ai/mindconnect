@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.config;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -21,16 +22,16 @@ import java.util.Optional;
 public class VectorStoreConfig {
 
     @Bean
-    VectorStores vectorStores(LlmEmbeddings embeddings, LlmConfigRepository llmConfigs,
+    VectorStores vectorStores(LlmEmbeddings embeddings, LlmConfigRepository llmConfigs, Namespace namespace,
                               @Value("${mindconnect.vector-store.backend:memory}") String backend,
-                              @Value("${mindconnect.vector-store.dir:data/vector-stores}") String dir,
+                              @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
                               @Value("${mindconnect.vector-store.url:}") String url,
                               @Value("${mindconnect.vector-store.user:}") String user,
                               @Value("${mindconnect.vector-store.password:}") String password,
                               @Value("${mindconnect.vector-store.embedding-config:embeddings}") String embeddingConfig) {
         Map<String, String> strings = new LinkedHashMap<>();
         strings.put("vectorStoreBackend", backend);
-        strings.put("vectorStoreDir", dir);
+        strings.put("dataBaseDir", dataBaseDir);
         strings.put("vectorStoreUrl", url);
         strings.put("vectorStoreUser", user);
         strings.put("vectorStorePassword", password);
@@ -40,6 +41,7 @@ public class VectorStoreConfig {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) llmConfigs);
+                if (type == Namespace.class) return Optional.of((T) namespace);
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {

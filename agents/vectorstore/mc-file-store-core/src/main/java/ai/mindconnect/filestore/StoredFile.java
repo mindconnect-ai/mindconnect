@@ -9,9 +9,16 @@ import java.time.Instant;
  * and only the backend knows where the bytes live (disk, object storage, db).
  */
 public record StoredFile(
-        String id,
+        FileId id,
         String name,
         String contentType,
         long size,
         Instant createdAt
-) {}
+) {
+
+    public StoredFile {
+        if (id == null) {
+            throw new IllegalArgumentException("A stored file needs an id");
+        }
+    }
+}

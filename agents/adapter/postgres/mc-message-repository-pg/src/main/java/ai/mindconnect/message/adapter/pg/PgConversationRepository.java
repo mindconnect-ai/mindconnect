@@ -5,39 +5,42 @@ import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.message.domain.Conversation;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.port.out.ConversationRepository;
 
 import javax.sql.DataSource;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * {@link ConversationRepository} on Postgres. One row of
- * {@code mc_conversation} per conversation: the document, plus the namespace
- * and creation time that {@link #findByNamespace} filters and sorts by —
- * newest first, exactly as the file store lists them.
+ * {@code mc_conversation} per conversation, keyed by {@code (namespace, id)}:
+ * the document, plus the creation time that {@link #findAll} sorts by —
+ * newest first, exactly as the file store lists them. The repository is
+ * bound to one namespace and every statement matches it.
  */
 public final class PgConversationRepository implements ConversationRepository {
 
     private final DocumentTable<Conversation> conversations;
+    private final Namespace namespace;
 
-    public PgConversationRepository(DataSource dataSource) {
-        this(Sql.of(dataSource));
+    public PgConversationRepository(DataSource dataSource, Namespace namespace) {
+        this(Sql.of(dataSource), namespace);
     }
 
     /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
-    public PgConversationRepository(Sql sql) {
+    public PgConversationRepository(Sql sql, Namespace namespace) {
+        this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.conversations = DocumentTable.of(Conversation.class)
                 .table("mc_conversation")
-                .id("id", "UUID", Conversation::id)
-                .requiredColumn("namespace", "TEXT", c -> c.namespace().value())
+                .partitionKey("namespace", "TEXT", c -> namespace.value())
+                .id("id", "TEXT", c -> c.id().value())
                 .column("created_at", "TIMESTAMPTZ", Conversation::createdAt)
                 .index("namespace", "created_at")
                 .build(sql);
     }
 
-    /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */
     public PgConversationRepository initSchema() {
         conversations.createSchema();
         return this;
@@ -49,12 +52,12 @@ public final class PgConversationRepository implements ConversationRepository {
     }
 
     @Override
-    public Optional<Conversation> findById(UUID id) {
-        return conversations.findById(id);
+    public Optional<Conversation> findById(ConversationId id) {
+        return conversations.findById(namespace.value(), id.value());
     }
 
     @Override
-    public List<Conversation> findByNamespace(Namespace namespace, PageRequest page) {
+    public List<Conversation> findAll(PageRequest page) {
         return conversations.find("WHERE namespace = ? ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
                 namespace.value(), page.size(), page.offset());
     }

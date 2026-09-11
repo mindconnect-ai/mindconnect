@@ -9,10 +9,10 @@ Everything lives in one package, `ai.mindconnect.agent.tool`:
 ```
 Tool                 name · description · parameter schema · execute(args)
 ToolFactory          binds an AgentTool config into a Tool for one call scope
-ToolRegistry         what exists, per namespace
+ToolRegistry         what exists
 ToolAdvisor          the filter chain around every invocation
 ToolEnvironment      configuration strings and services a factory may ask for
-ToolCallScope        namespace · user · session · agent of one invocation
+ToolCallScope        user · session · agent of one invocation
 MultiToolProvider    one factory, several tools
 AgentTool            how an agent configures a tool (enabled, overrides)
 SpiToolRegistry      ServiceLoader-based registry over the factories

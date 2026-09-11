@@ -21,7 +21,7 @@ import java.util.List;
  *   <li>{@code initial-data/llm-configs/*.json} — imported if no config with the same name exists;
  *       if the stored config differs from the classpath version the supplied {@link ConfirmOverwrite}
  *       callback is invoked and the record is overwritten only if it returns {@code true}.</li>
- *   <li>{@code initial-data/agent-definitions/*.json} — same semantics per name+namespace.</li>
+ *   <li>{@code initial-data/agent-definitions/*.json} — same semantics per name.</li>
  * </ul>
  * New records are always imported. Existing identical records are silently skipped.
  */
@@ -48,6 +48,12 @@ public class InitialDataLoader {
         this.objectMapper = objectMapper;
     }
 
+    /** Reads a seed document. */
+    private <T> T readSeed(Resource resource, Class<T> type) throws java.io.IOException {
+        return objectMapper.readerFor(type)
+                .readValue(resource.getInputStream());
+    }
+
     /** Load without interactive prompts — existing differing records are skipped with a log warning. */
     public void load() {
         load((type, name, diff) -> {
@@ -68,7 +74,7 @@ public class InitialDataLoader {
     private void loadLlmConfigs(ConfirmOverwrite confirm) {
         for (Resource resource : scan("classpath:initial-data/llm-configs/*.json")) {
             try {
-                LlmConfig incoming = objectMapper.readValue(resource.getInputStream(), LlmConfig.class);
+                LlmConfig incoming = readSeed(resource, LlmConfig.class);
                 llmConfigRepository.findByName(incoming.name()).ifPresentOrElse(existing -> {
                     String diff = diffJson(existing, incoming);
                     if (diff == null) {
@@ -94,8 +100,8 @@ public class InitialDataLoader {
     private void loadAgentDefinitions(ConfirmOverwrite confirm) {
         for (Resource resource : scan("classpath:initial-data/agent-definitions/*.json")) {
             try {
-                AgentDefinition incoming = objectMapper.readValue(resource.getInputStream(), AgentDefinition.class);
-                agentDefinitionRepository.findByName(incoming.namespace(), incoming.name()).ifPresentOrElse(existing -> {
+                AgentDefinition incoming = readSeed(resource, AgentDefinition.class);
+                agentDefinitionRepository.findByName(incoming.name()).ifPresentOrElse(existing -> {
                     String diff = diffJson(existing, incoming);
                     if (diff == null) {
                         log.debug("Agent '{}' is up to date — skipping", incoming.name());

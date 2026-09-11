@@ -127,19 +127,19 @@ public final class AgentListComponent implements UiComponent {
     }
 
     private static UiList.Item row(AgentDefinition a) {
-        return UiList.Item.of(a.id().toString(), a.name())
+        return UiList.Item.of(a.id().value(), a.name())
                 .labelNode(headerNode(a))
                 .description(a.description())
-                .href("/admin/agents/" + a.id())
+                .href("/admin/agents/" + a.id().value())
                 // Straight into a conversation: starts a fresh session
                 // with this agent and lands on its chat page.
                 .action(UiAction.primary("chat", "Chat").icon("chat")
-                        .onClick(trigger(on(ChatUiController.class).startSession(a.id(), null))))
+                        .onClick(trigger(on(ChatUiController.class).startSession(a.id().value(), null))))
                 .action(UiAction.secondary("copy", "Copy").icon("copy")
-                        .onClick(trigger(on(AgentUiController.class).copy(a.id()))))
+                        .onClick(trigger(on(AgentUiController.class).copy(a.id().value()))))
                 .action(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete agent '" + a.name() + "'?")
-                        .onClick(trigger(on(AgentUiController.class).delete(a.id()))));
+                        .onClick(trigger(on(AgentUiController.class).delete(a.id().value()))));
     }
 
     /**
@@ -149,19 +149,19 @@ public final class AgentListComponent implements UiComponent {
      * sit on one line. When no config is set, just the plain name node.
      */
     private static UiStack headerNode(AgentDefinition a) {
-        var name = UiText.of("agent-name-" + a.id(), a.name())
+        var name = UiText.of("agent-name-" + a.id().value(), a.name())
                 .<UiText>withCssClass("agent-name");
-        var stack = UiStack.of("agent-head-" + a.id())
+        var stack = UiStack.of("agent-head-" + a.id().value())
                 .direction(UiStack.Direction.HORIZONTAL)
                 .gap(8)
                 .<UiStack>withCssClass("agent-head")
                 // The item's own icon slot goes unrendered once a labelNode
                 // takes over the label, so the icon rides in the node itself.
-                .child(UiIcon.of("agent-icon-" + a.id(), a.iconOrDefault()))
+                .child(UiIcon.of("agent-icon-" + a.id().value(), a.iconOrDefault()))
                 .child(name);
         String llm = a.llmConfigName();
         if (llm != null && !llm.isBlank()) {
-            stack.child(UiText.of("agent-llm-" + a.id(), llm)
+            stack.child(UiText.of("agent-llm-" + a.id().value(), llm)
                     .<UiText>withCssClass("agent-llm-badge"));
         }
         return stack;

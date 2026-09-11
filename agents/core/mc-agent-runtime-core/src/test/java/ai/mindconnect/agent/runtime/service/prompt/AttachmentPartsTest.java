@@ -1,23 +1,25 @@
 package ai.mindconnect.agent.runtime.service.prompt;
 
+import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.ContentPart;
+import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class AttachmentPartsTest {
 
     private static AgentSession session(AttachedFile... files) {
-        return new AgentSession(UUID.randomUUID(), UUID.randomUUID(), Namespace.DEFAULT, "u",
-                UUID.randomUUID(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
+        return new AgentSession(SessionId.random(), AgentId.random(), UserId.of("u"),
+                ConversationId.random(), "t", SessionStatus.ACTIVE, Instant.now(), null, null, null, null,
                 List.of(), List.of(files));
     }
 

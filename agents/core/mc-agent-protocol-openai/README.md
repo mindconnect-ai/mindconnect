@@ -11,7 +11,7 @@ var backend = new OpenAiResponsesBackend(System.getenv("OPENAI_API_KEY"))
                 .withHostedTool("web_search")                       // runs inside OpenAI
                 .withTools(List.of(weatherToolDefinition)));        // client-executed
 
-Session s = backend.open("demo", "assistant");
+Session s = backend.openSessionForAgent("assistant");
 
 // Function tools answered automatically by the backend-agnostic ToolLoop:
 Response r = new ToolLoop(backend.responses(), List.of(weatherHandler))

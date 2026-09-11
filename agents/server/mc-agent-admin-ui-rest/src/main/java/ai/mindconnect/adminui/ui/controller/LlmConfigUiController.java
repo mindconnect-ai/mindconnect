@@ -1,6 +1,5 @@
 package ai.mindconnect.adminui.ui.controller;
 
-
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent;
 import ai.mindconnect.common.util.EnvVarResolver;
@@ -13,6 +12,7 @@ import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.RateLimitConfig;
@@ -28,7 +28,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/admin/api/llm-configs")
@@ -54,7 +53,8 @@ public class LlmConfigUiController {
                                     EncryptionHelper encryption,
                                     OkHttpClient httpClient,
                                     ObjectMapper objectMapper) {
-        this(repository, testService, encryption, new LmStudioModelCatalog(httpClient, objectMapper));
+        this(repository, testService, encryption,
+                new LmStudioModelCatalog(httpClient, objectMapper));
     }
 
     /** For tests: a catalog that answers without an LM Studio. */
@@ -110,10 +110,12 @@ public class LlmConfigUiController {
      */
     @PostMapping("/field-groups")
     public UiPatch fieldGroups(@RequestParam("form") String formId,
-                               @RequestParam(value = "id", required = false) UUID id,
+                               @RequestParam(value = "id", required = false) String idValue,
                                @RequestParam(value = "reason", required = false) String reason,
                                @RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
+        LlmConfigId id = idValue == null || idValue.isBlank()
+                ? null : LlmConfigId.of(idValue);
         LlmConfig config = id == null ? null : repository.findById(id).orElse(null);
         boolean isAlias = body.bool("isAlias",
                 config != null && config.isAlias());
@@ -238,7 +240,8 @@ public class LlmConfigUiController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<UiPage> detail(@PathVariable UUID id) {
+    public ResponseEntity<UiPage> detail(@PathVariable("id") String idValue) {
+        LlmConfigId id = LlmConfigId.of(idValue);
         return repository.findById(id)
                 .map(c -> ResponseEntity.ok(new LlmConfigDetailPage(c).render()))
                 .orElse(ResponseEntity.notFound().build());
@@ -253,7 +256,8 @@ public class LlmConfigUiController {
 
     /** The edit form; for an LM Studio config with its server's model list. */
     @GetMapping("/{id}/edit")
-    public ResponseEntity<UiPage> editForm(@PathVariable UUID id) {
+    public ResponseEntity<UiPage> editForm(@PathVariable("id") String idValue) {
+        LlmConfigId id = LlmConfigId.of(idValue);
         return repository.findById(id)
                 .map(c -> ResponseEntity.ok(new LlmConfigFormPage(c, repository.findAll(),
                         lmStudioCatalogFor(c)).render()))
@@ -274,7 +278,7 @@ public class LlmConfigUiController {
         // the invisible provider fields, and vice versa.
         LlmProvider provider = isAlias ? null : requiredProvider(body);
         var config = new LlmConfig(
-                UUID.randomUUID(),
+                LlmConfigId.random(),
                 body.str("name"),
                 provider,
                 isAlias ? null : body.str("model"),
@@ -297,8 +301,9 @@ public class LlmConfigUiController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<UiPage> update(@PathVariable UUID id,
+    public ResponseEntity<UiPage> update(@PathVariable("id") String idValue,
                                          @RequestBody Map<String, Object> raw) {
+        LlmConfigId id = LlmConfigId.of(idValue);
         var body = new FormBody(raw);
         return repository.findById(id)
                 .map(existing -> {
@@ -337,7 +342,8 @@ public class LlmConfigUiController {
      * and submits via the form's POST.
      */
     @GetMapping("/{id}/test")
-    public ResponseEntity<UiPatch> testDialog(@PathVariable UUID id) {
+    public ResponseEntity<UiPatch> testDialog(@PathVariable("id") String idValue) {
+        LlmConfigId id = LlmConfigId.of(idValue);
         return repository.findById(id)
                 .map(c -> ResponseEntity.ok(testPatch(c, null, null)))
                 .orElse(ResponseEntity.notFound().build());
@@ -349,8 +355,9 @@ public class LlmConfigUiController {
      * the result underneath the form so the admin can re-send.
      */
     @PostMapping("/{id}/test")
-    public ResponseEntity<UiPatch> runTest(@PathVariable UUID id,
+    public ResponseEntity<UiPatch> runTest(@PathVariable("id") String idValue,
                                            @RequestBody Map<String, Object> raw) {
+        LlmConfigId id = LlmConfigId.of(idValue);
         var body = new FormBody(raw);
         String message = body.str("message");
         return repository.findById(id)
@@ -369,8 +376,9 @@ public class LlmConfigUiController {
     @PostMapping(value = "/{id}/test-audio",
             consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<UiPatch> runAudioTest(
-            @PathVariable UUID id,
+            @PathVariable("id") String idValue,
             @RequestParam("audio") org.springframework.web.multipart.MultipartFile audio) {
+        LlmConfigId id = LlmConfigId.of(idValue);
         return repository.findById(id)
                 .map(c -> {
                     byte[] bytes;
@@ -434,7 +442,8 @@ public class LlmConfigUiController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<UiPage> delete(@PathVariable UUID id) {
+    public ResponseEntity<UiPage> delete(@PathVariable("id") String idValue) {
+        LlmConfigId id = LlmConfigId.of(idValue);
         if (repository.findById(id).isEmpty()) return ResponseEntity.notFound().build();
         repository.deleteById(id);
         return ResponseEntity.ok(list());

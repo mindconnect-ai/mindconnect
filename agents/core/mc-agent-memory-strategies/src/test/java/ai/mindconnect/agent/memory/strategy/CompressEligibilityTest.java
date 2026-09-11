@@ -6,12 +6,16 @@ import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.runtime.memory.domain.SummaryPlacement;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.runtime.port.out.TokenCounters;
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.message.domain.ChatTurnId;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
 
@@ -39,12 +43,11 @@ class CompressEligibilityTest {
 
     /** Ratios are validated to (0,1] — this is "pressure from the first token". */
     private static final double PRESSURE_ALWAYS = 0.0001;
-
-    private final UUID conversationId = UUID.randomUUID();
-    private final UUID agentId = UUID.randomUUID();
-    private final UUID userId = UUID.randomUUID();
+    private final ConversationId conversationId = ConversationId.random();
+    private final AgentId agentId = AgentId.random();
+    private final UserId userId = UserId.of("u");
     /** messageId → stub, recorded by the fake conversation manager. */
-    private final Map<UUID, String> compressed = new LinkedHashMap<>();
+    private final Map<MessageId, String> compressed = new LinkedHashMap<>();
     private int seq;
 
     // ── fixture ─────────────────────────────────────────────────────────────
@@ -67,10 +70,10 @@ class CompressEligibilityTest {
         };
         LlmConfigRepository configs = new LlmConfigRepository() {
             @Override public void save(LlmConfig config) { }
-            @Override public Optional<LlmConfig> findById(UUID id) { return Optional.empty(); }
+            @Override public Optional<LlmConfig> findById(LlmConfigId id) { return Optional.empty(); }
             @Override public Optional<LlmConfig> findByName(String name) { return Optional.empty(); }
             @Override public List<LlmConfig> findAll() { return List.of(); }
-            @Override public void deleteById(UUID id) { }
+            @Override public void deleteById(LlmConfigId id) { }
         };
         return new SummarizingWindowStrategy(cfg,
                 new RecordingConversationManager(compressed),
@@ -81,17 +84,17 @@ class CompressEligibilityTest {
     }
 
     private AgentDefinition def() {
-        return AgentDefinition.create(new Namespace("test"), "a", "d", "p", null, "llm");
+        return AgentDefinition.create("a", "d", "p", null, "llm");
     }
 
     private AgentSession session() {
-        return AgentSession.startSubAgent(agentId, new Namespace("test"), "u",
+        return AgentSession.startSubAgent(agentId, userId,
                 conversationId, null, null, null);
     }
 
     private int run(SummarizingWindowConfig cfg, List<Message> history) {
         return strategy(cfg).compressEligibleToolResults(def(), session(),
-                AuthenticationInfo.of(UserId.of("u"), new Namespace("test")), history);
+                AuthenticationInfo.of(userId), history);
     }
 
     // ── history building ────────────────────────────────────────────────────
@@ -117,7 +120,7 @@ class CompressEligibilityTest {
 
     private Message message(ParticipantType sender, MessageType type, String content,
                             Map<String, Object> metadata) {
-        return Message.of(conversationId, UUID.randomUUID(), sender, type, content, ++seq)
+        return Message.of(conversationId, UUID.randomUUID().toString(), sender, type, content, ++seq)
                 .withMetadata(metadata);
     }
 
@@ -153,7 +156,7 @@ class CompressEligibilityTest {
         int marked = run(cfg(true, PRESSURE_ALWAYS), history);
 
         assertThat(marked).isEqualTo(2);
-        List<UUID> markedIds = List.copyOf(compressed.keySet());
+        List<MessageId> markedIds = List.copyOf(compressed.keySet());
         List<Message> results = history.stream()
                 .filter(m -> m.type() == MessageType.TOOL_RESULT).toList();
         assertThat(markedIds).containsExactly(results.get(0).id(), results.get(1).id());
@@ -207,55 +210,55 @@ class CompressEligibilityTest {
     // ── fake store ──────────────────────────────────────────────────────────
 
     /** Records compressMessage; every other port method is out of this hook's path. */
-    private record RecordingConversationManager(Map<UUID, String> compressed)
+    private record RecordingConversationManager(Map<MessageId, String> compressed)
             implements ai.mindconnect.message.port.in.ConversationManager {
 
-        @Override public void compressMessage(UUID conversationId, UUID messageId,
+        @Override public void compressMessage(ConversationId conversationId, MessageId messageId,
                                               String stub, Integer compressedTokenCount) {
             compressed.put(messageId, stub);
         }
 
         @Override public ai.mindconnect.message.domain.Conversation createConversation(
-                Namespace namespace, String title,
+                ConversationId id, String title,
                 ai.mindconnect.message.domain.ConversationType type,
                 List<ai.mindconnect.message.domain.Participant> participants) {
             throw new UnsupportedOperationException();
         }
-        @Override public Optional<ai.mindconnect.message.domain.Conversation> findById(UUID conversationId) {
+        @Override public Optional<ai.mindconnect.message.domain.Conversation> findById(ConversationId conversationId) {
             throw new UnsupportedOperationException();
         }
-        @Override public List<ai.mindconnect.message.domain.Conversation> listByNamespace(
-                Namespace namespace, ai.mindconnect.common.PageRequest page) {
+        @Override public List<ai.mindconnect.message.domain.Conversation> list(
+                ai.mindconnect.common.PageRequest page) {
             throw new UnsupportedOperationException();
         }
-        @Override public List<Message> loadHistory(UUID conversationId, ai.mindconnect.common.PageRequest page) {
+        @Override public List<Message> loadHistory(ConversationId conversationId, ai.mindconnect.common.PageRequest page) {
             throw new UnsupportedOperationException();
         }
-        @Override public ai.mindconnect.message.domain.ConversationHistory loadCompleteHistory(UUID conversationId) {
+        @Override public ai.mindconnect.message.domain.ConversationHistory loadCompleteHistory(ConversationId conversationId) {
             throw new UnsupportedOperationException();
         }
-        @Override public Message addMessageToConversation(UUID conversationId, UUID senderId,
-                ParticipantType senderType, MessageType type, String content, UUID turnId) {
+        @Override public Message addMessageToConversation(ConversationId conversationId, String senderId,
+                ParticipantType senderType, MessageType type, String content, ChatTurnId turnId) {
             throw new UnsupportedOperationException();
         }
-        @Override public Message addMessageToConversation(UUID conversationId, UUID senderId,
-                ParticipantType senderType, MessageType type, String content, UUID turnId,
+        @Override public Message addMessageToConversation(ConversationId conversationId, String senderId,
+                ParticipantType senderType, MessageType type, String content, ChatTurnId turnId,
                 Integer run, Map<String, Object> metadata) {
             throw new UnsupportedOperationException();
         }
-        @Override public Message addMessageToConversation(UUID conversationId, UUID senderId,
+        @Override public Message addMessageToConversation(ConversationId conversationId, String senderId,
                 ParticipantType senderType, MessageType type,
-                java.util.List<ai.mindconnect.message.domain.ContentPart> parts, UUID turnId,
+                java.util.List<ai.mindconnect.message.domain.ContentPart> parts, ChatTurnId turnId,
                 Integer run, Map<String, Object> metadata) {
             throw new UnsupportedOperationException();
         }
-        @Override public void updateTokenCount(UUID conversationId, UUID messageId, int tokenCount) {
+        @Override public void updateTokenCount(ConversationId conversationId, MessageId messageId, int tokenCount) {
             throw new UnsupportedOperationException();
         }
-        @Override public void updateDurationMs(UUID conversationId, UUID messageId, long durationMs) {
+        @Override public void updateDurationMs(ConversationId conversationId, MessageId messageId, long durationMs) {
             throw new UnsupportedOperationException();
         }
-        @Override public int deleteMessages(UUID conversationId, int fromSeq, int toSeq) {
+        @Override public int deleteMessages(ConversationId conversationId, int fromSeq, int toSeq) {
             throw new UnsupportedOperationException();
         }
     }

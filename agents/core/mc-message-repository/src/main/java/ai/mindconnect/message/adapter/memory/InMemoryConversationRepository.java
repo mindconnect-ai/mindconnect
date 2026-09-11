@@ -1,6 +1,7 @@
 package ai.mindconnect.message.adapter.memory;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.message.domain.ConversationId;
+
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Conversation;
 import ai.mindconnect.message.port.out.ConversationRepository;
@@ -8,13 +9,12 @@ import ai.mindconnect.message.port.out.ConversationRepository;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /** In-memory {@link ConversationRepository} — process-lifetime storage, no persistence. */
 public class InMemoryConversationRepository implements ConversationRepository {
 
-    private final Map<UUID, Conversation> store = new ConcurrentHashMap<>();
+    private final Map<ConversationId, Conversation> store = new ConcurrentHashMap<>();
 
     @Override
     public Conversation save(Conversation conversation) {
@@ -23,14 +23,13 @@ public class InMemoryConversationRepository implements ConversationRepository {
     }
 
     @Override
-    public Optional<Conversation> findById(UUID id) {
+    public Optional<Conversation> findById(ConversationId id) {
         return Optional.ofNullable(store.get(id));
     }
 
     @Override
-    public List<Conversation> findByNamespace(Namespace namespace, PageRequest page) {
+    public List<Conversation> findAll(PageRequest page) {
         return store.values().stream()
-                .filter(c -> c.namespace().equals(namespace))
                 .skip((long) page.page() * page.size())
                 .limit(page.size())
                 .toList();

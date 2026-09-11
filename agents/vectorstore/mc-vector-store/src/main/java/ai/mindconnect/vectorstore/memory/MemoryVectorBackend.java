@@ -50,7 +50,7 @@ public final class MemoryVectorBackend implements VectorStoreBackend {
     @Override
     public VectorStore open(String storeId, Map<String, String> config) {
         ensureReaper(config);
-        Path dir = Path.of(value(config, "dir", "data/vector-stores"));
+        Path dir = storesDir(config);
         int maxChunks = Integer.parseInt(value(config, "maxChunksPerStore", "100000"));
         Path file = dir.resolve(sanitize(storeId) + ".jsonl").toAbsolutePath();
         return STORES.computeIfAbsent(file.toString(),
@@ -59,7 +59,7 @@ public final class MemoryVectorBackend implements VectorStoreBackend {
 
     @Override
     public java.util.List<String> listStores(Map<String, String> config) {
-        Path dir = Path.of(value(config, "dir", "data/vector-stores"));
+        Path dir = storesDir(config);
         if (!java.nio.file.Files.isDirectory(dir)) {
             return java.util.List.of();
         }
@@ -73,6 +73,15 @@ public final class MemoryVectorBackend implements VectorStoreBackend {
             log.warn("Could not list vector stores in {}: {}", dir, e.toString());
             return java.util.List.of();
         }
+    }
+
+    /** {@code <baseDir>/<namespace>/vector-stores}: the stores of one namespace share a directory, and only they do. */
+    private static Path storesDir(Map<String, String> config) {
+        String namespace = config == null ? null : config.get("namespace");
+        if (namespace == null || namespace.isBlank()) {
+            throw new IllegalArgumentException("memory vector backend requires the 'namespace' config key");
+        }
+        return Path.of(value(config, "baseDir", "data")).resolve(namespace).resolve("vector-stores");
     }
 
     private static synchronized void ensureReaper(Map<String, String> config) {

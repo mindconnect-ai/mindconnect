@@ -50,7 +50,7 @@ public final class RoundtripCardComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "trace-r-" + trace.id();
+        return "trace-r-" + (trace.id() == null ? "" : trace.id().value());
     }
 
     @Override

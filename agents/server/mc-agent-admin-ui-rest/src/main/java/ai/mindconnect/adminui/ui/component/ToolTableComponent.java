@@ -8,13 +8,13 @@ import static ai.mindconnect.ui.mvc.UiActions.ROW_ID;
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiTable;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Map;
-import java.util.UUID;
 
 /**
  * Tabular view of an agent's tools. Each row has View / Edit / Delete
@@ -27,27 +27,27 @@ public final class ToolTableComponent implements UiComponent {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final AgentDefinition agent;
-    private final UUID selectedToolId;
+    private final AgentToolId selectedToolId;
 
     public ToolTableComponent(AgentDefinition agent) {
         this(agent, null);
     }
 
-    public ToolTableComponent(AgentDefinition agent, UUID selectedToolId) {
+    public ToolTableComponent(AgentDefinition agent, AgentToolId selectedToolId) {
         this.agent = agent;
         this.selectedToolId = selectedToolId;
     }
 
     @Override
     public String id() {
-        return "tool-table-" + agent.id();
+        return "tool-table-" + agent.id().value();
     }
 
     @Override
     public UiTable render() {
         var table = UiTable.of(id(), "Tools")
                 .action(UiAction.primary("add-tool", "Add Tool").icon("add")
-                        .onClick(trigger(on(AgentUiController.class).newToolForm(agent.id()))))
+                        .onClick(trigger(on(AgentUiController.class).newToolForm(agent.id().value()))))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("description", "Description"))
                 .column(UiTable.Column.text("overrides", "Overrides"))
@@ -55,16 +55,16 @@ public final class ToolTableComponent implements UiComponent {
                 .column(UiTable.Column.text("deferred", "Deferred"))
                 .column(UiTable.Column.text("needsApproval", "Approval"))
                 .rowAction(UiAction.secondary("view", "View").icon("show")
-                        .onClick(trigger(on(AgentUiController.class).viewTool(agent.id(), ROW_ID))))
+                        .onClick(trigger(on(AgentUiController.class).viewTool(agent.id().value(), ROW_ID.toString()))))
                 .rowAction(UiAction.secondary("edit", "Edit").icon("edit")
-                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id(), ROW_ID))))
+                        .onClick(trigger(on(AgentUiController.class).editToolForm(agent.id().value(), ROW_ID.toString()))))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this tool?")
-                        .onClick(trigger(on(AgentUiController.class).deleteTool(agent.id(), ROW_ID, null))));
+                        .onClick(trigger(on(AgentUiController.class).deleteTool(agent.id().value(), ROW_ID.toString(), null))));
 
         for (AgentTool t : agent.tools()) {
             table.row(Map.of(
-                "id",          t.id().toString(),
+                "id",          t.id().value(),
                 "name",        t.name(),
                 "description", t.description() != null ? t.description() : "",
                 "overrides",   overridesSummary(t),
@@ -73,7 +73,7 @@ public final class ToolTableComponent implements UiComponent {
                 "needsApproval", t.needsApproval() ? "✓" : "—"
             ));
         }
-        if (selectedToolId != null) table.selectedRow(selectedToolId.toString());
+        if (selectedToolId != null) table.selectedRow(selectedToolId.value());
         return table;
     }
 

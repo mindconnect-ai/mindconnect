@@ -4,4 +4,4 @@ import ai.mindconnect.agent.tool.AgentTool;
 
 import java.util.List;
 
-public record UpdateToolsRequest(List<AgentTool> tools) {}
+public record UpdateToolsRequest(List<AgentTool.Json> tools) {}

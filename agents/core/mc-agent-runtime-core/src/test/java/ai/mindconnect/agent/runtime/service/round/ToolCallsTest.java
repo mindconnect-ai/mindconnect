@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -18,37 +19,41 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class ToolCallsTest {
 
-    private final UUID conversationId = UUID.randomUUID();
+    private final ConversationId conversationId = ConversationId.random();
     private final AtomicInteger seq = new AtomicInteger();
 
     // ── message fixtures ────────────────────────────────────────────────────
 
+    private static String sender() {
+        return UUID.randomUUID().toString();
+    }
+
     private Message userChat(String text) {
-        return Message.of(conversationId, UUID.randomUUID(), ParticipantType.USER,
+        return Message.of(conversationId, sender(), ParticipantType.USER,
                 MessageType.CHAT, text, seq.incrementAndGet());
     }
 
     private Message agentChat(String text) {
-        return Message.of(conversationId, UUID.randomUUID(), ParticipantType.AGENT,
+        return Message.of(conversationId, sender(), ParticipantType.AGENT,
                 MessageType.CHAT, text, seq.incrementAndGet());
     }
 
     private Message toolCall(String callId, String name) {
         String content = "{\"toolCalls\":[{\"id\":\"" + callId + "\",\"name\":\"" + name
                 + "\",\"arguments\":{\"q\":\"x\"}}]}";
-        return Message.of(conversationId, UUID.randomUUID(), ParticipantType.AGENT,
+        return Message.of(conversationId, sender(), ParticipantType.AGENT,
                         MessageType.TOOL_CALL, content, seq.incrementAndGet())
                 .withMetadata(Map.of("callIds", List.of(callId)));
     }
 
     private Message dispatched(String callId) {
-        return Message.of(conversationId, UUID.randomUUID(), ParticipantType.AGENT,
+        return Message.of(conversationId, sender(), ParticipantType.AGENT,
                         MessageType.TOOL_DISPATCHED, "", seq.incrementAndGet())
                 .withMetadata(Map.of("callId", callId));
     }
 
     private Message toolResult(String callId) {
-        return Message.of(conversationId, UUID.randomUUID(), ParticipantType.AGENT,
+        return Message.of(conversationId, sender(), ParticipantType.AGENT,
                         MessageType.TOOL_RESULT, "{\"result\":\"ok\"}", seq.incrementAndGet())
                 .withMetadata(Map.of("callId", callId, "failed", false));
     }
@@ -121,7 +126,7 @@ class ToolCallsTest {
     @Test
     void aResultWithoutMetadataStillClosesViaContentFallback() {
         // Messages persisted before concept 16 carry the callId only in content.
-        Message legacyResult = Message.of(conversationId, UUID.randomUUID(), ParticipantType.AGENT,
+        Message legacyResult = Message.of(conversationId, sender(), ParticipantType.AGENT,
                 MessageType.TOOL_RESULT,
                 "{\"toolCallId\":\"c1\",\"toolName\":\"search\",\"result\":\"ok\"}",
                 seq.incrementAndGet());
@@ -132,7 +137,7 @@ class ToolCallsTest {
 
     @Test
     void unreadableToolCallContentDoesNotBreakTheFold() {
-        Message broken = Message.of(conversationId, UUID.randomUUID(), ParticipantType.AGENT,
+        Message broken = Message.of(conversationId, sender(), ParticipantType.AGENT,
                         MessageType.TOOL_CALL, "not json at all", seq.incrementAndGet())
                 .withMetadata(Map.of("callIds", List.of("c1")));
         ToolCalls calls = ToolCalls.of(List.of(userChat("hi"), broken));

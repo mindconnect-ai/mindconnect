@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.SessionId;
+
 import ai.mindconnect.agent.runtime.tools.todo.TodoList;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +14,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * Persists the todo list of each session as:
@@ -28,17 +30,19 @@ public class FileTodoListRepository implements TodoListRepository {
     private final Path baseDir;
     private final ObjectMapper mapper;
 
-    public FileTodoListRepository(Path baseDir) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+    public FileTodoListRepository(Path baseDir, Namespace namespace) {
+        this.baseDir = baseDir.resolve(namespace.value()).toAbsolutePath().normalize();
         this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
     @Override
-    public Optional<TodoList> findBySession(UUID sessionId) {
+    public Optional<TodoList> findBySession(SessionId sessionId) {
         Path file = fileFor(sessionId);
         if (!Files.exists(file)) return Optional.empty();
         try {
-            return Optional.of(mapper.readValue(file.toFile(), TodoList.class));
+            // A list written before the namespace was recorded takes it from the session asked for.
+            return Optional.of(mapper.readerFor(TodoList.class)
+                    .readValue(file.toFile()));
         } catch (IOException e) {
             log.warn("Failed to read todo list for session {}: {}", sessionId, e.getMessage());
             return Optional.empty();
@@ -60,7 +64,7 @@ public class FileTodoListRepository implements TodoListRepository {
     }
 
     @Override
-    public void deleteBySession(UUID sessionId) {
+    public void deleteBySession(SessionId sessionId) {
         Path file = fileFor(sessionId);
         try {
             Files.deleteIfExists(file);
@@ -69,10 +73,10 @@ public class FileTodoListRepository implements TodoListRepository {
         }
     }
 
-    private Path fileFor(UUID sessionId) {
+    private Path fileFor(SessionId sessionId) {
         return baseDir
                 .resolve("sessions")
-                .resolve(sessionId.toString())
+                .resolve(sessionId.value())
                 .resolve(FILE_NAME);
     }
 }

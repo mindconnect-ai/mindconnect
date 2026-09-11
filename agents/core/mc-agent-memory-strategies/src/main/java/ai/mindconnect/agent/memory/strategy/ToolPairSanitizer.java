@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.memory.strategy;
 
+import ai.mindconnect.message.domain.MessageId;
+
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -17,7 +19,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 
 /**
  * Repairs the {@code assistant tool_calls} ↔ {@code tool} pairing in a
@@ -187,8 +188,7 @@ public final class ToolPairSanitizer {
                     + "\",\"toolName\":\"unknown\",\"result\":\"" + PLACEHOLDER_RESULT + "\"}";
         }
         return new Message(
-                UUID.randomUUID(),
-                parentToolCall.conversationId(),
+                MessageId.random(), parentToolCall.conversationId(),
                 parentToolCall.senderId(),
                 ParticipantType.AGENT,
                 parentToolCall.recipientId(),

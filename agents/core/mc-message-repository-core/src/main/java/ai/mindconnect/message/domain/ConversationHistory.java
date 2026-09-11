@@ -5,7 +5,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 /**
  * The COMPLETE loaded history of one conversation — the type that says what a
@@ -26,10 +25,10 @@ import java.util.UUID;
  */
 public final class ConversationHistory {
 
-    private final UUID conversationId;
+    private final ConversationId conversationId;
     private final List<Message> messages;
 
-    private ConversationHistory(UUID conversationId, List<Message> messages) {
+    private ConversationHistory(ConversationId conversationId, List<Message> messages) {
         this.conversationId = conversationId;
         this.messages = new ArrayList<>(messages);
         this.messages.sort(Comparator.comparingInt(Message::sequenceNum));
@@ -41,11 +40,11 @@ public final class ConversationHistory {
      * {@code ConversationManager.loadCompleteHistory}, which loads everything;
      * this factory exists for that implementation and for tests.
      */
-    public static ConversationHistory of(UUID conversationId, List<Message> messages) {
+    public static ConversationHistory of(ConversationId conversationId, List<Message> messages) {
         return new ConversationHistory(conversationId, messages);
     }
 
-    public UUID conversationId() {
+    public ConversationId conversationId() {
         return conversationId;
     }
 
@@ -124,7 +123,7 @@ public final class ConversationHistory {
     }
 
     /** The current turn's id — stable across approval resumes. */
-    public Optional<UUID> currentTurnId() {
+    public Optional<ChatTurnId> currentTurnId() {
         return currentTurn().map(ChatTurn::turnId).filter(java.util.Objects::nonNull);
     }
 

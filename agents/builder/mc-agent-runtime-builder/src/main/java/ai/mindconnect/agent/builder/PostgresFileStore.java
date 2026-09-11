@@ -23,7 +23,7 @@ final class PostgresFileStore {
         }
     }
 
-    static FileStore open(Sql sql) {
-        return new PgFileStore(sql).initSchema();
+    static FileStore open(Sql sql, ai.mindconnect.agent.Namespace namespace) {
+        return new PgFileStore(sql, namespace).initSchema();
     }
 }

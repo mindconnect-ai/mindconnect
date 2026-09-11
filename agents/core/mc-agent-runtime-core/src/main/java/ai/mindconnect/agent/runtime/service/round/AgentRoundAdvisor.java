@@ -1,9 +1,10 @@
 package ai.mindconnect.agent.runtime.service.round;
 
+import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;
-import java.util.UUID;
 
 /**
  * Turn-level policy around a single round — the same in-band pattern as
@@ -35,7 +36,7 @@ public interface AgentRoundAdvisor {
     }
 
     /** What an advisor may know about the round it wraps. */
-    record RoundContext(String requestId, UUID conversationId, UUID sessionId,
+    record RoundContext(String requestId, ConversationId conversationId, SessionId sessionId,
                         List<Message> history) { }
 
     default RoundOutcome aroundRound(RoundContext context, Execution execution) {

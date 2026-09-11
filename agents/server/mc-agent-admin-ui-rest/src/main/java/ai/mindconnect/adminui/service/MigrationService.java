@@ -135,7 +135,7 @@ public class MigrationService {
         for (Resource resource : scan("classpath:initial-data/agent-definitions/*.json")) {
             readEach(resource, AgentDefinition.class, objectMapper).ifPresent(incoming -> {
                 Optional<AgentDefinition> existing =
-                        agentDefinitionRepository.findByName(incoming.namespace(), incoming.name());
+                        agentDefinitionRepository.findByName(incoming.name());
                 pendingFor(EntityType.AGENT, incoming.name(), existing.orElse(null), incoming, objectMapper)
                         .ifPresent(result::add);
             });
@@ -253,7 +253,8 @@ public class MigrationService {
 
     private <T> Optional<T> readEach(Resource resource, Class<T> type, ObjectMapper mapper) {
         try {
-            return Optional.of(mapper.readValue(resource.getInputStream(), type));
+            return Optional.of(mapper.readerFor(type)
+                    .<T>readValue(resource.getInputStream()));
         } catch (Exception e) {
             log.warn("Failed to read {} from {}: {}", type.getSimpleName(), resource.getFilename(), e.getMessage());
             return Optional.empty();

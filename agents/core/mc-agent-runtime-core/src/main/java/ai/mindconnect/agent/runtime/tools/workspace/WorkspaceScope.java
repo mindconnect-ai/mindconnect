@@ -1,6 +1,8 @@
 package ai.mindconnect.agent.runtime.tools.workspace;
 
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.AgentId;
 
 /**
  * Identifies one of the three logical workspace scopes for an agent session.
@@ -13,21 +15,21 @@ import java.util.UUID;
  */
 public record WorkspaceScope(
         ScopeType type,
-        UUID agentId,
-        String userId,
-        UUID sessionId
+        AgentId agentId,
+        UserId userId,
+        SessionId sessionId
 ) {
     public enum ScopeType { USER, AGENT_USER, SESSION }
 
-    public static WorkspaceScope user(String userId) {
+    public static WorkspaceScope user(UserId userId) {
         return new WorkspaceScope(ScopeType.USER, null, userId, null);
     }
 
-    public static WorkspaceScope agentUser(UUID agentId, String userId) {
+    public static WorkspaceScope agentUser(AgentId agentId, UserId userId) {
         return new WorkspaceScope(ScopeType.AGENT_USER, agentId, userId, null);
     }
 
-    public static WorkspaceScope session(UUID agentId, String userId, UUID sessionId) {
+    public static WorkspaceScope session(AgentId agentId, UserId userId, SessionId sessionId) {
         return new WorkspaceScope(ScopeType.SESSION, agentId, userId, sessionId);
     }
 }

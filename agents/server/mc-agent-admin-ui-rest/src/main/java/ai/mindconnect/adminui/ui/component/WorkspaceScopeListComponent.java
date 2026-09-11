@@ -9,7 +9,7 @@ import ai.mindconnect.ui.model.UiList;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * One file listing for a single workspace scope (SESSION / AGENT_USER /
@@ -24,14 +24,14 @@ import java.util.UUID;
  */
 public final class WorkspaceScopeListComponent implements UiComponent {
 
-    private final UUID sessionId;
+    private final SessionId sessionId;
     private final String scopeKey;
     private final String title;
     private final String emptyHint;
     private final WorkspaceStore store;
     private final WorkspaceScope scope;
 
-    public WorkspaceScopeListComponent(UUID sessionId, String scopeKey, String title,
+    public WorkspaceScopeListComponent(SessionId sessionId, String scopeKey, String title,
                                         String emptyHint, WorkspaceStore store, WorkspaceScope scope) {
         this.sessionId = sessionId;
         this.scopeKey = scopeKey;
@@ -43,7 +43,7 @@ public final class WorkspaceScopeListComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "ws-list-" + scopeKey + "-" + sessionId;
+        return "ws-list-" + scopeKey + "-" + sessionId.value();
     }
 
     @Override
@@ -64,7 +64,7 @@ public final class WorkspaceScopeListComponent implements UiComponent {
             long bytes = store.sizeOf(scope, name).orElse(0L);
             String size = humanSize(bytes);
             String label = name;
-            String viewUrl = "/admin/api/sessions/" + sessionId + "/workspace/"
+            String viewUrl = "/admin/api/sessions/" + sessionId.value() + "/workspace/"
                     + scopeKey + "/file?name=" + urlEncode(name);
             String downloadUrl = viewUrl + "&download=true";
 

@@ -13,6 +13,7 @@ import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.protocol.item.Role;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 
@@ -22,7 +23,6 @@ import org.junit.jupiter.api.condition.EnabledIf;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -54,7 +54,7 @@ class RuntimeFileQaExampleTest {
                 .defaultLlmConfigName("chat")
                 .build()) {
 
-            AgentDefinition reader = AgentDefinition.create(runtime.namespace(), "reader",
+            AgentDefinition reader = AgentDefinition.create("reader",
                     "Answers questions about uploaded documents.",
                     "Answer questions about the user's uploaded documents by searching them "
                             + "with the vector_search tool. Be brief and cite what you find.",
@@ -66,7 +66,7 @@ class RuntimeFileQaExampleTest {
                     runtime.conversationManager(), "example-user")
                     .withFiles(runtime.fileStore(), runtime::attachStored);
 
-            Session session = backend.open(runtime.namespace().value(), "reader");
+            Session session = backend.open("reader");
 
             // Same three lines as the OpenAI example — that is the point:
             StoredFile file = backend.files().upload("notes.txt", "text/plain",
@@ -97,7 +97,7 @@ class RuntimeFileQaExampleTest {
 
     /** Model, URL and key come from mc.env — local by default, no cost. */
     private static LlmConfig local(String name, String model, String apiKey, LlmConfigType type) {
-        return new LlmConfig(UUID.randomUUID(), name, LlmProvider.LM_STUDIO, model,
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.LM_STUDIO, model,
                 TestModels.baseUrl(), apiKey, 0.2, 2048, Map.of(), 128_000,
                 false, null, null, null, type, null);
     }

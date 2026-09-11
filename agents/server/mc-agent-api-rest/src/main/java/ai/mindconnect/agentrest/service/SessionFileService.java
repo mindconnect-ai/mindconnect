@@ -1,5 +1,7 @@
 package ai.mindconnect.agentrest.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
@@ -24,7 +26,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import ai.mindconnect.agent.SessionId;
 
 /**
  * Attaches a stored file to a chat session — the one code path shared by the
@@ -42,6 +44,8 @@ import java.util.UUID;
  */
 @Service
 public class SessionFileService {
+
+    private static final Logger log = LoggerFactory.getLogger(SessionFileService.class);
 
     public static final String CHAT_UPLOADS_TEMPLATE = "chat-uploads";
 
@@ -76,21 +80,23 @@ public class SessionFileService {
      * record, images included. {@link #listAttachments} adds the searchable
      * chunks each ingested file produced.
      */
-    public List<AttachedFile> attachments(UUID sessionId) {
+    public List<AttachedFile> attachments(SessionId sessionId) {
         return sessions.findById(sessionId).map(AgentSession::attachedFiles).orElse(List.of());
     }
 
     /** The session's ingested files: spooled file id → chunk count. Empty when none. */
-    public Map<String, Long> listAttachments(UUID sessionId) {
+    public Map<String, Long> listAttachments(SessionId sessionId) {
         VectorStores stores = storesProvider.getIfAvailable();
         if (stores == null) return Map.of();
-        String storeName = "session-" + sessionId;
+        String storeName = "session-" + sessionId.value();
         try {
             if (stores.registry().instance(storeName).isPresent()) {
                 return stores.openWith(stores.settingsFor(storeName)).listFiles();
             }
-        } catch (RuntimeException ignored) {
-            // Store unreadable — report "no attachments" rather than break the chat.
+        } catch (RuntimeException e) {
+            // Store unreadable — report "no attachments" rather than break the chat,
+            // but say so: an empty list alone looks like data that was never there.
+            log.warn("Vector store {} is unreadable, listing no attachments: {}", storeName, e.getMessage());
         }
         return Map.of();
     }
@@ -102,11 +108,11 @@ public class SessionFileService {
      * copy goes with them; an image, never ingested, simply leaves the
      * session's record. The original in the file store is untouched.
      */
-    public void deleteAttachment(UUID sessionId, String fileIdOrName) {
+    public void deleteAttachment(SessionId sessionId, String fileIdOrName) {
         String fileName = Path.of(fileIdOrName).getFileName().toString();
         VectorStores stores = storesProvider.getIfAvailable();
         if (stores != null) {
-            String storeName = "session-" + sessionId;
+            String storeName = "session-" + sessionId.value();
             for (String ingestedId : listAttachments(sessionId).keySet()) {
                 if (!Path.of(ingestedId).getFileName().toString().equals(fileName)) continue;
                 stores.openWith(stores.settingsFor(storeName)).deleteFile(ingestedId);
@@ -129,7 +135,7 @@ public class SessionFileService {
      * afterwards the model asks for it again through {@code view_attachment}
      * — activated for the session, like {@code vector_search} on ingest.
      */
-    private void activateViewer(UUID sessionId) {
+    private void activateViewer(SessionId sessionId) {
         DynamicToolActivations activations = activationsProvider.getIfAvailable();
         if (activations != null) {
             activations.activate(sessionId,
@@ -137,8 +143,8 @@ public class SessionFileService {
         }
     }
 
-    public AttachResult attach(UUID sessionId, StoredFile stored) {
-        AttachedFile attached = new AttachedFile(stored.id(), stored.name(), stored.contentType(), stored.size());
+    public AttachResult attach(SessionId sessionId, StoredFile stored) {
+        AttachedFile attached = new AttachedFile(stored.id().value(), stored.name(), stored.contentType(), stored.size());
         if (attached.isImage()) {
             // An image is not text to index: it goes to the model with the
             // next message as an image part — or as that part's placeholder
@@ -158,7 +164,7 @@ public class SessionFileService {
             return new AttachResult(stored, null, false,
                     stored.name() + ": vector stores are not configured in this application.");
         }
-        String storeName = "session-" + sessionId;
+        String storeName = "session-" + sessionId.value();
         VectorStoreTemplate template = stores.template(CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
             VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE,
                     "memory", Map.of(), "embeddings", "file-ingestion",
@@ -166,7 +172,7 @@ public class SessionFileService {
             stores.registry().saveTemplate(created);
             return created;
         });
-        stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.toString());
+        stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.value());
         VectorStoreInstance instance = stores.settingsFor(storeName);
 
         try {

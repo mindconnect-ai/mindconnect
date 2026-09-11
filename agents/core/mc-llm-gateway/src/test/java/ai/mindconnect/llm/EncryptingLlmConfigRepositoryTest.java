@@ -1,5 +1,6 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -8,7 +9,6 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -18,10 +18,10 @@ class EncryptingLlmConfigRepositoryTest {
     private static final class CapturingRepo implements LlmConfigRepository {
         LlmConfig saved;
         @Override public void save(LlmConfig config) { this.saved = config; }
-        @Override public Optional<LlmConfig> findById(UUID id) { return Optional.ofNullable(saved); }
+        @Override public Optional<LlmConfig> findById(LlmConfigId id) { return Optional.ofNullable(saved); }
         @Override public Optional<LlmConfig> findByName(String name) { return Optional.ofNullable(saved); }
         @Override public List<LlmConfig> findAll() { return saved == null ? List.of() : List.of(saved); }
-        @Override public void deleteById(UUID id) {}
+        @Override public void deleteById(LlmConfigId id) {}
     }
 
     private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");

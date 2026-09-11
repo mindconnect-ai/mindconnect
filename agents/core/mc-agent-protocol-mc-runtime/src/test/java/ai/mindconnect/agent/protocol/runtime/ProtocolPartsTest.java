@@ -3,7 +3,9 @@ package ai.mindconnect.agent.protocol.runtime;
 import ai.mindconnect.agent.protocol.item.ContentPart;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.Role;
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.StoredFile;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
@@ -19,7 +21,7 @@ class ProtocolPartsTest {
 
     @Test
     void aStoredImageBecomesAnImagePartReferencingItsId() {
-        StoredFile stored = new StoredFile("f-1", "photo.png", "image/png", 240, Instant.now());
+        StoredFile stored = new StoredFile(FileId.of("f-1"), "photo.png", "image/png", 240, Instant.now());
 
         assertThat(ProtocolParts.image(stored))
                 .isEqualTo(new ai.mindconnect.message.domain.ContentPart.Image("f-1", "photo.png", "image/png", 240));
@@ -27,7 +29,7 @@ class ProtocolPartsTest {
 
     @Test
     void aStoredMessageReadsBackWithItsMediaAsFileIdSources() {
-        Message m = Message.of(UUID.randomUUID(), UUID.randomUUID(), ParticipantType.USER, MessageType.CHAT, List.of(
+        Message m = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER, MessageType.CHAT, List.of(
                 new ai.mindconnect.message.domain.ContentPart.Text("what is this?"),
                 new ai.mindconnect.message.domain.ContentPart.Image("f-1", "photo.png", "image/png", 240),
                 new ai.mindconnect.message.domain.ContentPart.File("f-2", "spec.pdf", "application/pdf", 1024)), 1);
@@ -43,7 +45,7 @@ class ProtocolPartsTest {
 
     @Test
     void aTextMessageIsOneTextPart_theCompressedStubWhenThereIsOne() {
-        Message m = Message.of(UUID.randomUUID(), UUID.randomUUID(), ParticipantType.AGENT, MessageType.CHAT, "long", 1);
+        Message m = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.AGENT, MessageType.CHAT, "long", 1);
 
         assertThat(ProtocolParts.message(Role.ASSISTANT, m).content())
                 .containsExactly(new ContentPart.Text("long"));

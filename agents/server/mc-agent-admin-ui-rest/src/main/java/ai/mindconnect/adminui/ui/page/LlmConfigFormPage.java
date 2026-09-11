@@ -37,7 +37,7 @@ public final class LlmConfigFormPage extends AdminPage {
     public UiPage render() {
         String url = config == null
                 ? "/admin/llm-configs/new"
-                : "/admin/llm-configs/" + config.id() + "/edit";
+                : "/admin/llm-configs/" + config.id().value() + "/edit";
         return UiPage.of(url, new LlmConfigFormComponent(config, allConfigs, lmStudio).render());
     }
 }

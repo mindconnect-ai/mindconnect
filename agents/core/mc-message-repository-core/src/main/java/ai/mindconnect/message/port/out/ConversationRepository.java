@@ -1,18 +1,19 @@
 package ai.mindconnect.message.port.out;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Conversation;
+import ai.mindconnect.message.domain.ConversationId;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
+/** Storage of conversations, per tenant. */
 public interface ConversationRepository {
 
     Conversation save(Conversation conversation);
 
-    Optional<Conversation> findById(UUID id);
+    Optional<Conversation> findById(ConversationId id);
 
-    List<Conversation> findByNamespace(Namespace namespace, PageRequest page);
+    /** A page of one tenant's conversations. */
+    List<Conversation> findAll(PageRequest page);
 }

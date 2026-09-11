@@ -1,19 +1,19 @@
 package ai.mindconnect.agent.runtime.port.in;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.message.domain.Message;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
  * Stateful handle to one chat session.
  *
- * <p>Returned by {@link AgentRuntime#openChat(UUID)} and
- * {@link AgentRuntime#attachChat(UUID)}. The session id, agent definition and
+ * <p>Returned by {@link AgentRuntime#openChat(ai.mindconnect.agent.AgentId)} and
+ * {@link AgentRuntime#attachChat(SessionId)}. The session id, agent definition and
  * auth context are bound at construction — call sites do not pass them
  * around.
  *
@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  */
 public interface AgentChatClient {
 
-    UUID sessionId();
+    SessionId sessionId();
 
     AgentDefinition definition();
 

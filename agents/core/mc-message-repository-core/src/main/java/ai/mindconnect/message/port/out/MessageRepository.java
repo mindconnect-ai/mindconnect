@@ -1,24 +1,31 @@
 package ai.mindconnect.message.port.out;
 
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageId;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.function.IntFunction;
 
+/**
+ * Storage of messages. A message is a child of its conversation, so it is
+ * addressed by the conversation and its own id — the adapter knows which
+ * conversation to open without searching them all.
+ */
 public interface MessageRepository {
 
     /**
      * Persists a message. If a message with the same {@code id} already exists
-     * it is overwritten (upsert) — this allows updating the compressed flag.
+     * in its conversation it is overwritten (upsert) — this allows updating the
+     * compressed flag.
      */
     Message save(Message message);
 
-    List<Message> findByConversationId(UUID conversationId, PageRequest page);
+    List<Message> findByConversation(ConversationId conversation, PageRequest page);
 
-    Optional<Message> findById(UUID conversationId, UUID messageId);
+    Optional<Message> findById(ConversationId conversation, MessageId id);
 
     /**
      * Appends a message with the next free sequence number of its
@@ -36,8 +43,8 @@ public interface MessageRepository {
      * message to store. It is called while the reservation is held, so it
      * should do nothing but build the message.
      */
-    Message append(UUID conversationId, IntFunction<Message> create);
+    Message append(ConversationId conversation, IntFunction<Message> create);
 
     /** Deletes all messages whose sequenceNum is in [fromSeq, toSeq] inclusive. */
-    void deleteBySequenceRange(UUID conversationId, int fromSeq, int toSeq);
+    void deleteBySequenceRange(ConversationId conversation, int fromSeq, int toSeq);
 }

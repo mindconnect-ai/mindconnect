@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.port.in;
 
+
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 
