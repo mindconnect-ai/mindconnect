@@ -13,7 +13,7 @@ import ai.mindconnect.ui.model.UiToast;
  * client shows only a generic message for a non-2xx answer, and a patch leaves
  * the form — and what the user typed into it — on screen.
  */
-final class VersionedForms {
+class VersionedForms {
 
     static final String FIELD = "version";
 
