@@ -51,7 +51,7 @@ class CurrentUsersTest {
     @Test
     void aSessionOpensOnlyForItsOwner() {
         var repo = new InMemoryAgentSessionRepository();
-        AgentSession alices = repo.save(AgentSession.start(AgentId.of("default-chat"), UserId.of("alice"),
+        AgentSession alices = repo.create(AgentSession.start(AgentId.of("default-chat"), UserId.of("alice"),
                 ConversationId.random()));
         var access = new SessionAccess(repo);
 
