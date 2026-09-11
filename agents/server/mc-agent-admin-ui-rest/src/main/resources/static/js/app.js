@@ -10,6 +10,7 @@ import { install as installMarkdown }   from "/sui-ext/markdown/extension.js";
 import { install as installDiagram }    from "/sui-ext/diagram/extension.js";
 import { watchConnectionBudget }        from "/js/connection-budget.js";
 import { installAudioRecorder }         from "/js/audio-recorder.js";
+import { installCopyField }             from "/js/copy-field.js";
 
 // ── Renderer + extensions ────────────────────────────────────────────────────
 
@@ -77,6 +78,9 @@ watchConnectionBudget(bus);
 // dialog. Browser-only: the handler records and posts, the server never knows
 // it was not an upload.
 installAudioRecorder(bus);
+
+// "Copy" beside a field, e.g. a new API token's secret on the profile page.
+installCopyField(bus);
 
 // Console hook. `mc.streams()` lists the server-sent streams this tab holds
 // (a chat page should show `user-stream` and one `msg-list-…`, nothing

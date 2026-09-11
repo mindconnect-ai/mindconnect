@@ -1,6 +1,8 @@
 package ai.mindconnect.filestore;
 
 
+import ai.mindconnect.agent.UserId;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -12,8 +14,18 @@ import java.util.Optional;
  */
 public interface FileStore {
 
-    /** Stores {@code content} under a fresh id and returns its metadata. */
-    StoredFile save(String name, String contentType, InputStream content) throws IOException;
+    /** Stores {@code content} under a fresh id, on nobody's behalf, and returns its metadata. */
+    default StoredFile save(String name, String contentType, InputStream content) throws IOException {
+        return save(name, contentType, content, null);
+    }
+
+    /**
+     * Stores {@code content} under a fresh id and returns its metadata.
+     *
+     * @param creator the user the file is stored for, recorded as its
+     *                {@link StoredFile#creator()}; {@code null} for nobody
+     */
+    StoredFile save(String name, String contentType, InputStream content, UserId creator) throws IOException;
 
     Optional<StoredFile> find(FileId id);
 

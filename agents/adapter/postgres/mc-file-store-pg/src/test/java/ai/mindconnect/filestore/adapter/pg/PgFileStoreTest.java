@@ -1,6 +1,8 @@
 package ai.mindconnect.filestore.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStoreBackend;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.jdbc.Sql;
@@ -32,6 +34,45 @@ class PgFileStoreTest {
         sql = Sql.of(requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_file");
         store = new PgFileStore(sql, NS).initSchema();
+    }
+
+    @Test
+    void theCreatorIsStoredAndReadBack() throws IOException {
+        StoredFile alices = store.save("a.txt", "text/plain", new ByteArrayInputStream(new byte[] {1}),
+                UserId.of("alice"));
+        StoredFile nobodys = store.save("b.txt", "text/plain", new ByteArrayInputStream(new byte[] {2}));
+
+        assertThat(alices.creator()).isEqualTo(UserId.of("alice"));
+        assertThat(store.find(alices.id())).contains(alices);
+        assertThat(store.find(nobodys.id())).get().extracting(StoredFile::creator).isNull();
+        assertThat(store.list()).containsExactlyInAnyOrder(alices, nobodys);
+    }
+
+    @Test
+    void aTableFromBeforeCreatorsGainsTheColumnAndItsRowsHaveNone() throws IOException {
+        sql.execute("DROP TABLE IF EXISTS mc_file");
+        sql.execute("""
+                CREATE TABLE mc_file (
+                    namespace    TEXT NOT NULL,
+                    id           TEXT NOT NULL,
+                    name         TEXT NOT NULL,
+                    content_type TEXT,
+                    size         BIGINT NOT NULL,
+                    created_at   TIMESTAMPTZ NOT NULL,
+                    content      BYTEA NOT NULL,
+                    PRIMARY KEY (namespace, id)
+                );
+                INSERT INTO mc_file VALUES ('test', 'file-0123456789abcdef0123', 'old.txt', 'text/plain', 1,
+                                            now(), decode('01', 'hex'));
+                """);
+
+        PgFileStore upgraded = new PgFileStore(sql, NS).initSchema();
+
+        assertThat(upgraded.find(FileId.of("file-0123456789abcdef0123"))).get()
+                .extracting(StoredFile::name, StoredFile::creator).containsExactly("old.txt", null);
+        StoredFile fresh = upgraded.save("new.txt", "text/plain", new ByteArrayInputStream(new byte[] {2}),
+                UserId.of("bob"));
+        assertThat(upgraded.find(fresh.id())).get().extracting(StoredFile::creator).isEqualTo(UserId.of("bob"));
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Map;
 
@@ -32,6 +33,22 @@ public class ResponsesErrors {
     public ResponseEntity<Map<String, Object>> unknownModel(ModelResolver.UnknownModelException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(error("invalid_request_error", e.getMessage(), "model"));
+    }
+
+    /**
+     * A status the request already carries — above all the 401 of a request
+     * without an authenticated caller, which the catch-all below would report
+     * as a server error.
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> status(ResponseStatusException e) {
+        String type = switch (e.getStatusCode().value()) {
+            case 401 -> "authentication_error";
+            case 404 -> "not_found";
+            default -> e.getStatusCode().is5xxServerError() ? "server_error" : "invalid_request_error";
+        };
+        String message = e.getReason() != null ? e.getReason() : e.getStatusCode().toString();
+        return ResponseEntity.status(e.getStatusCode()).body(error(type, message, null));
     }
 
     /** A request this server understands but cannot accept as sent. */

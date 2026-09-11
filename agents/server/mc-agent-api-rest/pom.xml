@@ -72,6 +72,12 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- In-memory conversations, so controller tests run on the real session service. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-message-repository</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
 </project>

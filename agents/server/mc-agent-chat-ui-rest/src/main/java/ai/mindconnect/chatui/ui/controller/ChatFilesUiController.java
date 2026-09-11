@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 
 /**
@@ -111,11 +112,13 @@ public class ChatFilesUiController {
                           @AuthenticationPrincipal OidcUser user) throws IOException {
         SessionId sessionId = SessionId.of(sessionIdValue);
         requireOwned(sessionId, user);
+        // The caller owns the session (checked above), so the uploads are the session owner's files.
+        UserId owner = UserId.of(SessionOwnership.userIdOf(user));
         UiPatch patch = UiPatch.of();
         for (MultipartFile file : files) {
             StoredFile stored;
             try (InputStream content = file.getInputStream()) {
-                stored = fileStore.save(file.getOriginalFilename(), file.getContentType(), content);
+                stored = fileStore.save(file.getOriginalFilename(), file.getContentType(), content, owner);
             }
             SessionFileService.AttachResult result = sessionFiles.attach(sessionId, stored);
             patch.toast(result.success()

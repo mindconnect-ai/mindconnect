@@ -17,6 +17,20 @@ Interactive documentation ships with the server: **http://localhost:8080/swagger
 generated from the same annotations the endpoints carry. The pages below cover
 the parts that need more explanation than a signature.
 
+## Authentication
+
+With authentication off (the default) every request runs as the dev user. With
+it on, every request needs a bearer token — a personal API token created on the
+profile page of the Admin UI, or an access token of the Keycloak realm:
+
+```bash
+curl -H "Authorization: Bearer mct_…" http://localhost:8080/api/agents
+```
+
+The caller is always the authenticated user; no endpoint takes a user id from
+the request. In Swagger UI, **Authorize** takes the token. See
+[Authentication](./authentication.md).
+
 ## Agents and sessions
 
 | | |
@@ -28,14 +42,22 @@ the parts that need more explanation than a signature.
 | `PUT /api/agents/{id}/tools` | replace the tool list |
 | `POST /api/agents/{id}/copy` | duplicate as `{name}-copy` |
 | `DELETE /api/agents/{id}` | delete |
-| `POST /api/sessions` | start a session — body `{agentId, userId}` |
-| `GET /api/sessions?agentId=&userId=` | a user's sessions for one agent |
+| `POST /api/sessions` | start a session for the caller — body `{agentId}` |
+| `GET /api/sessions?agentId=` | the caller's sessions for one agent |
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
 
 A server runs in one namespace, set with `mindconnect.namespace` (default
 `local`, `MC_NAMESPACE`); no endpoint names one. Ids travel as their plain
 value, in paths and in JSON.
+
+Every user-scoped resource — a session and everything under
+`/api/sessions/{id}`, an uploaded file, a workspace, the user stream, a
+transcription job — belongs to the authenticated caller, and a request for
+someone else's answers 404, exactly like one for an id that does not exist.
+No request names its user: a `userId` an older client still sends is ignored.
+Agents, LLM configs, vector stores and workflows are shared configuration,
+open to every authenticated caller.
 
 ## OpenAI Responses API
 
@@ -69,6 +91,11 @@ changes nothing for anyone else. A name that is neither is refused rather
 than quietly answered by something else. The client's **conversation** is a
 session, so `previous_response_id` continues the session that response was
 made in.
+
+Responses, conversations and files belong to the authenticated caller, as on
+`/api`: someone else's response or file answers `404` with
+`{"error": {"type": "not_found", …}}`, and a `previous_response_id` or
+`conversation` that is not the caller's is treated like an unknown one.
 
 Not supported: client-side function tools — this runtime executes tools
 inside the turn instead of handing them back to the caller — skills, and
@@ -172,10 +199,11 @@ someone that an agent is waiting for them — needs the opposite: little about
 every session, without attaching to any of them. That is the user stream:
 
 ```bash
-curl -N "http://localhost:8080/api/users/$USER/stream?afterSeq=0"
+curl -N "http://localhost:8080/api/users/me/stream?afterSeq=0"
 ```
 
-The first frame is the `attached` frame with the buffer bounds
+The path names the caller: `me`, or the caller's own user id. Any other user
+answers 404. The first frame is the `attached` frame with the buffer bounds
 (`firstBufferedSeq`, `latestSeq`); then the buffered events after `afterSeq`
 replay and the stream continues live. Every frame is one JSON object with a
 `seq` and a `type`, and the `sessionId` it is about:
@@ -312,9 +340,9 @@ for you — a transcript is worth little without the audio behind it, and only
 the caller knows when that stops being true. The job's `fileId` and `fileUrl`
 come back with the submit answer and with every poll.
 
-A job that a request submitted under a login is readable only by that user;
-on an installation without login, by anyone who reaches the endpoint, like
-the rest of this API.
+A job is readable only by the user who submitted it, and the recording is that
+user's file. A job from before requesters were recorded stays readable by
+anyone who has its id.
 
 ## Beyond chat
 
@@ -326,3 +354,11 @@ CRUD shapes and are best read in the Swagger UI. One shape worth knowing:
 ingested file produced, 0 for an image, which goes to the model with the
 next message instead. `DELETE …/files?file=` takes the file's name or its
 ingested id.
+
+A file in the store is its uploader's (`creator` in the file object).
+`GET /api/files` lists the caller's own files; by id, a file answers its
+uploader only, and only the uploader deletes it. Files uploaded before
+uploaders were recorded have no `creator`: they stay readable by id — chats
+and transcripts still point at them — but are not listed and cannot be
+deleted through the API. Attaching a file by id, to a chat message or a
+session, works only for a file the caller may read.

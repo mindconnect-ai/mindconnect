@@ -25,6 +25,17 @@ mindconnect:
   # The namespace this process runs in: file data under data.base-dir/<namespace>,
   # a namespace key column in Postgres. One process serves one namespace.
   namespace: ${MC_NAMESPACE:local}
+  # Authentication of the REST API. Off by default: every request runs as the
+  # dev user. On: every request needs a bearer token — a JWT of the issuer
+  # below (Keycloak) or a personal API token created in the admin UI, which
+  # works here when both apps share their data (same data directory or
+  # database, same namespace).
+  auth:
+    enabled: ${MC_AUTH_ENABLED:false}
+    dev-user: ${MC_DEV_USER:mc_user}
+    jwt:
+      issuer-uri: ${KC_ISSUER_URI:}
+      audiences: ${MC_JWT_AUDIENCES:}
   postgres:
     url: ${MC_POSTGRES_URL:jdbc:postgresql://localhost:5432/mindconnect}
     username: ${MC_POSTGRES_USER:}

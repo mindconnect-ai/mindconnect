@@ -21,6 +21,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>
         </dependency>
+        <!-- bearer authentication of the REST API: Keycloak JWT or personal API token -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-security</artifactId>
+        </dependency>
         <!-- persistence: one starter per backend, mindconnect.persistence picks -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

@@ -137,7 +137,7 @@ public class VectorStoreUiController {
                 .column(UiTable.Column.text("size", "Size"))
                 .column(UiTable.Column.text("created", "Uploaded"))
                 .rowAction(UiAction.secondary("download", "Download").icon("download")
-                        .onClick(ai.mindconnect.ui.model.UiTrigger.openInTab("/api/files/{id}/content")))
+                        .onClick(ai.mindconnect.ui.model.UiTrigger.openInTab(BASE + "/files/{id}/content")))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this file from the file store? (Already-ingested chunks stay.)")
                         .dispatch("DELETE", "/admin/vector-stores/files/{id}"));
@@ -231,17 +231,50 @@ public class VectorStoreUiController {
         return String.format("%.1f MB", bytes / (1024.0 * 1024));
     }
 
+    /** The uploads are stored as the signed-in user's files — the file store records who put them there. */
     @PostMapping(value = "/files/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public UiPage uploadFiles(@org.springframework.web.bind.annotation.RequestParam("vs-files-upload")
-                              List<org.springframework.web.multipart.MultipartFile> uploads) {
+                              List<org.springframework.web.multipart.MultipartFile> uploads,
+                              @org.springframework.security.core.annotation.AuthenticationPrincipal
+                              org.springframework.security.oauth2.core.oidc.user.OidcUser user) {
+        String userId = ai.mindconnect.chatui.service.SessionOwnership.userIdOf(user);
+        ai.mindconnect.agent.UserId creator = userId == null || userId.isBlank()
+                ? null : ai.mindconnect.agent.UserId.of(userId);
         for (var upload : uploads) {
             try (var content = upload.getInputStream()) {
-                fileStore.save(upload.getOriginalFilename(), upload.getContentType(), content);
+                fileStore.save(upload.getOriginalFilename(), upload.getContentType(), content, creator);
             } catch (java.io.IOException e) {
                 throw new IllegalStateException("Upload failed: " + e.getMessage(), e);
             }
         }
         return list("files");
+    }
+
+    /**
+     * The files tab's Download button. The Files API takes bearer tokens only,
+     * so the browser downloads here, with its session — and gets what the Files
+     * API would give the signed-in user: their own files and those stored
+     * before creators were recorded; anything else is 404.
+     */
+    @GetMapping("/files/{id}/content")
+    public org.springframework.http.ResponseEntity<org.springframework.core.io.InputStreamResource> downloadStoredFile(
+            @PathVariable String id,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal
+            org.springframework.security.oauth2.core.oidc.user.OidcUser user) throws java.io.IOException {
+        String userId = ai.mindconnect.chatui.service.SessionOwnership.userIdOf(user);
+        ai.mindconnect.agent.UserId caller = userId == null || userId.isBlank()
+                ? null : ai.mindconnect.agent.UserId.of(userId);
+        var file = fileStore.find(ai.mindconnect.filestore.FileId.of(id))
+                .filter(f -> f.readableBy(caller)).orElse(null);
+        if (file == null) {
+            return org.springframework.http.ResponseEntity.notFound().build();
+        }
+        return org.springframework.http.ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"" + file.name() + "\"")
+                .contentType(file.contentType() != null
+                        ? MediaType.parseMediaType(file.contentType())
+                        : MediaType.APPLICATION_OCTET_STREAM)
+                .body(new org.springframework.core.io.InputStreamResource(fileStore.content(file.id())));
     }
 
     @DeleteMapping("/files/{id}")

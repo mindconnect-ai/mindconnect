@@ -37,6 +37,7 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * Backend adapter: the protocol surface implemented against the Mindconnect
@@ -55,6 +56,14 @@ import java.util.function.Consumer;
  * ({@link #sessions()}, {@link #responses()}, {@link #conversations()})
  * because the interfaces' {@code get} methods collide on one class.
  *
+ * <p>Everything is the caller's own. Sessions open for the caller, files are
+ * stored as the caller's, and a session, response or file of someone else's
+ * is not found — the answer a missing one gets. The caller is either fixed
+ * (the {@code String} constructor: an embedding, the CLI) or asked on every
+ * operation (the {@code Supplier} one: a server, whose caller is the current
+ * request's). {@link #conversations()} is not scoped: the runtime cannot map a
+ * conversation back to its session yet, and no served endpoint exposes it.
+ *
  * <p>v1 mapping notes: ids are the runtime's id values as strings; responses are
  * tracked in-memory (a restart forgets them — the conversation keeps the
  * durable truth); {@code Conversations.items} maps the legacy Message format
@@ -66,23 +75,58 @@ public final class AgentRuntimeBackend {
     private final AgentSessionService sessionService;
     private final AgentDefinitionRepository definitions;
     private final ConversationManager conversationManager;
-    private final UserId userId;
+    private final Supplier<UserId> caller;
 
-    private final Map<String, ResponseAssembler> assemblers = new ConcurrentHashMap<>();
-    private final Map<String, ChatTurnHandle> handles = new ConcurrentHashMap<>();
+    private final Map<String, ResponseAssembler> assemblers;
+    private final Map<String, ChatTurnHandle> handles;
+    /**
+     * Whose session each response ran in. A session's owner never changes, so
+     * it is noted once at creation — a stream refreshes its response on every
+     * event, and must not read the session each time to learn this.
+     */
+    private final Map<String, UserId> owners;
 
     private ai.mindconnect.filestore.FileStore fileStore;
     private FileAttacher fileAttacher;
 
 
+    /** A backend that always acts for {@code userId}. */
     public AgentRuntimeBackend(AgentChatService chat, AgentSessionService sessionService,
                                AgentDefinitionRepository definitions,
                                ConversationManager conversationManager, String userId) {
+        this(chat, sessionService, definitions, conversationManager, fixed(UserId.of(userId)));
+    }
+
+    /**
+     * A backend that acts for whoever {@code caller} names, asked on every
+     * operation — a server passes the authenticated user of the current
+     * request. The supplier may throw to refuse a request without one.
+     */
+    public AgentRuntimeBackend(AgentChatService chat, AgentSessionService sessionService,
+                               AgentDefinitionRepository definitions,
+                               ConversationManager conversationManager, Supplier<UserId> caller) {
+        this(chat, sessionService, definitions, conversationManager, caller,
+                new ConcurrentHashMap<>(), new ConcurrentHashMap<>(), new ConcurrentHashMap<>());
+    }
+
+    private AgentRuntimeBackend(AgentChatService chat, AgentSessionService sessionService,
+                                AgentDefinitionRepository definitions,
+                                ConversationManager conversationManager, Supplier<UserId> caller,
+                                Map<String, ResponseAssembler> assemblers,
+                                Map<String, ChatTurnHandle> handles,
+                                Map<String, UserId> owners) {
         this.chat = chat;
         this.sessionService = sessionService;
         this.definitions = definitions;
         this.conversationManager = conversationManager;
-        this.userId = UserId.of(userId);
+        this.caller = caller;
+        this.assemblers = assemblers;
+        this.handles = handles;
+        this.owners = owners;
+    }
+
+    private static Supplier<UserId> fixed(UserId user) {
+        return () -> user;
     }
 
     /**
@@ -95,6 +139,26 @@ public final class AgentRuntimeBackend {
         this.fileStore = fileStore;
         this.fileAttacher = fileAttacher;
         return this;
+    }
+
+    /** Who is calling now, as the caller supplier answers. */
+    public UserId currentUser() {
+        return caller.get();
+    }
+
+    /**
+     * This backend acting for {@code user}, whatever the caller supplier would
+     * say — the same responses, the same files. For work that outlives the
+     * request thread: a stream's callbacks run on the channel's thread, where a
+     * supplier that reads the current request has nobody to answer with. Ask
+     * {@link #currentUser()} on the request thread and give the callbacks this.
+     */
+    public AgentRuntimeBackend actingFor(UserId user) {
+        var view = new AgentRuntimeBackend(chat, sessionService, definitions, conversationManager,
+                fixed(user), assemblers, handles, owners);
+        view.fileStore = fileStore;
+        view.fileAttacher = fileAttacher;
+        return view;
     }
 
     // ── The three protocol surfaces, by composition ─────────────────────────
@@ -111,6 +175,29 @@ public final class AgentRuntimeBackend {
 
     public Response create(ResponseRequest request) { return responsesApi.create(request); }
 
+    /**
+     * The session, if it exists and is the caller's. A session id travels in
+     * URLs and client state, so it opens nothing on its own.
+     */
+    private Optional<AgentSession> ownedSession(String sessionId) {
+        UserId user = caller.get();
+        try {
+            return Optional.of(sessionService.findSession(SessionId.of(sessionId)))
+                    .filter(session -> user.equals(session.userId()));
+        } catch (RuntimeException e) {
+            return Optional.empty();
+        }
+    }
+
+    /** The response's assembler, if the response ran in one of the caller's sessions. */
+    private Optional<ResponseAssembler> ownedResponse(String responseId) {
+        UserId user = caller.get();
+        if (responseId == null || !user.equals(owners.get(responseId))) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(assemblers.get(responseId));
+    }
+
     private final Sessions sessionsApi = new Sessions() {
 
         @Override
@@ -118,7 +205,7 @@ public final class AgentRuntimeBackend {
             AgentDefinition def = definitions.findByName(agentName)
                     .orElseThrow(() -> new RuntimeBackendException(
                             "No agent named '" + agentName + "'"));
-            AgentSession session = sessionService.openChat(def.id(), userId);
+            AgentSession session = sessionService.openChat(def.id(), caller.get());
             return toProtocol(session, agentName);
         }
 
@@ -131,14 +218,11 @@ public final class AgentRuntimeBackend {
 
         @Override
         public Optional<Session> get(String sessionId) {
-            try {
-                AgentSession session = sessionService.findSession(SessionId.of(sessionId));
+            return ownedSession(sessionId).map(session -> {
                 String agentName = definitions.findById(session.agentDefinitionId())
                         .map(AgentDefinition::name).orElse("unknown");
-                return Optional.of(toProtocol(session, agentName));
-            } catch (Exception e) {
-                return Optional.empty();
-            }
+                return toProtocol(session, agentName);
+            });
         }
 
         private Session toProtocol(AgentSession session, String agentName) {
@@ -155,13 +239,15 @@ public final class AgentRuntimeBackend {
                 throw new RuntimeBackendException("clientTools are not supported by the "
                         + "runtime backend yet — register tools on the agent definition");
             }
-            AgentSession session = sessionService.findSession(SessionId.of(request.sessionId()));
+            AgentSession session = ownedSession(request.sessionId()).orElseThrow(() ->
+                    new RuntimeBackendException("Unknown session " + request.sessionId()));
             String agentName = definitions.findById(session.agentDefinitionId())
                     .map(AgentDefinition::name).orElse("unknown");
 
             String responseId = "resp_" + UUID.randomUUID();
             ResponseAssembler assembler = new ResponseAssembler(responseId,
                     session.conversationId().value(), request.sessionId(), agentName);
+            owners.put(responseId, session.userId());
             assemblers.put(responseId, assembler);
 
             ChatTurnHandle handle = chat.submitChat(
@@ -188,21 +274,22 @@ public final class AgentRuntimeBackend {
 
         @Override
         public Optional<Response> get(String responseId) {
-            return Optional.ofNullable(assemblers.get(responseId)).map(ResponseAssembler::snapshot);
+            return ownedResponse(responseId).map(ResponseAssembler::snapshot);
         }
 
         @Override
         public boolean cancel(String responseId) {
+            if (ownedResponse(responseId).isEmpty()) {
+                return false;
+            }
             ChatTurnHandle handle = handles.get(responseId);
             return handle != null && handle.cancel();
         }
 
         @Override
         public Subscription subscribe(SubscribeRequest request, Consumer<ResponseEvent> consumer) {
-            ResponseAssembler assembler = assemblers.get(request.responseId());
-            if (assembler == null) {
-                throw new RuntimeBackendException("Unknown response " + request.responseId());
-            }
+            ResponseAssembler assembler = ownedResponse(request.responseId()).orElseThrow(() ->
+                    new RuntimeBackendException("Unknown response " + request.responseId()));
             // includeChildren: sub-agent events are folded into the parent's
             // items by the assembler (v1) — nothing separate to merge yet.
             long afterSeq = request.afterSeq() == Long.MAX_VALUE ? Long.MAX_VALUE : request.afterSeq();
@@ -275,24 +362,31 @@ public final class AgentRuntimeBackend {
             return "image-" + UUID.randomUUID().toString().substring(0, 8) + extension;
         }
 
-        /** The stored file behind a media source: looked up (FileId) or stored now (Inline). */
+        /**
+         * The stored file behind a media source: looked up (FileId) or stored
+         * now (Inline). A file the caller may not read is unknown — attaching
+         * it would put its content in front of the caller's model.
+         */
         private ai.mindconnect.filestore.StoredFile resolve(ContentPart.MediaSource source, String name) {
             requireFiles();
+            UserId user = caller.get();
             return switch (source) {
                 case ContentPart.MediaSource.FileId f -> fileStore.find(ai.mindconnect.filestore.FileId.of(f.fileId()))
+                        .filter(stored -> stored.readableBy(user))
                         .orElseThrow(() -> new RuntimeBackendException(
                                 "Unknown file id " + f.fileId() + " — upload via files() first"));
-                case ContentPart.MediaSource.Inline in -> storeInline(name, in);
+                case ContentPart.MediaSource.Inline in -> storeInline(name, in, user);
                 case ContentPart.MediaSource.Url u -> throw new RuntimeBackendException(
                         "Url media sources are not supported by the runtime backend yet");
             };
         }
 
         private ai.mindconnect.filestore.StoredFile storeInline(String name,
-                                                                ContentPart.MediaSource.Inline in) {
+                                                                ContentPart.MediaSource.Inline in,
+                                                                UserId user) {
             try {
                 byte[] bytes = java.util.Base64.getDecoder().decode(in.base64Data());
-                return fileStore.save(name, in.mediaType(), new ByteArrayInputStream(bytes));
+                return fileStore.save(name, in.mediaType(), new ByteArrayInputStream(bytes), user);
             } catch (Exception e) {
                 throw new RuntimeBackendException("Failed to store inline document: " + e.getMessage(), e);
             }
@@ -304,18 +398,23 @@ public final class AgentRuntimeBackend {
         @Override
         public StoredFile upload(String filename, String mediaType, byte[] content) {
             requireFiles();
+            UserId user = caller.get();
             try {
-                var stored = fileStore.save(filename, mediaType, new ByteArrayInputStream(content));
+                var stored = fileStore.save(filename, mediaType, new ByteArrayInputStream(content), user);
                 return toProtocolFile(stored);
             } catch (Exception e) {
                 throw new RuntimeBackendException("Upload failed: " + e.getMessage(), e);
             }
         }
 
+        /** The caller's file — or one stored before creators were recorded, which anyone may read by id. */
         @Override
         public Optional<StoredFile> get(String fileId) {
             requireFiles();
-            return fileStore.find(ai.mindconnect.filestore.FileId.of(fileId)).map(AgentRuntimeBackend::toProtocolFile);
+            UserId user = caller.get();
+            return fileStore.find(ai.mindconnect.filestore.FileId.of(fileId))
+                    .filter(stored -> stored.readableBy(user))
+                    .map(AgentRuntimeBackend::toProtocolFile);
         }
     };
 

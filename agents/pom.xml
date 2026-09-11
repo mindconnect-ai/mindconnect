@@ -44,6 +44,9 @@
         <module>adapter/postgres/mc-message-repository-pg</module>
         <module>adapter/postgres/mc-agent-runtime-pg</module>
         <module>adapter/postgres/mc-file-store-pg</module>
+        <module>core/mc-user-core</module>
+        <module>core/mc-user</module>
+        <module>adapter/postgres/mc-user-pg</module>
         <module>springstarter/mc-agent-starter-file</module>
         <module>springstarter/mc-agent-starter-postgres</module>
         <module>core/mc-credentials</module>
@@ -65,6 +68,7 @@
         <module>mcp/mc-agent-tools-mcp</module>
         <module>mcp/mc-mcp-gateway-admin-ui-rest</module>
         <module>server/mc-agent-api-rest</module>
+        <module>server/mc-agent-security</module>
         <module>server/mc-agent-api-responses-rest</module>
         <module>server/mc-agent-api-app</module>
         <module>server/mc-agent-chat-ui-rest</module>

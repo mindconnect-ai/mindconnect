@@ -38,7 +38,9 @@ import java.util.concurrent.atomic.AtomicReference;
  *
  * <p>This class translates and delegates; it holds no agent logic. The
  * protocol surface it calls is the same one the OpenAI backend implements in
- * the other direction, which is what makes the two interchangeable.
+ * the other direction, which is what makes the two interchangeable. That
+ * surface acts for the authenticated caller, so a response of someone else's
+ * answers exactly like one that does not exist.
  */
 @RestController
 @RequestMapping("/v1")
@@ -81,6 +83,11 @@ public class ResponsesController {
     private SseEmitter stream(CreateResponseRequest request) {
         SseEmitter emitter = new SseEmitter(0L);        // a turn can take minutes
 
+        // The subscription's callbacks run on the channel's thread, where the
+        // request's caller can no longer be asked — so the backend they use
+        // is bound to the caller here, on the request thread.
+        AgentRuntimeBackend callers = backend.actingFor(backend.currentUser());
+
         ModelResolver.Resolution resolution = models.resolve(request.model());
         Session session = sessions.bind(request, resolution);
 
@@ -90,16 +97,16 @@ public class ResponsesController {
         AtomicReference<ResponseDto> current = new AtomicReference<>();
         StreamEvents events = new StreamEvents(current::get, mapper);
 
-        Response created = backend.responses().create(new ResponseRequest(
+        Response created = callers.responses().create(new ResponseRequest(
                 session.id(), mapper.toItems(request.input()), true, java.util.List.of()));
         current.set(mapper.toDto(created, request.model()));
 
-        var subscription = backend.responses().subscribe(
+        var subscription = callers.responses().subscribe(
                 SubscribeRequest.replay(created.id()),
                 event -> {
                     // Refresh before writing: a lifecycle frame must not
                     // announce "completed" while carrying the queued object.
-                    backend.responses().get(created.id())
+                    callers.responses().get(created.id())
                             .ifPresent(r -> current.set(mapper.toDto(r, request.model())));
                     // One protocol event can be several frames — an item that
                     // opens or closes brings its content part with it.

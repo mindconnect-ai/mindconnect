@@ -7,6 +7,10 @@ import ai.mindconnect.filestore.FileStoreBackend;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
+import ai.mindconnect.user.adapter.file.FileUserRepository;
+import ai.mindconnect.user.port.out.ApiTokenRepository;
+import ai.mindconnect.user.port.out.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -64,6 +68,20 @@ public class FilePersistenceAutoConfiguration {
             return files;
         }
         return new EncryptingLlmConfigRepository(files, helper);
+    }
+
+    /** The installation's users, under {@code <mindconnect.data.base-dir>/<namespace>/system/users}. */
+    @Bean
+    @ConditionalOnMissingBean(UserRepository.class)
+    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir, Namespace namespace) {
+        return new FileUserRepository(Path.of(baseDir), namespace);
+    }
+
+    /** Personal API tokens, stored as hashes under {@code <mindconnect.data.base-dir>/<namespace>/system/api-tokens}. */
+    @Bean
+    @ConditionalOnMissingBean(ApiTokenRepository.class)
+    ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir, Namespace namespace) {
+        return new FileApiTokenRepository(Path.of(baseDir), namespace);
     }
 
     /** Uploads: the {@code filesystem} backend under {@code <mindconnect.data.base-dir>/<namespace>/files} unless configured otherwise. */

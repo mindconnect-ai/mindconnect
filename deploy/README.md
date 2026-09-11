@@ -74,6 +74,17 @@ curl -so /dev/null -w '%{http_code}\n' \
   "https://<AUTH_DOMAIN>/realms/mindconnect/protocol/openid-connect/logout?client_id=mc-admin-ui&post_logout_redirect_uri=https%3A%2F%2F<ADMIN_DOMAIN>%2F"
 ```
 
+### Calling the API
+
+With the `keycloak` profile, `/api/**` and `/v1/**` need a bearer token. Users
+create personal API tokens on their profile page — the avatar in the header;
+an access token of the realm works as well and is checked against the same
+`KC_ISSUER_URI` the login uses, so there is nothing more to configure:
+
+```bash
+curl -H "Authorization: Bearer mct_…" https://<ADMIN_DOMAIN>/api/agents
+```
+
 ## Deploying a new version
 
 ```bash

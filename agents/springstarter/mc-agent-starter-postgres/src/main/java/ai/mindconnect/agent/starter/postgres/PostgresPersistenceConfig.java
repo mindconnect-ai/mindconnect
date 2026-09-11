@@ -178,4 +178,16 @@ public class PostgresPersistenceConfig {
         return new EncryptingLlmConfigRepository(
                 new PgLlmConfigRepository(mindconnectSql, namespace).initSchema(), encryptionHelper);
     }
+
+    // ── users ───────────────────────────────────────────────────────────────
+
+    @Bean
+    ai.mindconnect.user.port.out.UserRepository userRepository(Sql mindconnectSql, Namespace namespace) {
+        return new ai.mindconnect.user.adapter.pg.PgUserRepository(mindconnectSql, namespace).initSchema();
+    }
+
+    @Bean
+    ai.mindconnect.user.port.out.ApiTokenRepository apiTokenRepository(Sql mindconnectSql, Namespace namespace) {
+        return new ai.mindconnect.user.adapter.pg.PgApiTokenRepository(mindconnectSql, namespace).initSchema();
+    }
 }

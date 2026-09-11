@@ -153,6 +153,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
+        <!-- Bearer authentication of /api/** and /v1/**: Keycloak JWT or personal API token -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-security</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
