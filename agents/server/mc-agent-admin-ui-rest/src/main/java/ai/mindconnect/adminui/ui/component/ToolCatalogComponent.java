@@ -25,15 +25,37 @@ import java.util.Map;
  */
 public final class ToolCatalogComponent implements UiComponent {
 
-    /** One catalog row: group (rubric), name, description, parameters schema and declared overrides schema. */
-    public record Entry(String group, String name, String description, Object schema, Object overridesSchema) {}
+    /**
+     * One catalog row: group (rubric), optional subgroup (the source within
+     * that rubric — an MCP server, say), name, description, parameters
+     * schema and declared overrides schema.
+     */
+    public record Entry(String group, String subgroup, String name, String description,
+                        Object schema, Object overridesSchema, boolean enabled) {
+
+        public Entry(String group, String subgroup, String name, String description,
+                     Object schema, Object overridesSchema) {
+            this(group, subgroup, name, description, schema, overridesSchema, true);
+        }
+
+        public Entry(String group, String name, String description, Object schema, Object overridesSchema) {
+            this(group, null, name, description, schema, overridesSchema, true);
+        }
+    }
 
     private final List<Entry> entries;
     private final String query;
+    /** Extra header actions a section contributes, e.g. "register an MCP server". */
+    private final List<UiAction> headerActions;
 
     public ToolCatalogComponent(List<Entry> entries, String query) {
+        this(entries, query, List.of());
+    }
+
+    public ToolCatalogComponent(List<Entry> entries, String query, List<UiAction> headerActions) {
         this.entries = entries;
         this.query = query;
+        this.headerActions = headerActions == null ? List.of() : headerActions;
     }
 
     @Override
@@ -62,6 +84,7 @@ public final class ToolCatalogComponent implements UiComponent {
         var list = UiList.of(id(), "Tools  (" + entries.size() + ")").icon("tools");
         list.withCssClass("tool-catalog");
         list.headerExtra(searchForm());
+        headerActions.forEach(list::action);
 
         if (entries.isEmpty()) {
             list.item(UiList.Item.of("empty", "No tools registered")
@@ -78,9 +101,25 @@ public final class ToolCatalogComponent implements UiComponent {
         byGroup.forEach((group, groupEntries) -> {
             String gid = "tool-group-" + group.toLowerCase().replaceAll("\\W+", "-");
             var groupList = UiList.of(gid + "-list", "");
+            // Within a group, tools that name a source are gathered under it —
+            // one MCP server's forty tools are a section, not a wall. Tools
+            // without a source keep their place directly in the group.
+            Map<String, List<Entry>> bySubgroup = new LinkedHashMap<>();
             for (Entry e : groupEntries) {
-                groupList.item(catalogItem(e));
+                bySubgroup.computeIfAbsent(e.subgroup(), sg -> new ArrayList<>()).add(e);
             }
+            bySubgroup.forEach((subgroup, subEntries) -> {
+                if (subgroup == null) {
+                    subEntries.forEach(e -> groupList.item(catalogItem(e)));
+                    return;
+                }
+                String sid = gid + "-" + subgroup.toLowerCase().replaceAll("\\W+", "-");
+                var subList = UiList.of(sid + "-list", "");
+                subEntries.forEach(e -> subList.item(catalogItem(e)));
+                groupList.item(UiList.Item.of(sid, "")
+                        .content(subList)
+                        .collapsible(subgroup + "  (" + subEntries.size() + ")", false, sid + "-sum"));
+            });
             // Empty label: the collapse summary is the heading; a label would
             // repeat the group name inside the open section. Starts collapsed.
             list.item(UiList.Item.of(gid, "")
@@ -107,6 +146,8 @@ public final class ToolCatalogComponent implements UiComponent {
         if (overridesTable != null) content.child(overridesTable);
         content.child(UiAction.primary("test-" + e.name(), "Test")
                 .dispatch("GET", "/admin/api/tools/" + e.name() + "/test"));
+        content.child(UiAction.secondary("settings-" + e.name(), "Settings").icon("tools")
+                .dispatch("GET", "/admin/api/tools/" + e.name() + "/settings"));
         return UiList.Item.of("tool-" + e.name(), e.name())
                 .content(content)
                 // Client-controlled collapse: starts closed, the user's
@@ -114,13 +155,19 @@ public final class ToolCatalogComponent implements UiComponent {
                 .collapsibleClient(summary(e), "tool-sum-" + e.name());
     }
 
-    /** Collapsed-state summary line: name + first line of the description. */
+    /**
+     * Collapsed-state summary line: name + first line of the description.
+     * A switched-off tool says so here, because this line is the whole row
+     * an operator sees before opening it — and a row that looks like every
+     * other one would make the catalog a list of lies.
+     */
     private static String summary(Entry e) {
         String d = e.description() == null ? "" : e.description().strip();
         int nl = d.indexOf('\n');
         if (nl >= 0) d = d.substring(0, nl).strip();
         if (d.length() > 100) d = d.substring(0, 100) + "…";
-        return d.isBlank() ? e.name() : e.name() + " — " + d;
+        String head = e.enabled() ? e.name() : e.name() + "  (off)";
+        return d.isBlank() ? head : head + " — " + d;
     }
 
     /** Description as markdown; parameters/overrides render as tables below. */

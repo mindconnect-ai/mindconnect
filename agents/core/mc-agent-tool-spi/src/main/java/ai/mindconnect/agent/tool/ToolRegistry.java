@@ -52,4 +52,12 @@ public interface ToolRegistry {
      * tools that declare none (e.g. MCP tools, whose knobs are all parameters).
      */
     default Map<String, Object> overridesSchema(String toolName) { return Map.of(); }
+
+    /**
+     * The finer rubric a tool belongs to inside its group
+     * ({@code MultiToolProvider.subgroup}), or null when it has none —
+     * which is the case for every tool that comes from a single source.
+     * Catalogs use it to break a large group into readable sections.
+     */
+    default String subgroupOf(String toolName) { return null; }
 }

@@ -52,6 +52,13 @@ mindconnect:
     dev-user: ${MC_DEV_USER:mc_user}
   tools:
     tavily-api-key: ${TAVILY_API_KEY:}
+  mcp:
+    # Suggestions for registering MCP servers, fetched from Docker's public
+    # catalog. Off by default: it is an outbound call to a third party, and
+    # an installation that does not want one should not make it because
+    # somebody opened a screen. Registering by hand works without it.
+    catalog:
+      enabled: ${MC_MCP_CATALOG_ENABLED:false}
   encryption:
     # Required — encrypts stored LLM credentials. No default on purpose.
     # Set MINDCONNECT_ENCRYPTION_SECRET_KEY to a strong, private 32-char value.

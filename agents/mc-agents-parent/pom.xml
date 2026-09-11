@@ -193,7 +193,22 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-agent-tools-gmail</artifactId>
+                <artifactId>mc-mcp-gateway-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-mcp-gateway-local</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-tools-mcp</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-mcp-gateway-admin-ui-rest</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

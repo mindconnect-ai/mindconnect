@@ -62,6 +62,20 @@ public interface MultiToolProvider {
      */
     default String group() { return "general"; }
 
+    /**
+     * Optional finer rubric <em>within</em> {@link #group()}, for a provider
+     * that speaks for several sources at once: the MCP provider serves every
+     * registered server, and its tools want to be read per server rather than
+     * as one heap of forty. Returns the source's name — a server id, a
+     * store, whatever the provider groups by — or {@code null} for tools
+     * that have no such source, which is the default and what every existing
+     * provider does.
+     *
+     * <p>Presentation only. Tool names stay unique across the whole
+     * registry, so nothing resolves differently because of a subgroup.
+     */
+    default String subgroup(String toolName) { return null; }
+
     /** Optional capture of runtime dependencies; default is a no-op. */
     default void bind(ToolEnvironment env) {}
 

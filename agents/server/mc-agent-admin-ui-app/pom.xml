@@ -58,8 +58,17 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-tools-gmail</artifactId>
+            <artifactId>mc-agent-tools-mcp</artifactId>
             <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-mcp-gateway-local</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-mcp-gateway-admin-ui-rest</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

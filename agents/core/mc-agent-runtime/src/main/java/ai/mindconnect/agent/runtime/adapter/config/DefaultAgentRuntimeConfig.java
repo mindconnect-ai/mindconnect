@@ -215,7 +215,8 @@ public class DefaultAgentRuntimeConfig {
                                @Value("${mindconnect.vector-store.url:}") String vectorStoreUrl,
                                @Value("${mindconnect.vector-store.user:}") String vectorStoreUser,
                                @Value("${mindconnect.vector-store.password:}") String vectorStorePassword,
-                               @Value("${mindconnect.vector-store.embedding-config:embeddings}") String vectorStoreEmbeddingConfig) {
+                               @Value("${mindconnect.vector-store.embedding-config:embeddings}") String vectorStoreEmbeddingConfig,
+                                org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.tool.ToolRepository> toolRepository) {
         // The web tools build their own OkHttpClient internally (with
         // bounded timeouts the SSE-tuned host client wouldn't carry), so
         // the runtime no longer threads any HTTP client through the
@@ -265,8 +266,17 @@ public class DefaultAgentRuntimeConfig {
         // behind the very startup that is waiting for the first round. The
         // listener below starts it once the context is up.
         SpiToolRegistry registry = SpiToolRegistry.deferred(hostBacked(env, applicationContext));
-        registryRef.set(registry);
-        return registry;
+        // What the operator decided lies over what the classpath offers. No
+        // repository means no decisions: then this is the plain registry and
+        // a host without the settings store behaves exactly as before.
+        ai.mindconnect.agent.tool.ToolRepository settings = toolRepository.getIfAvailable();
+        ToolRegistry effective = settings == null
+                ? registry
+                : new ai.mindconnect.agent.tool.OverlayToolRegistry(registry, settings);
+        // The effective one: tool_search reads this reference, and it must not
+        // offer the model a tool an operator switched off.
+        registryRef.set(effective);
+        return effective;
     }
 
     /**
@@ -284,7 +294,14 @@ public class DefaultAgentRuntimeConfig {
         // singleton is built — which is the property that matters here. The
         // warm-up itself only ever runs once, however often the event comes.
         return event -> {
-            if (toolRegistry instanceof SpiToolRegistry spi) spi.warmUp();
+            // The bean handed in may be the operator's overlay; the warm-up
+            // belongs to the registry underneath it. Without this unwrap the
+            // instanceof below would not match and no provider would ever bind.
+            ai.mindconnect.agent.tool.ToolRegistry inner =
+                    toolRegistry instanceof ai.mindconnect.agent.tool.OverlayToolRegistry overlay
+                            ? overlay.source()
+                            : toolRegistry;
+            if (inner instanceof SpiToolRegistry spi) spi.warmUp();
         };
     }
 

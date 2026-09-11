@@ -3,7 +3,9 @@ package ai.mindconnect.adminui.ui;
 import ai.mindconnect.adminui.service.TaskMonitor;
 import ai.mindconnect.adminui.service.UserStream;
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
+import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.ui.model.UiPage;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,13 +29,22 @@ public class AdminLayoutFactory {
     private final BuildInfo buildInfo;
     /** Absent when the host runs no task queue; the header then has no badge. */
     private final TaskMonitor taskMonitor;
+    /**
+     * Present when this host has an MCP gateway to administer. Same shape as
+     * the task monitor above: what the shell offers follows from what the
+     * host actually assembled, and the composition point is the one place
+     * that can see it.
+     */
+    private final ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin;
 
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
                               BuildInfo buildInfo,
-                              Optional<TaskMonitor> taskMonitor) {
+                              Optional<TaskMonitor> taskMonitor,
+                              ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin) {
         this.authEnabled = authEnabled;
         this.buildInfo = buildInfo;
         this.taskMonitor = taskMonitor.orElse(null);
+        this.mcpRegistryAdmin = mcpRegistryAdmin;
     }
 
     /**
@@ -45,7 +56,8 @@ public class AdminLayoutFactory {
         return new AdminLayout(currentUserName(), authEnabled, buildInfo.label(),
                 taskMonitor == null ? null : TaskMonitorComponent.badge(taskMonitor.counts()),
                 UiPage.ActiveStream.of(UserStream.CHANNEL_ID, UserStream.STREAM_URL,
-                        "Live updates", "/admin/agents"));
+                        "Live updates", "/admin/agents"),
+                mcpRegistryAdmin.getIfAvailable() != null);
     }
 
     private String currentUserName() {
