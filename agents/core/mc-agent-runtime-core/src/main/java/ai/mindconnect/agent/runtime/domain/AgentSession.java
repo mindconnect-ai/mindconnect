@@ -80,13 +80,33 @@ public record AgentSession(
          * <p>A list because a session will eventually host several agents
          * talking to each other; today anything but one entry is a bug.
          */
-        java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> sessionAgents
+        java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> sessionAgents,
+        /**
+         * The directory this session works in — where the user launched the
+         * CLI, the project the chat is about — as an absolute path, or
+         * {@code null} when the session has none. The file-rooted tools
+         * (files, bash, documents, glob) take it as their base directory
+         * ahead of any configured default, the system prompt names it, and a
+         * sub-agent spawned from this session inherits it. Set at open or
+         * changed later ({@code /cd}); validated by the session service.
+         */
+        String workingDir,
+        /**
+         * Further directories this session may reach by absolute path,
+         * beside the working directory — a library checked out next to the
+         * project, a data folder. Absolute, validated paths; empty when
+         * none. The working directory is the base for relative paths, these
+         * are roots for absolute ones.
+         */
+        java.util.List<String> additionalDirs
 ) implements ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader {
     public AgentSession {
         if (activatedTools == null) activatedTools = java.util.List.of();
+        if (additionalDirs == null) additionalDirs = java.util.List.of();
         if (attachedFiles == null) attachedFiles = java.util.List.of();
         if (approvedTools == null) approvedTools = java.util.Set.of();
         if (sessionAgents == null) sessionAgents = java.util.List.of();
+        if (workingDir != null && workingDir.isBlank()) workingDir = null;
         // "Exactly one main" is the invariant the whole resolution path rests
         // on: without a main agent, mainAgent() is empty and the runtime falls
         // back to agentDefinitionId — which for an inline agent resolves to
@@ -102,13 +122,27 @@ public record AgentSession(
     }
 
     /** Pre-activatedTools constructor: nothing activated. */
+    /** A session without directories — how every session was built before it had any. */
+    public AgentSession(SessionId id, AgentId agentDefinitionId, UserId userId,
+                        ConversationId conversationId, String title, SessionStatus status,
+                        Instant startedAt, Instant completedAt, SessionId parentSessionId,
+                        ChatTurnId parentTurnId, String parentToolCallId,
+                        java.util.List<String> activatedTools, java.util.List<AttachedFile> attachedFiles,
+                        java.util.Set<String> approvedTools,
+                        java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> sessionAgents) {
+        this(id, agentDefinitionId, userId, conversationId, title, status,
+                startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
+                activatedTools, attachedFiles, approvedTools, sessionAgents, null, java.util.List.of());
+    }
+
     public AgentSession(SessionId id, AgentId agentDefinitionId, UserId userId,
                         ConversationId conversationId, String title, SessionStatus status,
                         Instant startedAt, Instant completedAt, SessionId parentSessionId,
                         ChatTurnId parentTurnId, String parentToolCallId) {
         this(id, agentDefinitionId, userId, conversationId, title, status,
                 startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
-                java.util.List.of(), java.util.List.of(), java.util.Set.of(), java.util.List.of());
+                java.util.List.of(), java.util.List.of(), java.util.Set.of(), java.util.List.of(),
+                null, java.util.List.of());
     }
 
     /** Pre-approvedTools constructor: nothing approved yet. */
@@ -119,7 +153,8 @@ public record AgentSession(
                         java.util.List<String> activatedTools, java.util.List<AttachedFile> attachedFiles) {
         this(id, agentDefinitionId, userId, conversationId, title, status,
                 startedAt, completedAt, parentSessionId, parentTurnId, parentToolCallId,
-                activatedTools, attachedFiles, java.util.Set.of(), java.util.List.of());
+                activatedTools, attachedFiles, java.util.Set.of(), java.util.List.of(),
+                null, java.util.List.of());
     }
 
     /** This session plus one tool approved for the rest of it. */
@@ -128,7 +163,8 @@ public record AgentSession(
         merged.add(toolName);
         return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, attachedFiles, java.util.Set.copyOf(merged), sessionAgents);
+                parentToolCallId, activatedTools, attachedFiles, java.util.Set.copyOf(merged), sessionAgents,
+                workingDir, additionalDirs);
     }
 
     /** This session plus one activated tool (no-op if already active). */
@@ -137,7 +173,8 @@ public record AgentSession(
         merged.addAll(names);
         return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, java.util.List.copyOf(merged), attachedFiles, approvedTools, sessionAgents);
+                parentToolCallId, java.util.List.copyOf(merged), attachedFiles, approvedTools, sessionAgents,
+                workingDir, additionalDirs);
     }
 
     /**
@@ -151,7 +188,8 @@ public record AgentSession(
         for (AttachedFile f : files) merged.put(f.name(), f);
         return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, java.util.List.copyOf(merged.values()), approvedTools, sessionAgents);
+                parentToolCallId, activatedTools, java.util.List.copyOf(merged.values()), approvedTools, sessionAgents,
+                workingDir, additionalDirs);
     }
 
     /** This session without the attached file of the given name. */
@@ -159,10 +197,31 @@ public record AgentSession(
         return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
                 parentToolCallId, activatedTools,
-                attachedFiles.stream().filter(f -> !f.name().equals(name)).toList(), approvedTools, sessionAgents);
+                attachedFiles.stream().filter(f -> !f.name().equals(name)).toList(), approvedTools, sessionAgents,
+                workingDir, additionalDirs);
     }
 
     /** The attached files' names, in attach order — what the notices and the prompt speak of. */
+    /** This session working in {@code dir} — an absolute, validated path, or {@code null} for none. */
+    public AgentSession withWorkingDir(String dir) {
+        return new AgentSession(id, agentDefinitionId, userId, conversationId,
+                title, status, startedAt, completedAt, parentSessionId, parentTurnId,
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents, dir, additionalDirs);
+    }
+
+    /** Has this session a working directory? */
+    public boolean hasWorkingDir() {
+        return workingDir != null;
+    }
+
+    /** This session with its additional directories replaced — absolute, validated paths; empty for none. */
+    public AgentSession withAdditionalDirs(java.util.List<String> dirs) {
+        return new AgentSession(id, agentDefinitionId, userId, conversationId,
+                title, status, startedAt, completedAt, parentSessionId, parentTurnId,
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents, workingDir,
+                dirs == null ? java.util.List.of() : java.util.List.copyOf(dirs));
+    }
+
     public java.util.List<String> attachedFileNames() {
         return attachedFiles.stream().map(AttachedFile::name).toList();
     }
@@ -189,13 +248,16 @@ public record AgentSession(
             @JsonProperty("activatedTools")    java.util.List<String> activatedTools,
             @JsonProperty("attachedFiles")     java.util.List<AttachedFile> attachedFiles,
             @JsonProperty("approvedTools")     java.util.Set<String> approvedTools,
-            @JsonProperty("sessionAgents")     java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> sessionAgents) {
+            @JsonProperty("sessionAgents")     java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> sessionAgents,
+            @JsonProperty("workingDir")        String workingDir,
+            @JsonProperty("additionalDirs")    java.util.List<String> additionalDirs) {
         return new AgentSession(new SessionId(id), new AgentId(agentDefinitionId),
                 new UserId(userId), new ConversationId(conversationId),
                 title, status, startedAt, completedAt,
                 parentSessionId == null ? null : new SessionId(parentSessionId),
                 parentTurnId == null ? null : new ChatTurnId(parentTurnId),
-                parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents,
+                workingDir, additionalDirs);
     }
 
     /**
@@ -216,9 +278,12 @@ public record AgentSession(
      * actually runs.
      */
     public AgentSession withSessionAgent(ai.mindconnect.agent.runtime.domain.session.SessionAgent agent) {
+        // The directories are the chat's, not the agent's: a model switch must
+        // not send the file tools back to the server's default.
         return new AgentSession(id, agent.id(), userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, attachedFiles, approvedTools, java.util.List.of(agent));
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, java.util.List.of(agent),
+                workingDir, additionalDirs);
     }
 
     /** This session with its agents replaced. */
@@ -226,7 +291,8 @@ public record AgentSession(
             java.util.List<ai.mindconnect.agent.runtime.domain.session.SessionAgent> agents) {
         return new AgentSession(id, agentDefinitionId, userId, conversationId,
                 title, status, startedAt, completedAt, parentSessionId, parentTurnId,
-                parentToolCallId, activatedTools, attachedFiles, approvedTools, agents);
+                parentToolCallId, activatedTools, attachedFiles, approvedTools, agents,
+                workingDir, additionalDirs);
     }
 
     /** Top-level session — no parent linkage. */
@@ -253,18 +319,21 @@ public record AgentSession(
     public AgentSession withTitle(String title) {
         return new AgentSession(id, agentDefinitionId, userId,
                 conversationId, title, status, startedAt, completedAt,
-                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
+                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents,
+                workingDir, additionalDirs);
     }
 
     public AgentSession complete() {
         return new AgentSession(id, agentDefinitionId, userId,
                 conversationId, title, SessionStatus.COMPLETED, startedAt, Instant.now(),
-                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
+                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents,
+                workingDir, additionalDirs);
     }
 
     public AgentSession error() {
         return new AgentSession(id, agentDefinitionId, userId,
                 conversationId, title, SessionStatus.ERROR, startedAt, Instant.now(),
-                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents);
+                parentSessionId, parentTurnId, parentToolCallId, activatedTools, attachedFiles, approvedTools, sessionAgents,
+                workingDir, additionalDirs);
     }
 }

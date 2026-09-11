@@ -137,7 +137,9 @@ public final class VectorIngestFileTool implements Tool {
         }
 
         @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-            return new VectorIngestFileTool(stores, baseDir, scope);
+            // The session's working directory is where the files are.
+            return new VectorIngestFileTool(stores,
+                    scope != null && scope.hasWorkingDir() ? scope.workingDir() : baseDir, scope);
         }
     }
 }

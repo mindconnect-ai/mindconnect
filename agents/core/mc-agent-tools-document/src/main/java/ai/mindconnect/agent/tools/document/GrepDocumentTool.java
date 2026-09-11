@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.document;
 
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.DocumentModel;
 import ai.mindconnect.agent.tools.document.DocumentReader;
@@ -32,10 +33,17 @@ public class GrepDocumentTool implements Tool {
     private static final int MAX_CHARS = 30_000;
 
     private final Path baseDir;
+    private final FileRoots roots;
     private final DocumentReader reader;
 
     public GrepDocumentTool(Path baseDir, DocumentReader reader) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+        this(FileRoots.of(baseDir), reader);
+    }
+
+    /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
+    public GrepDocumentTool(FileRoots roots, DocumentReader reader) {
+        this.roots = roots;
+        this.baseDir = roots.base();
         this.reader = reader;
     }
 
@@ -91,8 +99,8 @@ public class GrepDocumentTool implements Tool {
         int contextLines = parseContextLines(arguments.get("context_lines"));
         boolean caseSensitive = parseBool(arguments.get("case_sensitive"), false);
 
-        Path target = baseDir.resolve(relative).normalize();
-        if (!target.startsWith(baseDir)) return "Error: path is outside the allowed base directory";
+        Path target = roots.resolve(relative).orElse(null);
+        if (target == null) return roots.outsideError(relative);
         if (!Files.exists(target)) return "Error: file does not exist: " + relative;
         if (!Files.isRegularFile(target)) return "Error: not a regular file: " + relative;
 

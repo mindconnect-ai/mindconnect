@@ -93,7 +93,8 @@ public final class ChatPage {
                         .orElse(false))
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
-                .withModelLabel(agent.llmConfigName());
+                .withModelLabel(agent.llmConfigName())
+                .withWorkingDir(session.workingDir());
     }
 
     /** Hands the host's links to the components that render them. */

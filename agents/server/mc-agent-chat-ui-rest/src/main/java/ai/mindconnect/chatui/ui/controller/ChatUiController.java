@@ -47,7 +47,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.function.Consumer;
 
 @RestController
@@ -75,6 +74,8 @@ public class ChatUiController {
     private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository;
     private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
     private final SessionAgentResolver agentResolver;
+    /** The server's tree a user may pick a working directory from. */
+    private final ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser;
 
     public ChatUiController(AgentSessionService sessionService,
                              AgentChatService chatService,
@@ -90,7 +91,10 @@ public class ChatUiController {
                              ToolApprovalStore approvalStore,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.chatui.ui.ChatHostLinks> hostLinks,
                              ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
-                             ai.mindconnect.agent.tool.ToolRegistry toolRegistry) {
+                             ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
+                             org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.runtime.service.WorkingDirBrowser> dirBrowser) {
+        this.dirBrowser = dirBrowser.getIfAvailable(() ->
+                new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(sessionService.workingDirPolicy()));
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
         this.chatService = chatService;
@@ -254,6 +258,128 @@ public class ChatUiController {
                 shell(saved, sessionRepository.findHeadersByUser(UserId.of(userId))));
     }
 
+    /**
+     * The directory dialog: a folder chooser over the server's tree, opened
+     * at the chat's working directory — at the root when it has none or
+     * the directory cannot be listed any more (a directory that vanished
+     * must not take the dialog down with it).
+     */
+    @GetMapping("/sessions/{sessionId}/dirs-dialog")
+    public ResponseEntity<UiPatch> dirDialog(@PathVariable SessionId sessionId,
+                                             @AuthenticationPrincipal OidcUser user) {
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var session = sessionOpt.get();
+        var dlg = ai.mindconnect.ui.model.UiDialog.of("Working directory",
+                session.hasWorkingDir() ? session.workingDir() : "The server's default directory",
+                pickerForm(session, session.workingDir()));
+        dlg.setId("chat-dialog");
+        return ResponseEntity.ok(UiPatch.of()
+                .patch(UiPatch.Operation.remove("chat-dialog"))
+                .patch(UiPatch.Operation.append("sui-dialogs", dlg)));
+    }
+
+    /** The chooser's form at {@code path}, or at the root when there is none or it cannot be listed. */
+    private ai.mindconnect.ui.model.UiForm pickerForm(ai.mindconnect.agent.runtime.domain.AgentSession session, String path) {
+        ai.mindconnect.agent.runtime.service.WorkingDirBrowser.Listing listing;
+        try {
+            listing = dirBrowser.list(session.userId(), path);
+        } catch (RuntimeException e) {
+            listing = dirBrowser.list(session.userId(), null);
+        }
+        return ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.form(session.id(), session, listing);
+    }
+
+    /** One step down or up in the chooser — the form alone is redrawn, at {@code path}. */
+    @GetMapping("/sessions/{sessionId}/dirs")
+    public ResponseEntity<UiPatch> browseDirs(@PathVariable SessionId sessionId,
+                                              @RequestParam(required = false) String path,
+                                              @AuthenticationPrincipal OidcUser user) {
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var listing = dirBrowser.list(sessionOpt.get().userId(), path);
+        return ResponseEntity.ok(redrawnPicker(sessionOpt.get(), listing));
+    }
+
+    /** The path typed into the field, opened below it — a path that is no directory is an error toast. */
+    @PostMapping("/sessions/{sessionId}/dirs/go")
+    public ResponseEntity<UiPatch> goDir(@PathVariable SessionId sessionId,
+                                         @RequestBody Map<String, Object> raw,
+                                         @AuthenticationPrincipal OidcUser user) {
+        return browseDirs(sessionId, pathOf(raw), user);
+    }
+
+    /**
+     * Makes the field's path the working directory — empty for the server's
+     * default — and closes the dialog. The composer redraws, since its
+     * directory button names the folder.
+     */
+    @PostMapping("/sessions/{sessionId}/dirs/use")
+    public ResponseEntity<UiPatch> useDir(@PathVariable SessionId sessionId,
+                                          @RequestBody Map<String, Object> raw,
+                                          @AuthenticationPrincipal OidcUser user) {
+        if (ownedSession(sessionId, user).isEmpty()) return ResponseEntity.notFound().build();
+        var saved = sessionService.changeWorkingDir(sessionId, pathOf(raw), null);
+        return ResponseEntity.ok(UiPatch.of()
+                .patch(UiPatch.Operation.remove("chat-dialog"))
+                .patch(composerRefresh(saved))
+                .toast(ai.mindconnect.ui.model.UiToast.success(saved.hasWorkingDir()
+                        ? "Working directory: " + saved.workingDir()
+                        : "Working in the server's default directory.").title("Working directory")));
+    }
+
+    /** Adds the field's path to the additional directories; the dialog stays open and shows it. */
+    @PostMapping("/sessions/{sessionId}/dirs/add")
+    public ResponseEntity<UiPatch> addDir(@PathVariable SessionId sessionId,
+                                          @RequestBody Map<String, Object> raw,
+                                          @AuthenticationPrincipal OidcUser user) {
+        if (ownedSession(sessionId, user).isEmpty()) return ResponseEntity.notFound().build();
+        String path = pathOf(raw);
+        if (path == null) throw new IllegalArgumentException("Type or pick a directory to add first");
+        var saved = sessionService.addDirectory(sessionId, path);
+        return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId(), path))
+                .toast(ai.mindconnect.ui.model.UiToast.success("Added " + path).title("Additional directories")));
+    }
+
+    /** Removes one additional directory; the dialog stays open. */
+    @PostMapping("/sessions/{sessionId}/dirs/remove")
+    public ResponseEntity<UiPatch> removeDir(@PathVariable SessionId sessionId,
+                                             @RequestParam String path,
+                                             @AuthenticationPrincipal OidcUser user) {
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var session = sessionOpt.get();
+        var saved = sessionService.changeWorkingDir(sessionId, session.workingDir(),
+                session.additionalDirs().stream().filter(d -> !d.equals(path)).toList());
+        return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId(), saved.workingDir()))
+                .toast(ai.mindconnect.ui.model.UiToast.success("Removed " + path).title("Additional directories")));
+    }
+
+    /** The chooser's form redrawn in place. */
+    private UiPatch redrawnPicker(ai.mindconnect.agent.runtime.domain.AgentSession session,
+                                  ai.mindconnect.agent.runtime.service.WorkingDirBrowser.Listing listing) {
+        return UiPatch.of().patch(UiPatch.Operation.replace(
+                ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.ID,
+                ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.form(session.id(), session, listing)));
+    }
+
+    /** The chooser's path field, trimmed; {@code null} when empty. */
+    private static String pathOf(Map<String, Object> raw) {
+        String path = raw == null ? null
+                : new FormBody(raw).str(ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.PATH_FIELD);
+        return path == null || path.isBlank() ? null : path.trim();
+    }
+
+    /** The composer drawn afresh — its directory button names the working directory. */
+    private UiPatch.Operation composerRefresh(ai.mindconnect.agent.runtime.domain.AgentSession session) {
+        var agent = agentResolver.resolve(session);
+        return new ai.mindconnect.chatui.ui.component.ChatFormComponent(session.id(), agent.id(), false)
+                .withModelLabel(agent.llmConfigName())
+                .withAttachmentCount(sessionFiles.attachments(session.id()).size())
+                .withWorkingDir(session.workingDir())
+                .reset();
+    }
+
     /** The rename dialog for one chat. */
     @GetMapping("/sessions/{sessionId}/rename")
     public ResponseEntity<UiPatch> renameDialog(@PathVariable("sessionId") String sessionIdValue,
@@ -414,6 +540,18 @@ public class ChatUiController {
      * and falls back to the inline agent this controller has always built. So
      * upgrading changes nothing until the agent is installed.
      */
+    /**
+     * A dialog value the runtime refuses — a working directory that does
+     * not exist, an agent id nobody has — comes back as an error toast over
+     * the dialog that is still open, not as the client's bare "HTTP 400".
+     */
+    @org.springframework.web.bind.annotation.ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<UiPatch> rejected(IllegalArgumentException e) {
+        return ResponseEntity.ok(UiPatch.of().toast(
+                ai.mindconnect.ui.model.UiToast.error(e.getMessage() == null ? "Invalid value" : e.getMessage())
+                        .title("Not applied")));
+    }
+
     private AgentSession openDefaultChat(String userId) {
         return agentRepository.findByName(DEFAULT_CHAT_AGENT)
                 .map(a -> sessionService.openChat(a.id(), UserId.of(userId)))

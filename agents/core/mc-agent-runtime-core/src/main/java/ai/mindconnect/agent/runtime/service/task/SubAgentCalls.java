@@ -147,8 +147,11 @@ final class SubAgentCalls {
                 return "Error: " + e.getMessage();
             }
             try {
+                // A sub-agent works where its parent works: the user's
+                // project, not the runtime's default directory.
                 subSession = sessionService.openChat(target.id(), parentSession.userId(),
-                        parentSession.id(), parentTurnId, toolCallId);
+                        parentSession.id(), parentTurnId, toolCallId, parentSession.workingDir(),
+                        parentSession.additionalDirs());
             } catch (Exception e) {
                 log.warn("Failed to open sub-session for '{}': {}", agentName, e.getMessage());
                 parentStream.accept(new StreamEvent.SubAgentError(cardId, agentName, e.getMessage()));

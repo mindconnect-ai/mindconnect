@@ -353,6 +353,28 @@ public class DefaultAgentRuntimeConfig {
         return new AgentRegistryService(definitionRepository);
     }
 
+    /**
+     * Where a session may work: under {@code mindconnect.tools.working-dir-root}
+     * when set, else under the tools' base directory — a server must not let
+     * a user point the file tools at any directory its process can read.
+     * A root with {@code {user}} in it gives every user a root of their own.
+     * The CLI sets the root to {@code /}: one user, their own machine.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy(
+            @Value("${mindconnect.tools.working-dir-root:}") String workingDirRoot,
+            @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir) {
+        return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
+                workingDirRoot == null || workingDirRoot.isBlank() ? baseDir : workingDirRoot);
+    }
+
+    /** The directories a user may pick a working directory from — the policy's tree, nothing beyond. */
+    @Bean
+    ai.mindconnect.agent.runtime.service.WorkingDirBrowser workingDirBrowser(
+            ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy) {
+        return new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(workingDirPolicy);
+    }
+
     @Bean
     AgentSessionService agentSessionService(AgentDefinitionRepository definitionRepository,
                                              AgentSessionRepository sessionRepository,
@@ -361,10 +383,11 @@ public class DefaultAgentRuntimeConfig {
                                              ConversationSummaryRepository conversationSummaryRepository,
                                              TodoListRepository todoListRepository,
                                              ToolApprovalStore approvalStore,
-                                             UserChannels userChannels) {
+                                             UserChannels userChannels,
+                                             ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy) {
         return new AgentSessionService(definitionRepository, sessionRepository,
                 conversationManager, workingMemoryRepository, conversationSummaryRepository,
-                todoListRepository, approvalStore, userChannels);
+                todoListRepository, approvalStore, userChannels, workingDirPolicy);
     }
 
     /**

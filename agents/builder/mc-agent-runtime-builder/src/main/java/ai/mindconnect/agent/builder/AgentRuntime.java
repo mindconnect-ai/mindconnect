@@ -49,9 +49,28 @@ public final class AgentRuntime implements AutoCloseable {
 
     /** Opens a chat session with the named agent. */
     public AgentSession openSession(String agentName, UserId userId) {
+        return openSession(agentName, userId, (java.nio.file.Path) null);
+    }
+
+    /**
+     * A session for a registry agent that works in {@code workingDir} — the
+     * file tools take it as their base directory, the prompt names it, and
+     * sub-agents inherit it. {@code null} for the runtime's default.
+     */
+    public AgentSession openSession(String agentName, UserId userId, java.nio.file.Path workingDir) {
         AgentDefinition def = definitionRepository.findByName(agentName)
                 .orElseThrow(() -> new IllegalArgumentException("No agent named '" + agentName + "'"));
-        return sessionService.openChat(def.id(), userId);
+        return sessionService.openChat(def.id(), userId, workingDir == null ? null : workingDir.toString());
+    }
+
+    /** Moves a session to another working directory ({@code null} clears it). */
+    public AgentSession changeWorkingDir(ai.mindconnect.agent.SessionId sessionId, java.nio.file.Path workingDir) {
+        return sessionService.changeWorkingDir(sessionId, workingDir == null ? null : workingDir.toString());
+    }
+
+    /** Lets a session reach one more directory by absolute path, beside its working directory. */
+    public AgentSession addDirectory(ai.mindconnect.agent.SessionId sessionId, java.nio.file.Path dir) {
+        return sessionService.addDirectory(sessionId, dir.toString());
     }
 
     /**

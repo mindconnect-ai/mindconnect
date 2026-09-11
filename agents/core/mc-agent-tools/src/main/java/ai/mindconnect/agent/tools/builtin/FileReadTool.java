@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.nio.file.Files;
@@ -11,9 +12,16 @@ public class FileReadTool implements Tool {
     private static final int MAX_CHARS = 20_000;
 
     private final Path baseDir;
+    private final FileRoots roots;
 
     public FileReadTool(Path baseDir) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+        this(FileRoots.of(baseDir));
+    }
+
+    /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
+    public FileReadTool(FileRoots roots) {
+        this.roots = roots;
+        this.baseDir = roots.base();
     }
 
     @Override
@@ -50,10 +58,9 @@ public class FileReadTool implements Tool {
             return ToolPaths.missingArgError("path", ToolPaths.PATH_ALIASES, arguments);
         }
         String relative = ToolPaths.normalise(raw, baseDir);
-        Path target = baseDir.resolve(relative).normalize();
-        if (!target.startsWith(baseDir)) {
-            return "Error: path is outside the allowed base directory ("
-                    + baseDir + "). Requested: " + raw;
+        Path target = roots.resolve(relative).orElse(null);
+        if (target == null) {
+            return roots.outsideError(raw);
         }
         if (!Files.exists(target)) {
             return "Error: file does not exist: " + relative;

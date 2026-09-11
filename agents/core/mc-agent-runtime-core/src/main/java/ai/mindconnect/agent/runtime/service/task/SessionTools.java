@@ -85,9 +85,14 @@ public final class SessionTools implements ToolDefinitionProvider {
     }
 
     /** Whether {@code toolName} is one of the inline delegation tools this agent enables. */
-    /** Who is calling, for the factories and advisors: this session, its user, this agent, its chat. */
+    /**
+     * Who is calling, for the factories and advisors: this session, its user,
+     * this agent, its chat — and where the session works, so the file-rooted
+     * tools take its working directory as their base.
+     */
     private ToolCallScope scope() {
-        return new ToolCallScope(session.userId(), session.id(), def.id(), rootSessionId);
+        return new ToolCallScope(session.userId(), session.id(), def.id(), rootSessionId,
+                session.workingDir(), session.additionalDirs());
     }
 
     public boolean isInline(String toolName) {

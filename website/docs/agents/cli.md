@@ -95,7 +95,10 @@ current agent. Everything starting with `/` is a command.
 
 | Command | What it does |
 |---------|--------------|
-| `/new` | Start a new session (keep the same agent) |
+| `/new` | Start a new session (keep the same agent) — in local mode it works in the directory the CLI was launched in |
+| `/cd <dir>` | Change the session's working directory (`~` and relative paths allowed; `/cd` alone clears it). The file tools and `bash` work there from the next message on, and the model is told |
+| `/add-dir <dir>` | Let the tools reach one more directory by absolute path, beside the working directory |
+| `/dirs` | Show the session's working and additional directories |
 | `/sessions` | List and switch to another session |
 | `/back` | Return to agent selection |
 | `/help` | Show the command help |

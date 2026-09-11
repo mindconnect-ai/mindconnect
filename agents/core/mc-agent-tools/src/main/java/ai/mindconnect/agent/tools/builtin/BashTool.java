@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,9 +18,17 @@ public class BashTool implements Tool {
     private static final int TIMEOUT_SECONDS = 60;
 
     private final File workingDir;
+    /** The session's directories, when the tool is scoped to one; names the extra ones in the description. */
+    private final FileRoots roots;
 
     public BashTool(File workingDir) {
         this.workingDir = workingDir;
+        this.roots = null;
+    }
+
+    public BashTool(FileRoots roots) {
+        this.workingDir = roots.base().toFile();
+        this.roots = roots;
     }
 
     @Override
@@ -29,8 +38,11 @@ public class BashTool implements Tool {
 
     @Override
     public String description() {
+        String extra = roots == null || roots.extra().isEmpty() ? ""
+                : " The session may also use these directories: " + String.join(", ",
+                        roots.extra().stream().map(java.nio.file.Path::toString).toList()) + ".";
         return "Executes a bash command in the working directory " + workingDir.getAbsolutePath() +
-               " and returns the combined stdout and stderr output.";
+               " and returns the combined stdout and stderr output." + extra;
     }
 
     @Override

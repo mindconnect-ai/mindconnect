@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,9 +63,16 @@ public class GlobTool implements Tool {
     );
 
     private final Path baseDir;
+    private final FileRoots roots;
 
     public GlobTool(Path baseDir) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+        this(FileRoots.of(baseDir));
+    }
+
+    /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
+    public GlobTool(FileRoots roots) {
+        this.roots = roots;
+        this.baseDir = roots.base();
     }
 
     @Override
@@ -72,14 +80,27 @@ public class GlobTool implements Tool {
         return "glob";
     }
 
+    /**
+     * Is the tool rooted at the user's home — the runtime default — rather
+     * than at a project? At home a search from the root walks everything the
+     * user owns; in a project it is what the caller wants.
+     */
+    private boolean homeRooted() {
+        return baseDir.equals(Path.of(System.getProperty("user.home")).toAbsolutePath().normalize());
+    }
+
     @Override
     public String description() {
+        String where = homeRooted()
+                ? "Both `path` and `pattern` are required. `path` is relative to the base directory; " +
+                  "always pass a specific project directory rather than the base directory itself, " +
+                  "otherwise the search will scan the entire home tree and time out.\n"
+                : "`pattern` is required; `path` is a sub-directory of the working directory " +
+                  baseDir + " and defaults to the working directory itself.\n";
         return "Finds files by name pattern under a given directory. Returns paths newest first " +
                "(sorted by modification time). Pure path matching — does NOT read file contents; " +
                "use grep for that.\n" +
-               "Both `path` and `pattern` are required. `path` is relative to the base directory; " +
-               "always pass a specific project directory rather than the base directory itself, " +
-               "otherwise the search will scan the entire home tree and time out.\n" +
+               where +
                "Pattern examples:\n" +
                "  *.java                — Java files directly in `path`\n" +
                "  **/*.java             — Java files anywhere under `path`\n" +
@@ -100,15 +121,18 @@ public class GlobTool implements Tool {
                         ),
                         "path", Map.of(
                                 "type", "string",
-                                "description", "Sub-directory to search in (relative to base directory). " +
-                                        "Required — pass a specific project directory, not the base directory itself."
+                                "description", homeRooted()
+                                        ? "Sub-directory to search in (relative to base directory). " +
+                                          "Required — pass a specific project directory, not the base directory itself."
+                                        : "Sub-directory to search in, relative to the working directory. " +
+                                          "Optional — omit or pass '.' for the working directory itself."
                         ),
                         "limit", Map.of(
                                 "type", "integer",
                                 "description", "Max number of files to return. Default 200, hard cap 2000."
                         )
                 ),
-                "required", new String[]{"pattern", "path"}
+                "required", homeRooted() ? new String[]{"pattern", "path"} : new String[]{"pattern"}
         );
     }
 
@@ -119,17 +143,20 @@ public class GlobTool implements Tool {
             return "Error: pattern is required";
         }
         String rawPath = ToolPaths.firstString(arguments, ToolPaths.PATH_ALIASES);
-        if (rawPath == null || rawPath.equals(".")) {
+        if (rawPath == null || rawPath.isBlank()) rawPath = ".";
+        // A session working in a project searches the project — that is the
+        // point. Only a tool still rooted at the user's home refuses the
+        // root: that would be a walk over the entire home tree.
+        if (rawPath.equals(".") && homeRooted()) {
             return "Error: path is required and must be a specific sub-directory (e.g. 'projects/my-app'). " +
                     "Searching from the base directory itself would scan your entire home tree.";
         }
         String relativeRoot = ToolPaths.normalise(rawPath, baseDir);
         int limit = parseLimit(arguments.get("limit"));
 
-        Path searchRoot = baseDir.resolve(relativeRoot).normalize();
-        if (!searchRoot.startsWith(baseDir)) {
-            return "Error: path is outside the allowed base directory ("
-                    + baseDir + "). Requested: " + rawPath;
+        Path searchRoot = roots.resolve(relativeRoot).orElse(null);
+        if (searchRoot == null) {
+            return roots.outsideError(rawPath);
         }
         if (!Files.exists(searchRoot)) {
             return "Error: path does not exist: " + relativeRoot
@@ -151,7 +178,7 @@ public class GlobTool implements Tool {
         }
 
         log.info("glob: searching '{}' for pattern '{}' (limit={}, timeout={}s)",
-                baseDir.relativize(searchRoot), pattern, limit, TIMEOUT_MS / 1000);
+                roots.display(searchRoot), pattern, limit, TIMEOUT_MS / 1000);
         long walkStart = System.currentTimeMillis();
         long deadline = walkStart + TIMEOUT_MS;
         List<Match> matches = new ArrayList<>();
@@ -179,7 +206,7 @@ public class GlobTool implements Tool {
                     }
                     String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
                     if (!dir.equals(searchRoot) && EXCLUDED_DIRS.contains(name)) {
-                        log.debug("glob: skipping excluded dir {}", baseDir.relativize(dir));
+                        log.debug("glob: skipping excluded dir {}", roots.display(dir));
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     // Log entries at the first level under the search root so the
@@ -277,7 +304,7 @@ public class GlobTool implements Tool {
         sb.append('\n');
         for (Match m : shown) {
             // Render paths relative to baseDir so they're stable across invocations.
-            sb.append(baseDir.relativize(m.path()).toString().replace('\\', '/')).append('\n');
+            sb.append(roots.display(m.path()).replace('\\', '/')).append('\n');
         }
         return sb.toString().stripTrailing();
     }
@@ -296,10 +323,10 @@ public class GlobTool implements Tool {
     private String suggestionsFor(Path missing) {
         Path parent = missing.getParent();
         // Walk up until we find a parent that exists and is inside baseDir.
-        while (parent != null && parent.startsWith(baseDir) && !Files.isDirectory(parent)) {
+        while (parent != null && roots.contains(parent) && !Files.isDirectory(parent)) {
             parent = parent.getParent();
         }
-        if (parent == null || !parent.startsWith(baseDir) || !Files.isDirectory(parent)) {
+        if (parent == null || !roots.contains(parent) || !Files.isDirectory(parent)) {
             return "";
         }
         String missingName = missing.getFileName() != null ? missing.getFileName().toString() : "";
@@ -323,7 +350,7 @@ public class GlobTool implements Tool {
         children.sort(Comparator.comparingInt(c -> similarityScore(needle, c.toLowerCase())));
         int top = Math.min(3, children.size());
         StringBuilder sb = new StringBuilder("\nDid you mean one of these (in '");
-        sb.append(baseDir.relativize(parent)).append("')?\n");
+        sb.append(roots.display(parent)).append("')?\n");
         for (int i = 0; i < top; i++) {
             sb.append("  - ").append(children.get(i)).append('/').append('\n');
         }

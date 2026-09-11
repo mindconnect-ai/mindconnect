@@ -13,6 +13,25 @@ final class DocBaseDirs {
 
     static final String DEFAULT_BASE_DIR_KEY = "defaultBaseDir";
 
+    /**
+     * Where a document tool may go in this scope: the session's working
+     * directory as the base — else the tool's override, the default, the
+     * home — and the session's additional directories beside it.
+     */
+    static ai.mindconnect.agent.tool.FileRoots roots(ai.mindconnect.agent.tool.ToolCallScope scope,
+                                                    AgentTool tool, String defaultBaseDir) {
+        String fallback = resolve(tool, defaultBaseDir);
+        return scope == null
+                ? ai.mindconnect.agent.tool.FileRoots.of(java.nio.file.Path.of(fallback))
+                : scope.fileRoots(fallback);
+    }
+
+    /** The session's working directory first, then the tool's override, the default, the home. */
+    static String resolve(ai.mindconnect.agent.tool.ToolCallScope scope, AgentTool tool, String defaultBaseDir) {
+        if (scope != null && scope.hasWorkingDir()) return scope.workingDir();
+        return resolve(tool, defaultBaseDir);
+    }
+
     static String resolve(AgentTool tool, String defaultBaseDir) {
         Object configured = tool.overrides().get("baseDir");
         if (configured instanceof String s && !s.isBlank()) return s;

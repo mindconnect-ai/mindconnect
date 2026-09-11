@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.document;
 
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -22,9 +23,16 @@ import java.util.Map;
 public final class DocumentWriteTool implements Tool {
 
     private final Path baseDir;
+    private final FileRoots roots;
 
     public DocumentWriteTool(Path baseDir) {
-        this.baseDir = baseDir;
+        this(FileRoots.of(baseDir));
+    }
+
+    /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
+    public DocumentWriteTool(FileRoots roots) {
+        this.roots = roots;
+        this.baseDir = roots.base();
     }
 
     @Override
@@ -67,14 +75,13 @@ public final class DocumentWriteTool implements Tool {
                 || sections.isEmpty()) {
             return "Error: 'path' and a non-empty 'sections' array are required.";
         }
-        Path base = baseDir.toAbsolutePath().normalize();
-        Path target = base.resolve(relative).normalize();
-        if (!target.startsWith(base)) {
-            return "Error: path escapes the base directory.";
+        Path target = roots.resolve(relative).orElse(null);
+        if (target == null) {
+            return roots.outsideError(relative);
         }
         String templateRel = arguments.get("template") instanceof String t && !t.isBlank() ? t : null;
         try {
-            XWPFDocument document = openDocument(base, templateRel);
+            XWPFDocument document = openDocument(roots, templateRel);
             boolean styled = templateRel != null;
             int written = 0;
             for (Object raw : sections) {
@@ -98,12 +105,12 @@ public final class DocumentWriteTool implements Tool {
     }
 
     /** Fresh document, or the template with its body cleared (styles survive). */
-    private static XWPFDocument openDocument(Path base, String templateRel) throws Exception {
+    private static XWPFDocument openDocument(FileRoots roots, String templateRel) throws Exception {
         if (templateRel == null) {
             return new XWPFDocument();
         }
-        Path template = base.resolve(templateRel).normalize();
-        if (!template.startsWith(base) || !Files.isRegularFile(template)) {
+        Path template = roots.resolve(templateRel).orElse(null);
+        if (template == null || !Files.isRegularFile(template)) {
             throw new IllegalArgumentException("template not found: " + templateRel);
         }
         XWPFDocument document = new XWPFDocument(Files.newInputStream(template));

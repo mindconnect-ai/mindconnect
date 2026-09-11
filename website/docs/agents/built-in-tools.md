@@ -41,10 +41,38 @@ Always available; no API keys required.
 | `tool_search` | Lets the agent find and activate its *deferred* tools on demand. | The agent's `toolSearch` config |
 | `view_attachment` | Shows an attached image or PDF to the model again — as a message of its own in the running turn, since media goes with a message in its own turn only. Activated for a session when an image or PDF is attached; see [images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts). | — |
 
-The file tools resolve paths against a **base directory**
-(`mindconnect.tools.base-dir`). It defaults to the **user home** — in the Admin
-UI too (its `mindconnect.data.base-dir: ./data` is a different property that
-only controls where *stored data* lives, not the file tools).
+The file tools resolve paths against the session's **working directory** —
+the directory the user is in. The CLI sets it to the directory it was
+launched in and changes it with `/cd`; the chat has a folder button on its
+composer that names the directory and opens a chooser; the REST API takes `workingDir` on
+`POST /api/sessions` and `PUT /api/sessions/{id}/working-dir`. The model is
+told where it is in the system prompt, `bash` runs there, `glob` searches it
+from `.`, and a sub-agent called from the session inherits it.
+
+A session can reach **additional directories** beside its working directory
+— a library checked out next to the project, a data folder — by absolute
+path (`/add-dir` in the CLI, *Additional directories* in the chat's chooser,
+`additionalDirs` on the API). Relative paths always mean the working
+directory; anything outside the working directory and the additional ones
+is refused with an error naming the allowed directories.
+
+The chat's **chooser** works like the operating system's folder dialog:
+one path field, the folders inside it to step into (and *Up*), and *Use
+this folder* takes what the field says — typed or clicked, empty for the
+server's default. It browses the server's tree under
+`mindconnect.tools.working-dir-root` and nothing beyond it. The additional
+directories are listed under the folders with a *Remove* each, and *Add
+this folder* adds the field's path as one more. On a multi-user server give the root a
+`{user}` placeholder (`/srv/mindconnect/users/{user}`): each user then picks
+from, and works in, a tree of their own.
+
+A session without one falls back to the tool's own `baseDir` override, then
+the **base directory** (`mindconnect.tools.base-dir`), which defaults to the
+**user home** — in the Admin UI too (its `mindconnect.data.base-dir: ./data`
+is a different property that only controls where *stored data* lives, not
+the file tools). On a server a working directory must lie under
+`mindconnect.tools.working-dir-root` (default: the base directory); the CLI
+sets that root to `/`.
 
 ## Workspace tools (`mc-agent-tools`)
 

@@ -63,6 +63,21 @@ public class LocalAgentClient implements AgentClient {
     }
 
     @Override
+    public AgentSession startSession(AgentId agentDefinitionId, UserId userId, String workingDir) {
+        return sessionService.openChat(agentDefinitionId, userId, workingDir);
+    }
+
+    @Override
+    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir) {
+        return sessionService.changeWorkingDir(sessionId, workingDir);
+    }
+
+    @Override
+    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
+        return sessionService.changeWorkingDir(sessionId, workingDir, additionalDirs);
+    }
+
+    @Override
     public List<AgentSession> listSessions(AgentId agentDefinitionId, UserId userId) {
         return sessionService.listSessions(agentDefinitionId, userId);
     }

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.document;
 
+import ai.mindconnect.agent.tool.FileRoots;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.DocumentModel;
 import ai.mindconnect.agent.tools.document.DocumentReader;
@@ -24,10 +25,17 @@ public final class DocumentSectionsTool implements Tool {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final Path baseDir;
+    private final FileRoots roots;
     private final DocumentReader reader;
 
     public DocumentSectionsTool(Path baseDir, DocumentReader reader) {
-        this.baseDir = baseDir.toAbsolutePath().normalize();
+        this(FileRoots.of(baseDir), reader);
+    }
+
+    /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
+    public DocumentSectionsTool(FileRoots roots, DocumentReader reader) {
+        this.roots = roots;
+        this.baseDir = roots.base();
         this.reader = reader;
     }
 
@@ -75,9 +83,9 @@ public final class DocumentSectionsTool implements Tool {
         boolean includeContent = !(arguments.get("include_content") instanceof Boolean b) || b;
 
         String relative = rawPath.toString();
-        Path target = baseDir.resolve(relative).normalize();
-        if (!target.startsWith(baseDir)) {
-            return "Error: path is outside the allowed base directory";
+        Path target = roots.resolve(relative).orElse(null);
+        if (target == null) {
+            return roots.outsideError(relative);
         }
         if (!Files.exists(target)) {
             return "Error: file does not exist: " + relative;

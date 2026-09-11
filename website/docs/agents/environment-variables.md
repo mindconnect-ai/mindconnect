@@ -39,7 +39,8 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.namespace` | `local` | The one namespace every repository is bound to — bound to `MC_NAMESPACE` in the apps' yaml. |
 | `mindconnect.postgres.*` | — | `url`, `username`, `password`, `pool-size` (default 10) for `postgres` mode; bound to `MC_POSTGRES_*`. |
 | `mindconnect.data.base-dir` | `data` | Root for **all** file persistence (definitions, configs, conversations, workspaces); in `postgres` mode only the file-based side channels. |
-| `mindconnect.tools.base-dir` | user home | Working/base directory for `bash` and the file tools — security-relevant. |
+| `mindconnect.tools.base-dir` | user home | Base directory for `bash` and the file tools when a session has no working directory of its own — security-relevant. |
+| `mindconnect.tools.working-dir-root` | `base-dir` | The root a session's working directory (`workingDir` on `POST /api/sessions`, the chat's directory chooser, `/cd` in the CLI) must lie under, and the tree the chat's directory picker shows. With `{user}` in it — `/srv/mindconnect/users/{user}` — every user gets a root of their own, created on first use, and sees nobody else's. The CLI sets `/`. |
 | `mindconnect.user.id` | app-specific | The user id that owns sessions and data (the CLI ships a hard-coded default). |
 | `mindconnect.remote.url` | _(unset)_ | Points the CLI at a remote agent server instead of local mode. |
 | `mindconnect.remote.token` | _(unset)_ | Bearer token the CLI sends to a remote agent server that requires authentication; also read from `MC_REMOTE_TOKEN`. |

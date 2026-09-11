@@ -240,6 +240,15 @@ public final class AgentRuntimeBuilder {
         return property("defaultBaseDir", dir.toString());
     }
 
+    /**
+     * The root a session's working directory must lie under (default: the
+     * tools' base directory). {@code Path.of("/")} lets a session work
+     * anywhere — right for one user on their own machine, not for a server.
+     */
+    public AgentRuntimeBuilder workingDirRoot(Path root) {
+        return property("workingDirRoot", root.toString());
+    }
+
     public AgentRuntimeBuilder tavilyApiKey(String key) {
         return property("tavilyApiKey", key);
     }
@@ -441,10 +450,15 @@ public final class AgentRuntimeBuilder {
                 : new FileLlmCallTraceRepository(dataDir, namespace);
         var approvalStore = new ToolApprovalStore();
         var userChannels = new UserChannels();
+        // Where a session may work: under workingDirRoot when set, else under
+        // the tools' base directory — the same rule the Spring apps apply.
+        String workingDirRoot = environment.getOrDefault("workingDirRoot", "");
+        var workingDirPolicy = ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
+                workingDirRoot.isBlank() ? environment.get("defaultBaseDir") : workingDirRoot);
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
-                userChannels);
+                userChannels, workingDirPolicy);
         var sessionChannels = new SessionChannels();
         var turnWorker = new AgentTurnWorker(
                 conversationManager, definitionRepository, sessionService,

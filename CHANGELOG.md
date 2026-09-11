@@ -143,6 +143,44 @@ fresh empty one, so nothing has to be moved by hand at release time.
   checks, and `compute(key, change)` in `Documents` and `DocumentTable`: decide
   on the stored document, or its absence, and write — under one lock.
 
+- **agents:** a session has a working directory. `AgentSession.workingDir`
+  is the directory the user is in — the CLI sets it to where it was
+  launched (local mode) and changes it with `/cd`, the chat's composer
+  has a folder button that names it and opens a chooser, `POST /api/sessions` takes
+  `workingDir` and `PUT /api/sessions/{id}/working-dir` changes it, an
+  embedding calls `AgentRuntime.openSession(agent, user, path)`. The
+  file-rooted tools (`file_*`, `glob`, `bash`, the document tools,
+  `vector_ingest_file`) take it as their base directory ahead of a tool's
+  `baseDir` override and the configured default; the system prompt names
+  it; a sub-agent called from the session inherits it. `glob` searches a
+  working directory from `.` and no longer requires `path` there. The
+  directory must exist and, on a server, lie under the new
+  `mindconnect.tools.working-dir-root` (default: `mindconnect.tools.base-dir`;
+  the CLI sets `/`). Sessions written before read as having none, so
+  nothing changes for them.
+
+- **agents:** a session can reach additional directories beside its working
+  directory (`AgentSession.additionalDirs`): `/add-dir` and `/dirs` in the
+  CLI, *Additional directories* in the chat's chooser, `additionalDirs` on
+  `POST /api/sessions` and `PUT /api/sessions/{id}/working-dir`,
+  `AgentRuntime.addDirectory` in an embedding. Relative paths keep meaning
+  the working directory; an absolute path into an additional directory is
+  allowed, anything outside the session's directories is refused with an
+  error naming them. `FileRoots` in `mc-agent-tool-spi` is the one sandbox
+  check the file, glob and document tools now share
+  (`ToolCallScope.fileRoots`), and each of those tools takes a `FileRoots`
+  beside its `Path` constructor.
+
+- **agents:** the chat's folder button opens a directory chooser that works
+  like the operating system's: one path field, the folders inside to step
+  into, *Use this folder* takes what the field says. It browses the server's
+  tree under `mindconnect.tools.working-dir-root` and nothing beyond it; the
+  additional directories are listed beneath with a *Remove* each and an
+  *Add this folder*. `GET /api/directories?userId=&path=` is the same listing over REST. The
+  root may carry `{user}` (`/srv/mindconnect/users/{user}`): then every
+  user has a root of their own, created on first use, and picks from and
+  works in that tree only — the way to run this on a multi-user server.
+
 ### Changed
 
 - **agents:** `AgentSessionRepository` has `create` and `update(id, change)`

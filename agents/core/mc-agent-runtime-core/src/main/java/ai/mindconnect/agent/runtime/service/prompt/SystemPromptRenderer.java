@@ -24,7 +24,30 @@ public final class SystemPromptRenderer {
         String rendered = renderer.render(def.systemPrompt(), def, session, auth);
         String addendum = strategy.systemPromptAddendum(def, session);
         String prompt = (addendum == null || addendum.isEmpty()) ? rendered : rendered + addendum;
-        return prompt + attachedFilesSection(session);
+        return prompt + workingDirSection(session) + attachedFilesSection(session);
+    }
+
+    /**
+     * Names the session's working directory, so the model knows where it is
+     * — what {@code .} means, where relative paths land, where {@code bash}
+     * runs — without probing for it. Rendered fresh every round: a
+     * {@code /cd} shows up on the next turn.
+     */
+    static String workingDirSection(AgentSession session) {
+        if (session == null || (!session.hasWorkingDir() && session.additionalDirs().isEmpty())) return "";
+        StringBuilder out = new StringBuilder("\n\n## Working directory\n");
+        if (session.hasWorkingDir()) {
+            out.append("You are working in `").append(session.workingDir()).append("`. Relative paths in the "
+                    + "file tools resolve against it, `bash` runs in it, and `.` means this directory.");
+        }
+        if (!session.additionalDirs().isEmpty()) {
+            out.append(session.hasWorkingDir() ? " You may also use these directories, by absolute path:"
+                    : "You may use these directories, by absolute path:");
+            for (String dir : session.additionalDirs()) {
+                out.append("\n- `").append(dir).append('`');
+            }
+        }
+        return out.toString();
     }
 
     /**

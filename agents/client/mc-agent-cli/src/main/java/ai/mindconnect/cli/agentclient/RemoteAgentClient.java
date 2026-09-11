@@ -81,10 +81,33 @@ public class RemoteAgentClient implements AgentClient {
      */
     @Override
     public AgentSession startSession(AgentId agentDefinitionId, UserId userId) {
-        String body = toJson(Map.of("agentId", agentDefinitionId.value()));
+        return startSession(agentDefinitionId, userId, null);
+    }
+
+    @Override
+    public AgentSession startSession(AgentId agentDefinitionId, UserId userId, String workingDir) {
+        Map<String, Object> fields = new java.util.LinkedHashMap<>();
+        fields.put("agentId", agentDefinitionId.value());
+        if (workingDir != null) fields.put("workingDir", workingDir);
         Request req = new Request.Builder()
                 .url(baseUrl + "/api/sessions")
-                .post(RequestBody.create(body, JSON)).build();
+                .post(RequestBody.create(toJson(fields), JSON)).build();
+        return execute(req, AgentSession.class);
+    }
+
+    @Override
+    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir) {
+        return changeWorkingDir(sessionId, workingDir, null);
+    }
+
+    @Override
+    public AgentSession changeWorkingDir(SessionId sessionId, String workingDir, List<String> additionalDirs) {
+        Map<String, Object> fields = new java.util.LinkedHashMap<>();
+        fields.put("workingDir", workingDir);
+        if (additionalDirs != null) fields.put("additionalDirs", additionalDirs);
+        Request req = new Request.Builder()
+                .url(baseUrl + "/api/sessions/" + sessionId.value() + "/working-dir")
+                .put(RequestBody.create(toJson(fields), JSON)).build();
         return execute(req, AgentSession.class);
     }
 

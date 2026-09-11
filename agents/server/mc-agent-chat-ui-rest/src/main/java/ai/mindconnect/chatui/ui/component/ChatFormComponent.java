@@ -102,6 +102,28 @@ public final class ChatFormComponent implements UiComponent {
         return this;
     }
 
+    /** The chat's working directory, or {@code null} for the server's default. */
+    private String workingDir;
+
+    /** Names the working directory on the composer's folder button. */
+    public ChatFormComponent withWorkingDir(String workingDir) {
+        this.workingDir = workingDir == null || workingDir.isBlank() ? null : workingDir;
+        return this;
+    }
+
+    /**
+     * The folder button: the working directory's own name, or a plain
+     * "Directory" while the chat has none — it opens the chooser. Sits
+     * beside the model, since where the chat works is as much its setting
+     * as what it runs on.
+     */
+    private UiAction dirAction() {
+        String label = workingDir == null ? "Directory" : DirectoryPickerComponent.name(workingDir);
+        return UiAction.secondary("dir", label).icon("folder")
+                .onClick(trigger(on(ChatUiController.class).dirDialog(sessionId, null)))
+                .<UiAction>withCssClass("chat-model-btn");
+    }
+
     // ── Patch operations ───────────────────────────────────────────────────
 
     /**
@@ -155,6 +177,7 @@ public final class ChatFormComponent implements UiComponent {
                 // accessible names, the sprite tokens the glyphs.
                 .action(attachAction())
                 .action(recordAction())
+                .action(dirAction())
                 // Model and tools sit on the composer, where you notice them
                 // while typing — not in a settings page you have to go find.
                 .action(UiAction.secondary("model", modelLabel).icon("ai")
