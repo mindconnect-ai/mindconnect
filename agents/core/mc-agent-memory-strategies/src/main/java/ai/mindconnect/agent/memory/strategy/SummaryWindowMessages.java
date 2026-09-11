@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.memory.strategy;
 
-import ai.mindconnect.agent.memory.domain.ConversationSummary;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.port.out.TokenCounter;
+import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 
 import java.util.ArrayList;
 import java.util.List;

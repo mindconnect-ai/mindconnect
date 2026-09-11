@@ -1,11 +1,11 @@
 package ai.mindconnect.adminui.service;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.service.task.AgentTurnWorker;
-import ai.mindconnect.agent.service.task.ToolCallWorker;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.Subscription;

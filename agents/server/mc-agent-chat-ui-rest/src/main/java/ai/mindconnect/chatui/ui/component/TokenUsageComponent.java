@@ -1,6 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiNode;
 

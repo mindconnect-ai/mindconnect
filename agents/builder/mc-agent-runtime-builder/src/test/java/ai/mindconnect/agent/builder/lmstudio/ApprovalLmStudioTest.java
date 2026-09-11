@@ -1,11 +1,11 @@
 package ai.mindconnect.agent.builder.lmstudio;
 
 import ai.mindconnect.agent.builder.AgentRuntime;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.approval.ApprovalScope;
-import ai.mindconnect.agent.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
+import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 

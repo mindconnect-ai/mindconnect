@@ -1,9 +1,9 @@
 package ai.mindconnect.cli.agentclient;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
 import com.fasterxml.jackson.core.type.TypeReference;

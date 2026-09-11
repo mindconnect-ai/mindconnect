@@ -5,7 +5,7 @@ import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.message.port.out.MessageRepository;
 
 public final class FetchToolResultToolFactory implements ToolFactory {

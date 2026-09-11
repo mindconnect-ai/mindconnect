@@ -1,20 +1,19 @@
 package ai.mindconnect.agent.memory.strategy;
 
-import ai.mindconnect.agent.port.out.LlmMessageMapper;
-import ai.mindconnect.agent.service.MessageToLlmMessageMapper;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.memory.domain.AutoCompactConfig;
-import ai.mindconnect.agent.memory.domain.FullHistoryMemoryConfig;
-import ai.mindconnect.agent.memory.domain.MemoryConfig;
-import ai.mindconnect.agent.memory.domain.NoMemoryConfig;
-import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
-import ai.mindconnect.agent.memory.domain.WindowedMemoryConfig;
-import ai.mindconnect.agent.port.in.AgentTaskRunner;
-import ai.mindconnect.agent.memory.port.in.MemoryStrategy;
-import ai.mindconnect.agent.memory.port.in.MemoryStrategyFactory;
-import ai.mindconnect.agent.port.out.ToolResultSummarizer;
-import ai.mindconnect.agent.memory.port.out.ConversationSummaryRepository;
-import ai.mindconnect.agent.port.out.TokenCounters;
+import ai.mindconnect.agent.runtime.port.out.LlmMessageMapper;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.memory.domain.AutoCompactConfig;
+import ai.mindconnect.agent.runtime.memory.domain.FullHistoryMemoryConfig;
+import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
+import ai.mindconnect.agent.runtime.memory.domain.NoMemoryConfig;
+import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
+import ai.mindconnect.agent.runtime.memory.domain.WindowedMemoryConfig;
+import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
+import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
+import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategyFactory;
+import ai.mindconnect.agent.runtime.port.out.ToolResultSummarizer;
+import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
+import ai.mindconnect.agent.runtime.port.out.TokenCounters;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
 

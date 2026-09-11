@@ -1,7 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAppShell;
 import ai.mindconnect.ui.model.UiMenu;
@@ -139,7 +140,7 @@ public final class ChatShellComponent implements UiComponent {
     private String iconFor(AgentSessionHeader s) {
         UUID agentId = s.agentDefinitionId();
         String icon = agentId == null ? null : agentIcons.get(agentId);
-        return icon == null ? ai.mindconnect.agent.domain.AgentDefinition.DEFAULT_ICON : icon;
+        return icon == null ? AgentDefinition.DEFAULT_ICON : icon;
     }
 
     private static String ago(Instant when) {

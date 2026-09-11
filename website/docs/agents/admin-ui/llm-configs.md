@@ -160,7 +160,9 @@ starting the app:
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
-Local providers (`lm-studio-default`, `agent-default`) need no key.
+Local providers (`lm-studio-default`, `gemma-reader`, `embeddings`) need no
+key. `agent-default`, which every bundled agent uses, is an alias for
+`openai-default` and therefore needs `OPENAI_API_KEY` — or repoint it.
 
 👉 The full list of variables you can set is on the
 **[Environment variables](../environment-variables.md)** page.

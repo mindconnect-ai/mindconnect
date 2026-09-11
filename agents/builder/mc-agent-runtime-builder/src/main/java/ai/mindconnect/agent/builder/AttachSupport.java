@@ -1,9 +1,11 @@
 package ai.mindconnect.agent.builder;
 
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.tools.toolsearch.DynamicToolActivations;
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -138,7 +140,7 @@ final class AttachSupport {
      * reference later ({@code Document(FileId)} content parts).
      */
     String attachStored(UUID sessionId, ai.mindconnect.filestore.StoredFile stored) {
-        var attached = new ai.mindconnect.agent.domain.AttachedFile(
+        var attached = new AttachedFile(
                 stored.id(), stored.name(), stored.contentType(), stored.size());
         if (attached.isImage()) {
             // Not text to index: the image goes to the model with the next
@@ -147,7 +149,7 @@ final class AttachSupport {
             sessions.findById(sessionId).ifPresent(session ->
                     sessions.save(session.withAttachedFiles(List.of(attached))));
             activations.activate(sessionId,
-                    List.of(ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME));
+                    List.of(ViewAttachmentTool.NAME));
             return stored.name() + " attached — it goes to the model with the next message.";
         }
         try {
@@ -177,7 +179,7 @@ final class AttachSupport {
             }
 
             activations.activate(sessionId, attached.isPdf()
-                    ? List.of("vector_search", ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.NAME)
+                    ? List.of("vector_search", ViewAttachmentTool.NAME)
                     : List.of("vector_search"));
             sessions.findById(sessionId).ifPresent(session ->
                     sessions.save(session.withAttachedFiles(List.of(attached))));

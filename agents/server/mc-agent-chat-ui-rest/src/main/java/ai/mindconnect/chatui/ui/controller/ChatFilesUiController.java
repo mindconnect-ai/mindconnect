@@ -3,6 +3,10 @@ package ai.mindconnect.chatui.ui.controller;
 import ai.mindconnect.agentrest.service.SessionFileService;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.springframework.http.MediaType;
@@ -30,19 +34,19 @@ public class ChatFilesUiController {
 
     private final FileStore fileStore;
     private final SessionFileService sessionFiles;
-    private final ai.mindconnect.agent.port.out.AgentSessionRepository sessions;
-    private final ai.mindconnect.agent.service.AgentSessionService sessionService;
-    private final ai.mindconnect.agent.service.SessionAgentResolver agentResolver;
+    private final AgentSessionRepository sessions;
+    private final AgentSessionService sessionService;
+    private final SessionAgentResolver agentResolver;
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
-                                 ai.mindconnect.agent.port.out.AgentSessionRepository sessions,
-                                 ai.mindconnect.agent.service.AgentSessionService sessionService,
-                                 ai.mindconnect.agent.port.out.AgentDefinitionRepository agents) {
+                                 AgentSessionRepository sessions,
+                                 AgentSessionService sessionService,
+                                 AgentDefinitionRepository agents) {
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
         this.sessions = sessions;
         this.sessionService = sessionService;
-        this.agentResolver = new ai.mindconnect.agent.service.SessionAgentResolver(agents);
+        this.agentResolver = new SessionAgentResolver(agents);
     }
 
     /**

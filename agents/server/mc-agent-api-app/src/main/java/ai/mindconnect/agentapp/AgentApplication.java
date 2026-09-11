@@ -1,7 +1,7 @@
 package ai.mindconnect.agentapp;
 
-import ai.mindconnect.agent.adapter.config.DefaultAgentRuntimeConfig;
-import ai.mindconnect.agent.adapter.config.TodoToolsConfig;
+import ai.mindconnect.agent.runtime.adapter.config.DefaultAgentRuntimeConfig;
+import ai.mindconnect.agent.runtime.adapter.config.TodoToolsConfig;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;

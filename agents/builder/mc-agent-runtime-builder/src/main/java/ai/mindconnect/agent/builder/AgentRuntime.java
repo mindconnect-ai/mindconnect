@@ -1,15 +1,17 @@
 package ai.mindconnect.agent.builder;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.domain.StreamEvent;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
+import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
+import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -30,13 +32,13 @@ public final class AgentRuntime implements AutoCloseable {
     private final Namespace namespace;
     private final ExecutorService turnExecutor;
     private final AttachSupport attachSupport;   // null when the file/vector modules are absent
-    private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
+    private final ToolApprovalStore approvalStore;
 
     AgentRuntime(AgentChatService chatService, AgentSessionService sessionService,
                  AgentDefinitionRepository definitionRepository, LlmConfigRepository llmConfigRepository,
                  ConversationManager conversationManager,
                  Namespace namespace, ExecutorService turnExecutor, AttachSupport attachSupport,
-                 ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
+                 ToolApprovalStore approvalStore) {
         this.chatService = chatService;
         this.sessionService = sessionService;
         this.definitionRepository = definitionRepository;
@@ -89,7 +91,7 @@ public final class AgentRuntime implements AutoCloseable {
         if (llmConfigRepository.findByName(llmConfigName).isEmpty()) {
             throw new IllegalArgumentException("No LLM config named '" + llmConfigName + "'");
         }
-        var agent = ai.mindconnect.agent.domain.session.InlineSessionAgent.of(
+        var agent = InlineSessionAgent.of(
                 "Chat", systemPrompt, llmConfigName, toolNames, toolSearch);
         return sessionService.openChat(agent, namespace, userId);
     }
@@ -164,7 +166,7 @@ public final class AgentRuntime implements AutoCloseable {
 
     public AgentChatService chatService() { return chatService; }
     /** The open-approval registry — cards render from it, tests assert on it. */
-    public ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore() { return approvalStore; }
+    public ToolApprovalStore approvalStore() { return approvalStore; }
     public AgentSessionService sessionService() { return sessionService; }
     public AgentDefinitionRepository agentDefinitions() { return definitionRepository; }
     public LlmConfigRepository llmConfigs() { return llmConfigRepository; }

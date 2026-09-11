@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentDefinitionStatus;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;

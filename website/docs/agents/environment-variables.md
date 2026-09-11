@@ -54,7 +54,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `ANTHROPIC_API_KEY` | `claude-default`, `claude-haiku-default` | Anthropic API key |
 | `CLAUDE_MODEL` | `claude-default` | Override model id (default `claude-sonnet-4-6`) |
 | `CLAUDE_HAIKU_MODEL` | `claude-haiku-default` | Override model id (default `claude-haiku-4-5`) |
-| `OPENAI_API_KEY` | `openai-default` | OpenAI API key |
+| `OPENAI_API_KEY` | `openai-default`, and through the `agent-default` alias every bundled agent | OpenAI API key |
 | `OPENAI_MODEL` | `openai-default` | Override model id (default `gpt-5.4-mini`) |
 | `OPENAI_EMBEDDING_MODEL` | `openai-embeddings` | Override the embedding model (default `text-embedding-3-small`; `OPENAI_API_KEY` is the key) |
 | `EMBEDDING_BASE_URL` | `embeddings` | Local embedding server (default `http://localhost:1234`, LM Studio) |
@@ -67,7 +67,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `SPEECH_TO_TEXT_MODEL` | `speech-to-text` | Override model id (default `whisper-1`) |
 | `SPEECH_TO_TEXT_BASE_URL` | `speech-to-text` | Where the transcription endpoint lives (default `https://api.openai.com`) — point it at Groq or a local Whisper server |
 
-Local providers (`lm-studio-default`, `agent-default`, `embeddings`) need **no**
+Local providers (`lm-studio-default`, `gemma-reader`, `embeddings`) need **no**
 key — they talk to LM Studio at `http://localhost:1234`.
 
 ## Tools

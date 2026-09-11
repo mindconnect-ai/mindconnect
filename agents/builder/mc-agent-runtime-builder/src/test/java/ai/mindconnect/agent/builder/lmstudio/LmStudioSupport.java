@@ -2,8 +2,8 @@ package ai.mindconnect.agent.builder.lmstudio;
 
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.memory.domain.MemoryConfig;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -11,6 +11,7 @@ import ai.mindconnect.message.domain.ConversationHistory;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 
+import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -135,7 +136,7 @@ final class LmStudioSupport {
      * questions live ONLY in the ToolApprovalStore now (the gate parks the
      * tool task there) — nothing about them is a conversation message.
      */
-    static ai.mindconnect.agent.service.approval.ToolApproval openApproval(
+    static ToolApproval openApproval(
             AgentRuntime runtime, UUID rootSessionId) {
         var open = runtime.approvalStore().openForRoot(rootSessionId);
         return open.isEmpty() ? null : open.get(0);

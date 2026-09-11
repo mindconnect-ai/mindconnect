@@ -1,21 +1,33 @@
 package ai.mindconnect.chatui.ui.controller;
 
 
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.chatui.ui.page.ChatPage;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.StreamEvent;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.agent.tools.todo.TodoListService;
+import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
+import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
+import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
+import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.service.InlineAgentTools;
+import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
+import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import ai.mindconnect.ui.model.UiAction;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -26,8 +38,6 @@ import ai.mindconnect.ui.model.UiPatch;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
@@ -53,18 +63,18 @@ public class ChatUiController {
     private final WorkspaceStore workspaceStore;
     private final ObjectMapper objectMapper;
     /** Optional — null in setups where trace persistence is disabled. */
-    private final ai.mindconnect.agent.port.out.LlmCallTraceRepository traceRepository;
+    private final LlmCallTraceRepository traceRepository;
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
     private final ai.mindconnect.chatui.service.SessionStreams sessionStreams;
 
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
-    private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
+    private final ToolApprovalStore approvalStore;
     /** What the embedding app adds to the chat — none in a standalone chat app. */
     private final ai.mindconnect.chatui.ui.ChatHostLinks hostLinks;
     private final Namespace defaultNamespace;
     private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository;
     private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
-    private final ai.mindconnect.agent.service.SessionAgentResolver agentResolver;
+    private final SessionAgentResolver agentResolver;
 
     public ChatUiController(AgentSessionService sessionService,
                              AgentChatService chatService,
@@ -74,11 +84,11 @@ public class ChatUiController {
                              WorkspaceStore workspaceStore,
                              Namespace defaultNamespace,
                              ObjectMapper objectMapper,
-                             ai.mindconnect.agent.port.out.LlmCallTraceRepository traceRepository,
+                             LlmCallTraceRepository traceRepository,
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                              ai.mindconnect.chatui.service.SessionStreams sessionStreams,
                              ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
-                             ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore,
+                             ToolApprovalStore approvalStore,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.chatui.ui.ChatHostLinks> hostLinks,
                              ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
                              ai.mindconnect.agent.tool.ToolRegistry toolRegistry) {
@@ -98,7 +108,7 @@ public class ChatUiController {
         this.defaultNamespace = defaultNamespace;
         this.llmConfigRepository = llmConfigRepository;
         this.toolRegistry = toolRegistry;
-        this.agentResolver = new ai.mindconnect.agent.service.SessionAgentResolver(agentRepository);
+        this.agentResolver = new SessionAgentResolver(agentRepository);
     }
 
 
@@ -118,7 +128,7 @@ public class ChatUiController {
         // Headers for the sidebar; only the chat being shown is loaded whole.
         var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId(user));
         var latest = sessions.isEmpty()
-                ? java.util.Optional.<ai.mindconnect.agent.domain.AgentSession>empty()
+                ? java.util.Optional.<AgentSession>empty()
                 : sessionRepository.findById(sessions.get(0).id());
         if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
@@ -186,7 +196,7 @@ public class ChatUiController {
         var body = new FormBody(raw);
         String agentId = body.str("agentId");
 
-        ai.mindconnect.agent.domain.session.SessionAgent agent;
+        SessionAgent agent;
         if (agentId != null && !agentId.isBlank()) {
             var def = agentRepository.findById(UUID.fromString(agentId))
                     .orElseThrow(() -> new IllegalArgumentException("No such agent: " + agentId));
@@ -203,7 +213,7 @@ public class ChatUiController {
             String llm = sameAgent ? differing(body.str("llmConfigName"), def.llmConfigName()) : null;
 
             List<ai.mindconnect.agent.tool.AgentTool> toolOverride = null;
-            ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig searchOverride = null;
+            AgentDefinition.ToolSearchConfig searchOverride = null;
             if (sameAgent) {
                 // Compared against what the dialog could actually offer, not
                 // against everything the agent has: a tool the registry does
@@ -219,11 +229,11 @@ public class ChatUiController {
                 }
                 boolean search = body.bool("toolSearch", def.toolSearchOrOff().enabled());
                 if (search != def.toolSearchOrOff().enabled()) {
-                    searchOverride = new ai.mindconnect.agent.domain.AgentDefinition.ToolSearchConfig(
+                    searchOverride = new AgentDefinition.ToolSearchConfig(
                             search, def.toolSearchOrOff().groups());
                 }
             }
-            agent = new ai.mindconnect.agent.domain.session.SessionAgentRef(
+            agent = new SessionAgentRef(
                     def.id(), true, def.name(), llm, toolOverride, searchOverride, prompt);
         } else {
             // Staying inline keeps the same agent — and therefore the same
@@ -233,7 +243,7 @@ public class ChatUiController {
             String prompt = body.str("systemPrompt");
             var fresh = inlineAgent(body.str("llmConfigName"),
                     body.strList("tools"), body.bool("toolSearch", true), prompt);
-            agent = previous instanceof ai.mindconnect.agent.domain.session.InlineSessionAgent kept
+            agent = previous instanceof InlineSessionAgent kept
                     ? kept.withLlmConfigName(fresh.llmConfigName())
                           .withTools(fresh.tools().stream()
                                   .map(ai.mindconnect.agent.tool.AgentTool::name).toList(),
@@ -303,7 +313,7 @@ public class ChatUiController {
 
         var sessions = sessionRepository.findHeadersByUser(defaultNamespace, userId);
         var newest = sessions.isEmpty()
-                ? java.util.Optional.<ai.mindconnect.agent.domain.AgentSession>empty()
+                ? java.util.Optional.<AgentSession>empty()
                 : sessionRepository.findById(sessions.get(0).id());
         if (newest.isEmpty()) {
             var fresh = openDefaultChat(userId);
@@ -318,7 +328,7 @@ public class ChatUiController {
      * standing between one user's chat and another's, and an id is not a
      * secret — it travels in URLs, links and logs.
      */
-    private java.util.Optional<ai.mindconnect.agent.domain.AgentSession> ownedSession(
+    private java.util.Optional<AgentSession> ownedSession(
             UUID sessionId, OidcUser user) {
         String userId = userId(user);
         return sessionRepository.findById(sessionId)
@@ -334,8 +344,8 @@ public class ChatUiController {
     // ── Building the shell ──────────────────────────────────────────────────
 
     /** The chat app shell: history left, agent and title on top, conversation. */
-    private UiPage shell(ai.mindconnect.agent.domain.AgentSession session,
-                         List<? extends ai.mindconnect.agent.domain.view.AgentSessionHeader> sessions) {
+    private UiPage shell(AgentSession session,
+                         List<? extends AgentSessionHeader> sessions) {
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
         var appShell = new ai.mindconnect.chatui.ui.component.ChatShellComponent(
@@ -367,7 +377,7 @@ public class ChatUiController {
      * and falls back to the inline agent this controller has always built. So
      * upgrading changes nothing until the agent is installed.
      */
-    private ai.mindconnect.agent.domain.AgentSession openDefaultChat(String userId) {
+    private AgentSession openDefaultChat(String userId) {
         return agentRepository.findByName(defaultNamespace, DEFAULT_CHAT_AGENT)
                 .map(a -> sessionService.openChat(a.id(), defaultNamespace, userId))
                 .orElseGet(() -> sessionService.openChat(inlineDefaultChatAgent(),
@@ -375,25 +385,25 @@ public class ChatUiController {
     }
 
     /** The fallback chat agent: the standard model, the standard tools. */
-    private ai.mindconnect.agent.domain.session.InlineSessionAgent inlineDefaultChatAgent() {
+    private InlineSessionAgent inlineDefaultChatAgent() {
         return inlineAgent(defaultLlmConfigName(),
                 ai.mindconnect.chatui.ui.component.ChatSettingsComponent.DEFAULT_TOOLS, true);
     }
 
     /** The session's own agent, built from a model name and tool names. */
-    private ai.mindconnect.agent.domain.session.InlineSessionAgent inlineAgent(
+    private InlineSessionAgent inlineAgent(
             String llmConfigName, List<String> tools, boolean toolSearch) {
         return inlineAgent(llmConfigName, tools, toolSearch, null);
     }
 
     /** @param systemPrompt {@code null} or blank falls back to the built-in one. */
-    private ai.mindconnect.agent.domain.session.InlineSessionAgent inlineAgent(
+    private InlineSessionAgent inlineAgent(
             String llmConfigName, List<String> tools, boolean toolSearch, String systemPrompt) {
         List<String> names = tools == null || tools.isEmpty()
                 ? ai.mindconnect.chatui.ui.component.ChatSettingsComponent.DEFAULT_TOOLS
                 : tools;
         var known = allToolNames();
-        return ai.mindconnect.agent.domain.session.InlineSessionAgent.of(
+        return InlineSessionAgent.of(
                 "Chat", systemPrompt == null || systemPrompt.isBlank() ? CHAT_SYSTEM_PROMPT : systemPrompt,
                 llmConfigName == null ? defaultLlmConfigName() : llmConfigName,
                 names.stream().filter(known::contains).toList(),
@@ -444,7 +454,7 @@ public class ChatUiController {
      * been enough to lose all of it.
      */
     private List<ai.mindconnect.agent.tool.AgentTool> pickTools(
-            ai.mindconnect.agent.domain.AgentDefinition def, List<String> names) {
+            AgentDefinition def, List<String> names) {
         var byName = def.tools().stream().collect(java.util.stream.Collectors.toMap(
                 ai.mindconnect.agent.tool.AgentTool::name, t -> t, (a, b) -> a));
         var known = allToolNames();
@@ -473,7 +483,7 @@ public class ChatUiController {
      * agent of its own.
      *
      * <p>Two shapes mean the same thing. Picking an agent in the settings
-     * dialog writes a {@link ai.mindconnect.agent.domain.session.SessionAgentRef};
+     * dialog writes a {@link SessionAgentRef};
      * opening a chat from an agent — which is now every chat, via
      * {@code default-chat} — sets only {@code agentDefinitionId} and leaves the
      * session-agent list empty. Reading just the ref reported "no agent" for
@@ -483,10 +493,10 @@ public class ChatUiController {
      * <p>The id is checked against the registry: an inline agent's id is minted
      * for the session and would otherwise look like a binding.
      */
-    private UUID boundAgentId(ai.mindconnect.agent.domain.AgentSession session) {
+    private UUID boundAgentId(AgentSession session) {
         UUID ref = session.mainAgent()
-                .filter(a -> a instanceof ai.mindconnect.agent.domain.session.SessionAgentRef)
-                .map(ai.mindconnect.agent.domain.session.SessionAgent::id)
+                .filter(a -> a instanceof SessionAgentRef)
+                .map(SessionAgent::id)
                 .orElse(null);
         if (ref != null) {
             return ref;
@@ -511,7 +521,7 @@ public class ChatUiController {
 
     private List<AgentDefinition> selectableAgents(UUID currentAgentId) {
         return agentRepository.findByNamespace(defaultNamespace).stream()
-                .filter(a -> a.status() != ai.mindconnect.agent.domain.AgentDefinitionStatus.DEPRECATED)
+                .filter(a -> a.status() != AgentDefinitionStatus.DEPRECATED)
                 .filter(a -> CHAT_GROUP.equals(a.groupOrDefault()) || a.id().equals(currentAgentId))
                 .toList();
     }
@@ -523,8 +533,8 @@ public class ChatUiController {
     private List<String> allToolNames() {
         var names = new java.util.TreeSet<String>();
         toolRegistry.toolNamesByGroup().values().forEach(names::addAll);
-        names.add(ai.mindconnect.agent.service.InlineAgentTools.RUN_AGENT);
-        names.add(ai.mindconnect.agent.service.InlineAgentTools.RUN_AGENTS);
+        names.add(InlineAgentTools.RUN_AGENT);
+        names.add(InlineAgentTools.RUN_AGENTS);
         return List.copyOf(names);
     }
 
@@ -595,8 +605,8 @@ public class ChatUiController {
      * chat-page rendering and patch generation goes through this single
      * factory so the controller never reaches for the model directly.
      */
-    private ChatPage buildChatPage(ai.mindconnect.agent.domain.AgentSession session,
-                                    ai.mindconnect.agent.domain.AgentDefinition agent) {
+    private ChatPage buildChatPage(AgentSession session,
+                                   AgentDefinition agent) {
         var history = sessionService.loadHistory(session.id());
         var memory  = safeMemorySnapshot(session.id());
         // Source-of-truth for "is this turn currently streaming?" is the
@@ -642,7 +652,7 @@ public class ChatUiController {
     }
 
     /** The sessions with a turn in flight — the stream registry is the truth, as for the Stop button. */
-    private java.util.Set<UUID> runningSessions(List<? extends ai.mindconnect.agent.domain.view.AgentSessionHeader> sessions) {
+    private java.util.Set<UUID> runningSessions(List<? extends AgentSessionHeader> sessions) {
         java.util.Set<UUID> running = new java.util.HashSet<>();
         for (var s : sessions) {
             if (activeStreams.findHandle("msg-list-" + s.id()).isPresent()) running.add(s.id());
@@ -651,7 +661,7 @@ public class ChatUiController {
     }
 
     /** The sessions with a tool stopped at the approval gate — the store is the truth, as for the cards. */
-    private java.util.Set<UUID> waitingSessions(List<? extends ai.mindconnect.agent.domain.view.AgentSessionHeader> sessions) {
+    private java.util.Set<UUID> waitingSessions(List<? extends AgentSessionHeader> sessions) {
         java.util.Set<UUID> waiting = new java.util.HashSet<>();
         for (var s : sessions) {
             if (!approvalStore.openForRoot(s.id()).isEmpty()) waiting.add(s.id());
@@ -699,12 +709,12 @@ public class ChatUiController {
     private List<TaskCardComponent> buildSubAgentCards(UUID parentSessionId, String toolCallId,
                                                        boolean running, String inputJson, String resultText) {
         if (toolCallId == null || toolCallId.isBlank()) return List.of();
-        List<ai.mindconnect.agent.domain.AgentSession> children;
+        List<AgentSession> children;
         try {
             children = sessionRepository.findByParentSessionId(parentSessionId).stream()
                     .filter(s -> toolCallId.equals(s.parentToolCallId()))
                     .sorted(java.util.Comparator.comparing(
-                            ai.mindconnect.agent.domain.AgentSession::startedAt))
+                            AgentSession::startedAt))
                     .toList();
         } catch (Exception e) {
             log.warn("Failed to list sub-sessions of {} for toolCall {}: {}",
@@ -761,7 +771,7 @@ public class ChatUiController {
     }
 
     /** Wall-clock duration of a (completed) session in ms, or 0 when unknown. */
-    private static long durationOf(ai.mindconnect.agent.domain.AgentSession s) {
+    private static long durationOf(AgentSession s) {
         if (s.startedAt() == null || s.completedAt() == null) return 0L;
         return java.time.Duration.between(s.startedAt(), s.completedAt()).toMillis();
     }
@@ -877,7 +887,7 @@ public class ChatUiController {
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         boolean delivered = chatService.answerApproval(sessionId, callId, approved,
-                ai.mindconnect.agent.service.approval.ApprovalScope.fromParam(scope));
+                ApprovalScope.fromParam(scope));
         log.info("POST /chat/api/sessions/{}/approval call={} approved={} scope={} delivered={}",
                 sessionId, callId, approved, scope, delivered);
         return ResponseEntity.ok(buildChatPage(sessionOpt.get(), agentOpt.get()).headerOnly());
@@ -911,7 +921,7 @@ public class ChatUiController {
                 .filter(m -> m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
                 .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER)
                 // a message the runtime inserted mid-turn is not a question to ask again
-                .filter(m -> !ai.mindconnect.agent.tools.attachment.ViewAttachmentTool.insertedBy(m))
+                .filter(m -> !ViewAttachmentTool.insertedBy(m))
                 .map(Message::partsOrText)
                 .findFirst()
                 .orElse(null);
@@ -944,9 +954,9 @@ public class ChatUiController {
      *                       before the turn starts — used by regenerate so the
      *                       just-deleted messages leave the DOM immediately.
      */
-    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(ai.mindconnect.agent.domain.AgentSession session,
-                                                     ai.mindconnect.agent.domain.AgentDefinition agent,
-                                                     String text, boolean initialRefresh) {
+    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(AgentSession session,
+                                                                          AgentDefinition agent,
+                                                                          String text, boolean initialRefresh) {
         return runTurnStream(session, agent, text, initialRefresh,
                 handler -> chatService.submitChat(session.id(), text, handler));
     }
@@ -956,10 +966,10 @@ public class ChatUiController {
      * message ({@code text} echoed as a user bubble) or an approval answer
      * ({@code text == null} — the card click is the input, nothing to echo).
      */
-    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(ai.mindconnect.agent.domain.AgentSession session,
-                                                     ai.mindconnect.agent.domain.AgentDefinition agent,
-                                                     String text, boolean initialRefresh,
-                                                     java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
+    private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(AgentSession session,
+                                                                          AgentDefinition agent,
+                                                                          String text, boolean initialRefresh,
+                                                                          java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
         UUID sessionId = session.id();
         // Channel id == the id of the message-list container the patches
         // target. This way the client's {@code findStreamTarget} lookup

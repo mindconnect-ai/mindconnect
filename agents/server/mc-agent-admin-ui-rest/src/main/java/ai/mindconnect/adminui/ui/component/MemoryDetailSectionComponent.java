@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;

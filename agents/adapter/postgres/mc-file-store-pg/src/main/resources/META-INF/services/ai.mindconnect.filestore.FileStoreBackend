@@ -1,1 +1,1 @@
-ai.mindconnect.filestore.pg.PgFileStoreBackend
+ai.mindconnect.filestore.adapter.pg.PgFileStoreBackend

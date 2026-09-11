@@ -1,14 +1,15 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -186,7 +187,7 @@ public final class AgentFormComponent implements UiComponent {
      */
     private String memoryConfigJson(AgentDefinition agent) {
         try {
-            return objectMapper.writerFor(ai.mindconnect.agent.memory.domain.MemoryConfig.class)
+            return objectMapper.writerFor(MemoryConfig.class)
                     .withDefaultPrettyPrinter()
                     .writeValueAsString(agent.effectiveMemoryConfig());
         } catch (Exception e) {

@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.builder;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.llm.domain.LlmConfig;
 import org.junit.jupiter.api.Test;
 

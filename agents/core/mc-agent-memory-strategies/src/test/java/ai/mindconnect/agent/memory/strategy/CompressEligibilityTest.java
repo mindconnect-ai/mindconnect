@@ -1,11 +1,11 @@
 package ai.mindconnect.agent.memory.strategy;
 
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.memory.domain.SummarizingWindowConfig;
-import ai.mindconnect.agent.memory.domain.SummaryPlacement;
-import ai.mindconnect.agent.port.out.TokenCounter;
-import ai.mindconnect.agent.port.out.TokenCounters;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
+import ai.mindconnect.agent.runtime.memory.domain.SummaryPlacement;
+import ai.mindconnect.agent.runtime.port.out.TokenCounter;
+import ai.mindconnect.agent.runtime.port.out.TokenCounters;
 import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.Namespace;
@@ -15,6 +15,7 @@ import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
 
+import ai.mindconnect.agent.runtime.service.MessageToLlmMessageMapper;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -76,7 +77,7 @@ class CompressEligibilityTest {
                 null,                       // summaries — untouched by this hook
                 (toolName, fullResult) -> "STUB",
                 null,                       // task runner — untouched by this hook
-                counters, configs, new ai.mindconnect.agent.service.MessageToLlmMessageMapper());
+                counters, configs, new MessageToLlmMessageMapper());
     }
 
     private AgentDefinition def() {

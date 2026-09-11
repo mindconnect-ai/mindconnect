@@ -1,25 +1,25 @@
 package ai.mindconnect.adminui.ui.controller;
 
 
-import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.adminui.ui.page.MemoryPage;
 import ai.mindconnect.adminui.ui.page.TodosPage;
 import ai.mindconnect.adminui.ui.page.TracesPage;
 import ai.mindconnect.adminui.ui.page.WorkspacePage;
-import ai.mindconnect.agent.domain.StreamEvent;
-import ai.mindconnect.agent.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.tools.workspace.WorkspaceScope;
-import ai.mindconnect.agent.port.in.ChatTurnHandle;
-import ai.mindconnect.agent.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.tools.workspace.WorkspaceStore;
-import ai.mindconnect.agent.service.AgentChatService;
-import ai.mindconnect.agent.service.AgentSessionService;
-import ai.mindconnect.agent.tools.todo.TodoListService;
-import ai.mindconnect.common.LoggingContext;
+import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
+import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceScope;
+import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.tools.workspace.WorkspaceStore;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.ui.model.UiList;
+import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,15 +28,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 @RestController
 @RequestMapping("/admin/api")
@@ -52,19 +47,19 @@ public class SessionUiController {
     private final WorkspaceStore workspaceStore;
     private final ObjectMapper objectMapper;
     /** Optional — null in setups where trace persistence is disabled. */
-    private final ai.mindconnect.agent.port.out.LlmCallTraceRepository traceRepository;
+    private final LlmCallTraceRepository traceRepository;
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
 
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
     private final ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory;
-    private final ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore;
+    private final ToolApprovalStore approvalStore;
     /**
      * The session tools (memory, traces, todos, workspace) have to resolve the
      * agent the same way the run does. A chat with an inline session agent has
      * no entry in the registry, and looking it up there answered 404 for every
      * one of these dialogs.
      */
-    private final ai.mindconnect.agent.service.SessionAgentResolver agentResolver;
+    private final SessionAgentResolver agentResolver;
 
     public SessionUiController(AgentSessionService sessionService,
                              AgentChatService chatService,
@@ -74,11 +69,11 @@ public class SessionUiController {
                              WorkspaceStore workspaceStore,
                              Namespace defaultNamespace,
                              ObjectMapper objectMapper,
-                             ai.mindconnect.agent.port.out.LlmCallTraceRepository traceRepository,
+                             LlmCallTraceRepository traceRepository,
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                              ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
                              ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory,
-                             ai.mindconnect.agent.service.approval.ToolApprovalStore approvalStore) {
+                             ToolApprovalStore approvalStore) {
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
         this.chatService = chatService;
@@ -91,7 +86,7 @@ public class SessionUiController {
         this.activeStreams = activeStreams;
         this.layoutFactory = layoutFactory;
         this.approvalStore = approvalStore;
-        this.agentResolver = new ai.mindconnect.agent.service.SessionAgentResolver(agentRepository);
+        this.agentResolver = new SessionAgentResolver(agentRepository);
     }
 
     /**
@@ -190,7 +185,7 @@ public class SessionUiController {
         // history straight from those known paths — no scanning every
         // conversation directory on disk.
         List<UUID> sessionIds = collectSessionTree(sessionId);
-        List<ai.mindconnect.agent.domain.LlmCallTrace> traces = new java.util.ArrayList<>();
+        List<LlmCallTrace> traces = new java.util.ArrayList<>();
         for (UUID sid : sessionIds) {
             try {
                 UUID convId = sessionRepository.findById(sid)
@@ -202,7 +197,7 @@ public class SessionUiController {
             }
         }
         traces.sort(java.util.Comparator.comparing(
-                ai.mindconnect.agent.domain.LlmCallTrace::startedAt));
+                LlmCallTrace::startedAt));
 
         // History needs to span every session in the tree so the trace UI
         // can show TOOL_RESULT messages alongside their tool calls.
@@ -215,7 +210,7 @@ public class SessionUiController {
             }
         }
 
-        final List<ai.mindconnect.agent.domain.LlmCallTrace> tracesFinal = traces;
+        final List<LlmCallTrace> tracesFinal = traces;
         final List<Message> historyFinal = combinedHistory;
         return sessionRepository.findById(sessionId)
                 .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
@@ -322,7 +317,7 @@ public class SessionUiController {
     }
 
     private WorkspaceScope resolveScope(String key,
-                                         ai.mindconnect.agent.domain.AgentSession session) {
+                                         AgentSession session) {
         return switch (key) {
             case "session" -> WorkspaceScope.session(session.agentDefinitionId(),
                                                     session.userId(), session.id());

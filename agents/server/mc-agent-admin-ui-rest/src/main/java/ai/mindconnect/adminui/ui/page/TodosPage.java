@@ -2,10 +2,10 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.TodoListComponent;
-import ai.mindconnect.agent.domain.AgentDefinition;
-import ai.mindconnect.agent.domain.AgentSession;
-import ai.mindconnect.agent.tools.todo.TodoList;
-import ai.mindconnect.agent.tools.todo.TodoStatus;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.tools.todo.TodoList;
+import ai.mindconnect.agent.runtime.tools.todo.TodoStatus;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPage;
