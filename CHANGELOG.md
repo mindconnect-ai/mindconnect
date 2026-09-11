@@ -49,6 +49,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** knowing another user's chat session id is no longer enough to
+  act in that chat. Most chat endpoints already checked the owner; sending a
+  message, regenerating a reply, cancelling a turn, attaching, removing or
+  viewing a file, and the turn's live stream (`/chat/api/streams/...`) did
+  not — and a session id travels in URLs and logs. These endpoints now answer
+  404 for a session that is not the caller's, and the stream list shows only
+  the caller's own turns. Inside a chat, the `vector_search`, `vector_upsert`
+  and `vector_delete_file` tools refuse the upload store of any other chat
+  session, so the model cannot be talked into reading another user's
+  attachments by naming their store.
 - **agents:** a response reviewer follows its own rules again when the user's
   message is itself an instruction. The reviewer received the user's words as
   its own prompt, so "Antworte exakt mit: Hallo Welt" often made it answer

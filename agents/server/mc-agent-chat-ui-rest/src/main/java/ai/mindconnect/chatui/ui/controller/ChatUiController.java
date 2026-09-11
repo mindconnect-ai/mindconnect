@@ -332,9 +332,8 @@ public class ChatUiController {
      */
     private java.util.Optional<AgentSession> ownedSession(
             SessionId sessionId, OidcUser user) {
-        String userId = userId(user);
         return sessionRepository.findById(sessionId)
-                .filter(session -> UserId.of(userId).equals(session.userId()));
+                .filter(session -> ai.mindconnect.chatui.service.SessionOwnership.owns(session, user));
     }
 
     /** Closes the settings dialog without touching anything. */
@@ -554,7 +553,7 @@ public class ChatUiController {
     }
 
     private static String userId(OidcUser user) {
-        return user == null ? "mc_user" : user.getPreferredUsername();
+        return ai.mindconnect.chatui.service.SessionOwnership.userIdOf(user);
     }
 
     @PostMapping("/agents/{agentId}/sessions")
@@ -617,7 +616,7 @@ public class ChatUiController {
         // registry — not page-local state. Lets a navigate-back during a
         // live turn render the form in Stop-mode without any client-side
         // reconciliation.
-        String channelId = "msg-list-" + session.id().value();
+        String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(session.id());
         var handleOpt = activeStreams.findHandle(channelId);
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
@@ -659,7 +658,7 @@ public class ChatUiController {
     private java.util.Set<SessionId> runningSessions(List<? extends AgentSessionHeader> sessions) {
         java.util.Set<SessionId> running = new java.util.HashSet<>();
         for (var s : sessions) {
-            if (activeStreams.findHandle("msg-list-" + s.id().value()).isPresent()) running.add(s.id());
+            if (activeStreams.findHandle(ai.mindconnect.chatui.service.SessionOwnership.channelOf(s.id())).isPresent()) running.add(s.id());
         }
         return running;
     }
@@ -816,13 +815,15 @@ public class ChatUiController {
 
     /**
      * Cooperatively cancels a running chat turn. Returns 204 if a live turn
-     * was signalled, 404 if no chat is currently running. The stream
-     * completes via the normal {@code Done} flow once the loop reaches its
-     * next cancel-check point.
+     * was signalled, 404 if no chat is currently running or the session is
+     * not the caller's. The stream completes via the normal {@code Done} flow
+     * once the loop reaches its next cancel-check point.
      */
     @DeleteMapping("/sessions/{sessionId}/chat")
-    public ResponseEntity<Void> cancelChat(@PathVariable("sessionId") String sessionIdValue) {
+    public ResponseEntity<Void> cancelChat(@PathVariable("sessionId") String sessionIdValue,
+                                           @AuthenticationPrincipal OidcUser user) {
         SessionId sessionId = SessionId.of(sessionIdValue);
+        if (ownedSession(sessionId, user).isEmpty()) return ResponseEntity.notFound().build();
         boolean cancelled = chatService.cancelChat(sessionId);
         log.info("DELETE /chat/api/sessions/{}/chat → cancelled={}", sessionId.value(), cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
@@ -856,7 +857,8 @@ public class ChatUiController {
 
     @PostMapping("/sessions/{sessionId}/chat/stream")
     public ResponseEntity<ai.mindconnect.ui.model.UiPatch> chatStream(@PathVariable("sessionId") String sessionIdValue,
-                                                 @RequestBody Map<String, Object> raw) {
+                                                 @RequestBody Map<String, Object> raw,
+                                                 @AuthenticationPrincipal OidcUser user) {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var body = new FormBody(raw);
         String text = body.str("message");
@@ -864,9 +866,9 @@ public class ChatUiController {
             return ResponseEntity.badRequest().build();
         }
 
-        var sessionOpt = sessionRepository.findById(sessionId);
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.notFound().build();
         }
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
@@ -912,11 +914,12 @@ public class ChatUiController {
      */
     @PostMapping(value = "/sessions/{sessionId}/messages/{seq}/regenerate")
     public ResponseEntity<ai.mindconnect.ui.model.UiPatch> regenerate(@PathVariable("sessionId") String sessionIdValue,
-                                                 @PathVariable int seq) {
+                                                 @PathVariable int seq,
+                                                 @AuthenticationPrincipal OidcUser user) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        var sessionOpt = sessionRepository.findById(sessionId);
+        var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) {
-            return ResponseEntity.badRequest().build();
+            return ResponseEntity.notFound().build();
         }
         var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
         if (agentOpt.isEmpty()) {
@@ -984,7 +987,7 @@ public class ChatUiController {
         // target. This way the client's {@code findStreamTarget} lookup
         // naturally detects "chat page mounted", and both the submitter and
         // any observer resolve the same stream.
-        String channelId = "msg-list-" + sessionId.value();
+        String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId);
         String returnHref = "/chat/sessions/" + sessionId.value();
         String streamLabel = agent.name() != null ? agent.name() : "Agent";
         String pendingId  = "bot-pending-"  + sessionId.value();

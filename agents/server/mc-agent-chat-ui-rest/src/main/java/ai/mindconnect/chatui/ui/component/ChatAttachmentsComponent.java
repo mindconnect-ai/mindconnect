@@ -50,7 +50,7 @@ public final class ChatAttachmentsComponent {
                 .rowAction(UiAction.danger("remove", "Remove").icon("remove")
                         .confirm("Remove this file from the conversation?")
                         .onClick(trigger(on(ChatFilesUiController.class)
-                                .remove(sessionId.value(), ROW_ID.toString()))));
+                                .remove(sessionId.value(), ROW_ID.toString(), null))));
         for (AttachedFile f : files) {
             table.row(Map.of(
                     "id", java.net.URLEncoder.encode(f.name(), java.nio.charset.StandardCharsets.UTF_8),

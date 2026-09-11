@@ -165,7 +165,7 @@ public final class MessageListComponent implements UiComponent {
 
     @Override
     public String id() {
-        return "msg-list-" + sessionId.value();
+        return ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId);
     }
 
     @Override

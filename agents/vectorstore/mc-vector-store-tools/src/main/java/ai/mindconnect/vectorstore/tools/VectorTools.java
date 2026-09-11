@@ -61,7 +61,7 @@ public final class VectorTools {
     public static final class DeleteFileFactory extends BaseFactory {
         @Override public String name() { return "vector_delete_file"; }
         @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-            return new DeleteFileTool(stores);
+            return new DeleteFileTool(stores, scope);
         }
     }
 
@@ -100,6 +100,10 @@ public final class VectorTools {
             if (storeName == null || fileId == null
                     || !(arguments.get("chunks") instanceof List<?> rawChunks) || rawChunks.isEmpty()) {
                 return "Error: 'store', 'file_id' and a non-empty 'chunks' array are required.";
+            }
+            String denied = foreignSessionStore(stores, storeName, callScope);
+            if (denied != null) {
+                return denied;
             }
             List<String> texts = new ArrayList<>();
             List<String> titles = new ArrayList<>();
@@ -186,6 +190,10 @@ public final class VectorTools {
                 }
                 storeName = sessionStoreName(callScope.sessionId());
             }
+            String denied = foreignSessionStore(stores, storeName, callScope);
+            if (denied != null) {
+                return denied;
+            }
             int topK = clamp(arguments.get("top_k"), 5, 20);
             try {
                 float[] embedded = stores.embedFor(storeName, List.of(query)).get(0);
@@ -215,7 +223,7 @@ public final class VectorTools {
         }
     }
 
-    record DeleteFileTool(VectorStores stores) implements Tool {
+    record DeleteFileTool(VectorStores stores, ToolCallScope callScope) implements Tool {
         @Override public String name() { return "vector_delete_file"; }
 
         @Override public String description() {
@@ -235,6 +243,10 @@ public final class VectorTools {
             if (storeName == null || fileId == null) {
                 return "Error: 'store' and 'file_id' are required.";
             }
+            String denied = foreignSessionStore(stores, storeName, callScope);
+            if (denied != null) {
+                return denied;
+            }
             try {
                 stores.openWith(stores.settingsFor(storeName)).deleteFile(fileId);
                 return "Removed file '" + fileId + "' from store '" + storeName + "'.";
@@ -245,6 +257,41 @@ public final class VectorTools {
     }
 
     // ── helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * A chat session's upload store holds what one user attached to one chat,
+     * and the model running in that chat is the user's proxy — so from inside
+     * a session a tool may only touch that session's own store. Everything
+     * else it names is a knowledge base (global or an agent's) and stays open.
+     * Two things mark a store as another session's: a registered
+     * {@code SESSION} scope naming a different session, and the
+     * {@code session-} name the upload pipeline uses — the name matters for
+     * stores that do not exist yet, or the model could create
+     * {@code session-<other>} itself and read what lands there later.
+     *
+     * <p>A call without a session is the installation's own run and is not
+     * restricted here: the ingestion workflow that fills an upload store
+     * resolves its tools detached from any session.
+     *
+     * @return the tool's error text, or {@code null} when access is fine
+     */
+    static String foreignSessionStore(VectorStores stores, String storeName, ToolCallScope callScope) {
+        if (callScope == null || callScope.sessionId() == null) {
+            return null;
+        }
+        SessionId own = callScope.sessionId();
+        if (storeName.equals(SearchTool.sessionStoreName(own))) {
+            return null;
+        }
+        VectorStoreInstance settings = stores.settingsFor(storeName);
+        boolean anotherSessionsScope = settings.scope() == VectorStoreInstance.Scope.SESSION
+                && !own.value().equals(settings.scopeRef());
+        if (anotherSessionsScope || storeName.startsWith("session-")) {
+            return "Error: store '" + storeName + "' belongs to another chat session and is not "
+                    + "accessible from this one. Omit 'store' to search the files attached to this chat.";
+        }
+        return null;
+    }
 
     private static Map<String, Object> schema(Map<String, Object> properties, List<String> required) {
         Map<String, Object> schema = new LinkedHashMap<>();
