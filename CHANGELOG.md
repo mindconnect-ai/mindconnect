@@ -32,6 +32,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
   agent definitions keep working). Values in `env` and `headers` are used as
   entered; a `${NAME}` placeholder is refused until users can set their own
   variables — the environment of the server process is never read.
+  `process` and `docker` targets start only where
+  `mindconnect.mcp.allow-process` / `mindconnect.mcp.allow-docker` allow it;
+  unset, both are on while sign-in is off and off once it is on, because
+  registering asks for a login, not an admin role. A started server inherits
+  only `PATH`, `HOME`, locale, proxy and container-daemon variables from the
+  admin UI. Failed MCP calls report `Error: …`, so the chat and a workflow's
+  tool step see them as failures.
   Discovered tools are cached on disk, so a restart does not start every server
   again. Registrations live in `<data>/<namespace>/system/mcp-servers/`, one
   JSON file per server; a Gmail registration ships disabled. The modules sit in
@@ -49,6 +56,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** `ToolCallScope.rootSessionId`, the chat at the top of a sub-agent
   chain, and `ToolInvoker.call(tool, arguments, scope)`, which the tool-call
   workflow step now calls with the scope found on its run.
+- **agents:** `ToolRegistry.releaseSession(sessionId)` and
+  `MultiToolProvider.releaseSession(sessionId)`: whoever ends a session lets
+  the tools go of what they hold for it. The tool test bench calls it after
+  every test, so testing an MCP tool no longer leaves a connection — or a
+  container — behind per click.
 
 ### Removed
 

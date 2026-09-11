@@ -26,17 +26,24 @@ final class McpTargetEndpoints {
 
     /** Container CLI to run {@link McpTarget.Docker} with; null when none was found. */
     private final String containerBinary;
+    /** Which kinds of target this installation starts at all. */
+    private final McpStartPolicy policy;
 
-    McpTargetEndpoints(String containerBinary) {
+    McpTargetEndpoints(String containerBinary, McpStartPolicy policy) {
         this.containerBinary = containerBinary;
+        this.policy = policy;
     }
 
     /**
+     * Every way to a running server passes through here — the probe, discovery
+     * and a call — so this is where a kind of target the installation does not
+     * start is refused.
+     *
      * @throws McpGatewayException when the target cannot be run here at all —
-     *         no container runtime, a mount whose host path is missing, or a
-     *         value that uses a variable. All are configuration problems, and
-     *         all are worth saying out loud rather than letting the server fail
-     *         cryptically.
+     *         a kind of target this installation does not start, no container
+     *         runtime, a mount whose host path is missing, or a value that uses
+     *         a variable. All are configuration problems, and all are worth
+     *         saying out loud rather than letting the server fail cryptically.
      */
     McpEndpoint toEndpoint(McpTarget target) {
         return switch (target) {
@@ -48,6 +55,11 @@ final class McpTargetEndpoints {
     }
 
     private McpStdioSpawn dockerSpawn(McpTarget.Docker docker) {
+        if (!policy.allowDocker()) {
+            throw new McpGatewayException("docker targets are switched off on this installation: a "
+                    + "container runs with the rights of this server's container runtime. An operator "
+                    + "allows them with " + McpStartPolicy.ALLOW_DOCKER + "=true");
+        }
         if (containerBinary == null) {
             throw new McpGatewayException(
                     "no container runtime available for image '" + docker.image() + "'");
@@ -74,6 +86,11 @@ final class McpTargetEndpoints {
     }
 
     private McpStdioSpawn processSpawn(McpTarget.Process process) {
+        if (!policy.allowProcess()) {
+            throw new McpGatewayException("process targets are switched off on this installation: a "
+                    + "process runs with the rights of this server. An operator allows them with "
+                    + McpStartPolicy.ALLOW_PROCESS + "=true");
+        }
         String executable = process.command().get(0);
         return new McpStdioSpawn(
                 executable,

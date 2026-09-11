@@ -146,6 +146,13 @@ with prefix `gmail` turns its `search_emails` into `gmail_search_emails`.
   is stored in the registration and sent as it is. `${NAME}` is reserved for
   variables of the signed-in user; until users can set them, a registration that
   uses one does not start. The environment of the server process is never read.
+- **Starting a server here is the installation's decision.** `process` and `docker`
+  targets run with the rights of the admin UI, and registering asks for a login, not an
+  admin role. They start only where `mindconnect.mcp.allow-process` /
+  `mindconnect.mcp.allow-docker` allow it; unset, both follow sign-in — on while
+  `mindconnect.auth.enabled` is false, off once it is true. `http` needs neither. A
+  started server inherits only `PATH`, `HOME`, locale, proxy and container-daemon
+  variables; anything else it needs goes into its registration's `env`.
 - **The prefix is fixed** once a server is registered: agents bind the tool names it
   produces. Register a new server to use a different one.
 - **Storage:** one JSON file per server under

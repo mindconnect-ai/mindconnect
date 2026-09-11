@@ -28,6 +28,9 @@ public final class WarmUpProviders {
 
     static final AtomicInteger slowBinds = new AtomicInteger();
     static final AtomicInteger flakyBinds = new AtomicInteger();
+    /** Sessions {@link Fast} was asked to release, in order. */
+    static final java.util.List<ai.mindconnect.agent.SessionId> fastReleases =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
 
     static void reset() {
         slowBindMillis = 300;
@@ -35,6 +38,7 @@ public final class WarmUpProviders {
         throwFromIsAvailable = true;
         slowBinds.set(0);
         flakyBinds.set(0);
+        fastReleases.clear();
     }
 
     /** Ready, but not at once — like an MCP server that has to be spawned. */
@@ -72,6 +76,10 @@ public final class WarmUpProviders {
         @Override public Set<String> toolNames() { return bound ? Set.of("fast_tool") : Set.of(); }
 
         @Override public String group() { return "warmup-fast"; }
+
+        @Override public void releaseSession(ai.mindconnect.agent.SessionId sessionId) {
+            fastReleases.add(sessionId);
+        }
 
         @Override public void bind(ToolEnvironment env) { bound = true; }
 

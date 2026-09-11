@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tool;
 
+import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import org.junit.jupiter.api.Test;
 
@@ -151,12 +152,33 @@ class OverlayToolRegistryTest {
         assertThat(repository.reads).isEqualTo(afterFirst);
     }
 
+    @Test
+    void releasing_a_session_reaches_the_registry_beneath() {
+        // The switch decides what may be resolved, not what a session holds:
+        // a tool switched off after a call still has its connection to let go.
+        FakeRegistry source = new FakeRegistry();
+        OverlayToolRegistry registry = new OverlayToolRegistry(source,
+                new FakeRepository().set("glob", new ToolSettings(false, null, Map.of())));
+        SessionId session = SessionId.random();
+
+        registry.releaseSession(session);
+
+        assertThat(source.released).containsExactly(session);
+    }
+
     private static OverlayToolRegistry overlay(ToolRepository repository) {
         return new OverlayToolRegistry(new FakeRegistry(), repository);
     }
 
     /** Two tools, one per group, with a small schema. */
     private static final class FakeRegistry implements ToolRegistry {
+
+        final List<SessionId> released = new java.util.ArrayList<>();
+
+        @Override
+        public void releaseSession(SessionId sessionId) {
+            released.add(sessionId);
+        }
 
         @Override
         public Optional<Tool> resolve(AgentTool agentTool, ToolCallScope scope) {

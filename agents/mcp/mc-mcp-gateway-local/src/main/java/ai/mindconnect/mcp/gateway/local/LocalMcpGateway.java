@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The gateway running in the host's own JVM: registrations from a
@@ -35,9 +36,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * without a restart.
  *
  * <p>A server that cannot be reached costs its own tools and nothing else:
- * discovery failures are logged and remembered as "no tools" for this
- * repository version, so a broken registration neither blocks the catalog
- * nor retries on every keystroke.
+ * discovery failures are logged and remembered as "no tools" until a
+ * registration changes or somebody re-reads that server's tools, so a broken
+ * registration neither blocks the catalog nor retries on every keystroke.
  */
 public final class LocalMcpGateway implements McpGateway, AutoCloseable {
 
@@ -53,17 +54,33 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     private final Map<McpServerId, List<McpTool>> toolsByServer = new ConcurrentHashMap<>();
     private volatile long cachedAtVersion = Long.MIN_VALUE;
 
+    /**
+     * Moves with every {@link #forget}. Dropping a discovery changes what
+     * {@link #tools} answers without touching a registration, so the
+     * repository's version alone does not show it — and the tool provider
+     * notices a changed catalog by {@link #catalogVersion()} and nothing else.
+     */
+    private final AtomicLong discoveryGeneration = new AtomicLong();
+
     public LocalMcpGateway(McpServerRepository repository,
                            McpProxy proxy,
                            McpSessionRegistry sessions,
                            Path storageDir,
                            Namespace namespace,
-                           String containerRuntime) {
+                           String containerRuntime,
+                           McpStartPolicy startPolicy) {
         this.repository = repository;
         this.proxy = proxy;
         this.sessions = sessions;
         this.discoveryCache = new McpDiscoveryCache(storageDir, namespace);
-        this.endpoints = new McpTargetEndpoints(ContainerBinary.detect(containerRuntime).orElse(null));
+        // Where containers may not start, no container runtime is looked for.
+        String containerBinary = startPolicy.allowDocker()
+                ? ContainerBinary.detect(containerRuntime).orElse(null)
+                : null;
+        this.endpoints = new McpTargetEndpoints(containerBinary, startPolicy);
+        log.info("MCP servers started on this machine: process targets {}, docker targets {}",
+                startPolicy.allowProcess() ? "allowed" : "switched off",
+                startPolicy.allowDocker() ? "allowed" : "switched off");
     }
 
     @Override
@@ -113,20 +130,31 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
         sessions.shutdown();
     }
 
+    /**
+     * The repository's version together with {@link #discoveryGeneration}: a
+     * saved registration moves the first, "Re-read tools" only the second, and
+     * either has to reach the tool names the provider keeps.
+     */
     @Override
     public long catalogVersion() {
-        return repository.version();
+        return 31 * repository.version() + discoveryGeneration.get();
     }
 
     /**
      * Drops what was discovered for one server, in memory and on disk, and
      * closes its pooled connections — they still speak to the old image, URL
-     * or token. Used by the admin side after a registration changed.
+     * or token. Used by the admin side after a registration changed, and by
+     * "Re-read tools".
      */
     void forget(McpServerId server) {
         toolsByServer.remove(server);
         discoveryCache.invalidate(server);
         sessions.closeServer(server.value());
+        // Last: a lookup that read the version before this line sees the new
+        // one next time and rebuilds; one that reads it after this line finds
+        // the discovery already gone. Moved first, a lookup in between would
+        // file the old tools under the new version and keep them.
+        discoveryGeneration.incrementAndGet();
     }
 
     /** What was remembered for this server, without contacting it. */

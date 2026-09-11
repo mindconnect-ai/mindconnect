@@ -52,7 +52,24 @@ class LocalMcpGatewayForgetTest {
     }
 
     private LocalMcpGateway gateway(InMemoryRepository repository) {
-        return new LocalMcpGateway(repository, proxy, sessions, storage, Namespace.DEFAULT, "nothing-here");
+        return new LocalMcpGateway(repository, proxy, sessions, storage, Namespace.DEFAULT, "nothing-here",
+                McpStartPolicy.allowAll());
+    }
+
+    @Test
+    void forgetting_a_server_moves_the_catalog_version_although_no_registration_changed() {
+        // "Re-read tools" writes no file. The tool provider notices a changed
+        // catalog by this number alone, so without it agents kept the old
+        // tools — or none, when the server had been down at the first lookup.
+        InMemoryRepository repository = new InMemoryRepository().with(GMAIL, true);
+        LocalMcpGateway gateway = gateway(repository);
+        long repositoryVersion = repository.version();
+        long before = gateway.catalogVersion();
+
+        gateway.forget(GMAIL);
+
+        assertThat(repository.version()).as("no registration changed").isEqualTo(repositoryVersion);
+        assertThat(gateway.catalogVersion()).isNotEqualTo(before);
     }
 
     @Test

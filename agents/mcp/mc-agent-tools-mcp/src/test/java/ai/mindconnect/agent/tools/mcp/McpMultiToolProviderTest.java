@@ -115,7 +115,9 @@ class McpMultiToolProviderTest {
                 .orElseThrow()
                 .execute(Map.of());
 
-        assertThat(answer).contains("no session");
+        // "Error:" is how the tool-call worker and the workflow step tell a
+        // failure — a workflow started from the admin has no session either.
+        assertThat(answer).startsWith("Error:").contains("agent session");
         assertThat(gateway.calls).isEmpty();
     }
 
@@ -201,7 +203,16 @@ class McpMultiToolProviderTest {
                 .orElseThrow()
                 .execute(Map.of());
 
-        assertThat(answer).contains("Tool execution failed").contains("container did not start");
+        assertThat(answer).startsWith("Error:").contains("container did not start");
+    }
+
+    @Test
+    void releasing_a_session_releases_it_at_the_gateway() {
+        FakeGateway gateway = new FakeGateway().server("gmail", "gmail", "search_emails");
+
+        boundTo(gateway).releaseSession(SCOPE.sessionId());
+
+        assertThat(gateway.released).containsExactly(SCOPE.sessionId());
     }
 
     @Test
@@ -225,7 +236,7 @@ class McpMultiToolProviderTest {
                 .create("gmail_search_emails", AgentTool.of("gmail_search_emails"), SCOPE)
                 .orElseThrow()
                 .execute(Map.of()))
-                .isEqualTo("Error from MCP server: invalid query");
+                .isEqualTo("Error: the MCP server reported: invalid query");
     }
 
     private static McpMultiToolProvider boundTo(McpGateway gateway) {
@@ -279,6 +290,10 @@ class McpMultiToolProviderTest {
             return answer != null ? answer : new McpResult(false, List.of("called " + serverId.value() + "/" + toolName));
         }
 
-        @Override public void release(McpCaller caller) { }
+        final List<SessionId> released = new ArrayList<>();
+
+        @Override public void release(McpCaller caller) {
+            released.add(caller.sessionId());
+        }
     }
 }
