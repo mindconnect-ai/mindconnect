@@ -7,16 +7,26 @@ import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.common.DomainException;
+import ai.mindconnect.common.StaleVersionException;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 /**
  * Use-case service for {@link AgentDefinition} CRUD.
  *
- * <p>Stateless and thread-safe.
+ * <p>Stateless and thread-safe. Saves are versioned (see
+ * {@code ai.mindconnect.common.Versions}): an edit form passes the version it
+ * was opened with and is refused when the agent was saved since; a change
+ * that carries no version is applied to the agent as stored and re-applied if
+ * another save came in between.
  */
 public class AgentRegistryService {
+
+    /** How often a change without a version is re-applied when another save came in between. */
+    private static final int ATTEMPTS = 3;
 
     private final AgentDefinitionRepository definitionRepository;
 
@@ -46,12 +56,27 @@ public class AgentRegistryService {
     }
 
     /**
-     * Applies the patch to the agent. Absent patch fields are left as-is;
-     * present fields overwrite. Throws {@code notFound} if the agent does
-     * not exist.
+     * Applies the patch to the agent as it is stored now. Absent patch fields are
+     * left as-is; present fields overwrite. When another save lands between reading
+     * and writing, the patch is applied again to the newer agent. Throws
+     * {@code notFound} if the agent does not exist.
      */
     public AgentDefinition update(AgentId agentId, AgentPatch patch) {
+        return retrying(() -> update(agentId, patch, null));
+    }
+
+    /**
+     * Applies the patch to the agent the caller read at {@code expectedVersion} — an
+     * edit form's save. With {@code null} nothing is checked and nothing retried.
+     *
+     * @throws StaleVersionException when the agent was saved since; nothing is written
+     */
+    public AgentDefinition update(AgentId agentId, AgentPatch patch, Long expectedVersion) {
         AgentDefinition def = load(agentId);
+        long stored = def.version() == null ? 0 : def.version();
+        if (expectedVersion != null && expectedVersion != stored) {
+            throw new StaleVersionException("AgentDefinition", agentId.value(), expectedVersion, stored);
+        }
 
         AgentDefinition updated = def.withBasicFields(
                 patch.name().orElse(def.name()),
@@ -79,7 +104,21 @@ public class AgentRegistryService {
         if (patch.memoryConfig().isPresent()) {
             updated = updated.withMemoryConfig(patch.memoryConfig().get());
         }
+        // Still carries the version read above: the store refuses it if a save landed since.
         return definitionRepository.save(updated);
+    }
+
+    /**
+     * Replaces the agent's tools with what {@code change} makes of the stored list —
+     * adding, editing or removing one tool without dropping a tool that was added
+     * meanwhile. {@code change} may run more than once.
+     */
+    public AgentDefinition updateTools(AgentId agentId, UnaryOperator<List<AgentTool>> change) {
+        return retrying(() -> {
+            AgentDefinition def = load(agentId);
+            List<AgentTool> tools = def.tools() == null ? List.of() : def.tools();
+            return definitionRepository.save(def.withTools(change.apply(tools)));
+        });
     }
 
     /**
@@ -108,5 +147,15 @@ public class AgentRegistryService {
     private AgentDefinition load(AgentId agentId) {
         return find(agentId)
                 .orElseThrow(() -> DomainException.notFound("AgentDefinition", agentId.toString()));
+    }
+
+    private static AgentDefinition retrying(Supplier<AgentDefinition> save) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return save.get();
+            } catch (StaleVersionException e) {
+                if (attempt >= ATTEMPTS) throw e;
+            }
+        }
     }
 }

@@ -55,8 +55,23 @@ public final class FileVectorStoreRegistry {
         return read(templatesDir, name, VectorStoreTemplate.class);
     }
 
-    public void saveTemplate(VectorStoreTemplate template) {
-        write(templatesDir, template.name(), template);
+    /**
+     * Saves the template: the version it carries is checked against the stored one
+     * and it is stored one higher, both under the file's lock ({@code null}: no check).
+     *
+     * @return the template as stored, with its new version
+     * @throws ai.mindconnect.common.StaleVersionException when it was saved by someone else meanwhile
+     */
+    public VectorStoreTemplate saveTemplate(VectorStoreTemplate template) {
+        Path file = fileFor(templatesDir, template.name());
+        return locked(file, () -> {
+            Long stored = read(templatesDir, template.name(), VectorStoreTemplate.class)
+                    .map(VectorStoreTemplate::version).orElse(null);
+            VectorStoreTemplate saved = template.withVersion(ai.mindconnect.common.Versions.next(
+                    stored, template.version(), "VectorStoreTemplate", template.name()));
+            store(file, saved);
+            return saved;
+        });
     }
 
     public void deleteTemplate(String name) {

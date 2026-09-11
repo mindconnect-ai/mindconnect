@@ -2,6 +2,7 @@ package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent;
+import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.common.util.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.adminui.ui.component.LlmConfigTestComponent;
@@ -300,39 +301,47 @@ public class LlmConfigUiController {
         return list();
     }
 
+    /**
+     * Saves the edit form against the version it was opened with; when the config
+     * was saved since, the form stays on screen with a toast instead.
+     */
     @PutMapping("/{id}")
-    public ResponseEntity<UiPage> update(@PathVariable("id") String idValue,
-                                         @RequestBody Map<String, Object> raw) {
+    public ResponseEntity<?> update(@PathVariable("id") String idValue,
+                                    @RequestBody Map<String, Object> raw) {
         LlmConfigId id = LlmConfigId.of(idValue);
         var body = new FormBody(raw);
-        return repository.findById(id)
-                .map(existing -> {
-                    boolean isAlias = body.bool("isAlias", existing.isAlias());
-                    LlmProvider provider = isAlias ? null : requiredProvider(body);
-                    var updated = new LlmConfig(
-                            existing.id(),
-                            body.str("name"),
-                            provider,
-                            isAlias ? null : body.str("model"),
-                            isAlias ? null : body.str("baseUrl"),
-                            isAlias ? null : apiKeyForUpdate(existing, provider, body.str("apiKey")),
-                            body.dbl("defaultTemperature", existing.defaultTemperature()),
-                            body.num("maxOutputTokens", existing.maxOutputTokens()),
-                            additionalParamsFrom(body, existing.additionalParams(), provider),
-                            body.numOrNull("contextWindowTokens"),
-                            isAlias,
-                            isAlias ? body.str("delegatesTo") : null,
-                            raw.containsKey("retryEnabled") ? retryFrom(body) : existing.retry(),
-                            raw.containsKey("maxConcurrentRequests")
-                                    ? rateLimitFrom(body) : existing.rateLimit(),
-                            raw.containsKey("type")
-                                    ? typeFrom(body, existing.type()) : existing.type(),
-                            raw.containsKey("capabilities")
-                                    ? capabilitiesFrom(body) : existing.capabilities());
-                    repository.save(updated);
-                    return ResponseEntity.ok(list());
-                })
-                .orElse(ResponseEntity.notFound().build());
+        LlmConfig existing = repository.findById(id).orElse(null);
+        if (existing == null) {
+            return ResponseEntity.notFound().build();
+        }
+        boolean isAlias = body.bool("isAlias", existing.isAlias());
+        LlmProvider provider = isAlias ? null : requiredProvider(body);
+        var updated = new LlmConfig(
+                existing.id(),
+                body.str("name"),
+                provider,
+                isAlias ? null : body.str("model"),
+                isAlias ? null : body.str("baseUrl"),
+                isAlias ? null : apiKeyForUpdate(existing, provider, body.str("apiKey")),
+                body.dbl("defaultTemperature", existing.defaultTemperature()),
+                body.num("maxOutputTokens", existing.maxOutputTokens()),
+                additionalParamsFrom(body, existing.additionalParams(), provider),
+                body.numOrNull("contextWindowTokens"),
+                isAlias,
+                isAlias ? body.str("delegatesTo") : null,
+                raw.containsKey("retryEnabled") ? retryFrom(body) : existing.retry(),
+                raw.containsKey("maxConcurrentRequests")
+                        ? rateLimitFrom(body) : existing.rateLimit(),
+                raw.containsKey("type")
+                        ? typeFrom(body, existing.type()) : existing.type(),
+                raw.containsKey("capabilities")
+                        ? capabilitiesFrom(body) : existing.capabilities());
+        try {
+            repository.save(updated.withVersion(VersionedForms.version(body)));
+        } catch (StaleVersionException e) {
+            return ResponseEntity.ok(VersionedForms.changedMeanwhile("LLM config '" + existing.name() + "'"));
+        }
+        return ResponseEntity.ok(list());
     }
 
     /**

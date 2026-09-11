@@ -179,6 +179,26 @@ public final class Documents<K, V> {
     }
 
     /**
+     * Reads the document — empty when there is none — lets {@code change} decide
+     * what to store, and writes that, all under the document's write lock. For a
+     * save that depends on what is stored, whether or not anything is: a version
+     * check, say. Returning the very instance that was read writes nothing.
+     *
+     * @return what is stored afterwards
+     */
+    public V compute(K key, Function<Optional<V>, V> change) {
+        Path file = pathOf(key);
+        return locked(file, () -> {
+            Optional<V> current = read(file);
+            V next = Objects.requireNonNull(change.apply(current), "compute: the change returned null");
+            if (current.isEmpty() || next != current.get()) {
+                store(file, next);
+            }
+            return next;
+        });
+    }
+
+    /**
      * Stores {@code value} under {@code key}, replacing whatever is there. For
      * documents that are rebuilt whole rather than changed — a snapshot, a list
      * a tool replaces. For anything else, {@link #update} does not lose a

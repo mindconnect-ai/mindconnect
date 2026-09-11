@@ -24,6 +24,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-repo</artifactId>
         </dependency>
+        <!-- Versions and StaleVersionException: templates are saved against the version they were read with. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-common</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tool-spi</artifactId>
