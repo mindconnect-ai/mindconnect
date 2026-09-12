@@ -41,8 +41,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   runs on, the config behind it — says *Used by …* and starts unticked.
   Importing keeps what is already here unless overwrite is chosen, an overwrite
   keeps local ids so that sessions and aliases keep working, and an API key
-  that came with a registry file is dropped rather than used. Off for an
-  installation that wants no outbound calls
+  that came with a registry file is dropped rather than used. An application
+  ships registries as files under `initial-data/registries/`; the admin UI
+  comes with [mindconnect-ai/mc-registry](https://github.com/mindconnect-ai/mc-registry),
+  the default agents, LLM configs and workflows plus an example package. Off
+  for an installation that wants no outbound calls
   (`mindconnect.registry.enabled=false`); format and settings in the docs under
   *Registry*.
 

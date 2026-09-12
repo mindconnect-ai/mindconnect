@@ -192,8 +192,29 @@ export ACME_REGISTRY_TOKEN=ghp_…
 | `mindconnect.registry.timeout` | `PT20S` | per-request HTTP timeout |
 
 Registries are stored per namespace under
-`<data-base-dir>/<namespace>/system/registries/<id>.json`, so an installation can
-ship one the way it ships a seed agent: drop the file in.
+`<data-base-dir>/<namespace>/system/registries/<id>.json`.
+
+### Shipping a registry with an application
+
+An application ships its registries the way it ships its seed agents and MCP
+servers: one file per registry under `initial-data/registries/` on its
+classpath. On start, every registry not configured yet is installed; one that
+is — pinned to a tag, disabled — is left as the operator made it, and one that
+was deleted comes back on the next start (disable it instead to keep it quiet).
+
+```json title="initial-data/registries/mindconnect-ai-mc-registry.json"
+{
+  "name": "Mindconnect registry",
+  "owner": "mindconnect-ai",
+  "repo": "mc-registry",
+  "ref": "main"
+}
+```
+
+The file name is the registry's id — `owner-repo`, as the screen names a
+registry you add by hand, so the two cannot end up as duplicates. The admin UI
+ships [mindconnect-ai/mc-registry](https://github.com/mindconnect-ai/mc-registry)
+this way.
 
 ## What importing means
 

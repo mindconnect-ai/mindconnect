@@ -3,6 +3,7 @@ package ai.mindconnect.agent.registry.spring;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.adapter.github.GitHubRegistryClient;
+import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
 import ai.mindconnect.agent.registry.adapter.installer.AgentDefinitionInstaller;
 import ai.mindconnect.agent.registry.adapter.installer.LlmConfigInstaller;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
@@ -36,9 +37,12 @@ import java.time.Duration;
  * whole thing away for an installation that wants no outbound calls even as a
  * possibility.
  *
- * <p>{@code mindconnect.registry.default-source} seeds one registry on first
- * start ({@code owner/repo[@ref][:index-path]}) — how a distribution points a
- * fresh installation at its own catalogue without shipping a file.
+ * <p>The registries an application ships with are files under
+ * {@code initial-data/registries/} on its classpath, installed on start when
+ * not configured yet — see {@link InitialRegistrySources}.
+ * {@code mindconnect.registry.default-source} seeds one more on first start
+ * ({@code owner/repo[@ref][:index-path]}) — how a deployment points a fresh
+ * installation at its own catalogue without shipping a file.
  *
  * <p>Ordered after the persistence starters: the installers are conditional on
  * the repositories those register, and a {@code @ConditionalOnBean} evaluated
@@ -62,6 +66,7 @@ public class RegistryAutoConfiguration {
             ObjectProvider<Namespace> namespace) {
         FileRegistrySourceRepository repository = new FileRegistrySourceRepository(
                 Path.of(dataBaseDir), namespace.getIfAvailable(() -> Namespace.DEFAULT));
+        InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
         seed(repository, defaultSource);
         return repository;
     }
