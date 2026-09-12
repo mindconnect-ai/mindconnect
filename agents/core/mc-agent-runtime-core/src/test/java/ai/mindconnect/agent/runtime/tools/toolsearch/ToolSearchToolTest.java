@@ -146,6 +146,25 @@ class ToolSearchToolTest {
     }
 
     @Test
+    void theSkillToolIsNeverAMatch() {
+        ToolRegistry withSkill = new ToolRegistry() {
+            @Override public Optional<Tool> resolve(AgentTool agentTool, ToolCallScope scope) {
+                return Optional.of(stubTool(agentTool.name(), "Loads the full instructions of one skill."));
+            }
+            @Override public Map<String, Set<String>> toolNamesByGroup() {
+                return Map.of("skills", Set.of(ai.mindconnect.agent.runtime.skill.SkillTool.NAME));
+            }
+        };
+        ref.set(withSkill);
+
+        String result = tool(Set.of(), Set.of("*")).execute(Map.of("query", "skill instructions"));
+
+        assertThat(result).as("the skill tool comes with the agent's skills setting, not from a search")
+                .startsWith("No tools found");
+        assertThat(activations.activated(sessionId)).isEmpty();
+    }
+
+    @Test
     void assignedDeferredToolsAreSearchableWithoutAnyGroupGrant() {
         String result = tool(Set.of("code_execute"), Set.of())
                 .execute(Map.of("query", "execute a program"));

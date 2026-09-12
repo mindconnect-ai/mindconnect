@@ -75,7 +75,10 @@ public final class DynamicToolActivations {
      *   <li>the {@code skill} tool when the agent enables skills and there
      *       are any to load, carrying the names its setting names for the same
      *       reason. A tool that would find nothing is left away, so the switch
-     *       costs nothing until somebody writes a skill.</li>
+     *       costs nothing until somebody writes a skill. This is the only way
+     *       an agent gets it: a {@code skill} row among its tools or found by
+     *       a search is dropped, since it would carry no names and reach
+     *       every skill, whatever the setting says.</li>
      * </ul>
      */
     public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
@@ -83,6 +86,9 @@ public final class DynamicToolActivations {
         List<AgentTool> refs = new ArrayList<>();
         List<String> deferredNames = new ArrayList<>();
         for (AgentTool tool : def.tools()) {
+            // The skill tool follows the agent's skills setting alone (below): a
+            // row assigned by hand would carry no names and reach every skill.
+            if (SkillTool.NAME.equals(tool.name())) continue;
             if (!tool.deferred()) {
                 refs.add(tool);
                 continue;
@@ -93,6 +99,9 @@ public final class DynamicToolActivations {
             }
         }
         for (String name : activated) {
+            // Same for an activation: a session that searched its way to the
+            // skill tool before this was closed off must not keep a second one.
+            if (SkillTool.NAME.equals(name)) continue;
             if (def.tools().stream().noneMatch(t -> name.equals(t.name()))) {
                 refs.add(AgentTool.of(name));
             }
@@ -104,9 +113,7 @@ public final class DynamicToolActivations {
                     "groups", List.copyOf(search.groups()))));
         }
         var skillsConfig = def.skillsOrOff();
-        if (skillsConfig.enabled()
-                && def.tools().stream().noneMatch(t -> SkillTool.NAME.equals(t.name()))
-                && hasSkills(def, sessionId)) {
+        if (skillsConfig.enabled() && hasSkills(def, sessionId)) {
             refs.add(AgentTool.of(SkillTool.NAME, null, Map.of(
                     SkillToolFactory.NAMES, List.copyOf(skillsConfig.names()))));
         }
