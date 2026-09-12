@@ -9,6 +9,8 @@ import ai.mindconnect.adminui.ui.component.LlmConfigTestComponent;
 import ai.mindconnect.adminui.ui.page.LlmConfigDetailPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigFormPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigListPage;
+import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
+import ai.mindconnect.llm.adapter.ProviderModelCatalog;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.domain.LlmCapability;
@@ -47,6 +49,7 @@ public class LlmConfigUiController {
     private final LlmConfigTestService testService;
     private final EncryptionHelper encryption;
     private final LmStudioModelCatalog lmStudio;
+    private final ProviderModelCatalog providerModels;
 
     @org.springframework.beans.factory.annotation.Autowired
     public LlmConfigUiController(LlmConfigRepository repository,
@@ -55,18 +58,28 @@ public class LlmConfigUiController {
                                     OkHttpClient httpClient,
                                     ObjectMapper objectMapper) {
         this(repository, testService, encryption,
-                new LmStudioModelCatalog(httpClient, objectMapper));
+                new LmStudioModelCatalog(httpClient, objectMapper),
+                new ProviderModelCatalog(httpClient, objectMapper));
     }
 
-    /** For tests: a catalog that answers without an LM Studio. */
+    /** For tests: catalogs that answer without an LM Studio or a provider account. */
     LlmConfigUiController(LlmConfigRepository repository,
                           LlmConfigTestService testService,
                           EncryptionHelper encryption,
                           LmStudioModelCatalog lmStudio) {
+        this(repository, testService, encryption, lmStudio, new ProviderModelCatalog());
+    }
+
+    LlmConfigUiController(LlmConfigRepository repository,
+                          LlmConfigTestService testService,
+                          EncryptionHelper encryption,
+                          LmStudioModelCatalog lmStudio,
+                          ProviderModelCatalog providerModels) {
         this.repository = repository;
         this.testService = testService;
         this.encryption = encryption;
         this.lmStudio = lmStudio;
+        this.providerModels = providerModels;
     }
 
     /**
@@ -78,6 +91,7 @@ public class LlmConfigUiController {
      */
     @PostMapping("/encrypt-key")
     public UiPatch encryptKey(@RequestParam("form") String formId,
+                              @RequestParam(value = "id", required = false) String idValue,
                               @RequestBody Map<String, Object> raw) {
         String key = new FormBody(raw).str("apiKey");
         String shown = key;
@@ -91,8 +105,14 @@ public class LlmConfigUiController {
                 throw new IllegalStateException("Failed to encrypt API key", e);
             }
         }
+        LlmConfigId id = idValue == null || idValue.isBlank() ? null : LlmConfigId.of(idValue);
+        LlmProvider provider = providerFrom(new FormBody(raw));
+        // The rebuilt field keeps the trigger that reloads the model list —
+        // an encrypted key is exactly when the list becomes fetchable.
+        String swapUrl = ProviderModelCatalog.supports(provider)
+                ? LlmConfigFormComponent.swapUrl(formId, id) : null;
         return UiPatch.of().patch(UiPatch.Operation.replace("apiKey",
-                LlmConfigFormComponent.apiKeyField(shown, formId)));
+                LlmConfigFormComponent.apiKeyField(shown, formId, id, swapUrl)));
     }
 
     /**
@@ -102,12 +122,18 @@ public class LlmConfigUiController {
      * groups. Values the admin already typed ride along in the submitted form
      * body and win over the stored config, so toggling never loses input.
      *
-     * <p>With LM Studio as the provider the base URL is asked for its models
-     * (so the model field becomes a dropdown), and when the trigger was the
-     * model pick itself ({@code reason=model}) — or the context window is
-     * still empty — the picked model's context length and capabilities are
-     * written into the settings group. A pick also names a config that has
-     * no name yet, after the model.
+     * <p>Picking a provider fills in its endpoint — {@code https://api.mistral.ai}
+     * for Mistral, {@code https://api.groq.com/openai} for Groq — as long as the
+     * base URL is still empty or another provider's default; a URL someone typed
+     * themselves (a proxy, a local server) is never overwritten.
+     *
+     * <p>The endpoint is then asked for its models, so the Model field becomes a
+     * dropdown: LM Studio through its native API, every other provider but Azure
+     * through its {@code /v1/models} listing. When the trigger was the model pick
+     * itself ({@code reason=model}) — or the context window is still empty — the
+     * picked model's context window (and, from LM Studio, its capabilities) are
+     * written into the settings group. A pick also names a config that has no
+     * name yet, after the model.
      */
     @PostMapping("/field-groups")
     public UiPatch fieldGroups(@RequestParam("form") String formId,
@@ -124,23 +150,41 @@ public class LlmConfigUiController {
         LlmProvider provider = providerFrom(body);
         if (provider == null && config != null) provider = config.provider();
         String model = or(body.str("model"), config == null ? null : config.model());
-        String baseUrl = or(body.str("baseUrl"), config == null ? null : config.baseUrl());
+        String apiKey = or(body.str("apiKey"), config == null ? null : config.apiKey());
+        String baseUrl = baseUrlFor(provider,
+                or(body.str("baseUrl"), config == null ? null : config.baseUrl()));
 
-        LmStudioModelCatalog.Catalog catalog = null;
-        LlmConfigFormComponent.LmStudioPrefill prefill = null;
-        String suggestedName = null;
+        ModelChoices choices = ModelChoices.none();
+        LlmConfigFormComponent.ModelPrefill prefill = null;
+        boolean modelPicked = "model".equals(reason);
+        boolean contextEmpty = body.numOrNull("contextWindowTokens") == null;
+        String pickedId = null;
         if (!isAlias && provider == LlmProvider.LM_STUDIO) {
-            catalog = lmStudio.fetch(baseUrl);
+            LmStudioModelCatalog.Catalog catalog = lmStudio.fetch(baseUrl);
+            choices = ModelChoices.of(catalog);
             LmStudioModel picked = catalog.find(model);
-            boolean modelPicked = "model".equals(reason);
-            boolean contextEmpty = body.numOrNull("contextWindowTokens") == null;
-            if (picked != null && (modelPicked || contextEmpty)) {
-                prefill = LlmConfigFormComponent.LmStudioPrefill.of(picked);
+            if (picked != null) {
+                pickedId = picked.id();
+                if (modelPicked || contextEmpty) {
+                    prefill = LlmConfigFormComponent.ModelPrefill.of(picked);
+                }
             }
-            String name = body.str("name");
-            if (modelPicked && picked != null && (name == null || name.isBlank())) {
-                suggestedName = LlmConfigFormComponent.suggestedName(picked.id());
+        } else if (!isAlias && ProviderModelCatalog.supports(provider)) {
+            ProviderModelCatalog.Catalog catalog =
+                    providerModels.fetch(probeConfig(provider, baseUrl, apiKey, config));
+            choices = ModelChoices.of(catalog);
+            ProviderModelCatalog.Model picked = catalog.find(model);
+            if (picked != null) {
+                pickedId = picked.id();
+                if (modelPicked || contextEmpty) {
+                    prefill = LlmConfigFormComponent.ModelPrefill.of(picked);
+                }
             }
+        }
+        String suggestedName = null;
+        String name = body.str("name");
+        if (modelPicked && pickedId != null && (name == null || name.isBlank())) {
+            suggestedName = LlmConfigFormComponent.suggestedName(pickedId);
         }
         UiPatch patch = UiPatch.of();
         if (suggestedName != null) {
@@ -157,8 +201,8 @@ public class LlmConfigUiController {
                                 provider == null ? null : provider.name(),
                                 model,
                                 baseUrl,
-                                or(body.str("apiKey"), config == null ? null : config.apiKey()),
-                                formId, id, catalog)))
+                                apiKey,
+                                formId, id, choices)))
                 .patch(UiPatch.Operation.replace("llm-type-cfg",
                         LlmConfigFormComponent.withHiddenIf(isAlias,
                                 LlmConfigFormComponent.typeGroup(type, config, prefill,
@@ -171,6 +215,39 @@ public class LlmConfigUiController {
     /** First non-null value — form input wins over the stored config. */
     private static String or(String formValue, String stored) {
         return formValue != null ? formValue : stored;
+    }
+
+    /**
+     * The base URL the form should show for this provider: what is in the form
+     * when somebody chose it, the provider's own endpoint otherwise. "Somebody
+     * chose it" excludes another provider's default — that is what sits in the
+     * field right after switching provider, and leaving it there would point
+     * Mistral at OpenAI.
+     */
+    static String baseUrlFor(LlmProvider provider, String baseUrl) {
+        if (provider == null) return baseUrl;
+        if (LlmProvider.isADefaultBaseUrl(baseUrl)) return provider.defaultBaseUrl();
+        return baseUrl;
+    }
+
+    /**
+     * The config to ask for a model list: the form's provider, endpoint and
+     * key, with the key taken from storage when the form shows only the mask,
+     * and then resolved — {@code ${VAR}} expanded and {@code enc:} decrypted,
+     * exactly as a gateway would before a call.
+     */
+    private LlmConfig probeConfig(LlmProvider provider, String baseUrl, String apiKey,
+                                  LlmConfig stored) {
+        String key = MASKED_KEY.equals(apiKey) && stored != null ? stored.apiKey() : apiKey;
+        LlmConfig probe = new LlmConfig(LlmConfigId.random(), "probe", provider, null, baseUrl, key,
+                0, 0, Map.of(), null, false, null, null, null, LlmConfigType.CHAT, null);
+        try {
+            return probe.resolved(encryption);
+        } catch (RuntimeException e) {
+            // A key that cannot be decrypted (a rotated secret) must not take
+            // down the form — the listing simply fails and says why.
+            return probe;
+        }
     }
 
     /**
@@ -262,14 +339,23 @@ public class LlmConfigUiController {
         LlmConfigId id = LlmConfigId.of(idValue);
         return repository.findById(id)
                 .map(c -> ResponseEntity.ok(new LlmConfigFormPage(c, repository.findAll(),
-                        lmStudioCatalogFor(c)).render()))
+                        modelChoicesFor(c)).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    /** The LM Studio catalog for an LM Studio config, {@code null} for any other. */
-    private LmStudioModelCatalog.Catalog lmStudioCatalogFor(LlmConfig config) {
-        if (config.isAlias() || config.provider() != LlmProvider.LM_STUDIO) return null;
-        return lmStudio.fetch(config.baseUrl());
+    /**
+     * The model list to open the edit form with: LM Studio's catalog for an LM
+     * Studio config, the provider's own listing for anything that publishes
+     * one, nothing for an alias or Azure OpenAI.
+     */
+    private ModelChoices modelChoicesFor(LlmConfig config) {
+        if (config.isAlias()) return ModelChoices.none();
+        if (config.provider() == LlmProvider.LM_STUDIO) {
+            return ModelChoices.of(lmStudio.fetch(config.baseUrl()));
+        }
+        if (!ProviderModelCatalog.supports(config.provider())) return ModelChoices.none();
+        return ModelChoices.of(providerModels.fetch(probeConfig(config.provider(),
+                config.baseUrl(), config.apiKey(), config)));
     }
 
     @PostMapping

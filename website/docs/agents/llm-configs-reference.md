@@ -73,7 +73,7 @@ change its `llmConfigName` instead.
 |-------|---------|
 | `provider` | One of `ANTHROPIC`, `OPENAI`, `AZURE_OPENAI`, `GOOGLE_GEMINI`, `LM_STUDIO` |
 | `model` | Model id. `${VAR:default}` reads an env var with a fallback |
-| `baseUrl` | API endpoint (override for proxies / local servers) |
+| `baseUrl` | API endpoint. Optional: each provider knows its own (`LlmProvider.defaultBaseUrl()`), so set it only for a proxy, a local server, or an Azure resource |
 | `apiKey` | API key, usually injected from an env var |
 | `contextWindowTokens` | Token budget used to size the working-memory window |
 | `capabilities` | What the model reads and does — `TOOL_CALLING`, `VISION`, `DOCUMENTS`, `AUDIO_INPUT`. Vision and documents decide whether an image or PDF reaches the model as content or as a placeholder. Omitted: the provider's default applies |

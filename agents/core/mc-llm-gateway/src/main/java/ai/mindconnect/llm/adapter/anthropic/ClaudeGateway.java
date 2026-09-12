@@ -93,9 +93,7 @@ public class ClaudeGateway implements LlmGateway {
             throw new RuntimeException("Failed to build Anthropic request", e);
         }
 
-        String baseUrl = config.baseUrl() != null && !config.baseUrl().isBlank()
-                ? config.baseUrl()
-                : "https://api.anthropic.com";
+        String baseUrl = LlmProvider.ANTHROPIC.baseUrlOr(config.baseUrl());
 
         Request httpRequest = new Request.Builder()
                 .url(baseUrl + "/v1/messages")

@@ -48,7 +48,6 @@ public class GeminiGateway implements LlmGateway {
     private static final Logger wire = LoggerFactory.getLogger("ai.mindconnect.llm.wire");
     private static final MediaType JSON = MediaType.get("application/json");
 
-    private static final String DEFAULT_BASE_URL = "https://generativelanguage.googleapis.com";
 
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
@@ -96,8 +95,7 @@ public class GeminiGateway implements LlmGateway {
             throw new RuntimeException("Failed to build Gemini request", e);
         }
 
-        String baseUrl = config.baseUrl() != null && !config.baseUrl().isBlank()
-                ? config.baseUrl() : DEFAULT_BASE_URL;
+        String baseUrl = LlmProvider.GOOGLE_GEMINI.baseUrlOr(config.baseUrl());
         String url = baseUrl + "/v1beta/models/" + config.model()
                 + ":streamGenerateContent?alt=sse&key=" + config.apiKey();
 

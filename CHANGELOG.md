@@ -35,9 +35,26 @@ fresh empty one, so nothing has to be moved by hand at release time.
   JSON. Omitting it keeps the previous behaviour: the rate-limit error reaches
   the caller. A fallback is only taken before anything has streamed, so a
   partial answer is never duplicated.
+- **agents:** the Admin UI's LLM-config form reads the **model list from the
+  provider**, so a model is picked rather than typed. LM Studio already did
+  this through its native API; now every provider that publishes a listing does
+  — OpenAI, Groq, Mistral, DeepSeek, Together, OpenRouter, Perplexity,
+  Fireworks and Ollama through `/v1/models`, Anthropic and Gemini through their
+  equivalents. Only models fitting the config type are offered, a model the
+  provider no longer lists stays selectable, and a listing that fails leaves a
+  text field carrying the reason. Azure OpenAI keeps free text: its configs
+  name a deployment, not a model.
 
 ### Changed
 
+- **agents:** every provider now knows its own API endpoint, so **Base URL is
+  prefilled** when a provider is picked in the Admin UI —
+  `https://api.mistral.ai`, `https://api.groq.com/openai`,
+  `http://localhost:11434` — and switching provider replaces a URL that was
+  only the previous provider's default. A URL you typed yourself is never
+  overwritten. `baseUrl` is now optional in a config JSON as well: left out,
+  the provider's endpoint applies instead of the call failing against a `null`
+  host.
 - **agents:** a rate limit is now readable in the log. `HTTP 429` used to be
   logged as a bare status and a body; it now names the config and the model
   that was limited, the provider's `Retry-After` hint, and what happens next —

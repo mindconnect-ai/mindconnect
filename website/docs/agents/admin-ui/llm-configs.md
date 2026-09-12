@@ -17,7 +17,29 @@ list of bundled configs and every field, see the
 
 A config has a `name`, `provider`, `model`, `baseUrl`, `apiKey`,
 `contextWindowTokens`, and optional `additionalParams`, rate-limit and retry
-settings. The form also covers:
+settings.
+
+Picking the **provider** fills the **Base URL** in with that provider's own
+endpoint — `https://api.mistral.ai` for Mistral, `https://api.groq.com/openai`
+for Groq, `http://localhost:11434` for Ollama — so nobody has to look it up.
+Switching provider replaces a URL that is still the previous provider's
+default; a URL you typed yourself (a proxy, a compatible host) is left alone.
+Azure OpenAI is the exception: its endpoint is your own resource, so the field
+stays empty for you to fill in.
+
+The **Model** field is then a dropdown of the models that endpoint actually
+serves, read live: LM Studio through its native API, every other provider
+through its `/v1/models` listing (Anthropic and Gemini through their
+equivalents). Only the models that fit the config type are offered, and a model
+the provider no longer lists stays selectable so that opening the form never
+drops it. The listing needs the API key, so entering one reloads the list —
+as does changing the base URL. When a provider cannot be asked, the field falls
+back to free text with the reason in its hint ("the API key is not accepted",
+"this endpoint serves no model list"), so typing an id always remains possible.
+Azure OpenAI stays free text: its configs name a *deployment*, which is your
+own name for a model.
+
+The form also covers:
 
 - **Type** — `Chat`, `Embedding` (embedding configs power the vector store)
   or `Speech to text` (since 0.5.3: a Whisper-style model that turns a

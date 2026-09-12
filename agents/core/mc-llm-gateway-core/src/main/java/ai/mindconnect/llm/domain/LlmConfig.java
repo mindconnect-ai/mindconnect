@@ -223,7 +223,7 @@ public record LlmConfig(
 
     public static LlmConfig claude(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.ANTHROPIC,
-                model, "https://api.anthropic.com", apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null, null);
+                model, LlmProvider.ANTHROPIC.defaultBaseUrl(), apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig ollama(String name, String model, String baseUrl) {
@@ -233,7 +233,7 @@ public record LlmConfig(
 
     public static LlmConfig mistral(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.MISTRAL,
-                model, "https://api.mistral.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
+                model, LlmProvider.MISTRAL.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     /**
@@ -247,32 +247,32 @@ public record LlmConfig(
 
     public static LlmConfig deepSeek(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.DEEPSEEK,
-                model, "https://api.deepseek.com", apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null, null);
+                model, LlmProvider.DEEPSEEK.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig together(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.TOGETHER,
-                model, "https://api.together.xyz", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+                model, LlmProvider.TOGETHER.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig openRouter(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.OPENROUTER,
-                model, "https://openrouter.ai/api", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+                model, LlmProvider.OPENROUTER.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig perplexity(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.PERPLEXITY,
-                model, "https://api.perplexity.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
+                model, LlmProvider.PERPLEXITY.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig fireworks(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.FIREWORKS,
-                model, "https://api.fireworks.ai/inference", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+                model, LlmProvider.FIREWORKS.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig googleGemini(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.GOOGLE_GEMINI,
-                model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
+                model, LlmProvider.GOOGLE_GEMINI.defaultBaseUrl(), apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
     }
 
     /**
