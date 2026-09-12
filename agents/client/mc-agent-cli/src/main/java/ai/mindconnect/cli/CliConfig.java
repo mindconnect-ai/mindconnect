@@ -79,16 +79,12 @@ public class CliConfig {
                                      AzureOpenAiGateway azureOpenAiGateway,
                                      GeminiGateway geminiGateway) {
         var gateways = new java.util.HashMap<LlmProvider, ai.mindconnect.llm.port.out.LlmGateway>();
-        gateways.put(LlmProvider.LM_STUDIO,    openAiCompatibleGateway);
-        gateways.put(LlmProvider.OPENAI,       openAiCompatibleGateway);
-        gateways.put(LlmProvider.GROQ,         openAiCompatibleGateway);
-        gateways.put(LlmProvider.OLLAMA,       openAiCompatibleGateway);
-        gateways.put(LlmProvider.MISTRAL,      openAiCompatibleGateway);
-        gateways.put(LlmProvider.DEEPSEEK,     openAiCompatibleGateway);
-        gateways.put(LlmProvider.TOGETHER,     openAiCompatibleGateway);
-        gateways.put(LlmProvider.OPENROUTER,   openAiCompatibleGateway);
-        gateways.put(LlmProvider.PERPLEXITY,   openAiCompatibleGateway);
-        gateways.put(LlmProvider.FIREWORKS,    openAiCompatibleGateway);
+        // Every provider speaks the OpenAI API unless it has an adapter of
+        // its own — so default them all to it and override the three that
+        // differ. A provider added to the enum is then routed by itself.
+        for (LlmProvider provider : LlmProvider.values()) {
+            gateways.put(provider, openAiCompatibleGateway);
+        }
         gateways.put(LlmProvider.ANTHROPIC,     claudeGateway);
         gateways.put(LlmProvider.AZURE_OPENAI,  azureOpenAiGateway);
         gateways.put(LlmProvider.GOOGLE_GEMINI, geminiGateway);

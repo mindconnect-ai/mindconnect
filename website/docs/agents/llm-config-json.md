@@ -75,7 +75,7 @@ one:
 |-------|------|-------------|
 | `id` | UUID | Stable identifier. Use a fresh UUID for a new config. |
 | `name` | string | Unique name; what an agent references via `llmConfigName`. |
-| `provider` | enum | One of `ANTHROPIC`, `OPENAI`, `AZURE_OPENAI`, `GOOGLE_GEMINI`, `LM_STUDIO`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`, `TOGETHER`, `OPENROUTER`, `PERPLEXITY`, `FIREWORKS`. |
+| `provider` | enum | One of `ANTHROPIC`, `OPENAI`, `AZURE_OPENAI`, `GOOGLE_GEMINI`, `LM_STUDIO`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`, `XAI` (Grok), `MOONSHOT` (Kimi), `TOGETHER`, `OPENROUTER`, `PERPLEXITY`, `FIREWORKS`. |
 | `model` | string | Model id. Supports `${VAR}` / `${VAR:default}`. |
 | `baseUrl` | string | API endpoint. **Optional** — left out, the provider's own endpoint applies (`https://api.openai.com`, `https://api.mistral.ai`, `https://api.groq.com/openai`, `http://localhost:11434` …). Set it for a proxy, a local server, or an Azure resource, which has no default. |
 | `apiKey` | string | API key — almost always an env-var placeholder like `${ANTHROPIC_API_KEY}`. Literal keys are stored encrypted in the Admin UI (the CLI stores them as-is — use placeholders there). |

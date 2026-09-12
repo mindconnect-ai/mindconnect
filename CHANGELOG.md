@@ -35,6 +35,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
   JSON. Omitting it keeps the previous behaviour: the rate-limit error reaches
   the caller. A fallback is only taken before anything has streamed, so a
   partial answer is never duplicated.
+- **agents:** two providers more — **`XAI`** (the Grok models) and
+  **`MOONSHOT`** (the Kimi models). Both speak the OpenAI API, so they arrive
+  with everything the others have: endpoint prefilled (`https://api.x.ai`,
+  `https://api.moonshot.ai` — set the base URL to `https://api.moonshot.cn` for
+  Moonshot's mainland-China endpoint), model list in the form, retry, rate
+  limit and fallbacks. The provider dropdown now names the models a vendor is
+  known for, so Grok and Kimi are findable under XAI and MOONSHOT. The apps
+  register the OpenAI-compatible gateway as the default for every provider
+  rather than listing them one by one, so the next one is a single enum
+  constant.
 - **agents:** the Admin UI's LLM-config form reads the **model list from the
   provider**, so a model is picked rather than typed. LM Studio already did
   this through its native API; now every provider that publishes a listing does

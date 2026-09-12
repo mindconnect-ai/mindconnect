@@ -40,8 +40,33 @@ class LlmProviderBaseUrlTest {
         assertThat(LlmProvider.FIREWORKS.defaultBaseUrl()).isEqualTo("https://api.fireworks.ai/inference");
         assertThat(LlmProvider.OLLAMA.defaultBaseUrl()).isEqualTo("http://localhost:11434");
         assertThat(LlmProvider.LM_STUDIO.defaultBaseUrl()).isEqualTo("http://localhost:1234");
+        assertThat(LlmProvider.XAI.defaultBaseUrl()).isEqualTo("https://api.x.ai");
+        assertThat(LlmProvider.MOONSHOT.defaultBaseUrl()).isEqualTo("https://api.moonshot.ai");
         assertThat(LlmProvider.GOOGLE_GEMINI.defaultBaseUrl())
                 .isEqualTo("https://generativelanguage.googleapis.com");
+    }
+
+    @Test
+    void aVendorWhoseModelsGoByAnotherNameSaysBoth() {
+        assertThat(LlmProvider.XAI.label()).isEqualTo("XAI (Grok)");
+        assertThat(LlmProvider.MOONSHOT.label()).isEqualTo("MOONSHOT (Kimi)");
+        assertThat(LlmProvider.MISTRAL.label())
+                .as("a vendor named after its models needs no second name")
+                .isEqualTo("MISTRAL");
+        for (LlmProvider provider : LlmProvider.values()) {
+            assertThat(provider.label()).as("%s", provider).isNotBlank().contains(provider.name());
+        }
+    }
+
+    @Test
+    void grokAndKimiAreReachedThroughTheOpenAiApi() {
+        assertThat(LlmConfig.xai("grok", "grok-4", "k").baseUrl()).isEqualTo("https://api.x.ai");
+        assertThat(LlmConfig.moonshot("kimi", "kimi-k2-turbo-preview", "k").baseUrl())
+                .isEqualTo("https://api.moonshot.ai");
+        assertThat(ai.mindconnect.llm.adapter.ProviderModelCatalog.supports(LlmProvider.XAI))
+                .as("their model lists are OpenAI-compatible too").isTrue();
+        assertThat(ai.mindconnect.llm.adapter.ProviderModelCatalog.supports(LlmProvider.MOONSHOT))
+                .isTrue();
     }
 
     @Test

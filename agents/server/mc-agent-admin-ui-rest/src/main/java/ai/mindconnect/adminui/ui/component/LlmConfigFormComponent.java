@@ -388,7 +388,9 @@ public final class LlmConfigFormComponent implements UiComponent {
         List<UiField.Option> providerOptions = new ArrayList<>();
         if (provider == null) providerOptions.add(UiField.Option.of("", "— pick a provider —"));
         Arrays.stream(LlmProvider.values())
-                .map(p -> UiField.Option.of(p.name(), p.name()))
+                // The stored value is the enum name; the label may also carry
+                // the name the models go by (Grok, Kimi), so they are findable.
+                .map(p -> UiField.Option.of(p.name(), p.label()))
                 .forEach(providerOptions::add);
         String swapUrl = swapUrl(formId, configId);
         group.field(UiField.select("type", "Type",

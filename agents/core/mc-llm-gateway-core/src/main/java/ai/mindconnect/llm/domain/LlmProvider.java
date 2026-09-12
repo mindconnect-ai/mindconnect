@@ -38,6 +38,15 @@ public enum LlmProvider {
     OPENROUTER("https://openrouter.ai/api", Set.of(LlmCapability.TOOL_CALLING)),
     PERPLEXITY("https://api.perplexity.ai", Set.of(LlmCapability.TOOL_CALLING)),
     FIREWORKS("https://api.fireworks.ai/inference", Set.of(LlmCapability.TOOL_CALLING)),
+    /** xAI, the Grok models. Its API is OpenAI-compatible. */
+    XAI("https://api.x.ai", Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
+    /**
+     * Moonshot AI, the Kimi models. OpenAI-compatible; the mainland-China
+     * endpoint is {@code https://api.moonshot.cn}, which a config sets as its
+     * base URL. Only tool calling by default — the Kimi line is mixed, and a
+     * config for a vision model declares {@code VISION} itself.
+     */
+    MOONSHOT("https://api.moonshot.ai", Set.of(LlmCapability.TOOL_CALLING)),
     GOOGLE_GEMINI("https://generativelanguage.googleapis.com",
             Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS,
             LlmCapability.AUDIO_INPUT));
@@ -103,6 +112,20 @@ public enum LlmProvider {
      */
     public Set<LlmCapability> defaultCapabilities() {
         return defaultCapabilities;
+    }
+
+    /**
+     * The provider as a person picks it from a list. The enum name for most of
+     * them — it <em>is</em> the vendor's name — but a vendor whose models go by
+     * another name says both, so that somebody looking for Grok or Kimi finds
+     * the company that serves it.
+     */
+    public String label() {
+        return switch (this) {
+            case XAI -> "XAI (Grok)";
+            case MOONSHOT -> "MOONSHOT (Kimi)";
+            default -> name();
+        };
     }
 
     /** The additional-parameter fields this provider's gateway understands. */

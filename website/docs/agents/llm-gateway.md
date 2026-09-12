@@ -100,15 +100,18 @@ for: it is the case an admin can fix from the Admin UI.
 | Gateway | Providers it serves |
 |---------|---------------------|
 | `ClaudeGateway` | Anthropic (Claude) |
-| `OpenAiCompatibleGateway` | OpenAI and every OpenAI-compatible API — LM Studio, Groq, Ollama, Mistral, DeepSeek, Together, OpenRouter, Perplexity, Fireworks |
+| `OpenAiCompatibleGateway` | OpenAI and every OpenAI-compatible API — LM Studio, Groq, Ollama, Mistral, DeepSeek, xAI (Grok), Moonshot (Kimi), Together, OpenRouter, Perplexity, Fireworks |
 | `AzureOpenAiGateway` | Azure OpenAI |
 | `GeminiGateway` | Google Gemini |
 
 The `LlmProvider` enum lists all wired providers: `OPENAI`, `ANTHROPIC`,
 `AZURE_OPENAI`, `GOOGLE_GEMINI`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`,
-`TOGETHER`, `OPENROUTER`, `PERPLEXITY`, `FIREWORKS`, `LM_STUDIO`. Most of them
-share the OpenAI-compatible gateway — adding another compatible vendor is a
-config entry, not new code.
+`XAI` (Grok), `MOONSHOT` (Kimi), `TOGETHER`, `OPENROUTER`, `PERPLEXITY`,
+`FIREWORKS`, `LM_STUDIO`. Each constant also carries the provider's own
+endpoint, so a config may leave `baseUrl` out. Everything but Anthropic, Azure
+OpenAI and Gemini is served by the OpenAI-compatible gateway, which the apps
+register as the default for the whole enum — so another compatible vendor is
+one enum constant, not new wiring.
 
 ### Decorator gateways
 

@@ -270,6 +270,22 @@ public record LlmConfig(
                 model, LlmProvider.FIREWORKS.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
+    /** xAI's Grok models — {@code grok-4}, {@code grok-4-fast}, {@code grok-3-mini}, … */
+    public static LlmConfig xai(String name, String model, String apiKey) {
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.XAI,
+                model, LlmProvider.XAI.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 256_000, false, null, null, null, null, null);
+    }
+
+    /**
+     * Moonshot AI's Kimi models — {@code kimi-k2-turbo-preview},
+     * {@code kimi-latest}, … For the mainland-China endpoint, override the base
+     * URL with {@code https://api.moonshot.cn}.
+     */
+    public static LlmConfig moonshot(String name, String model, String apiKey) {
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.MOONSHOT,
+                model, LlmProvider.MOONSHOT.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
+    }
+
     public static LlmConfig googleGemini(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.GOOGLE_GEMINI,
                 model, LlmProvider.GOOGLE_GEMINI.defaultBaseUrl(), apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);

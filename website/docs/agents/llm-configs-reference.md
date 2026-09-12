@@ -71,7 +71,7 @@ change its `llmConfigName` instead.
 
 | Field | Meaning |
 |-------|---------|
-| `provider` | One of `ANTHROPIC`, `OPENAI`, `AZURE_OPENAI`, `GOOGLE_GEMINI`, `LM_STUDIO` |
+| `provider` | `ANTHROPIC`, `OPENAI`, `AZURE_OPENAI`, `GOOGLE_GEMINI`, `LM_STUDIO`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`, `XAI` (Grok), `MOONSHOT` (Kimi), `TOGETHER`, `OPENROUTER`, `PERPLEXITY` or `FIREWORKS` |
 | `model` | Model id. `${VAR:default}` reads an env var with a fallback |
 | `baseUrl` | API endpoint. Optional: each provider knows its own (`LlmProvider.defaultBaseUrl()`), so set it only for a proxy, a local server, or an Azure resource |
 | `apiKey` | API key, usually injected from an env var |
@@ -95,6 +95,31 @@ export OPENAI_API_KEY=sk-...
 Local providers (`lm-studio-default`, `gemma-reader`, `embeddings`) need no
 key — just a running LM Studio instance. `agent-default` needs whatever its
 target needs: `OPENAI_API_KEY` as shipped.
+
+## Providers without a bundled config
+
+Not every supported provider ships a seed config — there is nothing to seed but
+a model name and a key. Create one in the Admin UI (the base URL fills itself
+in, the model list loads once the key is there) or drop a JSON file next to the
+others:
+
+```json title="llm-configs/grok.json"
+{
+  "id": "00000001-0000-0000-0000-000000000020",
+  "name": "grok",
+  "provider": "XAI",
+  "model": "${XAI_MODEL:grok-4}",
+  "apiKey": "${XAI_API_KEY}",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 8192,
+  "contextWindowTokens": 256000
+}
+```
+
+The same shape works for `MOONSHOT` (Kimi — set `baseUrl` to
+`https://api.moonshot.cn` for the mainland-China endpoint), `DEEPSEEK`,
+`MISTRAL`, `GROQ` and the rest: leave `baseUrl` out and the provider's own
+endpoint applies.
 
 ## Adding your own
 
