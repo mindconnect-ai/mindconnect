@@ -39,8 +39,15 @@ import java.time.Duration;
  * <p>{@code mindconnect.registry.default-source} seeds one registry on first
  * start ({@code owner/repo[@ref][:index-path]}) — how a distribution points a
  * fresh installation at its own catalogue without shipping a file.
+ *
+ * <p>Ordered after the persistence starters: the installers are conditional on
+ * the repositories those register, and a {@code @ConditionalOnBean} evaluated
+ * before them finds nothing — the screen then offers every entry and can
+ * import none.
  */
-@AutoConfiguration
+@AutoConfiguration(afterName = {
+        "ai.mindconnect.agent.starter.file.FilePersistenceAutoConfiguration",
+        "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig"})
 @ConditionalOnProperty(prefix = "mindconnect.registry", name = "enabled",
         havingValue = "true", matchIfMissing = true)
 public class RegistryAutoConfiguration {

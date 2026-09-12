@@ -11,8 +11,13 @@ import org.springframework.context.annotation.Bean;
  * Contributes the workflow installer when this host has both a workflow store
  * to write into and the registry on the classpath. Either missing and there is
  * nothing to wire — the registry is optional, and so is the workflow engine.
+ *
+ * <p>Ordered after the auto-configurations that register a workflow store, so
+ * that {@code @ConditionalOnBean} sees it.
  */
-@AutoConfiguration
+@AutoConfiguration(afterName = {
+        "ai.mindconnect.workflow.admin.WorkflowAdminAutoConfiguration",
+        "ai.mindconnect.workflow.persistence.pg.WorkflowPostgresAutoConfiguration"})
 @ConditionalOnClass(name = "ai.mindconnect.agent.registry.port.out.RegistryInstaller")
 public class WorkflowRegistryAutoConfiguration {
 
