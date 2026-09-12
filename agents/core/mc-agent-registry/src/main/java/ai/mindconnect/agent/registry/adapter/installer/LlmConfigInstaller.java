@@ -135,7 +135,7 @@ public class LlmConfigInstaller implements RegistryInstaller {
                 apiKey, incoming.defaultTemperature(), incoming.maxOutputTokens(),
                 incoming.additionalParams(), incoming.contextWindowTokens(), incoming.isAlias(),
                 incoming.delegatesTo(), incoming.retry(), incoming.rateLimit(), incoming.type(),
-                incoming.capabilities(), version);
+                incoming.capabilities(), incoming.fallbackModels(), version);
     }
 
     /**
