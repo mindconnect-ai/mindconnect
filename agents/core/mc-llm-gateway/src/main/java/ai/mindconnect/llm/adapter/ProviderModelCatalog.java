@@ -5,6 +5,7 @@ import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -155,6 +156,11 @@ public class ProviderModelCatalog {
         }
         LlmProvider provider = config.provider();
         String baseUrl = normalise(provider.baseUrlOr(config.baseUrl()));
+        if (baseUrl == null || HttpUrl.parse(baseUrl) == null) {
+            // "localhost:11434" or "api.mistral.ai" typed without a scheme —
+            // OkHttp would throw on it, and the form should say why instead.
+            return Catalog.unavailable(baseUrl, "not a URL — it has to start with http:// or https://");
+        }
         String apiKey = config.apiKey();
         if (needsApiKey(provider) && (apiKey == null || apiKey.isBlank())) {
             return Catalog.unavailable(baseUrl, "no API key yet");
@@ -181,9 +187,32 @@ public class ProviderModelCatalog {
                         parseOpenAi(get(openAiRequest(baseUrl, apiKey))), null);
             };
         } catch (IOException e) {
-            log.debug("Model listing for {} at {} failed: {}", provider, baseUrl, e.getMessage());
-            return Catalog.unavailable(baseUrl, e.getMessage());
+            String reason = redact(e.getMessage(), apiKey);
+            log.debug("Model listing for {} at {} failed: {}", provider, baseUrl, reason);
+            return Catalog.unavailable(baseUrl, reason);
+        } catch (IllegalArgumentException e) {
+            // The URL was checked in fetch, so this is a header OkHttp refuses —
+            // a key with a line break pasted in. Its message may quote the key.
+            log.debug("Model listing for {} at {} could not be requested", provider, baseUrl);
+            return Catalog.unavailable(baseUrl,
+                    "the request could not be built — does the API key contain a line break or a stray character?");
         }
+    }
+
+    /**
+     * The error text with the key cut out. The form shows it and the log keeps
+     * it, and neither may carry a secret — Gemini's key travels in the URL, and
+     * an I/O error can quote whatever it was sent.
+     */
+    static String redact(String message, String apiKey) {
+        if (message == null) return "request failed";
+        if (apiKey == null || apiKey.isBlank()) return message;
+        return message.replace(apiKey, "***");
+    }
+
+    /** A request URL as it may be shown: without its query, which is where Gemini puts the key. */
+    static String shown(HttpUrl url) {
+        return url.newBuilder().query(null).build().toString();
     }
 
     private static Request openAiRequest(String baseUrl, String apiKey) {
@@ -327,17 +356,17 @@ public class ProviderModelCatalog {
             response = httpClient.newCall(request).execute();
         } catch (IOException | IllegalArgumentException e) {
             throw new IOException(e.getMessage() == null
-                    ? request.url() + " unreachable" : e.getMessage(), e);
+                    ? shown(request.url()) + " unreachable" : e.getMessage(), e);
         }
         try (response) {
             if (!response.isSuccessful()) {
                 throw new IOException(switch (response.code()) {
                     case 401, 403 -> "HTTP " + response.code() + " — the API key is not accepted";
                     case 404 -> "HTTP 404 — this endpoint serves no model list";
-                    default -> "HTTP " + response.code() + " from " + request.url();
+                    default -> "HTTP " + response.code() + " from " + shown(request.url());
                 });
             }
-            if (response.body() == null) throw new IOException("Empty answer from " + request.url());
+            if (response.body() == null) throw new IOException("Empty answer from " + shown(request.url()));
             return objectMapper.readTree(response.body().byteStream());
         }
     }

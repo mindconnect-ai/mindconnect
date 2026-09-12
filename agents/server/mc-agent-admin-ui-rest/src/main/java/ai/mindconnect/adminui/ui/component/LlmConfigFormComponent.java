@@ -431,8 +431,9 @@ public final class LlmConfigFormComponent implements UiComponent {
                         .onChange(UiTrigger.api("POST", swapUrl, formId)))
                 .field(UiField.select("provider", "Provider", provider == null ? "" : provider, providerOptions)
                         .asEditable().asRequired()
-                        // Switching re-renders the provider-parameter group below.
-                        .onChange(UiTrigger.api("POST", swapUrl, formId)))
+                        // Switching re-renders the provider-parameter group below;
+                        // reason=provider lets it replace the old provider's endpoint.
+                        .onChange(UiTrigger.api("POST", swapUrl + "&reason=provider", formId)))
                 .field(modelField(model, models, configType, swapUrl, formId));
         if (isLmStudio) {
             group.field(UiField.text("baseUrl", "Base URL", baseUrl)

@@ -128,6 +128,59 @@ class ProviderModelCatalogTest {
     }
 
     @Test
+    void aFailedGeminiListingDoesNotShowTheKeyThatTravelsInItsUrl() throws Exception {
+        var server = com.sun.net.httpserver.HttpServer.create(
+                new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+        server.createContext("/", exchange -> {
+            byte[] body = "{\"error\":{\"code\":400,\"message\":\"API key not valid\"}}".getBytes();
+            exchange.sendResponseHeaders(400, body.length);
+            exchange.getResponseBody().write(body);
+            exchange.close();
+        });
+        server.start();
+        try {
+            String baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
+            var config = new ai.mindconnect.llm.domain.LlmConfig(
+                    ai.mindconnect.llm.domain.LlmConfigId.random(), "g", LlmProvider.GOOGLE_GEMINI,
+                    "gemini-2.5-flash", baseUrl, "AIzaSECRET", 0.7, 8192, java.util.Map.of(), null,
+                    false, null, null, null, null, null);
+
+            var answer = catalog.fetch(config);
+
+            assertThat(answer.available()).isFalse();
+            assertThat(answer.error()).contains("HTTP 400").doesNotContain("AIzaSECRET").doesNotContain("key=");
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void aBaseUrlWithoutSchemeIsReportedInsteadOfThrown() {
+        var answer = catalog.fetch(ai.mindconnect.llm.domain.LlmConfig.ollama("o", "llama3", "localhost:11434"));
+
+        assertThat(answer.available()).isFalse();
+        assertThat(answer.error()).contains("http://");
+    }
+
+    @Test
+    void aKeyAnHttpHeaderCannotCarryIsReportedWithoutQuotingIt() {
+        var answer = catalog.fetch(ai.mindconnect.llm.domain.LlmConfig.claude("c", "claude-opus-5",
+                "sk-ant-SECRET\n"));
+
+        assertThat(answer.available()).isFalse();
+        assertThat(answer.error()).contains("API key").doesNotContain("SECRET");
+    }
+
+    @Test
+    void theKeyIsCutFromWhatAnErrorSays() {
+        assertThat(ProviderModelCatalog.redact("failed for ...?key=AIzaSECRET", "AIzaSECRET"))
+                .isEqualTo("failed for ...?key=***");
+        assertThat(ProviderModelCatalog.shown(okhttp3.HttpUrl.get(
+                "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=AIzaSECRET")))
+                .isEqualTo("https://generativelanguage.googleapis.com/v1beta/models");
+    }
+
+    @Test
     void openRouterAndLocalServersAreAskedWithoutAKey() {
         assertThat(ProviderModelCatalog.needsApiKey(LlmProvider.OPENROUTER))
                 .as("OpenRouter's catalog is public").isFalse();

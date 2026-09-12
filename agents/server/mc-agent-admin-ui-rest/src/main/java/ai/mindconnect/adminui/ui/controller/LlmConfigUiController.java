@@ -122,10 +122,11 @@ public class LlmConfigUiController {
      * groups. Values the admin already typed ride along in the submitted form
      * body and win over the stored config, so toggling never loses input.
      *
-     * <p>Picking a provider fills in its endpoint — {@code https://api.mistral.ai}
-     * for Mistral, {@code https://api.groq.com/openai} for Groq — as long as the
-     * base URL is still empty or another provider's default; a URL someone typed
-     * themselves (a proxy, a local server) is never overwritten.
+     * <p>Picking a provider ({@code reason=provider}) fills in its endpoint —
+     * {@code https://api.mistral.ai} for Mistral, {@code https://api.groq.com/openai}
+     * for Groq — as long as the base URL is still empty or another provider's
+     * default; a URL someone typed themselves (a proxy, a local server) is never
+     * overwritten, and no other trigger replaces a URL that is there.
      *
      * <p>The endpoint is then asked for its models, so the Model field becomes a
      * dropdown: LM Studio through its native API, every other provider but Azure
@@ -152,7 +153,8 @@ public class LlmConfigUiController {
         String model = or(body.str("model"), config == null ? null : config.model());
         String apiKey = or(body.str("apiKey"), config == null ? null : config.apiKey());
         String baseUrl = baseUrlFor(provider,
-                or(body.str("baseUrl"), config == null ? null : config.baseUrl()));
+                or(body.str("baseUrl"), config == null ? null : config.baseUrl()),
+                "provider".equals(reason));
 
         ModelChoices choices = ModelChoices.none();
         LlmConfigFormComponent.ModelPrefill prefill = null;
@@ -219,14 +221,22 @@ public class LlmConfigUiController {
 
     /**
      * The base URL the form should show for this provider: what is in the form
-     * when somebody chose it, the provider's own endpoint otherwise. "Somebody
-     * chose it" excludes another provider's default — that is what sits in the
-     * field right after switching provider, and leaving it there would point
-     * Mistral at OpenAI.
+     * when somebody chose it, the provider's own endpoint otherwise. Right
+     * after the provider select changed, "somebody chose it" excludes another
+     * provider's default — that is what sits in the field then, and leaving it
+     * there would point Mistral at OpenAI. Any other re-render keeps a
+     * non-empty URL as it is, even one that equals some provider's default: an
+     * OpenAI-compatible config aimed at a local Ollama on
+     * {@code http://localhost:11434} means exactly that.
+     *
+     * @param providerSwitched whether the provider select triggered this render
      */
-    static String baseUrlFor(LlmProvider provider, String baseUrl) {
+    static String baseUrlFor(LlmProvider provider, String baseUrl, boolean providerSwitched) {
         if (provider == null) return baseUrl;
-        if (LlmProvider.isADefaultBaseUrl(baseUrl)) return provider.defaultBaseUrl();
+        boolean empty = baseUrl == null || baseUrl.isBlank();
+        if (empty || (providerSwitched && LlmProvider.isADefaultBaseUrl(baseUrl))) {
+            return provider.defaultBaseUrl();
+        }
         return baseUrl;
     }
 
