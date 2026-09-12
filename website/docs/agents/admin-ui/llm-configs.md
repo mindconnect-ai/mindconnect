@@ -30,10 +30,12 @@ stays empty for you to fill in.
 The **Model** field is then a dropdown of the models that endpoint actually
 serves, read live: LM Studio through its native API, every other provider
 through its `/v1/models` listing (Anthropic and Gemini through their
-equivalents). Only the models that fit the config type are offered, and a model
-the provider no longer lists stays selectable so that opening the form never
-drops it. The listing needs the API key, so entering one reloads the list —
-as does changing the base URL. When a provider cannot be asked, the field falls
+equivalents). Only the models that fit the config type are offered — image,
+text-to-speech, moderation, realtime and legacy completion models, which no
+config can call, are left out — and a model the provider no longer lists stays
+selectable so that opening the form never drops it. The listing needs the API
+key (except at OpenRouter, whose catalog is public, and at local servers), so
+entering one reloads the list — as does changing the base URL. When a provider cannot be asked, the field falls
 back to free text with the reason in its hint ("the API key is not accepted",
 "this endpoint serves no model list"), so typing an id always remains possible.
 Azure OpenAI stays free text: its configs name a *deployment*, which is your
@@ -52,8 +54,9 @@ The form also covers:
   a picture or document when the config has the capability, as a placeholder
   line when it does not. A config that has never declared any shows its
   provider's default preselected; saving the form pins that set;
-- **Fallback models (on rate limit)** (chat configs) — other configs, picked
-  from the list, that a rate-limited call moves on to in order: when the
+- **Fallback models (on rate limit)** (chat configs) — other chat configs
+  (or aliases of one, shown with their target), picked from the list, that a
+  rate-limited call moves on to in order: when the
   provider answers 429 (or 529, overloaded) and the retries are used up, the
   same request is re-sent through the next one. Pick a config at another
   provider — its limit is a different limit. Nothing picked means the call

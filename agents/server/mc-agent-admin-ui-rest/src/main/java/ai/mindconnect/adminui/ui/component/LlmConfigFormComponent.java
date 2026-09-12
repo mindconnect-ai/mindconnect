@@ -247,29 +247,52 @@ public final class LlmConfigFormComponent implements UiComponent {
 
     /**
      * The models this config falls back to when the provider rate-limits it:
-     * every other config, in the order the admin picks them. Empty means the
-     * call fails with the rate-limit error instead of moving on, so the hint
-     * says what picking one buys — usually a second vendor, whose limit is a
-     * different limit. A name whose config was deleted since stays in the list
-     * rather than disappearing silently on the next save.
+     * every other config that ends at a chat model, in the order the admin
+     * picks them. An embedding or speech-to-text config cannot answer a chat
+     * call, and an alias counts by the config it resolves to — shown with its
+     * target, and left out when that target is the config being edited. Empty
+     * means the call fails with the rate-limit error instead of moving on, so
+     * the hint says what picking one buys — usually a second vendor, whose
+     * limit is a different limit. A stored name whose config was deleted or no
+     * longer qualifies stays in the list, marked, rather than disappearing
+     * silently on the next save.
      */
     private static UiField fallbackModelsField(LlmConfig config, List<LlmConfig> allConfigs) {
         List<String> current = config == null ? List.of() : config.fallbackModels();
+        List<LlmConfig> configs = allConfigs == null ? List.of() : allConfigs;
+        java.util.Map<String, LlmConfig> byName = new java.util.HashMap<>();
+        for (LlmConfig c : configs) byName.putIfAbsent(c.name(), c);
         java.util.LinkedHashMap<String, UiField.Option> options = new java.util.LinkedHashMap<>();
-        for (LlmConfig other : allConfigs == null ? List.<LlmConfig>of() : allConfigs) {
+        for (LlmConfig other : configs) {
             if (config != null && other.id().equals(config.id())) continue;
-            options.put(other.name(), UiField.Option.of(other.name(), other.name()));
+            LlmConfig target = resolvedOrNull(other, byName);
+            if (target == null || target.type() != LlmConfigType.CHAT) continue;
+            if (config != null && target.name().equals(config.name())) continue;
+            String label = other.isAlias() ? other.name() + " → " + target.name() : other.name();
+            options.put(other.name(), UiField.Option.of(other.name(), label));
         }
         for (String name : current) {
-            options.putIfAbsent(name, UiField.Option.of(name, name + " (no such config)"));
+            options.putIfAbsent(name, UiField.Option.of(name, name
+                    + (byName.containsKey(name) ? " (not usable as a fallback)" : " (no such config)")));
         }
         return UiField.multiselect("fallbackModels", "Fallback models (on rate limit)",
                         current, List.copyOf(options.values()))
+                // Checkboxes whose ticked rows move up and down: the order is the fallback order.
+                .orderable()
                 .asEditable()
-                .hint("Tried in order when this config is rate-limited (HTTP 429) or the provider is "
+                .hint("Tried top to bottom when this config is rate-limited (HTTP 429) or the provider is "
                         + "overloaded (529), after its own retries are used up. Pick a config at another "
                         + "provider — its limit is a different limit. Nothing picked: the call fails with "
                         + "the rate-limit error.");
+    }
+
+    /** The config an alias ends at, or {@code null} for a broken or circular chain. */
+    private static LlmConfig resolvedOrNull(LlmConfig config, java.util.Map<String, LlmConfig> byName) {
+        try {
+            return config.resolveAlias(byName::get);
+        } catch (IllegalStateException e) {
+            return null;
+        }
     }
 
     /**
@@ -297,6 +320,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                             + "saving pins it.";
         }
         return UiField.multiselect("capabilities", "Capabilities", current, options)
+                .asCheckboxes()
                 .asEditable()
                 .hint("What the model reads and does. Vision: images sent with a message reach "
                         + "the model as pictures, otherwise as a placeholder line. Documents: the "

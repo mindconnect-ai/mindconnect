@@ -2,6 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigType;
+import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiFieldGroup;
 import ai.mindconnect.ui.model.UiNode;
@@ -36,6 +37,8 @@ class LlmConfigFallbackFieldTest {
 
         UiField fallbacks = field(chat, "fallbackModels");
         assertThat(fallbacks.getFieldType()).isEqualTo(UiField.FieldType.MULTISELECT);
+        assertThat(fallbacks.isOrderable())
+                .as("checkboxes whose order is the fallback order").isTrue();
         assertThat(optionValues(fallbacks)).containsExactly("openai-default", "gemini-default");
         assertThat(fallbacks.getValue()).isEqualTo(List.of());
     }
@@ -74,5 +77,42 @@ class LlmConfigFallbackFieldTest {
                 List.of(CLAUDE, OPENAI));
 
         assertThat(field(embedding, "fallbackModels")).isNull();
+    }
+
+    @Test
+    void onlyConfigsThatEndAtAChatModelAreChoices() {
+        LlmConfig transcribe = LlmConfig.speechToText("speech-to-text", LlmProvider.OPENAI,
+                "whisper-1", null, "k");
+        LlmConfig toOpenAi = LlmConfig.alias("agent-default", "openai-default");
+        LlmConfig toSpeech = LlmConfig.alias("stt-default", "speech-to-text");
+        LlmConfig toItself = LlmConfig.alias("claude-alias", "claude-default");
+        LlmConfig dangling = LlmConfig.alias("broken", "nowhere");
+
+        UiField fallbacks = field(
+                LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, CLAUDE, null,
+                        List.of(CLAUDE, OPENAI, transcribe, toOpenAi, toSpeech, toItself, dangling)),
+                "fallbackModels");
+
+        assertThat(optionValues(fallbacks))
+                .as("no speech-to-text config, no alias to one, none back to the config itself, no broken alias")
+                .containsExactly("openai-default", "agent-default");
+        assertThat(fallbacks.getOptions()).extracting(UiField.Option::getLabel)
+                .containsExactly("openai-default", "agent-default → openai-default");
+    }
+
+    @Test
+    void aStoredFallbackThatNoLongerQualifiesStaysVisibleAndMarked() {
+        LlmConfig transcribe = LlmConfig.speechToText("speech-to-text", LlmProvider.OPENAI,
+                "whisper-1", null, "k");
+        LlmConfig config = CLAUDE.withFallbackModels(List.of("speech-to-text"));
+
+        UiField fallbacks = field(
+                LlmConfigFormComponent.typeGroup(LlmConfigType.CHAT, config, null,
+                        List.of(config, transcribe)),
+                "fallbackModels");
+
+        assertThat(fallbacks.getOptions()).extracting(UiField.Option::getLabel)
+                .containsExactly("speech-to-text (not usable as a fallback)");
+        assertThat(fallbacks.getValue()).isEqualTo(List.of("speech-to-text"));
     }
 }

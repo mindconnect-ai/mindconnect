@@ -136,9 +136,12 @@ public class ProviderModelCatalog {
                 && provider != LlmProvider.AZURE_OPENAI;
     }
 
-    /** Does a listing at this provider need an API key to answer? Local servers do not. */
+    /**
+     * Does a listing at this provider need an API key to answer? Local servers
+     * do not, and OpenRouter publishes its catalog to anyone.
+     */
     public static boolean needsApiKey(LlmProvider provider) {
-        return provider != LlmProvider.OLLAMA;
+        return provider != LlmProvider.OLLAMA && provider != LlmProvider.OPENROUTER;
     }
 
     /**
@@ -212,7 +215,7 @@ public class ProviderModelCatalog {
         List<Model> models = new ArrayList<>();
         for (JsonNode m : data) {
             String id = m.path("id").asText(null);
-            if (id == null || id.isBlank()) continue;
+            if (id == null || id.isBlank() || fitsNoConfigType(id)) continue;
             // OpenRouter is the one that says more: a display name and the window.
             String name = m.path("name").asText(null);
             Integer context = intOrNull(m.path("context_length"));
@@ -251,6 +254,7 @@ public class ProviderModelCatalog {
             String name = m.path("name").asText(null);
             if (name == null || name.isBlank()) continue;
             String id = name.startsWith("models/") ? name.substring("models/".length()) : name;
+            if (fitsNoConfigType(id)) continue;
             boolean chat = false;
             boolean embedding = false;
             for (JsonNode method : m.path("supportedGenerationMethods")) {
@@ -277,6 +281,23 @@ public class ProviderModelCatalog {
         if (lower.contains("embed")) return LlmConfigType.EMBEDDING;
         if (lower.contains("whisper") || lower.contains("transcribe")) return LlmConfigType.SPEECH_TO_TEXT;
         return null;
+    }
+
+    /**
+     * Ids of models no config can use: image and video generators, text-to-speech,
+     * moderation, realtime and computer-use models, and the legacy completion
+     * models that predate chat. Providers list them next to their chat models,
+     * but a chat call to one fails, and there is no config type for what they do.
+     */
+    private static final java.util.regex.Pattern NO_CONFIG_TYPE = java.util.regex.Pattern.compile(
+            "dall-e|gpt-image|chatgpt-image|imagen|(^|/)veo-|(^|/)sora"
+                    + "|(^|[-_/.])tts([-_.]|$)"
+                    + "|moderation|realtime|computer-use"
+                    + "|(^|/)(babbage|davinci)-\\d+$|(^|/)gpt-3\\.5-turbo-instruct");
+
+    /** Is this a model none of the config types can call? See {@link #NO_CONFIG_TYPE}. */
+    static boolean fitsNoConfigType(String id) {
+        return NO_CONFIG_TYPE.matcher(id.toLowerCase(java.util.Locale.ROOT)).find();
     }
 
     /** {@code gpt-4o · GPT-4o · 128k} — id first, since that is what the config stores. */

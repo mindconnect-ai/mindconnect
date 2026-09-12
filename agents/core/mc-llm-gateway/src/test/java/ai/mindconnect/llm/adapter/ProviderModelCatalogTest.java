@@ -128,6 +128,41 @@ class ProviderModelCatalogTest {
     }
 
     @Test
+    void openRouterAndLocalServersAreAskedWithoutAKey() {
+        assertThat(ProviderModelCatalog.needsApiKey(LlmProvider.OPENROUTER))
+                .as("OpenRouter's catalog is public").isFalse();
+        assertThat(ProviderModelCatalog.needsApiKey(LlmProvider.OLLAMA)).isFalse();
+        assertThat(ProviderModelCatalog.needsApiKey(LlmProvider.TOGETHER)).isTrue();
+    }
+
+    @Test
+    void modelsNoConfigCanCallAreLeftOutOfTheListing() throws Exception {
+        List<ProviderModelCatalog.Model> models = catalog.parseOpenAi(parse("""
+                {"data":[
+                  {"id":"gpt-4o"},{"id":"gpt-4o-mini-tts"},{"id":"tts-1-hd"},{"id":"dall-e-3"},
+                  {"id":"gpt-image-1"},{"id":"chatgpt-image-latest"},{"id":"omni-moderation-latest"},
+                  {"id":"gpt-realtime"},{"id":"computer-use-preview"},{"id":"babbage-002"},
+                  {"id":"davinci-002"},{"id":"gpt-3.5-turbo-instruct"},{"id":"sora-2"},
+                  {"id":"gpt-4o-transcribe"},{"id":"text-embedding-3-small"},{"id":"gpt-3.5-turbo"},
+                  {"id":"meta-llama/llama-3.3-70b-instruct"},{"id":"mistral-small-latest"}]}
+                """));
+
+        assertThat(models).extracting(ProviderModelCatalog.Model::id)
+                .as("image, speech, moderation, realtime and legacy completion models are no config's model")
+                .containsExactly("gpt-3.5-turbo", "gpt-4o", "gpt-4o-transcribe",
+                        "meta-llama/llama-3.3-70b-instruct", "mistral-small-latest", "text-embedding-3-small");
+
+        List<ProviderModelCatalog.Model> gemini = catalog.parseGemini(parse("""
+                {"models":[
+                  {"name":"models/gemini-2.5-flash","supportedGenerationMethods":["generateContent"]},
+                  {"name":"models/gemini-2.5-flash-preview-tts","supportedGenerationMethods":["generateContent"]},
+                  {"name":"models/imagen-4.0-generate-001","supportedGenerationMethods":["predict"]},
+                  {"name":"models/veo-3.0-generate-001","supportedGenerationMethods":["predictLongRunning"]}]}
+                """));
+        assertThat(gemini).extracting(ProviderModelCatalog.Model::id).containsExactly("gemini-2.5-flash");
+    }
+
+    @Test
     void theBaseUrlIsTakenAsTheProviderRootWhateverWasTyped() {
         assertThat(ProviderModelCatalog.normalise("https://api.mistral.ai/v1/"))
                 .isEqualTo("https://api.mistral.ai");
