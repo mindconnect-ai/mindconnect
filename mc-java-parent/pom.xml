@@ -43,7 +43,7 @@
              .mvn/maven.config (IntelliJ needs all or none - see the script). -->
         <revision>0.8.1</revision>
         <sha1></sha1>
-        <changelist>-SNAPSHOT</changelist>
+        <changelist></changelist>
         <!-- Version of the published semantic-ui artifacts (their own repo:
              mindconnect-ai/mc-semantic-ui) consumed across the monorepo. -->
         <semantic-ui.version>0.3.1</semantic-ui.version>
