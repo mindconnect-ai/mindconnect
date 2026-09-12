@@ -50,18 +50,22 @@ public class ChatFilesUiController {
     private final AgentSessionService sessionService;
     private final SessionAgentResolver agentResolver;
     private final SessionOwnership ownership;
+    /** Whether a turn is live right now — the composer is redrawn in that state. */
+    private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  AgentSessionRepository sessions,
                                  AgentSessionService sessionService,
                                  AgentDefinitionRepository agents,
-                                 SessionOwnership ownership) {
+                                 SessionOwnership ownership,
+                                 ai.mindconnect.chatui.service.ActiveStreams activeStreams) {
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
         this.sessions = sessions;
         this.sessionService = sessionService;
         this.agentResolver = new SessionAgentResolver(agents);
         this.ownership = ownership;
+        this.activeStreams = activeStreams;
     }
 
     /**
@@ -160,17 +164,24 @@ public class ChatFilesUiController {
     /**
      * The composer carries the number of attached files on its "+", so a file
      * arriving or leaving has to redraw it — otherwise the count keeps saying
-     * what was true before the upload until the page is reloaded.
+     * what was true before the upload until the page is reloaded. The tool
+     * count rides along for the same reason: the menu behind the "+" shows
+     * both, and half a rebuilt composer would state one of them stale.
      */
     private UiPatch.Operation attachmentCountRefresh(SessionId sessionId) {
         var session = sessions.findById(sessionId).orElse(null);
         var agent = session == null ? null : agentResolver.resolve(session);
+        // Whichever state the composer is in stays: a file attached mid-turn
+        // must not swap the Stop button for a Send button.
+        boolean streaming = activeStreams.findHandle(
+                SessionOwnership.channelOf(sessionId)).isPresent();
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
-                        sessionId, agent == null ? null : agent.id(), false)
+                        sessionId, agent == null ? null : agent.id(), streaming)
                 .withModelLabel(agent == null ? null : agent.llmConfigName())
                 .withAttachmentCount(sessionFiles.attachments(sessionId).size())
+                .withToolCount(agent == null || agent.tools() == null ? 0 : agent.tools().size())
                 .withWorkingDir(session == null ? null : session.workingDir())
                 .withDirChoice(sessionService.workingDirChoice());
-        return form.reset();
+        return UiPatch.Operation.replace(form.id(), form.render());
     }
 }

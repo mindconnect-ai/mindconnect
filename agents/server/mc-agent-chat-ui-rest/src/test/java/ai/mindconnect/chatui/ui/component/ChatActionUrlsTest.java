@@ -44,7 +44,13 @@ class ChatActionUrlsTest {
     void theComposerKeepsItsRoutes() throws Exception {
         String out = json(new ChatFormComponent(SESSION, AGENT).render());
 
+        // The "+" is a menu now, so the composer carries all four of its
+        // routes rather than the attach dialog alone.
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/attach-dialog\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE
+                + "/attach-dialog?kind=images\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/tools-dialog\"");
+        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/subagents-dialog\"");
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/settings\"");
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/chat/stream\"");
     }

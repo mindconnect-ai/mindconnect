@@ -56,6 +56,16 @@ public final class ChatFormComponent implements UiComponent {
 
     @Override
     public String id() {
+        return formId(sessionId);
+    }
+
+    /**
+     * The composer's node id, without a component instance. A control outside
+     * the form — the "Ask" button in the sub-agent picker — has to name the
+     * form it submits, and naming it by hand in two places is how the two
+     * drift apart.
+     */
+    public static String formId(SessionId sessionId) {
         return "chat-form-" + sessionId.value();
     }
 
@@ -74,21 +84,32 @@ public final class ChatFormComponent implements UiComponent {
         return this;
     }
 
+    /** How many tools this chat offers up front — shown on the "+" menu. */
+    private int toolCount;
+
     /**
-     * The "+": an icon on its own while nothing is attached, an icon with a
-     * count once something is. The files themselves live behind it, in the
-     * dialog it opens — a strip above the input pushed the conversation up
-     * for something you only look at when you go looking.
+     * Puts the tool count on the "+" menu's Tools entry, so what the chat can
+     * reach for is readable from the composer rather than from a dialog two
+     * clicks in.
      */
-    private UiAction attachAction() {
-        var open = trigger(on(ChatUiController.class).attachDialog(sessionId.value(), null));
-        if (attachmentCount == 0) {
-            return UiAction.icon("attach", "Attach files").icon("add")
-                    .onClick(open);
-        }
-        return UiAction.secondary("attach", "(" + attachmentCount + ")").icon("add")
-                .onClick(open)
-                .<UiAction>withCssClass("chat-attach-btn");
+    public ChatFormComponent withToolCount(int count) {
+        this.toolCount = Math.max(count, 0);
+        return this;
+    }
+
+    /**
+     * The "+": a popover of everything a conversation can be given — files,
+     * images, tools, sub-agents. It used to be a single button that opened the
+     * attach dialog, which made files the only thing the composer could add;
+     * see {@link ChatPlusMenuComponent} for why the rest moved in beside them.
+     *
+     * <p>It rides in the form's content rather than in the action footer,
+     * because the footer renders {@code UiAction}s and a menu is a node. The
+     * stylesheet parks it in the card's bottom-left corner, where the "+" has
+     * always been.
+     */
+    private ai.mindconnect.ui.model.UiNode plusMenu() {
+        return ChatPlusMenuComponent.menu(sessionId, attachmentCount, toolCount);
     }
 
     /** What the composer's model button says — the chat's current model. */
@@ -185,10 +206,10 @@ public final class ChatFormComponent implements UiComponent {
     private UiForm idleForm() {
         UiForm form = UiForm.of(id(), null)
                 .field(messageField(null))
-                // "+" opens the attach dialog (drop-zone lives there, not on
-                // the page); the paper plane sends. Labels become the
-                // accessible names, the sprite tokens the glyphs.
-                .action(attachAction())
+                // "+" opens the add-menu (files, images, tools, sub-agents);
+                // the paper plane sends. Labels become the accessible names,
+                // the sprite tokens the glyphs.
+                .content(plusMenu())
                 .action(recordAction());
         if (dirChoice) {
             form = form.action(dirAction());
