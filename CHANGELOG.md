@@ -23,6 +23,23 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** registries — a **Registry** screen that installs LLM configs,
+  agents, workflows and whole packages from a GitHub project. A registry is a
+  repository, not a server: an index (`registry.json`) and the entity files it
+  points at, added by its `owner/repo` (`owner/repo@v1.2.0` pins a tag, a
+  private one names the *environment variable* holding its token). Browse it,
+  filter by kind, import — a package installs the agent, its sub-agents, the
+  workflow they run and the LLM config they share, dependencies first and each
+  entity once, with a report that says line by line what was imported, updated,
+  skipped or failed. Importing keeps what is already here unless overwrite is
+  chosen, an overwrite keeps local ids so that sessions and aliases keep
+  working, and an API key that came with a registry file is dropped rather than
+  used. Off for an installation that wants no outbound calls
+  (`mindconnect.registry.enabled=false`); format and settings in the docs under
+  *Registry*.
+
 ## [0.8.1] - 2026-09-12
 
 ### Fixed
