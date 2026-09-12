@@ -25,9 +25,10 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
  * one button per row that turns it on or off right there. No Apply: a chat's
  * tool list is not a form you fill in, it is a switch you flick while you are
  * typing — so every click is its own request and the dialog stays open,
- * redrawn from what the chat now carries. The settings dialog does the same
+ * redrawn from what the chat now carries. The settings dialog used to do this
  * job with a native {@code <select multiple>}, which is the one control
- * nobody ever operated correctly.
+ * nobody ever operated correctly; it keeps the agent, the model and the
+ * prompt, which genuinely are a form.
  *
  * <p>A group opens when something in it is on, so a chat's actual reach is
  * visible without a single click; the rest stay shut, because a picker of

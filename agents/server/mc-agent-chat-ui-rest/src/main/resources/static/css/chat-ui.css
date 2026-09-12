@@ -1065,3 +1065,39 @@
 #chat-tools-body .sui-activity-body {
     padding-inline: 0;
 }
+
+/* ── The settings dialog ──────────────────────────────────────────────────
+   Three fields — agent, model, prompt — and no tabs, since the tool list
+   that used to need a second tab now lives behind the composer's "+".
+
+   The framework's form spacing is calibrated for a page-sized form; in a
+   dialog of three fields it leaves the prompt hanging a long way below the
+   model. Tightened, and the prompt given the room a prompt needs. */
+.chat-settings-form .sui-field {
+    margin-bottom: var(--sui-space-lg, 16px);
+}
+
+.chat-settings-form .sui-field > label {
+    font-weight: 600;
+}
+
+/* Four rows is the framework's textarea default and about right for a note;
+   a system prompt is a page of instructions, so it starts taller and grows
+   to whatever the dialog can give it before scrolling itself. */
+.chat-settings-form textarea {
+    min-height: 11rem;
+    max-height: 40vh;
+    line-height: 1.55;
+    resize: vertical;
+}
+
+/* The closing line: where the tools and the sub-agents went. Quiet, and set
+   off from the last field so it does not read as another hint. */
+.chat-settings-elsewhere {
+    display: block;
+    margin-top: var(--sui-space-sm, 8px);
+    padding-top: var(--sui-space-md, 12px);
+    border-top: 1px solid var(--sui-color-border-soft, var(--sui-color-border));
+    color: var(--sui-color-text-muted);
+    font-size: var(--sui-text-sm, 13px);
+}
