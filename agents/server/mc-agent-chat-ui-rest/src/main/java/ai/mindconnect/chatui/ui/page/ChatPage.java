@@ -94,6 +94,7 @@ public final class ChatPage {
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
+                .withToolCount(agent.tools() == null ? 0 : agent.tools().size())
                 .withWorkingDir(session.workingDir());
     }
 
@@ -201,12 +202,28 @@ public final class ChatPage {
      * and vector_search activates for the session.
      */
     public static ai.mindconnect.ui.model.UiUpload attachZone(ai.mindconnect.agent.SessionId sessionId) {
-        return ai.mindconnect.ui.model.UiUpload
+        return attachZone(sessionId, false);
+    }
+
+    /**
+     * @param imagesOnly narrows the file chooser to pictures and says so in
+     *                   the drop text — what the "+" menu's "Add images"
+     *                   asks for. The upload endpoint is the same either way:
+     *                   the accept attribute is a courtesy to the file dialog,
+     *                   not a rule, and the pipeline already tells an image
+     *                   from a document by its media type.
+     */
+    public static ai.mindconnect.ui.model.UiUpload attachZone(
+            ai.mindconnect.agent.SessionId sessionId, boolean imagesOnly) {
+        var zone = ai.mindconnect.ui.model.UiUpload
                 .of("chat-attach", null)
                 .multiple()
-                .dropText("Attach files (searchable by the agent)")
-                .buttonLabel("Attach…")
+                .dropText(imagesOnly
+                        ? "Drop images here — they travel with your next message"
+                        : "Attach files (searchable by the agent)")
+                .buttonLabel(imagesOnly ? "Choose images…" : "Attach…")
                 .uploadTo("/chat/api/sessions/" + sessionId.value() + "/chat-files");
+        return imagesOnly ? zone.accept("image/*") : zone;
     }
 
     /**

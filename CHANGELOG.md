@@ -112,6 +112,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
   model name no longer costs you the API key you typed into the LLM config.
   Backed by `POST /admin/api/migrations/apply-field?id=…&field=…`.
 
+- **agents:** the chat composer's "+" is a menu — files, images, tools and
+  sub-agents, instead of the attach dialog alone. Two of the four are new
+  places rather than new doors: **Tools** lists every tool the registry can
+  hand out, grouped by rubric, one switch per row, turned on and off while the
+  dialog stays open (the groups that hold something switched on start
+  expanded); **Sub-agents** shows the specialists the chat may hand work to
+  with one switch for the delegation tools (`run_agent`, `run_agents`,
+  `list_agents`) and an *Ask* that drops the brief into the composer for you
+  to finish. **Add images** is the attach dialog with the file chooser
+  narrowed to pictures. Chat endpoints added:
+  `GET /chat/api/sessions/{id}/tools-dialog`, `.../subagents-dialog`,
+  `POST .../tools`, `.../tool-search`, `.../delegation`, `.../delegate`;
+  `GET .../attach-dialog` takes `?kind=files|images`. The settings dialog
+  behind the model button keeps its own model, agent and prompt fields.
+
 ### Changed
 
 - **agents:** every provider now knows its own API endpoint, so **Base URL is
@@ -159,6 +174,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the tool was between two reads of the pipe, the JVM closed the pipe on its
   own, the call returned without a word, and the process ran on unseen. The
   same race made `BashToolOutputTest` fail now and then in CI.
+- **agents:** attaching a file or switching a chat's working directory
+  mid-turn no longer swaps the composer's Stop button for a Send button.
+  Anything that redraws the composer now renders it in whichever state the
+  session is actually in.
 
 ## [0.8.1] - 2026-09-12
 
