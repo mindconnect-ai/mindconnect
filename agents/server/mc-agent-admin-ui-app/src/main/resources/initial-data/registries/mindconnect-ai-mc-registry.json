@@ -1,0 +1,8 @@
+{
+  "name": "Mindconnect registry",
+  "owner": "mindconnect-ai",
+  "repo": "mc-registry",
+  "ref": "main",
+  "indexPath": "registry.json",
+  "enabled": true
+}

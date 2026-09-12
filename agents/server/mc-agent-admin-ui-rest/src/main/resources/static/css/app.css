@@ -530,19 +530,70 @@ body {
 }
 .llm-test-result--err .llm-test-body { color: var(--sui-color-danger); }
 
-/* ── Grouped catalogs: tools, agents ───────────────────────────────────────
-   The collapsed summary line is the primary reading surface here — it is the
-   group heading, not a detail toggle — so the framework default (12px, subtle
-   gray, meant for background activity) is too quiet for it. */
-.tool-catalog .sui-activity-summary,
-#agent-list .sui-activity-summary {
+/* ── Collapsible summaries ─────────────────────────────────────────────────
+   The framework styles a collapsible's summary as a quiet detail toggle (12px,
+   subtle gray, meant for background activity). In this app the summary is
+   nearly always what you read — a catalog's group heading, a migration row, a
+   trace card — so every one reads at body size in the theme's own ink. */
+.sui-activity-summary {
     font-size: var(--sui-text-md, 14px);
+    font-weight: 500;
     color: var(--sui-color-text);
     padding: 6px 0;
 }
-/* The nested per-group list needs no header block of its own. */
+
+/* ── Grouped catalogs: tools, agents, registry entries ─────────────────────
+   The nested per-group list needs no header block of its own. */
 .tool-catalog .sui-activity-body .sui-list-header,
-#agent-list .sui-activity-body .sui-list-header { display: none; }
+#agent-list .sui-activity-body .sui-list-header,
+.registry-catalog .sui-activity-body .sui-list-header { display: none; }
+
+/* A package's Contents tab: what importing each entry would do here. An entry
+   that is already here is the one to look at twice — Import and overwrite
+   replaces it — so it takes the warning ink; a new one stays quiet. */
+.registry-member-state { font-size: var(--sui-text-sm, 13px); font-weight: 500; }
+.registry-member-state--present { color: var(--sui-color-warning, #d97706); }
+.registry-member-state--new { color: var(--sui-color-success, #16a34a); }
+.registry-member-state--unavailable { color: var(--sui-color-text-subtle); }
+.registry-member-desc { font-size: var(--sui-text-sm, 13px); color: var(--sui-color-text-subtle); }
+.registry-member-used-by { font-size: var(--sui-text-sm, 13px); color: var(--sui-color-text); }
+.registry-package-legend {
+    display: block;
+    margin: 4px 0 12px;
+    font-size: var(--sui-text-sm, 13px);
+    color: var(--sui-color-text-subtle);
+}
+/* The Import box sits in the row's top right corner, on the line of the name.
+   It lives in the row body rather than in the label (the label is the link to
+   the entry), so the row becomes a two-column grid: the body's own layout is
+   dissolved and its parts placed — the box beside the name, the state and the
+   description under both. A long name wraps in its column instead of running
+   under the box. */
+/* Full row width at every level — the rubric and the row in it — and no empty
+   actions column, so every box lines up on the same right edge. */
+.registry-catalog .sui-list-item-main { flex: 1 1 auto; min-width: 0; }
+.registry-catalog .sui-list-item-actions:empty { display: none; }
+.sui-list-item-main:has(> .registry-member-body) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 12px;
+    align-items: start;
+}
+.sui-list-item-main:has(> .registry-member-body) > .sui-list-item-label { grid-column: 1; grid-row: 1; }
+.registry-member-body { display: contents; }
+.registry-member-body > * { grid-column: 1 / -1; }
+.registry-member-body > .registry-member-include { grid-column: 2; grid-row: 1; justify-self: end; }
+.registry-member-include .sui-field {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+.registry-member-include .sui-field label {
+    margin: 0;
+    font-size: var(--sui-text-sm, 13px);
+    color: var(--sui-color-text-subtle);
+}
 
 /* ── Theme picker ─────────────────────────────────────────────────────────
    Injected into the header by js/theme-switch.js in the framework's own

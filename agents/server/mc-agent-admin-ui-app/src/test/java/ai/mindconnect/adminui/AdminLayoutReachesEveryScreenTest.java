@@ -2,6 +2,7 @@ package ai.mindconnect.adminui;
 
 import ai.mindconnect.adminui.ui.AdminLayoutAdvice;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
+import ai.mindconnect.agent.registry.admin.ui.RegistryUiController;
 import ai.mindconnect.mcp.gateway.admin.ui.McpGatewayUiController;
 import ai.mindconnect.workflow.admin.ui.WorkflowAdminUiController;
 import org.junit.jupiter.api.Test;
@@ -39,5 +40,6 @@ class AdminLayoutReachesEveryScreenTest {
     void the_other_embedded_screens_keep_it_too() {
         assertThat(WRAPPED.test(AgentUiController.class)).as("admin UI").isTrue();
         assertThat(WRAPPED.test(WorkflowAdminUiController.class)).as("workflow admin").isTrue();
+        assertThat(WRAPPED.test(RegistryUiController.class)).as("registry").isTrue();
     }
 }

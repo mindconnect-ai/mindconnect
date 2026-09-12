@@ -21,7 +21,8 @@ import java.util.List;
  *       event bus then fetches the same URL as JSON.</li>
  *   <li>GET without HTML on a <em>legacy</em> section whose controller still
  *       lives under {@code /admin/api/**} → forward there server-side.</li>
- *   <li>Same-URL sections ({@code /workflow-admin}, {@code /admin/vector-stores})
+ *   <li>Same-URL sections ({@code /workflow-admin}, {@code /admin/vector-stores},
+ *       {@code /registry})
  *       serve JSON on the page URL directly — new sections should follow that
  *       pattern; the legacy list below shrinks as controllers migrate.</li>
  * </ul>
@@ -32,7 +33,7 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
 
     /** Sections whose controllers already serve JSON on the page URL. */
     private static final List<String> SAME_URL_SECTIONS = List.of(
-            "/workflow-admin", "/admin/vector-stores", "/mcp-gateway");
+            "/workflow-admin", "/admin/vector-stores", "/mcp-gateway", "/registry");
 
     /** Sections whose controllers still live under /admin/api/<section>. */
     private static final List<String> LEGACY_SECTIONS = List.of(

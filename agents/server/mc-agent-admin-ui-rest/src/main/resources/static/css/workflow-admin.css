@@ -357,16 +357,3 @@
   word-break: break-word;
   max-width: 40vw;
 }
-
-/* Every row in the migration list is a collapsible; its summary is the row.
-   The framework's muted 12px summary style is fine for secondary detail
-   toggles, but here it IS the content — make it read like a list entry. */
-#migration-list .sui-activity-summary,
-#agent-list .sui-activity-summary,
-.tool-catalog .sui-activity-summary {
-  font-size: var(--sui-text-md);
-  font-weight: 500;
-  /* The theme's own ink, not a literal: a hard-coded slate was invisible
-     on the dark themes' surfaces. */
-  color: var(--sui-color-text);
-}

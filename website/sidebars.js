@@ -43,6 +43,7 @@ const sidebars = {
             'agents/prompt-renderer',
             'agents/vector-store',
             'agents/persistence',
+            'agents/registry',
             'agents/creating-a-tool',
           ],
         },

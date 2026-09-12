@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "name": "Example registry",
+  "description": "A worked example of the registry layout — copy this directory into a GitHub repository of your own and add it under Registry in the admin UI.",
+  "entries": [
+    {
+      "id": "example-llm",
+      "type": "llm-config",
+      "name": "example-default",
+      "description": "Claude Sonnet, keyed from the installation's own environment",
+      "version": "1.0.0",
+      "path": "llm-configs/example-default.json",
+      "tags": ["anthropic"],
+      "author": "mindconnect"
+    },
+    {
+      "id": "changelog-writer",
+      "type": "agent",
+      "name": "changelog-writer",
+      "description": "Turns a list of commits into a changelog entry a reader can decide on",
+      "version": "1.0.0",
+      "path": "agents/changelog-writer.json",
+      "tags": ["writing", "release"],
+      "author": "mindconnect",
+      "requires": ["example-llm"]
+    },
+    {
+      "id": "greeting",
+      "type": "workflow",
+      "name": "greeting",
+      "description": "A one-step workflow, here to show the file layout",
+      "version": "1.0.0",
+      "path": "workflows/greeting.json",
+      "author": "mindconnect"
+    },
+    {
+      "id": "release-kit",
+      "type": "package",
+      "name": "Release kit",
+      "description": "The changelog writer, the workflow it runs, and the model they share",
+      "version": "1.0.0",
+      "path": "packages/release-kit.json",
+      "author": "mindconnect"
+    }
+  ]
+}

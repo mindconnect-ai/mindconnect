@@ -63,6 +63,8 @@
         <module>core/mc-agent-tools-web</module>
         <module>core/mc-agent-tools-web-browser</module>
         <module>core/mc-agent-tools-workflow</module>
+        <module>core/mc-agent-registry-core</module>
+        <module>core/mc-agent-registry</module>
         <module>mcp/mc-mcp-proxy</module>
         <module>mcp/mc-mcp-gateway-core</module>
         <module>mcp/mc-mcp-gateway-local</module>
@@ -73,6 +75,7 @@
         <module>server/mc-agent-api-responses-rest</module>
         <module>server/mc-agent-api-app</module>
         <module>server/mc-agent-chat-ui-rest</module>
+        <module>server/mc-agent-registry-admin-ui-rest</module>
         <module>server/mc-agent-admin-ui-rest</module>
         <module>server/mc-agent-admin-ui-app</module>
         <module>client/mc-agent-cli</module>
