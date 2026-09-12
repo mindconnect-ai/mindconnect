@@ -2,3 +2,4 @@ ai.mindconnect.agent.runtime.tools.toolsearch.ToolSearchToolFactory
 ai.mindconnect.agent.runtime.tools.todo.TodoWriteToolFactory
 ai.mindconnect.agent.runtime.tools.todo.TodoReadToolFactory
 ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentToolFactory
+ai.mindconnect.agent.runtime.skill.SkillToolFactory

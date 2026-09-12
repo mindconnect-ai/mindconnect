@@ -53,6 +53,9 @@ public class AgentUiController {
     private final ToolRegistry toolRegistry;
     private final ToolTestService toolTestService;
     private final ObjectMapper objectMapper;
+    /** Fills the form's skills picker; optional, like the skills screen's own store. */
+    private final org.springframework.beans.factory.ObjectProvider<
+            ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog;
 
     public AgentUiController(AgentRegistryService registryService,
                                 AgentDefinitionRepository repository,
@@ -60,7 +63,9 @@ public class AgentUiController {
                                 LlmConfigRepository llmConfigRepository,
                                 ToolRegistry toolRegistry,
                                 ToolTestService toolTestService,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper,
+                                org.springframework.beans.factory.ObjectProvider<
+                                        ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog) {
         this.registryService = registryService;
         this.repository = repository;
         this.sessionRepository = sessionRepository;
@@ -68,6 +73,7 @@ public class AgentUiController {
         this.toolRegistry = toolRegistry;
         this.toolTestService = toolTestService;
         this.objectMapper = objectMapper;
+        this.skillCatalog = skillCatalog;
     }
 
     @GetMapping
@@ -94,7 +100,7 @@ public class AgentUiController {
 
     @GetMapping("/new")
     public UiPage newForm() {
-        return new AgentFormPage(null, llmConfigRepository, repository, objectMapper).render();
+        return new AgentFormPage(null, llmConfigRepository, repository, objectMapper, skills()).render();
     }
 
     @GetMapping("/{id}")
@@ -125,7 +131,7 @@ public class AgentUiController {
     public ResponseEntity<UiPage> editForm(@PathVariable("id") String idValue) {
         AgentId id = AgentId.of(idValue);
         return registryService.find(id)
-                .map(a -> ResponseEntity.ok(new AgentFormPage(a, llmConfigRepository, repository, objectMapper).render()))
+                .map(a -> ResponseEntity.ok(new AgentFormPage(a, llmConfigRepository, repository, objectMapper, skills()).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -147,7 +153,8 @@ public class AgentUiController {
                 .withMaxIterations(body.num("maxIterations", agent.maxIterations()))
                 .withResponseReviewers(body.strList("responseReviewers"))
                 .withCallableAgents(body.strList("callableAgents"))
-                .withToolSearch(toolSearchFromForm(body));
+                .withToolSearch(toolSearchFromForm(body))
+                .withSkills(skillsFromForm(body));
         try {
             patch = withMemoryConfig(patch, body);
         } catch (IllegalArgumentException e) {
@@ -182,7 +189,8 @@ public class AgentUiController {
                 .withMaxIterations(body.num("maxIterations", existing.maxIterations()))
                 .withResponseReviewers(body.strList("responseReviewers"))
                 .withCallableAgents(body.strList("callableAgents"))
-                .withToolSearch(toolSearchFromForm(body));
+                .withToolSearch(toolSearchFromForm(body))
+                .withSkills(skillsFromForm(body));
         try {
             patch = withMemoryConfig(patch, body);
         } catch (IllegalArgumentException e) {
@@ -229,13 +237,28 @@ public class AgentUiController {
         return new AgentDefinition.ToolSearchConfig(enabled, groups);
     }
 
+    /**
+     * The form's two skills fields. An empty selection with the switch on is
+     * not "no skills" but "every skill there is" — see the field's hint.
+     */
+    private static AgentDefinition.SkillsConfig skillsFromForm(FormBody body) {
+        boolean enabled = Boolean.TRUE.equals(body.bool("skillsEnabled"));
+        java.util.List<String> names = body.strList("skills");
+        return new AgentDefinition.SkillsConfig(enabled, names == null ? java.util.List.of() : names);
+    }
+
+    /** The skill catalog this host wires, or null when it wires none. */
+    private ai.mindconnect.agent.runtime.skill.SkillCatalog skills() {
+        return skillCatalog.getIfAvailable();
+    }
+
     @PostMapping("/{id}/copy")
     public ResponseEntity<UiPage> copy(@PathVariable("id") String idValue) {
         AgentId id = AgentId.of(idValue);
         return registryService.find(id)
                 .map(existing -> {
                     var copy = registryService.copy(id);
-                    return ResponseEntity.ok(new AgentFormPage(copy, llmConfigRepository, repository, objectMapper).render());
+                    return ResponseEntity.ok(new AgentFormPage(copy, llmConfigRepository, repository, objectMapper, skills()).render());
                 })
                 .orElse(ResponseEntity.notFound().build());
     }

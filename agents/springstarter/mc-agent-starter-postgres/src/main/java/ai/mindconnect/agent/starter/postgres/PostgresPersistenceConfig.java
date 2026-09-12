@@ -5,6 +5,7 @@ import ai.mindconnect.agent.runtime.adapter.pg.PgAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgLlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.adapter.pg.PgSkillRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.pg.PgWorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
@@ -118,6 +119,11 @@ public class PostgresPersistenceConfig {
     @Bean
     TodoListRepository todoListRepository(Sql mindconnectSql, Namespace namespace) {
         return new PgTodoListRepository(mindconnectSql, namespace).initSchema();
+    }
+
+    @Bean
+    ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository(Sql mindconnectSql, Namespace namespace) {
+        return new PgSkillRepository(mindconnectSql, namespace).initSchema();
     }
 
     @Bean

@@ -69,6 +69,14 @@ public record AgentDefinition(
          * ({@code "*"} = every group).
          */
         ToolSearchConfig toolSearch,
+        /**
+         * Agent-level skills setting. {@code null} (older persisted agents)
+         * means disabled. When enabled, the runtime injects the {@code skill}
+         * tool and lists the agent's skills in the system prompt; the names
+         * listed here narrow that to those skills, and an empty list leaves
+         * every skill of the installation, the user and the project open.
+         */
+        SkillsConfig skills,
         Instant createdAt,
         Instant updatedAt,
         /**
@@ -114,7 +122,37 @@ public record AgentDefinition(
     }
 
     /**
+     * Skills switch + the names it is narrowed to, stored with the agent.
+     */
+    public record SkillsConfig(boolean enabled, List<String> names) {
+        public SkillsConfig {
+            if (names == null) names = List.of();
+        }
+
+        public static final SkillsConfig OFF = new SkillsConfig(false, List.of());
+
+        /** Every skill this installation, user and project have. */
+        public static SkillsConfig all() {
+            return new SkillsConfig(true, List.of());
+        }
+    }
+
+    /**
      * Without a version: the definition saves without a version check.
+     */
+    public AgentDefinition(AgentId id, String name, String description, String group, String icon,
+                           String systemPrompt, String welcomeMessage, String llmConfigName,
+                           int maxIterations, MemoryConfig memoryConfig, AgentDefinitionStatus status,
+                           List<AgentTool> tools, List<String> responseReviewers, List<String> callableAgents,
+                           ToolSearchConfig toolSearch, SkillsConfig skills,
+                           Instant createdAt, Instant updatedAt) {
+        this(id, name, description, group, icon, systemPrompt, welcomeMessage, llmConfigName,
+                maxIterations, memoryConfig, status, tools, responseReviewers, callableAgents, toolSearch,
+                skills, createdAt, updatedAt, null);
+    }
+
+    /**
+     * Pre-skills constructor: skills off.
      */
     public AgentDefinition(AgentId id, String name, String description, String group, String icon,
                            String systemPrompt, String welcomeMessage, String llmConfigName,
@@ -123,14 +161,14 @@ public record AgentDefinition(
                            ToolSearchConfig toolSearch, Instant createdAt, Instant updatedAt) {
         this(id, name, description, group, icon, systemPrompt, welcomeMessage, llmConfigName,
                 maxIterations, memoryConfig, status, tools, responseReviewers, callableAgents, toolSearch,
-                createdAt, updatedAt, null);
+                null, createdAt, updatedAt, null);
     }
 
     /** This definition as read with, or to be saved against, {@code version} — nothing else changes. */
     public AgentDefinition withVersion(Long version) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig, status, tools, responseReviewers,
-                callableAgents, toolSearch, createdAt, updatedAt, version);
+                callableAgents, toolSearch, skills, createdAt, updatedAt, version);
     }
 
     /**
@@ -151,6 +189,22 @@ public record AgentDefinition(
      */
     public ToolSearchConfig toolSearchOrOff() {
         return toolSearch == null ? ToolSearchConfig.OFF : toolSearch;
+    }
+
+    /**
+     * Never {@code null}: older agents without the field read as OFF.
+     */
+    public SkillsConfig skillsOrOff() {
+        return skills == null ? SkillsConfig.OFF : skills;
+    }
+
+    /**
+     * Replaces the skills setting (see {@link SkillsConfig}).
+     */
+    public AgentDefinition withSkills(SkillsConfig skills) {
+        return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
+                llmConfigName, maxIterations, memoryConfig,
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     public static AgentDefinition create(String name, String description,
@@ -231,7 +285,7 @@ public record AgentDefinition(
     public AgentDefinition withCallableAgents(List<String> callableAgents) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     /**
@@ -240,7 +294,7 @@ public record AgentDefinition(
     public AgentDefinition withIcon(String icon) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     /**
@@ -249,7 +303,7 @@ public record AgentDefinition(
     public AgentDefinition withGroup(String group) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     /**
@@ -258,26 +312,26 @@ public record AgentDefinition(
     public AgentDefinition withToolSearch(ToolSearchConfig toolSearch) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withMemoryConfig(MemoryConfig memoryConfig) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig, status, tools, responseReviewers,
-                callableAgents, toolSearch, createdAt, Instant.now(), version);
+                callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withTools(List<AgentTool> tools) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withBasicFields(String name, String description, String systemPrompt,
                                            String welcomeMessage, String llmConfigName) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withBasicFields(String name, String description,
@@ -285,7 +339,7 @@ public record AgentDefinition(
                                            String llmConfigName, List<String> responseReviewers) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     /**
@@ -301,13 +355,14 @@ public record AgentDefinition(
                                            List<String> responseReviewers) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition asCopy() {
         Instant now = Instant.now();
         return new AgentDefinition(AgentId.random(), name + "-copy", description, group, icon,
                 systemPrompt, welcomeMessage, llmConfigName, maxIterations, memoryConfig,
-                AgentDefinitionStatus.ACTIVE, List.of(), responseReviewers, callableAgents, toolSearch, now, now);
+                AgentDefinitionStatus.ACTIVE, List.of(), responseReviewers, callableAgents, toolSearch,
+                skills, now, now);
     }
 }

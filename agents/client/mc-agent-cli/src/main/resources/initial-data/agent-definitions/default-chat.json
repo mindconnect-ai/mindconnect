@@ -18,6 +18,10 @@
   },
   "responseReviewers": [],
   "status": "ACTIVE",
+  "skills": {
+    "enabled": true,
+    "names": []
+  },
   "tools": [
     {
       "id": "00000003-0000-0000-0000-000000000004",

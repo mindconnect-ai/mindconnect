@@ -126,6 +126,7 @@ public final class AgentRuntimeBuilder {
     private final Map<String, String> environment = new LinkedHashMap<>();
     private final List<LlmConfig> pendingLlmConfigs = new ArrayList<>();
     private final List<AgentDefinition> pendingAgentDefinitions = new ArrayList<>();
+    private final List<ai.mindconnect.agent.runtime.skill.Skill> pendingSkills = new ArrayList<>();
     private final List<String> pendingWorkflowResources = new ArrayList<>();
 
     private AgentRuntimeBuilder(Mode mode, Path dataDir) {
@@ -321,6 +322,36 @@ public final class AgentRuntimeBuilder {
         return agentDefinition(readClasspath(resource, AgentDefinition.class));
     }
 
+    /** Stores a skill agents with skills switched on can load. */
+    public AgentRuntimeBuilder skill(ai.mindconnect.agent.runtime.skill.Skill skill) {
+        pendingSkills.add(skill);
+        return this;
+    }
+
+    /**
+     * Stores a skill written as a {@code SKILL.md} on the classpath — front
+     * matter for name and description, the body for the instructions. The
+     * resource's base name is the fallback name when the front matter names
+     * none.
+     */
+    public AgentRuntimeBuilder skillFromClasspath(String resource) {
+        String fileName = Path.of(resource).getFileName().toString();
+        String fallback = fileName.endsWith(".md") ? fileName.substring(0, fileName.length() - 3) : fileName;
+        String content;
+        try (InputStream in = classpath(resource)) {
+            content = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read classpath resource: " + resource, e);
+        }
+        var skill = ai.mindconnect.agent.runtime.skill.Skill.fromMarkdown(fallback, content,
+                ai.mindconnect.agent.runtime.skill.SkillSource.MANAGED, null);
+        if (skill == null) {
+            throw new IllegalArgumentException("Not a usable SKILL.md (no instructions, or a name that is "
+                    + "not lower-case letters, digits and dashes): " + resource);
+        }
+        return skill(skill);
+    }
+
     /**
      * Copies a workflow JSON from the classpath into the workflow directory
      * (file name = resource base name) — e.g. the {@code file-ingestion}
@@ -358,6 +389,10 @@ public final class AgentRuntimeBuilder {
                 ? new InMemoryTodoListRepository()
                 : sql != null ? new PgTodoListRepository(sql, namespace).initSchema()
                 : new FileTodoListRepository(dataDir, namespace);
+        ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository = inMemory
+                ? new ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository()
+                : sql != null ? new ai.mindconnect.agent.runtime.adapter.pg.PgSkillRepository(sql, namespace).initSchema()
+                : new ai.mindconnect.agent.runtime.adapter.file.FileSkillRepository(dataDir, objectMapper, namespace);
         AgentDefinitionRepository definitionRepository = inMemory
                 ? new InMemoryAgentDefinitionRepository()
                 : sql != null ? new PgAgentDefinitionRepository(sql, namespace).initSchema()
@@ -447,7 +482,11 @@ public final class AgentRuntimeBuilder {
                 tokenCounterRegistry, llmConfigRepository, messageMapper);
 
         // 5. Tools: SPI over whatever capability modules are on the classpath.
-        DynamicToolActivations activations = new DynamicToolActivations(sessionRepository);
+        // What an agent with skills switched on can load: the stored skills,
+        // the user's own SKILL.md files and the session project's. See SkillCatalog.
+        var skillCatalog = ai.mindconnect.agent.runtime.skill.SkillCatalog.of(
+                skillRepository, environment.getOrDefault("skillsUserDir", ""));
+        DynamicToolActivations activations = new DynamicToolActivations(sessionRepository, skillCatalog);
         ToolRegistryRef registryRef = new ToolRegistryRef();
         MapToolEnvironment.Builder env = MapToolEnvironment.builder()
                 .service(AgentDefinitionRepository.class, definitionRepository)
@@ -455,6 +494,7 @@ public final class AgentRuntimeBuilder {
                 .service(MessageRepository.class, messageRepository)
                 .service(ai.mindconnect.message.port.in.ConversationManager.class, conversationManager)
                 .service(TodoListService.class, todoListService)
+                .service(ai.mindconnect.agent.runtime.skill.SkillCatalog.class, skillCatalog)
                 .service(ToolRegistryRef.class, registryRef)
                 .service(DynamicToolActivations.class, activations)
                 .service(LlmEmbeddings.class, embeddings)
@@ -498,7 +538,7 @@ public final class AgentRuntimeBuilder {
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, activations,
                 llmChat, traceRepository, sessionChannels,
-                statelessRunner, workingMemoryRepository, instructionFiles);
+                statelessRunner, workingMemoryRepository, instructionFiles, skillCatalog);
         var toolWorker = new ToolCallWorker(
                 conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, toolRegistry, activations, toolExecutor, sessionChannels,
@@ -513,11 +553,12 @@ public final class AgentRuntimeBuilder {
         AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
                 conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
                 statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
-                instructionFiles);
+                instructionFiles, skillCatalog);
 
         // 7. Seed configs, agents, workflows.
         for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);
         for (AgentDefinition definition : pendingAgentDefinitions) definitionRepository.save(definition);
+        for (var skill : pendingSkills) skillRepository.save(skill);
         seedWorkflows(workflows);
 
         AttachSupport attachSupport = AttachSupport.createIfPresent(

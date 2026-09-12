@@ -142,6 +142,29 @@ An app adds both; the property picks.
 |--------|---------|
 | `mc-agent-cli` | Command-line chat client |
 
+## Skills
+
+A skill is know-how written down once — how a report is formatted here, what a
+release involves — and loaded when it is needed. Only name and description sit
+in the system prompt, a line each; the instructions arrive when the model calls
+the `skill` tool for that name. Ten skills cost ten lines until one is used.
+
+They come from three places, read fresh every round: the ones this installation
+stores (admin UI, `/api/skills`), a user's own `SKILL.md` files, and a project's
+in `.mindconnect/skills/` under the session's working directory — the more
+specific source winning by name. An agent switches them on and may name the
+ones it gets; naming none leaves it every skill there is.
+
+```markdown
+---
+name: weekly-report
+description: Use when writing the weekly status report for a customer
+tools: file_read, vector_search
+---
+1. Read last week's report under `reports/`.
+2. Start from `template.md` in this skill's directory.
+```
+
 ## Memory
 
 Agents remember across sessions via episodic memory.

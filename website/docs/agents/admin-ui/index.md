@@ -102,12 +102,13 @@ Run it once per podman machine — or any time login starts failing with a
 
 ## The main sections
 
-The navigation has seven top-level entries:
+The navigation has eight top-level entries:
 
 | Section | What you do there |
 |---------|-------------------|
 | **[Agents](./agents.md)** | Create, edit, delete and copy agents. In the detail view: configure tools and start or continue sessions. |
 | **[Tools](./tools.md)** | Browse the available tools, inspect their schemas, and test a tool. |
+| **[Skills](./skills.md)** | Create, edit and delete the instruction packs agents load on demand. |
 | **[LLM Configs](./llm-configs.md)** | Create, edit, delete and **test** LLM configs. API keys come from environment variables. |
 | **Workflows** | The embedded workflow admin UI (`mc-workflow-admin-rest`): edit, save and run workflows. |
 | **[Vector Stores](./vector-stores.md)** | Manage vector-store templates and stores, upload files, run semantic searches. |

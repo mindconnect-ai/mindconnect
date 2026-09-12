@@ -22,6 +22,8 @@ import java.util.List;
  *       if the stored config differs from the classpath version the supplied {@link ConfirmOverwrite}
  *       callback is invoked and the record is overwritten only if it returns {@code true}.</li>
  *   <li>{@code initial-data/agent-definitions/*.json} — same semantics per name.</li>
+ *   <li>{@code initial-data/skills/*.md} — one {@code SKILL.md} per skill, imported
+ *       when no stored skill carries its name and never overwritten.</li>
  * </ul>
  * New records are always imported. Existing identical records are silently skipped.
  */
@@ -38,13 +40,16 @@ public class InitialDataLoader {
 
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentDefinitionRepository;
+    private final ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository;
     private final ObjectMapper objectMapper;
 
     public InitialDataLoader(LlmConfigRepository llmConfigRepository,
                              AgentDefinitionRepository agentDefinitionRepository,
+                             ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository,
                              ObjectMapper objectMapper) {
         this.llmConfigRepository = llmConfigRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
+        this.skillRepository = skillRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -67,6 +72,38 @@ public class InitialDataLoader {
     public void load(ConfirmOverwrite confirmOverwrite) {
         loadLlmConfigs(confirmOverwrite);
         loadAgentDefinitions(confirmOverwrite);
+        loadSkills();
+    }
+
+    /**
+     * Imports the shipped {@code SKILL.md} files the store does not already
+     * know by name. No overwrite prompt, unlike the records above: a skill is
+     * prose somebody has since made their own, and the shipped wording has no
+     * claim on it.
+     */
+    private void loadSkills() {
+        for (Resource resource : scan("classpath:initial-data/skills/*.md")) {
+            String fileName = resource.getFilename() == null ? "skill" : resource.getFilename();
+            String fallback = fileName.endsWith(".md")
+                    ? fileName.substring(0, fileName.length() - 3) : fileName;
+            try {
+                String content = new String(resource.getInputStream().readAllBytes(),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                var incoming = ai.mindconnect.agent.runtime.skill.Skill.fromMarkdown(fallback, content,
+                        ai.mindconnect.agent.runtime.skill.SkillSource.MANAGED, null);
+                if (incoming == null) {
+                    log.warn("Initial skill {} has no instructions, or a name that is not lower-case "
+                            + "letters, digits and dashes — skipping", fileName);
+                    continue;
+                }
+                if (skillRepository.findByName(incoming.name()).isEmpty()) {
+                    skillRepository.save(incoming);
+                    log.info("Imported skill '{}'", incoming.name());
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load skill from {}: {}", fileName, e.getMessage());
+            }
+        }
     }
 
     // ── LLM configs ───────────────────────────────────────────────────────────

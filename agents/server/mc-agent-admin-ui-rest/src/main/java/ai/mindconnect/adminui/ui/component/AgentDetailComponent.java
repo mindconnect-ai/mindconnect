@@ -100,6 +100,7 @@ public final class AgentDetailComponent implements UiComponent {
                 // the header above the tabs already shows the symbol itself.
                 .field(UiField.text("icon", "Icon", agent.iconOrDefault()))
                 .field(UiField.text("callableAgents", "Callable Agents", callableAgentsSummary()))
+                .field(UiField.text("skills", "Skills", skillsSummary()))
                 .field(UiField.text("llmConfigName", "LLM Config", agent.llmConfigName()))
                 .field(UiField.text("status", "Status",
                         agent.status() != null ? agent.status().name() : null))
@@ -113,6 +114,13 @@ public final class AgentDetailComponent implements UiComponent {
                 .action(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete agent '" + agent.name() + "'?")
                         .onClick(trigger(on(AgentUiController.class).delete(agent.id().value()))));
+    }
+
+    /** Whether the agent may load skills, and which — or that it may not. */
+    private String skillsSummary() {
+        var skills = agent.skillsOrOff();
+        if (!skills.enabled()) return "off";
+        return skills.names().isEmpty() ? "all skills" : String.join(", ", skills.names());
     }
 
     /** The roster, or the word for having none — which means all of them. */

@@ -5,6 +5,7 @@ import ai.mindconnect.agent.runtime.adapter.file.FileAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileLlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.adapter.file.FileSkillRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileWorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
@@ -65,6 +66,17 @@ public class FileRepositoriesConfig {
     @Bean
     TodoListRepository todoListRepository(Path agentStorageDir, Namespace namespace) {
         return new FileTodoListRepository(agentStorageDir, namespace);
+    }
+
+    /**
+     * The skills this installation stores. The ones a project or a user
+     * keeps as {@code SKILL.md} files need no store — they are read where
+     * they lie.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository(
+            Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
+        return new FileSkillRepository(agentStorageDir, objectMapper, namespace);
     }
 
     /**
