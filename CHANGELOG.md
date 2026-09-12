@@ -29,16 +29,28 @@ fresh empty one, so nothing has to be moved by hand at release time.
   agents, workflows and whole packages from a GitHub project. A registry is a
   repository, not a server: an index (`registry.json`) and the entity files it
   points at, added by its `owner/repo` (`owner/repo@v1.2.0` pins a tag, a
-  private one names the *environment variable* holding its token). Browse it,
-  filter by kind, import — a package installs the agent, its sub-agents, the
-  workflow they run and the LLM config they share, dependencies first and each
-  entity once, with a report that says line by line what was imported, updated,
-  skipped or failed. Importing keeps what is already here unless overwrite is
-  chosen, an overwrite keeps local ids so that sessions and aliases keep
-  working, and an API key that came with a registry file is dropped rather than
-  used. Off for an installation that wants no outbound calls
+  private one names the *environment variable* holding its token). Browse it
+  under *Agents*, *LLM configs*, *Workflows* and *Packages*, import — a package
+  installs the agent, its sub-agents, the workflow they run and the LLM config
+  they share, dependencies first and each entity once, with a report that says
+  line by line what was imported, updated, removed, skipped or failed. A
+  package's *Contents* tab lists everything it would install, marks what is
+  already here, and lets you untick entries to leave them out; **Remove** takes
+  a package out again, deleting the included entries and keeping the rest. An
+  entry that something outside the package still uses — the alias every agent
+  runs on, the config behind it — says *Used by …* and starts unticked.
+  Importing keeps what is already here unless overwrite is chosen, an overwrite
+  keeps local ids so that sessions and aliases keep working, and an API key
+  that came with a registry file is dropped rather than used. Off for an
+  installation that wants no outbound calls
   (`mindconnect.registry.enabled=false`); format and settings in the docs under
   *Registry*.
+
+### Changed
+
+- **agents:** the admin UI's collapsible headings — tool and agent groups,
+  migration rows, trace cards — read at body size in the theme's text colour
+  instead of the framework's small grey detail style.
 
 ## [0.8.1] - 2026-09-12
 

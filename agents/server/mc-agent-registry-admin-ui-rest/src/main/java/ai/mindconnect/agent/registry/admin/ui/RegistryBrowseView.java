@@ -14,11 +14,15 @@ import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTrigger;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 /**
- * What one registry offers: search, filter by kind, and import.
+ * What one registry offers: search, filter by kind, and import, with the
+ * entries filed under their kind the way the agent list files agents under
+ * their group.
  *
  * <p>Each row says what this installation would do with it — already here, or
  * a kind this installation cannot install at all — because the alternative is
@@ -28,6 +32,12 @@ final class RegistryBrowseView {
 
     static final String STACK_ID = "registry-browse-stack";
     private static final String FORM_ID = "registry-browse-search";
+    static final String CATALOG_CSS_CLASS = "registry-catalog";
+
+    /** The rubrics in the order they earn attention: what you chat with, what it runs on, then the rest. */
+    static final List<RegistryItemType> GROUP_ORDER = List.of(
+            RegistryItemType.AGENT, RegistryItemType.LLM_CONFIG,
+            RegistryItemType.WORKFLOW, RegistryItemType.PACKAGE);
 
     private final RegistrySource source;
     private final RegistryIndex index;
@@ -80,21 +90,71 @@ final class RegistryBrowseView {
             return UiStack.of(STACK_ID).child(list);
         }
 
-        for (RegistryEntry entry : entries) {
-            RegistryService.EntryStatus entryStatus = status.apply(entry);
-            UiList.Item item = UiList.Item.of("entry-" + entry.id(), entry.name())
-                    .icon(iconFor(entry.type()))
-                    .description(describe(entry, entryStatus))
-                    .dispatch("GET", base + "/entry/" + entry.id());
-            if (entryStatus.installable()) {
-                item.action(UiAction.primary("import-" + entry.id(),
-                                entryStatus.present() ? "Re-import" : "Import")
-                        .icon("download")
-                        .dispatch("GET", base + "/entry/" + entry.id()));
-            }
-            list.item(item);
-        }
+        // A search or a kind filter asks to see the matches, so their rubrics
+        // open; unfiltered, the rubrics are the map and start closed, like the
+        // agent list and the tool catalog.
+        boolean open = type != null || (query != null && !query.isBlank());
+        addGrouped(list, "registry-group-", entries, open, entry -> row(base, entry));
         return UiStack.of(STACK_ID).child(list);
+    }
+
+    private UiList.Item row(String base, RegistryEntry entry) {
+        RegistryService.EntryStatus entryStatus = status.apply(entry);
+        UiList.Item item = UiList.Item.of("entry-" + entry.id(), entry.name())
+                .icon(iconFor(entry.type()))
+                .description(describe(entry, entryStatus))
+                .dispatch("GET", base + "/entry/" + entry.id());
+        // Both open the entry, where the warning and the confirmation sit; the
+        // label says what the import would do to this installation.
+        if (entryStatus.installable() && entryStatus.present()) {
+            item.action(UiAction.danger("overwrite-" + entry.id(), "Overwrite")
+                    .icon("refresh")
+                    .dispatch("GET", base + "/entry/" + entry.id()));
+        } else if (entryStatus.installable()) {
+            item.action(UiAction.primary("import-" + entry.id(), "Import")
+                    .icon("download")
+                    .dispatch("GET", base + "/entry/" + entry.id()));
+        }
+        return item;
+    }
+
+    /**
+     * Files {@code entries} into {@code list} as one collapsible rubric per kind,
+     * in {@link #GROUP_ORDER}; within a kind they keep the order they came in.
+     * A kind with no entries gets no rubric.
+     */
+    static void addGrouped(UiList list, String idPrefix, List<RegistryEntry> entries, boolean open,
+                           Function<RegistryEntry, UiList.Item> row) {
+        // The admin UI's stylesheet gives grouped catalogs readable rubric
+        // headings; the framework's summary style is a quiet detail toggle.
+        list.withCssClass(CATALOG_CSS_CLASS);
+        Map<RegistryItemType, List<RegistryEntry>> byType = new LinkedHashMap<>();
+        for (RegistryItemType kind : GROUP_ORDER) {
+            List<RegistryEntry> ofKind = entries.stream().filter(e -> e.type() == kind).toList();
+            if (!ofKind.isEmpty()) {
+                byType.put(kind, ofKind);
+            }
+        }
+        for (Map.Entry<RegistryItemType, List<RegistryEntry>> group : byType.entrySet()) {
+            String gid = idPrefix + group.getKey().wireName();
+            UiList groupList = UiList.of(gid + "-list", "");
+            group.getValue().forEach(entry -> groupList.item(row.apply(entry)));
+            // The empty label keeps the kind from being repeated inside the
+            // rubric it already titles.
+            list.item(UiList.Item.of(gid, "")
+                    .content(groupList)
+                    .collapsible(groupTitle(group.getKey()) + "  (" + group.getValue().size() + ")",
+                            open, gid + "-sum"));
+        }
+    }
+
+    static String groupTitle(RegistryItemType type) {
+        return switch (type) {
+            case AGENT -> "Agents";
+            case LLM_CONFIG -> "LLM configs";
+            case WORKFLOW -> "Workflows";
+            case PACKAGE -> "Packages";
+        };
     }
 
     private String title() {
@@ -111,14 +171,19 @@ final class RegistryBrowseView {
         } else if (status.present()) {
             text.append(" · already here");
         }
-        if (entry.description() != null && !entry.description().isBlank()) {
-            String description = entry.description().strip();
-            if (description.length() > 180) {
-                description = description.substring(0, 180) + "…";
-            }
-            text.append(" · ").append(description);
+        return text.append(shortDescription(entry)).toString();
+    }
+
+    /** {@code " · "} and the description cut to a line or two, or nothing without one. */
+    static String shortDescription(RegistryEntry entry) {
+        if (entry.description() == null || entry.description().isBlank()) {
+            return "";
         }
-        return text.toString();
+        String description = entry.description().strip();
+        if (description.length() > 180) {
+            description = description.substring(0, 180) + "…";
+        }
+        return " · " + description;
     }
 
     private static List<UiField.Option> typeOptions() {

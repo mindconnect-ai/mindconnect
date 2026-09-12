@@ -17,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -57,6 +58,37 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
     @Override
     public boolean exists(String name) {
         return name != null && repository.findByName(name).isPresent();
+    }
+
+    /** Agents running on that LLM config, or calling or reviewing with that agent. */
+    @Override
+    public List<String> referencesTo(RegistryItemType type, String name) {
+        if (name == null || (type != RegistryItemType.LLM_CONFIG && type != RegistryItemType.AGENT)) {
+            return List.of();
+        }
+        return repository.findAll().stream()
+                .filter(agent -> type == RegistryItemType.LLM_CONFIG
+                        ? name.equals(agent.llmConfigName())
+                        : !name.equals(agent.name())
+                                && (contains(agent.callableAgents(), name)
+                                        || contains(agent.responseReviewers(), name)))
+                .map(AgentDefinition::name)
+                .toList();
+    }
+
+    private static boolean contains(List<String> names, String name) {
+        return names != null && names.contains(name);
+    }
+
+    @Override
+    public ImportedItem remove(RegistryEntry entry) {
+        Optional<AgentDefinition> existing = repository.findByName(entry.name());
+        if (existing.isEmpty()) {
+            return ImportedItem.skipped(entry, entry.name(), "no agent of this name is here");
+        }
+        repository.deleteById(existing.get().id());
+        log.info("Removed agent '{}' (registry entry '{}')", entry.name(), entry.id());
+        return ImportedItem.removed(entry, entry.name());
     }
 
     @Override

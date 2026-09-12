@@ -70,6 +70,48 @@ class WorkflowRegistryInstallerTest {
     }
 
     @Test
+    void references_are_found_in_steps_nested_anywhere_in_a_workflow() {
+        installer.install(entry("digest"), """
+                {
+                  "@class" : "ai.mindconnect.workflow.domain.WorkflowData",
+                  "name" : "digest",
+                  "steps" : [ {
+                    "@class" : "ai.mindconnect.workflow.domain.ForEachData",
+                    "name" : "each",
+                    "loopOver" : "items",
+                    "runVar" : "item",
+                    "steps" : [ {
+                      "@class" : "ai.mindconnect.agent.tools.workflow.step.AgentCallData",
+                      "name" : "summarize",
+                      "agent" : "Summarizer",
+                      "message" : "${item}"
+                    }, {
+                      "@class" : "ai.mindconnect.agent.tools.workflow.step.AgentCallData",
+                      "name" : "inline",
+                      "agentSpec" : { "name" : "writer", "llmConfigName" : "agent-default" },
+                      "message" : "${item}"
+                    } ]
+                  } ],
+                  "subWorkflows" : [ ]
+                }
+                """, ImportMode.SKIP_EXISTING);
+        installer.install(entry("summarize"), JSON, ImportMode.SKIP_EXISTING);
+
+        assertThat(installer.referencesTo(RegistryItemType.AGENT, "Summarizer")).containsExactly("digest");
+        assertThat(installer.referencesTo(RegistryItemType.LLM_CONFIG, "agent-default")).containsExactly("digest");
+        assertThat(installer.referencesTo(RegistryItemType.AGENT, "Poet")).isEmpty();
+    }
+
+    @Test
+    void remove_deletes_the_workflow_under_the_id_the_import_wrote() {
+        installer.install(entry("Summarize Text"), JSON, ImportMode.SKIP_EXISTING);
+
+        assertThat(installer.remove(entry("Summarize Text")).status()).isEqualTo(ImportStatus.REMOVED);
+        assertThat(repository.findById("summarize-text")).isEmpty();
+        assertThat(installer.remove(entry("Summarize Text")).status()).isEqualTo(ImportStatus.SKIPPED);
+    }
+
+    @Test
     void a_name_that_sanitises_to_nothing_still_gets_an_id() {
         assertThat(WorkflowRegistryInstaller.idOf("///")).isEqualTo("workflow");
         assertThat(WorkflowRegistryInstaller.idOf(null)).isEqualTo("workflow");

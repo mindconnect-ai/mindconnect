@@ -16,6 +16,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -56,6 +57,29 @@ public class LlmConfigInstaller implements RegistryInstaller {
     @Override
     public boolean exists(String name) {
         return name != null && repository.findByName(name).isPresent();
+    }
+
+    /** Aliases that delegate to that LLM config. */
+    @Override
+    public List<String> referencesTo(RegistryItemType type, String name) {
+        if (type != RegistryItemType.LLM_CONFIG || name == null) {
+            return List.of();
+        }
+        return repository.findAll().stream()
+                .filter(config -> config.isAlias() && name.equals(config.delegatesTo()))
+                .map(LlmConfig::name)
+                .toList();
+    }
+
+    @Override
+    public ImportedItem remove(RegistryEntry entry) {
+        Optional<LlmConfig> existing = repository.findByName(entry.name());
+        if (existing.isEmpty()) {
+            return ImportedItem.skipped(entry, entry.name(), "no LLM config of this name is here");
+        }
+        repository.deleteById(existing.get().id());
+        log.info("Removed LLM config '{}' (registry entry '{}')", entry.name(), entry.id());
+        return ImportedItem.removed(entry, entry.name());
     }
 
     @Override

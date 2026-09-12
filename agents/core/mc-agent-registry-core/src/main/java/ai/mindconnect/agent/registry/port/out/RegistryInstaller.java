@@ -50,4 +50,41 @@ public interface RegistryInstaller {
      *         line and carries on with the next member
      */
     ImportedItem install(RegistryEntry entry, String content, ImportMode mode) throws Exception;
+
+    /**
+     * Deletes the entity of the entry's name from this installation — how a
+     * package is removed again. Whatever else points at it (an agent naming a
+     * deleted LLM config, a workflow calling a deleted agent) is not this
+     * method's to know; the person chose what to remove on the package's
+     * Contents tab.
+     *
+     * <p>The default removes nothing and says so, for an installer written
+     * before removal existed.
+     *
+     * @return {@link ImportedItem#removed removed}, or
+     *         {@link ImportedItem#skipped skipped} when nothing of that name is here
+     * @throws Exception when the store refuses; the service turns it into a
+     *         {@code FAILED} line and carries on
+     */
+    default ImportedItem remove(RegistryEntry entry) throws Exception {
+        return ImportedItem.skipped(entry, entry.name(), "this installation cannot remove "
+                + entry.type().label().toLowerCase(java.util.Locale.ROOT) + "s");
+    }
+
+    /**
+     * The names of this installer's stored entities that point at the entity
+     * of that kind and name — the agents running on an LLM config, the
+     * workflows calling an agent. Asked before a package is removed, so that
+     * what something else still needs is not ticked for deletion.
+     *
+     * <p>The default knows of no references, for an installer written before
+     * removal existed; an entity it cannot see into is then not protected.
+     *
+     * @param type the kind of the entity referred to
+     * @param name its name
+     * @return the referring entities' names; empty when none
+     */
+    default java.util.List<String> referencesTo(RegistryItemType type, String name) {
+        return java.util.List.of();
+    }
 }

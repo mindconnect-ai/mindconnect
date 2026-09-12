@@ -169,7 +169,7 @@ public final class AdminLayout {
         }
         menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
         if (registry) {
-            menu.item(navItem("nav-registry", "Registry", "/registry", "download", navigate));
+            menu.item(navItem("nav-registry", "Registry", "/registry", "package", navigate));
         }
         menu.item(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));

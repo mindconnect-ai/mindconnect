@@ -10,10 +10,15 @@ import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Installs a {@code workflow} entry into the host's workflow store — the same
@@ -33,6 +38,8 @@ import java.util.Locale;
 public class WorkflowRegistryInstaller implements RegistryInstaller {
 
     private static final Logger log = LoggerFactory.getLogger(WorkflowRegistryInstaller.class);
+    /** Reads a serialised workflow as a plain tree, to search it for references. */
+    private static final ObjectMapper TREE_READER = new ObjectMapper();
 
     private final WorkflowDataRepository repository;
     private final JacksonWorkflowSerializer serializer;
@@ -55,6 +62,66 @@ public class WorkflowRegistryInstaller implements RegistryInstaller {
     @Override
     public boolean exists(String name) {
         return name != null && repository.exists(idOf(name));
+    }
+
+    /**
+     * Workflows whose steps call that agent, run an inline agent on that LLM
+     * config, or call that workflow. Read from each workflow's serialised form,
+     * so a reference nested in a loop or a branch is found the same way.
+     */
+    @Override
+    public List<String> referencesTo(RegistryItemType type, String name) {
+        if (name == null || type == RegistryItemType.PACKAGE) {
+            return List.of();
+        }
+        List<String> referring = new ArrayList<>();
+        for (String id : repository.listIds()) {
+            if (type == RegistryItemType.WORKFLOW && id.equals(idOf(name))) {
+                continue;
+            }
+            try {
+                Optional<WorkflowData> workflow = repository.findById(id);
+                if (workflow.isPresent()
+                        && refersTo(TREE_READER.readTree(serializer.write(workflow.get())), type, name)) {
+                    referring.add(id);
+                }
+            } catch (Exception unreadable) {
+                log.debug("Workflow '{}' not searched for references: {}", id, unreadable.getMessage());
+            }
+        }
+        return referring;
+    }
+
+    private static boolean refersTo(JsonNode node, RegistryItemType type, String name) {
+        if (node.isObject()) {
+            String stepClass = node.path("@class").asText("");
+            boolean hit = switch (type) {
+                case AGENT -> stepClass.endsWith(".AgentCallData") && name.equals(node.path("agent").asText(null));
+                case LLM_CONFIG -> name.equals(node.path("llmConfigName").asText(null));
+                case WORKFLOW -> stepClass.endsWith(".CallWorkflowData")
+                        && name.equals(node.path("workflow").asText(null));
+                case PACKAGE -> false;
+            };
+            if (hit) {
+                return true;
+            }
+        }
+        for (JsonNode child : node) {
+            if (refersTo(child, type, name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    public ImportedItem remove(RegistryEntry entry) {
+        String id = idOf(entry.name());
+        if (!repository.delete(id)) {
+            return ImportedItem.skipped(entry, id, "no workflow with this id is here");
+        }
+        log.info("Removed workflow '{}' (registry entry '{}')", id, entry.id());
+        return ImportedItem.removed(entry, id);
     }
 
     @Override

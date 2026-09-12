@@ -86,6 +86,26 @@ class AgentDefinitionInstallerTest {
                 .isEqualTo("my prompt");
     }
 
+    @Test
+    void references_are_the_agents_running_on_a_config_or_calling_an_agent() {
+        repository.save(AgentDefinition.create("web-researcher", "", "p", null, "default"));
+        repository.save(AgentDefinition.create("lead", "", "p", null, "other")
+                .withCallableAgents(List.of("web-researcher")));
+
+        assertThat(installer.referencesTo(RegistryItemType.LLM_CONFIG, "default")).containsExactly("web-researcher");
+        assertThat(installer.referencesTo(RegistryItemType.AGENT, "web-researcher")).containsExactly("lead");
+        assertThat(installer.referencesTo(RegistryItemType.WORKFLOW, "web-researcher")).isEmpty();
+    }
+
+    @Test
+    void remove_deletes_the_agent_of_the_entrys_name_and_skips_when_there_is_none() {
+        repository.save(AgentDefinition.create("web-researcher", "mine", "my prompt", null, "default"));
+
+        assertThat(installer.remove(ENTRY).status()).isEqualTo(ImportStatus.REMOVED);
+        assertThat(repository.findByName("web-researcher")).isEmpty();
+        assertThat(installer.remove(ENTRY).status()).isEqualTo(ImportStatus.SKIPPED);
+    }
+
     private static final class FakeRepository implements AgentDefinitionRepository {
         private final List<AgentDefinition> agents = new ArrayList<>();
 

@@ -31,6 +31,10 @@ public record ImportedItem(
         return new ImportedItem(entry.id(), entry.type(), name, ImportStatus.UPDATED, null);
     }
 
+    public static ImportedItem removed(RegistryEntry entry, String name) {
+        return new ImportedItem(entry.id(), entry.type(), name, ImportStatus.REMOVED, null);
+    }
+
     public static ImportedItem skipped(RegistryEntry entry, String name, String detail) {
         return new ImportedItem(entry.id(), entry.type(), name, ImportStatus.SKIPPED, detail);
     }

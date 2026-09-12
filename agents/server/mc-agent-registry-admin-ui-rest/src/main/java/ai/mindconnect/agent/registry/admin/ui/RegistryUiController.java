@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * The registry screen: the registries this installation knows, what each of
@@ -139,7 +140,8 @@ public class RegistryUiController {
 
     @GetMapping("/api/{id}/entry/{entryId}")
     public UiPage entry(@PathVariable String id, @PathVariable String entryId) {
-        return entryPage(id, entryId, null, null);
+        // Nobody has chosen yet: the view unticks what something else still uses.
+        return entryPage(id, entryId, null, null, null);
     }
 
     /**
@@ -147,42 +149,81 @@ public class RegistryUiController {
      * an import changes the agents, workflows and configs of this installation,
      * and the report is the record of it — it should survive a click, not
      * vanish with the next one.
+     *
+     * <p>For a package the body is its Contents tab: an unticked Import box
+     * leaves that entry out.
      */
     @PostMapping("/api/{id}/import/{entryId}")
     public UiPage importEntry(@PathVariable String id, @PathVariable String entryId,
-                              @RequestParam(defaultValue = "SKIP_EXISTING") String mode) {
+                              @RequestParam(defaultValue = "SKIP_EXISTING") String mode,
+                              @RequestBody(required = false) Map<String, Object> body) {
         Optional<RegistrySource> found = source(id);
         if (found.isEmpty()) {
             return list();
         }
+        Set<String> excluded = RegistryEntryView.excludedFrom(body);
         try {
-            ImportReport report = registry.importEntry(found.get().id(), entryId, modeOf(mode));
-            return entryPage(id, entryId, report, null);
+            ImportReport report = registry.importEntry(found.get().id(), entryId, modeOf(mode), excluded);
+            return entryPage(id, entryId, excluded, report, null);
         } catch (RuntimeException e) {
             log.warn("Importing '{}' from registry '{}' failed: {}", entryId, id, e.getMessage());
-            return entryPage(id, entryId, null, message(e));
+            return entryPage(id, entryId, excluded, null, message(e));
         }
     }
 
-    private UiPage entryPage(String id, String entryId, ImportReport report, String error) {
+    /**
+     * Removes a package: deletes the entries included on its Contents tab that
+     * are here, and shows what happened on the same page.
+     */
+    @PostMapping("/api/{id}/remove/{entryId}")
+    public UiPage removeEntry(@PathVariable String id, @PathVariable String entryId,
+                              @RequestBody(required = false) Map<String, Object> body) {
+        Optional<RegistrySource> found = source(id);
+        if (found.isEmpty()) {
+            return list();
+        }
+        Set<String> kept = RegistryEntryView.excludedFrom(body);
+        try {
+            ImportReport report = registry.removeEntry(found.get().id(), entryId, kept);
+            return entryPage(id, entryId, kept, report, null);
+        } catch (RuntimeException e) {
+            log.warn("Removing '{}' of registry '{}' failed: {}", entryId, id, e.getMessage());
+            return entryPage(id, entryId, kept, null, message(e));
+        }
+    }
+
+    private UiPage entryPage(String id, String entryId, Set<String> excluded,
+                             ImportReport report, String error) {
         Optional<RegistrySource> found = source(id);
         if (found.isEmpty()) {
             return list();
         }
         RegistrySource source = found.get();
-        Optional<RegistryEntry> entry;
+        RegistryIndex index;
         try {
-            entry = registry.index(source.id()).find(entryId);
+            index = registry.index(source.id());
         } catch (RuntimeException e) {
             return UiPage.of(RegistryListView.BASE + "/" + id,
                     new RegistryUnreadableView(source, message(e)).render());
         }
+        Optional<RegistryEntry> entry = index.find(entryId);
         if (entry.isEmpty()) {
             return browse(id, null, null);
         }
+        RegistryService.PackageContents contents = null;
+        String contentsError = null;
+        if (entry.get().type() == RegistryItemType.PACKAGE) {
+            try {
+                contents = registry.packageContents(source.id(), entry.get());
+            } catch (RuntimeException e) {
+                // The details and the import still work; only the list tab says why it is empty.
+                log.warn("Reading package '{}' from {} failed: {}", entryId, source.coordinates(), e.getMessage());
+                contentsError = message(e);
+            }
+        }
         return UiPage.of(RegistryListView.BASE + "/" + id + "/entry/" + entryId,
-                new RegistryEntryView(source, entry.get(), registry.status(entry.get()),
-                        report, error).render());
+                new RegistryEntryView(source, index, entry.get(), registry::status,
+                        contents, contentsError, excluded, report, error).render());
     }
 
     // ----------------------------------------------------------------- helpers

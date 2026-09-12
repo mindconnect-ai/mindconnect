@@ -96,6 +96,26 @@ class LlmConfigInstallerTest {
         assertThat(installer.exists("default")).isTrue();
     }
 
+    @Test
+    void references_are_the_aliases_delegating_to_a_config() throws Exception {
+        repository.save(LlmConfig.claude("default", "claude-opus-5", "k"));
+        installer.install(new RegistryEntry("alias", RegistryItemType.LLM_CONFIG, "agent-default", null, null,
+                        "llm-configs/agent-default.json", List.of(), null, null, List.of()),
+                "{\"name\":\"agent-default\",\"isAlias\":true,\"delegatesTo\":\"default\"}", ImportMode.OVERWRITE);
+
+        assertThat(installer.referencesTo(RegistryItemType.LLM_CONFIG, "default")).containsExactly("agent-default");
+        assertThat(installer.referencesTo(RegistryItemType.AGENT, "default")).isEmpty();
+    }
+
+    @Test
+    void remove_deletes_the_config_of_the_entrys_name_and_skips_when_there_is_none() throws Exception {
+        repository.save(LlmConfig.claude("default", "claude-opus-5", "k"));
+
+        assertThat(installer.remove(ENTRY).status()).isEqualTo(ImportStatus.REMOVED);
+        assertThat(repository.findByName("default")).isEmpty();
+        assertThat(installer.remove(ENTRY).status()).isEqualTo(ImportStatus.SKIPPED);
+    }
+
     /** A store that is a list — enough for what the installer does with one. */
     private static final class FakeRepository implements LlmConfigRepository {
         private final List<LlmConfig> configs = new ArrayList<>();

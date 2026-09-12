@@ -29,9 +29,31 @@ by its `owner/repo`:
 Pin a tag for a registry you do not control: a branch is whatever its owner
 pushed last.
 
-Open a registry to see what it offers, filter by kind, and import an entry. Each
+Open a registry to see what it offers — filed under *Agents*, *LLM configs*,
+*Workflows* and *Packages* — search or filter by kind, and import an entry. Each
 row says what this installation would do with it — *already here*, or a kind this
-installation cannot install at all — before you press anything.
+installation cannot install at all — before you press anything; its button reads
+**Import** for something new and **Overwrite** for something already here.
+
+A package opens on two tabs: its details, and *Contents* — everything importing
+it would install, the entries its members require included, each marked *New*
+or *Already here*. Every entry has an **Include** box, ticked by default; untick
+one to leave it out. A left-out entry is not installed at all, not even as what
+another entry requires, and the report lists it as skipped.
+
+**Remove** takes a package out again: it deletes the included entries that are
+here — workflows first, then agents, then the LLM configs they run on — and
+leaves the unticked ones in place.
+
+An entry that something outside the package still uses says so — *Used by Agent
+'default-chat', Agent 'planner' and 13 more* — and starts unticked, so that
+removing a package does not take the model away from every other agent. The
+check follows the chain: when a shared alias stays, the config it delegates to
+stays too. What counts as a use: an agent's LLM config, the agents it calls and
+its reviewers, an alias's target, and a workflow's agent calls, inline agents
+and called workflows. A reference kept anywhere else — a tool setting, an
+application property naming a default agent — is not seen, so read the list
+before you press Remove.
 
 Importing has two modes:
 

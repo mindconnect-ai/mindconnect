@@ -24,9 +24,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * The import walk: dependencies before the entry, a package as its member
@@ -39,14 +41,16 @@ class RegistryServiceTest {
 
     private final Map<String, RegistryEntry> entries = new LinkedHashMap<>();
     private final Map<String, RegistryPackage> packages = new HashMap<>();
+    /** Every removal across all installers, in the order it happened. */
+    private final List<String> removalLog = new ArrayList<>();
     private RecordingInstaller agents;
     private RecordingInstaller configs;
     private RegistryService service;
 
     @BeforeEach
     void setUp() {
-        agents = new RecordingInstaller(RegistryItemType.AGENT);
-        configs = new RecordingInstaller(RegistryItemType.LLM_CONFIG);
+        agents = new RecordingInstaller(RegistryItemType.AGENT, removalLog);
+        configs = new RecordingInstaller(RegistryItemType.LLM_CONFIG, removalLog);
         service = new RegistryService(new FixedSources(), new FakeClient(),
                 List.of(agents, configs));
     }
@@ -186,6 +190,135 @@ class RegistryServiceTest {
                 .hasMessageContaining("disabled");
     }
 
+    @Test
+    void a_packages_contents_are_everything_its_import_would_install_in_order() {
+        entry("default-llm", RegistryItemType.LLM_CONFIG);
+        entry("researcher", RegistryItemType.AGENT, "default-llm");
+        entry("kit", RegistryItemType.PACKAGE);
+        RegistryEntry inline = new RegistryEntry("helper", RegistryItemType.AGENT, "helper", null,
+                null, "agents/helper.json", List.of(), null, null, List.of("default-llm"));
+        packages.put("packages/kit.json", new RegistryPackage("Kit", null, null,
+                List.of("researcher", "gone"), List.of(inline)));
+
+        RegistryService.PackageContents contents = service.packageContents(SOURCE.id(), entries.get("kit"));
+
+        // What a member requires is installed too, so it is shown — once, before it is needed.
+        assertThat(contents.members()).extracting(RegistryEntry::id)
+                .containsExactly("default-llm", "researcher", "helper");
+        assertThat(contents.unresolved()).containsExactly("gone");
+        assertThat(configs.installed).isEmpty();
+    }
+
+    @Test
+    void a_left_out_entry_is_installed_neither_as_a_member_nor_as_a_requirement() {
+        entry("default-llm", RegistryItemType.LLM_CONFIG);
+        entry("researcher", RegistryItemType.AGENT, "default-llm");
+        entry("writer", RegistryItemType.AGENT);
+        entry("kit", RegistryItemType.PACKAGE);
+        packages.put("packages/kit.json", new RegistryPackage("Kit", null, null,
+                List.of("default-llm", "researcher", "writer"), List.of()));
+
+        ImportReport report = service.importEntry(SOURCE.id(), "kit", ImportMode.SKIP_EXISTING,
+                Set.of("default-llm", "writer"));
+
+        assertThat(agents.installed).containsExactly("researcher");
+        assertThat(configs.installed).isEmpty();
+        assertThat(report.items()).extracting(ImportedItem::entryId, ImportedItem::status)
+                .containsExactly(
+                        tuple("default-llm", ImportStatus.SKIPPED),
+                        tuple("researcher", ImportStatus.IMPORTED),
+                        tuple("writer", ImportStatus.SKIPPED));
+    }
+
+    @Test
+    void removing_a_package_deletes_the_included_entries_that_are_here_dependents_first() {
+        entry("default-llm", RegistryItemType.LLM_CONFIG);
+        entry("researcher", RegistryItemType.AGENT, "default-llm");
+        entry("writer", RegistryItemType.AGENT, "default-llm");
+        entry("reviewer", RegistryItemType.AGENT);
+        entry("kit", RegistryItemType.PACKAGE);
+        packages.put("packages/kit.json", new RegistryPackage("Kit", null, null,
+                List.of("researcher", "writer", "reviewer"), List.of()));
+        configs.present.add("default-llm");
+        agents.present.addAll(List.of("researcher", "writer"));
+
+        ImportReport report = service.removeEntry(SOURCE.id(), "kit", Set.of("writer"));
+
+        // The agents go before the config they run on; writer stays; reviewer was never here.
+        assertThat(removalLog).containsExactly("researcher", "default-llm");
+        assertThat(agents.present).containsExactly("writer");
+        assertThat(report.items()).extracting(ImportedItem::entryId, ImportedItem::status)
+                .containsExactly(
+                        tuple("reviewer", ImportStatus.SKIPPED),
+                        tuple("researcher", ImportStatus.REMOVED),
+                        tuple("default-llm", ImportStatus.REMOVED),
+                        tuple("writer", ImportStatus.SKIPPED));
+    }
+
+    @Test
+    void a_member_here_says_what_outside_the_package_uses_it() {
+        entry("default-llm", RegistryItemType.LLM_CONFIG);
+        entry("researcher", RegistryItemType.AGENT, "default-llm");
+        entry("writer", RegistryItemType.AGENT, "default-llm");
+        entry("kit", RegistryItemType.PACKAGE);
+        packages.put("packages/kit.json", new RegistryPackage("Kit", null, null,
+                List.of("researcher", "writer"), List.of()));
+        configs.present.add("default-llm");
+        agents.present.add("researcher");
+        agents.references.put("llm-config:default-llm", List.of("researcher", "default-chat"));
+        agents.references.put("agent:writer", List.of("planner"));
+
+        RegistryService.PackageContents contents = service.packageContents(SOURCE.id(), entries.get("kit"));
+
+        // researcher is in the package, so only default-chat counts; writer is not
+        // here, so what would call it is nothing to protect.
+        assertThat(contents.usedBy("default-llm")).containsExactly("Agent 'default-chat'");
+        assertThat(contents.usedBy("researcher")).isEmpty();
+        assertThat(contents.usedBy("writer")).isEmpty();
+    }
+
+    @Test
+    void what_a_member_used_from_outside_needs_counts_as_used_too() {
+        entry("openai", RegistryItemType.LLM_CONFIG);
+        entry("alias", RegistryItemType.LLM_CONFIG, "openai");
+        entry("helper", RegistryItemType.AGENT, "alias");
+        entry("kit", RegistryItemType.PACKAGE);
+        packages.put("packages/kit.json", new RegistryPackage("Kit", null, null,
+                List.of("helper"), List.of()));
+        configs.present.addAll(List.of("openai", "alias"));
+        agents.present.add("helper");
+        configs.references.put("llm-config:openai", List.of("alias"));
+        agents.references.put("llm-config:alias", List.of("helper", "default-chat"));
+
+        RegistryService.PackageContents contents = service.packageContents(SOURCE.id(), entries.get("kit"));
+
+        // The alias stays for default-chat, so the config it delegates to must stay as well;
+        // helper is used by nothing outside and may go.
+        assertThat(contents.usedBy("alias")).containsExactly("Agent 'default-chat'");
+        assertThat(contents.usedBy("openai")).containsExactly("LLM config 'alias'");
+        assertThat(contents.usedBy("helper")).isEmpty();
+    }
+
+    @Test
+    void only_a_package_can_be_removed() {
+        entry("researcher", RegistryItemType.AGENT);
+        agents.present.add("researcher");
+
+        assertThatThrownBy(() -> service.removeEntry(SOURCE.id(), "researcher", Set.of()))
+                .isInstanceOf(RegistryException.class)
+                .hasMessageContaining("Only a package");
+        assertThat(agents.present).containsExactly("researcher");
+    }
+
+    @Test
+    void only_a_package_has_contents() {
+        entry("researcher", RegistryItemType.AGENT);
+
+        assertThatThrownBy(() -> service.packageContents(SOURCE.id(), entries.get("researcher")))
+                .isInstanceOf(RegistryException.class)
+                .hasMessageContaining("not a package");
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private ImportReport importEntry(String entryId) {
@@ -257,9 +390,28 @@ class RegistryServiceTest {
         final List<String> installed = new ArrayList<>();
         final List<String> present = new ArrayList<>();
         String failOn;
+        private final List<String> removalLog;
 
-        RecordingInstaller(RegistryItemType type) {
+        RecordingInstaller(RegistryItemType type, List<String> removalLog) {
             this.type = type;
+            this.removalLog = removalLog;
+        }
+
+        /** "llm-config:default-llm" → the names of this installer's entities that use it. */
+        final Map<String, List<String>> references = new HashMap<>();
+
+        @Override
+        public List<String> referencesTo(RegistryItemType type, String name) {
+            return references.getOrDefault(type.wireName() + ":" + name, List.of());
+        }
+
+        @Override
+        public ImportedItem remove(RegistryEntry entry) {
+            if (!present.remove(entry.name())) {
+                return ImportedItem.skipped(entry, entry.name(), "not here");
+            }
+            removalLog.add(entry.name());
+            return ImportedItem.removed(entry, entry.name());
         }
 
         @Override
