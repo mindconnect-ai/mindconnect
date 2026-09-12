@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -67,6 +68,26 @@ public record LlmConfig(
          */
         Set<LlmCapability> capabilities,
         /**
+         * Other configs, <em>by name</em>, to try in order when this one is
+         * rate-limited — a provider answering HTTP 429 (rate limit) or 529
+         * (overloaded) after this config's own {@link #retry} policy is
+         * exhausted. Empty (the default) means <em>no fallback</em>: the
+         * transient error propagates to the caller.
+         *
+         * <p>Followed by {@code ai.mindconnect.llm.service.RoutingLlmChatService}:
+         * the first name that still answers serves the request. A fallback may
+         * name an alias (it is resolved like any other name) and may point at a
+         * different provider entirely — that is the point, a second vendor is
+         * not affected by the first one's limit. Only the config the request
+         * actually routed to is consulted, so fallback lists are not chained
+         * recursively; a name that no config carries is skipped with a warning.
+         *
+         * <p>A fallback is only taken while nothing has streamed yet — once the
+         * first chunk reached the caller, switching models would duplicate a
+         * partial answer, so the error propagates instead.
+         */
+        List<String> fallbackModels,
+        /**
          * The stored version this config was read with — optimistic locking for
          * edits made as a whole (the admin form, a REST save). A store saves it only
          * if it is still the stored version and stores it one higher; {@code null}
@@ -82,14 +103,14 @@ public record LlmConfig(
                      Set<LlmCapability> capabilities) {
         this(id, name, provider, model, baseUrl, apiKey, defaultTemperature, maxOutputTokens,
                 additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type,
-                capabilities, null);
+                capabilities, List.of(), null);
     }
 
     /** This config as read with, or to be saved against, {@code version} — nothing else changes. */
     public LlmConfig withVersion(Long version) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
                 defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo,
-                retry, rateLimit, type, capabilities, version);
+                retry, rateLimit, type, capabilities, fallbackModels, version);
     }
 
     /**
@@ -104,6 +125,22 @@ public record LlmConfig(
             capabilities = capabilities.isEmpty() ? Set.of()
                     : Collections.unmodifiableSet(EnumSet.copyOf(capabilities));
         }
+        fallbackModels = normaliseFallbacks(fallbackModels);
+    }
+
+    /**
+     * Fallback names as stored: never null, never blank, trimmed, without
+     * duplicates and in the declared order — a form or a hand-written JSON
+     * file can carry all of those.
+     */
+    private static List<String> normaliseFallbacks(List<String> names) {
+        if (names == null || names.isEmpty()) return List.of();
+        LinkedHashSet<String> cleaned = new LinkedHashSet<>();
+        for (String name : names) {
+            if (name == null || name.isBlank()) continue;
+            cleaned.add(name.trim());
+        }
+        return List.copyOf(cleaned);
     }
 
     /** Has this config declared its capabilities itself, rather than leaving them to the provider? */
@@ -160,11 +197,13 @@ public record LlmConfig(
             @JsonProperty("rateLimit")            RateLimitConfig rateLimit,
             @JsonProperty("type")                 LlmConfigType type,
             @JsonProperty("capabilities")         Set<LlmCapability> capabilities,
+            @JsonProperty("fallbackModels")       List<String> fallbackModels,
             @JsonProperty("version")              Long version) {
         return new LlmConfig(new LlmConfigId(id), name, provider, model, baseUrl, apiKey,
                 defaultTemperature, maxOutputTokens,
                 additionalParams != null ? additionalParams : Map.of(),
-                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
+                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities,
+                fallbackModels, version);
     }
 
     /**
@@ -184,7 +223,7 @@ public record LlmConfig(
 
     public static LlmConfig claude(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.ANTHROPIC,
-                model, "https://api.anthropic.com", apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null, null);
+                model, LlmProvider.ANTHROPIC.defaultBaseUrl(), apiKey, 0.7, 8192, Map.of(), 200_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig ollama(String name, String model, String baseUrl) {
@@ -194,7 +233,7 @@ public record LlmConfig(
 
     public static LlmConfig mistral(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.MISTRAL,
-                model, "https://api.mistral.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
+                model, LlmProvider.MISTRAL.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     /**
@@ -208,32 +247,48 @@ public record LlmConfig(
 
     public static LlmConfig deepSeek(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.DEEPSEEK,
-                model, "https://api.deepseek.com", apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null, null);
+                model, LlmProvider.DEEPSEEK.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 64_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig together(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.TOGETHER,
-                model, "https://api.together.xyz", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+                model, LlmProvider.TOGETHER.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig openRouter(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.OPENROUTER,
-                model, "https://openrouter.ai/api", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+                model, LlmProvider.OPENROUTER.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
     }
 
     public static LlmConfig perplexity(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.PERPLEXITY,
-                model, "https://api.perplexity.ai", apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
+                model, LlmProvider.PERPLEXITY.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig fireworks(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.FIREWORKS,
-                model, "https://api.fireworks.ai/inference", apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+                model, LlmProvider.FIREWORKS.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+    }
+
+    /** xAI's Grok models — {@code grok-4}, {@code grok-4-fast}, {@code grok-3-mini}, … */
+    public static LlmConfig xai(String name, String model, String apiKey) {
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.XAI,
+                model, LlmProvider.XAI.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 256_000, false, null, null, null, null, null);
+    }
+
+    /**
+     * Moonshot AI's Kimi models — {@code kimi-k2-turbo-preview},
+     * {@code kimi-latest}, … For the mainland-China endpoint, override the base
+     * URL with {@code https://api.moonshot.cn}.
+     */
+    public static LlmConfig moonshot(String name, String model, String apiKey) {
+        return new LlmConfig(LlmConfigId.random(), name, LlmProvider.MOONSHOT,
+                model, LlmProvider.MOONSHOT.defaultBaseUrl(), apiKey, 0.7, 4096, Map.of(), 128_000, false, null, null, null, null, null);
     }
 
     public static LlmConfig googleGemini(String name, String model, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), name, LlmProvider.GOOGLE_GEMINI,
-                model, "https://generativelanguage.googleapis.com", apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
+                model, LlmProvider.GOOGLE_GEMINI.defaultBaseUrl(), apiKey, 0.7, 8192, Map.of(), 1_000_000, false, null, null, null, null, null);
     }
 
     /**
@@ -294,18 +349,36 @@ public record LlmConfig(
 
     public LlmConfig withContextWindowTokens(Integer contextWindowTokens) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, fallbackModels, version);
     }
 
     public LlmConfig withApiKey(String apiKey) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, fallbackModels, version);
+    }
+
+    /** Returns a copy with the given retry policy ({@code null}: no retry — the call fails fast). */
+    public LlmConfig withRetry(RetryConfig retry) {
+        return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, fallbackModels, version);
+    }
+
+    /** Returns a copy whose rate-limit fallbacks are exactly the given config names ({@code null}/empty: none). */
+    public LlmConfig withFallbackModels(List<String> fallbackModels) {
+        return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, fallbackModels, version);
+    }
+
+    /** Does this config name at least one other config to fall back to on a rate limit? */
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean hasFallbackModels() {
+        return fallbackModels != null && !fallbackModels.isEmpty();
     }
 
     /** Returns a copy declaring exactly the given capabilities ({@code null}: not declared, the provider's default applies). */
     public LlmConfig withCapabilities(Set<LlmCapability> capabilities) {
         return new LlmConfig(id, name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, version);
+                defaultTemperature, maxOutputTokens, additionalParams, contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities, fallbackModels, version);
     }
 
     /**
@@ -346,6 +419,7 @@ public record LlmConfig(
                 rateLimit,
                 type,
                 capabilities,
+                fallbackModels,
                 version);
     }
 

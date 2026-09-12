@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
+import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.domain.LlmCapability;
@@ -54,7 +55,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void lmStudioGetsADropdownOfChatModelsAndNoKeyField() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "LM_STUDIO",
-                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, CATALOG);
+                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, ModelChoices.of(CATALOG));
 
         UiField model = field(group, "model");
         assertThat(model.getFieldType()).isEqualTo(UiField.FieldType.SELECT);
@@ -73,7 +74,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void anEmbeddingConfigSeesOnlyEmbeddingModels() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "EMBEDDING", "LM_STUDIO",
-                null, null, null, FORM, null, CATALOG);
+                null, null, null, FORM, null, ModelChoices.of(CATALOG));
 
         UiField model = field(group, "model");
         assertThat(optionValues(model)).containsExactly("", "text-embedding-nomic-embed-text-v1.5");
@@ -86,7 +87,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void aStoredModelTheServerNoLongerHasStaysSelectable() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "LM_STUDIO",
-                "qwen/qwen3-32b", "http://localhost:1234", null, FORM, null, CATALOG);
+                "qwen/qwen3-32b", "http://localhost:1234", null, FORM, null, ModelChoices.of(CATALOG));
 
         UiField model = field(group, "model");
         assertThat(model.getValue()).isEqualTo("qwen/qwen3-32b");
@@ -98,7 +99,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void whenLmStudioIsDownTheModelIsATextFieldWithTheReason() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "LM_STUDIO",
-                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, DOWN);
+                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, ModelChoices.of(DOWN));
 
         UiField model = field(group, "model");
         assertThat(model.getFieldType()).isEqualTo(UiField.FieldType.TEXT);
@@ -108,21 +109,26 @@ class LlmConfigFormLmStudioTest {
     }
 
     @Test
-    void otherProvidersKeepTheTextFieldAndTheKey() {
+    void aProviderWithoutAListingKeepsTheTextFieldAndTheKey() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "OPENAI",
-                "gpt-5", null, "${OPENAI_API_KEY}", FORM, null, null);
+                "gpt-5", null, "${OPENAI_API_KEY}", FORM, null, ModelChoices.none());
 
         UiField model = field(group, "model");
         assertThat(model.getFieldType()).isEqualTo(UiField.FieldType.TEXT);
         assertThat(model.getOnChange()).isNull();
         assertThat(field(group, "apiKey")).isNotNull();
-        assertThat(field(group, "baseUrl").getOnChange()).isNull();
+        assertThat(field(group, "baseUrl").getValue())
+                .as("an empty base URL is filled in with the provider's endpoint")
+                .isEqualTo("https://api.openai.com");
+        assertThat(field(group, "baseUrl").getOnChange())
+                .as("a new endpoint serves different models")
+                .isNotNull();
     }
 
     @Test
     void aNewConfigStartsWithNoProviderAndNoPicker() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", null,
-                null, null, null, FORM, null, null);
+                null, null, null, FORM, null, ModelChoices.none());
 
         UiField provider = field(group, "provider");
         assertThat(provider.getValue()).isEqualTo("");
@@ -133,26 +139,28 @@ class LlmConfigFormLmStudioTest {
         assertThat(field(group, "apiKey")).isNotNull();
 
         UiFieldGroup chosen = LlmConfigFormComponent.baseGroup(false, "CHAT", "OPENAI",
-                null, null, null, FORM, null, null);
+                null, null, null, FORM, null, ModelChoices.none());
         assertThat(optionValues(field(chosen, "provider")))
                 .as("once a provider is chosen the blank is gone")
                 .doesNotContain("");
     }
 
     @Test
-    void aCatalogForAnotherProviderIsIgnored() {
-        // The controller only fetches for LM Studio, but the component must not
-        // rely on that: a catalog with a non-LM-Studio provider changes nothing.
+    void onlyLmStudioLosesTheApiKeyField() {
+        // A dropdown is a matter of the catalog, the key field a matter of the
+        // provider: every provider but LM Studio keeps its key, dropdown or not.
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "OLLAMA",
-                "llama3", null, null, FORM, null, CATALOG);
+                "llama3", null, null, FORM, null, ModelChoices.of(CATALOG));
 
-        assertThat(field(group, "model").getFieldType()).isEqualTo(UiField.FieldType.TEXT);
         assertThat(field(group, "apiKey")).isNotNull();
+        assertThat(field(group, "baseUrl").getValue())
+                .as("Ollama's own port, prefilled")
+                .isEqualTo("http://localhost:11434");
     }
 
     @Test
     void thePickedModelFillsContextWindowAndCapabilities() {
-        var prefill = LlmConfigFormComponent.LmStudioPrefill.of(GPT_OSS);
+        var prefill = LlmConfigFormComponent.ModelPrefill.of(GPT_OSS);
         assertThat(prefill.contextWindowTokens()).as("loaded context wins").isEqualTo(32768);
         assertThat(prefill.capabilities()).containsExactly(LlmCapability.TOOL_CALLING);
         assertThat(prefill.hint()).contains("32768").contains("131072");
@@ -163,13 +171,13 @@ class LlmConfigFormLmStudioTest {
         assertThat(field(chat, "capabilities").getValue()).isEqualTo(List.of("TOOL_CALLING"));
         assertThat(field(chat, "capabilities").getHint()).contains("LM Studio");
 
-        var vision = LlmConfigFormComponent.LmStudioPrefill.of(GEMMA);
+        var vision = LlmConfigFormComponent.ModelPrefill.of(GEMMA);
         assertThat(vision.contextWindowTokens()).as("not loaded: the maximum").isEqualTo(131072);
         assertThat(vision.capabilities()).containsExactlyInAnyOrder(LlmCapability.TOOL_CALLING, LlmCapability.VISION);
         assertThat(vision.hint()).contains("not loaded");
 
         UiFieldGroup embedding = LlmConfigFormComponent.typeGroup(LlmConfigType.EMBEDDING, null,
-                LlmConfigFormComponent.LmStudioPrefill.of(NOMIC));
+                LlmConfigFormComponent.ModelPrefill.of(NOMIC));
         assertThat(field(embedding, "contextWindowTokens").getValue()).isEqualTo(2048);
     }
 
@@ -191,7 +199,7 @@ class LlmConfigFormLmStudioTest {
         var mapper = new ObjectMapper();
 
         String withCatalog = mapper.writeValueAsString(
-                new LlmConfigFormComponent(config, List.of(config), CATALOG).render());
+                new LlmConfigFormComponent(config, List.of(config), ModelChoices.of(CATALOG)).render());
         String withoutCatalog = mapper.writeValueAsString(
                 new LlmConfigFormComponent(config, List.of(config)).render());
 

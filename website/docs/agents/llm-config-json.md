@@ -34,7 +34,8 @@ The format of a file in
     "maxAttempts": 5,
     "baseBackoffMillis": 2000,
     "maxBackoffMillis": 30000
-  }
+  },
+  "fallbackModels": ["openai-default", "gemini-default"]
 }
 ```
 
@@ -74,9 +75,9 @@ one:
 |-------|------|-------------|
 | `id` | UUID | Stable identifier. Use a fresh UUID for a new config. |
 | `name` | string | Unique name; what an agent references via `llmConfigName`. |
-| `provider` | enum | One of `ANTHROPIC`, `OPENAI`, `AZURE_OPENAI`, `GOOGLE_GEMINI`, `LM_STUDIO`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`, `TOGETHER`, `OPENROUTER`, `PERPLEXITY`, `FIREWORKS`. |
+| `provider` | enum | One of `ANTHROPIC`, `OPENAI`, `AZURE_OPENAI`, `GOOGLE_GEMINI`, `LM_STUDIO`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`, `XAI` (Grok), `MOONSHOT` (Kimi), `TOGETHER`, `OPENROUTER`, `PERPLEXITY`, `FIREWORKS`. |
 | `model` | string | Model id. Supports `${VAR}` / `${VAR:default}`. |
-| `baseUrl` | string | API endpoint (override for proxies / local servers). |
+| `baseUrl` | string | API endpoint. **Optional** — left out, the provider's own endpoint applies (`https://api.openai.com`, `https://api.mistral.ai`, `https://api.groq.com/openai`, `http://localhost:11434` …). Set it for a proxy, a local server, or an Azure resource, which has no default. |
 | `apiKey` | string | API key — almost always an env-var placeholder like `${ANTHROPIC_API_KEY}`. Literal keys are stored encrypted in the Admin UI (the CLI stores them as-is — use placeholders there). |
 | `type` | enum? | `CHAT` (default), `EMBEDDING` or `SPEECH_TO_TEXT`. Embedding configs power the vector store; speech-to-text configs turn a recording into text through `LlmTranscription` (since 0.5.3). Only chat configs have sampling settings. |
 | `capabilities` | string[]? | What the model reads and does: any of `TOOL_CALLING`, `VISION` (images), `DOCUMENTS` (PDF), `AUDIO_INPUT`. `VISION` and `DOCUMENTS` decide whether an image or PDF sent with a message reaches the model as content or as a placeholder line. **Omitted means not declared** — the provider's default applies (Anthropic and OpenAI: tool calling, vision, documents; Gemini: those plus audio; Azure OpenAI: tool calling, vision; local servers and routers: tool calling only). A declared list, `[]` included, always wins over that default. Chat configs only. |
@@ -86,6 +87,7 @@ one:
 | `additionalParams` | object | Provider-specific options. For Anthropic e.g. `thinking` (`adaptive`/`disabled`) and `effort` (`low`, `medium`, `high`, `xhigh`, `max`). |
 | `rateLimit` | object? | Optional. `maxConcurrentRequests` caps in-flight calls. |
 | `retry` | object? | Optional. `enabled`, `maxAttempts`, `baseBackoffMillis`, `maxBackoffMillis`. **Omitting the block means no retry at all** — the built-in defaults only apply when the block is present and enabled. |
+| `fallbackModels` | string[]? | Optional. Other configs, by name, to try in order when this one is rate-limited (HTTP 429) or the provider is overloaded (529) — after `retry` is exhausted. Point them at a different provider: its limit is a different limit. A fallback may name an alias. Omitted or `[]` means the call fails with the rate-limit error. Chat configs only. |
 | `isAlias` / `delegatesTo` | bool / string | Alias configs forward to another config by name — useful to give a stable name (`agent-default`) that you can repoint. |
 
 :::info Env-var placeholders

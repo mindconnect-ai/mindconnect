@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.anthropic;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.LlmHttpErrors;
 import ai.mindconnect.llm.adapter.TraceRedaction;
 import ai.mindconnect.llm.domain.*;
 import ai.mindconnect.llm.port.in.LlmCallListener;
@@ -92,9 +93,7 @@ public class ClaudeGateway implements LlmGateway {
             throw new RuntimeException("Failed to build Anthropic request", e);
         }
 
-        String baseUrl = config.baseUrl() != null && !config.baseUrl().isBlank()
-                ? config.baseUrl()
-                : "https://api.anthropic.com";
+        String baseUrl = LlmProvider.ANTHROPIC.baseUrlOr(config.baseUrl());
 
         Request httpRequest = new Request.Builder()
                 .url(baseUrl + "/v1/messages")
@@ -120,16 +119,19 @@ public class ClaudeGateway implements LlmGateway {
             if (!response.isSuccessful()) {
                 errorStatus = response.code();
                 errorBody = response.body() != null ? response.body().string() : "(no body)";
-                log.warn("Claude stream error: HTTP {} — body: {}", errorStatus, errorBody);
+                LlmHttpErrors.logHttpError(log, "Anthropic", config, errorStatus,
+                        response.header("retry-after"), errorBody);
                 fireListener(listener, startedAt, start, config, request, prettyRequestJson,
                         responseEvents, null, 0, 0, null, errorStatus, errorBody);
                 // Transient errors (rate limit / overloaded) are surfaced as a
                 // typed exception so the generic RetryingLlmGateway can back off
                 // and retry; everything else fails fast.
                 if (LlmTransientException.isTransient(errorStatus)) {
-                    throw new LlmTransientException(errorStatus,
-                            LlmTransientException.parseRetryAfterMillis(response.header("retry-after")),
-                            "Anthropic stream error: " + errorStatus);
+                    long retryAfterMillis = LlmTransientException.parseRetryAfterMillis(
+                            response.header("retry-after"));
+                    throw new LlmTransientException(errorStatus, retryAfterMillis,
+                            LlmHttpErrors.transientMessage("Anthropic", config, errorStatus,
+                                    retryAfterMillis));
                 }
                 throw new RuntimeException("Anthropic stream error: " + errorStatus);
             }

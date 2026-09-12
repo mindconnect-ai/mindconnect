@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent;
-import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
+import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.ui.model.UiPage;
 
@@ -16,21 +16,20 @@ public final class LlmConfigFormPage extends AdminPage {
 
     private final LlmConfig config;
     private final List<LlmConfig> allConfigs;
-    private final LmStudioModelCatalog.Catalog lmStudio;
+    private final ModelChoices models;
 
     public LlmConfigFormPage(LlmConfig config, List<LlmConfig> allConfigs) {
-        this(config, allConfigs, null);
+        this(config, allConfigs, ModelChoices.none());
     }
 
     /**
-     * @param lmStudio the LM Studio catalog for an LM Studio config's base
-     *                 URL, {@code null} for any other config
+     * @param models the model list the form's Model field offers — from LM
+     *               Studio, from the provider's own listing, or none
      */
-    public LlmConfigFormPage(LlmConfig config, List<LlmConfig> allConfigs,
-                             LmStudioModelCatalog.Catalog lmStudio) {
+    public LlmConfigFormPage(LlmConfig config, List<LlmConfig> allConfigs, ModelChoices models) {
         this.config = config;
         this.allConfigs = allConfigs;
-        this.lmStudio = lmStudio;
+        this.models = models;
     }
 
     @Override
@@ -38,6 +37,6 @@ public final class LlmConfigFormPage extends AdminPage {
         String url = config == null
                 ? "/admin/llm-configs/new"
                 : "/admin/llm-configs/" + config.id().value() + "/edit";
-        return UiPage.of(url, new LlmConfigFormComponent(config, allConfigs, lmStudio).render());
+        return UiPage.of(url, new LlmConfigFormComponent(config, allConfigs, models).render());
     }
 }

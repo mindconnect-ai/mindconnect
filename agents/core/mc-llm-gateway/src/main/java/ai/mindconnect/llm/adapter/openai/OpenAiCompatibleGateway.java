@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.springframework.stereotype.Component;
@@ -19,7 +20,8 @@ public class OpenAiCompatibleGateway extends AbstractOpenAiGateway {
 
     @Override
     protected String endpointUrl(LlmConfig config) {
-        return config.baseUrl() + "/v1/chat/completions";
+        // A config may leave baseUrl empty and mean "wherever this provider lives".
+        return config.provider().baseUrlOr(config.baseUrl()) + "/v1/chat/completions";
     }
 
     @Override

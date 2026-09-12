@@ -43,6 +43,15 @@ public record LlmRequest(
         return new LlmRequest(configName, newMessages, tools, temperature, maxOutputTokens, stream, additionalParams);
     }
 
+    /**
+     * The same request routed at another config — what the fallback chain
+     * sends when the configured model is rate-limited. Only the name changes;
+     * messages, tools and sampling settings travel unchanged.
+     */
+    public LlmRequest withConfigName(String newConfigName) {
+        return new LlmRequest(newConfigName, messages, tools, temperature, maxOutputTokens, stream, additionalParams);
+    }
+
     public LlmRequest withAdditionalParams(Map<String, Object> params) {
         return new LlmRequest(configName, messages, tools, temperature, maxOutputTokens, stream, params);
     }

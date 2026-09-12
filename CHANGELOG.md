@@ -25,6 +25,38 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** an LLM config can name **fallback models**. When the provider
+  rate-limits it (HTTP 429) or reports itself overloaded (529) and the config's
+  own retries are used up, the same request is re-sent through the next config
+  in `fallbackModels`, in order, until one answers — normally a config at
+  another provider, whose limit is a different limit. Configure it in the Admin
+  UI (*Fallback models (on rate limit)* in the chat settings: tick chat
+  configs and move them into the order they are tried) or as a
+  `"fallbackModels": ["openai-default", "gemini-default"]` list in the config
+  JSON. Omitting it keeps the previous behaviour: the rate-limit error reaches
+  the caller. A fallback is only taken before anything has streamed, so a
+  partial answer is never duplicated.
+- **agents:** two providers more — **`XAI`** (the Grok models) and
+  **`MOONSHOT`** (the Kimi models). Both speak the OpenAI API, so they arrive
+  with everything the others have: endpoint prefilled (`https://api.x.ai`,
+  `https://api.moonshot.ai` — set the base URL to `https://api.moonshot.cn` for
+  Moonshot's mainland-China endpoint), model list in the form, retry, rate
+  limit and fallbacks. The provider dropdown now names the models a vendor is
+  known for, so Grok and Kimi are findable under XAI and MOONSHOT. The apps
+  register the OpenAI-compatible gateway as the default for every provider
+  rather than listing them one by one, so the next one is a single enum
+  constant.
+- **agents:** the Admin UI's LLM-config form reads the **model list from the
+  provider**, so a model is picked rather than typed. LM Studio already did
+  this through its native API; now every provider that publishes a listing does
+  — OpenAI, Groq, Mistral, DeepSeek, Together, OpenRouter, Perplexity,
+  Fireworks and Ollama through `/v1/models`, Anthropic and Gemini through their
+  equivalents. Only models fitting the config type are offered — image,
+  text-to-speech, moderation and legacy completion models are left out — a
+  model the provider no longer lists stays selectable, and a listing that fails
+  leaves a text field carrying the reason. OpenRouter's list needs no API key.
+  Azure OpenAI keeps free text: its configs name a deployment, not a model.
+
 - **agents:** registries — a **Registry** screen that installs LLM configs,
   agents, workflows and whole packages from a GitHub project. A registry is a
   repository, not a server: an index (`registry.json`) and the entity files it
@@ -76,6 +108,21 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** every provider now knows its own API endpoint, so **Base URL is
+  prefilled** when a provider is picked in the Admin UI —
+  `https://api.mistral.ai`, `https://api.groq.com/openai`,
+  `http://localhost:11434` — and switching provider replaces a URL that was
+  only the previous provider's default. A URL you typed yourself is never
+  overwritten. `baseUrl` is now optional in a config JSON as well: left out,
+  the provider's endpoint applies instead of the call failing against a `null`
+  host.
+- **agents:** a rate limit is now readable in the log. `HTTP 429` used to be
+  logged as a bare status and a body; it now names the config and the model
+  that was limited, the provider's `Retry-After` hint, and what happens next —
+  how many retries are left and which fallback models follow, or that neither
+  is configured, which is the case an admin can fix. The retry and fallback
+  steps log their own line, so one rate limit reads as one story from limit to
+  answer.
 - **agents:** the admin UI's collapsible headings — tool and agent groups,
   migration rows, trace cards — read at body size in the theme's text colour
   instead of the framework's small grey detail style.

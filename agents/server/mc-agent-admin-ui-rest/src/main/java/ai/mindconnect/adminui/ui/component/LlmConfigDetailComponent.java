@@ -53,6 +53,9 @@ public final class LlmConfigDetailComponent implements UiComponent {
                 .field(UiField.text("maxConcurrentRequests", "Max Concurrent Requests",
                         config.rateLimit() == null ? "Unlimited"
                                 : String.valueOf(config.rateLimit().maxConcurrentRequests())))
+                .field(UiField.text("fallbackModels", "Fallback models (on rate limit)",
+                        config.hasFallbackModels()
+                                ? String.join(" → ", config.fallbackModels()) : "None"))
                 .action(UiAction.primary("edit", "Edit").icon("edit")
                         .dispatch("GET", "/admin/api/llm-configs/" + config.id().value() + "/edit"))
                 .action(UiAction.secondary("test", "Test").icon("flash")

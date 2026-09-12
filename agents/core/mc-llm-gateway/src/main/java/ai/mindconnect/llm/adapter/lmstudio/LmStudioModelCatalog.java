@@ -34,7 +34,7 @@ public class LmStudioModelCatalog {
     private static final Logger log = LoggerFactory.getLogger(LmStudioModelCatalog.class);
 
     /** Where LM Studio serves by default. */
-    public static final String DEFAULT_BASE_URL = "http://localhost:1234";
+    public static final String DEFAULT_BASE_URL = ai.mindconnect.llm.domain.LlmProvider.LM_STUDIO.defaultBaseUrl();
 
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);

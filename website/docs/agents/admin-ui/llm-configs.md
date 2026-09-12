@@ -17,7 +17,31 @@ list of bundled configs and every field, see the
 
 A config has a `name`, `provider`, `model`, `baseUrl`, `apiKey`,
 `contextWindowTokens`, and optional `additionalParams`, rate-limit and retry
-settings. The form also covers:
+settings.
+
+Picking the **provider** fills the **Base URL** in with that provider's own
+endpoint — `https://api.mistral.ai` for Mistral, `https://api.groq.com/openai`
+for Groq, `http://localhost:11434` for Ollama — so nobody has to look it up.
+Switching provider replaces a URL that is still the previous provider's
+default; a URL you typed yourself (a proxy, a compatible host) is left alone.
+Azure OpenAI is the exception: its endpoint is your own resource, so the field
+stays empty for you to fill in.
+
+The **Model** field is then a dropdown of the models that endpoint actually
+serves, read live: LM Studio through its native API, every other provider
+through its `/v1/models` listing (Anthropic and Gemini through their
+equivalents). Only the models that fit the config type are offered — image,
+text-to-speech, moderation, realtime and legacy completion models, which no
+config can call, are left out — and a model the provider no longer lists stays
+selectable so that opening the form never drops it. The listing needs the API
+key (except at OpenRouter, whose catalog is public, and at local servers), so
+entering one reloads the list — as does changing the base URL. When a provider cannot be asked, the field falls
+back to free text with the reason in its hint ("the API key is not accepted",
+"this endpoint serves no model list"), so typing an id always remains possible.
+Azure OpenAI stays free text: its configs name a *deployment*, which is your
+own name for a model.
+
+The form also covers:
 
 - **Type** — `Chat`, `Embedding` (embedding configs power the vector store)
   or `Speech to text` (since 0.5.3: a Whisper-style model that turns a
@@ -30,6 +54,14 @@ settings. The form also covers:
   a picture or document when the config has the capability, as a placeholder
   line when it does not. A config that has never declared any shows its
   provider's default preselected; saving the form pins that set;
+- **Fallback models (on rate limit)** (chat configs) — other chat configs
+  (or aliases of one, shown with their target), picked from the list, that a
+  rate-limited call moves on to in order: when the
+  provider answers 429 (or 529, overloaded) and the retries are used up, the
+  same request is re-sent through the next one. Pick a config at another
+  provider — its limit is a different limit. Nothing picked means the call
+  fails with the rate-limit error. See
+  [rate limits and fallbacks](../llm-gateway.md#rate-limits-and-fallbacks);
 - **alias mode** — *Delegates To* forwards the config to another one by name;
 - **Temperature** and **Max Output Tokens**;
 - provider-specific extra parameters, rendered from the provider catalog;

@@ -12,12 +12,15 @@ import java.util.Set;
  * providers endpoint of the REST API.
  */
 public enum LlmProvider {
-    LM_STUDIO(Set.of(LlmCapability.TOOL_CALLING)),
-    OPENAI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS),
+    LM_STUDIO("http://localhost:1234", Set.of(LlmCapability.TOOL_CALLING)),
+    OPENAI("https://api.openai.com",
+            Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS),
             SpeechParams.TRANSCRIPTION),
-    AZURE_OPENAI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
-    GROQ(Set.of(LlmCapability.TOOL_CALLING), SpeechParams.TRANSCRIPTION),
-    ANTHROPIC(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS), List.of(
+    /** No default: the endpoint is the customer's own resource, {@code https://<resource>.openai.azure.com}. */
+    AZURE_OPENAI(null, Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
+    GROQ("https://api.groq.com/openai", Set.of(LlmCapability.TOOL_CALLING), SpeechParams.TRANSCRIPTION),
+    ANTHROPIC("https://api.anthropic.com",
+            Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS), List.of(
             AdditionalParamSpec.select("thinking", "Thinking",
                     List.of("adaptive", "disabled"),
                     "Anthropic adaptive thinking. 'adaptive' enables reasoning + interleaved "
@@ -28,27 +31,74 @@ public enum LlmProvider {
                     "Reasoning depth / token spend. Only applies when thinking is set. "
                             + "Leave at 'default' to omit.",
                     LlmConfigType.CHAT))),
-    OLLAMA(Set.of(LlmCapability.TOOL_CALLING)),
-    MISTRAL(Set.of(LlmCapability.TOOL_CALLING)),
-    DEEPSEEK(Set.of(LlmCapability.TOOL_CALLING)),
-    TOGETHER(Set.of(LlmCapability.TOOL_CALLING)),
-    OPENROUTER(Set.of(LlmCapability.TOOL_CALLING)),
-    PERPLEXITY(Set.of(LlmCapability.TOOL_CALLING)),
-    FIREWORKS(Set.of(LlmCapability.TOOL_CALLING)),
-    GOOGLE_GEMINI(Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS,
+    OLLAMA("http://localhost:11434", Set.of(LlmCapability.TOOL_CALLING)),
+    MISTRAL("https://api.mistral.ai", Set.of(LlmCapability.TOOL_CALLING)),
+    DEEPSEEK("https://api.deepseek.com", Set.of(LlmCapability.TOOL_CALLING)),
+    TOGETHER("https://api.together.xyz", Set.of(LlmCapability.TOOL_CALLING)),
+    OPENROUTER("https://openrouter.ai/api", Set.of(LlmCapability.TOOL_CALLING)),
+    PERPLEXITY("https://api.perplexity.ai", Set.of(LlmCapability.TOOL_CALLING)),
+    FIREWORKS("https://api.fireworks.ai/inference", Set.of(LlmCapability.TOOL_CALLING)),
+    /** xAI, the Grok models. Its API is OpenAI-compatible. */
+    XAI("https://api.x.ai", Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
+    /**
+     * Moonshot AI, the Kimi models. OpenAI-compatible; the mainland-China
+     * endpoint is {@code https://api.moonshot.cn}, which a config sets as its
+     * base URL. Only tool calling by default — the Kimi line is mixed, and a
+     * config for a vision model declares {@code VISION} itself.
+     */
+    MOONSHOT("https://api.moonshot.ai", Set.of(LlmCapability.TOOL_CALLING)),
+    GOOGLE_GEMINI("https://generativelanguage.googleapis.com",
+            Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS,
             LlmCapability.AUDIO_INPUT));
 
+    private final String defaultBaseUrl;
     private final Set<LlmCapability> defaultCapabilities;
     private final List<AdditionalParamSpec> additionalParams;
 
-    LlmProvider(Set<LlmCapability> defaultCapabilities) {
-        this(defaultCapabilities, List.of());
+    LlmProvider(String defaultBaseUrl, Set<LlmCapability> defaultCapabilities) {
+        this(defaultBaseUrl, defaultCapabilities, List.of());
     }
 
-    LlmProvider(Set<LlmCapability> defaultCapabilities, List<AdditionalParamSpec> additionalParams) {
+    LlmProvider(String defaultBaseUrl, Set<LlmCapability> defaultCapabilities,
+                List<AdditionalParamSpec> additionalParams) {
+        this.defaultBaseUrl = defaultBaseUrl;
         this.defaultCapabilities = defaultCapabilities.isEmpty() ? Set.of()
                 : Collections.unmodifiableSet(EnumSet.copyOf(defaultCapabilities));
         this.additionalParams = additionalParams;
+    }
+
+    /**
+     * Where this provider's API lives, <em>without</em> the {@code /v1/…} path
+     * the adapters append — what a config's {@code baseUrl} should hold when
+     * nobody wants to override it. The admin form fills it in when the provider
+     * is picked, and the adapters fall back to it for a config that carries
+     * none.
+     *
+     * <p>{@code null} for {@link #AZURE_OPENAI} alone: its endpoint is the
+     * customer's own resource and cannot be guessed.
+     */
+    public String defaultBaseUrl() {
+        return defaultBaseUrl;
+    }
+
+    /** {@code baseUrl} if it holds anything, else this provider's {@link #defaultBaseUrl()}. */
+    public String baseUrlOr(String baseUrl) {
+        return baseUrl != null && !baseUrl.isBlank() ? baseUrl.trim() : defaultBaseUrl;
+    }
+
+    /**
+     * Is this URL just some provider's default rather than an endpoint someone
+     * chose? The form uses it to decide whether switching the provider may
+     * replace the base URL in place: a default may be overwritten, a hand-typed
+     * proxy or local URL may not.
+     */
+    public static boolean isADefaultBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) return true;
+        String trimmed = baseUrl.trim();
+        for (LlmProvider provider : values()) {
+            if (trimmed.equals(provider.defaultBaseUrl)) return true;
+        }
+        return false;
     }
 
     /**
@@ -62,6 +112,20 @@ public enum LlmProvider {
      */
     public Set<LlmCapability> defaultCapabilities() {
         return defaultCapabilities;
+    }
+
+    /**
+     * The provider as a person picks it from a list. The enum name for most of
+     * them — it <em>is</em> the vendor's name — but a vendor whose models go by
+     * another name says both, so that somebody looking for Grok or Kimi finds
+     * the company that serves it.
+     */
+    public String label() {
+        return switch (this) {
+            case XAI -> "XAI (Grok)";
+            case MOONSHOT -> "MOONSHOT (Kimi)";
+            default -> name();
+        };
     }
 
     /** The additional-parameter fields this provider's gateway understands. */

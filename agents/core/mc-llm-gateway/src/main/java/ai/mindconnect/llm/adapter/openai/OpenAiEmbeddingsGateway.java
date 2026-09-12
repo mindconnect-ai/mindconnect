@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.LlmHttpErrors;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -62,6 +63,11 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
             try (Response response = httpClient.newCall(request).execute()) {
             String payload = response.body() != null ? response.body().string() : "";
             if (!response.isSuccessful()) {
+                // An embedding call has no retry decorator and no fallback of
+                // its own, but a 429 here is still a rate limit and must read
+                // as one in the log rather than as an opaque failure.
+                LlmHttpErrors.logHttpError(log, "OpenAI-compatible embeddings", config,
+                        response.code(), response.header("retry-after"), payload);
                 throw new IllegalStateException("Embeddings call failed (" + response.code() + "): "
                         + truncate(payload));
             }
