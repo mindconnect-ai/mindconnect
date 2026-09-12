@@ -13,13 +13,15 @@ concept — the three sources, the file format, how one is written — is
 
 ## The list
 
-It shows what an agent could actually load: the skills this installation
-stores, plus the `SKILL.md` files in the signed-in user's own skills directory.
+It shows every skill this installation stores, plus the `SKILL.md` files in the
+signed-in user's own skills directory.
 A skill a project keeps in its `.mindconnect/skills/` belongs to a session's
 working directory and shows up in the chat that works there, not here.
 
-- **New Skill** — create one.
-- **Delete** — on a stored skill's row.
+- **New Skill** — create one. A name another stored skill already has is
+  refused: an agent looks skills up by name.
+- **Delete** — on a stored skill's row. A skill the app ships comes back on
+  the next start; switch it off instead to keep it away.
 - A row from a file says so and has no buttons: it is edited where it lies,
   and this screen has no business writing into somebody's repository or home
   directory.

@@ -32,8 +32,9 @@ import java.util.Optional;
 /**
  * The skills screens. Ids in paths are their plain values.
  *
- * <p>The list shows what an agent could actually load: the stored skills and
- * the {@code SKILL.md} files in the signed-in user's own skills directory. A
+ * <p>The list shows every stored skill — a switched-off one too, since this
+ * is where it is switched back on — and the {@code SKILL.md} files in the
+ * signed-in user's own skills directory. A
  * project's skills belong to a session's working directory and show up in
  * the chat that works there, not on this screen.
  *
@@ -135,6 +136,9 @@ public class SkillUiController {
         if (!skill.hasValidName()) {
             return ResponseEntity.ok(VersionedForms.unusableName("Skill", skill.name()));
         }
+        if (nameTaken(skill)) {
+            return ResponseEntity.ok(VersionedForms.nameTaken("Skill", skill.name()));
+        }
         Skill saved = repository().save(skill);
         return detail(saved.id().value(), user);
     }
@@ -157,6 +161,9 @@ public class SkillUiController {
                 .withVersion(VersionedForms.version(body));
         if (!updated.hasValidName()) {
             return ResponseEntity.ok(VersionedForms.unusableName("Skill", updated.name()));
+        }
+        if (nameTaken(updated)) {
+            return ResponseEntity.ok(VersionedForms.nameTaken("Skill", updated.name()));
         }
         try {
             repository().save(updated);
@@ -183,9 +190,22 @@ public class SkillUiController {
                         .findFirst());
     }
 
-    /** What this user can see: the stored skills plus their own files. */
+    /**
+     * What this user can see: every stored skill — switched off or hidden
+     * behind a file of the same name included, since this is where it is
+     * switched back on or deleted — then their own files.
+     */
     private List<Skill> visible(OidcUser user) {
-        return catalog().all(userIdOf(user), null);
+        List<Skill> skills = new java.util.ArrayList<>(repository().findAll());
+        skills.addAll(catalog().userSkills(userIdOf(user)));
+        return List.copyOf(skills);
+    }
+
+    /** Whether another stored skill already carries {@code skill}'s name. */
+    private boolean nameTaken(Skill skill) {
+        return repository().findByName(skill.name())
+                .filter(other -> !other.id().equals(skill.id()))
+                .isPresent();
     }
 
     /** The signed-in user as an id, or {@code null} when there is none to read. */

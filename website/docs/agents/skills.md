@@ -104,18 +104,22 @@ may load — so a model cannot invent one, and a wrong guess costs no round.
 
 ## Managing skills
 
-The **Skills** screen lists what an agent could load: the stored skills plus
-the files in the signed-in user's own skills directory. Stored skills are
-created, edited, switched off and deleted there; a skill read from a file is
-shown read-only and edited where it lies. Every stored skill can be fetched as
+The **Skills** screen lists every stored skill — one switched off included,
+marked `(off)` — plus the files in the signed-in user's own skills directory.
+Stored skills are created, edited, switched off and deleted there; a skill read
+from a file is shown read-only and edited where it lies. A stored name is
+unique: saving a second skill under a name one already has is refused, since
+an agent looks skills up by name. Every stored skill can be fetched as
 a `SKILL.md` (`/admin/api/skills/{id}/markdown`, or `/api/skills/{id}/markdown`)
 — drop that file into a repository's `.mindconnect/skills/` and it travels with
 the code.
 
-Skills shipped with the app are imported once on first start from
-`initial-data/skills/*.md`; see [Initial data](./initial-data.md). A stored
-skill is never overwritten by the shipped version — it is prose someone has
-since made their own.
+Skills shipped with the app are imported on start from
+`initial-data/skills/*.md` whenever no stored skill carries their name; see
+[Initial data](./initial-data.md). A stored skill is never overwritten by the
+shipped version — it is prose someone has since made their own. Deleting a
+shipped skill therefore brings it back on the next start; to be rid of one,
+switch it off.
 
 ## Configuration
 

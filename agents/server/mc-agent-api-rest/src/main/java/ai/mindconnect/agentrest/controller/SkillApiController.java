@@ -77,16 +77,39 @@ public class SkillApiController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @Operation(summary = "Create a skill")
+    @Operation(summary = "Create a skill",
+            description = "Refused with 400 when the name is not lower-case letters, digits and "
+                    + "dashes, and with 409 when a stored skill already has it.")
     @PostMapping
-    public ResponseEntity<Skill> create(@RequestBody SkillRequest req) {
+    public ResponseEntity<?> create(@RequestBody SkillRequest req) {
         log.info("POST /api/skills name={}", req.name());
         Skill skill = Skill.create(req.name(), req.description(), req.instructions(), req.tools());
         if (req.enabled() != null && !req.enabled()) {
             skill = skill.withFields(skill.name(), skill.description(), skill.instructions(),
                     skill.tools(), false);
         }
-        return ResponseEntity.ok(repository.save(skill));
+        ResponseEntity<String> refused = refusal(skill);
+        return refused != null ? refused : ResponseEntity.ok(repository.save(skill));
+    }
+
+    /**
+     * Why {@code skill} cannot be saved as it is, or {@code null} when it can:
+     * a name no model could type is the caller's mistake (400), and a name
+     * another stored skill has is a conflict (409) — the runtime looks skills
+     * up by name, so the second one would never be reached.
+     */
+    private ResponseEntity<String> refusal(Skill skill) {
+        if (!skill.hasValidName()) {
+            return ResponseEntity.badRequest().body("Skill name '" + skill.name() + "' is not usable: use "
+                    + "lower-case letters, digits and dashes, starting with a letter or digit, at most "
+                    + "64 characters");
+        }
+        boolean taken = repository.findByName(skill.name())
+                .filter(other -> !other.id().equals(skill.id()))
+                .isPresent();
+        return taken
+                ? ResponseEntity.status(HttpStatus.CONFLICT).body("A skill named '" + skill.name() + "' already exists")
+                : null;
     }
 
     @Operation(summary = "Update a skill",
@@ -104,6 +127,8 @@ public class SkillApiController {
                         req.tools() == null ? existing.tools() : req.tools(),
                         req.enabled() == null ? existing.enabled() : req.enabled())
                 .withVersion(req.version());
+        ResponseEntity<String> refused = refusal(updated);
+        if (refused != null) return refused;
         try {
             return ResponseEntity.ok(repository.save(updated));
         } catch (StaleVersionException e) {

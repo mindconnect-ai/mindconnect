@@ -80,6 +80,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
   migration rows, trace cards — read at body size in the theme's text colour
   instead of the framework's small grey detail style.
 
+### Fixed
+
+- **agents:** an agent reaches only the skills its setting allows. The `skill`
+  tool could also be found with `tool_search` or assigned by hand from the tool
+  catalog, and that copy carried no names — it offered every skill, even to an
+  agent with skills switched off, and sat beside the injected one as a second
+  tool of the same name, which a provider can reject. The setting is now the
+  only way an agent gets the tool.
+- **agents:** the **Skills** screen lists every stored skill again, including
+  one switched off or hidden behind a user's `SKILL.md` of the same name —
+  before, such a skill disappeared from the list and could only be reached by
+  its URL. Saving a second stored skill under a name one already has is
+  refused (a toast in the admin UI, `409` from `/api/skills`), since an agent
+  looks skills up by name and would silently get only one of them; a name no
+  model could type is a `400` from the API instead of a `500`.
+
 ## [0.8.1] - 2026-09-12
 
 ### Fixed

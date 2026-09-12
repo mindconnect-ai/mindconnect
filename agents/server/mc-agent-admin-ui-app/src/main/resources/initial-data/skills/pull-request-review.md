@@ -5,8 +5,8 @@ tools: bash, file_read, grep
 ---
 # Reviewing a change
 
-An example skill, and a working one — edit it, or delete it, to make the
-screen yours. It shows the shape a skill has: a description that says WHEN,
+An example skill, and a working one — edit it, or switch it off, to make the
+screen yours (deleted, it comes back with the next start). It shows the shape a skill has: a description that says WHEN,
 and instructions long enough to be worth loading.
 
 ## Read the change before judging it

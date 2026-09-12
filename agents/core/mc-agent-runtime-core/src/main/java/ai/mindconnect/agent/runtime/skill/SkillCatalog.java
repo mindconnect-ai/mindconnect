@@ -113,6 +113,17 @@ public final class SkillCatalog {
     }
 
     /**
+     * The {@code SKILL.md} files in this user's own skills directory, as they
+     * are — not merged with the stored skills. What a screen that manages
+     * skills lists beside the store: {@link #all} answers what an agent can
+     * load, and leaves out exactly the skills such a screen must still show,
+     * a stored one switched off or hidden behind a file of the same name.
+     */
+    public List<Skill> userSkills(UserId userId) {
+        return FileSkills.list(userDir(userId), SkillSource.USER);
+    }
+
+    /**
      * The skills a binding may load: everything {@link #all} found when it
      * names none, and only the ones it names otherwise. This is the form the
      * {@code skill} tool works in — it knows the names its binding carries,

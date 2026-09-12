@@ -87,6 +87,48 @@ class SkillToolBindingTest {
         assertThat(refs(agent(null))).extracting(AgentTool::name).containsExactly("file_read");
     }
 
+    /** A session repository holding one session that a search has already given {@code names}. */
+    private static AgentSessionRepository sessionThatActivated(AgentSession session) {
+        return new AgentSessionRepository() {
+            @Override public AgentSession create(AgentSession s) { return s; }
+            @Override public Optional<AgentSession> update(SessionId id, UnaryOperator<AgentSession> change) {
+                return Optional.of(change.apply(session));
+            }
+            @Override public Optional<AgentSession> findById(SessionId id) { return Optional.of(session); }
+            @Override public List<AgentSession> findByAgent(AgentId agent, UserId user) { return List.of(); }
+            @Override public List<AgentSession> findByUser(UserId user) { return List.of(); }
+            @Override public List<AgentSession> findByParentSession(SessionId parent) { return List.of(); }
+            @Override public void deleteById(SessionId id) { }
+        };
+    }
+
+    @Test
+    void aSkillToolFoundBySearchIsNeitherASecondToolNorAWayPastTheSetting() {
+        AgentSession session = AgentSession.start(AgentId.random(), UserId.of("alice"), ConversationId.random())
+                .withActivatedTools(List.of(SkillTool.NAME));
+        var activations = new DynamicToolActivations(sessionThatActivated(session), catalog());
+
+        var narrowed = activations.effectiveRefs(
+                agent(new AgentDefinition.SkillsConfig(true, List.of("release"))), session.id());
+        assertThat(narrowed).extracting(AgentTool::name).containsExactly("file_read", SkillTool.NAME);
+        assertThat(narrowed.get(1).overrides()).containsEntry(SkillToolFactory.NAMES, List.of("release"));
+
+        assertThat(activations.effectiveRefs(agent(AgentDefinition.SkillsConfig.OFF), session.id()))
+                .as("switched off, a search result does not bring the tool back")
+                .extracting(AgentTool::name).containsExactly("file_read");
+    }
+
+    @Test
+    void aSkillToolAssignedByHandIsDroppedInFavourOfTheSetting() {
+        AgentDefinition off = agent(AgentDefinition.SkillsConfig.OFF)
+                .withTools(List.of(AgentTool.of("file_read"), AgentTool.of(SkillTool.NAME)));
+        assertThat(refs(off)).extracting(AgentTool::name).containsExactly("file_read");
+
+        var refs = refs(off.withSkills(new AgentDefinition.SkillsConfig(true, List.of("release"))));
+        assertThat(refs).extracting(AgentTool::name).containsExactly("file_read", SkillTool.NAME);
+        assertThat(refs.get(1).overrides()).containsEntry(SkillToolFactory.NAMES, List.of("release"));
+    }
+
     @Test
     void theFactoryBuildsTheToolAgainstTheBindingAndTheCallersDirectory() {
         var factory = new SkillToolFactory();
