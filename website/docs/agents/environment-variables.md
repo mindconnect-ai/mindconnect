@@ -45,6 +45,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.tools.disabled` | — | Tools this installation does not offer at all, comma-separated (`bash,process_kill`). They leave every catalog and never resolve — an agent definition that names one goes without it, and the Admin UI's tool settings cannot switch it back on. `MC_TOOLS_DISABLED` in the `server` profile. |
 | `mindconnect.working-dirs.choice` | `true` | Whether a user may choose a chat's directories. `false`: no folder button in the chat, `workingDir`/`additionalDirs` on `POST /api/sessions`, `PUT /api/sessions/{id}/working-dir` and `GET /api/directories` are refused (`/cd` and `/add-dir` in the CLI too), and every chat works in its own directory under `users.home`. |
 | `mindconnect.agent.instructions.user-dir` | `~/.mindconnect` | Where a user's standing instructions live (`AGENTS.md`, `PROMPT.md` or `CLAUDE.md`), read into every session's system prompt beside the project's own file. The default suits a desktop: one person, one home. A server runs as one service account, so put `{user}` in the value and each user gets a directory of their own. `off` drops the user scope. |
+| `mindconnect.agent.skills.user-dir` | `~/.mindconnect/skills` | Where a user's own [skills](./skills.md) live — `SKILL.md` files they can load in every project, beside the ones this installation stores and the ones a project keeps in `.mindconnect/skills/`. Same shape as the line above: the default suits a desktop, a server puts `{user}` in the value, `off` drops the user scope. `MC_SKILLS_USER_DIR` in the `server` profile. |
 | `mindconnect.user.id` | app-specific | The user id that owns sessions and data (the CLI ships a hard-coded default). |
 | `mindconnect.remote.url` | _(unset)_ | Points the CLI at a remote agent server instead of local mode. |
 | `mindconnect.remote.token` | _(unset)_ | Bearer token the CLI sends to a remote agent server that requires authentication; also read from `MC_REMOTE_TOKEN`. |
@@ -71,9 +72,11 @@ plus `keycloak` for login). It sets:
 - `mindconnect.tools.base-dir: <data.base-dir>/tools` instead of the account's home.
 - `mindconnect.agent.instructions.user-dir: off` — set a path with `{user}` for one
   `AGENTS.md` per user.
+- `mindconnect.agent.skills.user-dir: off` — likewise, a path with `{user}` for one
+  skills directory per user. The installation's own skills are unaffected.
 
 Each value can be overridden (`MC_TOOLS_DISABLED`, `MC_WORKING_DIR_ROOT`,
-`MC_TOOLS_BASE_DIR`, `MC_INSTRUCTIONS_USER_DIR`). Uploads need local disk either way:
+`MC_TOOLS_BASE_DIR`, `MC_INSTRUCTIONS_USER_DIR`, `MC_SKILLS_USER_DIR`). Uploads need local disk either way:
 on several nodes, `users.home` has to be shared storage for the file tools to find
 a chat's copy.
 

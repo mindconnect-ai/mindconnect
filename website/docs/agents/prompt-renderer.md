@@ -71,7 +71,12 @@ change shows up on the next turn without touching the agent.
 | `## Working directory` | the session has one, or has additional directories | Where relative paths resolve, where `bash` runs, which further directories may be reached by absolute path |
 | `## User instructions` | the user's instructions directory holds one of the files below | The user's standing instructions, verbatim |
 | `## Project instructions` | the working directory holds one of them | The project's own instructions, verbatim |
+| `## Skills` | the agent has [skills](./skills.md) switched on and there are any | One line per skill — name and description — and that the `skill` tool loads the rest |
 | `## Attached files` | files are attached to the chat | Their names, kinds and on-disk paths, and how to search them |
+
+The skills section is the one that deliberately says less than it knows: the
+instructions stay out until the model asks for a skill by name, which is what
+makes a long skill cheap to have.
 
 ### Instruction files
 

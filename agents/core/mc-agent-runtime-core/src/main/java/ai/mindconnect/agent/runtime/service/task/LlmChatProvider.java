@@ -10,6 +10,7 @@ import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.service.prompt.SystemPromptRenderer;
 import ai.mindconnect.agent.runtime.service.round.LlmAnswer;
 import ai.mindconnect.agent.runtime.service.round.LlmProvider;
@@ -78,12 +79,13 @@ public final class LlmChatProvider implements LlmProvider {
     private final LlmCallTraceRepository traceRepository;
     private final TraceContext traceContext;
     private final InstructionFiles instructions;
+    private final SkillCatalog skills;
 
     public LlmChatProvider(LlmChat llmChat, AgentDefinition def, AgentSession session,
                            MemoryStrategy memoryStrategy, PromptRenderer promptRenderer,
                            Consumer<StreamEvent> stream,
                            LlmCallTraceRepository traceRepository, TraceContext traceContext,
-                           InstructionFiles instructions) {
+                           InstructionFiles instructions, SkillCatalog skills) {
         this.llmChat = llmChat;
         this.def = def;
         this.session = session;
@@ -93,6 +95,7 @@ public final class LlmChatProvider implements LlmProvider {
         this.traceRepository = traceRepository;
         this.traceContext = traceContext;
         this.instructions = instructions;
+        this.skills = skills == null ? SkillCatalog.none() : skills;
     }
 
     @Override
@@ -133,7 +136,7 @@ public final class LlmChatProvider implements LlmProvider {
         List<LlmMessage> window = new ArrayList<>();
         window.add(LlmMessage.system(
                 SystemPromptRenderer.render(promptRenderer, memoryStrategy, def, session, auth,
-                        instructions)));
+                        instructions, skills)));
         window.addAll(memoryStrategy.buildWindow(def, session, auth, history));
         return window;
     }

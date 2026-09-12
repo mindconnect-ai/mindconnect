@@ -49,6 +49,31 @@ fresh empty one, so nothing has to be moved by hand at release time.
   (`mindconnect.registry.enabled=false`); format and settings in the docs under
   *Registry*.
 
+- **agents:** skills — know-how written down once and loaded when it is needed,
+  instead of carried in a system prompt from the first token on. Only a skill's
+  name and description stand in the prompt, a line each; the instructions
+  arrive when the model calls the new `skill` tool for that name, so ten skills
+  cost ten lines until one is used and can be written out at the length the
+  work actually needs. Three sources, read fresh every round: the skills this
+  installation stores (the new **Skills** screen in the admin UI, or
+  `/api/skills`), a user's own `SKILL.md` files under
+  `mindconnect.agent.skills.user-dir`, and a project's in `.mindconnect/skills/`
+  under the session's working directory — same name means one skill, with the
+  more specific source winning, so a repository can say how its own reports are
+  written. The file format is the portable one: front matter for `name`,
+  `description` and `tools`, the body for the instructions, either as
+  `<name>/SKILL.md` beside the files it refers to (the skill is handed over
+  with its directory, so a template or checklist is one `file_read` away) or as
+  a lone `<name>.md`. An agent gets skills from its new `skills` setting
+  (`{"enabled": true, "names": [...]}`, empty names meaning every skill there
+  is) in the edit form or over `PUT /api/agents/{id}`; the `skill` tool is then
+  injected and taken away with the setting, never assigned by hand, and it
+  offers the model exactly the names that agent may load. A skill grants
+  nothing: the tools it names are a hint, and the agent's own bindings still
+  decide what it may call. A first example skill is seeded on a fresh install,
+  and any stored skill can be fetched as a `SKILL.md` to commit into a
+  repository. See [Skills](https://mindconnect-ai.github.io/mindconnect/agents/skills).
+
 ### Changed
 
 - **agents:** the admin UI's collapsible headings — tool and agent groups,

@@ -22,6 +22,8 @@ public class SpaController {
         "/admin/agents/**",
         "/admin/tools",
         "/admin/tools/**",
+        "/admin/skills",
+        "/admin/skills/**",
         "/admin/sessions",
         "/admin/sessions/**",
         "/admin/llm-configs",

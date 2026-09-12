@@ -176,11 +176,16 @@ public class DefaultAgentRuntimeConfig {
                         new MessageToLlmMessageMapper(partContentReader)));
     }
 
-    /** Session-scoped tool activations written by tool_search, read per round. */
+    /**
+     * Session-scoped tool activations written by tool_search, read per round —
+     * and the place the {@code skill} tool is added to an agent that has
+     * skills switched on, which is why the catalog comes in here too.
+     */
     @Bean
     DynamicToolActivations dynamicToolActivations(
-            AgentSessionRepository sessionRepository) {
-        return new DynamicToolActivations(sessionRepository);
+            AgentSessionRepository sessionRepository,
+            ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog) {
+        return new DynamicToolActivations(sessionRepository, skillCatalog);
     }
 
     @Bean
@@ -390,6 +395,30 @@ public class DefaultAgentRuntimeConfig {
     }
 
     /**
+     * What an agent with skills switched on can load, and what its prompt
+     * says about it: the skills this installation stores, plus the
+     * {@code SKILL.md} files the user and the session's project keep.
+     *
+     * <p>{@code mindconnect.agent.skills.user-dir} says where a user's own
+     * skills live. Unset means {@code ~/.mindconnect/skills}, which is right
+     * for a desktop; a server runs as one service account, so put
+     * {@code {user}} in the value and each user gets a directory of their
+     * own. {@code off} drops the user scope, leaving the stored skills and
+     * the project's.
+     *
+     * <p>Without a {@code SkillRepository} bean — an app that wires no store
+     * — only the file scopes are read; nothing here fails for the want of one.
+     */
+    @Bean
+    ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog(
+            org.springframework.beans.factory.ObjectProvider<
+                    ai.mindconnect.agent.runtime.skill.SkillRepository> skillRepository,
+            @Value("${mindconnect.agent.skills.user-dir:}") String userDir) {
+        return ai.mindconnect.agent.runtime.skill.SkillCatalog.of(
+                skillRepository.getIfAvailable(), userDir);
+    }
+
+    /**
      * Where a session may work: under {@code mindconnect.tools.working-dir-root}
      * when set, else in the user's own home; without one, under the tools'
      * base directory — a server must not let a user point the file tools at
@@ -476,11 +505,12 @@ public class DefaultAgentRuntimeConfig {
                                     SessionChannels sessionChannels,
                                     AgentTaskRunner agentTaskRunner,
                                     WorkingMemoryRepository workingMemoryRepository,
-                                    ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles) {
+                                    ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles,
+                                    ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog) {
         return new AgentTurnWorker(conversationManager, definitionRepository, sessionService,
                 memoryStrategyFactory, promptRenderer, toolRegistry, dynamicToolActivations,
                 llmChat, llmCallTraceRepository, sessionChannels,
-                agentTaskRunner, workingMemoryRepository, instructionFiles);
+                agentTaskRunner, workingMemoryRepository, instructionFiles, skillCatalog);
     }
 
     @Bean
@@ -512,11 +542,12 @@ public class DefaultAgentRuntimeConfig {
                                       LocalTaskQueue taskQueue,
                                       ToolApprovalStore approvalStore,
                                       ExecutorService turnExecutor,
-                                      ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles) {
+                                      ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles,
+                                      ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog) {
         return new AgentChatService(sessionService, definitionRepository, conversationManager,
                 memoryStrategyFactory, workingMemoryRepository, promptRenderer,
                 agentTaskRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
-                instructionFiles);
+                instructionFiles, skillCatalog);
     }
 
     /**

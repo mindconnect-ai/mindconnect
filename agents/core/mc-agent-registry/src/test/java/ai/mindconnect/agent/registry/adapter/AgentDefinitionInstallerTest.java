@@ -61,6 +61,17 @@ class AgentDefinitionInstallerTest {
     }
 
     @Test
+    void carries_the_skills_setting_of_the_registry_file() throws Exception {
+        String json = JSON.replace("\"tools\": []",
+                "\"tools\": [], \"skills\": {\"enabled\": true, \"names\": [\"weekly-report\"]}");
+
+        installer.install(ENTRY, json, ImportMode.SKIP_EXISTING);
+
+        assertThat(repository.findByName("web-researcher").orElseThrow().skillsOrOff())
+                .isEqualTo(new AgentDefinition.SkillsConfig(true, List.of("weekly-report")));
+    }
+
+    @Test
     void an_overwrite_keeps_the_local_id_and_the_date_it_first_arrived() throws Exception {
         AgentDefinition existing = AgentDefinition.create("web-researcher", "old", "old prompt",
                 null, "default");

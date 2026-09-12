@@ -117,7 +117,8 @@ public class AgentApiController {
     public record UpdateAgentRequest(String name, String description, String systemPrompt,
                                      String welcomeMessage, String llmConfigName,
                                      Integer maxIterations, List<String> responseReviewers,
-                                     AgentDefinition.ToolSearchConfig toolSearch, Long version) {
+                                     AgentDefinition.ToolSearchConfig toolSearch,
+                                     AgentDefinition.SkillsConfig skills, Long version) {
 
         /** Without a version: the update is applied to the agent as stored. */
         public UpdateAgentRequest(String name, String description, String systemPrompt,
@@ -125,7 +126,7 @@ public class AgentApiController {
                                   Integer maxIterations, List<String> responseReviewers,
                                   AgentDefinition.ToolSearchConfig toolSearch) {
             this(name, description, systemPrompt, welcomeMessage, llmConfigName, maxIterations,
-                    responseReviewers, toolSearch, null);
+                    responseReviewers, toolSearch, null, null);
         }
     }
 
@@ -147,7 +148,8 @@ public class AgentApiController {
                 .withLlmConfigName(req.llmConfigName())
                 .withMaxIterations(req.maxIterations())
                 .withResponseReviewers(req.responseReviewers())
-                .withToolSearch(req.toolSearch());
+                .withToolSearch(req.toolSearch())
+                .withSkills(req.skills());
         return registryService.update(AgentId.of(agentId), patch, req.version());
     }
 

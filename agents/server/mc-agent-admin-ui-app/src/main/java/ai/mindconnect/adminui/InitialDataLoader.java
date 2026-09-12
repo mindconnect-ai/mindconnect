@@ -2,6 +2,9 @@ package ai.mindconnect.adminui;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.skill.Skill;
+import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.runtime.skill.SkillSource;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -24,6 +27,10 @@ import java.util.List;
  *       if the stored config differs from the classpath version the supplied {@link ConfirmOverwrite}
  *       callback is invoked and the record is overwritten only if it returns {@code true}.</li>
  *   <li>{@code initial-data/agent-definitions/*.json} — same semantics per name.</li>
+ *   <li>{@code initial-data/skills/*.md} — one {@code SKILL.md} per skill, imported
+ *       when no skill of that name is stored. A stored one is never touched: a
+ *       skill is text someone edits, and the shipped version has nothing to say
+ *       about what they made of it.</li>
  * </ul>
  * New records are always imported. Existing identical records are silently skipped.
  */
@@ -40,13 +47,16 @@ public class InitialDataLoader implements ApplicationRunner {
 
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentDefinitionRepository;
+    private final SkillRepository skillRepository;
     private final ObjectMapper objectMapper;
 
     public InitialDataLoader(LlmConfigRepository llmConfigRepository,
                              AgentDefinitionRepository agentDefinitionRepository,
+                             SkillRepository skillRepository,
                              ObjectMapper objectMapper) {
         this.llmConfigRepository = llmConfigRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
+        this.skillRepository = skillRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -68,6 +78,7 @@ public class InitialDataLoader implements ApplicationRunner {
     public void load(ConfirmOverwrite confirmOverwrite) {
         loadLlmConfigs(confirmOverwrite);
         loadAgentDefinitions(confirmOverwrite);
+        loadSkills();
     }
 
     // ── LLM configs ───────────────────────────────────────────────────────────
@@ -118,6 +129,40 @@ public class InitialDataLoader implements ApplicationRunner {
                 });
             } catch (Exception e) {
                 log.warn("Failed to load agent definition from {}: {}", resource.getFilename(), e.getMessage());
+            }
+        }
+    }
+
+    // ── Skills ────────────────────────────────────────────────────────────────
+
+    /**
+     * Imports the shipped {@code SKILL.md} files, and only those the store
+     * does not already know by name. No overwrite prompt: unlike a config,
+     * a skill is prose someone has since rewritten for their own house, and
+     * the shipped wording has no claim on it.
+     */
+    private void loadSkills() {
+        for (Resource resource : scan("classpath:initial-data/skills/*.md")) {
+            String fileName = resource.getFilename() == null ? "skill" : resource.getFilename();
+            String fallback = fileName.endsWith(".md")
+                    ? fileName.substring(0, fileName.length() - 3) : fileName;
+            try {
+                String content = new String(resource.getInputStream().readAllBytes(),
+                        java.nio.charset.StandardCharsets.UTF_8);
+                Skill incoming = Skill.fromMarkdown(fallback, content, SkillSource.MANAGED, null);
+                if (incoming == null) {
+                    log.warn("Initial skill {} has no instructions, or a name that is not lower-case "
+                            + "letters, digits and dashes — skipping", fileName);
+                    continue;
+                }
+                if (skillRepository.findByName(incoming.name()).isPresent()) {
+                    log.debug("Skill '{}' is already stored — skipping", incoming.name());
+                    continue;
+                }
+                skillRepository.save(incoming);
+                log.info("Imported skill '{}'", incoming.name());
+            } catch (Exception e) {
+                log.warn("Failed to load skill from {}: {}", fileName, e.getMessage());
             }
         }
     }

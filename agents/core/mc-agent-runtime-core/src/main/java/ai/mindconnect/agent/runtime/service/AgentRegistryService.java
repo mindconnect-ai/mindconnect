@@ -90,6 +90,9 @@ public class AgentRegistryService {
         if (patch.toolSearch().isPresent()) {
             updated = updated.withToolSearch(patch.toolSearch().get());
         }
+        if (patch.skills().isPresent()) {
+            updated = updated.withSkills(patch.skills().get());
+        }
         if (patch.tools().isPresent()) {
             updated = updated.withTools(patch.tools().get());
         }

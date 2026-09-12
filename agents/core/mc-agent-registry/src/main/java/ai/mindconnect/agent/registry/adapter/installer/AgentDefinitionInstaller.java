@@ -119,6 +119,7 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
                 incoming.responseReviewers(),
                 incoming.callableAgents(),
                 incoming.toolSearch(),
+                incoming.skills(),
                 existing.map(AgentDefinition::createdAt).orElse(now),
                 now,
                 existing.map(AgentDefinition::version).orElse(null));

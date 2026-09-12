@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.service.agents;
 
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
+import ai.mindconnect.agent.runtime.markdown.FrontMatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -10,11 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -116,131 +114,14 @@ public final class ProjectAgents {
      * prompt. {@code null} when there is no prompt to run on.
      */
     static ProjectAgent parse(String fileName, String content) {
-        Map<String, String> head = Map.of();
-        String body = content;
-        String text = content.stripLeading();
-        if (text.startsWith("---")) {
-            int firstBreak = text.indexOf('\n');
-            int close = firstBreak < 0 ? -1 : indexOfClosingFence(text, firstBreak + 1);
-            if (close >= 0) {
-                Map<String, String> fields = frontMatter(text.substring(firstBreak + 1, close));
-                // A pair of --- lines with no field between them is not front
-                // matter, it is a horizontal rule opening the prompt. Taking
-                // it for front matter would swallow the lines in between.
-                if (!fields.isEmpty()) {
-                    head = fields;
-                    int afterFence = text.indexOf('\n', close);
-                    body = afterFence < 0 ? "" : text.substring(afterFence + 1);
-                }
-            }
-        }
-        String prompt = body.strip();
+        FrontMatter.Parsed parsed = FrontMatter.parse(content);
+        String prompt = parsed.body().strip();
         if (prompt.isEmpty()) return null;
-        String name = head.getOrDefault("name", fileName).strip();
+        String name = parsed.get("name", fileName).strip();
         if (name.isEmpty()) name = fileName;
-        return new ProjectAgent(name, head.getOrDefault("description", ""), prompt,
-                listOf(head.get("tools")), listOf(head.get("disallowedtools")),
-                blankToNull(head.get("model")));
-    }
-
-
-    /**
-     * The {@code key: value} lines of a front-matter block, keys lowercased.
-     *
-     * <p>A value may also arrive as an indented block sequence, which is what
-     * anyone writing YAML reaches for:
-     *
-     * <pre>
-     * tools:
-     *   - file_read
-     *   - grep
-     * </pre>
-     *
-     * Those items are joined into the comma form, so the flow list and the
-     * block list mean the same thing. They have to: reading the block form as
-     * an empty value would leave the agent with every tool its caller has,
-     * which is the opposite of what a file naming two tools asks for. For the
-     * same reason a blank line between the key and its items, or between two
-     * items, does not end the list.
-     */
-    private static Map<String, String> frontMatter(String block) {
-        Map<String, String> head = new LinkedHashMap<>();
-        String[] lines = block.split("\n", -1);
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i];
-            if (line.isBlank() || line.stripLeading().startsWith("#")) continue;
-            int colon = line.indexOf(':');
-            if (colon <= 0) continue;
-            String key = line.substring(0, colon).strip().toLowerCase(Locale.ROOT);
-            String value = line.substring(colon + 1).strip();
-            if (value.isEmpty()) {
-                List<String> items = new ArrayList<>();
-                for (int next = nextNonBlank(lines, i + 1);
-                     next < lines.length && isSequenceItem(lines[next]);
-                     next = nextNonBlank(lines, i + 1)) {
-                    items.add(lines[next].stripLeading().substring(1).strip());
-                    i = next;
-                }
-                value = String.join(", ", items);
-            }
-            head.put(key, unquote(value));
-        }
-        return head;
-    }
-
-    /** The index of the first line from {@code from} on that is not blank; {@code lines.length} when none is. */
-    private static int nextNonBlank(String[] lines, int from) {
-        int at = from;
-        while (at < lines.length && lines[at].isBlank()) at++;
-        return at;
-    }
-
-    /** A {@code - item} line of a block sequence, indented or not. */
-    private static boolean isSequenceItem(String line) {
-        String stripped = line.stripLeading();
-        return stripped.length() > 1 && stripped.charAt(0) == '-'
-                && Character.isWhitespace(stripped.charAt(1));
-    }
-
-    /** The line index where a lone {@code ---} closes the front matter, or -1. */
-    private static int indexOfClosingFence(String text, int from) {
-        int at = from;
-        while (at < text.length()) {
-            int end = text.indexOf('\n', at);
-            String line = (end < 0 ? text.substring(at) : text.substring(at, end)).strip();
-            if (line.equals("---")) return at;
-            if (end < 0) return -1;
-            at = end + 1;
-        }
-        return -1;
-    }
-
-    private static String unquote(String value) {
-        if (value.length() > 1
-                && ((value.startsWith("\"") && value.endsWith("\""))
-                    || (value.startsWith("'") && value.endsWith("'")))) {
-            return value.substring(1, value.length() - 1);
-        }
-        return value;
-    }
-
-    /**
-     * A front-matter list. {@code null} when the key is absent or has no
-     * value at all — YAML's null, nothing said — and a list, possibly empty,
-     * when it names one: {@code []} is an answer, and the answer is none.
-     */
-    private static List<String> listOf(String value) {
-        if (value == null || value.isBlank()) return null;
-        String inner = value.strip();
-        if (inner.startsWith("[") && inner.endsWith("]")) {
-            inner = inner.substring(1, inner.length() - 1);
-        }
-        return Arrays.stream(inner.split(","))
-                .map(String::strip)
-                .map(ProjectAgents::unquote)
-                .map(String::strip)
-                .filter(s -> !s.isEmpty())
-                .toList();
+        return new ProjectAgent(name, parsed.get("description", ""), prompt,
+                parsed.list("tools"), parsed.list("disallowedtools"),
+                blankToNull(parsed.fields().get("model")));
     }
 
     private static String blankToNull(String value) {

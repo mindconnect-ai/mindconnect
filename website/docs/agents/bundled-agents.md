@@ -62,6 +62,16 @@ rather than driven directly:
 | **title-generator** | Generates a short conversation title from the first message. |
 | **answer-relevance-checker** | Reviews a draft answer for relevance and returns a verdict. |
 
+## Skills
+
+`coding-assistant` and `default-chat` ship with [skills](./skills.md) switched
+on and no names selected, which means every skill this installation, the user
+and the session's project have. It costs nothing while there are none: the
+`skill` tool is only added to an agent that actually has one to load, and the
+prompt's skills section only appears then. The Admin UI and the CLI seed one
+example skill, `pull-request-review`, so the screen is not empty on a fresh
+install.
+
 ## Customizing
 
 Edit any JSON file under `initial-data/agent-definitions/` to change a prompt,

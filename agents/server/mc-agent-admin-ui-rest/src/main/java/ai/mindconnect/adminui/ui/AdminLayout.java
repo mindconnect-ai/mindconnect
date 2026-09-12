@@ -162,6 +162,7 @@ public final class AdminLayout {
         menu.item(navItem("nav-chat", "Chat", "/chat", "chat", navigate));
         menu.item(navItem("nav-agents", "Agents", "/admin/agents", "bot", navigate));
         menu.item(navItem("nav-tools", "Tools", "/admin/tools", "tools", navigate));
+        menu.item(navItem("nav-skills", "Skills", "/admin/skills", "graduation-cap", navigate));
         menu.item(navItem("nav-llm-configs", "LLM Configs", "/admin/llm-configs", "ai", navigate));
         menu.item(navItem("nav-workflows", "Workflows", "/workflow-admin", "branch", navigate));
         if (mcpGateway) {

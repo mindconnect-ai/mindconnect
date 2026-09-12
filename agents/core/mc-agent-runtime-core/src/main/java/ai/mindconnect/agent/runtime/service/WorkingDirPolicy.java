@@ -177,7 +177,7 @@ public final class WorkingDirPolicy {
     }
 
     /** {@code ~} and {@code $HOME} at the start of a path stand for the user's home. */
-    static Path expand(String path) {
+    public static Path expand(String path) {
         String home = System.getProperty("user.home");
         if (path.equals("~") || path.equals("$HOME")) return Path.of(home);
         if (path.startsWith("~/")) return Path.of(home, path.substring(2));
@@ -201,7 +201,7 @@ public final class WorkingDirPolicy {
      * sessions; a {@code +} never occurs in a safe id, so a replaced id
      * cannot meet a safe one either.
      */
-    static String pathSafe(String userId) {
+    public static String pathSafe(String userId) {
         if (SAFE_ID.matcher(userId).matches()) return userId;
         String safe = userId.trim().replaceAll("[^A-Za-z0-9._-]", "_");
         while (safe.startsWith(".")) safe = "_" + safe.substring(1);

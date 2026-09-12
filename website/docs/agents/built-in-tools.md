@@ -8,7 +8,7 @@ sidebar_position: 9
 Tools are the capabilities you grant to an agent. Most ship in a
 `mc-agent-tools-*` module and register via the `ToolFactory` SPI — add the
 module to the runtime and the tool is available to assign. Some live in
-`mc-agent-runtime-core` itself (the todo tools, `tool_search`, and the inline
+`mc-agent-runtime-core` itself (the todo tools, `tool_search`, `skill`, and the inline
 `run_agent`/`run_agents`), and dynamic bundles like Gmail or workflow tools use
 the second SPI, `MultiToolProvider`. This page lists the built-in tools, what
 they do, and any configuration or environment keys they need.
@@ -42,6 +42,7 @@ Always available; no API keys required.
 | `run_agent` | Delegates a task to another agent by name — see [sub-agents](./sub-agents.md). | — |
 | `run_agents` | Fans several sub-agent calls out in parallel. | — |
 | `tool_search` | Lets the agent find and activate its *deferred* tools on demand. | The agent's `toolSearch` config |
+| `skill` | Loads the full instructions of one [skill](./skills.md); the prompt carries only names and descriptions. Injected, not assigned. | The agent's `skills` config |
 | `view_attachment` | Shows an attached image or PDF to the model again — as a message of its own in the running turn, since media goes with a message in its own turn only. Activated for a session when an image or PDF is attached; see [images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts). | — |
 
 The file tools resolve paths against the session's **working directory** —

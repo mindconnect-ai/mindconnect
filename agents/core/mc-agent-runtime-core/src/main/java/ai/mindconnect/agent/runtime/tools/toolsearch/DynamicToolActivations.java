@@ -1,6 +1,9 @@
 package ai.mindconnect.agent.runtime.tools.toolsearch;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.skill.SkillCatalog;
+import ai.mindconnect.agent.runtime.skill.SkillTool;
+import ai.mindconnect.agent.runtime.skill.SkillToolFactory;
 import ai.mindconnect.agent.tool.AgentTool;
 
 import java.util.ArrayList;
@@ -23,9 +26,17 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class DynamicToolActivations {
 
     private final ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions;
+    /** What the {@code skill} tool would find; empty means the tool is not worth offering. */
+    private final SkillCatalog skills;
 
     public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions) {
+        this(sessions, SkillCatalog.none());
+    }
+
+    public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions,
+                                  SkillCatalog skills) {
         this.sessions = sessions;
+        this.skills = skills == null ? SkillCatalog.none() : skills;
     }
 
     /** Marks {@code toolNames} usable for {@code sessionId}, persisted on the session. */
@@ -60,7 +71,11 @@ public final class DynamicToolActivations {
      *       searchable tool configures it explicitly);</li>
      *   <li>the {@code tool_search} tool itself when the agent enables it,
      *       carrying its search space (deferred names + group filter) as
-     *       overrides so the factory needs no definition lookup.</li>
+     *       overrides so the factory needs no definition lookup;</li>
+     *   <li>the {@code skill} tool when the agent enables skills and there
+     *       are any to load, carrying the names its setting names for the same
+     *       reason. A tool that would find nothing is left away, so the switch
+     *       costs nothing until somebody writes a skill.</li>
      * </ul>
      */
     public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
@@ -88,6 +103,23 @@ public final class DynamicToolActivations {
                     "assigned", List.copyOf(deferredNames),
                     "groups", List.copyOf(search.groups()))));
         }
+        var skillsConfig = def.skillsOrOff();
+        if (skillsConfig.enabled()
+                && def.tools().stream().noneMatch(t -> SkillTool.NAME.equals(t.name()))
+                && hasSkills(def, sessionId)) {
+            refs.add(AgentTool.of(SkillTool.NAME, null, Map.of(
+                    SkillToolFactory.NAMES, List.copyOf(skillsConfig.names()))));
+        }
         return refs;
+    }
+
+    /**
+     * Whether this agent has a skill to load in this session — the same
+     * question the prompt's skills section answers, asked of the same
+     * catalog, so the tool and the section appear together or not at all.
+     */
+    private boolean hasSkills(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
+        var session = sessionId == null ? null : sessions.findById(sessionId).orElse(null);
+        return !skills.available(def, session).isEmpty();
     }
 }

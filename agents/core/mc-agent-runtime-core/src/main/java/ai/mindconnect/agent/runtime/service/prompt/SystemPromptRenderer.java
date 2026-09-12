@@ -5,6 +5,7 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
+import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.AuthenticationInfo;
 
 /**
@@ -12,23 +13,36 @@ import ai.mindconnect.agent.AuthenticationInfo;
  * the memory strategy's optional addendum (e.g. compressed conversation
  * summaries), then the sections the runtime adds itself — where the session
  * works, the user's standing instructions, what the project asks of an agent
- * working there, and which files are attached to the chat.
+ * working there, which skills it can load, and which files are attached to
+ * the chat.
  */
 public final class SystemPromptRenderer {
 
     private SystemPromptRenderer() {}
 
+    /** Without a skill catalog: an assembly that has no skills. */
     public static String render(PromptRenderer renderer,
                                 MemoryStrategy strategy,
                                 AgentDefinition def,
                                 AgentSession session,
                                 AuthenticationInfo auth,
                                 InstructionFiles instructions) {
+        return render(renderer, strategy, def, session, auth, instructions, SkillCatalog.none());
+    }
+
+    public static String render(PromptRenderer renderer,
+                                MemoryStrategy strategy,
+                                AgentDefinition def,
+                                AgentSession session,
+                                AuthenticationInfo auth,
+                                InstructionFiles instructions,
+                                SkillCatalog skills) {
         String rendered = renderer.render(def.systemPrompt(), def, session, auth);
         String addendum = strategy.systemPromptAddendum(def, session);
         String prompt = (addendum == null || addendum.isEmpty()) ? rendered : rendered + addendum;
         return prompt + workingDirSection(session)
                 + instructions.userSection(session) + instructions.projectSection(session)
+                + (skills == null ? "" : skills.promptSection(def, session))
                 + attachedFilesSection(session);
     }
 
