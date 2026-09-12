@@ -51,6 +51,7 @@ the finished report:
 | `mc-message-repository` | Conversation & message storage |
 | `mc-credentials` | Credential storage for tools and providers |
 | `mc-agent-tools*` | Built-in tool providers (web, browser, document, todo, workflow) |
+| `mc-agent-registry-core` / `mc-agent-registry` | Import LLM configs, agents, workflows and whole packages from a registry — a GitHub project with an index |
 
 ### `mcp/` — Model Context Protocol servers as tools
 
@@ -69,6 +70,30 @@ server of its own without the tool side noticing.
 
 Concepts: `mc-sandbox/agents/doc/concepts/21-*`, `22-*`, `23-*`. Manual tests:
 `doc/manual-tests/mcp/`.
+
+### Registry — import from a GitHub project
+
+A registry is a repository, not a server: an index (`registry.json`) and the
+entity files it points at. Add one by its `owner/repo` under **Registry** in the
+admin UI, browse what it offers, import an entry — or a package that installs an
+agent, its sub-agents, their workflow and the LLM config they share, in order and
+each one once.
+
+| Module | Purpose |
+|--------|---------|
+| `mc-agent-registry-core` | What a registry is: domain, the ports (`RegistryClient`, `RegistrySourceRepository`, `RegistryInstaller`), the import service |
+| `mc-agent-registry` | The GitHub client (raw files over HTTPS, optional token), the file-backed store of registries, the LLM-config and agent installers |
+| `mc-agent-registry-admin-ui-rest` | The `/registry` screen |
+
+Installers are contributed by the module that owns the entity — the workflow one
+lives in `mc-agent-tools-workflow` — so an installation without a workflow engine
+lists workflows it cannot import and says so, instead of dragging the engine in.
+
+Nothing installs itself: reading a registry is safe, installing one is a decision
+a person makes per entry. Format and configuration:
+[website/docs/agents/registry.md](../website/docs/agents/registry.md), worked
+example: [`doc/registry-example/`](doc/registry-example/). Manual tests:
+`doc/manual-tests/registry/`.
 
 ### `adapter/` — alternative implementations of the core ports
 
@@ -116,6 +141,29 @@ An app adds both; the property picks.
 | Module | Purpose |
 |--------|---------|
 | `mc-agent-cli` | Command-line chat client |
+
+## Skills
+
+A skill is know-how written down once — how a report is formatted here, what a
+release involves — and loaded when it is needed. Only name and description sit
+in the system prompt, a line each; the instructions arrive when the model calls
+the `skill` tool for that name. Ten skills cost ten lines until one is used.
+
+They come from three places, read fresh every round: the ones this installation
+stores (admin UI, `/api/skills`), a user's own `SKILL.md` files, and a project's
+in `.mindconnect/skills/` under the session's working directory — the more
+specific source winning by name. An agent switches them on and may name the
+ones it gets; naming none leaves it every skill there is.
+
+```markdown
+---
+name: weekly-report
+description: Use when writing the weekly status report for a customer
+tools: file_read, vector_search
+---
+1. Read last week's report under `reports/`.
+2. Start from `template.md` in this skill's directory.
+```
 
 ## Memory
 

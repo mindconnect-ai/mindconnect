@@ -26,3 +26,8 @@ mindconnect:
       # ~/.mindconnect would be the service account's, the same file for everyone.
       # Point it at a path with {user} in it for one AGENTS.md per user, or leave it off.
       user-dir: ${MC_INSTRUCTIONS_USER_DIR:off}
+    skills:
+      # Same reason: ~/.mindconnect/skills would be one directory for everybody.
+      # A path with {user} in it gives each user their own; the skills this
+      # installation stores are unaffected either way.
+      user-dir: ${MC_SKILLS_USER_DIR:off}

@@ -55,6 +55,7 @@ The format of a file in
 | `status` | enum | `DRAFT`, `ACTIVE` (usable) or `DEPRECATED`. |
 | `memoryConfig` | object | Working-memory strategy (see below). |
 | `toolSearch` | object? | Optional: `{ "enabled": true, "groups": ["web", …] }` — gives the agent the `tool_search` tool so it can activate *deferred* tools from the listed groups on demand. |
+| `skills` | object? | Optional: `{ "enabled": true, "names": ["weekly-report", …] }` — gives the agent the `skill` tool and lists those [skills](./skills.md) in its prompt. An empty `names` means every skill the installation, the user and the project have. |
 | `responseReviewers` | array | Optional reviewer agents that check answers (e.g. `answer-relevance-checker`). Empty for none. |
 | `tools` | array | The tools this agent may call (see below). |
 | `createdAt` / `updatedAt` | timestamp | Bookkeeping. |

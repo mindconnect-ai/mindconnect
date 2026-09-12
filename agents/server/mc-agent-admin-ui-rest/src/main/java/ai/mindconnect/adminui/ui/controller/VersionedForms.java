@@ -31,6 +31,36 @@ class VersionedForms {
         }
     }
 
+    /**
+     * What the save answers to a name the runtime could not work with — a
+     * skill's, which the model has to be able to type. Like the version
+     * refusal, a patch rather than a status: the form and what the user
+     * typed stay on screen.
+     */
+    static UiPatch unusableName(String what, String name) {
+        return UiPatch.of().toast(UiToast.error("'" + name + "' cannot be used as a name here: use "
+                + "lower-case letters, digits and dashes, starting with a letter or digit.")
+                .title(what + " not saved"));
+    }
+
+    /**
+     * What the save answers to a name another stored entry already has — a
+     * skill's, which the runtime looks up by name, so two of them would leave
+     * one silently unreachable.
+     */
+    static UiPatch nameTaken(String what, String name) {
+        return UiPatch.of().toast(UiToast.error("There is already a " + what.toLowerCase(java.util.Locale.ROOT)
+                        + " named '" + name + "'. Choose another name, or edit that one.")
+                .title(what + " not saved"));
+    }
+
+    /** What a save answers on a host that wires no store for what it is saving. */
+    static UiPatch noStore() {
+        return UiPatch.of().toast(UiToast.error("This installation stores no skills. A project or a "
+                        + "user can still keep them as SKILL.md files, and agents read those.")
+                .title("Not saved"));
+    }
+
     /** What the save answers when {@code what} (e.g. "Agent 'scout'") was saved by someone else first. */
     static UiPatch changedMeanwhile(String what) {
         return UiPatch.of().toast(UiToast.error(what + " was changed by someone else in the meantime — "

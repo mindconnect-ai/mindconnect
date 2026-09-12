@@ -30,7 +30,8 @@ fresh empty one, so nothing has to be moved by hand at release time.
   own retries are used up, the same request is re-sent through the next config
   in `fallbackModels`, in order, until one answers — normally a config at
   another provider, whose limit is a different limit. Configure it in the Admin
-  UI (*Fallback models (on rate limit)* in the chat settings) or as a
+  UI (*Fallback models (on rate limit)* in the chat settings: tick chat
+  configs and move them into the order they are tried) or as a
   `"fallbackModels": ["openai-default", "gemini-default"]` list in the config
   JSON. Omitting it keeps the previous behaviour: the rate-limit error reaches
   the caller. A fallback is only taken before anything has streamed, so a
@@ -50,10 +51,60 @@ fresh empty one, so nothing has to be moved by hand at release time.
   this through its native API; now every provider that publishes a listing does
   — OpenAI, Groq, Mistral, DeepSeek, Together, OpenRouter, Perplexity,
   Fireworks and Ollama through `/v1/models`, Anthropic and Gemini through their
-  equivalents. Only models fitting the config type are offered, a model the
-  provider no longer lists stays selectable, and a listing that fails leaves a
-  text field carrying the reason. Azure OpenAI keeps free text: its configs
-  name a deployment, not a model.
+  equivalents. Only models fitting the config type are offered — image,
+  text-to-speech, moderation and legacy completion models are left out — a
+  model the provider no longer lists stays selectable, and a listing that fails
+  leaves a text field carrying the reason. OpenRouter's list needs no API key.
+  Azure OpenAI keeps free text: its configs name a deployment, not a model.
+
+- **agents:** registries — a **Registry** screen that installs LLM configs,
+  agents, workflows and whole packages from a GitHub project. A registry is a
+  repository, not a server: an index (`registry.json`) and the entity files it
+  points at, added by its `owner/repo` (`owner/repo@v1.2.0` pins a tag, a
+  private one names the *environment variable* holding its token). Browse it
+  under *Agents*, *LLM configs*, *Workflows* and *Packages*, import — a package
+  installs the agent, its sub-agents, the workflow they run and the LLM config
+  they share, dependencies first and each entity once, with a report that says
+  line by line what was imported, updated, removed, skipped or failed. A
+  package's *Contents* tab lists everything it would install, marks what is
+  already here, and lets you untick entries to leave them out; **Remove** takes
+  a package out again, deleting the included entries and keeping the rest. An
+  entry that something outside the package still uses — the alias every agent
+  runs on, the config behind it — says *Used by …* and starts unticked.
+  Importing keeps what is already here unless overwrite is chosen, an overwrite
+  keeps local ids so that sessions and aliases keep working, and an API key
+  that came with a registry file is dropped rather than used. An application
+  ships registries as files under `initial-data/registries/`; the admin UI
+  comes with [mindconnect-ai/mc-registry](https://github.com/mindconnect-ai/mc-registry),
+  the default agents, LLM configs and workflows plus an example package. Off
+  for an installation that wants no outbound calls
+  (`mindconnect.registry.enabled=false`); format and settings in the docs under
+  *Registry*.
+
+- **agents:** skills — know-how written down once and loaded when it is needed,
+  instead of carried in a system prompt from the first token on. Only a skill's
+  name and description stand in the prompt, a line each; the instructions
+  arrive when the model calls the new `skill` tool for that name, so ten skills
+  cost ten lines until one is used and can be written out at the length the
+  work actually needs. Three sources, read fresh every round: the skills this
+  installation stores (the new **Skills** screen in the admin UI, or
+  `/api/skills`), a user's own `SKILL.md` files under
+  `mindconnect.agent.skills.user-dir`, and a project's in `.mindconnect/skills/`
+  under the session's working directory — same name means one skill, with the
+  more specific source winning, so a repository can say how its own reports are
+  written. The file format is the portable one: front matter for `name`,
+  `description` and `tools`, the body for the instructions, either as
+  `<name>/SKILL.md` beside the files it refers to (the skill is handed over
+  with its directory, so a template or checklist is one `file_read` away) or as
+  a lone `<name>.md`. An agent gets skills from its new `skills` setting
+  (`{"enabled": true, "names": [...]}`, empty names meaning every skill there
+  is) in the edit form or over `PUT /api/agents/{id}`; the `skill` tool is then
+  injected and taken away with the setting, never assigned by hand, and it
+  offers the model exactly the names that agent may load. A skill grants
+  nothing: the tools it names are a hint, and the agent's own bindings still
+  decide what it may call. A first example skill is seeded on a fresh install,
+  and any stored skill can be fetched as a `SKILL.md` to commit into a
+  repository. See [Skills](https://mindconnect-ai.github.io/mindconnect/agents/skills).
 
 ### Changed
 
@@ -72,6 +123,25 @@ fresh empty one, so nothing has to be moved by hand at release time.
   is configured, which is the case an admin can fix. The retry and fallback
   steps log their own line, so one rate limit reads as one story from limit to
   answer.
+- **agents:** the admin UI's collapsible headings — tool and agent groups,
+  migration rows, trace cards — read at body size in the theme's text colour
+  instead of the framework's small grey detail style.
+
+### Fixed
+
+- **agents:** an agent reaches only the skills its setting allows. The `skill`
+  tool could also be found with `tool_search` or assigned by hand from the tool
+  catalog, and that copy carried no names — it offered every skill, even to an
+  agent with skills switched off, and sat beside the injected one as a second
+  tool of the same name, which a provider can reject. The setting is now the
+  only way an agent gets the tool.
+- **agents:** the **Skills** screen lists every stored skill again, including
+  one switched off or hidden behind a user's `SKILL.md` of the same name —
+  before, such a skill disappeared from the list and could only be reached by
+  its URL. Saving a second stored skill under a name one already has is
+  refused (a toast in the admin UI, `409` from `/api/skills`), since an agent
+  looks skills up by name and would silently get only one of them; a name no
+  model could type is a `400` from the API instead of a `500`.
 
 ## [0.8.1] - 2026-09-12
 

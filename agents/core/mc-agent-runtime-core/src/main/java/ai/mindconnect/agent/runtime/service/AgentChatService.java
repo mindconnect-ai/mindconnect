@@ -85,6 +85,7 @@ public class AgentChatService {
     private final ToolApprovalStore approvalStore;
     private final ExecutorService turnExecutor;
     private final ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions;
+    private final ai.mindconnect.agent.runtime.skill.SkillCatalog skills;
 
     public AgentChatService(AgentSessionService sessionService,
                             AgentDefinitionRepository definitionRepository,
@@ -99,6 +100,26 @@ public class AgentChatService {
                             ToolApprovalStore approvalStore,
                             ExecutorService turnExecutor,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions) {
+        this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
+                workingMemoryRepository, promptRenderer, agentTaskRunner, sessionChannels, userChannels,
+                queue, approvalStore, turnExecutor, instructions,
+                ai.mindconnect.agent.runtime.skill.SkillCatalog.none());
+    }
+
+    public AgentChatService(AgentSessionService sessionService,
+                            AgentDefinitionRepository definitionRepository,
+                            ConversationManager conversationManager,
+                            MemoryStrategyFactory memoryStrategyFactory,
+                            WorkingMemoryRepository workingMemoryRepository,
+                            PromptRenderer promptRenderer,
+                            AgentTaskRunner agentTaskRunner,
+                            SessionChannels sessionChannels,
+                            UserChannels userChannels,
+                            TaskQueue queue,
+                            ToolApprovalStore approvalStore,
+                            ExecutorService turnExecutor,
+                            ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
+                            ai.mindconnect.agent.runtime.skill.SkillCatalog skills) {
         this.sessionService = sessionService;
         this.definitionRepository = definitionRepository;
         this.conversationManager = conversationManager;
@@ -112,6 +133,7 @@ public class AgentChatService {
         this.approvalStore = approvalStore;
         this.turnExecutor = turnExecutor;
         this.instructions = instructions;
+        this.skills = skills == null ? ai.mindconnect.agent.runtime.skill.SkillCatalog.none() : skills;
     }
 
     /**
@@ -450,7 +472,7 @@ public class AgentChatService {
         AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
         return WorkingMemoryBuilder.build(promptRenderer, memoryStrategyFactory.create(def),
-                def, session, auth, instructions);
+                def, session, auth, instructions, skills);
     }
 
     /**
@@ -471,7 +493,7 @@ public class AgentChatService {
         if (!result.isEmpty()) {
             try {
                 WorkingMemory stats = WorkingMemoryBuilder.build(promptRenderer, strategy, def, session,
-                        auth, instructions);
+                        auth, instructions, skills);
                 workingMemoryRepository.save(session.id(), auth, stats);
             } catch (Exception e) {
                 log.warn("Failed to save working memory after compression: {}", e.getMessage());

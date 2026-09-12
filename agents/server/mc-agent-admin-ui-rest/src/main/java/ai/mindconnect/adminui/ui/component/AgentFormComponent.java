@@ -9,6 +9,8 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
+import ai.mindconnect.agent.runtime.skill.Skill;
+import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -34,6 +36,8 @@ public final class AgentFormComponent implements UiComponent {
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentRepository;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    /** What the skills picker offers; null when this host wires no catalog. */
+    private final SkillCatalog skillCatalog;
 
     /**
      * @param agent {@code null} for the new-agent form, an existing
@@ -43,10 +47,19 @@ public final class AgentFormComponent implements UiComponent {
                               LlmConfigRepository llmConfigRepository,
                               AgentDefinitionRepository agentRepository,
                               com.fasterxml.jackson.databind.ObjectMapper objectMapper) {
+        this(agent, llmConfigRepository, agentRepository, objectMapper, null);
+    }
+
+    public AgentFormComponent(AgentDefinition agent,
+                              LlmConfigRepository llmConfigRepository,
+                              AgentDefinitionRepository agentRepository,
+                              com.fasterxml.jackson.databind.ObjectMapper objectMapper,
+                              SkillCatalog skillCatalog) {
         this.agent = agent;
         this.llmConfigRepository = llmConfigRepository;
         this.agentRepository = agentRepository;
         this.objectMapper = objectMapper;
+        this.skillCatalog = skillCatalog;
     }
 
     @Override
@@ -149,6 +162,19 @@ public final class AgentFormComponent implements UiComponent {
                         .hint("Comma-separated registry groups searchable beyond the agent's own "
                                 + "deferred tools, e.g. web, documents — or * for every group. "
                                 + "Empty = only deferred assigned tools are searchable"))
+                // Skills: the switch, then which of them. Empty is "all of
+                // them", like the roster below — a skill added later is then
+                // in reach without touching every agent.
+                .field(UiField.bool("skillsEnabled", "Enable Skills",
+                        !isNew && agent.skillsOrOff().enabled())
+                        .asEditable()
+                        .hint("Adds the skill tool and lists the skills below in the prompt — a line "
+                                + "each, the instructions only when the agent loads one"))
+                .field(UiField.multiselect("skills", "Skills",
+                        isNew ? List.of() : agent.skillsOrOff().names(), skillOptions())
+                        .asEditable()
+                        .hint("The skills this agent may load. Select none to leave it every skill "
+                                + "the installation, the user and the project have"))
                 // The roster this agent delegates to. Empty is not "none" but
                 // "no restriction" — the hint has to say so, or an empty
                 // multiselect reads as a locked door.
@@ -172,6 +198,20 @@ public final class AgentFormComponent implements UiComponent {
                 .link(UiLink.of("back", "/admin/agents", "← Back to Agents"));
 
         return UiStack.of(id() + "-page").child(header).child(form);
+    }
+
+    /**
+     * The skills to choose from: the installation's, plus whatever the agent
+     * already names — a name that came from a file or another host stays
+     * selectable, so opening the form cannot silently drop it.
+     */
+    private List<UiField.Option> skillOptions() {
+        java.util.SortedSet<String> names = new java.util.TreeSet<>();
+        if (skillCatalog != null) {
+            skillCatalog.all(null, null).stream().map(Skill::name).forEach(names::add);
+        }
+        if (agent != null) names.addAll(agent.skillsOrOff().names());
+        return names.stream().map(name -> UiField.Option.of(name, name)).toList();
     }
 
     /**

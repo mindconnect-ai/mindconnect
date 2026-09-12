@@ -1,0 +1,11 @@
+{
+  "name": "example-default",
+  "provider": "ANTHROPIC",
+  "model": "claude-sonnet-5",
+  "baseUrl": "https://api.anthropic.com",
+  "apiKey": "${ANTHROPIC_API_KEY}",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 8192,
+  "contextWindowTokens": 200000,
+  "capabilities": ["TOOL_CALLING", "VISION", "DOCUMENTS"]
+}

@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.ui;
 import ai.mindconnect.adminui.service.TaskMonitor;
 import ai.mindconnect.adminui.service.UserStream;
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
+import ai.mindconnect.agent.registry.service.RegistryService;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.ui.model.UiPage;
 import org.springframework.beans.factory.ObjectProvider;
@@ -36,15 +37,19 @@ public class AdminLayoutFactory {
      * that can see it.
      */
     private final ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin;
+    /** Present when this host has registries to browse — same shape as the two above. */
+    private final ObjectProvider<RegistryService> registryService;
 
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
                               BuildInfo buildInfo,
                               Optional<TaskMonitor> taskMonitor,
-                              ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin) {
+                              ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
+                              ObjectProvider<RegistryService> registryService) {
         this.authEnabled = authEnabled;
         this.buildInfo = buildInfo;
         this.taskMonitor = taskMonitor.orElse(null);
         this.mcpRegistryAdmin = mcpRegistryAdmin;
+        this.registryService = registryService;
     }
 
     /**
@@ -57,7 +62,8 @@ public class AdminLayoutFactory {
                 taskMonitor == null ? null : TaskMonitorComponent.badge(taskMonitor.counts()),
                 UiPage.ActiveStream.of(UserStream.CHANNEL_ID, UserStream.STREAM_URL,
                         "Live updates", "/admin/agents"),
-                mcpRegistryAdmin.getIfAvailable() != null);
+                mcpRegistryAdmin.getIfAvailable() != null,
+                registryService.getIfAvailable() != null);
     }
 
     private String currentUserName() {

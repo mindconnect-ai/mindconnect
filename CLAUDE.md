@@ -90,6 +90,11 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-agent-protocol` (+ `-openai`, `-mc-runtime`): protocol vocabulary and backend adapters
     - `mc-agent-tool-spi`: what a tool is — `Tool`, `ToolFactory`, `MultiToolProvider`, registry
     - `mc-agent-tools*`: built-in tool providers (filesystem/bash, code, document, web, web-browser, workflow)
+    - `mc-agent-registry-core` / `mc-agent-registry`: importing from a registry — a GitHub
+      project with an index of LLM configs, agents, workflows and packages — ports + import
+      service / GitHub client, file-backed source store, installers. An installer is
+      contributed by the module owning the entity (the workflow one sits in
+      `mc-agent-tools-workflow`)
     - `mc-credentials`: credential storage for tools & providers
   - `mcp/` — MCP servers as registered tools, split like the rest (ports in `-core`)
     - `mc-mcp-gateway-core` / `mc-mcp-gateway-local`: gateway ports and types / the in-process gateway
@@ -108,6 +113,7 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
   - `server/` — deployable Spring Boot services
     - `mc-agent-api-rest` / `mc-agent-api-app`: REST API library / agent server (streaming via SSE)
     - `mc-agent-admin-ui-rest` / `mc-agent-admin-ui-app`: admin UI library / app (port 9090)
+    - `mc-agent-registry-admin-ui-rest`: the `/registry` screen, embedded by the admin UI
   - `client/mc-agent-cli`: terminal REPL client
 
 ## Architecture Notes

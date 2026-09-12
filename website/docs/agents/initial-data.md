@@ -14,10 +14,12 @@ src/main/resources/initial-data/
 │   ├── research-lead.json
 │   ├── web-researcher.json
 │   └── …
-└── llm-configs/
-    ├── claude-default.json
-    ├── agent-default.json
-    └── …
+├── llm-configs/
+│   ├── claude-default.json
+│   ├── agent-default.json
+│   └── …
+└── skills/
+    └── pull-request-review.md
 ```
 
 One file per record. The filename is just a label — the **`name`** field inside
@@ -38,7 +40,13 @@ So editing a JSON file changes the seed for *fresh* installs immediately; for an
 existing install you confirm the overwrite in the CLI, while in the Admin UI you
 apply pending changes via the **Migrations** page (or edit the record in the UI).
 
-The Admin UI ships a third seed folder, `initial-data/workflows/`, installed by
+`initial-data/skills/*.md` is the exception to the table above: a
+[skill](./skills.md) is imported when no stored skill carries its name, and a
+stored one is never touched — not silently, not with a prompt. It is prose
+somebody has since rewritten for their own house, and the shipped wording has
+no claim on it. Delete the stored skill to get the shipped one back.
+
+The Admin UI ships a fourth seed folder, `initial-data/workflows/`, installed by
 a separate mechanism (`InitialWorkflowLoader`, which saves them into the
 workflow store — with file persistence `<data.base-dir>/<namespace>/workflows`,
 default `data/local/workflows`) that never overwrites existing workflows.
@@ -56,3 +64,4 @@ agent from an orchestrator via `run_agent("<name>", "…")`.
 
 - [Agent definition JSON](./agent-json.md)
 - [LLM config JSON](./llm-config-json.md)
+- [Skills](./skills.md) — the `SKILL.md` format

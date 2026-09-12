@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.tools.toolsearch;
 
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.skill.SkillTool;
 import ai.mindconnect.agent.tool.ToolRegistryRef;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
@@ -159,6 +160,8 @@ public final class ToolSearchTool implements Tool {
                     .findFirst().orElse("assigned"));
         }
         candidates.remove(name());   // searching for the search tool helps nobody
+        // The skill tool comes with the agent's skills setting, never from a search.
+        candidates.remove(SkillTool.NAME);
         return candidates;
     }
 

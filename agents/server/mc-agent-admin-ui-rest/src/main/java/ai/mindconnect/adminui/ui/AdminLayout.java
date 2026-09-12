@@ -33,6 +33,8 @@ public final class AdminLayout {
     private final UiPage.ActiveStream taskStream;
     /** Whether this host has an MCP gateway to administer; false hides its entry. */
     private final boolean mcpGateway;
+    /** Whether this host can browse registries — same idea as {@link #mcpGateway}. */
+    private final boolean registry;
 
     /**
      * @param userName    display name of the current user (e.g. {@code "mc_user"})
@@ -66,12 +68,25 @@ public final class AdminLayout {
      */
     public AdminLayout(String userName, boolean authEnabled, String versionLabel,
                        UiNode taskBadge, UiPage.ActiveStream taskStream, boolean mcpGateway) {
+        this(userName, authEnabled, versionLabel, taskBadge, taskStream, mcpGateway, false);
+    }
+
+    /**
+     * @param registry whether this host can browse registries. Conditional for
+     *                 the same reason as {@code mcpGateway}: the screen is
+     *                 contributed by a module, and a nav item to a route
+     *                 nobody serves is a 404 with a label.
+     */
+    public AdminLayout(String userName, boolean authEnabled, String versionLabel,
+                       UiNode taskBadge, UiPage.ActiveStream taskStream, boolean mcpGateway,
+                       boolean registry) {
         this.userName = userName;
         this.authEnabled = authEnabled;
         this.versionLabel = versionLabel;
         this.taskBadge = taskBadge;
         this.taskStream = taskStream;
         this.mcpGateway = mcpGateway;
+        this.registry = registry;
     }
 
     /**
@@ -147,12 +162,16 @@ public final class AdminLayout {
         menu.item(navItem("nav-chat", "Chat", "/chat", "chat", navigate));
         menu.item(navItem("nav-agents", "Agents", "/admin/agents", "bot", navigate));
         menu.item(navItem("nav-tools", "Tools", "/admin/tools", "tools", navigate));
+        menu.item(navItem("nav-skills", "Skills", "/admin/skills", "graduation-cap", navigate));
         menu.item(navItem("nav-llm-configs", "LLM Configs", "/admin/llm-configs", "ai", navigate));
         menu.item(navItem("nav-workflows", "Workflows", "/workflow-admin", "branch", navigate));
         if (mcpGateway) {
             menu.item(navItem("nav-mcp", "MCP Servers", "/mcp-gateway", "plug", navigate));
         }
         menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
+        if (registry) {
+            menu.item(navItem("nav-registry", "Registry", "/registry", "package", navigate));
+        }
         menu.item(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));
         // The build's version as the last entry, pushed to the bottom by the

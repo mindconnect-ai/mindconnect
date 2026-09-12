@@ -1,0 +1,7 @@
+{
+  "name": "Release kit",
+  "description": "The changelog writer, the workflow it runs, and the model they share.",
+  "version": "1.0.0",
+  "includes": ["example-llm", "changelog-writer", "greeting"],
+  "items": []
+}

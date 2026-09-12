@@ -28,7 +28,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  */
 @ControllerAdvice(basePackages = {"ai.mindconnect.adminui.ui.controller",
         "ai.mindconnect.chatui.ui.controller", "ai.mindconnect.workflow.admin",
-        "ai.mindconnect.mcp.gateway.admin.ui"})
+        "ai.mindconnect.mcp.gateway.admin.ui", "ai.mindconnect.agent.registry.admin.ui"})
 public class AdminLayoutAdvice implements ResponseBodyAdvice<Object> {
 
     /** Root-node id used by {@link AdminLayout#withLayout}; marks a wrapped page. */
