@@ -30,6 +30,13 @@ settings. The form also covers:
   a picture or document when the config has the capability, as a placeholder
   line when it does not. A config that has never declared any shows its
   provider's default preselected; saving the form pins that set;
+- **Fallback models (on rate limit)** (chat configs) — other configs, picked
+  from the list, that a rate-limited call moves on to in order: when the
+  provider answers 429 (or 529, overloaded) and the retries are used up, the
+  same request is re-sent through the next one. Pick a config at another
+  provider — its limit is a different limit. Nothing picked means the call
+  fails with the rate-limit error. See
+  [rate limits and fallbacks](../llm-gateway.md#rate-limits-and-fallbacks);
 - **alias mode** — *Delegates To* forwards the config to another one by name;
 - **Temperature** and **Max Output Tokens**;
 - provider-specific extra parameters, rendered from the provider catalog;

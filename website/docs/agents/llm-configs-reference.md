@@ -64,7 +64,8 @@ change its `llmConfigName` instead.
     "maxAttempts": 5,
     "baseBackoffMillis": 2000,
     "maxBackoffMillis": 30000
-  }
+  },
+  "fallbackModels": ["openai-default", "gemini-default"]
 }
 ```
 
@@ -79,6 +80,7 @@ change its `llmConfigName` instead.
 | `additionalParams` | Provider-specific options (e.g. Anthropic `thinking` / `effort`) |
 | `rateLimit` | Optional — cap concurrent requests |
 | `retry` | Optional — automatic retry with backoff |
+| `fallbackModels` | Optional — other configs, by name, to switch to when this one is rate-limited (see [rate limits and fallbacks](./llm-gateway.md#rate-limits-and-fallbacks)) |
 
 ## Setting API keys
 

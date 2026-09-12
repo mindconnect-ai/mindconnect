@@ -40,6 +40,59 @@ caller → LlmTranscription (RoutingLlmTranscriptionService) → TranscriptionGa
 the `LlmGatewayRegistry` for the gateway registered against that provider. Every
 call is streamed — chunks arrive in order and end with a single `Done`.
 
+## Rate limits and fallbacks
+
+A provider answering **HTTP 429** (rate limit) or **529** (overloaded) is
+handled in three steps, each configured on the [LLM config](./llm-config-json.md)
+itself:
+
+1. **Stay under the limit** — `rateLimit.maxConcurrentRequests` caps how many
+   calls for that config are in flight at once, which is what keeps a
+   `run_agents` fan-out from producing the 429 in the first place.
+2. **Wait it out** — the `retry` block retries with exponential backoff, and a
+   `Retry-After` header from the provider always wins over the computed wait.
+3. **Move on** — `fallbackModels` names other configs, in order. When the
+   retries are used up, the same request is re-routed at the next one until a
+   model answers:
+
+   ```json title="llm-configs/claude-default.json"
+   "fallbackModels": ["openai-default", "gemini-default"]
+   ```
+
+   A fallback is usually a config at a *different provider* — its rate limit is
+   a different limit — but it can be any config, including an alias. Names that
+   match no config are skipped, and a list that circles back to the primary
+   never calls it twice. With no fallbacks named, the rate-limit error reaches
+   the caller, which is the behaviour of every version before this one.
+
+A fallback is only taken **before anything has streamed**. Once the first chunk
+has reached the caller, switching models would duplicate a partial answer, so
+the error propagates instead. Gateways report 429/529 before any content, so in
+practice the whole chain happens before the user sees a single token.
+
+### What a rate limit looks like in the log
+
+Every 429/529 is logged with the config, the model, the provider's
+`Retry-After` hint, what happens next, and the provider's own error body — so
+the log says which of a dozen models was limited and whether anything is
+configured to deal with it:
+
+```
+WARN  LLM RATE LIMIT (HTTP 429) from Anthropic — config 'claude-default',
+      model 'claude-sonnet-4-6', Retry-After 20 s; retrying up to 4 attempt(s),
+      then falling back to openai-default → gemini-default
+      — provider said: {"type":"error","error":{"type":"rate_limit_error",…}}
+WARN  LLM rate limit (HTTP 429) for config 'claude-default'
+      (model claude-sonnet-4-6), attempt 1/4 — retrying in 20000 ms (provider Retry-After)
+WARN  LLM rate limit HTTP 429 on config 'claude-default' (model claude-sonnet-4-6)
+      — falling back to 'openai-default' (model gpt-5.4-mini), fallback 1 of 2
+INFO  LLM fallback succeeded: config 'openai-default' (model gpt-5.4-mini)
+      answered for rate-limited 'claude-default'
+```
+
+`no fallback models configured` in that first line is the part worth grepping
+for: it is the case an admin can fix from the Admin UI.
+
 ## Implementations
 
 ### Provider gateways
@@ -66,6 +119,11 @@ behaviour without the provider adapters knowing about it:
   config's** `retry` block; no block means no retry).
 - **`ThrottlingLlmGateway`** — enforces rate limits (per the LLM config's
   `rateLimit` block).
+
+Switching to another model is *not* a decorator: a fallback means a different
+config, possibly at a different provider, so it lives one level up in
+`RoutingLlmChatService`, which is the layer that maps a name to a config and a
+gateway.
 
 You don't compose them by hand: `DefaultLlmGatewayRegistry` wraps every
 registered gateway automatically as `Throttling( Retrying( adapter ) )`.

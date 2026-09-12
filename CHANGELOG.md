@@ -23,6 +23,29 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
+### Added
+
+- **agents:** an LLM config can name **fallback models**. When the provider
+  rate-limits it (HTTP 429) or reports itself overloaded (529) and the config's
+  own retries are used up, the same request is re-sent through the next config
+  in `fallbackModels`, in order, until one answers — normally a config at
+  another provider, whose limit is a different limit. Configure it in the Admin
+  UI (*Fallback models (on rate limit)* in the chat settings) or as a
+  `"fallbackModels": ["openai-default", "gemini-default"]` list in the config
+  JSON. Omitting it keeps the previous behaviour: the rate-limit error reaches
+  the caller. A fallback is only taken before anything has streamed, so a
+  partial answer is never duplicated.
+
+### Changed
+
+- **agents:** a rate limit is now readable in the log. `HTTP 429` used to be
+  logged as a bare status and a body; it now names the config and the model
+  that was limited, the provider's `Retry-After` hint, and what happens next —
+  how many retries are left and which fallback models follow, or that neither
+  is configured, which is the case an admin can fix. The retry and fallback
+  steps log their own line, so one rate limit reads as one story from limit to
+  answer.
+
 ## [0.8.1] - 2026-09-12
 
 ### Fixed

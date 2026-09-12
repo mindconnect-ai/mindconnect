@@ -161,7 +161,8 @@ public class LlmConfigUiController {
                                 formId, id, catalog)))
                 .patch(UiPatch.Operation.replace("llm-type-cfg",
                         LlmConfigFormComponent.withHiddenIf(isAlias,
-                                LlmConfigFormComponent.typeGroup(type, config, prefill))))
+                                LlmConfigFormComponent.typeGroup(type, config, prefill,
+                                        repository.findAll()))))
                 .patch(UiPatch.Operation.replace("llm-provider-params",
                         LlmConfigFormComponent.withHiddenIf(isAlias,
                                 LlmConfigFormComponent.providerParamsGroup(provider, type, config))));
@@ -296,7 +297,9 @@ public class LlmConfigUiController {
                 retryFrom(body),
                 rateLimitFrom(body),
                 typeFrom(body, LlmConfigType.CHAT),
-                capabilitiesFrom(body));
+                capabilitiesFrom(body),
+                body.strList("fallbackModels"),
+                null);
         repository.save(config);
         return list();
     }
@@ -335,7 +338,10 @@ public class LlmConfigUiController {
                 raw.containsKey("type")
                         ? typeFrom(body, existing.type()) : existing.type(),
                 raw.containsKey("capabilities")
-                        ? capabilitiesFrom(body) : existing.capabilities());
+                        ? capabilitiesFrom(body) : existing.capabilities(),
+                raw.containsKey("fallbackModels")
+                        ? body.strList("fallbackModels") : existing.fallbackModels(),
+                null);
         try {
             repository.save(updated.withVersion(VersionedForms.version(body)));
         } catch (StaleVersionException e) {

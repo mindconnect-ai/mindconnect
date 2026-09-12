@@ -73,11 +73,21 @@ public class RetryingLlmGateway implements LlmGateway {
                 return; // completed (possibly after streaming) — done
             } catch (LlmTransientException te) {
                 if (committed.get() || attempt >= maxAttempts || cancellation.isCancelled()) {
+                    // Out of attempts is the state an admin needs to see by
+                    // itself: it is the moment the call either falls back to
+                    // another model or fails outright.
+                    if (!committed.get() && !cancellation.isCancelled() && maxAttempts > 1) {
+                        log.warn("LLM {} exhausted after {} attempt(s) for config '{}' (model {}) — no attempt left",
+                                te.status() == 429 ? "rate limit (HTTP 429)" : "transient error HTTP " + te.status(),
+                                maxAttempts, config.name(), config.model());
+                    }
                     throw te;
                 }
                 long backoff = policy.backoffForAttempt(attempt, te.retryAfterMillis());
-                log.warn("LLM transient error HTTP {} for config '{}' (attempt {}/{}); retrying in {} ms",
-                        te.status(), config.name(), attempt, maxAttempts, backoff);
+                log.warn("LLM {} for config '{}' (model {}), attempt {}/{} — retrying in {} ms ({})",
+                        te.status() == 429 ? "rate limit (HTTP 429)" : "transient error HTTP " + te.status(),
+                        config.name(), config.model(), attempt, maxAttempts, backoff,
+                        te.retryAfterMillis() > 0 ? "provider Retry-After" : "exponential backoff");
                 sleep(backoff, te.status());
             }
         }

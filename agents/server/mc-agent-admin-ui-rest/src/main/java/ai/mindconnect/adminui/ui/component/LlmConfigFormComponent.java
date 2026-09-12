@@ -113,7 +113,7 @@ public final class LlmConfigFormComponent implements UiComponent {
      * parameters below.
      */
     public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(LlmConfigType type, LlmConfig config) {
-        return typeGroup(type, config, null);
+        return typeGroup(type, config, null, List.of());
     }
 
     /**
@@ -122,6 +122,16 @@ public final class LlmConfigFormComponent implements UiComponent {
      */
     public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(LlmConfigType type, LlmConfig config,
                                                                  LmStudioPrefill prefill) {
+        return typeGroup(type, config, prefill, List.of());
+    }
+
+    /**
+     * @param allConfigs every stored config — the choices for the fallback
+     *                   models a rate-limited call switches to
+     */
+    public static ai.mindconnect.ui.model.UiFieldGroup typeGroup(LlmConfigType type, LlmConfig config,
+                                                                 LmStudioPrefill prefill,
+                                                                 List<LlmConfig> allConfigs) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("llm-type-cfg", switch (type) {
             case EMBEDDING -> "Embedding settings";
             case SPEECH_TO_TEXT -> "Speech-to-text settings";
@@ -166,8 +176,36 @@ public final class LlmConfigFormComponent implements UiComponent {
                 .field(UiField.number("maxConcurrentRequests", "Max Concurrent Requests",
                         config != null && config.rateLimit() != null
                                 ? config.rateLimit().maxConcurrentRequests() : null).asEditable()
-                        .hint("Caps in-flight LLM requests for this config (across turns, sub-agents, tool loops). Leave empty for unlimited. Use it to stay under a provider's rate limit when run_agents fans out."));
+                        .hint("Caps in-flight LLM requests for this config (across turns, sub-agents, tool loops). Leave empty for unlimited. Use it to stay under a provider's rate limit when run_agents fans out."))
+                .field(fallbackModelsField(config, allConfigs));
         return group;
+    }
+
+    /**
+     * The models this config falls back to when the provider rate-limits it:
+     * every other config, in the order the admin picks them. Empty means the
+     * call fails with the rate-limit error instead of moving on, so the hint
+     * says what picking one buys — usually a second vendor, whose limit is a
+     * different limit. A name whose config was deleted since stays in the list
+     * rather than disappearing silently on the next save.
+     */
+    private static UiField fallbackModelsField(LlmConfig config, List<LlmConfig> allConfigs) {
+        List<String> current = config == null ? List.of() : config.fallbackModels();
+        java.util.LinkedHashMap<String, UiField.Option> options = new java.util.LinkedHashMap<>();
+        for (LlmConfig other : allConfigs == null ? List.<LlmConfig>of() : allConfigs) {
+            if (config != null && other.id().equals(config.id())) continue;
+            options.put(other.name(), UiField.Option.of(other.name(), other.name()));
+        }
+        for (String name : current) {
+            options.putIfAbsent(name, UiField.Option.of(name, name + " (no such config)"));
+        }
+        return UiField.multiselect("fallbackModels", "Fallback models (on rate limit)",
+                        current, List.copyOf(options.values()))
+                .asEditable()
+                .hint("Tried in order when this config is rate-limited (HTTP 429) or the provider is "
+                        + "overloaded (529), after its own retries are used up. Pick a config at another "
+                        + "provider — its limit is a different limit. Nothing picked: the call fails with "
+                        + "the rate-limit error.");
     }
 
     /**
@@ -443,7 +481,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                         isNew ? null : config.apiKey(),
                         id(), configId, lmStudio))
                 .content(withHiddenIf(isAlias,
-                        typeGroup(isNew ? LlmConfigType.CHAT : config.type(), config)))
+                        typeGroup(isNew ? LlmConfigType.CHAT : config.type(), config, null, allConfigs)))
                 .content(withHiddenIf(isAlias, providerParamsGroup(
                         isNew ? null : config.provider(),
                         isNew ? ai.mindconnect.llm.domain.LlmConfigType.CHAT : config.type(),

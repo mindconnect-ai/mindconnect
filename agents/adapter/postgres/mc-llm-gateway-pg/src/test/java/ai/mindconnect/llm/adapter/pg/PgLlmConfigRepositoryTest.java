@@ -70,7 +70,7 @@ class PgLlmConfigRepositoryTest {
         LlmConfig first = LlmConfig.lmStudio("local", "qwen", "http://localhost:1234");
         repo.save(first);
         LlmConfig renamed = LlmConfig.fromJson(first.id().value(), "local-qwen", first.provider(), "qwen-2",
-                first.baseUrl(), first.apiKey(), 0.1, 1024, Map.of(), null, false, null, null, null, null, null, null);
+                first.baseUrl(), first.apiKey(), 0.1, 1024, Map.of(), null, false, null, null, null, null, null, null, null);
         repo.save(renamed);
 
         assertThat(repo.findAll()).containsExactly(renamed.withVersion(2L));

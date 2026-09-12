@@ -34,7 +34,8 @@ The format of a file in
     "maxAttempts": 5,
     "baseBackoffMillis": 2000,
     "maxBackoffMillis": 30000
-  }
+  },
+  "fallbackModels": ["openai-default", "gemini-default"]
 }
 ```
 
@@ -86,6 +87,7 @@ one:
 | `additionalParams` | object | Provider-specific options. For Anthropic e.g. `thinking` (`adaptive`/`disabled`) and `effort` (`low`, `medium`, `high`, `xhigh`, `max`). |
 | `rateLimit` | object? | Optional. `maxConcurrentRequests` caps in-flight calls. |
 | `retry` | object? | Optional. `enabled`, `maxAttempts`, `baseBackoffMillis`, `maxBackoffMillis`. **Omitting the block means no retry at all** — the built-in defaults only apply when the block is present and enabled. |
+| `fallbackModels` | string[]? | Optional. Other configs, by name, to try in order when this one is rate-limited (HTTP 429) or the provider is overloaded (529) — after `retry` is exhausted. Point them at a different provider: its limit is a different limit. A fallback may name an alias. Omitted or `[]` means the call fails with the rate-limit error. Chat configs only. |
 | `isAlias` / `delegatesTo` | bool / string | Alias configs forward to another config by name — useful to give a stable name (`agent-default`) that you can repoint. |
 
 :::info Env-var placeholders
