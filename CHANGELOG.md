@@ -37,8 +37,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
   narrowed to pictures. Chat endpoints added:
   `GET /chat/api/sessions/{id}/tools-dialog`, `.../subagents-dialog`,
   `POST .../tools`, `.../tool-search`, `.../delegation`, `.../delegate`;
-  `GET .../attach-dialog` takes `?kind=files|images`. The settings dialog
-  behind the model button keeps its own model, agent and prompt fields.
+  `GET .../attach-dialog` takes `?kind=files|images`.
+
+### Changed
+
+- **agents:** the chat's settings dialog is the agent, the model and the
+  system prompt — three fields, no tabs. The tool multiselect and the
+  tool-search checkbox that used to need a second tab moved into the
+  composer's "+" menu, where they are switches rather than a form; the dialog
+  says so in a closing line. Applying it never writes the tool list any more,
+  so a chat that comes here to change its model keeps whatever it switched on
+  in the Tools picker. An LLM config that is an alias now reads as what it
+  points at (`agent-default → openai-default`) instead of
+  `agent-default (null / null)`, and an agent is listed with what it is for
+  rather than by name alone.
 
 ### Fixed
 
@@ -46,6 +58,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
   mid-turn no longer swaps the composer's Stop button for a Send button.
   Anything that redraws the composer now renders it in whichever state the
   session is actually in.
+- **agents:** editing the system prompt of a chat that has no agent behind it
+  is kept. The settings dialog submitted it and the handler then rebuilt the
+  chat's agent from its own previous prompt, so the edit vanished on Apply
+  with no error — a chat bound to an agent was unaffected.
+- **agents:** leaving an agent behind ("no agent" in the settings dialog) no
+  longer changes what the chat can do. It kept only the tools the registry can
+  resolve on that machine, so a chat detaching on a host without Gmail
+  credentials silently lost the agent's Gmail tools, and it dropped the
+  agent's `callableAgents` roster, which handed the chat the run of every
+  registered agent. Both are carried over now, bindings and all.
 
 ## [0.8.1] - 2026-09-12
 

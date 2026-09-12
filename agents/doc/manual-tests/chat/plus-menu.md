@@ -86,7 +86,7 @@ change the chat while staying open, and what the menu says about the chat
   `ChatPlusMenuComponentTest` and `ChatPickerComponentsTest`
   (mc-agent-chat-ui-rest). What they cannot check is the popover's placement
   and the flip-above, which is why step 1 is a human step.
-- The model button beside Send still opens the settings dialog, which keeps
-  its own model, agent and prompt fields — and its own tool multiselect. The
-  two views of the chat's tools read and write the same session agent; only
-  one dialog is open at a time, so they cannot disagree on screen.
+- The model button beside Send opens the settings dialog, which is the agent,
+  the model and the system prompt — and nothing else. Its own case is
+  `chat/settings-dialog.md`; the step that matters to this one is that
+  applying it does not touch the tools switched on here.

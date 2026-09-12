@@ -52,13 +52,44 @@ class ChatDialogActionUrlsTest {
 
     @Test
     void theSettingsDialogAppliesAndCloses() throws Exception {
-        var settings = new ChatSettingsComponent(SESSION, List.of(), List.of(), List.of(),
-                null, List.of(), false, null);
+        var settings = new ChatSettingsComponent(SESSION, List.of(), List.of(), null, null, null);
 
         String out = json(settings.render());
 
         assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/settings\"");
         assertThat(out).contains("\"url\":\"/chat/api/close-dialog\"");
+    }
+
+    /**
+     * Three fields, and the two that left. The tool multiselect and the
+     * tool-search checkbox moved behind the composer's "+", where they are
+     * switches rather than a form — and the dialog says so, because one that
+     * silently loses half its contents teaches people the feature was removed.
+     */
+    @Test
+    void theSettingsDialogIsTheAgentTheModelAndThePrompt() throws Exception {
+        String out = json(new ChatSettingsComponent(SESSION, List.of(), List.of(),
+                "agent-default", null, "You are helpful.").render());
+
+        // A field's id IS its form-control name, so these are the three keys
+        // applySettings reads out of the payload.
+        assertThat(out).contains("\"id\":\"agentId\"")
+                .contains("\"id\":\"llmConfigName\"")
+                .contains("\"id\":\"systemPrompt\"");
+        assertThat(out)
+                .as("tools are switched in the \"+\" menu now, not applied from a form")
+                .doesNotContain("\"id\":\"tools\"")
+                .doesNotContain("\"id\":\"toolSearch\"")
+                .doesNotContain("MULTISELECT");
+        assertThat(out).contains("Tools and sub-agents are switched in the composer");
+    }
+
+    /** No tabs for three fields — the second tab existed to hold the tool list. */
+    @Test
+    void theSettingsDialogHasNoTabs() throws Exception {
+        assertThat(json(new ChatSettingsComponent(SESSION, List.of(), List.of(), null, null, null)
+                .render()))
+                .doesNotContain("\"type\":\"section\"");
     }
 
     @Test
