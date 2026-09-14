@@ -153,6 +153,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   compared that ciphertext with the bundled plain value — so applying never
   made the row go away. Keys are now compared by what they decrypt or resolve
   to, and the diff shows only that a key differs, never the value.
+- **agents:** `bash` reliably notices a process the command left holding
+  its output after the shell exited — and kills it, or says it could not.
+  Whether that happened used to depend on timing: if the shell exited while
+  the tool was between two reads of the pipe, the JVM closed the pipe on its
+  own, the call returned without a word, and the process ran on unseen. The
+  same race made `BashToolOutputTest` fail now and then in CI.
 
 ## [0.8.1] - 2026-09-12
 
