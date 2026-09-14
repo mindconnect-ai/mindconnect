@@ -6,7 +6,9 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -86,6 +88,39 @@ class BashToolOutputTest {
             assertThat(out).startsWith("before\nafter\n")
                     .contains("kept the output open after the shell exited").contains("background=true");
             assertThat(took).as("returns shortly after the shell").isLessThan(BashTool.OUTPUT_GRACE_MS + 4_000);
+        } finally {
+            killAll(marker);
+        }
+    }
+
+    @Test
+    void theDrainKeepsThePipe_whileItIsBetweenReadsAsTheShellExits() throws Exception {
+        String marker = "sleep 34.7";
+        Process process = new ProcessBuilder("bash", "-c", "echo before; bash -c '" + marker + " &'; echo after")
+                .redirectErrorStream(true).start();
+        try {
+            // The reaper closes the shell's pipe as soon as nothing reads it.
+            // An Output slow to take a chunk is how the drain used to be away
+            // from the pipe just as the shell exited — and then saw the output
+            // end, with the sleep still holding it.
+            BashTool.Output slow = new BashTool.Output() {
+                @Override
+                synchronized void add(char[] chars, int offset, int length) {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException e) {
+                        throw new IllegalStateException(e);
+                    }
+                    super.add(chars, offset, length);
+                }
+            };
+            Thread drainer = Thread.ofVirtual().start(() -> BashTool.drain(process, slow));
+            assertThat(process.waitFor(5, TimeUnit.SECONDS)).as("the shell exits at once").isTrue();
+            assertThat(drainer.join(Duration.ofMillis(1_500))).as("the drain ends with the sleep, not the shell")
+                    .isFalse();
+            killAll(marker);
+            assertThat(drainer.join(Duration.ofSeconds(5))).as("the drain ends once the sleep is gone").isTrue();
+            assertThat(slow.text()).isEqualTo("before\nafter");
         } finally {
             killAll(marker);
         }

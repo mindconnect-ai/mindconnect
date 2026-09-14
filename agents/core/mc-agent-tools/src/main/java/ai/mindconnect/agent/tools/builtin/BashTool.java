@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.nio.charset.StandardCharsets;
@@ -337,16 +338,29 @@ public class BashTool implements Tool {
                 sessionId == null ? "no-session" : sessionId.value());
     }
 
-    /** Reads the output in chunks, not lines: a line without end must not grow in memory before the cap sees it. */
-    private static void drain(Process process, Output output) {
-        try (Reader reader = new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8)) {
-            char[] chunk = new char[8_192];
-            int read;
-            while ((read = reader.read(chunk)) != -1) {
-                output.add(chunk, 0, read);
+    /**
+     * Reads the output in chunks, not lines — a line without end must not
+     * grow in memory before the cap sees it — until the last process holding
+     * the pipe closes it; the shell's exit is not that. The JDK's reaper thread, once the shell
+     * has exited, takes what is left in the pipe and closes it, so that a
+     * process the shell left behind holds nothing; it takes the stream's
+     * monitor to do so, the same one a read holds. Holding the monitor for
+     * the whole drain keeps the pipe open between reads too: without that,
+     * the shell exiting while the last chunk was being added ended the
+     * output, and the process still holding it went unnoticed.
+     */
+    static void drain(Process process, Output output) {
+        InputStream in = process.getInputStream();
+        synchronized (in) {
+            try (Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
+                char[] chunk = new char[8_192];
+                int read;
+                while ((read = reader.read(chunk)) != -1) {
+                    output.add(chunk, 0, read);
+                }
+            } catch (IOException e) {
+                // The process was killed under us; what was read stays.
             }
-        } catch (IOException e) {
-            // The process was killed under us; what was read stays.
         }
     }
 
@@ -533,7 +547,7 @@ public class BashTool implements Tool {
      * counted, never held. Line breaks come out as {@code \n}, and the last
      * one is dropped, as reading line by line did.
      */
-    static final class Output {
+    static class Output {
         private final StringBuilder kept = new StringBuilder();
         private boolean full;
         private long droppedLines;
