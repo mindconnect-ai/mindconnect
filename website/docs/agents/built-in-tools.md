@@ -24,7 +24,7 @@ Always available; no API keys required.
 | Tool | Description | Needs |
 |------|-------------|-------|
 | `get_current_datetime` | Returns the current date and time in ISO-8601 with timezone. | — |
-| `list_agents` | Lists the agents with their names and descriptions. | — |
+| `list_agents` | Lists the agents this one may call, with their names and descriptions. Added by the runtime with `run_agent`. | — |
 | `bash` | Runs a bash command in the session's working directory; output drained as it comes, capped at 30,000 characters; `timeout` per call (default 120 s, max 600); a timed-out or cancelled command is killed with everything it spawned. `background` starts a server or watcher detached, watches it for three seconds and returns its pid, whether it is still running or already exited with which code, the log so far, and the log file (`logs/` in the session's directory). | Working dir |
 | `process_kill` | Ends a background process of this session by pid, with everything it spawned; without a pid lists them. Whatever still runs when the runtime stops is killed with it. | — |
 | `file_read` | Reads a text file with numbered lines, `cat -n` style; `offset` and `limit` page through a long one (2,000 lines or 20,000 characters per call); refuses binary files. | Working dir |
@@ -39,9 +39,9 @@ Always available; no API keys required.
 
 | Tool | Description | Needs |
 |------|-------------|-------|
-| `run_agent` | Delegates a task to another agent by name — see [sub-agents](./sub-agents.md). | — |
-| `run_agents` | Fans several sub-agent calls out in parallel. | — |
-| `tool_search` | Lets the agent find and activate its *deferred* tools on demand. | The agent's `toolSearch` config |
+| `run_agent` | Delegates a task to another agent by name — see [sub-agents](./sub-agents.md). Added by the runtime when the agent's roster names someone. | — |
+| `run_agents` | Fans several sub-agent calls out in parallel. Added with `run_agent`. | — |
+| `tool_search` | Lets the agent find and activate its *deferred* tools on demand. Added by the runtime when a tool is deferred. | — |
 | `skill` | Loads the full instructions of one [skill](./skills.md); the prompt carries only names and descriptions. Injected, not assigned. | The agent's `skills` config |
 | `view_attachment` | Shows an attached image or PDF to the model again — as a message of its own in the running turn, since media goes with a message in its own turn only. Activated for a session when an image or PDF is attached; see [images and documents as message parts](./vector-store.md#images-and-documents-as-message-parts). | — |
 

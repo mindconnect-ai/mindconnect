@@ -118,7 +118,7 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
                 incoming.tools(),
                 incoming.responseReviewers(),
                 incoming.callableAgents(),
-                incoming.toolSearch(),
+                incoming.callableByAgents(),
                 incoming.skills(),
                 existing.map(AgentDefinition::createdAt).orElse(now),
                 now,

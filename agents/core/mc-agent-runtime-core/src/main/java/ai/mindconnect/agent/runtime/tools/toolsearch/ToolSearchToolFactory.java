@@ -8,10 +8,7 @@ import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
 
 import java.util.Collection;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -20,8 +17,8 @@ import java.util.Set;
  * {@link DynamicToolActivations} services — a host that doesn't opt in simply
  * has no search tool.
  *
- * <p>Config override {@code groups} (array of group names) narrows what an
- * agent may discover; without it the whole registry is searchable.
+ * <p>Never bound by hand: the runtime adds it to an agent that has deferred
+ * tools and hands it their names as the {@code assigned} override.
  */
 public final class ToolSearchToolFactory implements ToolFactory {
 
@@ -50,36 +47,20 @@ public final class ToolSearchToolFactory implements ToolFactory {
     }
 
     @Override
-    public Map<String, Object> overridesSchema() {
-        Map<String, Object> groups = new LinkedHashMap<>();
-        groups.put("type", "array");
-        groups.put("items", Map.of("type", "string"));
-        groups.put("description", "Registry groups this agent may discover beyond its own deferred tools "
-                + "(e.g. [\"web\", \"documents\"]; \"*\" = every group). Unset = only the agent's "
-                + "deferred tools are searchable. Usually set via the agent's Tool Search settings, "
-                + "not per tool row.");
-        return Map.of("type", "object", "properties", Map.of("groups", groups));
-    }
-
-    @Override
     public Tool create(AgentTool agentTool, ToolCallScope scope) {
         return new ToolSearchTool(registryRef, activations,
                 scope == null ? null : scope.sessionId(),
-                names(agentTool, "assigned", false),
-                names(agentTool, "groups", true));
+                names(agentTool, "assigned"));
     }
 
-    /** Reads a string-collection override; groups are lowercased ("*" allowed). */
-    private static Set<String> names(AgentTool agentTool, String key, boolean lowercase) {
+    /** Reads a string-collection override. */
+    private static Set<String> names(AgentTool agentTool, String key) {
         if (agentTool == null || !(agentTool.overrides().get(key) instanceof Collection<?> raw)) {
             return Set.of();
         }
         Set<String> values = new LinkedHashSet<>();
         for (Object entry : raw) {
             String value = String.valueOf(entry).trim();
-            if (lowercase) {
-                value = value.toLowerCase(Locale.ROOT);
-            }
             if (!value.isEmpty()) {
                 values.add(value);
             }

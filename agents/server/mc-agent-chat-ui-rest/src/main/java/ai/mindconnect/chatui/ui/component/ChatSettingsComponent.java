@@ -10,60 +10,53 @@ import static ai.mindconnect.ui.mvc.UiActions.trigger;
 import static org.springframework.web.servlet.mvc.method.annotation.MvcUriComponentsBuilder.on;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
-import ai.mindconnect.ui.model.UiFieldGroup;
-import ai.mindconnect.ui.model.UiSection;
+import ai.mindconnect.ui.model.UiText;
 
+import java.util.ArrayList;
 import java.util.List;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 
 /**
- * Model and tools for one chat, as a dialog over the running conversation.
+ * Who answers in this chat, as a dialog over the running conversation: an
+ * agent, a model, a prompt. Three fields, in the order they overrule each
+ * other.
  *
- * <p>A chat never waits for this: it starts on the default model with the
- * default tools, and this is where you change your mind. Which is also why
- * the agent field can be empty — most chats have no agent behind them.
+ * <p>A chat never waits for this: it starts on the default agent with the
+ * default model, and this is where you change your mind. Which is also why
+ * the agent field can be empty — a chat may be its own agent, assembled from
+ * the two fields below it.
+ *
+ * <p><b>What is deliberately not here.</b> The tool list and the tool-search
+ * switch used to share this dialog, as a {@code <select multiple>} and a
+ * checkbox behind a tab called "Model &amp; tools". They are switches you
+ * flick while typing, not a form you fill in, and they now live one click
+ * behind the composer's "+" ({@link ChatToolsPickerComponent},
+ * {@link ChatSubAgentsComponent}) — so this dialog is the three things that
+ * genuinely are a form, and it needs no tabs to hold them. The closing line
+ * says where the rest went; a dialog that silently loses half its contents
+ * teaches people the feature was removed.
  */
 public final class ChatSettingsComponent implements UiComponent {
-
-    /** What a chat can do before anyone configures anything. */
-    public static final List<String> DEFAULT_TOOLS = List.of(
-            "list_agents", "run_agent", "run_agents",
-            "todo_read", "todo_write");
 
     private final SessionId sessionId;
     private final List<LlmConfig> llmConfigs;
     private final List<AgentDefinition> agents;
-    private final List<String> toolNames;
     private final String currentLlmConfigName;
-    private final List<String> currentTools;
-    private final boolean toolSearchOn;
     private final AgentId currentAgentId;
     /** What this chat runs on today — the agent's prompt, or its own override. */
     private final String currentSystemPrompt;
 
     public ChatSettingsComponent(SessionId sessionId, List<LlmConfig> llmConfigs,
-                                 List<AgentDefinition> agents, List<String> toolNames,
-                                 String currentLlmConfigName, List<String> currentTools,
-                                 boolean toolSearchOn, AgentId currentAgentId) {
-        this(sessionId, llmConfigs, agents, toolNames, currentLlmConfigName, currentTools,
-                toolSearchOn, currentAgentId, null);
-    }
-
-    public ChatSettingsComponent(SessionId sessionId, List<LlmConfig> llmConfigs,
-                                 List<AgentDefinition> agents, List<String> toolNames,
-                                 String currentLlmConfigName, List<String> currentTools,
-                                 boolean toolSearchOn, AgentId currentAgentId,
+                                 List<AgentDefinition> agents,
+                                 String currentLlmConfigName, AgentId currentAgentId,
                                  String currentSystemPrompt) {
-        this.currentSystemPrompt = currentSystemPrompt;
         this.sessionId = sessionId;
         this.llmConfigs = llmConfigs;
         this.agents = agents;
-        this.toolNames = toolNames;
         this.currentLlmConfigName = currentLlmConfigName;
-        this.currentTools = currentTools;
-        this.toolSearchOn = toolSearchOn;
         this.currentAgentId = currentAgentId;
+        this.currentSystemPrompt = currentSystemPrompt;
     }
 
     @Override
@@ -71,62 +64,96 @@ public final class ChatSettingsComponent implements UiComponent {
         return "chat-settings-" + sessionId.value();
     }
 
+    /** The dialog's heading — what this dialog is now about. */
+    public static final String TITLE = "Agent, model & prompt";
+
     @Override
     public UiForm render() {
-        List<UiField.Option> modelOptions = llmConfigs.stream()
-                .map(c -> UiField.Option.of(c.name(),
-                        c.name() + " (" + c.provider() + " / " + c.model() + ")"))
-                .toList();
-
-        List<UiField.Option> agentOptions = new java.util.ArrayList<>();
-        agentOptions.add(UiField.Option.of("", "— no agent: model and tools below —"));
-        agents.forEach(a -> agentOptions.add(UiField.Option.of(a.id().value(), a.name())));
-
-        List<UiField.Option> toolOptions = toolNames.stream()
-                .map(n -> UiField.Option.of(n, n))
-                .toList();
-
-        // One tab per half. The fields live in field groups inside the tabs,
-        // and the tabs inside the FORM — not the form inside the tabs. The
-        // submitted payload is the id of the <form> the button sits in
-        // (EventBus.inferImplicitPayload), so a second form would submit only
-        // its own half: pressing Apply on the agent tab would send agentId and
-        // nothing else, and the model, the tools and the prompt would arrive
-        // as absent. A hidden tab is hidden, not removed, so its inputs are
-        // still part of the one form.
-        var modelTab = UiFieldGroup.of(id() + "-g-model", null)
-                .field(UiField.select("llmConfigName", "Model", currentLlmConfigName, modelOptions)
-                        .asEditable()
-                        .hint("Provider, key and context window come with the config"))
-                .field(UiField.multiselect("tools", "Tools", currentTools, toolOptions)
-                        .asEditable()
-                        .hint("Offered up front. Everything else stays reachable through tool search"))
-                .field(UiField.bool("toolSearch", "Tool search", toolSearchOn)
-                        .asEditable()
-                        .hint("Lets the chat find the remaining tools itself instead of carrying "
-                                + "every definition in its context"))
-                .field(UiField.textarea("systemPrompt", "System prompt", currentSystemPrompt)
-                        .asEditable()
-                        .hint("Starts as the agent's own. Edit it and this chat alone uses "
-                                + "yours — the agent, its tools and the agents it may call "
-                                + "stay as they are"));
-
-        var agentTab = UiFieldGroup.of(id() + "-g-agent", null)
-                .field(UiField.select("agentId", "…or an agent",
-                                currentAgentId == null ? "" : currentAgentId.value(), agentOptions)
-                        .asEditable()
-                        .hint("Takes over prompt, model and tools — the fields on the other tab "
-                                + "stop applying"));
-
-        var tabs = UiSection.of(id() + "-tabs", null)
-                .section(id() + "-tab-model", "Model & tools", modelTab)
-                .section(id() + "-tab-agent", "Agent", agentTab);
-
-        return UiForm.of(id(), "Chat settings")
-                .content(tabs)
+        return UiForm.of(id(), null)
+                .field(agentField())
+                .field(modelField())
+                .field(promptField())
+                // After the fields, before the footer: where the tools and the
+                // sub-agents went when they left this dialog.
+                .content(UiText.of(id() + "-elsewhere",
+                                "Tools and sub-agents are switched in the composer's “+” menu.")
+                        .withCssClass("chat-settings-elsewhere"))
                 .action(UiAction.primary("apply", "Apply").icon("save")
-                        .onClick(trigger(on(ChatUiController.class).applySettings(sessionId.value(), null, null), id())))
+                        .onClick(trigger(on(ChatUiController.class)
+                                .applySettings(sessionId.value(), null, null), id())))
                 .action(UiAction.secondary("cancel", "Cancel")
-                        .onClick(trigger(on(ChatUiController.class).closeDialog())));
+                        .onClick(trigger(on(ChatUiController.class).closeDialog())))
+                .<UiForm>withCssClass("chat-settings-form");
+    }
+
+    /**
+     * The agent, first because it overrules the other two: picking a different
+     * one hands the chat over completely. Staying on the one it has leaves the
+     * two fields below acting as this chat's own overrides.
+     */
+    private UiField agentField() {
+        List<UiField.Option> options = new ArrayList<>();
+        options.add(UiField.Option.of("", "— no agent: the model and prompt below —"));
+        agents.forEach(a -> options.add(UiField.Option.of(a.id().value(), label(a))));
+        return UiField.select("agentId", "Agent",
+                        currentAgentId == null ? "" : currentAgentId.value(), options)
+                .asEditable()
+                .hint("An agent brings its own prompt, model and tools. Switch to a different "
+                        + "one and it takes over; stay on this one and the two fields below "
+                        + "override it for this chat alone");
+    }
+
+    /** An agent reads as what it is for, not just what it is called. */
+    private static String label(AgentDefinition agent) {
+        String description = agent.description();
+        if (description == null || description.isBlank()) {
+            return agent.name();
+        }
+        String trimmed = description.strip();
+        if (trimmed.length() > 70) {
+            trimmed = trimmed.substring(0, 69).strip() + "…";
+        }
+        return agent.name() + " — " + trimmed;
+    }
+
+    private UiField modelField() {
+        List<UiField.Option> options = llmConfigs.stream()
+                .map(c -> UiField.Option.of(c.name(), label(c)))
+                .toList();
+        return UiField.select("llmConfigName", "Model", currentLlmConfigName, options)
+                .asEditable()
+                .hint("Provider, key and context window come with the config");
+    }
+
+    /**
+     * A config reads as "name (provider / model)" — except an alias, which
+     * carries no provider settings of its own and reads as what it points at.
+     * {@code agent-default} is exactly that, and it used to render as
+     * "agent-default (null / null)": the sort of thing a dialog shows once
+     * and is never trusted again.
+     */
+    private static String label(LlmConfig config) {
+        if (config.isAlias()) {
+            return config.delegatesTo() == null || config.delegatesTo().isBlank()
+                    ? config.name()
+                    : config.name() + " \u2192 " + config.delegatesTo();
+        }
+        var detail = new ArrayList<String>();
+        if (config.provider() != null) {
+            detail.add(config.provider().toString());
+        }
+        if (config.model() != null && !config.model().isBlank()) {
+            detail.add(config.model());
+        }
+        return detail.isEmpty()
+                ? config.name()
+                : config.name() + " (" + String.join(" / ", detail) + ")";
+    }
+
+    private UiField promptField() {
+        return UiField.textarea("systemPrompt", "System prompt", currentSystemPrompt)
+                .asEditable()
+                .hint("Starts as the agent's own. Edit it and this chat alone uses yours — "
+                        + "the agent, its tools and the agents it may call stay as they are");
     }
 }

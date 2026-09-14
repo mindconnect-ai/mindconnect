@@ -30,7 +30,7 @@ public interface Tool {
 ```java
 public interface ToolFactory {
     String name();                              // the tool name this factory owns
-    default String group() { return "general"; } // catalog rubric + tool_search filter
+    default String group() { return "general"; } // catalog rubric
     default void bind(ToolEnvironment env) {}   // grab dependencies once at startup
     default boolean isAvailable() { return true; } // disable when config is missing
     default Map<String, Object> overridesSchema() { return Map.of(); } // per-agent config knobs
@@ -38,8 +38,8 @@ public interface ToolFactory {
 }
 ```
 
-`group()` decides where the tool appears in the Admin UI catalog and which
-`toolSearch.groups` filter matches it. `overridesSchema()` describes the keys
+`group()` decides where the tool appears in the Admin UI catalog and in the
+chat's tool picker. `overridesSchema()` describes the keys
 an agent may set in its tool binding's `overrides` map (e.g. `baseDir`) so the
 UI can render a form for them.
 

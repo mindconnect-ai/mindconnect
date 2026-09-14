@@ -11,6 +11,12 @@ The model picks a sub-agent through a tool call:
 run_agent("web-researcher", "Research Qdrant")
 ```
 
+An agent can call the agents its `callableAgents` roster names, and no
+others: the roster is what gives it `run_agent`, `run_agents` and
+`list_agents` in the first place, and an agent without one has none of them.
+Agents marked `callableByAgents: false` — the runtime's own helpers, like the
+title generator — are never callable, whatever a roster says.
+
 The sub-agent runs in its **own session** — own prompt, tools and model — does
 its work, and returns the result. Sub-agents can call sub-agents recursively,
 up to a depth of **5**; each sub-agent call times out after 2 hours.
@@ -59,8 +65,9 @@ started with.
 Its tools are **the caller's own, narrowed**: `disallowedTools` takes some
 away, `tools` keeps the ones it names, and naming a tool the caller does not
 have grants nothing. Each tool keeps the approval the caller's binding gives
-it, so a project cannot wave `bash` through, and tool search stays off so it
-cannot look further tools up either.
+it, so a project cannot wave `bash` through. A tool the caller left to tool
+search stays deferred, and tool search only ever finds those, so it cannot
+look further tools up either.
 
 That is what makes opening someone else's repository safe: the file can only
 narrow what the agent calling it was already allowed to do. It is not subject

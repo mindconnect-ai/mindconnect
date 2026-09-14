@@ -87,8 +87,8 @@ public class AgentRegistryService {
         if (patch.callableAgents().isPresent()) {
             updated = updated.withCallableAgents(patch.callableAgents().get());
         }
-        if (patch.toolSearch().isPresent()) {
-            updated = updated.withToolSearch(patch.toolSearch().get());
+        if (patch.callableByAgents().isPresent()) {
+            updated = updated.withCallableByAgents(patch.callableByAgents().get());
         }
         if (patch.skills().isPresent()) {
             updated = updated.withSkills(patch.skills().get());

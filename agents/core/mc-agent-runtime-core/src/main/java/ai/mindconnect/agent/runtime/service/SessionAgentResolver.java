@@ -61,8 +61,7 @@ public class SessionAgentResolver {
      * The session's own agent as a definition. The memory config is the
      * system default on purpose — it decides how long chats survive
      * compression and is not something a chat picker should set. The roster
-     * is the one the agent carries: empty for a chat from the picker, the
-     * caller's for a project's agent.
+     * is the one the agent carries: the caller's for a project's agent.
      */
     private static AgentDefinition inlineDefinition(AgentSession session, InlineSessionAgent inline) {
         Instant now = session.startedAt() != null ? session.startedAt() : Instant.now();
@@ -71,12 +70,14 @@ public class SessionAgentResolver {
                 inline.systemPrompt(), null, inline.llmConfigName(),
                 DEFAULT_MAX_ITERATIONS, SummarizingWindowConfig.DEFAULT,
                 AgentDefinitionStatus.ACTIVE, inline.tools(), java.util.List.of(), inline.callableAgents(),
-                inline.toolSearch(), now, now);
+                null, now, now);
     }
 
     /**
      * The agent as configured, with this chat's choices on top: model, tools,
-     * and — since the roster made detaching costly — the system prompt. See
+     * the roster, and — since the roster made detaching costly — the system
+     * prompt. A choice replaces the agent's outright; the agent is the
+     * template the chat started from, not a ceiling. See
      * {@link SessionAgentRef} for why that last one stopped being forbidden.
      * Everything the chat does not name stays the agent's own, the roster
      * included.
@@ -94,8 +95,8 @@ public class SessionAgentResolver {
         if (ref.tools() != null) {
             out = out.withTools(ref.tools());
         }
-        if (ref.toolSearch() != null) {
-            out = out.withToolSearch(ref.toolSearch());
+        if (ref.callableAgents() != null) {
+            out = out.withCallableAgents(ref.callableAgents());
         }
         return out;
     }

@@ -31,7 +31,10 @@ The agent form lets you set:
 - **LLM Config** — which model it uses, picked from your
   [LLM Configs](./llm-configs.md) (e.g. `agent-default`, `claude-default`).
 - **Max Iterations** — the tool-loop budget per turn.
-- **Tool Search** — enable `tool_search` and pick the groups it may search.
+- **Callable Agents** — the roster of agents this one may hand work to. Naming
+  any gives it `run_agent`, `run_agents` and `list_agents`.
+- **Callable by other agents** — off for the runtime's own helpers, so no
+  roster offers them.
 - **Response Reviewers** — reviewer agents that check answers.
 
 Tools are **not** part of this form — they're managed on the detail view's

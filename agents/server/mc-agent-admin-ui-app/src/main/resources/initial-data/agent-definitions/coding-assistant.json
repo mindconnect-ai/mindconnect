@@ -96,24 +96,6 @@
       "needsApproval": false
     },
     {
-      "id": "00000003-0000-0000-0000-000000000909",
-      "agentDefinitionId": "00000002-0000-0000-0000-000000000013",
-      "name": "list_agents",
-      "description": "Names the agents you can delegate to — the ones registered on this server and the ones this project defines in .mindconnect/agents.",
-      "enabled": true,
-      "deferred": false,
-      "needsApproval": false
-    },
-    {
-      "id": "00000003-0000-0000-0000-000000000907",
-      "agentDefinitionId": "00000002-0000-0000-0000-000000000013",
-      "name": "run_agent",
-      "description": "Delegates a task to another agent by name — the explorer, for sweeping an unfamiliar codebase.",
-      "enabled": true,
-      "deferred": false,
-      "needsApproval": false
-    },
-    {
       "id": "00000003-0000-0000-0000-000000000908",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000013",
       "name": "process_kill",
@@ -126,5 +108,7 @@
   "createdAt": "2026-09-09T00:00:00Z",
   "updatedAt": "2026-09-09T00:00:00Z",
   "llmConfigName": "agent-default",
-  "callableAgents": ["explorer"]
+  "callableAgents": [
+    "explorer"
+  ]
 }

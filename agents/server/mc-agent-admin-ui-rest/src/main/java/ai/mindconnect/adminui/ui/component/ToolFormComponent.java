@@ -64,8 +64,8 @@ public final class ToolFormComponent implements UiComponent {
         boolean isNew = tool == null;
 
         // Inline tools (run_agent / run_agents) are handled by AgentChatService,
-        // not the ToolRegistry — surface them here too so they're selectable and
-        // not mislabelled "(unregistered)", and so their schema shows below.
+        // not the ToolRegistry. They are no longer bound by hand — the roster
+        // brings them — but a schema lookup for an old row still finds them.
         Map<String, ToolDefinition> inlineDefs = new LinkedHashMap<>();
         for (var def : AgentChatService.inlineToolDefinitions()) {
             inlineDefs.put(def.name(), def);
@@ -77,12 +77,12 @@ public final class ToolFormComponent implements UiComponent {
         // whose name was renamed or removed from the classpath we still
         // surface it so the row stays editable.
         java.util.SortedMap<String, java.util.SortedSet<String>> byGroup = new java.util.TreeMap<>();
-        toolRegistry.toolNamesByGroup().forEach((g, names) ->
-                byGroup.computeIfAbsent(g, k -> new java.util.TreeSet<>()).addAll(names));
-        for (String n : inlineDefs.keySet()) {
-            boolean known = byGroup.values().stream().anyMatch(s -> s.contains(n));
-            if (!known) byGroup.computeIfAbsent("agents", k -> new java.util.TreeSet<>()).add(n);
-        }
+        // Without the tools the runtime derives: the roster brings the
+        // delegation tools, a deferred tool brings tool_search. A definition
+        // drops them on the way in, so a row for one would never save.
+        toolRegistry.toolNamesByGroup().forEach((g, names) -> names.stream()
+                .filter(n -> !AgentDefinition.DERIVED_TOOLS.contains(n))
+                .forEach(n -> byGroup.computeIfAbsent(g, k -> new java.util.TreeSet<>()).add(n)));
         List<UiField.Option> builtinOptions = new ArrayList<>();
         LinkedHashSet<String> registered = new LinkedHashSet<>();
         byGroup.forEach((g, names) -> {
@@ -142,8 +142,8 @@ public final class ToolFormComponent implements UiComponent {
                 .field(UiField.bool("deferred", "Deferred (via tool search only)",
                         !isNew && tool.deferred())
                         .asEditable()
-                        .hint("Deferred tools are not offered to the LLM up front — they are found "
-                                + "and activated through tool_search (enable Tool Search on the agent). "
+                        .hint("Deferred tools are not offered to the LLM up front — the agent finds "
+                                + "them with tool_search, which it gets as soon as one tool is deferred. "
                                 + "Keeps large tool sets out of the context until needed"))
                 .field(UiField.bool("needsApproval", "Needs approval",
                         !isNew && tool.needsApproval())

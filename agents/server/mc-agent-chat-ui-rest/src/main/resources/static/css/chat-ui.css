@@ -241,20 +241,32 @@
 }
 
 /* ── The composer's footer row ────────────────────────────────────────────
-   Attach, the model button, Send. The framework sizes buttons in this row
-   like icon buttons, which squeezes a text label to 32px and wraps it over
-   two lines on top of Send. The model button opts out: it keeps its text,
-   truncates when the window is narrow, and holds the left edge so Send stays
-   where the thumb expects it. */
-/* The framework parks this row absolutely in the composer's bottom-right
-   corner (inset: 56px 18px 18px auto), so the three buttons huddle there.
-   Anchoring it on BOTH sides spreads them across the field instead — width
-   must stay auto, or a set width plus a set right edge pushes the row out
-   past the card's left border. */
+   Dictate, the directory, the model, Send. The framework sizes buttons in
+   this row like icon buttons, which squeezes a text label to 32px and wraps
+   it over two lines on top of Send. The model button opts out: it keeps its
+   text, truncates when the window is narrow, and holds the left edge so Send
+   stays where the thumb expects it. */
+/* The row is parked in the composer's bottom strip and spread across the
+   whole card rather than huddled in one corner: anchored on BOTH sides, with
+   width left auto — a set width plus a set right edge pushes the row out past
+   the card's left border. The start inset leaves the square the "+" menu
+   occupies; that one is a node rather than an action, so it cannot ride in
+   this row — see the .chat-plus rules further down. */
+.chat-form.sui-form {
+    position: relative;
+}
+
 .chat-form .sui-form-footer {
-    left: 12px;
-    right: 12px;
+    position: absolute;
+    inset-block-end: 10px;
+    inset-inline-start: 54px;
+    inset-inline-end: 10px;
     width: auto;
+    /* The framework's form footer is a divider above a row of buttons. Inside
+       a composer it is neither. */
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
     gap: 0.5rem;
     align-items: center;
     justify-content: flex-start;
@@ -265,8 +277,8 @@
     margin-inline-start: auto;
 }
 
-/* The labelled buttons in this row (the model, and the "+" once it carries a
-   count) are plain .sui-btn; the icon-only ones are .sui-icon-btn. The row
+/* The labelled buttons in this row (the model, the directory) are plain
+   .sui-btn; the icon-only ones are .sui-icon-btn. The row
    squeezes a .sui-btn to icon size, which folded "agent-default" onto two
    lines under the send button — so they take their text width back and
    truncate instead of wrapping. */
@@ -929,4 +941,262 @@
 @media (prefers-reduced-motion: reduce) {
     .chat-record-btn.is-recording,
     .sui-btn.is-recording { animation: none; }
+}
+
+/* ── The composer's "+" ───────────────────────────────────────────────────
+   Files, images, tools, sub-agents — one popover in the composer's
+   bottom-left corner, where the attach button used to be on its own.
+
+   It lives in the form's CONTENT, not in the action footer: the footer
+   renders UiActions and a menu is a node. Absolute positioning is what puts
+   it back where it belongs; the footer's start inset (further up this file)
+   leaves exactly this square free. */
+.chat-form .chat-plus {
+    position: absolute;
+    inset-block-end: 10px;
+    inset-inline-start: 10px;
+    /* Above the textarea, so the trigger stays clickable across its whole
+       square rather than only where the field does not overlap it. */
+    z-index: 3;
+}
+
+/* The same quiet affordance as the other in-field buttons: no fill, no
+   border, a tint under the cursor — and round, because a "+" that opens
+   something should not read as another text button. */
+.chat-form .chat-plus > .sui-menu-button-trigger {
+    width: 36px;
+    height: 36px;
+    justify-content: center;
+    border-radius: 999px;
+    color: var(--sui-color-text-muted);
+}
+
+.chat-form .chat-plus > .sui-menu-button-trigger:hover,
+.chat-form .chat-plus[open] > .sui-menu-button-trigger {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text);
+}
+
+.chat-form .chat-plus .sui-menu-button-glyph .sui-icon {
+    width: 20px;
+    height: 20px;
+}
+
+/* The popover itself: a little wider and a little softer than the
+   framework's default kebab menu, because these are sentences ("Upload
+   files") rather than verbs, and it opens over the conversation. */
+.chat-plus .sui-menu-button-popover {
+    min-width: 15rem;
+    padding: 6px;
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(28, 27, 24, .14), 0 2px 6px rgba(28, 27, 24, .06);
+}
+
+.chat-plus .sui-menu-button-item {
+    padding: 9px 10px;
+    border-radius: 10px;
+}
+
+.chat-plus .sui-menu-button-item-icon .sui-icon {
+    width: 18px;
+    height: 18px;
+}
+
+/* ── The "+" pickers ──────────────────────────────────────────────────────
+   Tools and sub-agents are rows with a switch on the right, not a form with
+   an Apply: every click is its own request, so the button has to read as
+   state rather than as a submit. The dialog caps and scrolls itself.
+
+   Everything here is keyed off the two body ids rather than a class on the
+   controls: the framework's action renderer drops a UiAction's cssClass, so
+   a per-row hook would never reach the DOM. Which is also why "on" is a
+   PRIMARY action in the model — see ChatToolsPickerComponent.toggle and
+   ChatToolsPickerComponent.segments. */
+.chat-picker-empty,
+.chat-picker-hint {
+    color: var(--sui-color-text-muted);
+    font-size: var(--sui-text-sm, 13px);
+    line-height: 1.5;
+}
+
+/* Both switches are the same pill in the same place, so a row never moves
+   under the cursor between two clicks and the column lines up. */
+#chat-tools-body .sui-list-item-actions .sui-btn,
+#chat-subagents-body .sui-list-item-actions .sui-btn {
+    min-width: 5rem;
+    justify-content: center;
+    border-radius: 999px;
+    padding-block: 0.4rem;
+    font-size: var(--sui-text-sm, 13px);
+}
+
+/* "On" — a tint rather than the primary fill: forty filled buttons down a
+   column read as a wall, and the state only has to be legible next to its
+   neighbour. */
+#chat-tools-body .sui-list-item-actions .sui-btn--primary,
+#chat-subagents-body .sui-list-item-actions .sui-btn--primary {
+    background: var(--sui-color-primary-soft, var(--sui-color-surface-alt));
+    border-color: transparent;
+    color: var(--sui-color-primary, var(--sui-color-text));
+    box-shadow: none;
+}
+
+/* Both pickers' switches are segmented — Off | On | Search for a tool,
+   Off | Selected | All for tool search and delegation, Off | On for a
+   sub-agent: the buttons of a row join into one control, the current choice
+   tinted, the others quiet. Right-aligned and fixed per segment, so the
+   column lines up whether a row has two segments or three. A sub-agent's
+   Test sits apart in front of its switch, a button of its own. */
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions {
+    gap: 0;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]) {
+    min-width: 4.5rem;
+    border-radius: 0;
+    margin-inline-start: -1px;
+}
+
+@media (max-width: 480px) {
+    :is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]) {
+        min-width: 3.75rem;
+        padding-inline: 0.5rem;
+    }
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]):first-child,
+#chat-subagents-body .sui-list-item-actions .sui-btn[id^="test-"] + .sui-btn {
+    border-start-start-radius: 999px;
+    border-end-start-radius: 999px;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]):last-child {
+    border-start-end-radius: 999px;
+    border-end-end-radius: 999px;
+}
+
+/* A group's own switch sits on the line of its heading, and the group's rows
+   take the full width below it — left in the flow, the switch would claim a
+   column beside the rows and squeeze every one of them. On a phone there is
+   no room beside the heading, so it stays in the flow there. */
+@media (min-width: 481px) {
+    #chat-tools-body .sui-list-item[id^="chat-tool-group-"] {
+        position: relative;
+    }
+
+    #chat-tools-body .sui-list-item[id^="chat-tool-group-"] > .sui-list-item-main {
+        flex-basis: 100%;
+    }
+
+    #chat-tools-body .sui-list-item[id^="chat-tool-group-"] > .sui-list-item-actions {
+        position: absolute;
+        inset-block-start: 10px;
+        inset-inline-end: 20px;
+    }
+}
+
+#chat-subagents-body .sui-list-item-actions .sui-btn[id^="test-"] {
+    margin-inline-end: 0.75rem;
+}
+
+/* Three segments need their width: in a narrow dialog the row wraps and the
+   switch drops under its label instead of squeezing the label into a column
+   of single words. */
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item > .sui-list-item-main {
+    flex: 1 1 8rem;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item > .sui-list-item-actions {
+    margin-inline-start: auto;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn--secondary:not([id^="test-"]) {
+    color: var(--sui-color-text-muted);
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn--primary {
+    border: 1px solid var(--sui-color-primary, var(--sui-color-border));
+    position: relative;
+    cursor: default;
+}
+
+/* The Test dialog's answer: set off from the form it answers, green or red
+   at the edge rather than a filled box, since the answer can be long. */
+.chat-subagent-test-result {
+    border-inline-start: 3px solid var(--sui-color-border);
+    padding: 0.5rem 0 0.5rem 0.9rem;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.chat-subagent-test-result--ok  { border-inline-start-color: var(--sui-color-success, #16a34a); }
+.chat-subagent-test-result--err { border-inline-start-color: var(--sui-color-danger, #dc2626); }
+
+/* A list item's main column does not grow (flex: 0 1 auto), which is right
+   for a row of prose and wrong for both halves of a picker: a group's nested
+   list came out the width of its longest tool name, and the switches ended up
+   in a ragged column wherever each label happened to stop. */
+#chat-tools-body .sui-list-item-main,
+#chat-subagents-body .sui-list-item-main {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+/* A group's rows are a nested UiList, which brings its own card — inside a
+   group that is a second frame around the same thing. Flattened, and taking
+   the width it is given rather than the width of its longest tool name. */
+#chat-tools-body .sui-list-item .sui-list,
+#chat-subagents-body .sui-list-item .sui-list {
+    width: 100%;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+}
+
+/* The rows sit in the group's own inset, not the outer list's. */
+#chat-tools-body .sui-activity-body {
+    padding-inline: 0;
+}
+
+/* ── The settings dialog ──────────────────────────────────────────────────
+   Three fields — agent, model, prompt — and no tabs, since the tool list
+   that used to need a second tab now lives behind the composer's "+".
+
+   The framework's form spacing is calibrated for a page-sized form; in a
+   dialog of three fields it leaves the prompt hanging a long way below the
+   model. Tightened, and the prompt given the room a prompt needs. */
+.chat-settings-form .sui-field {
+    margin-bottom: var(--sui-space-lg, 16px);
+}
+
+.chat-settings-form .sui-field > label {
+    font-weight: 600;
+}
+
+/* Four rows is the framework's textarea default and about right for a note;
+   a system prompt is a page of instructions, so it starts taller and grows
+   to whatever the dialog can give it before scrolling itself. */
+.chat-settings-form textarea {
+    min-height: 11rem;
+    max-height: 40vh;
+    line-height: 1.55;
+    resize: vertical;
+}
+
+/* The closing line: where the tools and the sub-agents went. Quiet, and set
+   off from the last field so it does not read as another hint. */
+.chat-settings-elsewhere {
+    display: block;
+    margin-top: var(--sui-space-sm, 8px);
+    padding-top: var(--sui-space-md, 12px);
+    border-top: 1px solid var(--sui-color-border-soft, var(--sui-color-border));
+    color: var(--sui-color-text-muted);
+    font-size: var(--sui-text-sm, 13px);
 }

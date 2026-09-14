@@ -20,27 +20,6 @@
   "status": "ACTIVE",
   "tools": [
     {
-      "id": "00000003-0000-0000-0000-000000000200",
-      "agentDefinitionId": "00000002-0000-0000-0000-000000000020",
-      "name": "list_agents",
-      "description": "Lists all available agents with their names and descriptions. Call this FIRST to discover your workforce before planning.",
-      "enabled": true
-    },
-    {
-      "id": "00000003-0000-0000-0000-000000000201",
-      "agentDefinitionId": "00000002-0000-0000-0000-000000000020",
-      "name": "run_agent",
-      "description": "Delegates ONE self-contained sub-task to a specialized agent by name. Use when a task depends on a prior result, or for a single call. The sub-agent starts fresh with no memory — include all needed context in the message.",
-      "enabled": true
-    },
-    {
-      "id": "00000003-0000-0000-0000-000000000209",
-      "agentDefinitionId": "00000002-0000-0000-0000-000000000020",
-      "name": "run_agents",
-      "description": "Delegates SEVERAL independent sub-tasks in parallel (array of {name, message}) and returns all results together. Use whenever you have 2+ independent sub-tasks — it is much faster than calling run_agent repeatedly.",
-      "enabled": true
-    },
-    {
       "id": "00000003-0000-0000-0000-000000000202",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000020",
       "name": "todo_write",

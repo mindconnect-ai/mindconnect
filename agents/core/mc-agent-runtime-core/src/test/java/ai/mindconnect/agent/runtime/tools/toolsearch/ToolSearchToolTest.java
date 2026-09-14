@@ -27,9 +27,9 @@ import java.util.Set;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * tool_search must find registry tools by name/description/group, activate
- * the matches for the session (so the next round offers them), respect the
- * groups override, and stay honest when nothing matches.
+ * tool_search must find the agent's deferred tools by name/description/group,
+ * activate the matches for the session (so the next round offers them), find
+ * nothing beyond them, and stay honest when nothing matches.
  */
 class ToolSearchToolTest {
 
@@ -107,14 +107,15 @@ class ToolSearchToolTest {
         activations = new DynamicToolActivations(sessionRepo(sessions));
     }
 
-    private ToolSearchTool tool(Set<String> assigned, Set<String> allowedGroups) {
-        return new ToolSearchTool(ref, activations, sessionId,
-                assigned, allowedGroups);
+    private ToolSearchTool tool(Set<String> assigned) {
+        return new ToolSearchTool(ref, activations, sessionId, assigned);
     }
+
+    private static final Set<String> ALL = Set.of("web_fetch", "document_sections", "code_execute");
 
     @Test
     void findsByDescriptionAndActivatesForTheSession() {
-        String result = tool(Set.of(), Set.of("*")).execute(Map.of("query", "fetch a url over http"));
+        String result = tool(ALL).execute(Map.of("query", "fetch a url over http"));
 
         assertThat(result).contains("web_fetch").contains("available to you from your next step");
         assertThat(activations.activated(sessionId)).contains("web_fetch");
@@ -122,27 +123,17 @@ class ToolSearchToolTest {
 
     @Test
     void ranksNameMatchesAboveDescriptionMatches() {
-        String result = tool(Set.of(), Set.of("*")).execute(Map.of("query", "document", "max_results", 1));
+        String result = tool(ALL).execute(Map.of("query", "document", "max_results", 1));
 
         assertThat(result).contains("document_sections").doesNotContain("web_fetch");
         assertThat(activations.activated(sessionId)).containsExactly("document_sections");
     }
 
     @Test
-    void groupsOverrideNarrowsTheSearchSpace() {
-        // "execute" matches code_execute — but the agent may only search web tools.
-        String result = tool(Set.of(), Set.of("web")).execute(Map.of("query", "execute program container"));
-
-        assertThat(result).startsWith("No tools found");
-        assertThat(activations.activated(sessionId)).isEmpty();
-    }
-
-    @Test
     void noMatchExplainsTheSearchSpace() {
-        String result = tool(Set.of(), Set.of("*")).execute(Map.of("query", "quantum teleportation"));
+        String result = tool(Set.of("web_fetch")).execute(Map.of("query", "quantum teleportation"));
 
-        assertThat(result).startsWith("No tools found")
-                .contains("web").contains("documents").contains("code");
+        assertThat(result).startsWith("No tools found").contains("web_fetch");
     }
 
     @Test
@@ -157,23 +148,22 @@ class ToolSearchToolTest {
         };
         ref.set(withSkill);
 
-        String result = tool(Set.of(), Set.of("*")).execute(Map.of("query", "skill instructions"));
+        String result = tool(Set.of(ai.mindconnect.agent.runtime.skill.SkillTool.NAME))
+                .execute(Map.of("query", "skill instructions"));
 
         assertThat(result).as("the skill tool comes with the agent's skills setting, not from a search")
                 .startsWith("No tools found");
         assertThat(activations.activated(sessionId)).isEmpty();
     }
 
+    /** The agent's deferred tools are the whole search space — nothing in the registry beyond them. */
     @Test
-    void assignedDeferredToolsAreSearchableWithoutAnyGroupGrant() {
-        String result = tool(Set.of("code_execute"), Set.of())
-                .execute(Map.of("query", "execute a program"));
+    void onlyTheAssignedToolsCanBeFound() {
+        String result = tool(Set.of("code_execute")).execute(Map.of("query", "execute a program"));
 
         assertThat(result).contains("code_execute");
         assertThat(activations.activated(sessionId)).contains("code_execute");
-        // ...but nothing outside the assigned set leaks in:
-        assertThat(tool(Set.of("code_execute"), Set.of())
-                .execute(Map.of("query", "fetch url http")))
+        assertThat(tool(Set.of("code_execute")).execute(Map.of("query", "fetch url http")))
                 .startsWith("No tools found");
     }
 
@@ -183,56 +173,63 @@ class ToolSearchToolTest {
         AgentTool always = AgentTool.of("web_fetch");
         AgentTool deferred = new AgentTool(AgentToolId.random(), "document_sections",
                 null, Map.of("params", Map.of("path", "spec.docx")), true, true, false, null);
-        AgentDefinition def = definition(agentId, List.of(always, deferred),
-                new AgentDefinition.ToolSearchConfig(true, List.of("code")));
+        AgentDefinition def = definition(agentId, List.of(always, deferred), null);
 
         // Before any search: deferred tool hidden, tool_search injected with its space.
         List<AgentTool> before = activations.effectiveRefs(def, sessionId);
         assertThat(before).extracting(AgentTool::name)
                 .containsExactly("web_fetch", "tool_search");
-        AgentTool search = before.get(1);
-        assertThat(search.overrides().get("assigned")).isEqualTo(List.of("document_sections"));
-        assertThat(search.overrides().get("groups")).isEqualTo(List.of("code"));
+        assertThat(before.get(1).overrides()).containsOnlyKeys("assigned");
+        assertThat(before.get(1).overrides().get("assigned")).isEqualTo(List.of("document_sections"));
 
-        // After activation: the CONFIGURED ref returns (pins intact) plus a
-        // synthetic ref for the registry find.
+        // After activation: the CONFIGURED ref returns with its pins intact —
+        // and an activation of anything the agent does not list is ignored.
         activations.activate(sessionId, List.of("document_sections", "code_execute"));
         List<AgentTool> after = activations.effectiveRefs(def, sessionId);
         assertThat(after).extracting(AgentTool::name)
-                .containsExactlyInAnyOrder("web_fetch", "document_sections", "code_execute", "tool_search");
+                .containsExactlyInAnyOrder("web_fetch", "document_sections", "tool_search");
         assertThat(after.stream().filter(t -> t.name().equals("document_sections")).findFirst()
                 .orElseThrow().overrides()).containsKey("params");
     }
 
     @Test
-    void effectiveRefsWithoutToolSearchBehaveLikeBefore() {
-        AgentId agentId = AgentId.random();
-        AgentDefinition def = definition(agentId,
-                List.of(AgentTool.of("web_fetch")), null);
+    void withoutDeferredToolsThereIsNoToolSearch() {
+        AgentDefinition def = definition(AgentId.random(), List.of(AgentTool.of("web_fetch")), null);
 
         assertThat(activations.effectiveRefs(def, sessionId))
                 .extracting(AgentTool::name).containsExactly("web_fetch");
     }
 
-    private static AgentDefinition definition(AgentId agentId, List<AgentTool> tools,
-                                              AgentDefinition.ToolSearchConfig toolSearch) {
+    /** The delegation tools follow the roster: listed ones are dropped, a roster brings list_agents. */
+    @Test
+    void listAgentsFollowsTheRosterNotTheToolList() {
+        var listed = List.of(AgentTool.of("web_fetch"), AgentTool.of("list_agents"),
+                AgentTool.of("run_agent"), AgentTool.of("tool_search"));
+
+        assertThat(activations.effectiveRefs(definition(AgentId.random(), listed, null), sessionId))
+                .extracting(AgentTool::name).containsExactly("web_fetch");
+        assertThat(activations.effectiveRefs(definition(AgentId.random(), listed, List.of("explorer")), sessionId))
+                .extracting(AgentTool::name).containsExactly("web_fetch", "list_agents");
+    }
+
+    private static AgentDefinition definition(AgentId agentId, List<AgentTool> tools, List<String> roster) {
         return new AgentDefinition(agentId, "a", null, null, null, null, null,
-                "cfg", 5, null, null, tools, List.of(), null, toolSearch, null, null);
+                "cfg", 5, null, null, tools, List.of(), roster, null, null, null);
     }
 
     @Test
-    void factoryReadsGroupsOverrideAndRequiresServices() {
+    void factoryReadsTheAssignedToolsAndRequiresServices() {
         var factory = new ToolSearchToolFactory();
         factory.bind(env(Map.of(ToolRegistryRef.class, ref, DynamicToolActivations.class, activations)));
         assertThat(factory.isAvailable()).isTrue();
 
         var agentTool = new AgentTool(AgentToolId.random(), "tool_search", null,
-                Map.of("groups", List.of("Web", " documents ")), true, false, false, null);
+                Map.of("assigned", List.of("web_fetch", " document_sections ")), true, false, false, null);
         Tool created = factory.create(agentTool,
                 new ToolCallScope(UserId.of("u"), sessionId, null));
-        // May find web/documents tools but not code_execute.
         assertThat(created.execute(Map.of("query", "execute program container")))
-                .doesNotContain("code_execute");
+                .startsWith("No tools found");
+        assertThat(created.execute(Map.of("query", "sections"))).contains("document_sections");
 
         var unbound = new ToolSearchToolFactory();
         unbound.bind(env(Map.of()));

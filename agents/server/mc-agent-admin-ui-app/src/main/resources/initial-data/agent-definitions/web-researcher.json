@@ -25,13 +25,6 @@
       "name": "web_search",
       "description": "Searches the web using Tavily.",
       "enabled": true
-    },
-    {
-      "id": "00000003-0000-0000-0000-000000000022",
-      "agentDefinitionId": "00000002-0000-0000-0000-000000000004",
-      "name": "run_agent",
-      "description": "Delegates reading ONE web page to the url-reader sub-agent, which returns only the relevant excerpts. This is your ONLY way to read a page — you have no direct web_read tool.",
-      "enabled": true
     }
   ],
   "createdAt": "2025-01-01T00:00:00Z",

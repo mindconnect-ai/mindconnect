@@ -60,26 +60,26 @@ public final class DynamicToolActivations {
     }
 
     /**
-     * The tool references to resolve for one round, honouring the agent's
-     * tool-search configuration:
+     * The tool references to resolve for one round:
      * <ul>
      *   <li>non-deferred configured tools — always offered;</li>
      *   <li>deferred configured tools — only once a search activated them
      *       (with their configured overrides and pins intact);</li>
-     *   <li>synthetic references for activated registry finds beyond the
-     *       configured list (no overrides — an operator who wants pins on a
-     *       searchable tool configures it explicitly);</li>
-     *   <li>the {@code tool_search} tool itself when the agent enables it,
-     *       carrying its search space (deferred names + group filter) as
-     *       overrides so the factory needs no definition lookup;</li>
+     *   <li>the {@code tool_search} tool itself whenever some tool is
+     *       deferred, carrying their names as its search space so the factory
+     *       needs no definition lookup;</li>
+     *   <li>{@code list_agents} whenever the agent's roster names someone —
+     *       the delegation tools follow the roster, not the tool list.</li>
      *   <li>the {@code skill} tool when the agent enables skills and there
      *       are any to load, carrying the names its setting names for the same
      *       reason. A tool that would find nothing is left away, so the switch
      *       costs nothing until somebody writes a skill. This is the only way
-     *       an agent gets it: a {@code skill} row among its tools or found by
-     *       a search is dropped, since it would carry no names and reach
-     *       every skill, whatever the setting says.</li>
+     *       an agent gets it: a {@code skill} row among its tools is dropped,
+     *       since it would carry no names and reach every skill, whatever the
+     *       setting says.</li>
      * </ul>
+     * Nothing beyond these: a tool the agent does not list cannot be found,
+     * activated or offered.
      */
     public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
         Set<String> activated = activated(sessionId);
@@ -98,19 +98,12 @@ public final class DynamicToolActivations {
                 refs.add(tool);
             }
         }
-        for (String name : activated) {
-            // Same for an activation: a session that searched its way to the
-            // skill tool before this was closed off must not keep a second one.
-            if (SkillTool.NAME.equals(name)) continue;
-            if (def.tools().stream().noneMatch(t -> name.equals(t.name()))) {
-                refs.add(AgentTool.of(name));
-            }
+        if (!deferredNames.isEmpty()) {
+            refs.add(AgentTool.of(ai.mindconnect.agent.runtime.domain.AgentDefinition.TOOL_SEARCH, null,
+                    Map.of("assigned", List.copyOf(deferredNames))));
         }
-        var search = def.toolSearchOrOff();
-        if (search.enabled()) {
-            refs.add(AgentTool.of("tool_search", null, Map.of(
-                    "assigned", List.copyOf(deferredNames),
-                    "groups", List.copyOf(search.groups()))));
+        if (def.delegates()) {
+            refs.add(AgentTool.of("list_agents"));
         }
         var skillsConfig = def.skillsOrOff();
         if (skillsConfig.enabled() && hasSkills(def, sessionId)) {

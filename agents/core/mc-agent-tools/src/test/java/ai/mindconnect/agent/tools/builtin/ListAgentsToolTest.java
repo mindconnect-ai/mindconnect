@@ -44,6 +44,22 @@ class ListAgentsToolTest {
         };
     }
 
+    /**
+     * The caller as its session runs it wins over the registry's copy: a chat
+     * that narrowed its agent to one explorer is not shown the rest, or
+     * list_agents would advertise what run_agent refuses.
+     */
+    @Test
+    void theRunningCallersRosterWinsOverTheRegistrys() {
+        var chat = agent("chat", null);
+        var all = List.of(chat, agent("explorer", null), agent("verifier", null));
+
+        String out = ListAgentsTool.forCaller(repo(all),
+                () -> chat.withCallableAgents(List.of("explorer")), null).execute(Map.of());
+
+        assertThat(out).contains("explorer").doesNotContain("verifier");
+    }
+
     @Test
     void aCallerWithARosterSeesOnlyIt() {
         var planner = agent("planner", List.of("web-researcher", "verifier"));
@@ -59,20 +75,31 @@ class ListAgentsToolTest {
         assertThat(out).doesNotContain("planner does things");
     }
 
+    /** An empty roster names nobody — a caller that may call no one is shown no one. */
     @Test
-    void anEmptyRosterListsTheWholeNamespace() {
+    void anEmptyRosterListsNobody() {
         var assistant = agent("general", List.of());
         var all = List.of(assistant, agent("web-researcher", null), agent("title-generator", null));
 
-        String out = new ListAgentsTool(repo(all), assistant.id()).execute(Map.of());
+        assertThat(new ListAgentsTool(repo(all), assistant.id()).execute(Map.of()))
+                .isEqualTo("No agents found.");
+    }
 
-        assertThat(out).contains("general").contains("web-researcher").contains("title-generator");
+    /** An agent that is not callable by others is never listed, even on a roster. */
+    @Test
+    void anAgentNotCallableByOthersIsNeverListed() {
+        var chat = agent("chat", List.of("web-researcher", "title-generator"));
+        var all = List.of(chat, agent("web-researcher", null),
+                agent("title-generator", null).withCallableByAgents(false));
+
+        assertThat(new ListAgentsTool(repo(all), chat.id()).execute(Map.of()))
+                .contains("web-researcher").doesNotContain("title-generator");
     }
 
     /**
-     * A session's inline agent has an id with no definition behind it, and the
-     * old two-argument constructor passes none at all. Both mean "no roster",
-     * which is the whole namespace — not an empty answer.
+     * Without a caller to read a roster from — a tool resolved outside any
+     * session, for the catalog or a test bench — there is nothing to narrow
+     * by, and the list is every callable agent.
      */
     @Test
     void anUnknownOrAbsentCallerIsNotARestriction() {

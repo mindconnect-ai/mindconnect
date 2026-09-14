@@ -53,8 +53,10 @@ public class AgentDelegationMain {
                             + "name \"web-researcher\" and a precise, self-contained task. "
                             + "Then summarize the researcher's findings for the user.",
                     null, "demo-llm");
-            runtime.agentDefinitions().save(orchestrator.withTools(
-                    List.of(AgentTool.of("run_agent"))));
+            // Its roster is what gives it run_agent: naming the researcher is
+            // the whole grant.
+            runtime.agentDefinitions().save(orchestrator.withCallableAgents(
+                    List.of("web-researcher")));
 
             String question = args.length > 0 ? String.join(" ", args)
                     : "What is the latest stable OpenJDK release and when was it published? "
