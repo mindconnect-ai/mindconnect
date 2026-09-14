@@ -28,7 +28,7 @@ class SessionAgentTest {
     @Test
     void inlineAgentBindsEveryToolItNames() {
         var agent = InlineSessionAgent.of("Chat", "be helpful", "gpt",
-                List.of("file_read", "todo_write"), true);
+                List.of("file_read", "todo_write"), List.of());
 
         // A tool binding no longer points back at its agent — a tool call
         // learns the agent from its ToolCallScope.
@@ -39,18 +39,17 @@ class SessionAgentTest {
     }
 
     @Test
-    void toolSearchIsOffWhenNotAskedFor() {
-        assertThat(InlineSessionAgent.of("Chat", "p", "gpt", List.of(), true).toolSearch())
-                .isEqualTo(new AgentDefinition.ToolSearchConfig(true, List.of("*")));
-        assertThat(InlineSessionAgent.of("Chat", "p", "gpt", List.of(), false).toolSearch())
-                .isEqualTo(AgentDefinition.ToolSearchConfig.OFF);
+    void anInlineAgentCallsNobodyUnlessGivenARoster() {
+        assertThat(InlineSessionAgent.of("Chat", "p", "gpt", List.of(), List.of()).callableAgents()).isEmpty();
+        assertThat(InlineSessionAgent.of("Chat", "p", "gpt", List.of(), List.of("explorer")).callableAgents())
+                .containsExactly("explorer");
     }
 
     @Test
     void aSessionNeedsExactlyOneMainAgent() {
-        var main = InlineSessionAgent.of("Chat", "p", "gpt", List.of(), true);
+        var main = InlineSessionAgent.of("Chat", "p", "gpt", List.of(), List.of());
         var notMain = new InlineSessionAgent(main.id(), false, "Chat", "p", "gpt",
-                main.tools(), main.toolSearch());
+                main.tools());
 
         assertThat(session().withSessionAgents(List.of(main)).mainAgent()).contains(main);
 
@@ -72,8 +71,8 @@ class SessionAgentTest {
 
     @Test
     void inlineAndRefSurviveJsonRoundTrip() throws Exception {
-        var inline = InlineSessionAgent.of("Chat", "be helpful", "gpt", List.of("todo_read"), true);
-        var ref = new SessionAgentRef(AgentId.random(), true, "Poet", "claude", null, null);
+        var inline = InlineSessionAgent.of("Chat", "be helpful", "gpt", List.of("todo_read"), List.of());
+        var ref = new SessionAgentRef(AgentId.random(), true, "Poet", "claude", null);
 
         for (SessionAgent agent : List.of(inline, ref)) {
             String json = JSON.writeValueAsString(agent);
@@ -83,10 +82,34 @@ class SessionAgentTest {
     }
 
     @Test
+    void aRefsRosterSurvivesJson_andOneWrittenWithoutItKeepsTheAgents() throws Exception {
+        var ref = new SessionAgentRef(AgentId.random(), true, "Planner", null, null, null,
+                List.of("explorer"));
+
+        assertThat(JSON.readValue(JSON.writeValueAsString(ref), SessionAgent.class)).isEqualTo(ref);
+
+        String legacy = """
+                {"kind":"ref","id":"%s","main":true,"label":"Planner"}
+                """.formatted(UUID.randomUUID());
+        var restored = (SessionAgentRef) JSON.readValue(legacy, SessionAgent.class);
+        assertThat(restored.callableAgents()).as("no override, the agent's own roster").isNull();
+        // An empty roster is a choice of its own: nobody.
+        assertThat(new SessionAgentRef(AgentId.random(), true, "P", null, null, null, List.of())
+                .callableAgents()).isEmpty();
+
+        // A session written while a chat could still carry a tool-search setting still loads.
+        String withToolSearch = """
+                {"kind":"ref","id":"%s","main":true,"label":"Planner",
+                 "toolSearch":{"enabled":true,"groups":["*"]}}
+                """.formatted(UUID.randomUUID());
+        assertThat(JSON.readValue(withToolSearch, SessionAgent.class)).isInstanceOf(SessionAgentRef.class);
+    }
+
+    @Test
     void anInlineAgentsRosterSurvivesJson_andOneWrittenWithoutItHasNone() throws Exception {
-        var plain = InlineSessionAgent.of("helper", "help", "gpt", List.of("run_agent"), false);
+        var plain = InlineSessionAgent.of("helper", "help", "gpt", List.of("run_agent"), List.of());
         var withRoster = new InlineSessionAgent(plain.id(), true, "helper", "help", "gpt",
-                plain.tools(), plain.toolSearch(), List.of("explorer"));
+                plain.tools(), List.of("explorer"));
 
         assertThat(JSON.readValue(JSON.writeValueAsString(withRoster), SessionAgent.class)).isEqualTo(withRoster);
 

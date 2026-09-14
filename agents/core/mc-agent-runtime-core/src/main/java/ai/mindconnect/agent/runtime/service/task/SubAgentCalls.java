@@ -69,16 +69,13 @@ final class SubAgentCalls {
 
     /**
      * A project's agent as a session agent. Its tools are the caller's own,
-     * narrowed by the file: it can take away, never add. Tool search stays
-     * off for the same reason — an agent that could look up further tools
-     * would be widening the set through the back door. Without a model of
-     * its own it runs on the caller's.
+     * narrowed by the file: it can take away, never add. The deferred ones
+     * among them stay deferred, and a tool search only ever finds those, so
+     * searching widens nothing either. Without a model of its own it runs on
+     * the caller's.
      *
-     * <p>The roster is the caller's too. A project agent that inherits
-     * {@code run_agent} would otherwise have an empty roster, which reads as
-     * "anyone": a caller limited to one explorer could reach every agent in
-     * the registry by way of a file in the repository. A caller without a
-     * roster passes none on, so nothing is taken away either.
+     * <p>The roster is the caller's too, so handing a task to a file in the
+     * repository reaches exactly as far as the caller could.
      */
     static ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent inlineFor(
             ai.mindconnect.agent.runtime.service.agents.ProjectAgents.ProjectAgent agent, AgentDefinition caller) {
@@ -88,7 +85,7 @@ final class SubAgentCalls {
         var roster = caller == null ? java.util.List.<String>of() : caller.effectiveCallableAgents();
         return new ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent(
                 ai.mindconnect.agent.AgentId.random(), true, agent.name(), agent.systemPrompt(), model, tools,
-                AgentDefinition.ToolSearchConfig.OFF, roster);
+                roster);
     }
 
     void attach(TaskQueue queue) {
@@ -179,6 +176,13 @@ final class SubAgentCalls {
                             .findFirst()
                             .orElseThrow(() -> new IllegalArgumentException(
                                     "No agent named '" + agentName + "'"));
+                    // The runtime's own helpers answer in the one shape the
+                    // runtime asks for; a roster naming one does not make it
+                    // a delegate.
+                    if (!target.mayBeCalledByAgents()) {
+                        throw new IllegalArgumentException(
+                                "agent '" + agentName + "' cannot be called by other agents");
+                    }
                 }
             } catch (Exception e) {
                 log.warn("Failed to resolve sub-agent '{}': {}", agentName, e.getMessage());

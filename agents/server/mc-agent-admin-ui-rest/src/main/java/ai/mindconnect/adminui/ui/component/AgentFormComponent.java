@@ -97,6 +97,18 @@ public final class AgentFormComponent implements UiComponent {
                 .filter(other -> isNew || !other.id().equals(agent.id()))
                 .map(other -> UiField.Option.of(other.name(), other.name()))
                 .toList();
+        // Roster candidates: every other agent that lets itself be called —
+        // plus whatever the roster already names, so saving the form never
+        // drops an entry on its own.
+        var rosterNames = new java.util.LinkedHashSet<String>();
+        agentRepository.findAll().stream()
+                .filter(other -> isNew || !other.id().equals(agent.id()))
+                .filter(AgentDefinition::mayBeCalledByAgents)
+                .forEach(other -> rosterNames.add(other.name()));
+        if (!isNew) rosterNames.addAll(agent.effectiveCallableAgents());
+        List<UiField.Option> rosterOptions = rosterNames.stream()
+                .map(n -> UiField.Option.of(n, n))
+                .toList();
 
         // Same bar as the list and the detail page. A form's title is a plain
         // escaped string, so the icon has to come from a header-only UiList
@@ -150,21 +162,9 @@ public final class AgentFormComponent implements UiComponent {
                                 + "\"compressToolResults\" is the on/off switch), "
                                 + "full, windowed, auto_compact, none. "
                                 + "Leave blank to keep the current setting"))
-                .field(UiField.bool("toolSearchEnabled", "Enable Tool Search",
-                        !isNew && agent.toolSearchOrOff().enabled())
-                        .asEditable()
-                        .hint("Adds the tool_search tool: the agent can discover its deferred tools "
-                                + "(and the registry groups below) at runtime instead of carrying "
-                                + "every tool definition in its context"))
-                .field(UiField.text("toolSearchGroups", "Tool Search Groups",
-                        isNew ? null : String.join(", ", agent.toolSearchOrOff().groups()))
-                        .asEditable()
-                        .hint("Comma-separated registry groups searchable beyond the agent's own "
-                                + "deferred tools, e.g. web, documents — or * for every group. "
-                                + "Empty = only deferred assigned tools are searchable"))
                 // Skills: the switch, then which of them. Empty is "all of
-                // them", like the roster below — a skill added later is then
-                // in reach without touching every agent.
+                // them" — a skill added later is then in reach without
+                // touching every agent.
                 .field(UiField.bool("skillsEnabled", "Enable Skills",
                         !isNew && agent.skillsOrOff().enabled())
                         .asEditable()
@@ -175,14 +175,19 @@ public final class AgentFormComponent implements UiComponent {
                         .asEditable()
                         .hint("The skills this agent may load. Select none to leave it every skill "
                                 + "the installation, the user and the project have"))
-                // The roster this agent delegates to. Empty is not "none" but
-                // "no restriction" — the hint has to say so, or an empty
-                // multiselect reads as a locked door.
+                // The roster this agent delegates to — and the only thing
+                // that gives it run_agent and list_agents, so the hint says so.
                 .field(UiField.multiselect("callableAgents", "Callable Agents",
-                        isNew ? List.of() : agent.effectiveCallableAgents(), reviewerOptions)
+                        isNew ? List.of() : agent.effectiveCallableAgents(), rosterOptions)
                         .asEditable()
-                        .hint("The agents this one may see in list_agents and reach with "
-                                + "run_agent. Select none to leave it unrestricted"))
+                        .hint("The agents this one may hand work to. Naming any gives it run_agent, "
+                                + "run_agents and list_agents; naming none leaves it without"))
+                .field(UiField.bool("callableByAgents", "Callable by other agents",
+                        isNew || agent.mayBeCalledByAgents())
+                        .asEditable()
+                        .hint("Off for agents the runtime calls on its own, like a title generator "
+                                + "or a summarizer: they are not offered in any roster and "
+                                + "run_agent refuses them"))
                 .field(UiField.multiselect("responseReviewers", "Response Reviewers",
                         isNew ? List.of() : agent.effectiveResponseReviewers(), reviewerOptions)
                         .asEditable()

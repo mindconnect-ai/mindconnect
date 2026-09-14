@@ -1010,7 +1010,8 @@
    Everything here is keyed off the two body ids rather than a class on the
    controls: the framework's action renderer drops a UiAction's cssClass, so
    a per-row hook would never reach the DOM. Which is also why "on" is a
-   PRIMARY action in the model — see ChatToolsPickerComponent.toggle. */
+   PRIMARY action in the model — see ChatToolsPickerComponent.toggle and
+   ChatToolsPickerComponent.segments. */
 .chat-picker-empty,
 .chat-picker-hint {
     color: var(--sui-color-text-muted);
@@ -1039,6 +1040,104 @@
     color: var(--sui-color-primary, var(--sui-color-text));
     box-shadow: none;
 }
+
+/* Both pickers' switches are segmented — Off | On | Search for a tool,
+   Off | Selected | All for tool search and delegation, Off | On for a
+   sub-agent: the buttons of a row join into one control, the current choice
+   tinted, the others quiet. Right-aligned and fixed per segment, so the
+   column lines up whether a row has two segments or three. A sub-agent's
+   Test sits apart in front of its switch, a button of its own. */
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions {
+    gap: 0;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]) {
+    min-width: 4.5rem;
+    border-radius: 0;
+    margin-inline-start: -1px;
+}
+
+@media (max-width: 480px) {
+    :is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]) {
+        min-width: 3.75rem;
+        padding-inline: 0.5rem;
+    }
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]):first-child,
+#chat-subagents-body .sui-list-item-actions .sui-btn[id^="test-"] + .sui-btn {
+    border-start-start-radius: 999px;
+    border-end-start-radius: 999px;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn:not([id^="test-"]):last-child {
+    border-start-end-radius: 999px;
+    border-end-end-radius: 999px;
+}
+
+/* A group's own switch sits on the line of its heading, and the group's rows
+   take the full width below it — left in the flow, the switch would claim a
+   column beside the rows and squeeze every one of them. On a phone there is
+   no room beside the heading, so it stays in the flow there. */
+@media (min-width: 481px) {
+    #chat-tools-body .sui-list-item[id^="chat-tool-group-"] {
+        position: relative;
+    }
+
+    #chat-tools-body .sui-list-item[id^="chat-tool-group-"] > .sui-list-item-main {
+        flex-basis: 100%;
+    }
+
+    #chat-tools-body .sui-list-item[id^="chat-tool-group-"] > .sui-list-item-actions {
+        position: absolute;
+        inset-block-start: 10px;
+        inset-inline-end: 20px;
+    }
+}
+
+#chat-subagents-body .sui-list-item-actions .sui-btn[id^="test-"] {
+    margin-inline-end: 0.75rem;
+}
+
+/* Three segments need their width: in a narrow dialog the row wraps and the
+   switch drops under its label instead of squeezing the label into a column
+   of single words. */
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item > .sui-list-item-main {
+    flex: 1 1 8rem;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item > .sui-list-item-actions {
+    margin-inline-start: auto;
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn--secondary:not([id^="test-"]) {
+    color: var(--sui-color-text-muted);
+}
+
+:is(#chat-tools-body, #chat-subagents-body) .sui-list-item-actions .sui-btn--primary {
+    border: 1px solid var(--sui-color-primary, var(--sui-color-border));
+    position: relative;
+    cursor: default;
+}
+
+/* The Test dialog's answer: set off from the form it answers, green or red
+   at the edge rather than a filled box, since the answer can be long. */
+.chat-subagent-test-result {
+    border-inline-start: 3px solid var(--sui-color-border);
+    padding: 0.5rem 0 0.5rem 0.9rem;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.chat-subagent-test-result--ok  { border-inline-start-color: var(--sui-color-success, #16a34a); }
+.chat-subagent-test-result--err { border-inline-start-color: var(--sui-color-danger, #dc2626); }
 
 /* A list item's main column does not grow (flex: 0 1 auto), which is right
    for a row of prose and wrong for both halves of a picker: a group's nested

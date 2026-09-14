@@ -117,16 +117,16 @@ public class AgentApiController {
     public record UpdateAgentRequest(String name, String description, String systemPrompt,
                                      String welcomeMessage, String llmConfigName,
                                      Integer maxIterations, List<String> responseReviewers,
-                                     AgentDefinition.ToolSearchConfig toolSearch,
+                                     List<String> callableAgents, Boolean callableByAgents,
                                      AgentDefinition.SkillsConfig skills, Long version) {
 
         /** Without a version: the update is applied to the agent as stored. */
         public UpdateAgentRequest(String name, String description, String systemPrompt,
                                   String welcomeMessage, String llmConfigName,
                                   Integer maxIterations, List<String> responseReviewers,
-                                  AgentDefinition.ToolSearchConfig toolSearch) {
+                                  List<String> callableAgents, Boolean callableByAgents) {
             this(name, description, systemPrompt, welcomeMessage, llmConfigName, maxIterations,
-                    responseReviewers, toolSearch, null, null);
+                    responseReviewers, callableAgents, callableByAgents, null, null);
         }
     }
 
@@ -148,7 +148,8 @@ public class AgentApiController {
                 .withLlmConfigName(req.llmConfigName())
                 .withMaxIterations(req.maxIterations())
                 .withResponseReviewers(req.responseReviewers())
-                .withToolSearch(req.toolSearch())
+                .withCallableAgents(req.callableAgents())
+                .withCallableByAgents(req.callableByAgents())
                 .withSkills(req.skills());
         return registryService.update(AgentId.of(agentId), patch, req.version());
     }

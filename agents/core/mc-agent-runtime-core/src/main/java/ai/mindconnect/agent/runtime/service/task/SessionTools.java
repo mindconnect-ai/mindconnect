@@ -20,8 +20,9 @@ import java.util.List;
  * {@code tool_search} in round N activates tools that round N+1 must already
  * offer and execute. The inline delegation tools ({@code run_agent},
  * {@code run_agents}) have no registry entry; their definitions are appended
- * when the agent enables them, and {@link #isInline} tells the executor to
- * route them to the sub-agent runner instead of the registry.
+ * when the agent delegates — its roster names someone, or the project it
+ * works in defines agents of its own — and {@link #isInline} tells the
+ * executor to route them to the sub-agent runner instead of the registry.
  */
 public final class SessionTools implements ToolDefinitionProvider {
 
@@ -79,10 +80,10 @@ public final class SessionTools implements ToolDefinitionProvider {
         List<ToolDefinition> defs = new ArrayList<>(liveTools().stream()
                 .map(t -> ToolDefinition.of(t.name(), t.description(), t.parametersSchema()))
                 .toList());
-        if (enabled(InlineAgentTools.RUN_AGENT)) {
+        if (delegating()) {
             defs.add(InlineAgentTools.runAgentDefinition(projectAgents(), def.effectiveCallableAgents()));
+            defs.add(InlineAgentTools.runAgentsDefinition());
         }
-        if (enabled(InlineAgentTools.RUN_AGENTS)) defs.add(InlineAgentTools.runAgentsDefinition());
         return defs;
     }
 
@@ -93,7 +94,6 @@ public final class SessionTools implements ToolDefinitionProvider {
                 .toList();
     }
 
-    /** Whether {@code toolName} is one of the inline delegation tools this agent enables. */
     /**
      * Who is calling, for the factories and advisors: this session, its user,
      * this agent, its chat — and where the session works, so the file-rooted
@@ -104,12 +104,18 @@ public final class SessionTools implements ToolDefinitionProvider {
                 session.workingDir(), session.additionalDirs());
     }
 
+    /** Whether {@code toolName} is one of the inline delegation tools, and this agent delegates. */
     public boolean isInline(String toolName) {
         return (InlineAgentTools.RUN_AGENT.equals(toolName)
-                || InlineAgentTools.RUN_AGENTS.equals(toolName)) && enabled(toolName);
+                || InlineAgentTools.RUN_AGENTS.equals(toolName)) && delegating();
     }
 
-    private boolean enabled(String toolName) {
-        return def.tools().stream().anyMatch(t -> toolName.equals(t.name()) && t.enabled());
+    /**
+     * Whether this agent gets {@code run_agent} and {@code run_agents}: its
+     * roster names someone, or its project defines agents — those answer
+     * outside the roster, being part of the directory the agent works in.
+     */
+    private boolean delegating() {
+        return def.delegates() || !projectAgents().isEmpty();
     }
 }

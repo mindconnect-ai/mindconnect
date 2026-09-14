@@ -24,9 +24,10 @@ import java.util.Set;
  * ({@link DynamicToolActivations}), so from the next LLM round on they are
  * offered as regular tool definitions with their full schema.
  *
- * <p>Assigning {@code tool_search} to an agent is the operator's grant to
- * roam the registry; the {@code groups} config override narrows the
- * searchable space (e.g. only {@code web} and {@code documents}).
+ * <p>What it can find is exactly the agent's deferred tools — the ones set to
+ * be found by search. There is no wider search space: a tool nobody bound to
+ * the agent cannot be discovered, so what an agent may do stays readable in
+ * its definition.
  */
 public final class ToolSearchTool implements Tool {
 
@@ -37,18 +38,15 @@ public final class ToolSearchTool implements Tool {
     private final ToolRegistryRef registryRef;
     private final DynamicToolActivations activations;
     private final SessionId sessionId;
-    /** The agent's deferred tools — always searchable. */
+    /** The agent's deferred tools — the whole search space. */
     private final Set<String> assignedNames;
-    /** Registry groups additionally searchable; {@code "*"} = all, empty = none. */
-    private final Set<String> allowedGroups;
 
     public ToolSearchTool(ToolRegistryRef registryRef, DynamicToolActivations activations, SessionId sessionId,
-                          Set<String> assignedNames, Set<String> allowedGroups) {
+                          Set<String> assignedNames) {
         this.registryRef = registryRef;
         this.activations = activations;
         this.sessionId = sessionId;
         this.assignedNames = assignedNames;
-        this.allowedGroups = allowedGroups;
     }
 
     @Override
@@ -69,12 +67,6 @@ public final class ToolSearchTool implements Tool {
         if (!assignedNames.isEmpty()) {
             text.append(" Hidden tools you can unlock this way: ")
                     .append(String.join(", ", assignedNames)).append('.');
-        }
-        if (!allowedGroups.isEmpty()) {
-            text.append(" Also searchable: the ")
-                    .append(allowedGroups.contains("*") ? "entire tool registry"
-                            : "registry groups " + String.join(", ", allowedGroups))
-                    .append('.');
         }
         return text.toString();
     }
@@ -137,22 +129,10 @@ public final class ToolSearchTool implements Tool {
         return matches.size() > limit ? matches.subList(0, limit) : matches;
     }
 
-    /**
-     * The searchable space, name → group: the agent's deferred tools plus —
-     * when a group filter grants it — the registry groups it lists
-     * ({@code "*"} opens every group).
-     */
+    /** The searchable space, name → group: the agent's deferred tools. */
     private Map<String, String> candidates() {
         Map<String, Set<String>> byGroup = registryRef.get().toolNamesByGroup();
         Map<String, String> candidates = new LinkedHashMap<>();
-        if (!allowedGroups.isEmpty()) {
-            boolean all = allowedGroups.contains("*");
-            byGroup.forEach((group, names) -> {
-                if (all || allowedGroups.contains(group)) {
-                    names.forEach(toolName -> candidates.put(toolName, group));
-                }
-            });
-        }
         for (String toolName : assignedNames) {
             candidates.putIfAbsent(toolName, byGroup.entrySet().stream()
                     .filter(e -> e.getValue().contains(toolName))
@@ -202,16 +182,8 @@ public final class ToolSearchTool implements Tool {
 
     /** For the no-match message: what the agent is allowed to search at all. */
     private String searchSpaceSummary() {
-        List<String> parts = new ArrayList<>();
-        if (!assignedNames.isEmpty()) {
-            parts.add(assignedNames.size() + " assigned tool(s)");
-        }
-        if (allowedGroups.contains("*")) {
-            parts.add("all groups (" + String.join(", ", registryRef.get().toolNamesByGroup().keySet()) + ")");
-        } else if (!allowedGroups.isEmpty()) {
-            parts.add("groups: " + String.join(", ", allowedGroups));
-        }
-        return parts.isEmpty() ? "nothing (no deferred tools, no group filter)" : String.join(" + ", parts);
+        return assignedNames.isEmpty() ? "nothing (no deferred tools)"
+                : String.join(", ", assignedNames);
     }
 
     private static int clampLimit(Object raw) {

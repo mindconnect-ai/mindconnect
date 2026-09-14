@@ -144,7 +144,7 @@ public class AgentUiController {
                 body.str("systemPrompt"), body.str("welcomeMessage"),
                 body.str("llmConfigName"));
         var agent = registryService.create(spec);
-        // responseReviewers, maxIterations, toolSearch and memoryConfig are
+        // responseReviewers, maxIterations, the roster and memoryConfig are
         // applied as a follow-up patch (AgentSpec doesn't carry them yet).
         // Default maxIterations = whatever create() picked (10).
         AgentPatch patch = AgentPatch.of()
@@ -153,7 +153,7 @@ public class AgentUiController {
                 .withMaxIterations(body.num("maxIterations", agent.maxIterations()))
                 .withResponseReviewers(body.strList("responseReviewers"))
                 .withCallableAgents(body.strList("callableAgents"))
-                .withToolSearch(toolSearchFromForm(body))
+                .withCallableByAgents(Boolean.TRUE.equals(body.bool("callableByAgents")))
                 .withSkills(skillsFromForm(body));
         try {
             patch = withMemoryConfig(patch, body);
@@ -189,7 +189,7 @@ public class AgentUiController {
                 .withMaxIterations(body.num("maxIterations", existing.maxIterations()))
                 .withResponseReviewers(body.strList("responseReviewers"))
                 .withCallableAgents(body.strList("callableAgents"))
-                .withToolSearch(toolSearchFromForm(body))
+                .withCallableByAgents(Boolean.TRUE.equals(body.bool("callableByAgents")))
                 .withSkills(skillsFromForm(body));
         try {
             patch = withMemoryConfig(patch, body);
@@ -223,19 +223,6 @@ public class AgentUiController {
         }
     }
 
-    /** The agent form's tool-search checkbox + comma-separated groups field. */
-    private static AgentDefinition.ToolSearchConfig toolSearchFromForm(FormBody body) {
-        boolean enabled = Boolean.TRUE.equals(body.bool("toolSearchEnabled"));
-        String raw = body.str("toolSearchGroups");
-        java.util.List<String> groups = raw == null || raw.isBlank()
-                ? java.util.List.of()
-                : java.util.Arrays.stream(raw.split(","))
-                        .map(String::trim)
-                        .filter(g -> !g.isEmpty())
-                        .map(g -> g.toLowerCase(java.util.Locale.ROOT))
-                        .toList();
-        return new AgentDefinition.ToolSearchConfig(enabled, groups);
-    }
 
     /**
      * The form's two skills fields. An empty selection with the switch on is

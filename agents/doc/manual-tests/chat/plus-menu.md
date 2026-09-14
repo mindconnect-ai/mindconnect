@@ -40,36 +40,54 @@ change the chat while staying open, and what the menu says about the chat
    and open **+** again: **Upload files** now carries the badge `1`.
 
 4. **+** → **Tools**.
-   **Expected:** A dialog titled **Tools**. On top a **Tool search** row with
-   an **On**/**Add** switch; below it the groups (*Agents*, *Files*, *Web*, …)
-   with `n of m` beside each name. The groups that hold something switched on
-   are already expanded, the others are collapsed.
+   **Expected:** A dialog titled **Tools**: the groups (*Files*, *Web*, …)
+   with `n of m` beside each name and an **Off | On | Search** switch on each
+   group, and inside every group one row per tool with the same switch. No
+   row for `run_agent`, `run_agents`, `list_agents` or `tool_search`. The
+   groups that hold something on or searchable are already expanded.
 
-5. Expand a collapsed group and press **Add** on one of its tools, then press
-   **On** on the same row again.
+5. Expand a collapsed group and set one of its tools to **On**, then
+   **Search**, then **Off**.
    **Expected:** Each click answers on its own — the dialog stays open, the
-   row's button flips between **Add** and **On**, and the group's `n of m`
-   and the list's header count follow. Close the dialog and open **+**: the
-   **Tools** badge matches the header count you last saw. Reload the page
-   (F5) and open **+** → **Tools**: the change is still there.
+   tinted segment moves to what you clicked, and the group's `n of m` and
+   the header (`n on, n by search, n available`) follow. While a tool is on
+   **Search** a line under the list says tool search is on; with nothing on
+   Search the line is gone. Set the tool to **Search** once more, reload the
+   page (F5) and open **+** → **Tools**: it is still on **Search**.
+
+5a. On a group's own switch press **On**.
+   **Expected:** Every tool in the group reads **On** and the group's switch
+   tints **On**. Set one tool in it to **Off**: the group's switch shows no
+   tint — its tools no longer share a state.
 
 6. **+** → **Sub-agents**.
-   **Expected:** A dialog titled **Sub-agents**: a **Hand work to other
-   agents** row with a switch, then one row per agent the chat may call, each
-   with its icon and its description. When the switch is off, every **Ask**
-   button is disabled and says why.
+   **Expected:** A dialog titled **Sub-agents** with one row per agent — not
+   the chat's own agent, not `title-generator` or the summarizers — each with
+   its icon, its description, a **Test** button and **Off | On**. The ones the
+   chat's agent brought are **On** (for `default-chat`: `url-reader` and
+   `explorer`); the header reads `Sub-agents · n of m on`.
 
-7. Turn **Hand work to other agents** on, then press **Ask** on one agent.
-   **Expected:** Turning it on enables the **Ask** buttons without closing
-   the dialog. **Ask** closes the dialog and leaves the composer holding
-   `Use the <agent> sub-agent to ` — nothing is sent. Anything you had
-   already typed is still there, above the new line.
+7. Switch an agent the chat's agent did not have to **On**, and one it had
+   to **Off**.
+   **Expected:** The dialog stays open and the header count follows. Switch
+   every agent **Off**: the hint under the list says the chat calls no other
+   agent. Open **+** → **Tools**: there is still no row for the delegation
+   tools — they follow this picker, not the tool list.
 
-8. Type a task after the brief and press Send.
-   **Expected:** An ordinary turn; the agent calls `run_agent` (a sub-agent
-   card appears). Open **+** → **Tools** → *Agents*: `run_agent`,
-   `run_agents` and `list_agents` are **On** — that is what the switch in
-   step 7 did.
+8. One agent **On**, the rest **Off**. Close the dialog and ask the chat
+   "Which agents can you call?".
+   **Expected:** The chat calls `list_agents` and names only the agent that
+   is on. Switch every agent **Off** and ask again: the chat has no
+   `list_agents` or `run_agent` to call and says it cannot delegate.
+
+8a. **+** → **Sub-agents** → **Test** on any agent.
+   **Expected:** A dialog titled **Test <agent>** with a message field,
+   **Send** and **Back**. Send with the field empty: a red line says to type
+   a message first. Type "Say hello in one sentence" and Send: after the
+   agent answers, a green-edged block shows the answer (rendered as
+   Markdown) with the time it took, the form still above it. The chat
+   history on the left gained no entry. **Back** returns to the Sub-agents
+   picker.
 
 9. Type half a sentence into the composer, then start a turn and — while it
    is still streaming — open **+** → **Tools** and toggle any tool.
@@ -84,8 +102,10 @@ change the chat while staying open, and what the menu says about the chat
 
 - Automated twin for the routes and the switch states:
   `ChatPlusMenuComponentTest` and `ChatPickerComponentsTest`
-  (mc-agent-chat-ui-rest). What they cannot check is the popover's placement
-  and the flip-above, which is why step 1 is a human step.
+  (mc-agent-chat-ui-rest); the roster a chat sets over its agent's is pinned
+  by `SessionAgentResolverTest` and `ListAgentsToolTest`. What they cannot
+  check is the popover's placement and the flip-above, which is why step 1
+  is a human step.
 - The model button beside Send opens the settings dialog, which is the agent,
   the model and the system prompt — and nothing else. Its own case is
   `chat/settings-dialog.md`; the step that matters to this one is that

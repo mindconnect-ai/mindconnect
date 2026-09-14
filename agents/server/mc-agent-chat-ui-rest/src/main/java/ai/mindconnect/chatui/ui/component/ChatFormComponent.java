@@ -60,10 +60,9 @@ public final class ChatFormComponent implements UiComponent {
     }
 
     /**
-     * The composer's node id, without a component instance. A control outside
-     * the form — the "Ask" button in the sub-agent picker — has to name the
-     * form it submits, and naming it by hand in two places is how the two
-     * drift apart.
+     * The composer's node id, without a component instance, for a control
+     * outside the form that has to name the form it submits — naming it by
+     * hand in two places is how the two drift apart.
      */
     public static String formId(SessionId sessionId) {
         return "chat-form-" + sessionId.value();

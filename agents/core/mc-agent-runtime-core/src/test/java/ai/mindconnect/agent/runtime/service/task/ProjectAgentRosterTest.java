@@ -55,9 +55,7 @@ class ProjectAgentRosterTest {
     void aProjectAgentReachesOnlyTheAgentsItsCallerMay() {
         AgentDefinition helper = asRun(caller(List.of("explorer")));
 
-        assertThat(helper.tools()).extracting(AgentTool::name)
-                .as("naming no tools, it inherits run_agent")
-                .contains(InlineAgentTools.RUN_AGENT);
+        assertThat(helper.delegates()).as("it inherits the roster, and with it the delegation tools").isTrue();
         assertThat(helper.mayCall("explorer")).isTrue();
         assertThat(helper.mayCall("deployer"))
                 .as("an agent outside the caller's roster stays out of reach one level down")
@@ -70,7 +68,7 @@ class ProjectAgentRosterTest {
         AgentDefinition helper = asRun(caller(null));
 
         assertThat(helper.effectiveCallableAgents()).isEmpty();
-        assertThat(helper.mayCall("deployer")).as("no restriction, as for the caller").isTrue();
+        assertThat(helper.mayCall("deployer")).as("nobody, as for the caller").isFalse();
     }
 
     @Test

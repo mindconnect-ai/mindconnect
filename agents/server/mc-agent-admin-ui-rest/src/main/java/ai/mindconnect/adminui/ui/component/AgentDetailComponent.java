@@ -101,6 +101,8 @@ public final class AgentDetailComponent implements UiComponent {
                 .field(UiField.text("icon", "Icon", agent.iconOrDefault()))
                 .field(UiField.text("callableAgents", "Callable Agents", callableAgentsSummary()))
                 .field(UiField.text("skills", "Skills", skillsSummary()))
+                .field(UiField.text("callableByAgents", "Callable by other agents",
+                        agent.mayBeCalledByAgents() ? "yes" : "no"))
                 .field(UiField.text("llmConfigName", "LLM Config", agent.llmConfigName()))
                 .field(UiField.text("status", "Status",
                         agent.status() != null ? agent.status().name() : null))
@@ -123,10 +125,10 @@ public final class AgentDetailComponent implements UiComponent {
         return skills.names().isEmpty() ? "all skills" : String.join(", ", skills.names());
     }
 
-    /** The roster, or the word for having none — which means all of them. */
+    /** The roster, or the word for having none — which means no other agent. */
     private String callableAgentsSummary() {
         var roster = agent.effectiveCallableAgents();
-        return roster.isEmpty() ? "all agents" : String.join(", ", roster);
+        return roster.isEmpty() ? "none" : String.join(", ", roster);
     }
 
     /** The effective strategy kind, plus the compression switch where it exists. */

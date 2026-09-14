@@ -14,6 +14,7 @@ import java.util.List;
  * when it is wrong, and it is not a knob an end user turns. The system default
  * applies.
  */
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public record InlineSessionAgent(
         /** An inline agent is an agent without a stored definition; its id is minted with the session. */
         AgentId id,
@@ -22,14 +23,11 @@ public record InlineSessionAgent(
         String systemPrompt,
         String llmConfigName,
         List<AgentTool> tools,
-        AgentDefinition.ToolSearchConfig toolSearch,
         /**
          * The agents this one may call, by name — for a project's agent the
          * roster of the agent that called it, so handing a task to a file in
          * the repository cannot reach further than the caller could. Empty
-         * means no restriction, as on {@link AgentDefinition#callableAgents()}:
-         * a chat assembled in the picker, and every session written before
-         * the field existed.
+         * means nobody, as on {@link AgentDefinition#callableAgents()}.
          */
         List<String> callableAgents
 ) implements SessionAgent {
@@ -40,11 +38,10 @@ public record InlineSessionAgent(
         callableAgents = callableAgents == null ? List.of() : List.copyOf(callableAgents);
     }
 
-    /** Without a roster: the agent may call every agent, as a chat from the picker always could. */
+    /** Without a roster: the agent calls no other agent. */
     public InlineSessionAgent(AgentId id, boolean main, String label, String systemPrompt,
-                              String llmConfigName, List<AgentTool> tools,
-                              AgentDefinition.ToolSearchConfig toolSearch) {
-        this(id, main, label, systemPrompt, llmConfigName, tools, toolSearch, List.of());
+                              String llmConfigName, List<AgentTool> tools) {
+        this(id, main, label, systemPrompt, llmConfigName, tools, List.of());
     }
 
     /**
@@ -55,34 +52,18 @@ public record InlineSessionAgent(
      * {@code ToolCallScope}, and whatever is keyed by the agent — approvals,
      * the system prompt's agent metadata — is keyed by this id.
      *
-     * @param toolSearch whether the chat may find the remaining tools itself
+     * @param callableAgents the agents it may hand work to; empty for none
      */
-    public static InlineSessionAgent of(String label, String systemPrompt,
-                                        String llmConfigName, List<String> toolNames, boolean toolSearch) {
+    public static InlineSessionAgent of(String label, String systemPrompt, String llmConfigName,
+                                        List<String> toolNames, List<String> callableAgents) {
         AgentId id = AgentId.random();
         List<AgentTool> tools = (toolNames == null ? List.<String>of() : toolNames).stream()
                 .map(name -> AgentTool.of(name))
                 .toList();
-        var search = toolSearch
-                ? new AgentDefinition.ToolSearchConfig(true, List.of("*"))
-                : AgentDefinition.ToolSearchConfig.OFF;
-        return new InlineSessionAgent(id, true, label, systemPrompt, llmConfigName, tools, search);
-    }
-
-    /** The same agent under a new id — used when a chat detaches from one. */
-    public InlineSessionAgent withTools(List<String> toolNames, boolean toolSearch) {
-        List<AgentTool> rebuilt = (toolNames == null ? List.<String>of() : toolNames).stream()
-                .map(name -> AgentTool.of(name))
-                .toList();
-        var search = toolSearch
-                ? new AgentDefinition.ToolSearchConfig(true, List.of("*"))
-                : AgentDefinition.ToolSearchConfig.OFF;
-        return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, rebuilt, search,
-                callableAgents);
+        return new InlineSessionAgent(id, true, label, systemPrompt, llmConfigName, tools, callableAgents);
     }
 
     public InlineSessionAgent withLlmConfigName(String llmConfigName) {
-        return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, tools, toolSearch,
-                callableAgents);
+        return new InlineSessionAgent(id, main, label, systemPrompt, llmConfigName, tools, callableAgents);
     }
 }

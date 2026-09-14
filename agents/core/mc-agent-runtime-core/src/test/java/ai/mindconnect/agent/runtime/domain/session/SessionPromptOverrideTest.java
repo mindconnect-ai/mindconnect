@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SessionPromptOverrideTest {
 
     private static SessionAgentRef ref(String prompt) {
-        return new SessionAgentRef(AgentId.random(), true, "default-chat", null, null, null, prompt);
+        return new SessionAgentRef(AgentId.random(), true, "default-chat", null, null, prompt);
     }
 
     @Test
@@ -38,7 +38,7 @@ class SessionPromptOverrideTest {
     @Test
     void theBindingSurvivesTheOverride() {
         AgentId agentId = AgentId.random();
-        var r = new SessionAgentRef(agentId, true, "default-chat", null, null, null, "mine");
+        var r = new SessionAgentRef(agentId, true, "default-chat", null, null, "mine");
 
         assertThat(r.agentId()).isEqualTo(agentId);
         assertThat(r.label()).isEqualTo("default-chat");

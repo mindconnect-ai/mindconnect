@@ -13,13 +13,13 @@ import java.util.stream.Collectors;
 public class ListAgentsTool implements Tool {
 
     private final AgentDefinitionRepository definitionRepository;
-    /** The agent doing the asking — its roster decides what comes back. */
-    private final AgentId callerId;
+    /** The agent doing the asking — its roster decides what comes back; {@code null} for none. */
+    private final java.util.function.Supplier<AgentDefinition> caller;
     /** The session's working directory, whose project may define agents of its own. */
     private final String workingDir;
 
     public ListAgentsTool(AgentDefinitionRepository definitionRepository) {
-        this(definitionRepository, null, null);
+        this(definitionRepository, (AgentId) null, null);
     }
 
     public ListAgentsTool(AgentDefinitionRepository definitionRepository, AgentId callerId) {
@@ -36,7 +36,27 @@ public class ListAgentsTool implements Tool {
      */
     public ListAgentsTool(AgentDefinitionRepository definitionRepository,
                           AgentId callerId, String workingDir) {
-        this.callerId = callerId;
+        this(definitionRepository,
+                () -> callerId == null ? null : definitionRepository.findById(callerId).orElse(null),
+                workingDir);
+    }
+
+    /**
+     * @param caller the calling agent as it runs — for a session, the
+     *               definition with the chat's own roster laid over the
+     *               registry's, the one {@code run_agent} is checked against.
+     *               Read when the tool runs; supplying {@code null} lists
+     *               every agent.
+     */
+    public static ListAgentsTool forCaller(AgentDefinitionRepository definitionRepository,
+                                           java.util.function.Supplier<AgentDefinition> caller,
+                                           String workingDir) {
+        return new ListAgentsTool(definitionRepository, caller, workingDir);
+    }
+
+    private ListAgentsTool(AgentDefinitionRepository definitionRepository,
+                           java.util.function.Supplier<AgentDefinition> caller, String workingDir) {
+        this.caller = caller;
         this.definitionRepository = definitionRepository;
         this.workingDir = workingDir;
     }
@@ -67,9 +87,9 @@ public class ListAgentsTool implements Tool {
         // The roster lives on the calling agent and the rule for reading it
         // lives on AgentDefinition — the same mayCall a run_agent is checked
         // against, so the list can never offer what the call would refuse.
-        AgentDefinition caller = callerId == null
-                ? null : definitionRepository.findById(callerId).orElse(null);
+        AgentDefinition caller = this.caller.get();
         List<AgentDefinition> agents = definitionRepository.findAll().stream()
+                .filter(AgentDefinition::mayBeCalledByAgents)
                 .filter(a -> caller == null || caller.mayCall(a.name()))
                 .toList();
         // The project's own come first: they are the ones written for the

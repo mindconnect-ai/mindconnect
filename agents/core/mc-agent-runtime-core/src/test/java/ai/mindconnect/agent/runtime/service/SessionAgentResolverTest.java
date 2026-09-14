@@ -68,7 +68,7 @@ class SessionAgentResolverTest {
     @Test
     void anInlineAgentIsAssembledFromTheSessionItself() {
         var inline = InlineSessionAgent.of("Chat", "be helpful", "gpt",
-                List.of("file_read"), true);
+                List.of("file_read"), List.of());
         var session = sessionFor(inline.id()).withSessionAgents(List.of(inline));
 
         AgentDefinition resolved = resolver.resolve(session);
@@ -79,20 +79,19 @@ class SessionAgentResolverTest {
         assertThat(resolved.systemPrompt()).isEqualTo("be helpful");
         assertThat(resolved.llmConfigName()).isEqualTo("gpt");
         assertThat(resolved.tools()).extracting(t -> t.name()).containsExactly("file_read");
-        assertThat(resolved.toolSearchOrOff().enabled()).isTrue();
         // Not a knob a chat gets to turn: it decides how long conversations
         // survive compression.
         assertThat(resolved.effectiveMemoryConfig()).isEqualTo(SummarizingWindowConfig.DEFAULT);
-        assertThat(resolved.effectiveCallableAgents()).as("a chat from the picker reaches every agent")
-                .isEmpty();
-        assertThat(resolved.mayCall("anyone")).isTrue();
+        assertThat(resolved.effectiveCallableAgents()).as("no roster, nobody to call").isEmpty();
+        assertThat(resolved.mayCall("anyone")).isFalse();
+        assertThat(resolved.delegates()).isFalse();
     }
 
     @Test
     void anInlineAgentsRosterBecomesTheDefinitionsRoster() {
-        var plain = InlineSessionAgent.of("helper", "help", "gpt", List.of("run_agent"), false);
+        var plain = InlineSessionAgent.of("helper", "help", "gpt", List.of("run_agent"), List.of());
         var inline = new InlineSessionAgent(plain.id(), true, plain.label(), plain.systemPrompt(),
-                plain.llmConfigName(), plain.tools(), plain.toolSearch(), List.of("explorer"));
+                plain.llmConfigName(), plain.tools(), List.of("explorer"));
         var session = sessionFor(inline.id()).withSessionAgents(List.of(inline));
 
         AgentDefinition resolved = resolver.resolve(session);
@@ -105,28 +104,56 @@ class SessionAgentResolverTest {
     void aRefWithoutOverridesIsTheAgentAsConfigured() {
         var def = registered("Poet", "claude");
         var session = sessionFor(def.id())
-                .withSessionAgents(List.of(new SessionAgentRef(def.id(), true, "Poet", null, null, null)));
+                .withSessionAgents(List.of(new SessionAgentRef(def.id(), true, "Poet", null, null)));
 
         assertThat(resolver.resolve(session)).isEqualTo(def);
     }
 
     @Test
-    void aRefTakesThisChatsModelAndToolsButNeverItsPrompt() {
+    void aRefTakesThisChatsModelAndTools() {
         var def = registered("Poet", "claude");
-        var ownTools = InlineSessionAgent.of("x", "p", "gpt", List.of("todo_read"), false).tools();
+        var ownTools = InlineSessionAgent.of("x", "p", "gpt", List.of("todo_read"), List.of()).tools();
         var session = sessionFor(def.id()).withSessionAgents(List.of(
-                new SessionAgentRef(def.id(), true, "Poet", "gpt-4o", ownTools,
-                        new AgentDefinition.ToolSearchConfig(true, List.of("web")))));
+                new SessionAgentRef(def.id(), true, "Poet", "gpt-4o", ownTools)));
 
         AgentDefinition resolved = resolver.resolve(session);
 
         assertThat(resolved.llmConfigName()).isEqualTo("gpt-4o");
         assertThat(resolved.tools()).extracting(t -> t.name()).containsExactly("todo_read");
-        assertThat(resolved.toolSearchOrOff().groups()).containsExactly("web");
-        // The prompt stays the agent's: a ref wearing a foreign prompt would
-        // make "sessions of agent X" meaningless.
         assertThat(resolved.systemPrompt()).isEqualTo("the agent's own prompt");
         assertThat(resolved.name()).isEqualTo("Poet");
+    }
+
+    private AgentDefinition registeredWithRoster(String name, List<String> roster) {
+        var def = AgentDefinition.create(name, "d", "p", "hi", "claude").withCallableAgents(roster);
+        registry.put(def.id(), def);
+        return def;
+    }
+
+    private static AgentSession withRoster(AgentDefinition def, List<String> roster) {
+        return sessionFor(def.id()).withSessionAgents(List.of(
+                new SessionAgentRef(def.id(), true, def.name(), null, null, null, roster)));
+    }
+
+    /** The agent is the template: a chat's roster replaces it, and may name agents it never had. */
+    @Test
+    void aRefsRosterReplacesTheAgents() {
+        var def = registeredWithRoster("Planner", List.of("explorer", "verifier"));
+
+        AgentDefinition resolved = resolver.resolve(withRoster(def, List.of("verifier", "deployer")));
+
+        assertThat(resolved.effectiveCallableAgents()).containsExactly("verifier", "deployer");
+        assertThat(resolved.mayCall("explorer")).isFalse();
+        assertThat(resolver.resolve(withRoster(def, List.of())).delegates())
+                .as("an empty choice is nobody").isFalse();
+    }
+
+    @Test
+    void aRefWithoutARosterKeepsTheAgents() {
+        var def = registeredWithRoster("Planner", List.of("explorer"));
+
+        assertThat(resolver.resolve(withRoster(def, null)).effectiveCallableAgents())
+                .containsExactly("explorer");
     }
 
     @Test

@@ -8,6 +8,7 @@ import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
 import java.time.Instant;
 import java.util.List;
 
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
 public record AgentDefinition(
         AgentId id,
         String name,
@@ -50,25 +51,26 @@ public record AgentDefinition(
         List<String> responseReviewers,
         /**
          * The other agents this one may see and call, by name — the roster it
-         * delegates to. {@code null} or empty means no restriction: it sees
-         * every agent, which is what an agent that was never
-         * given a roster has always done.
+         * delegates to. {@code null} or empty means none: delegating is
+         * something an agent is given, agent by agent, never a default.
          *
-         * <p>Governs both halves of delegating, because half of it would be
-         * theatre: {@code list_agents} returns only these, and a
-         * {@code run_agent} for anything else is refused. Filtering the list
-         * alone would leave a model free to call a name it read in its own
-         * prompt.
+         * <p>The roster is also what gives an agent the delegation tools
+         * ({@link #DELEGATION_TOOLS}): the runtime offers them exactly when
+         * the roster names someone, so they are never listed in
+         * {@link #tools()}. It governs both halves of delegating, because
+         * half of it would be theatre: {@code list_agents} returns only these,
+         * and a {@code run_agent} for anything else is refused.
          */
         List<String> callableAgents,
         /**
-         * Agent-level tool-search setting. {@code null} (older persisted
-         * agents) means disabled. When enabled, the runtime injects the
-         * {@code tool_search} tool automatically; its search space is the
-         * agent's deferred tools plus the registry groups listed here
-         * ({@code "*"} = every group).
+         * Whether other agents may have this one on their roster at all.
+         * {@code null} reads as yes. The agents the runtime calls on its own
+         * — a title generator, a summarizer — answer in the one shape the
+         * runtime asks for and are no use as a delegate, so they say no: they
+         * are not offered in any roster picker and a {@code run_agent} naming
+         * one is refused even when a roster lists it.
          */
-        ToolSearchConfig toolSearch,
+        Boolean callableByAgents,
         /**
          * Agent-level skills setting. {@code null} (older persisted agents)
          * means disabled. When enabled, the runtime injects the {@code skill}
@@ -99,7 +101,27 @@ public record AgentDefinition(
     public AgentDefinition {
         group = normalisedName(group);
         icon = normalisedName(icon);
+        tools = tools == null ? null
+                : tools.stream().filter(t -> !DERIVED_TOOLS.contains(t.name())).toList();
     }
+
+    /** The tools an agent with a roster gets from the runtime, never from its own list. */
+    public static final java.util.Set<String> DELEGATION_TOOLS =
+            java.util.Set.of("run_agent", "run_agents", "list_agents");
+
+    /** The tool an agent with deferred tools gets from the runtime to find them. */
+    public static final String TOOL_SEARCH = "tool_search";
+
+    /**
+     * Tools the runtime derives rather than an agent lists: the delegation
+     * tools follow the roster, {@code tool_search} follows the deferred tools,
+     * {@code skill} follows the skills setting.
+     * They are dropped from {@link #tools()} on the way in — a definition
+     * written before they were derived still loads, and no list can say
+     * "run_agent" without a roster to run.
+     */
+    public static final java.util.Set<String> DERIVED_TOOLS = java.util.Set.of(
+            "run_agent", "run_agents", "list_agents", TOOL_SEARCH, "skill");
 
     /**
      * Trim, fold case, and read blank as absent — for the two machine names.
@@ -108,17 +130,6 @@ public record AgentDefinition(
         if (value == null) return null;
         String v = value.trim().toLowerCase(java.util.Locale.ROOT);
         return v.isEmpty() ? null : v;
-    }
-
-    /**
-     * Tool-search switch + registry-group filter, stored with the agent.
-     */
-    public record ToolSearchConfig(boolean enabled, List<String> groups) {
-        public ToolSearchConfig {
-            if (groups == null) groups = List.of();
-        }
-
-        public static final ToolSearchConfig OFF = new ToolSearchConfig(false, List.of());
     }
 
     /**
@@ -144,10 +155,10 @@ public record AgentDefinition(
                            String systemPrompt, String welcomeMessage, String llmConfigName,
                            int maxIterations, MemoryConfig memoryConfig, AgentDefinitionStatus status,
                            List<AgentTool> tools, List<String> responseReviewers, List<String> callableAgents,
-                           ToolSearchConfig toolSearch, SkillsConfig skills,
+                           Boolean callableByAgents, SkillsConfig skills,
                            Instant createdAt, Instant updatedAt) {
         this(id, name, description, group, icon, systemPrompt, welcomeMessage, llmConfigName,
-                maxIterations, memoryConfig, status, tools, responseReviewers, callableAgents, toolSearch,
+                maxIterations, memoryConfig, status, tools, responseReviewers, callableAgents, callableByAgents,
                 skills, createdAt, updatedAt, null);
     }
 
@@ -158,9 +169,9 @@ public record AgentDefinition(
                            String systemPrompt, String welcomeMessage, String llmConfigName,
                            int maxIterations, MemoryConfig memoryConfig, AgentDefinitionStatus status,
                            List<AgentTool> tools, List<String> responseReviewers, List<String> callableAgents,
-                           ToolSearchConfig toolSearch, Instant createdAt, Instant updatedAt) {
+                           Boolean callableByAgents, Instant createdAt, Instant updatedAt) {
         this(id, name, description, group, icon, systemPrompt, welcomeMessage, llmConfigName,
-                maxIterations, memoryConfig, status, tools, responseReviewers, callableAgents, toolSearch,
+                maxIterations, memoryConfig, status, tools, responseReviewers, callableAgents, callableByAgents,
                 null, createdAt, updatedAt, null);
     }
 
@@ -168,11 +179,11 @@ public record AgentDefinition(
     public AgentDefinition withVersion(Long version) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig, status, tools, responseReviewers,
-                callableAgents, toolSearch, skills, createdAt, updatedAt, version);
+                callableAgents, callableByAgents, skills, createdAt, updatedAt, version);
     }
 
     /**
-     * Pre-tool-search constructor: search disabled.
+     * Without a roster, callable by other agents.
      */
     public AgentDefinition(AgentId id, String name, String description,
                            String systemPrompt, String welcomeMessage, String llmConfigName,
@@ -182,13 +193,6 @@ public record AgentDefinition(
         this(id, name, description, null, null, systemPrompt, welcomeMessage, llmConfigName,
                 maxIterations, memoryConfig, status, tools, responseReviewers, null, null,
                 createdAt, updatedAt);
-    }
-
-    /**
-     * Never {@code null}: older agents without the field read as OFF.
-     */
-    public ToolSearchConfig toolSearchOrOff() {
-        return toolSearch == null ? ToolSearchConfig.OFF : toolSearch;
     }
 
     /**
@@ -204,7 +208,34 @@ public record AgentDefinition(
     public AgentDefinition withSkills(SkillsConfig skills) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills,
+                createdAt, Instant.now(), version);
+    }
+
+    /**
+     * Whether other agents may call this one — {@code null} reads as yes.
+     * Deliberately not {@code mayBeCalledByAgents}: Jackson would take that
+     * for the property's getter and store a stated {@code true} over the
+     * {@code null} the field holds.
+     */
+    public boolean mayBeCalledByAgents() {
+        return callableByAgents == null || callableByAgents;
+    }
+
+    /** Whether this agent delegates at all: its roster names someone. */
+    public boolean delegates() {
+        return !effectiveCallableAgents().isEmpty();
+    }
+
+    /** The tools left to {@code tool_search}, in order — empty when the agent searches nothing. */
+    public List<String> deferredToolNames() {
+        return tools == null ? List.of()
+                : tools.stream().filter(AgentTool::deferred).map(AgentTool::name).toList();
+    }
+
+    /** Whether this agent gets {@code tool_search}: some tool is set to be found by it. */
+    public boolean searchesTools() {
+        return !deferredToolNames().isEmpty();
     }
 
     public static AgentDefinition create(String name, String description,
@@ -258,25 +289,22 @@ public record AgentDefinition(
     }
 
     /**
-     * The roster as a list, empty when the agent may reach everything.
+     * The roster as a list, empty when the agent may call nobody.
      */
     public List<String> effectiveCallableAgents() {
         return callableAgents != null ? callableAgents : List.of();
     }
 
     /**
-     * Whether this agent may see and call the named one. An empty roster is
-     * no restriction, not a ban — an agent that names nobody reaches everyone,
-     * which is how every agent behaved before the field existed.
+     * Whether this agent may see and call the named one: the roster names it.
+     * An empty roster names nobody.
      *
      * <p>The comparison ignores case, like the name lookup a sub-agent call
      * does: a roster entry that differs only in case would otherwise pass the
      * lookup and fail this check.
      */
     public boolean mayCall(String agentName) {
-        List<String> roster = effectiveCallableAgents();
-        if (roster.isEmpty()) return true;
-        return agentName != null && roster.stream().anyMatch(agentName::equalsIgnoreCase);
+        return agentName != null && effectiveCallableAgents().stream().anyMatch(agentName::equalsIgnoreCase);
     }
 
     /**
@@ -285,7 +313,7 @@ public record AgentDefinition(
     public AgentDefinition withCallableAgents(List<String> callableAgents) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     /**
@@ -294,7 +322,7 @@ public record AgentDefinition(
     public AgentDefinition withIcon(String icon) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     /**
@@ -303,35 +331,33 @@ public record AgentDefinition(
     public AgentDefinition withGroup(String group) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
-    /**
-     * Replaces the tool-search setting (see {@link ToolSearchConfig}).
-     */
-    public AgentDefinition withToolSearch(ToolSearchConfig toolSearch) {
+    /** Allows or forbids other agents to call this one (see {@link #callableByAgents()}). */
+    public AgentDefinition withCallableByAgents(Boolean callableByAgents) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withMemoryConfig(MemoryConfig memoryConfig) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig, status, tools, responseReviewers,
-                callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withTools(List<AgentTool> tools) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withBasicFields(String name, String description, String systemPrompt,
                                            String welcomeMessage, String llmConfigName) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition withBasicFields(String name, String description,
@@ -339,7 +365,7 @@ public record AgentDefinition(
                                            String llmConfigName, List<String> responseReviewers) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     /**
@@ -355,14 +381,13 @@ public record AgentDefinition(
                                            List<String> responseReviewers) {
         return new AgentDefinition(id, name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, memoryConfig,
-                status, tools, responseReviewers, callableAgents, toolSearch, skills, createdAt, Instant.now(), version);
+                status, tools, responseReviewers, callableAgents, callableByAgents, skills, createdAt, Instant.now(), version);
     }
 
     public AgentDefinition asCopy() {
         Instant now = Instant.now();
         return new AgentDefinition(AgentId.random(), name + "-copy", description, group, icon,
                 systemPrompt, welcomeMessage, llmConfigName, maxIterations, memoryConfig,
-                AgentDefinitionStatus.ACTIVE, List.of(), responseReviewers, callableAgents, toolSearch,
-                skills, now, now);
+                AgentDefinitionStatus.ACTIVE, List.of(), responseReviewers, callableAgents, callableByAgents, skills, now, now);
     }
 }

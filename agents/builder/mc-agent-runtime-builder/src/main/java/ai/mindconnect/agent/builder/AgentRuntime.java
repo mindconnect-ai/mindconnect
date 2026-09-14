@@ -87,19 +87,20 @@ public final class AgentRuntime implements AutoCloseable {
      */
     public AgentSession openSession(String llmConfigName, java.util.List<String> toolNames,
                                     UserId userId) {
-        return openSession(llmConfigName, toolNames, DEFAULT_CHAT_PROMPT, true, userId);
+        return openSession(llmConfigName, toolNames, DEFAULT_CHAT_PROMPT, java.util.List.of(), userId);
     }
 
     /**
-     * The same, with the prompt and the tool-search switch under the caller's
-     * control.
+     * The same, with the prompt and the agents it may hand work to under the
+     * caller's control.
      *
-     * @param toolSearch lets the chat discover tools beyond {@code toolNames}
-     *                   at runtime instead of carrying every definition in its
-     *                   context
+     * @param callableAgents the registered agents the chat may call, by name;
+     *                       empty for none — the delegation tools come with a
+     *                       roster, never without
      */
     public AgentSession openSession(String llmConfigName, java.util.List<String> toolNames,
-                                    String systemPrompt, boolean toolSearch, UserId userId) {
+                                    String systemPrompt, java.util.List<String> callableAgents,
+                                    UserId userId) {
         if (llmConfigName == null || llmConfigName.isBlank()) {
             throw new IllegalArgumentException("A session without an agent needs a model name");
         }
@@ -107,7 +108,7 @@ public final class AgentRuntime implements AutoCloseable {
             throw new IllegalArgumentException("No LLM config named '" + llmConfigName + "'");
         }
         var agent = InlineSessionAgent.of(
-                "Chat", systemPrompt, llmConfigName, toolNames, toolSearch);
+                "Chat", systemPrompt, llmConfigName, toolNames, callableAgents);
         return sessionService.openChat(agent, userId);
     }
 

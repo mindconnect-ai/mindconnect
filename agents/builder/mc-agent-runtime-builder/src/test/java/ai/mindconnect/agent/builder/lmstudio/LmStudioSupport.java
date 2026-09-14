@@ -92,7 +92,7 @@ final class LmStudioSupport {
                 base.status(),
                 // A binding no longer names its agent: the definition lists it.
                 List.copyOf(tools),
-                base.responseReviewers(), base.callableAgents(), base.toolSearch(),
+                base.responseReviewers(), base.callableAgents(), base.callableByAgents(),
                 base.createdAt(), base.updatedAt());
         return AgentRuntimeBuilder.useInMemoryPersistence()
                 .llmConfig(LlmConfig.lmStudio("it-llm", model, BASE_URL))

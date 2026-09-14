@@ -113,33 +113,47 @@ fresh empty one, so nothing has to be moved by hand at release time.
   Backed by `POST /admin/api/migrations/apply-field?id=…&field=…`.
 
 - **agents:** the chat composer's "+" is a menu — files, images, tools and
-  sub-agents, instead of the attach dialog alone. Two of the four are new
-  places rather than new doors: **Tools** lists every tool the registry can
-  hand out, grouped by rubric, one switch per row, turned on and off while the
-  dialog stays open (the groups that hold something switched on start
-  expanded); **Sub-agents** shows the specialists the chat may hand work to
-  with one switch for the delegation tools (`run_agent`, `run_agents`,
-  `list_agents`) and an *Ask* that drops the brief into the composer for you
-  to finish. **Add images** is the attach dialog with the file chooser
-  narrowed to pictures. Chat endpoints added:
+  sub-agents, instead of the attach dialog alone. The chat's agent is the
+  template the chat starts from: **Tools** lists every tool the registry can
+  hand out, each row *Off*, *On* (offered to the model up front) or *Search*
+  (left for `tool_search` to find), and a group's switch sets all its tools at
+  once; **Sub-agents** lists every agent that may be called, each *Off* or *On*,
+  with a *Test* that sends it one message in a dialog and shows its answer.
+  Both start from what the agent brought and may add tools and agents it never
+  had; the dialog stays open while you switch. **Add images** is the attach
+  dialog with the file chooser narrowed to pictures. Chat endpoints added:
   `GET /chat/api/sessions/{id}/tools-dialog`, `.../subagents-dialog`,
-  `POST .../tools`, `.../tool-search`, `.../delegation`, `.../delegate`;
+  `.../subagents/test-dialog?agent=`;
+  `POST .../tools?tool=&state=OFF|ON|SEARCH`, `.../tools/group?group=&state=`,
+  `.../subagents?agent=&on=`, `.../subagents/test`;
   `GET .../attach-dialog` takes `?kind=files|images`.
 
 ### Changed
 
+- **agents:** delegating and tool search are explicit. An agent's
+  `callableAgents` roster names the agents it may call — an empty roster now
+  means none, not all — and the runtime gives `run_agent`, `run_agents` and
+  `list_agents` exactly to an agent whose roster names someone; they are no
+  longer listed as tools and are dropped from an agent file that still lists
+  them. Likewise an agent gets `tool_search` exactly when one of its tools is
+  `deferred`, and it finds only those: the `toolSearch` setting and its
+  registry-group filter are gone from agent files, the admin form and
+  `PUT /api/agents/{id}` (which takes `callableAgents` and `callableByAgents`
+  instead). An agent you relied on to reach every other agent needs its
+  roster filled in.
+- **agents:** agents have a `callableByAgents` flag. The runtime's own helpers
+  (title generator, summarizers, the answer-relevance checker) set it to
+  `false`: no roster picker offers them and `run_agent` refuses them.
 - **agents:** the chat's settings dialog is the agent, the model and the
-  system prompt — three fields, no tabs. The tool multiselect and the
-  tool-search checkbox that used to need a second tab moved into the
-  composer's "+" menu, where they are switches rather than a form; the dialog
+  system prompt — three fields, no tabs. The tool multiselect that used to
+  need a second tab moved into the composer's "+" menu, where tools are
+  switches rather than a form; the dialog
   says so in a closing line. Applying it never writes the tool list any more,
   so a chat that comes here to change its model keeps whatever it switched on
   in the Tools picker. An LLM config that is an alias now reads as what it
   points at (`agent-default → openai-default`) instead of
   `agent-default (null / null)`, and an agent is listed with what it is for
   rather than by name alone.
-
-### Changed
 
 - **agents:** every provider now knows its own API endpoint, so **Base URL is
   prefilled** when a provider is picked in the Admin UI —
@@ -186,6 +200,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the tool was between two reads of the pipe, the JVM closed the pipe on its
   own, the call returned without a word, and the process ran on unseen. The
   same race made `BashToolOutputTest` fail now and then in CI.
+- **agents:** `list_agents` answers with the roster the calling session
+  actually runs under. It read the agent from the registry, so an agent that
+  lives in its session — a project's agent started as a sub-agent — was
+  shown every registered agent, and then refused by `run_agent` when it
+  picked one outside its roster.
 - **agents:** attaching a file or switching a chat's working directory
   mid-turn no longer swaps the composer's Stop button for a Send button.
   Anything that redraws the composer now renders it in whichever state the

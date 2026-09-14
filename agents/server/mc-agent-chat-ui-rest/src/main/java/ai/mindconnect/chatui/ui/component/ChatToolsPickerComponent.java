@@ -6,11 +6,12 @@ import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;
+import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTrigger;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -21,18 +22,19 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
  * What this chat may reach for, as the picker behind the composer's
  * "+ &rarr; Tools".
  *
- * <p>One row per tool, grouped by the rubric the registry files it under, and
- * one button per row that turns it on or off right there. No Apply: a chat's
- * tool list is not a form you fill in, it is a switch you flick while you are
- * typing — so every click is its own request and the dialog stays open,
- * redrawn from what the chat now carries. The settings dialog used to do this
- * job with a native {@code <select multiple>}, which is the one control
- * nobody ever operated correctly; it keeps the agent, the model and the
- * prompt, which genuinely are a form.
+ * <p>Every tool the registry has, grouped by the rubric it is filed under,
+ * each set right there: {@link ToolState#OFF off}, {@link ToolState#ON on} —
+ * offered to the model up front — or {@link ToolState#SEARCH search}: bound,
+ * but left for {@code tool_search} to find when the task needs it. Tool
+ * search is not a setting of its own: the chat has it exactly when something
+ * is set to Search, and it finds exactly those.
  *
- * <p>A group opens when something in it is on, so a chat's actual reach is
- * visible without a single click; the rest stay shut, because a picker of
- * sixty rows is not a picker.
+ * <p>A group carries the same switch for all its tools at once. It sets the
+ * tools the group holds now — one added to the group later starts off.
+ *
+ * <p>No Apply: every click is its own request and the dialog stays open,
+ * redrawn from what the chat now carries. A group opens when something in it
+ * is on or searchable, so a chat's actual reach is visible without a click.
  */
 public final class ChatToolsPickerComponent {
 
@@ -41,81 +43,109 @@ public final class ChatToolsPickerComponent {
     /** Stable id of the picker's body, so a toggle can REPLACE it in place. */
     public static final String BODY_ID = "chat-tools-body";
 
+    /** Where one tool stands for this chat. */
+    public enum ToolState {
+        /** Not bound: the chat cannot use it. */
+        OFF,
+        /** Bound and offered to the model from the first step on. */
+        ON,
+        /** Bound as deferred: in the context only once tool search found it. */
+        SEARCH
+    }
+
     /**
-     * @param byGroup   every tool the registry can hand out, by rubric
-     * @param active    the names this chat offers up front
+     * @param byGroup   every tool the chat may be given, by rubric
+     * @param states    the tools this chat binds, and how; a missing name is off
      * @param subgroups tool name &rarr; the finer source it comes from (an MCP
      *                  server, a workflow), for the rows that have one
-     * @param search    whether the chat may find the remaining tools itself
      */
     public static UiNode node(SessionId sessionId, Map<String, ? extends Collection<String>> byGroup,
-                              Set<String> active, Map<String, String> subgroups, boolean search) {
+                              Map<String, ToolState> states, Map<String, String> subgroups) {
         var body = UiStack.of(BODY_ID).gap(12);
-        body.child(searchList(sessionId, search));
 
-        int offered = active.size();
-        int known = byGroup.values().stream().mapToInt(Collection::size).sum();
+        // Counted over the rows the picker shows: a binding the registry
+        // cannot resolve here (Gmail without credentials) stays on the chat
+        // but has no row, and a count nobody can find the rows for is noise.
+        var shown = new TreeSet<String>();
+        byGroup.values().forEach(shown::addAll);
+        long on = shown.stream().filter(n -> states.get(n) == ToolState.ON).count();
+        long searchable = shown.stream().filter(n -> states.get(n) == ToolState.SEARCH).count();
         var groups = UiList.of("chat-tools-groups",
-                "Tools · " + offered + " on, " + known + " available").icon("wrench");
+                "Tools · " + on + " on, " + searchable + " by search, " + shown.size() + " available")
+                .icon("wrench");
 
         new TreeMap<String, Collection<String>>(byGroup).forEach((group, names) -> {
             var sorted = new TreeSet<>(names);
-            long onHere = sorted.stream().filter(active::contains).count();
+            long reachable = sorted.stream().filter(states::containsKey).count();
             String gid = "chat-tool-group-" + slug(group);
             // Empty label: the collapse summary is the heading, and a label
             // would repeat the group name inside the open section.
             var rows = UiList.of(gid + "-rows", "");
             for (String name : sorted) {
-                rows.item(row(sessionId, group, name, subgroups.get(name), active.contains(name)));
+                rows.item(row(sessionId, group, name, subgroups.get(name),
+                        states.getOrDefault(name, ToolState.OFF)));
             }
-            groups.item(UiList.Item.of(gid, "")
+            var groupItem = UiList.Item.of(gid, "")
                     .content(rows)
-                    .collapsible(displayGroup(group) + "  ·  " + onHere + " of " + sorted.size(),
-                            onHere > 0, gid + "-sum"));
+                    .collapsible(displayGroup(group) + "  ·  " + reachable + " of " + sorted.size(),
+                            reachable > 0, gid + "-sum");
+            // The group's switch shows a state only when all its tools share it.
+            var common = sorted.stream().map(n -> states.getOrDefault(n, ToolState.OFF))
+                    .distinct().toList();
+            segments(groupItem, "tool-group-" + slug(group), common.size() == 1 ? common.get(0) : null,
+                    List.of(ToolState.values()), ChatToolsPickerComponent::label,
+                    s -> trigger(on(ChatUiController.class)
+                            .setToolGroup(sessionId.value(), group, s, null)));
+            groups.item(groupItem);
         });
         body.child(groups);
-        return body;
-    }
 
-    /** The chat's tool-search setting — the one switch here that is not a tool. */
-    private static UiNode searchList(SessionId sessionId, boolean search) {
-        var list = UiList.of("chat-tools-search", "");
-        list.item(UiList.Item.of("chat-tool-search", "Tool search")
-                .icon("search")
-                .description("Lets the chat look up the tools that are off instead of "
-                        + "carrying every definition in its context")
-                .action(toggle("tool-search", search,
-                        trigger(on(ChatUiController.class)
-                                .toggleToolSearch(sessionId.value(), !search, null)))));
-        return list;
+        if (searchable > 0) {
+            body.child(UiText.of("chat-tools-search-hint",
+                            "Tool search is on: the chat finds the tools set to Search when it needs them.")
+                    .withCssClass("chat-picker-hint"));
+        }
+        return body;
     }
 
     /** One tool: what it is called, where it comes from, and the switch. */
     private static UiList.Item row(SessionId sessionId, String group, String name,
-                                   String subgroup, boolean active) {
-        return UiList.Item.of("chat-tool-" + slug(name), name)
+                                   String subgroup, ToolState state) {
+        var item = UiList.Item.of("chat-tool-" + slug(name), name)
                 .icon(groupIcon(group))
-                .description(subgroup == null || subgroup.isBlank() ? null : "from " + subgroup)
-                .action(toggle("tool-" + slug(name), active,
-                        trigger(on(ChatUiController.class)
-                                .toggleTool(sessionId.value(), name, !active, null))));
+                .description(subgroup == null || subgroup.isBlank() ? null : "from " + subgroup);
+        segments(item, "tool-" + slug(name), state, List.of(ToolState.values()),
+                ChatToolsPickerComponent::label,
+                s -> trigger(on(ChatUiController.class).setTool(sessionId.value(), name, s, null)));
+        return item;
+    }
+
+    private static String label(ToolState state) {
+        return switch (state) {
+            case OFF -> "Off";
+            case ON -> "On";
+            case SEARCH -> "Search";
+        };
     }
 
     /**
-     * The switch: a tinted "On" that turns the thing off, or a quiet "Add"
-     * that turns it on. Both are the same control in the same place, so a row
-     * never moves under the cursor between two clicks.
+     * A segmented switch: one button per choice, the current one primary and
+     * without a trigger — clicking what is already set has nothing to do.
+     * With {@code current} {@code null} every choice is a click away.
      *
-     * <p>The state rides on the action's {@code style}, not on a css class:
-     * the framework's action renderer drops {@code cssClass}, so PRIMARY vs
-     * SECONDARY is the only per-row marker that reaches the DOM. The
-     * stylesheet tones the primary back down to a pill — forty filled buttons
-     * in a column are a wall, not a list.
+     * <p>The ids carry the choice, so the three buttons of a row stay apart
+     * when a redraw morphs them in place.
      */
-    static UiAction toggle(String id, boolean active, UiTrigger click) {
-        return active
-                ? UiAction.primary(id, "On").icon("check").onClick(click)
-                : UiAction.secondary(id, "Add").icon("plus").onClick(click);
+    static <T extends Enum<T>> void segments(UiList.Item item, String idPrefix, T current,
+                                             List<T> choices,
+                                             java.util.function.Function<T, String> label,
+                                             java.util.function.Function<T, UiTrigger> click) {
+        for (T choice : choices) {
+            String id = idPrefix + "-" + choice.name().toLowerCase();
+            item.action(choice == current
+                    ? UiAction.primary(id, label.apply(choice))
+                    : UiAction.secondary(id, label.apply(choice)).onClick(click.apply(choice)));
+        }
     }
 
     /** Groups are lowercase machine names ({@code files}, {@code web}); capitalize for display. */

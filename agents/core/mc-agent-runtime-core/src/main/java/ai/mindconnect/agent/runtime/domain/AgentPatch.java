@@ -13,7 +13,7 @@ import java.util.Optional;
  * partial updates explicit and avoids ambiguity with {@code null}.
  *
  * <p>Covers everything the admin UI's edit form can change — including
- * {@code maxIterations}, {@code responseReviewers} and {@code toolSearch} — so both the UI and the external REST API
+ * {@code maxIterations}, {@code responseReviewers} and {@code callableByAgents} — so both the UI and the external REST API
  * update agents through {@code AgentRegistryService.update} alone.
  *
  * <p>Build with {@link #of()} plus the with-ers; the canonical constructor
@@ -31,7 +31,7 @@ public record AgentPatch(
         Optional<Integer> maxIterations,
         Optional<List<String>> responseReviewers,
         Optional<List<String>> callableAgents,
-        Optional<AgentDefinition.ToolSearchConfig> toolSearch,
+        Optional<Boolean> callableByAgents,
         Optional<AgentDefinition.SkillsConfig> skills,
         Optional<List<AgentTool>> tools,
         Optional<ai.mindconnect.agent.runtime.memory.domain.MemoryConfig> memoryConfig
@@ -48,77 +48,77 @@ public record AgentPatch(
 
     public AgentPatch withName(String name) {
         return new AgentPatch(Optional.ofNullable(name), description, group, icon, systemPrompt,
-                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withDescription(String description) {
         return new AgentPatch(name, Optional.ofNullable(description), group, icon, systemPrompt,
-                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withGroup(String group) {
         return new AgentPatch(name, description, Optional.ofNullable(group), icon, systemPrompt,
-                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withIcon(String icon) {
         return new AgentPatch(name, description, group, Optional.ofNullable(icon), systemPrompt,
-                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withSystemPrompt(String systemPrompt) {
         return new AgentPatch(name, description, group, icon, Optional.ofNullable(systemPrompt),
-                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                welcomeMessage, llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withWelcomeMessage(String welcomeMessage) {
         return new AgentPatch(name, description, group, icon, systemPrompt,
                 Optional.ofNullable(welcomeMessage), llmConfigName, maxIterations,
-                responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withLlmConfigName(String llmConfigName) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
-                Optional.ofNullable(llmConfigName), maxIterations, responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                Optional.ofNullable(llmConfigName), maxIterations, responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withMaxIterations(Integer maxIterations) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
-                llmConfigName, Optional.ofNullable(maxIterations), responseReviewers, callableAgents, toolSearch, skills, tools, memoryConfig);
+                llmConfigName, Optional.ofNullable(maxIterations), responseReviewers, callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withResponseReviewers(List<String> responseReviewers) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
-                llmConfigName, maxIterations, Optional.ofNullable(responseReviewers), callableAgents, toolSearch, skills, tools, memoryConfig);
+                llmConfigName, maxIterations, Optional.ofNullable(responseReviewers), callableAgents, callableByAgents, skills, tools, memoryConfig);
     }
 
     public AgentPatch withCallableAgents(List<String> callableAgents) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, responseReviewers, Optional.ofNullable(callableAgents),
-                toolSearch, skills, tools, memoryConfig);
+                callableByAgents, skills, tools, memoryConfig);
     }
 
-    public AgentPatch withToolSearch(AgentDefinition.ToolSearchConfig toolSearch) {
+    public AgentPatch withCallableByAgents(Boolean callableByAgents) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
                 llmConfigName, maxIterations, responseReviewers, callableAgents,
-                Optional.ofNullable(toolSearch), skills, tools, memoryConfig);
+                Optional.ofNullable(callableByAgents), skills, tools, memoryConfig);
     }
 
     public AgentPatch withSkills(AgentDefinition.SkillsConfig skills) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
-                llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch,
+                llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents,
                 Optional.ofNullable(skills), tools, memoryConfig);
     }
 
     public AgentPatch withTools(List<AgentTool> tools) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
-                llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch, skills,
+                llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents, skills,
                 Optional.ofNullable(tools), memoryConfig);
     }
 
     public AgentPatch withMemoryConfig(ai.mindconnect.agent.runtime.memory.domain.MemoryConfig memoryConfig) {
         return new AgentPatch(name, description, group, icon, systemPrompt, welcomeMessage,
-                llmConfigName, maxIterations, responseReviewers, callableAgents, toolSearch, skills, tools,
+                llmConfigName, maxIterations, responseReviewers, callableAgents, callableByAgents, skills, tools,
                 Optional.ofNullable(memoryConfig));
     }
 }
