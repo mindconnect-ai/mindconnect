@@ -169,10 +169,7 @@ public final class AdminLayout {
             menu.item(navItem("nav-mcp", "MCP Servers", "/mcp-gateway", "plug", navigate));
         }
         menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
-        if (registry) {
-            menu.item(navItem("nav-registry", "Registry", "/registry", "package", navigate));
-        }
-        menu.item(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
+        menu.item(installGroup(navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));
         // The build's version as the last entry, pushed to the bottom by the
         // stylesheet: small and muted, an info icon in the collapsed rail. A
@@ -183,6 +180,21 @@ public final class AdminLayout {
                     .onClick(UiTrigger.api("GET", "/admin/api/about")));
         }
         return menu;
+    }
+
+    /**
+     * The two ways something arrives in this installation, under one entry:
+     * from a registry, or from the application's own seed data. Open while one
+     * of them is the current page, so the selected item is not hidden in a
+     * closed group.
+     */
+    private UiMenuItem installGroup(String navigate) {
+        UiMenuItem install = UiMenuItem.group("nav-install", "Install").icon("download");
+        if (registry) {
+            install.child(navItem("nav-registry", "Registry", "/registry", "package", navigate));
+        }
+        install.child(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
+        return install.open(install.getChildren().stream().anyMatch(UiMenuItem::isSelected));
     }
 
     /**
