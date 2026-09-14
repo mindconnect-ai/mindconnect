@@ -49,11 +49,10 @@ public final class SkillFormComponent implements UiComponent {
                         .placeholder("weekly-report")
                         .hint("What the model names in the skill tool: lower-case letters, "
                                 + "digits and dashes"))
-                // The version this form was opened with. Hidden, but submitted like
-                // every named input: the save is refused if the skill was saved since.
-                .field(UiField.text("version", "Version",
-                                isNew || skill.version() == null ? "0" : skill.version().toString())
-                        .asEditable().<UiField>hidden())
+                // The version this form was opened with: a hidden input, submitted
+                // with the rest — the save is refused if the skill was saved since.
+                .field(UiField.hidden("version",
+                        isNew || skill.version() == null ? "0" : skill.version().toString()))
                 .field(UiField.text("description", "Description", isNew ? null : skill.description())
                         .asEditable().asRequired()
                         .placeholder("Use when writing the weekly status report for a customer")

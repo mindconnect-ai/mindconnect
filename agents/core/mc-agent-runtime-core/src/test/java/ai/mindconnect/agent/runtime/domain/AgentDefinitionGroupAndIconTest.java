@@ -64,6 +64,22 @@ class AgentDefinitionGroupAndIconTest {
                 .isEqualTo("wand-sparkles");
     }
 
+    /**
+     * The one group with a meaning: an agent filed under it is offered as a
+     * response reviewer, any other is not — whatever else the group is called.
+     */
+    @Test
+    void onlyTheReviewerGroupMakesAReviewer() throws Exception {
+        assertThat(withGroup("reviewer").filedAsReviewer()).isTrue();
+        assertThat(withGroup("Reviewer").filedAsReviewer()).isTrue();
+        assertThat(withGroup("reviewers").filedAsReviewer()).isFalse();
+        assertThat(withGroup("utilities").filedAsReviewer()).isFalse();
+        assertThat(withGroup(null).filedAsReviewer()).isFalse();
+        // Not a property: an extra field would land in every stored agent.
+        assertThat(new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(withGroup("reviewer"))).doesNotContain("\"reviewer\":");
+    }
+
     /** The pre-group constructor still exists for callers that predate the field. */
     @Test
     void legacyConstructorLeavesTheAgentUngrouped() {

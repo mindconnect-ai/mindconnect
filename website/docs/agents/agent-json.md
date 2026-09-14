@@ -49,16 +49,17 @@ The format of a file in
 | `id` | UUID | Stable identifier. Use a fresh UUID for a new agent. |
 | `name` | string | Unique agent name; referenced by `run_agent("<name>", …)`. |
 | `description` | string | Short summary shown in lists and to orchestrators. |
+| `group` | string? | The rubric the admin list files the agent under — the seeds use `assistants`, `sub-agents`, `utilities` and `reviewer`; absent means `general`. `reviewer` is the one group with a meaning: only agents filed there are offered as `responseReviewers` in the admin UI. |
 | `systemPrompt` | string | The agent's role and instructions. Supports template vars like `{{ current_date }}`. |
 | `welcomeMessage` | string? | Optional greeting shown when a session starts. |
 | `llmConfigName` | string | Which [LLM config](./llm-config-json.md) to use (e.g. `agent-default`). |
 | `maxIterations` | int | Max tool-loop rounds per turn. |
 | `status` | enum | `DRAFT`, `ACTIVE` (usable) or `DEPRECATED`. |
 | `memoryConfig` | object | Working-memory strategy (see below). |
-| `skills` | object? | Optional: `{ "enabled": true, "names": ["weekly-report", …] }` — gives the agent the `skill` tool and lists those [skills](./skills.md) in its prompt. An empty `names` means every skill the installation, the user and the project have. |
+| `skills` | object? | Optional: `{ "mode": "SPECIFIC", "names": ["weekly-report", …] }` — which [skills](./skills.md) the agent may load. `mode` is `ALL` (the default, also when the field is absent: every skill the installation, the user and the project have), `SPECIFIC` (only `names`) or `NONE` (no `skill` tool, nothing about skills in the prompt). |
 | `callableAgents` | array | The agents this one may hand work to, by name. Naming any gives it `run_agent`, `run_agents` and `list_agents`; empty or absent, it calls no other agent. |
 | `callableByAgents` | boolean? | `false` for agents the runtime calls on its own (title generator, summarizers): they are offered in no roster and `run_agent` refuses them. Absent means `true`. |
-| `responseReviewers` | array | Optional reviewer agents that check answers (e.g. `answer-relevance-checker`). Empty for none. |
+| `responseReviewers` | array | The agents the answer passes through before the user sees it, in order (e.g. `answer-relevance-checker`). Empty for none. The admin UI offers the agents in the `reviewer` group. |
 | `tools` | array | The tools this agent may call (see below). The delegation tools and `tool_search` are never listed here — the runtime adds them (see the table below). |
 | `createdAt` / `updatedAt` | timestamp | Bookkeeping. |
 

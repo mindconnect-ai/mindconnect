@@ -81,7 +81,7 @@ class SystemPromptRendererSkillsTest {
 
     @Test
     void anAgentWithSkillsReadsTheirNamesAndWhenToUseThem() {
-        String prompt = render(agent(AgentDefinition.SkillsConfig.all()), catalogWithRelease());
+        String prompt = render(agent(AgentDefinition.SkillsConfig.ALL), catalogWithRelease());
 
         assertThat(prompt)
                 .startsWith("You are a helpful agent.")
@@ -94,9 +94,9 @@ class SystemPromptRendererSkillsTest {
 
     @Test
     void anAgentWithoutSkillsReadsNothingAboutThem() {
-        assertThat(render(agent(AgentDefinition.SkillsConfig.OFF), catalogWithRelease()))
+        assertThat(render(agent(AgentDefinition.SkillsConfig.NONE), catalogWithRelease()))
                 .isEqualTo("You are a helpful agent.");
-        assertThat(render(agent(AgentDefinition.SkillsConfig.all()), SkillCatalog.none()))
+        assertThat(render(agent(AgentDefinition.SkillsConfig.ALL), SkillCatalog.none()))
                 .as("skills on, but there are none")
                 .isEqualTo("You are a helpful agent.");
     }

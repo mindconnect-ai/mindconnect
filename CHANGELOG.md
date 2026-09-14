@@ -151,6 +151,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** an agent's skills setting is a mode: **All skills** (the
+  default — an agent that never set it, or was stored before the field,
+  now has every skill instead of none), **Specific skills** (only the ones
+  ticked; none ticked is none) or **None**. In JSON that is
+  `{"skills": {"mode": "SPECIFIC", "names": [...]}}` on the agent and in
+  `PUT /api/agents/{id}`; the previous `{"enabled": ..., "names": [...]}` is
+  still read, so stored agents keep what they had. The seeded utilities —
+  the title generator and the summarizers — are set to None:
+  they answer in one shape and have no use for a skill.
+- **agents:** in the agent form, **Skills**, **Callable Agents** and
+  **Response Reviewers** are checkbox lists instead of multi-selects — one
+  row per candidate, ticked or not, deprecated agents left out. The
+  reviewers' rows can be moved up and down, since they run in that order —
+  and only agents in the `reviewer` group are offered there, plus whichever
+  the agent already names. File an agent under that group (it is in the
+  Group list now) to make it a candidate.
 - **agents:** the admin UI's sidebar groups *Registry* and *Migrations* under
   one **Install** entry — the two ways agents, workflows and LLM configs arrive
   in an installation. The group opens by itself on either page.
@@ -204,6 +220,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** the admin UI keeps its menu after saving an agent, an LLM
+  config or a skill. Since saves started refusing a stale version, the detail
+  page they answered with came back without the app shell, and the only way
+  to the sidebar was the browser's back button. A session's memory, traces
+  and todos pages, opened outside their dialog, get the shell too.
 - **agents:** an agent reaches only the skills its setting allows. The `skill`
   tool could also be found with `tool_search` or assigned by hand from the tool
   catalog, and that copy carried no names — it offered every skill, even to an

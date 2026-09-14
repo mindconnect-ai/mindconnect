@@ -145,21 +145,30 @@ public final class SkillCatalog {
     }
 
     /**
-     * The skills this agent may load in this session. Empty when the agent
-     * has skills switched off — then it has no {@code skill} tool either,
-     * and the prompt says nothing about them.
+     * The skills this agent may load in this session, by its setting. Empty
+     * when it may load none — then it has no {@code skill} tool either, and
+     * the prompt says nothing about them.
      */
     public List<Skill> available(AgentDefinition def, AgentSession session) {
         if (def == null) return List.of();
-        AgentDefinition.SkillsConfig config = def.skillsOrOff();
-        if (!config.enabled()) return List.of();
-        return availableTo(config.names(), userIdOf(session), workingDirOf(session));
+        AgentDefinition.SkillsConfig config = def.skillsOrDefault();
+        return switch (config.mode()) {
+            case NONE -> List.of();
+            case ALL -> all(userIdOf(session), workingDirOf(session));
+            // SPECIFIC naming nothing is nothing — not "all", which is what
+            // availableTo makes of an empty list for the tool binding.
+            case SPECIFIC -> config.names().isEmpty() ? List.of()
+                    : availableTo(config.names(), userIdOf(session), workingDirOf(session));
+        };
     }
 
     /** The skill of that name this agent may load, if there is one. */
     public Optional<Skill> find(AgentDefinition def, AgentSession session, String name) {
-        if (def == null || !def.skillsOrOff().enabled()) return Optional.empty();
-        return find(def.skillsOrOff().names(), userIdOf(session), workingDirOf(session), name);
+        if (name == null || name.isBlank()) return Optional.empty();
+        String wanted = name.strip().toLowerCase(Locale.ROOT);
+        return available(def, session).stream()
+                .filter(skill -> skill.name().equals(wanted))
+                .findFirst();
     }
 
     /**

@@ -70,9 +70,9 @@ public final class DynamicToolActivations {
      *       needs no definition lookup;</li>
      *   <li>{@code list_agents} whenever the agent's roster names someone —
      *       the delegation tools follow the roster, not the tool list.</li>
-     *   <li>the {@code skill} tool when the agent enables skills and there
-     *       are any to load, carrying the names its setting names for the same
-     *       reason. A tool that would find nothing is left away, so the switch
+     *   <li>the {@code skill} tool when the agent's skills setting is not
+     *       NONE and there are any to load, carrying the names its setting
+     *       names for the same reason. A tool that would find nothing is left away, so the switch
      *       costs nothing until somebody writes a skill. This is the only way
      *       an agent gets it: a {@code skill} row among its tools is dropped,
      *       since it would carry no names and reach every skill, whatever the
@@ -105,7 +105,9 @@ public final class DynamicToolActivations {
         if (def.delegates()) {
             refs.add(AgentTool.of("list_agents"));
         }
-        var skillsConfig = def.skillsOrOff();
+        var skillsConfig = def.skillsOrDefault();
+        // hasSkills asks the catalog by the same setting, so SPECIFIC naming
+        // nothing gets no tool — the binding's empty list would mean "all".
         if (skillsConfig.enabled() && hasSkills(def, sessionId)) {
             refs.add(AgentTool.of(SkillTool.NAME, null, Map.of(
                     SkillToolFactory.NAMES, List.copyOf(skillsConfig.names()))));

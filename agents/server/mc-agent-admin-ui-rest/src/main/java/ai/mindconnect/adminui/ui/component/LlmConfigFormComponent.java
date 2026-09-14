@@ -633,12 +633,11 @@ public final class LlmConfigFormComponent implements UiComponent {
 
         return UiForm.of(id(), isNew ? "New LLM Config" : "Edit LLM Config: " + config.name())
                 .field(nameField(isNew ? null : config.name()))
-                // The version this form was opened with — outside the groups the
-                // alias toggle swaps. Hidden, but submitted: the save is refused if
-                // the config was saved since.
-                .field(UiField.text("version", "Version",
-                                isNew || config.version() == null ? "0" : config.version().toString())
-                        .asEditable().<UiField>hidden())
+                // The version this form was opened with — a hidden input outside the
+                // groups the alias toggle swaps. The save is refused if the config
+                // was saved since.
+                .field(UiField.hidden("version",
+                        isNew || config.version() == null ? "0" : config.version().toString()))
                 .field(UiField.bool("isAlias", "Is Alias", isAlias)
                         .asEditable()
                         .hint("If set, this config just points at another config by name — handy for a swappable 'default'")

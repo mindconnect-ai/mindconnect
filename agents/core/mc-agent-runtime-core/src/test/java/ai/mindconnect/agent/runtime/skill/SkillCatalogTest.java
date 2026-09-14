@@ -80,15 +80,18 @@ class SkillCatalogTest {
         store.save(Skill.create("house-style", "d", "i", List.of()));
         var catalog = SkillCatalog.of(store);
 
-        assertThat(catalog.available(agent(new AgentDefinition.SkillsConfig(true, List.of("release"))), session()))
+        assertThat(catalog.available(agent(AgentDefinition.SkillsConfig.specific(List.of("release"))), session()))
                 .extracting(Skill::name).containsExactly("release");
-        assertThat(catalog.available(agent(AgentDefinition.SkillsConfig.all()), session()))
+        assertThat(catalog.available(agent(AgentDefinition.SkillsConfig.ALL), session()))
                 .as("naming none means every skill there is")
                 .extracting(Skill::name).containsExactly("house-style", "release");
-        assertThat(catalog.available(agent(AgentDefinition.SkillsConfig.OFF), session())).isEmpty();
-        assertThat(catalog.available(agent(null), session()))
-                .as("an agent saved before the field existed has skills off")
+        assertThat(catalog.available(agent(AgentDefinition.SkillsConfig.NONE), session())).isEmpty();
+        assertThat(catalog.available(agent(AgentDefinition.SkillsConfig.specific(List.of())), session()))
+                .as("SPECIFIC naming nothing is nothing, not everything")
                 .isEmpty();
+        assertThat(catalog.available(agent(null), session()))
+                .as("an agent saved before the field existed has every skill")
+                .extracting(Skill::name).containsExactly("house-style", "release");
     }
 
     @Test
@@ -99,7 +102,7 @@ class SkillCatalogTest {
         var catalog = SkillCatalog.of(store);
 
         assertThat(catalog.all(null, null)).isEmpty();
-        assertThat(catalog.find(agent(AgentDefinition.SkillsConfig.all()), session(), "release")).isEmpty();
+        assertThat(catalog.find(agent(AgentDefinition.SkillsConfig.ALL), session(), "release")).isEmpty();
     }
 
     @Test
@@ -109,7 +112,7 @@ class SkillCatalogTest {
                 "SECRET-INSTRUCTION-BODY", List.of()));
         var catalog = SkillCatalog.of(store);
 
-        String section = catalog.promptSection(agent(AgentDefinition.SkillsConfig.all()), session());
+        String section = catalog.promptSection(agent(AgentDefinition.SkillsConfig.ALL), session());
 
         assertThat(section)
                 .startsWith("\n\n## Skills\n")
@@ -124,9 +127,9 @@ class SkillCatalogTest {
         Store store = new Store();
         store.save(Skill.create("release", "d", "i", List.of()));
 
-        assertThat(SkillCatalog.of(store).promptSection(agent(AgentDefinition.SkillsConfig.OFF), session()))
+        assertThat(SkillCatalog.of(store).promptSection(agent(AgentDefinition.SkillsConfig.NONE), session()))
                 .isEmpty();
-        assertThat(SkillCatalog.none().promptSection(agent(AgentDefinition.SkillsConfig.all()), session()))
+        assertThat(SkillCatalog.none().promptSection(agent(AgentDefinition.SkillsConfig.ALL), session()))
                 .isEmpty();
     }
 

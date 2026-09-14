@@ -78,27 +78,34 @@ the `SKILL.md` — a template, a checklist, a script — are one `file_read` awa
 
 ## Giving an agent skills
 
-In the admin UI, open the agent's edit form:
+In the admin UI, open the agent's edit form. **Skills** is one of three:
 
-- **Enable Skills** adds the `skill` tool and the prompt section. Off, the
-  agent has neither and its prompt says nothing about skills.
-- **Skills** narrows it to the skills you pick. Select none and the agent has
-  every skill the installation, the user and the project have — a skill added
-  later is then in reach without touching every agent.
+- **All skills** (the default): every skill the installation, the user and
+  the project have — a skill added later is then in reach without touching
+  the agent.
+- **Specific skills**: only the ones you tick in the list that appears
+  below. None ticked is none.
+- **None**: the agent has neither the `skill` tool nor a word about skills in
+  its prompt.
 
-Through the REST API, the same two values are one field on the agent:
+Through the REST API, the same setting is one field on the agent — `mode` is
+`ALL`, `SPECIFIC` or `NONE`, and `names` counts for `SPECIFIC` only:
 
 ```json
-{ "skills": { "enabled": true, "names": ["weekly-report", "release"] } }
+{ "skills": { "mode": "SPECIFIC", "names": ["weekly-report", "release"] } }
 ```
+
+An agent without the field has all skills. The earlier shape,
+`{ "enabled": true, "names": [] }`, is still read: on with names is
+`SPECIFIC`, on without names is `ALL`, off is `NONE`.
 
 Sub-agents are agents: a specialist gets its own skills the same way, and a
 skill loaded by one is not in any other's context.
 
 ## The `skill` tool
 
-The tool is injected, not assigned: an agent with skills switched on has it,
-one without does not, and you do not add it to the tool list by hand. It takes
+The tool is injected, not assigned: an agent whose skills are not `NONE` has
+it, one set to `NONE` does not, and you do not add it to the tool list by hand. It takes
 one parameter, `name`, whose allowed values are exactly the skills that agent
 may load — so a model cannot invent one, and a wrong guess costs no round.
 

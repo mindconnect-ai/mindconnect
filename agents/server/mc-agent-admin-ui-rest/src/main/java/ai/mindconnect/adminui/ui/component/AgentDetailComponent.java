@@ -118,11 +118,14 @@ public final class AgentDetailComponent implements UiComponent {
                         .onClick(trigger(on(AgentUiController.class).delete(agent.id().value()))));
     }
 
-    /** Whether the agent may load skills, and which — or that it may not. */
+    /** Which skills the agent may load: none, all, or the ones named. */
     private String skillsSummary() {
-        var skills = agent.skillsOrOff();
-        if (!skills.enabled()) return "off";
-        return skills.names().isEmpty() ? "all skills" : String.join(", ", skills.names());
+        var skills = agent.skillsOrDefault();
+        return switch (skills.mode()) {
+            case NONE -> "none";
+            case ALL -> "all skills";
+            case SPECIFIC -> skills.names().isEmpty() ? "none picked" : String.join(", ", skills.names());
+        };
     }
 
     /** The roster, or the word for having none — which means no other agent. */

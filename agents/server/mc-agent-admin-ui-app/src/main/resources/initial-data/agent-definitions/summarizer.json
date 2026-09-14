@@ -12,6 +12,9 @@
     "kind": "windowed",
     "windowSize": 4
   },
+  "skills": {
+    "mode": "NONE"
+  },
   "status": "ACTIVE",
   "tools": [],
   "createdAt": "2025-01-01T00:00:00Z",
