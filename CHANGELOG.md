@@ -106,6 +106,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and any stored skill can be fetched as a `SKILL.md` to commit into a
   repository. See [Skills](https://mindconnect-ai.github.io/mindconnect/agents/skills).
 
+- **agents:** the Migrations page in the admin UI can apply a single field.
+  Every row of a diff table has its own **Apply** that takes just that value
+  from the bundled seed and keeps the rest of the stored record — so a changed
+  model name no longer costs you the API key you typed into the LLM config.
+  Backed by `POST /admin/api/migrations/apply-field?id=…&field=…`.
+
 ### Changed
 
 - **agents:** every provider now knows its own API endpoint, so **Base URL is
@@ -142,6 +148,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   refused (a toast in the admin UI, `409` from `/api/skills`), since an agent
   looks skills up by name and would silently get only one of them; a name no
   model could type is a `400` from the API instead of a `500`.
+- **agents:** the Migrations page no longer reports every LLM config's
+  `apiKey` as changed forever. The store encrypts keys on save, and the diff
+  compared that ciphertext with the bundled plain value — so applying never
+  made the row go away. Keys are now compared by what they decrypt or resolve
+  to, and the diff shows only that a key differs, never the value.
 
 ## [0.8.1] - 2026-09-12
 
