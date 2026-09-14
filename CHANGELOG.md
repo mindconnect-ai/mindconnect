@@ -144,6 +144,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** agents have a `callableByAgents` flag. The runtime's own helpers
   (title generator, summarizers, the answer-relevance checker) set it to
   `false`: no roster picker offers them and `run_agent` refuses them.
+- **agents:** the seeded `default-chat` searches the web itself with
+  `web_search` and hands single pages to `url-reader` and codebase sweeps to
+  `explorer`, instead of sending every web question through `web-researcher`
+  and every file hunt through `file-finder`.
 - **agents:** the chat's settings dialog is the agent, the model and the
   system prompt — three fields, no tabs. The tool multiselect that used to
   need a second tab moved into the composer's "+" menu, where tools are
