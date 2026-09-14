@@ -47,6 +47,32 @@ class ResponseAssemblerTest {
     }
 
     @Test
+    void thinkingBecomesAReasoningItemAheadOfTheAnswer() {
+        List<ResponseEvent> events = new ArrayList<>();
+        assembler.subscribe(0, events::add);
+        assembler.accept(new StreamEvent.Thinking("Let me "));
+        assembler.accept(new StreamEvent.Thinking("see."));
+        assembler.accept(new StreamEvent.Token("42"));
+        assembler.accept(new StreamEvent.Done());
+
+        Response r = assembler.snapshot();
+        List<ConversationItem> items = r.output().stream().map(ConversationItemRecord::item).toList();
+
+        assertThat(items).hasSize(2);
+        assertThat(items.get(0)).isEqualTo(new ConversationItem.Reasoning("Let me see.", null));
+        assertThat(items.get(1)).isInstanceOf(ConversationItem.Message.class);
+        assertThat(r.outputText()).isEqualTo("42");
+        assertThat(events.stream().filter(e -> e instanceof ResponseEvent.ReasoningDelta)
+                .map(e -> ((ResponseEvent.ReasoningDelta) e).delta()))
+                .containsExactly("Let me ", "see.");
+        // the reasoning item is done before the text item is added
+        List<String> order = events.stream()
+                .filter(e -> e instanceof ResponseEvent.OutputItemDone || e instanceof ResponseEvent.OutputItemAdded)
+                .map(e -> e.getClass().getSimpleName()).toList();
+        assertThat(order).containsExactly("OutputItemAdded", "OutputItemDone", "OutputItemAdded", "OutputItemDone");
+    }
+
+    @Test
     void subAgentBecomesAgentCallPair() {
         UUID taskId = UUID.randomUUID();
         SessionId subSession = SessionId.random();

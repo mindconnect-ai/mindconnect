@@ -6,7 +6,8 @@ import java.util.Map;
 import java.util.UUID;
 
 public sealed interface StreamEvent
-        permits StreamEvent.Token, StreamEvent.ToolCallStarted, StreamEvent.ToolCallResult,
+        permits StreamEvent.Token, StreamEvent.Thinking,
+                StreamEvent.ToolCallStarted, StreamEvent.ToolCallResult,
                 StreamEvent.ToolCallFailed,
                 StreamEvent.AskingLlm, StreamEvent.Reviewing, StreamEvent.ReviewerDecision,
                 StreamEvent.ResponseRevised, StreamEvent.TurnUsage, StreamEvent.Done,
@@ -18,6 +19,13 @@ public sealed interface StreamEvent
     enum ReviewerVerdict { PASSED, MODIFIED, BLOCKED }
 
     record Token(String text) implements StreamEvent {}
+
+    /**
+     * A piece of the model's reasoning, streamed as it forms — what a
+     * reasoning model does before the first {@link Token}. Purely for
+     * showing: the runtime never feeds it back to the model.
+     */
+    record Thinking(String text) implements StreamEvent {}
 
     record ToolCallStarted(String toolName, Map<String, Object> arguments) implements StreamEvent {}
 

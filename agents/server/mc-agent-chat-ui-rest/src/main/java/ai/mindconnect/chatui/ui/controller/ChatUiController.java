@@ -1609,6 +1609,11 @@ public class ChatUiController {
         StringBuilder cumulativeText = new StringBuilder();
         /** Tracks whether the bot-pending item has been appended yet. */
         final boolean[] pendingAppended = new boolean[]{false};
+        // The model's reasoning, one card per stretch of thinking: opened by
+        // the first Thinking delta, closed by whatever the thought led to
+        // (the first token, a tool call, a sub-agent). A later stretch —
+        // thinking again after a tool result — gets a card of its own.
+        LiveThinking thinking = new LiveThinking(sessionId);
 
         // Per-task state, keyed by tool-call id (regular tools) or sub-agent
         // taskId (run_agent). Insertion order = render order in the chat.
@@ -1630,7 +1635,15 @@ public class ChatUiController {
 
         ChatTurnHandle turn = turnStarter.apply(event -> {
             switch (event) {
+                case StreamEvent.Thinking th -> {
+                    if (!thinking.open()) {
+                        publishPatch(bus, liveView.streamTaskStart(
+                                TaskCardComponent.runningThinking(thinking.start(), "")));
+                    }
+                    publishPatch(bus, liveView.streamThinking(thinking.nodeId(), thinking.append(th.text())));
+                }
                 case StreamEvent.Token t -> {
+                    closeThinking(thinking, liveView, bus);
                     cumulativeText.append(t.text());
                     if (!pendingAppended[0]) {
                         // First token: drop the thinking indicator and append
@@ -1665,18 +1678,22 @@ public class ChatUiController {
                                     .format(java.time.Instant.now()));
                     publishPatch(bus, liveView.appendApprovalCard(card));
                 }
-                case StreamEvent.ToolCallStarted s ->
+                case StreamEvent.ToolCallStarted s -> {
+                    closeThinking(thinking, liveView, bus);
                     startToolCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
                             null, s.toolName(), s.arguments());
+                }
                 case StreamEvent.ToolCallResult r ->
                     finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
                             null, r.toolName(), r.result(), r.durationMs(), false);
                 case StreamEvent.ToolCallFailed f ->
                     finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
                             null, f.toolName(), f.error(), f.durationMs(), true);
-                case StreamEvent.SubAgentStarted s ->
+                case StreamEvent.SubAgentStarted s -> {
+                    closeThinking(thinking, liveView, bus);
                     startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
                             null, s.taskId(), s.agentName(), s.subSessionId(), s.input());
+                }
                 case StreamEvent.SubAgentDone sd ->
                     finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
                             sd.taskId(), sd.agentName(), sd.finalText(), null);
@@ -1781,6 +1798,56 @@ public class ChatUiController {
         // Nothing to hand back: the turn's output travels on the session
         // stream this client is already reading.
         return ResponseEntity.ok(ai.mindconnect.ui.model.UiPatch.of());
+    }
+
+    /** The thinking card of the current stretch of reasoning, while a turn is streaming. */
+    private static final class LiveThinking {
+        private final SessionId sessionId;
+        private final StringBuilder text = new StringBuilder();
+        private String nodeId;
+        private long startedAt;
+        private int stretch;
+
+        LiveThinking(SessionId sessionId) {
+            this.sessionId = sessionId;
+        }
+
+        boolean open() {
+            return nodeId != null;
+        }
+
+        String nodeId() {
+            return nodeId;
+        }
+
+        /** Opens a new card; returns its node id. */
+        String start() {
+            nodeId = "task-think-" + sessionId.value() + "-" + (stretch++);
+            startedAt = System.currentTimeMillis();
+            text.setLength(0);
+            return nodeId;
+        }
+
+        /** Adds a delta; returns the reasoning so far. */
+        String append(String delta) {
+            text.append(delta);
+            return text.toString();
+        }
+
+        /** The finished card, and the slot is free for the next stretch. */
+        TaskCardComponent close() {
+            var card = TaskCardComponent.doneThinking(nodeId, text.toString(),
+                    System.currentTimeMillis() - startedAt);
+            nodeId = null;
+            return card;
+        }
+    }
+
+    /** Ends the open thinking card, if any: header flips from running to "thought for". */
+    private void closeThinking(LiveThinking thinking, ChatPage liveView,
+                               ai.mindconnect.chatui.service.StreamBus bus) {
+        if (!thinking.open()) return;
+        publishPatch(bus, liveView.streamTaskUpdate(thinking.close()));
     }
 
     /** Per-task state held while a turn is streaming. */

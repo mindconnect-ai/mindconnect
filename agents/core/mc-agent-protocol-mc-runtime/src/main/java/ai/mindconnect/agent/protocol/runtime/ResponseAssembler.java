@@ -50,6 +50,8 @@ public final class ResponseAssembler {
 
     private final StringBuilder textBuffer = new StringBuilder();
     private String pendingTextItemId;
+    private final StringBuilder reasoningBuffer = new StringBuilder();
+    private String pendingReasoningItemId;
     private final Deque<String> openToolCalls = new ArrayDeque<>();
     private final Map<UUID, String> openAgentTasks = new HashMap<>();
 
@@ -102,6 +104,7 @@ public final class ResponseAssembler {
         if (status.terminal()) return;
         switch (event) {
             case StreamEvent.Token t -> onToken(t.text());
+            case StreamEvent.Thinking t -> onThinking(t.text());
             case StreamEvent.ToolCallStarted t -> onToolCall(t.toolName(), t.arguments());
             case StreamEvent.ToolCallResult t -> onToolResult(t.result(), false);
             case StreamEvent.ToolCallFailed t -> onToolResult(t.error(), true);
@@ -196,7 +199,19 @@ public final class ResponseAssembler {
 
     // ── internals ───────────────────────────────────────────────────────────
 
+    private void onThinking(String text) {
+        if (pendingReasoningItemId == null) {
+            pendingReasoningItemId = nextItemId("rs");
+            emit(new ResponseEvent.OutputItemAdded(responseId, ++seq,
+                    new ConversationItemRecord(pendingReasoningItemId, items.size() + 1,
+                            new ConversationItem.Reasoning("", null))));
+        }
+        reasoningBuffer.append(text);
+        emit(new ResponseEvent.ReasoningDelta(responseId, ++seq, pendingReasoningItemId, text));
+    }
+
     private void onToken(String text) {
+        flushReasoning();
         if (pendingTextItemId == null) {
             pendingTextItemId = nextItemId("msg");
             emit(new ResponseEvent.OutputItemAdded(responseId, ++seq,
@@ -242,8 +257,20 @@ public final class ResponseAssembler {
         emit(new ResponseEvent.Completed(responseId, ++seq, usage));
     }
 
+    /** Finalizes the pending reasoning as its own item — it always precedes what it led to. */
+    private void flushReasoning() {
+        if (pendingReasoningItemId == null) return;
+        ConversationItemRecord entry = new ConversationItemRecord(pendingReasoningItemId, items.size() + 1,
+                new ConversationItem.Reasoning(reasoningBuffer.toString(), null));
+        items.add(entry);
+        emit(new ResponseEvent.OutputItemDone(responseId, ++seq, entry));
+        reasoningBuffer.setLength(0);
+        pendingReasoningItemId = null;
+    }
+
     /** Finalizes the pending assistant text as a message item. */
     private void flushText() {
+        flushReasoning();
         if (textBuffer.isEmpty() && pendingTextItemId == null) return;
         String itemId = pendingTextItemId != null ? pendingTextItemId : nextItemId("msg");
         ConversationItemRecord entry = new ConversationItemRecord(itemId, items.size() + 1,

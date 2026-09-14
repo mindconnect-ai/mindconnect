@@ -350,6 +350,11 @@ public final class ChatPage {
         return patch(messages.appendTaskCardInto(childListId, card));
     }
 
+    /** Every reasoning delta: grow the thinking card's body to the cumulative text. */
+    public UiPatch streamThinking(String nodeId, String cumulativeText) {
+        return patch(messages.replaceThinkingBody(nodeId, cumulativeText));
+    }
+
     /** REPLACE a task card in place — used for done / failed transitions. */
     public UiPatch streamTaskUpdate(TaskCardComponent card) {
         return patch(messages.replaceTaskCard(card));

@@ -25,6 +25,27 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** the model's **reasoning is shown in the chat** — as a collapsed
+  card above the answer, like a tool call, whose header runs while the model
+  thinks and reads "thought for 4.2 s" once the first token arrives. Open it
+  to read along. A Qwen3, DeepSeek-R1 or gpt-oss model on LM Studio, Ollama,
+  vLLM or Groq used to leave the chat sitting on "AI is thinking" with nothing
+  to show for it — the OpenAI-compatible gateway now picks the reasoning up
+  from the `reasoning_content` and `reasoning` fields as well as from inline
+  `<think>` tags in the content (which no longer leak into the answer). The
+  card comes back on reload: a text answer keeps its reasoning in the
+  message's `metadata.thinking`, a tool-call turn already had it. The REST
+  stream carries it as a `thinking` frame, the Responses API as a `reasoning`
+  item with `response.reasoning_summary_text.delta` events; the CLI stays
+  quiet. Claude's adaptive thinking shows the same way when the config asks
+  for it (`thinkingDisplay: summarized`).
+- **agents:** **`reasoning_effort`** on every OpenAI-compatible LLM config
+  (OpenAI, Azure, Groq, xAI, OpenRouter, Ollama, LM Studio, …) — a select in
+  the Admin UI form next to the provider's other parameters, or
+  `"additionalParams": {"reasoning_effort": "high"}` in the config JSON. Which
+  levels apply depends on the model; a server whose model does not reason
+  ignores the field.
+
 - **agents:** an LLM config can name **fallback models**. When the provider
   rate-limits it (HTTP 429) or reports itself overloaded (529) and the config's
   own retries are used up, the same request is re-sent through the next config
@@ -146,6 +167,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and only agents in the `reviewer` group are offered there, plus whichever
   the agent already names. File an agent under that group (it is in the
   Group list now) to make it a candidate.
+- **agents:** the admin UI's sidebar groups *Registry* and *Migrations* under
+  one **Install** entry — the two ways agents, workflows and LLM configs arrive
+  in an installation. The group opens by itself on either page.
 - **agents:** delegating and tool search are explicit. An agent's
   `callableAgents` roster names the agents it may call — an empty roster now
   means none, not all — and the runtime gives `run_agent`, `run_agents` and

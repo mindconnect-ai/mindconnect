@@ -77,7 +77,7 @@ change its `llmConfigName` instead.
 | `apiKey` | API key, usually injected from an env var |
 | `contextWindowTokens` | Token budget used to size the working-memory window |
 | `capabilities` | What the model reads and does — `TOOL_CALLING`, `VISION`, `DOCUMENTS`, `AUDIO_INPUT`. Vision and documents decide whether an image or PDF reaches the model as content or as a placeholder. Omitted: the provider's default applies |
-| `additionalParams` | Provider-specific options (e.g. Anthropic `thinking` / `effort`) |
+| `additionalParams` | Provider-specific options — Anthropic `thinking` / `effort`, `reasoning_effort` on every OpenAI-compatible provider |
 | `rateLimit` | Optional — cap concurrent requests |
 | `retry` | Optional — automatic retry with backoff |
 | `fallbackModels` | Optional — other configs, by name, to switch to when this one is rate-limited (see [rate limits and fallbacks](./llm-gateway.md#rate-limits-and-fallbacks)) |

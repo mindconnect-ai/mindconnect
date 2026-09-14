@@ -82,6 +82,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         List<String> responseEvents = new ArrayList<>();
         StringBuilder assistantText = new StringBuilder();
         Map<Integer, OpenAiToolCallBuilder> toolCallBuilders = new TreeMap<>();
+        ThinkTagSplitter thinkTags = new ThinkTagSplitter();
         Integer errorStatus = null;
         String errorBody = null;
 
@@ -154,7 +155,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                                     block.setLength(0);
                                     break;
                                 }
-                                ParsedDelta d = parseOpenAiDelta(dataLine, toolCallBuilders, handler);
+                                ParsedDelta d = parseOpenAiDelta(dataLine, toolCallBuilders, thinkTags, handler);
                                 textTokenCount += d.textDeltas;
                                 if (d.text != null) {
                                     assistantText.append(d.text);
@@ -174,6 +175,17 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                 // Some providers omit the final blank line; flush whatever is left.
                 if (block.length() > 0 && !cancelledClean) {
                     responseEvents.add(block.toString());
+                }
+                // A tail held back for a <think> tag that never came is answer text.
+                ThinkTagSplitter.Split tail = thinkTags.flush();
+                if (tail.thinking() != null) {
+                    handler.accept(new LlmStreamChunk.ThinkingDelta(0, "thinking", tail.thinking(), null, null));
+                }
+                if (tail.text() != null) {
+                    handler.accept(new LlmStreamChunk.TextDelta(tail.text()));
+                    textTokenCount++;
+                    assistantText.append(tail.text());
+                    if (debugAccumulatedText != null) debugAccumulatedText.append(tail.text());
                 }
             }
         } catch (IOException e) {
@@ -226,17 +238,24 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
     }
 
     /** Per-delta extraction result so the streaming loop stays linear. */
-    private record ParsedDelta(
+    record ParsedDelta(
             String text, int textDeltas, FinishReason finishReason,
             int promptTokens, int completionTokens) {}
 
     /**
      * Parses one OpenAI {@code data: {...}} payload, forwards the resulting
      * chunks to the live stream handler, and feeds the tool-call builders.
+     *
+     * <p>Reasoning reaches the handler as {@link LlmStreamChunk.ThinkingDelta}
+     * from whichever channel the server uses: the {@code reasoning_content}
+     * field (LM Studio, vLLM, DeepSeek, xAI, Moonshot), the {@code reasoning}
+     * field (Ollama, Groq, OpenRouter), or {@code <think>} tags inline in the
+     * content, which {@code thinkTags} cuts out. Package-private for tests.
      */
-    private ParsedDelta parseOpenAiDelta(String data,
-                                          Map<Integer, OpenAiToolCallBuilder> builders,
-                                          Consumer<LlmStreamChunk> handler) {
+    ParsedDelta parseOpenAiDelta(String data,
+                                 Map<Integer, OpenAiToolCallBuilder> builders,
+                                 ThinkTagSplitter thinkTags,
+                                 Consumer<LlmStreamChunk> handler) {
         try {
             JsonNode root = objectMapper.readTree(data);
             // Some backends (LM Studio among them) report failures as an SSE
@@ -253,6 +272,11 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
             JsonNode choice = root.path("choices").path(0);
             JsonNode delta = choice.path("delta");
 
+            String reasoning = firstText(delta, "reasoning_content", "reasoning");
+            if (reasoning != null) {
+                handler.accept(new LlmStreamChunk.ThinkingDelta(0, "thinking", reasoning, null, null));
+            }
+
             String text = delta.path("content").asText("");
             // Some models occasionally leak Harmony-style channel markers
             // or "to=functions.x" envelopes into the content channel
@@ -261,6 +285,11 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
             if (!text.isEmpty()) {
                 text = ContentLeakSanitizer.sanitize(text);
             }
+            ThinkTagSplitter.Split split = thinkTags.feed(text);
+            if (split.thinking() != null) {
+                handler.accept(new LlmStreamChunk.ThinkingDelta(0, "thinking", split.thinking(), null, null));
+            }
+            text = split.text() == null ? "" : split.text();
             int textDeltas = 0;
             if (text != null && !text.isEmpty()) {
                 handler.accept(new LlmStreamChunk.TextDelta(text));
@@ -305,6 +334,15 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         }
     }
 
+    /** The first of {@code fields} that holds non-empty text on {@code node}, else {@code null}. */
+    private static String firstText(JsonNode node, String... fields) {
+        for (String field : fields) {
+            JsonNode value = node.path(field);
+            if (value.isTextual() && !value.asText().isEmpty()) return value.asText();
+        }
+        return null;
+    }
+
     /** A backend that reports its failure as an SSE data event — must not be swallowed as a parse hiccup. */
     private static final class StreamErrored extends RuntimeException {
         private StreamErrored(String message) {
@@ -330,7 +368,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
      * lives here too because the adapter needs to surface the assembled list
      * via the listener (for trace persistence), independent of the runtime.
      */
-    private static final class OpenAiToolCallBuilder {
+    static final class OpenAiToolCallBuilder {
         private String id;
         private String name;
         private final StringBuilder argsJson = new StringBuilder();
@@ -411,6 +449,15 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         int maxTokens = request.maxOutputTokens() < 0 ? config.maxOutputTokens() : request.maxOutputTokens();
         // o-series models require max_completion_tokens; all others use max_tokens
         root.put(reasoning ? "max_completion_tokens" : "max_tokens", maxTokens);
+
+        // How hard a reasoning model thinks — the config's default, overridden
+        // per request. Which levels a server takes is its business; one it
+        // does not know it ignores (LM Studio, Ollama with a non-reasoning model).
+        Map<String, Object> params = LlmParams.merge(config, request);
+        String reasoningEffort = LlmParams.string(params, "reasoning_effort");
+        if (reasoningEffort != null) {
+            root.put("reasoning_effort", reasoningEffort);
+        }
 
         ArrayNode messages = root.putArray("messages");
         for (LlmMessage msg : request.messages()) {

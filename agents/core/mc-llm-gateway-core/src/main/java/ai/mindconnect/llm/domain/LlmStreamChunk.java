@@ -21,7 +21,7 @@ public sealed interface LlmStreamChunk
      * fragments of the same block. {@code type} ("thinking" |
      * "redacted_thinking") arrives with the first fragment; {@code textFragment}
      * accumulates readable reasoning; {@code signature} and {@code data} arrive
-     * once. Anthropic-specific — see {@link ThinkingBlock}.
+     * once (Anthropic only) — see {@link ThinkingBlock}.
      */
     record ThinkingDelta(int index, String type, String textFragment,
                          String signature, String data)
