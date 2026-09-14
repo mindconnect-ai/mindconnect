@@ -45,7 +45,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `"additionalParams": {"reasoning_effort": "high"}` in the config JSON. Which
   levels apply depends on the model. Local servers ignore the field; OpenAI
   is only sent it with a reasoning model (gpt-5, o-series), since it rejects
-  it on any other.
+  it on any other — and when a server still refuses it (gpt-5.4-mini does,
+  as soon as function tools are in the request), the call is repeated once
+  without the field and a warning says so, instead of failing the turn.
 
 - **agents:** an LLM config can name **fallback models**. When the provider
   rate-limits it (HTTP 429) or reports itself overloaded (529) and the config's

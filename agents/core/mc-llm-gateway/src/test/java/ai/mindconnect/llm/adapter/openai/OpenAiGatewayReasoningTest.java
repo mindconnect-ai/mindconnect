@@ -7,6 +7,12 @@ import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
+import ai.mindconnect.llm.domain.ToolDefinition;
+import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.port.in.LlmCallListener;
+import okhttp3.mockwebserver.MockResponse;
+import okhttp3.mockwebserver.MockWebServer;
+import okhttp3.mockwebserver.RecordedRequest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
@@ -73,6 +79,39 @@ class OpenAiGatewayReasoningTest {
                 Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
         assertThat(gateway.buildRequestNode(reasoning.resolved(encryption), request)
                 .path("reasoning_effort").asText()).isEqualTo("high");
+    }
+
+    @Test
+    void aServerThatRefusesTheEffortGetsTheRequestAgainWithoutIt() throws Exception {
+        try (MockWebServer server = new MockWebServer()) {
+            server.enqueue(new MockResponse().setResponseCode(400).setBody(
+                    "{\"error\":{\"message\":\"Function tools with reasoning_effort are not supported for "
+                            + "gpt-5.4-mini in /v1/chat/completions. To use function tools, use /v1/responses "
+                            + "or set reasoning_effort to 'none'.\",\"type\":\"invalid_request_error\","
+                            + "\"param\":\"reasoning_effort\",\"code\":null}}"));
+            server.enqueue(new MockResponse().setHeader("Content-Type", "text/event-stream").setBody(
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"hi\"},\"finish_reason\":null}]}\n\n"
+                            + "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n"
+                            + "data: [DONE]\n\n"));
+            server.start();
+            String baseUrl = server.url("/").toString().replaceAll("/$", "");
+            LlmConfig mini = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
+                    "gpt-5.4-mini", baseUrl, "sk-test", 0.7, 4096,
+                    Map.of("reasoning_effort", "medium"), 128_000, false, null, null, null, null, null);
+            ToolDefinition tool = ToolDefinition.of("get_weather", "weather", Map.of("type", "object"));
+            LlmRequest withTools = LlmRequest.streaming("openai", List.of(LlmMessage.user("hi")), List.of(tool));
+
+            List<LlmStreamChunk> chunks = new ArrayList<>();
+            gateway.chatStreaming(mini.resolved(encryption), withTools, chunks::add,
+                    Cancellation.none(), LlmCallListener.NOOP);
+
+            assertThat(server.getRequestCount()).isEqualTo(2);
+            RecordedRequest first = server.takeRequest();
+            RecordedRequest second = server.takeRequest();
+            assertThat(first.getBody().readUtf8()).contains("\"reasoning_effort\":\"medium\"");
+            assertThat(second.getBody().readUtf8()).doesNotContain("reasoning_effort").contains("get_weather");
+            assertThat(chunks).contains(new LlmStreamChunk.TextDelta("hi"));
+        }
     }
 
     @Test

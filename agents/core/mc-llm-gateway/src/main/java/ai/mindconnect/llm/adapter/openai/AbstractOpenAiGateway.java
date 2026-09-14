@@ -99,16 +99,12 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
             throw new RuntimeException("Failed to build OpenAI-compatible request", e);
         }
 
-        Request httpRequest = new Request.Builder()
-                .url(endpointUrl(config))
-                .header(authHeaderName(config), authHeader(config))
-                .post(RequestBody.create(body, JSON))
-                .build();
-
-        Call call = httpClient.newCall(httpRequest);
+        // One slot, because the call may be replaced by a second attempt (see
+        // openStream); the abort hook always reaches the one in flight.
+        Call[] call = { httpClient.newCall(httpRequest(config, body)) };
         // Wire the cancellation handle to the OkHttp call so cancel() actually
         // closes the upstream HTTP connection — not just flips a flag.
-        cancellation.registerAbort(call::cancel);
+        cancellation.registerAbort(() -> call[0].cancel());
 
         int textTokenCount = 0;
         int inputTokens = 0;
@@ -117,7 +113,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         StringBuilder debugAccumulatedText = wire.isDebugEnabled() ? new StringBuilder() : null;
         boolean cancelledClean = false;
 
-        try (Response response = call.execute()) {
+        try (Response response = openStream(call, config, requestNode)) {
             if (!response.isSuccessful()) {
                 errorStatus = response.code();
                 errorBody = response.body() != null ? response.body().string() : "(no body)";
@@ -191,7 +187,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                 }
             }
         } catch (IOException e) {
-            if (call.isCanceled()) {
+            if (call[0].isCanceled()) {
                 log.debug("LLM stream cancelled by caller after {}ms", System.currentTimeMillis() - start);
                 cancelledClean = true;
             } else {
@@ -229,6 +225,38 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                 finish, textTokenCount, inputTokens, outputTokens, System.currentTimeMillis() - start);
 
         handler.accept(new LlmStreamChunk.Done(finish, inputTokens, outputTokens));
+    }
+
+    private Request httpRequest(LlmConfig config, String body) {
+        return new Request.Builder()
+                .url(endpointUrl(config))
+                .header(authHeaderName(config), authHeader(config))
+                .post(RequestBody.create(body, JSON))
+                .build();
+    }
+
+    /**
+     * Executes the call — and when the server answers 400 naming
+     * {@code reasoning_effort} as the offending parameter, once more without
+     * it. OpenAI refuses the field on a model that does not reason and, on
+     * gpt-5.4-mini, whenever function tools are in the same Chat Completions
+     * request ("use /v1/responses or set reasoning_effort to 'none'"); which
+     * models and combinations that covers changes with their releases, so
+     * the gateway asks rather than guesses. The retry replaces {@code call[0]}
+     * so the cancellation hook reaches the attempt in flight.
+     */
+    private Response openStream(Call[] call, LlmConfig config, ObjectNode requestNode) throws IOException {
+        Response response = call[0].execute();
+        if (response.code() != 400 || !requestNode.has("reasoning_effort")) return response;
+        String errorBody = response.body() == null ? "" : response.peekBody(64 * 1024).string();
+        if (!errorBody.contains("reasoning_effort")) return response;
+        response.close();
+        log.warn("{} refused reasoning_effort for model {} — retrying without it: {}",
+                config.provider(), config.model(), errorBody.replaceAll("\\s+", " ").trim());
+        requestNode.remove("reasoning_effort");
+        logWireRequest(requestNode);
+        call[0] = httpClient.newCall(httpRequest(config, objectMapper.writeValueAsString(requestNode)));
+        return call[0].execute();
     }
 
     /** Pulls the {@code data: …} payload out of a single SSE block. */
