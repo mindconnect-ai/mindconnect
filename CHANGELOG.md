@@ -151,6 +151,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** the admin UI's sidebar groups *Registry* and *Migrations* under
+  one **Install** entry — the two ways agents, workflows and LLM configs arrive
+  in an installation. The group opens by itself on either page.
 - **agents:** delegating and tool search are explicit. An agent's
   `callableAgents` roster names the agents it may call — an empty roster now
   means none, not all — and the runtime gives `run_agent`, `run_agents` and
