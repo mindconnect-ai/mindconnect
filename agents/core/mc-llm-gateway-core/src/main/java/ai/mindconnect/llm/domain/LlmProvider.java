@@ -12,13 +12,14 @@ import java.util.Set;
  * providers endpoint of the REST API.
  */
 public enum LlmProvider {
-    LM_STUDIO("http://localhost:1234", Set.of(LlmCapability.TOOL_CALLING)),
+    LM_STUDIO("http://localhost:1234", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
     OPENAI("https://api.openai.com",
             Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS),
-            SpeechParams.TRANSCRIPTION),
+            ReasoningParams.CHAT_AND_TRANSCRIPTION),
     /** No default: the endpoint is the customer's own resource, {@code https://<resource>.openai.azure.com}. */
-    AZURE_OPENAI(null, Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
-    GROQ("https://api.groq.com/openai", Set.of(LlmCapability.TOOL_CALLING), SpeechParams.TRANSCRIPTION),
+    AZURE_OPENAI(null, Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION), ReasoningParams.CHAT),
+    GROQ("https://api.groq.com/openai", Set.of(LlmCapability.TOOL_CALLING),
+            ReasoningParams.CHAT_AND_TRANSCRIPTION),
     ANTHROPIC("https://api.anthropic.com",
             Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS), List.of(
             AdditionalParamSpec.select("thinking", "Thinking",
@@ -31,22 +32,22 @@ public enum LlmProvider {
                     "Reasoning depth / token spend. Only applies when thinking is set. "
                             + "Leave at 'default' to omit.",
                     LlmConfigType.CHAT))),
-    OLLAMA("http://localhost:11434", Set.of(LlmCapability.TOOL_CALLING)),
-    MISTRAL("https://api.mistral.ai", Set.of(LlmCapability.TOOL_CALLING)),
-    DEEPSEEK("https://api.deepseek.com", Set.of(LlmCapability.TOOL_CALLING)),
-    TOGETHER("https://api.together.xyz", Set.of(LlmCapability.TOOL_CALLING)),
-    OPENROUTER("https://openrouter.ai/api", Set.of(LlmCapability.TOOL_CALLING)),
-    PERPLEXITY("https://api.perplexity.ai", Set.of(LlmCapability.TOOL_CALLING)),
-    FIREWORKS("https://api.fireworks.ai/inference", Set.of(LlmCapability.TOOL_CALLING)),
+    OLLAMA("http://localhost:11434", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
+    MISTRAL("https://api.mistral.ai", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
+    DEEPSEEK("https://api.deepseek.com", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
+    TOGETHER("https://api.together.xyz", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
+    OPENROUTER("https://openrouter.ai/api", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
+    PERPLEXITY("https://api.perplexity.ai", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
+    FIREWORKS("https://api.fireworks.ai/inference", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
     /** xAI, the Grok models. Its API is OpenAI-compatible. */
-    XAI("https://api.x.ai", Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION)),
+    XAI("https://api.x.ai", Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION), ReasoningParams.CHAT),
     /**
      * Moonshot AI, the Kimi models. OpenAI-compatible; the mainland-China
      * endpoint is {@code https://api.moonshot.cn}, which a config sets as its
      * base URL. Only tool calling by default — the Kimi line is mixed, and a
      * config for a vision model declares {@code VISION} itself.
      */
-    MOONSHOT("https://api.moonshot.ai", Set.of(LlmCapability.TOOL_CALLING)),
+    MOONSHOT("https://api.moonshot.ai", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
     GOOGLE_GEMINI("https://generativelanguage.googleapis.com",
             Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS,
             LlmCapability.AUDIO_INPUT));
@@ -173,6 +174,36 @@ public enum LlmProvider {
                         LlmConfigType.SPEECH_TO_TEXT));
 
         private SpeechParams() {
+        }
+    }
+
+    /**
+     * The reasoning knob every OpenAI-compatible chat endpoint spells the
+     * same way: {@code reasoning_effort}. Which levels a server accepts
+     * differs — OpenAI's GPT-5 line takes the whole ladder, Groq and xAI a
+     * part of it — and a server whose model does not reason ignores the
+     * field, so one shared list serves them all.
+     */
+    private static final class ReasoningParams {
+        static final List<AdditionalParamSpec> CHAT = List.of(
+                AdditionalParamSpec.select("reasoning_effort", "Reasoning effort",
+                        List.of("none", "minimal", "low", "medium", "high", "xhigh"),
+                        "How hard a reasoning model thinks before it answers — more effort, "
+                                + "slower and better. Which levels the endpoint takes depends on "
+                                + "the model; one it does not know it ignores. Leave at "
+                                + "'default' to omit.",
+                        LlmConfigType.CHAT));
+
+        /** For the providers that also transcribe: the chat knob and the speech ones. */
+        static final List<AdditionalParamSpec> CHAT_AND_TRANSCRIPTION = concat(CHAT, SpeechParams.TRANSCRIPTION);
+
+        private static List<AdditionalParamSpec> concat(List<AdditionalParamSpec> a, List<AdditionalParamSpec> b) {
+            List<AdditionalParamSpec> all = new java.util.ArrayList<>(a);
+            all.addAll(b);
+            return List.copyOf(all);
+        }
+
+        private ReasoningParams() {
         }
     }
 }

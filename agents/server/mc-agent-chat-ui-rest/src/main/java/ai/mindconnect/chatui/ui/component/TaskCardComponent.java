@@ -170,6 +170,56 @@ public final class TaskCardComponent implements UiComponent {
                 false);
     }
 
+    // ── Factory helpers for thinking cards ─────────────────────────────────
+    //
+    // A reasoning model's thoughts, shown the way a tool call is: a collapsed
+    // card whose header moves while the model thinks, so the reader sees
+    // that something is happening before the first token of the answer —
+    // and can open it to read along. The body is REPLACEd on its own id
+    // ({@link #thinkingBodyId}) per delta, like the streaming reply bubble.
+
+    /** The id of a thinking card's body node — what each reasoning delta REPLACEs. */
+    public static String thinkingBodyId(String nodeId) {
+        return nodeId + "-md";
+    }
+
+    /** The body node: the reasoning so far, or an ellipsis before the first word. */
+    public static UiMarkdown thinkingBody(String nodeId, String text) {
+        return UiMarkdown.of(thinkingBodyId(nodeId), text == null || text.isBlank() ? "…" : text)
+                .<UiMarkdown>withCssClass("thinking-card-body");
+    }
+
+    /** Card for a model that is thinking right now. */
+    public static TaskCardComponent runningThinking(String nodeId, String textSoFar) {
+        return new TaskCardComponent(nodeId, runningThinkingHeader(), thinkingBody(nodeId, textSoFar), false);
+    }
+
+    /** Card for a thought that is over — the answer (or a tool call) has begun. */
+    public static TaskCardComponent doneThinking(String nodeId, String text, long durationMs) {
+        return new TaskCardComponent(nodeId, doneThinkingHeader(durationMs), thinkingBody(nodeId, text), false);
+    }
+
+    /** Card rebuilt from a persisted thought; no duration was recorded for it. */
+    public static TaskCardComponent historicThinking(String nodeId, String text) {
+        return new TaskCardComponent(nodeId, historicThinkingHeader(), thinkingBody(nodeId, text), false);
+    }
+
+    // Plain words, no marker: a thought is neither a task that can fail nor
+    // one that succeeds, so the ✓/✗ vocabulary of the tool cards does not fit.
+
+    public static String runningThinkingHeader() {
+        return "thinking…";
+    }
+
+    /** "thought for 12.3 s". */
+    public static String doneThinkingHeader(long durationMs) {
+        return "thought for " + String.format(java.util.Locale.ROOT, "%.1f", durationMs / 1000.0) + " s";
+    }
+
+    public static String historicThinkingHeader() {
+        return "thinking";
+    }
+
     // ── Factory helpers for sub-agent cards (tree-bearing) ─────────────────
     //
     // A sub-agent card is special: its body holds a NESTED list of child

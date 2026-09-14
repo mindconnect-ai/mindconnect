@@ -44,6 +44,10 @@ public record StreamEventFrame(String type, String text, String toolName,
                     new StreamEventFrame("token", t.text(), null, null, null, null,
                             null, null, null, null, null,
                             null, null, null, null, null, null);
+            case StreamEvent.Thinking th ->
+                    new StreamEventFrame("thinking", th.text(), null, null, null, null,
+                            null, null, null, null, null,
+                            null, null, null, null, null, null);
             case StreamEvent.ToolCallStarted s ->
                     new StreamEventFrame("tool_call_started", null, s.toolName(), s.arguments(), null, null,
                             null, null, null, null, null,
