@@ -2,12 +2,15 @@ package ai.mindconnect.llm.domain;
 
 /**
  * A reasoning ("thinking") block emitted by a model in an assistant turn.
- * Anthropic-specific: Claude 4.x with adaptive thinking produces these, each
- * carrying a cryptographic {@code signature}. When such a turn also contains
- * tool calls and is replayed in conversation history, the thinking blocks MUST
- * be sent back unchanged (signature included) as the <em>first</em> content
- * blocks of the assistant turn — otherwise the API rejects the request with
- * HTTP 400.
+ * Every reasoning model produces them — Claude with adaptive thinking, and
+ * the open models behind OpenAI-compatible servers (Qwen3, DeepSeek-R1,
+ * gpt-oss) whose reasoning arrives as {@code reasoning_content} /
+ * {@code reasoning} or inline {@code <think>} tags. Only Anthropic's carry a
+ * cryptographic {@code signature}: when such a turn also contains tool calls
+ * and is replayed in conversation history, the signed blocks MUST be sent
+ * back unchanged as the <em>first</em> content blocks of the assistant turn —
+ * otherwise the API rejects the request with HTTP 400. Unsigned blocks are
+ * for reading only and are never replayed.
  * <p>
  * Two shapes:
  * <ul>

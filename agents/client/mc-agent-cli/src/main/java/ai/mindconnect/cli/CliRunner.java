@@ -634,6 +634,8 @@ public class CliRunner implements CommandLineRunner {
                     // the REPL has no per-turn footer, and adding one changes
                     // every answer's shape. /memory remains the place to look.
                     case StreamEvent.TurnUsage u -> { }
+                    // Reasoning is shown in the chat UI; the terminal stays quiet.
+                    case StreamEvent.Thinking th -> { }
                     case StreamEvent.Done d -> {
                         if (inStatus[0]) {
                             System.out.print("\r\033[K");

@@ -454,17 +454,21 @@ public class ClaudeGateway implements LlmGateway {
                 msgNode.put("role", "assistant");
                 ArrayNode content = msgNode.putArray("content");
                 // Thinking blocks MUST come first and unchanged (signature included),
-                // or Anthropic rejects the replayed turn with HTTP 400.
+                // or Anthropic rejects the replayed turn with HTTP 400. A block
+                // without a signature came from another provider's model (the
+                // conversation switched configs) — Anthropic would reject it
+                // just the same, so it stays out.
                 if (msg.thinkingBlocks() != null) {
                     for (ThinkingBlock tb : msg.thinkingBlocks()) {
-                        ObjectNode block = content.addObject();
                         if ("redacted_thinking".equals(tb.type())) {
+                            ObjectNode block = content.addObject();
                             block.put("type", "redacted_thinking");
                             block.put("data", tb.data());
-                        } else {
+                        } else if (tb.signature() != null) {
+                            ObjectNode block = content.addObject();
                             block.put("type", "thinking");
                             block.put("thinking", tb.text() != null ? tb.text() : "");
-                            if (tb.signature() != null) block.put("signature", tb.signature());
+                            block.put("signature", tb.signature());
                         }
                     }
                 }

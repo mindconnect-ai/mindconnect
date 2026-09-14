@@ -54,10 +54,12 @@ import java.util.function.Consumer;
  *       the memory strategy's window (compression stubs and all). A
  *       compaction between two rounds simply takes effect on the next call.</li>
  *   <li><b>Streaming.</b> Text deltas go out as {@link StreamEvent.Token} on
- *       the turn's stream; tool-call and thinking deltas are reassembled by
- *       index and come back as ONE {@code TOOL_CALL} message, its content in
- *       exactly the shape the old persister wrote — history stays readable
- *       for both worlds.</li>
+ *       the turn's stream, reasoning deltas as {@link StreamEvent.Thinking};
+ *       tool-call and thinking deltas are reassembled by index and come back
+ *       as ONE {@code TOOL_CALL} message, its content in exactly the shape
+ *       the old persister wrote — history stays readable for both worlds. A
+ *       text answer keeps its readable reasoning in {@code metadata.thinking},
+ *       for showing only: the mapper never sends metadata to the model.</li>
  * </ul>
  *
  * <p>Cancellation is the loop's handle passed straight into the gateway,
@@ -114,9 +116,14 @@ public final class LlmChatProvider implements LlmProvider {
                 case LlmStreamChunk.ToolCallDelta tcd -> round.toolCallBuilders
                         .computeIfAbsent(tcd.index(), i -> new ToolCallBuilder())
                         .feed(tcd);
-                case LlmStreamChunk.ThinkingDelta thd -> round.thinkingBuilders
-                        .computeIfAbsent(thd.index(), i -> new ThinkingBlockBuilder())
-                        .feed(thd);
+                case LlmStreamChunk.ThinkingDelta thd -> {
+                    round.thinkingBuilders
+                            .computeIfAbsent(thd.index(), i -> new ThinkingBlockBuilder())
+                            .feed(thd);
+                    if (thd.textFragment() != null && !thd.textFragment().isEmpty()) {
+                        stream.accept(new StreamEvent.Thinking(thd.textFragment()));
+                    }
+                }
                 case LlmStreamChunk.Done done -> round.finish(done);
             }
         }, cancellation, traceListener());
@@ -152,6 +159,10 @@ public final class LlmChatProvider implements LlmProvider {
         Usage usage = Usage.ZERO;
         boolean truncated;
 
+        String readableThinking() {
+            return LlmChatProvider.readableThinking(thinkingBlocks);
+        }
+
         void finish(LlmStreamChunk.Done done) {
             for (ThinkingBlockBuilder builder : thinkingBuilders.values()) {
                 ThinkingBlock built = builder.build();
@@ -167,13 +178,29 @@ public final class LlmChatProvider implements LlmProvider {
 
         LlmAnswer toAnswer() {
             if (toolCalls.isEmpty()) {
-                return new LlmAnswer(List.of(TurnMessage.assistant(text.toString().trim())),
-                        usage, truncated);
+                TurnMessage answer = TurnMessage.assistant(text.toString().trim());
+                String thought = readableThinking();
+                if (thought != null) answer = answer.with("thinking", thought);
+                return new LlmAnswer(List.of(answer), usage, truncated);
             }
             return new LlmAnswer(List.of(TurnMessage.toolCalls(
                     toolCallContent(thinkingBlocks, toolCalls),
                     toolCalls.stream().map(ToolCall::id).toList())), usage, truncated);
         }
+    }
+
+    /**
+     * The reasoning a reader can see, all blocks joined — {@code null} when
+     * the model showed none (no reasoning model, or Anthropic with the
+     * display omitted). Redacted blocks have no text and contribute nothing.
+     */
+    private static String readableThinking(List<ThinkingBlock> thinkingBlocks) {
+        String joined = thinkingBlocks.stream()
+                .map(ThinkingBlock::text)
+                .filter(t -> t != null && !t.isBlank())
+                .collect(java.util.stream.Collectors.joining("\n\n"))
+                .trim();
+        return joined.isEmpty() ? null : joined;
     }
 
     /**

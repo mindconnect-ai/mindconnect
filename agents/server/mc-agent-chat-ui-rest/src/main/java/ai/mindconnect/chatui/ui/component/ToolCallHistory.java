@@ -16,7 +16,9 @@ import java.util.List;
  * result by tool-call id and hands out {@link TaskCardComponent}s, so
  * reloading a conversation looks like watching it happen. Sub-agent calls
  * recurse through the {@link MessageListComponent.SubAgentTreeProvider} the
- * caller supplies.
+ * caller supplies. The reasoning that led to a call (the TOOL_CALL message's
+ * {@code thinkingBlocks}) becomes a thinking card ahead of the call's own,
+ * where it stood while the turn ran.
  */
 public final class ToolCallHistory {
 
@@ -44,6 +46,9 @@ public final class ToolCallHistory {
         LinkedHashMap<String, List<TaskCardComponent>> byCallId = new LinkedHashMap<>();
         java.util.Map<String, String> argsByCallId = new java.util.HashMap<>();
         java.util.Map<String, String> nameByCallId = new java.util.HashMap<>();
+        // The thinking card that precedes a call, keyed by the FIRST call of
+        // the message it belongs to — one thought, however many calls it led to.
+        java.util.Map<String, TaskCardComponent> thinkingByCallId = new java.util.HashMap<>();
 
         // Pass 1: collect inputs from TOOL_CALL messages.
         for (Message m : sorted) {
@@ -53,6 +58,7 @@ public final class ToolCallHistory {
                 JsonNode node  = MAPPER.readTree(m.content());
                 JsonNode calls = node.path("toolCalls");
                 if (calls.isArray()) {
+                    boolean first = true;
                     for (JsonNode tc : calls) {
                         String id   = tc.path("id").asText("");
                         String name = tc.path("name").asText("tool");
@@ -61,6 +67,14 @@ public final class ToolCallHistory {
                                 .writeValueAsString(args);
                         nameByCallId.put(id, name);
                         argsByCallId.put(id, prettyArgs);
+                        if (first && !id.isEmpty()) {
+                            String thought = readableThinking(node.path("thinkingBlocks"));
+                            if (thought != null) {
+                                thinkingByCallId.put(id, TaskCardComponent.historicThinking(
+                                        "task-think-hist-" + m.id().value(), thought));
+                            }
+                        }
+                        first = false;
                     }
                 }
             } catch (Exception ignored) {}
@@ -89,7 +103,7 @@ public final class ToolCallHistory {
                     List<TaskCardComponent> subCards = subAgentTree.cardsFor(
                             callId, false, argsByCallId.get(callId), result);
                     if (subCards != null && !subCards.isEmpty()) {
-                        byCallId.put(key, subCards);
+                        byCallId.put(key, withThinking(thinkingByCallId, callId, subCards));
                         continue;
                     }
                 }
@@ -110,7 +124,8 @@ public final class ToolCallHistory {
 
                 String body = TaskCardComponent.taskCardBody(argsByCallId.get(callId), result);
                 String nodeId = "task-hist-" + m.id().value();
-                byCallId.put(key, List.of(TaskCardComponent.historic(nodeId, header, body)));
+                byCallId.put(key, withThinking(thinkingByCallId, callId,
+                        List.of(TaskCardComponent.historic(nodeId, header, body))));
             } catch (Exception ignored) {}
         }
 
@@ -134,13 +149,37 @@ public final class ToolCallHistory {
                     List<TaskCardComponent> subCards = subAgentTree.cardsFor(
                             id, true, argsByCallId.get(id), null);
                     if (subCards != null && !subCards.isEmpty()) {
-                        byCallId.put(id, subCards);
+                        byCallId.put(id, withThinking(thinkingByCallId, id, subCards));
                     }
                 }
             } catch (Exception ignored) {}
         }
 
         return byCallId.values().stream().flatMap(List::stream).toList();
+    }
+
+    /** The thinking card for {@code callId} ahead of its cards, when the call was preceded by one. */
+    private static List<TaskCardComponent> withThinking(java.util.Map<String, TaskCardComponent> thinkingByCallId,
+                                                        String callId, List<TaskCardComponent> cards) {
+        TaskCardComponent thinking = thinkingByCallId.get(callId);
+        if (thinking == null) return cards;
+        List<TaskCardComponent> all = new java.util.ArrayList<>(cards.size() + 1);
+        all.add(thinking);
+        all.addAll(cards);
+        return all;
+    }
+
+    /** The readable text of the persisted thinking blocks, joined; {@code null} when there is none. */
+    static String readableThinking(JsonNode thinkingBlocks) {
+        if (!thinkingBlocks.isArray()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (JsonNode block : thinkingBlocks) {
+            String text = block.path("text").asText("");
+            if (text.isBlank()) continue;
+            if (!sb.isEmpty()) sb.append("\n\n");
+            sb.append(text.trim());
+        }
+        return sb.isEmpty() ? null : sb.toString();
     }
 
     /** Pulls the "name" field out of a run_agent arguments JSON. */

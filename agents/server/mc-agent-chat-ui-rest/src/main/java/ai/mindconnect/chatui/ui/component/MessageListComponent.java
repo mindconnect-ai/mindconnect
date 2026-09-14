@@ -250,6 +250,13 @@ public final class MessageListComponent implements UiComponent {
                     // Reuse the wrapper render to get the same <li> shape.
                     list.item(((UiList) t.render()).getItems().get(0));
                 }
+                // The thought that led to this answer sits right above it,
+                // after the tools — where it was while the turn streamed.
+                Object thinking = m.metadata() == null ? null : m.metadata().get("thinking");
+                if (thinking instanceof String thought && !thought.isBlank()) {
+                    var card = TaskCardComponent.historicThinking("task-think-" + m.id().value(), thought);
+                    list.item(((UiList) card.render()).getItems().get(0));
+                }
             }
             list.item(messageItem(m, isUser));
             prevAgentSeq = m.sequenceNum();
@@ -379,6 +386,16 @@ public final class MessageListComponent implements UiComponent {
      */
     public UiPatch.Operation removeThinking(String thinkingId) {
         return UiPatch.Operation.remove("thinking-wrapper-" + thinkingId);
+    }
+
+    /**
+     * REPLACE a thinking card's body with the reasoning so far. Targets the
+     * body alone, not the card, so the reader's open/closed choice survives
+     * every delta — same shape as {@link #replaceBotPending(String, String)}.
+     */
+    public UiPatch.Operation replaceThinkingBody(String nodeId, String cumulativeText) {
+        return UiPatch.Operation.replace(TaskCardComponent.thinkingBodyId(nodeId),
+                TaskCardComponent.thinkingBody(nodeId, cumulativeText));
     }
 
     /** APPEND a task card to the list (running / done / failed variants). */
