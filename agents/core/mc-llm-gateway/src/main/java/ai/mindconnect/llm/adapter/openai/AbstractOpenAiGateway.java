@@ -176,8 +176,10 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                 if (block.length() > 0 && !cancelledClean) {
                     responseEvents.add(block.toString());
                 }
-                // A tail held back for a <think> tag that never came is answer text.
-                ThinkTagSplitter.Split tail = thinkTags.flush();
+                // A tail held back for a <think> tag that never came is answer
+                // text — unless the caller cancelled, after which nothing more
+                // may reach the handler.
+                ThinkTagSplitter.Split tail = cancelledClean ? ThinkTagSplitter.Split.NONE : thinkTags.flush();
                 if (tail.thinking() != null) {
                     handler.accept(new LlmStreamChunk.ThinkingDelta(0, "thinking", tail.thinking(), null, null));
                 }
@@ -451,11 +453,15 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         root.put(reasoning ? "max_completion_tokens" : "max_tokens", maxTokens);
 
         // How hard a reasoning model thinks — the config's default, overridden
-        // per request. Which levels a server takes is its business; one it
-        // does not know it ignores (LM Studio, Ollama with a non-reasoning model).
+        // per request. Which levels a server takes is its business. A field a
+        // server does not know it ignores (LM Studio, Ollama) — except OpenAI,
+        // which rejects it on a model that does not reason (HTTP 400), so there
+        // it goes only with its reasoning models. Azure names deployments, not
+        // models, so nothing can be told from the name and the field is sent.
         Map<String, Object> params = LlmParams.merge(config, request);
         String reasoningEffort = LlmParams.string(params, "reasoning_effort");
-        if (reasoningEffort != null) {
+        boolean effortAccepted = config.provider() != LlmProvider.OPENAI || reasoning;
+        if (reasoningEffort != null && effortAccepted) {
             root.put("reasoning_effort", reasoningEffort);
         }
 

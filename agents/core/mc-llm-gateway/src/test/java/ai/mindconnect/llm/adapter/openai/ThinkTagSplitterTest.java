@@ -51,6 +51,32 @@ class ThinkTagSplitterTest {
     }
 
     @Test
+    void aTagAfterRealTextIsJustText() {
+        // The user asked what the tag does; the model quotes it.
+        assertThat(splitter.feed("The tag looks like <think>this</think>, and it"))
+                .isEqualTo(new ThinkTagSplitter.Split("The tag looks like <think>this, and it", null));
+        assertThat(splitter.feed(" wraps <think>reasoning"))
+                .isEqualTo(new ThinkTagSplitter.Split(" wraps <think>reasoning", null));
+    }
+
+    @Test
+    void leadingWhitespaceDoesNotCountAsText() {
+        assertThat(splitter.feed("\n")).isEqualTo(new ThinkTagSplitter.Split("\n", null));
+        ThinkTagSplitter.Split s = splitter.feed("<think>hmm</think>ok");
+        assertThat(s.thinking()).isEqualTo("hmm");
+        assertThat(s.text()).isEqualTo("ok");
+    }
+
+    @Test
+    void aStrayClosingTagIsDropped() {
+        // The server's template pre-filled <think>; only the closing tag arrives.
+        assertThat(splitter.feed("so 42</think>The answer is 42"))
+                .isEqualTo(new ThinkTagSplitter.Split("so 42The answer is 42", null));
+        assertThat(splitter.feed("x</th")).isEqualTo(new ThinkTagSplitter.Split("x", null));
+        assertThat(splitter.feed("ink>y")).isEqualTo(new ThinkTagSplitter.Split("y", null));
+    }
+
+    @Test
     void anUnclosedThoughtFlushesAsThinking() {
         assertThat(splitter.feed("<think>never closed</"))
                 .isEqualTo(new ThinkTagSplitter.Split(null, "never closed"));

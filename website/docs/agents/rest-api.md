@@ -156,6 +156,7 @@ Each event is one JSON frame with a `type`:
 | type | carries |
 |---|---|
 | `token` | `text` — a piece of the answer as it is generated |
+| `thinking` | `text` — a piece of the model's reasoning, before the first `token` of what it led to |
 | `asking_llm` | the loop is waiting on the model |
 | `tool_call_started` | `toolName`, `arguments` |
 | `tool_call_result` | `toolName`, `result`, `durationMs` |

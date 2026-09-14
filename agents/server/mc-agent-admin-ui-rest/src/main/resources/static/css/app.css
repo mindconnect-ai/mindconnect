@@ -408,18 +408,9 @@ body {
     color: var(--sui-color-text);
     font-family: var(--sui-font-mono);
 }
-/* The model's reasoning, shown like a tool card: muted, so it reads as
-   an aside to the answer and not as part of it. */
-.thinking-card-body {
-    font-size: var(--sui-text-sm, 13px);
-    color: var(--sui-color-text-muted);
-    background: var(--sui-color-border-soft);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin-top: 6px;
-    line-height: 1.5;
-    word-break: break-word;
-}
+/* The model's reasoning: a task-card body, muted, so it reads as an
+   aside to the answer and not as part of it. */
+.thinking-card-body { color: var(--sui-color-text-muted); word-break: break-word; }
 .thinking-card-body p { margin: 0 0 .5em; }
 .thinking-card-body p:last-child { margin-bottom: 0; }
 .task-card-body strong {
