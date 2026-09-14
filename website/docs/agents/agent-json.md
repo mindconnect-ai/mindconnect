@@ -27,12 +27,13 @@ The format of a file in
     "toolResultEviction": { "afterTurns": 2, "aboveTokens": 800 }
   },
   "responseReviewers": [],
+  "callableAgents": ["web-researcher", "verifier"],
   "tools": [
     {
       "id": "00000003-0000-0000-0000-000000000250",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000025",
-      "name": "list_agents",
-      "description": "Lists all available agents.",
+      "name": "todo_write",
+      "description": "Publishes the plan as a checklist.",
       "enabled": true
     }
   ],
@@ -54,10 +55,11 @@ The format of a file in
 | `maxIterations` | int | Max tool-loop rounds per turn. |
 | `status` | enum | `DRAFT`, `ACTIVE` (usable) or `DEPRECATED`. |
 | `memoryConfig` | object | Working-memory strategy (see below). |
-| `toolSearch` | object? | Optional: `{ "enabled": true, "groups": ["web", …] }` — gives the agent the `tool_search` tool so it can activate *deferred* tools from the listed groups on demand. |
 | `skills` | object? | Optional: `{ "enabled": true, "names": ["weekly-report", …] }` — gives the agent the `skill` tool and lists those [skills](./skills.md) in its prompt. An empty `names` means every skill the installation, the user and the project have. |
+| `callableAgents` | array | The agents this one may hand work to, by name. Naming any gives it `run_agent`, `run_agents` and `list_agents`; empty or absent, it calls no other agent. |
+| `callableByAgents` | boolean? | `false` for agents the runtime calls on its own (title generator, summarizers): they are offered in no roster and `run_agent` refuses them. Absent means `true`. |
 | `responseReviewers` | array | Optional reviewer agents that check answers (e.g. `answer-relevance-checker`). Empty for none. |
-| `tools` | array | The tools this agent may call (see below). |
+| `tools` | array | The tools this agent may call (see below). The delegation tools and `tool_search` are never listed here — the runtime adds them (see the table below). |
 | `createdAt` / `updatedAt` | timestamp | Bookkeeping. |
 
 ### `memoryConfig`
@@ -82,11 +84,11 @@ Each entry grants the agent one tool.
 |-------|-------------|
 | `id` | UUID for this tool binding. |
 | `agentDefinitionId` | The owning agent's `id`. |
-| `name` | Tool name, e.g. `web_search`, `run_agent`, `file_read`. |
+| `name` | Tool name, e.g. `web_search`, `file_read`. `run_agent`, `run_agents`, `list_agents` and `tool_search` are dropped when the file is read. |
 | `description` | Shown to the model; can override the default description. |
 | `enabled` | `true` to make the tool callable. |
 | `overrides` | Optional per-agent config map for the tool, e.g. `{ "baseDir": "/tmp" }`. Which keys a tool accepts is shown in the Admin UI tool catalog. |
-| `deferred` | `true` keeps the tool out of the prompt until the agent's `tool_search` activates it — for large tool sets like MCP bundles. Default `false`. |
+| `deferred` | `true` keeps the tool out of the prompt until the agent finds it with `tool_search` — for large tool sets like MCP bundles. An agent gets `tool_search` as soon as one tool is deferred, and it finds only the deferred ones. Default `false`. |
 | `needsApproval` | `true` requires a human to approve every call before it runs (the turn waits for approval). Default `false`. |
 
 :::tip Editing in the UI
