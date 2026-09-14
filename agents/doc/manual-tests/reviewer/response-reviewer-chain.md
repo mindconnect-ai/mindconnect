@@ -21,6 +21,8 @@ the chain.
 ## Setup
 
 1. Create a reviewer agent `tone-reviewer` (Agents → New):
+   - Group: `reviewer` — only agents in that group are offered as
+     Response Reviewers
    - System prompt: `You review another agent's answer. The user question is
      {{ user_message }}, the draft answer is {{ agent_response }}. If the
      draft contains the word "BANANA", reply exactly: BLOCK: Answer withheld

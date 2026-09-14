@@ -11,6 +11,9 @@
   "memoryConfig": {
     "kind": "none"
   },
+  "skills": {
+    "mode": "NONE"
+  },
   "status": "ACTIVE",
   "tools": [],
   "createdAt": "2025-01-01T00:00:00Z",

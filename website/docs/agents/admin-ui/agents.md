@@ -26,16 +26,23 @@ and Delete), **Tools (n)** and **Sessions**.
 The agent form lets you set:
 
 - **Name** and description.
+- **Group** — the rubric the list files it under. `reviewer` is the one group
+  with a meaning: only agents filed there are offered as Response Reviewers.
 - **System prompt** — the agent's role and instructions — and an optional
   **Welcome Message**.
 - **LLM Config** — which model it uses, picked from your
   [LLM Configs](./llm-configs.md) (e.g. `agent-default`, `claude-default`).
 - **Max Iterations** — the tool-loop budget per turn.
-- **Callable Agents** — the roster of agents this one may hand work to. Naming
-  any gives it `run_agent`, `run_agents` and `list_agents`.
+- **Skills** — which [skills](../skills.md) the agent may load: all, specific
+  ones (a checkbox per skill appears), or none.
+- **Callable Agents** — the roster of agents this one may hand work to, a
+  checkbox per candidate. Naming any gives it `run_agent`, `run_agents` and
+  `list_agents`.
 - **Callable by other agents** — off for the runtime's own helpers, so no
   roster offers them.
-- **Response Reviewers** — reviewer agents that check answers.
+- **Response Reviewers** — the agents an answer passes through before the user
+  sees it, in the order of the ticked rows (move them up and down). Offered:
+  the agents in the `reviewer` group.
 
 Tools are **not** part of this form — they're managed on the detail view's
 Tools tab. Editing is the same form in "edit" mode; **Copy** pre-fills it from

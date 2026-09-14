@@ -67,8 +67,8 @@ class AgentDefinitionInstallerTest {
 
         installer.install(ENTRY, json, ImportMode.SKIP_EXISTING);
 
-        assertThat(repository.findByName("web-researcher").orElseThrow().skillsOrOff())
-                .isEqualTo(new AgentDefinition.SkillsConfig(true, List.of("weekly-report")));
+        assertThat(repository.findByName("web-researcher").orElseThrow().skillsOrDefault())
+                .isEqualTo(AgentDefinition.SkillsConfig.specific(List.of("weekly-report")));
     }
 
     @Test

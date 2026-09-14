@@ -19,8 +19,10 @@ public record AgentDefinition(
          * configuration, so it carries its group as data instead of declaring
          * it in code. A free string; the seeds use {@code assistants} for the
          * agents a person chats with, {@code sub-agents} for the specialists
-         * they delegate to, and {@code utilities} for the ones the runtime
-         * calls on its own. {@code null} or blank reads as {@code general}.
+         * they delegate to, {@code utilities} for the ones the runtime
+         * calls on its own, and {@link #REVIEWER_GROUP reviewer} for the ones
+         * an agent's answer may pass through — the one group with a meaning,
+         * see there. {@code null} or blank reads as {@code general}.
          */
         String group,
         /**
@@ -72,11 +74,9 @@ public record AgentDefinition(
          */
         Boolean callableByAgents,
         /**
-         * Agent-level skills setting. {@code null} (older persisted agents)
-         * means disabled. When enabled, the runtime injects the {@code skill}
-         * tool and lists the agent's skills in the system prompt; the names
-         * listed here narrow that to those skills, and an empty list leaves
-         * every skill of the installation, the user and the project open.
+         * Agent-level skills setting — see {@link SkillsConfig}. {@code null}
+         * (an agent stored before the field, or one that never set it) reads
+         * as every skill there is.
          */
         SkillsConfig skills,
         Instant createdAt,
@@ -133,18 +133,64 @@ public record AgentDefinition(
     }
 
     /**
-     * Skills switch + the names it is narrowed to, stored with the agent.
+     * Which skills an agent may load, stored with the agent. The mode says
+     * whether it is none, every skill the installation, the user and the
+     * project have, or the ones named; the names count only in
+     * {@link Mode#SPECIFIC} and are dropped otherwise. With any but
+     * {@link Mode#NONE} the runtime injects the {@code skill} tool and lists
+     * the loadable skills in the system prompt.
+     *
+     * <p>In JSON: {@code {"mode": "ALL"}} or
+     * {@code {"mode": "SPECIFIC", "names": ["release"]}}. The shape this
+     * replaced, {@code {"enabled": true, "names": [...]}}, is still read: on,
+     * with names, is SPECIFIC; on without names is ALL; off is NONE.
      */
-    public record SkillsConfig(boolean enabled, List<String> names) {
-        public SkillsConfig {
-            if (names == null) names = List.of();
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties(ignoreUnknown = true)
+    public record SkillsConfig(Mode mode, List<String> names) {
+
+        /** How the agent's skills are picked. */
+        public enum Mode {
+            /** No skills: neither the tool nor the prompt section. */
+            NONE,
+            /** Every skill there is — one added later is in reach without touching the agent. */
+            ALL,
+            /** Only the skills named; none named is none loadable. */
+            SPECIFIC
         }
 
-        public static final SkillsConfig OFF = new SkillsConfig(false, List.of());
+        public SkillsConfig {
+            if (mode == null) mode = Mode.ALL;
+            names = mode == Mode.SPECIFIC && names != null ? List.copyOf(names) : List.of();
+        }
 
-        /** Every skill this installation, user and project have. */
-        public static SkillsConfig all() {
-            return new SkillsConfig(true, List.of());
+        /**
+         * Reads both the current and the previous JSON shape: {@code mode}
+         * when present, else the old {@code enabled} switch, else the default.
+         */
+        @com.fasterxml.jackson.annotation.JsonCreator
+        public static SkillsConfig fromJson(
+                @com.fasterxml.jackson.annotation.JsonProperty("mode") Mode mode,
+                @com.fasterxml.jackson.annotation.JsonProperty("enabled") Boolean enabled,
+                @com.fasterxml.jackson.annotation.JsonProperty("names") List<String> names) {
+            if (mode == null && enabled != null) {
+                mode = !enabled ? Mode.NONE
+                        : names == null || names.isEmpty() ? Mode.ALL
+                        : Mode.SPECIFIC;
+            }
+            return new SkillsConfig(mode, names);
+        }
+
+        public static final SkillsConfig NONE = new SkillsConfig(Mode.NONE, List.of());
+        public static final SkillsConfig ALL = new SkillsConfig(Mode.ALL, List.of());
+
+        /** Only the skills named. */
+        public static SkillsConfig specific(List<String> names) {
+            return new SkillsConfig(Mode.SPECIFIC, names);
+        }
+
+        /** Whether the agent may load any skill at all — the tool and the prompt section follow this. */
+        public boolean enabled() {
+            return mode != Mode.NONE;
         }
     }
 
@@ -163,7 +209,7 @@ public record AgentDefinition(
     }
 
     /**
-     * Pre-skills constructor: skills off.
+     * Pre-skills constructor: the skills setting is left unset, which reads as every skill.
      */
     public AgentDefinition(AgentId id, String name, String description, String group, String icon,
                            String systemPrompt, String welcomeMessage, String llmConfigName,
@@ -196,10 +242,10 @@ public record AgentDefinition(
     }
 
     /**
-     * Never {@code null}: older agents without the field read as OFF.
+     * Never {@code null}: an agent without the field may load every skill.
      */
-    public SkillsConfig skillsOrOff() {
-        return skills == null ? SkillsConfig.OFF : skills;
+    public SkillsConfig skillsOrDefault() {
+        return skills == null ? SkillsConfig.ALL : skills;
     }
 
     /**
@@ -272,6 +318,25 @@ public record AgentDefinition(
      */
     public String groupOrDefault() {
         return group == null || group.isBlank() ? DEFAULT_GROUP : group;
+    }
+
+    /**
+     * The rubric of the agents an answer may pass through: only an agent
+     * filed here is offered as a response reviewer. A reviewer is an agent
+     * with a prompt shaped for the job (it sees the user's message and the
+     * draft, and answers with PASS, a rewrite or a BLOCK), so the picker
+     * shows the ones written for it rather than every agent there is.
+     */
+    public static final String REVIEWER_GROUP = "reviewer";
+
+    /**
+     * Whether this agent is filed under {@link #REVIEWER_GROUP}. Not
+     * {@code isReviewer}: Jackson would take that for a property's getter
+     * and write a {@code reviewer} field into every stored agent — the same
+     * reason {@link #mayBeCalledByAgents()} is named the way it is.
+     */
+    public boolean filedAsReviewer() {
+        return REVIEWER_GROUP.equals(group);
     }
 
     /**

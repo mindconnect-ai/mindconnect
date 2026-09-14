@@ -19,8 +19,7 @@
   "responseReviewers": [],
   "status": "ACTIVE",
   "skills": {
-    "enabled": true,
-    "names": []
+    "mode": "ALL"
   },
   "tools": [
     {

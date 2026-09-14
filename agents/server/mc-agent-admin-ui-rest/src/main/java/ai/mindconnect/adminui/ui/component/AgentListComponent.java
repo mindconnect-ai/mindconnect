@@ -40,7 +40,8 @@ public final class AgentListComponent implements UiComponent {
      * person chats with, then the specialists those delegate to, then the ones
      * the runtime calls on its own. Anything else follows, alphabetically.
      */
-    private static final List<String> GROUP_ORDER = List.of("assistants", "sub-agents", "utilities");
+    private static final List<String> GROUP_ORDER = List.of("assistants", "sub-agents", "utilities",
+            AgentDefinition.REVIEWER_GROUP);
 
     private final List<AgentDefinition> agents;
     private final String query;

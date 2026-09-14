@@ -17,8 +17,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  *
  * <p>It deliberately does <b>not</b> wrap:
  * <ul>
- *   <li>{@code UiPatch} responses — only {@link UiPage} is handled (the
- *       {@link #supports} check), so in-place updates pass through untouched.</li>
+ *   <li>{@code UiPatch} and every other non-page body — only a {@link UiPage}
+ *       body is handled, so in-place updates pass through untouched.</li>
  *   <li>Dialog pages ({@code !page.getDialogs().isEmpty()}) — modals render over
  *       the current page and must not carry their own header.</li>
  *   <li>Already-wrapped pages — guarded by the {@code admin-layout} root id, so
@@ -40,12 +40,16 @@ public class AdminLayoutAdvice implements ResponseBodyAdvice<Object> {
         this.layoutFactory = layoutFactory;
     }
 
+    /**
+     * Every handler in the advised packages: which responses are pages is
+     * decided on the body, in {@link #beforeBodyWrite}. Deciding it here, on
+     * the declared return type, is what lost the menu after a save — a save
+     * answers a page or a toast patch and is declared {@code ResponseEntity<?>}.
+     */
     @Override
     public boolean supports(MethodParameter returnType,
                             Class<? extends org.springframework.http.converter.HttpMessageConverter<?>> converterType) {
-        // Only act on handlers that can produce a UiPage (directly or wrapped in
-        // ResponseEntity). UiPatch handlers are skipped entirely.
-        return producesUiPage(returnType);
+        return true;
     }
 
     @Override
@@ -68,16 +72,4 @@ public class AdminLayoutAdvice implements ResponseBodyAdvice<Object> {
         return layoutFactory.current().withLayout(page);
     }
 
-    private static boolean producesUiPage(MethodParameter returnType) {
-        Class<?> type = returnType.getParameterType();
-        if (UiPage.class.isAssignableFrom(type)) {
-            return true;
-        }
-        // ResponseEntity<UiPage> — inspect the generic argument.
-        if (org.springframework.http.ResponseEntity.class.isAssignableFrom(type)) {
-            var generic = returnType.getGenericParameterType();
-            return generic.getTypeName().contains(UiPage.class.getName());
-        }
-        return false;
-    }
 }

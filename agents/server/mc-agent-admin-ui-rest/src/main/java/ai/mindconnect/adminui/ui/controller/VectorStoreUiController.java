@@ -346,11 +346,11 @@ public class VectorStoreUiController {
                 .field(UiField.text("name", "Name", isNew ? null : t.name()).asEditable()
                         .hint(builtIn ? BUILT_IN_NOTE + " Give this copy a name to save it as a template of your own."
                                 : "Unique template name, e.g. knowledge or chat-uploads"))
-                // The version this form was opened with (0 for a new template).
-                // Hidden, but submitted: the save is refused if the template was saved since.
-                .field(UiField.text("version", "Version",
-                                isNew || t.version() == null ? "0" : t.version().toString())
-                        .asEditable().<UiField>hidden())
+                // The version this form was opened with (0 for a new template): a
+                // hidden input, submitted with the rest — the save is refused if
+                // the template was saved since.
+                .field(UiField.hidden("version",
+                        isNew || t.version() == null ? "0" : t.version().toString()))
                 .field(UiField.select("backend", "Backend", t == null ? "memory" : t.backend(), backends)
                         .asEditable()
                         // Switching the backend swaps the backend-config group below.

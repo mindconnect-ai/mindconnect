@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.service.ToolTestService;
+import ai.mindconnect.adminui.ui.component.AgentFormComponent;
 import ai.mindconnect.adminui.ui.component.ToolTestComponent;
 import ai.mindconnect.adminui.ui.page.AgentDetailPage;
 import ai.mindconnect.adminui.ui.page.AgentFormPage;
@@ -225,13 +226,30 @@ public class AgentUiController {
 
 
     /**
-     * The form's two skills fields. An empty selection with the switch on is
-     * not "no skills" but "every skill there is" — see the field's hint.
+     * The form's two skills fields: the mode, and the names that count only
+     * in SPECIFIC — the config drops them otherwise.
      */
     private static AgentDefinition.SkillsConfig skillsFromForm(FormBody body) {
-        boolean enabled = Boolean.TRUE.equals(body.bool("skillsEnabled"));
-        java.util.List<String> names = body.strList("skills");
-        return new AgentDefinition.SkillsConfig(enabled, names == null ? java.util.List.of() : names);
+        return new AgentDefinition.SkillsConfig(
+                AgentFormComponent.skillsMode(body.str(AgentFormComponent.SKILLS_MODE)),
+                body.strList("skills"));
+    }
+
+    /**
+     * The skills mode changed: re-render the skills picker under it, shown
+     * only for SPECIFIC. The names the admin already ticked ride along in
+     * the submitted form body, so switching away and back loses nothing.
+     */
+    @PostMapping("/skills-field")
+    public UiPatch skillsField(@RequestParam(value = "id", required = false) String idValue,
+                               @RequestBody Map<String, Object> raw) {
+        var body = new FormBody(raw);
+        AgentDefinition agent = idValue == null || idValue.isBlank() ? null
+                : registryService.find(AgentId.of(idValue)).orElse(null);
+        var form = new AgentFormComponent(agent, llmConfigRepository, repository, objectMapper, skills());
+        return UiPatch.of().patch(UiPatch.Operation.replace("skills",
+                form.skillsField(AgentFormComponent.skillsMode(body.str(AgentFormComponent.SKILLS_MODE)),
+                        body.strList("skills"))));
     }
 
     /** The skill catalog this host wires, or null when it wires none. */

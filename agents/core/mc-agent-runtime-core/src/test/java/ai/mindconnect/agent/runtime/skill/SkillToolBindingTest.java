@@ -65,7 +65,7 @@ class SkillToolBindingTest {
 
     @Test
     void skillsOnAddsTheToolWithItsNames() {
-        List<AgentTool> refs = refs(agent(new AgentDefinition.SkillsConfig(true, List.of("release"))));
+        List<AgentTool> refs = refs(agent(AgentDefinition.SkillsConfig.specific(List.of("release"))));
 
         assertThat(refs).extracting(AgentTool::name).containsExactly("file_read", SkillTool.NAME);
         assertThat(refs.get(1).overrides()).containsEntry(SkillToolFactory.NAMES, List.of("release"));
@@ -74,17 +74,25 @@ class SkillToolBindingTest {
     @Test
     void withoutASkillToLoadTheToolIsNotOfferedAtAll() {
         var refs = new DynamicToolActivations(NO_SESSIONS, SkillCatalog.none())
-                .effectiveRefs(agent(AgentDefinition.SkillsConfig.all()), SessionId.random());
+                .effectiveRefs(agent(AgentDefinition.SkillsConfig.ALL), SessionId.random());
 
         assertThat(refs).as("a switch nobody has written a skill for costs nothing")
                 .extracting(AgentTool::name).containsExactly("file_read");
     }
 
     @Test
-    void skillsOffLeavesTheToolAway() {
-        assertThat(refs(agent(AgentDefinition.SkillsConfig.OFF))).extracting(AgentTool::name)
+    void skillsNoneLeavesTheToolAway() {
+        assertThat(refs(agent(AgentDefinition.SkillsConfig.NONE))).extracting(AgentTool::name)
                 .containsExactly("file_read");
-        assertThat(refs(agent(null))).extracting(AgentTool::name).containsExactly("file_read");
+        assertThat(refs(agent(AgentDefinition.SkillsConfig.specific(List.of()))))
+                .as("SPECIFIC naming nothing has nothing to load, so no tool")
+                .extracting(AgentTool::name).containsExactly("file_read");
+    }
+
+    @Test
+    void anAgentWithoutTheSettingGetsTheToolLikeAll() {
+        assertThat(refs(agent(null))).extracting(AgentTool::name)
+                .containsExactly("file_read", SkillTool.NAME);
     }
 
     /** A session repository holding one session that a search has already given {@code names}. */
@@ -109,22 +117,22 @@ class SkillToolBindingTest {
         var activations = new DynamicToolActivations(sessionThatActivated(session), catalog());
 
         var narrowed = activations.effectiveRefs(
-                agent(new AgentDefinition.SkillsConfig(true, List.of("release"))), session.id());
+                agent(AgentDefinition.SkillsConfig.specific(List.of("release"))), session.id());
         assertThat(narrowed).extracting(AgentTool::name).containsExactly("file_read", SkillTool.NAME);
         assertThat(narrowed.get(1).overrides()).containsEntry(SkillToolFactory.NAMES, List.of("release"));
 
-        assertThat(activations.effectiveRefs(agent(AgentDefinition.SkillsConfig.OFF), session.id()))
+        assertThat(activations.effectiveRefs(agent(AgentDefinition.SkillsConfig.NONE), session.id()))
                 .as("switched off, a search result does not bring the tool back")
                 .extracting(AgentTool::name).containsExactly("file_read");
     }
 
     @Test
     void aSkillToolAssignedByHandIsDroppedInFavourOfTheSetting() {
-        AgentDefinition off = agent(AgentDefinition.SkillsConfig.OFF)
+        AgentDefinition off = agent(AgentDefinition.SkillsConfig.NONE)
                 .withTools(List.of(AgentTool.of("file_read"), AgentTool.of(SkillTool.NAME)));
         assertThat(refs(off)).extracting(AgentTool::name).containsExactly("file_read");
 
-        var refs = refs(off.withSkills(new AgentDefinition.SkillsConfig(true, List.of("release"))));
+        var refs = refs(off.withSkills(AgentDefinition.SkillsConfig.specific(List.of("release"))));
         assertThat(refs).extracting(AgentTool::name).containsExactly("file_read", SkillTool.NAME);
         assertThat(refs.get(1).overrides()).containsEntry(SkillToolFactory.NAMES, List.of("release"));
     }
@@ -160,7 +168,7 @@ class SkillToolBindingTest {
     void theSessionsProjectSkillsAreInReach() {
         AgentSession session = AgentSession.start(AgentId.random(), UserId.of("alice"),
                 ConversationId.random());
-        assertThat(SkillCatalog.none().available(agent(AgentDefinition.SkillsConfig.all()), session))
+        assertThat(SkillCatalog.none().available(agent(AgentDefinition.SkillsConfig.ALL), session))
                 .isEmpty();
     }
 }
