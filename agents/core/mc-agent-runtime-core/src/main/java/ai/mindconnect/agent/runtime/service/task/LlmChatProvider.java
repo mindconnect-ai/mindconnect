@@ -57,9 +57,12 @@ import java.util.function.Consumer;
  *       the turn's stream, reasoning deltas as {@link StreamEvent.Thinking};
  *       tool-call and thinking deltas are reassembled by index and come back
  *       as ONE {@code TOOL_CALL} message, its content in exactly the shape
- *       the old persister wrote — history stays readable for both worlds. A
- *       text answer keeps its readable reasoning in {@code metadata.thinking},
- *       for showing only: the mapper never sends metadata to the model.</li>
+ *       the old persister wrote — history stays readable for both worlds.
+ *       Readable reasoning goes to {@code metadata.thinking} (with
+ *       {@code thinkingMs}, how long it took) on the answer or the tool-call
+ *       message, for showing only: the mapper never sends metadata to the
+ *       model. The content keeps only the blocks a provider wants back —
+ *       Anthropic's signed ones — so the token counts stay honest.</li>
  * </ul>
  *
  * <p>Cancellation is the loop's handle passed straight into the gateway,
@@ -110,17 +113,22 @@ public final class LlmChatProvider implements LlmProvider {
         llmChat.chatStreaming(request, chunk -> {
             switch (chunk) {
                 case LlmStreamChunk.TextDelta td -> {
+                    round.thinkingEnded();
                     round.text.append(td.text());
                     stream.accept(new StreamEvent.Token(td.text()));
                 }
-                case LlmStreamChunk.ToolCallDelta tcd -> round.toolCallBuilders
-                        .computeIfAbsent(tcd.index(), i -> new ToolCallBuilder())
-                        .feed(tcd);
+                case LlmStreamChunk.ToolCallDelta tcd -> {
+                    round.thinkingEnded();
+                    round.toolCallBuilders
+                            .computeIfAbsent(tcd.index(), i -> new ToolCallBuilder())
+                            .feed(tcd);
+                }
                 case LlmStreamChunk.ThinkingDelta thd -> {
                     round.thinkingBuilders
                             .computeIfAbsent(thd.index(), i -> new ThinkingBlockBuilder())
                             .feed(thd);
                     if (thd.textFragment() != null && !thd.textFragment().isEmpty()) {
+                        round.thinkingStarted();
                         stream.accept(new StreamEvent.Thinking(thd.textFragment()));
                     }
                 }
@@ -158,12 +166,20 @@ public final class LlmChatProvider implements LlmProvider {
         final List<ThinkingBlock> thinkingBlocks = new ArrayList<>();
         Usage usage = Usage.ZERO;
         boolean truncated;
+        /** Wall-clock span of the readable reasoning: first fragment to whatever came after it. */
+        long thinkingStartedAt;
+        long thinkingEndedAt;
 
-        String readableThinking() {
-            return LlmChatProvider.readableThinking(thinkingBlocks);
+        void thinkingStarted() {
+            if (thinkingStartedAt == 0) thinkingStartedAt = System.currentTimeMillis();
+        }
+
+        void thinkingEnded() {
+            if (thinkingStartedAt != 0 && thinkingEndedAt == 0) thinkingEndedAt = System.currentTimeMillis();
         }
 
         void finish(LlmStreamChunk.Done done) {
+            thinkingEnded();
             for (ThinkingBlockBuilder builder : thinkingBuilders.values()) {
                 ThinkingBlock built = builder.build();
                 if (built != null) thinkingBlocks.add(built);
@@ -177,16 +193,30 @@ public final class LlmChatProvider implements LlmProvider {
         }
 
         LlmAnswer toAnswer() {
-            if (toolCalls.isEmpty()) {
-                TurnMessage answer = TurnMessage.assistant(text.toString().trim());
-                String thought = readableThinking();
-                if (thought != null) answer = answer.with("thinking", thought);
-                return new LlmAnswer(List.of(answer), usage, truncated);
+            TurnMessage message = toolCalls.isEmpty()
+                    ? TurnMessage.assistant(text.toString().trim())
+                    : TurnMessage.toolCalls(toolCallContent(replayable(thinkingBlocks), toolCalls),
+                            toolCalls.stream().map(ToolCall::id).toList());
+            String thought = readableThinking(thinkingBlocks);
+            if (thought != null) {
+                message = message.with("thinking", thought)
+                        .with("thinkingMs", Math.max(0, thinkingEndedAt - thinkingStartedAt));
             }
-            return new LlmAnswer(List.of(TurnMessage.toolCalls(
-                    toolCallContent(thinkingBlocks, toolCalls),
-                    toolCalls.stream().map(ToolCall::id).toList())), usage, truncated);
+            return new LlmAnswer(List.of(message), usage, truncated);
         }
+    }
+
+    /**
+     * The blocks a provider needs back on the next call — Anthropic's, which
+     * carry a signature or encrypted data. An unsigned block came from an
+     * OpenAI-compatible server that never takes reasoning back; storing it in
+     * the content would only be counted against the context window for text
+     * the model never sees.
+     */
+    private static List<ThinkingBlock> replayable(List<ThinkingBlock> thinkingBlocks) {
+        return thinkingBlocks.stream()
+                .filter(tb -> tb.signature() != null || tb.data() != null)
+                .toList();
     }
 
     /**

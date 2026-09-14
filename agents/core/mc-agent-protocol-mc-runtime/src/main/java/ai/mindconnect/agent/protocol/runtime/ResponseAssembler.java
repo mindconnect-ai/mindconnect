@@ -201,6 +201,9 @@ public final class ResponseAssembler {
 
     private void onThinking(String text) {
         if (pendingReasoningItemId == null) {
+            // Reasoning after text has begun (a model reflecting mid-answer) is
+            // a new item after the message, not a slot shared with it.
+            flushText();
             pendingReasoningItemId = nextItemId("rs");
             emit(new ResponseEvent.OutputItemAdded(responseId, ++seq,
                     new ConversationItemRecord(pendingReasoningItemId, items.size() + 1,

@@ -69,9 +69,14 @@ public final class TaskCardComponent implements UiComponent {
     public TaskCardComponent(String nodeId, String headerLabel,
                              String bodyMarkdown, boolean open) {
         this(nodeId, headerLabel,
-                UiMarkdown.of(nodeId + "-md", bodyMarkdown)
+                UiMarkdown.of(bodyId(nodeId), bodyMarkdown)
                         .<UiMarkdown>withCssClass("task-card-body"),
                 open);
+    }
+
+    /** The id of a card's markdown body — what a patch that grows the body alone REPLACEs. */
+    public static String bodyId(String nodeId) {
+        return nodeId + "-md";
     }
 
     /** Stable id of a sub-agent card's summary span (the running/done marker shown even when collapsed). */
@@ -176,17 +181,12 @@ public final class TaskCardComponent implements UiComponent {
     // card whose header moves while the model thinks, so the reader sees
     // that something is happening before the first token of the answer —
     // and can open it to read along. The body is REPLACEd on its own id
-    // ({@link #thinkingBodyId}) per delta, like the streaming reply bubble.
-
-    /** The id of a thinking card's body node — what each reasoning delta REPLACEs. */
-    public static String thinkingBodyId(String nodeId) {
-        return nodeId + "-md";
-    }
+    // ({@link #bodyId}) while the thought streams, like the reply bubble.
 
     /** The body node: the reasoning so far, or an ellipsis before the first word. */
     public static UiMarkdown thinkingBody(String nodeId, String text) {
-        return UiMarkdown.of(thinkingBodyId(nodeId), text == null || text.isBlank() ? "…" : text)
-                .<UiMarkdown>withCssClass("thinking-card-body");
+        return UiMarkdown.of(bodyId(nodeId), text == null || text.isBlank() ? "…" : text)
+                .<UiMarkdown>withCssClass("task-card-body thinking-card-body");
     }
 
     /** Card for a model that is thinking right now. */
@@ -199,24 +199,25 @@ public final class TaskCardComponent implements UiComponent {
         return new TaskCardComponent(nodeId, doneThinkingHeader(durationMs), thinkingBody(nodeId, text), false);
     }
 
-    /** Card rebuilt from a persisted thought; no duration was recorded for it. */
-    public static TaskCardComponent historicThinking(String nodeId, String text) {
-        return new TaskCardComponent(nodeId, historicThinkingHeader(), thinkingBody(nodeId, text), false);
+    /** Card rebuilt from a persisted thought; the duration when one was recorded. */
+    public static TaskCardComponent historicThinking(String nodeId, String text, Long durationMs) {
+        String header = durationMs != null ? doneThinkingHeader(durationMs) : historicThinkingHeader();
+        return new TaskCardComponent(nodeId, header, thinkingBody(nodeId, text), false);
     }
 
     // Plain words, no marker: a thought is neither a task that can fail nor
     // one that succeeds, so the ✓/✗ vocabulary of the tool cards does not fit.
 
-    public static String runningThinkingHeader() {
+    private static String runningThinkingHeader() {
         return "thinking…";
     }
 
     /** "thought for 12.3 s". */
-    public static String doneThinkingHeader(long durationMs) {
+    private static String doneThinkingHeader(long durationMs) {
         return "thought for " + String.format(java.util.Locale.ROOT, "%.1f", durationMs / 1000.0) + " s";
     }
 
-    public static String historicThinkingHeader() {
+    private static String historicThinkingHeader() {
         return "thinking";
     }
 

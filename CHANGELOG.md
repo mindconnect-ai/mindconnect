@@ -33,9 +33,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   to show for it — the OpenAI-compatible gateway now picks the reasoning up
   from the `reasoning_content` and `reasoning` fields as well as from inline
   `<think>` tags in the content (which no longer leak into the answer). The
-  card comes back on reload: a text answer keeps its reasoning in the
-  message's `metadata.thinking`, a tool-call turn already had it. The REST
-  stream carries it as a `thinking` frame, the Responses API as a `reasoning`
+  card comes back on reload, duration included: the message keeps its
+  reasoning in `metadata.thinking` and `thinkingMs`, on an answer and on a
+  tool-call turn alike. The REST stream carries it as a `thinking` frame, the Responses API as a `reasoning`
   item with `response.reasoning_summary_text.delta` events; the CLI stays
   quiet. Claude's adaptive thinking shows the same way when the config asks
   for it (`thinkingDisplay: summarized`).
@@ -43,8 +43,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   (OpenAI, Azure, Groq, xAI, OpenRouter, Ollama, LM Studio, …) — a select in
   the Admin UI form next to the provider's other parameters, or
   `"additionalParams": {"reasoning_effort": "high"}` in the config JSON. Which
-  levels apply depends on the model; a server whose model does not reason
-  ignores the field.
+  levels apply depends on the model. Local servers ignore the field; OpenAI
+  is only sent it with a reasoning model (gpt-5, o-series), since it rejects
+  it on any other.
 
 - **agents:** an LLM config can name **fallback models**. When the provider
   rate-limits it (HTTP 429) or reports itself overloaded (529) and the config's

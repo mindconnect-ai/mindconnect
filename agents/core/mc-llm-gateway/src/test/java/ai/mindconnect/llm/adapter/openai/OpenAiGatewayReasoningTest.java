@@ -61,6 +61,21 @@ class OpenAiGatewayReasoningTest {
     }
 
     @Test
+    void openAiGetsTheFieldOnlyWithAReasoningModel() throws Exception {
+        LlmConfig nonReasoning = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
+                "gpt-4o", "https://api.openai.com", "sk-test", 0.7, 4096,
+                Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
+        assertThat(gateway.buildRequestNode(nonReasoning.resolved(encryption), request)
+                .has("reasoning_effort")).isFalse();
+
+        LlmConfig reasoning = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
+                "gpt-5", "https://api.openai.com", "sk-test", 0.7, 4096,
+                Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
+        assertThat(gateway.buildRequestNode(reasoning.resolved(encryption), request)
+                .path("reasoning_effort").asText()).isEqualTo("high");
+    }
+
+    @Test
     void reasoningContentFieldBecomesAThinkingDelta() {
         List<LlmStreamChunk> chunks = parse(
                 "{\"choices\":[{\"delta\":{\"reasoning_content\":\"Let me see\"}}]}",

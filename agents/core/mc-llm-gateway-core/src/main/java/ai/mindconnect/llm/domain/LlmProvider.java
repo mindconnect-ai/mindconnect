@@ -181,8 +181,9 @@ public enum LlmProvider {
      * The reasoning knob every OpenAI-compatible chat endpoint spells the
      * same way: {@code reasoning_effort}. Which levels a server accepts
      * differs — OpenAI's GPT-5 line takes the whole ladder, Groq and xAI a
-     * part of it — and a server whose model does not reason ignores the
-     * field, so one shared list serves them all.
+     * part of it. Local servers ignore a field they do not know; OpenAI
+     * rejects it on a model that does not reason, so the gateway sends it
+     * there only with its reasoning models. One shared list serves them all.
      */
     private static final class ReasoningParams {
         static final List<AdditionalParamSpec> CHAT = List.of(
@@ -190,18 +191,14 @@ public enum LlmProvider {
                         List.of("none", "minimal", "low", "medium", "high", "xhigh"),
                         "How hard a reasoning model thinks before it answers — more effort, "
                                 + "slower and better. Which levels the endpoint takes depends on "
-                                + "the model; one it does not know it ignores. Leave at "
-                                + "'default' to omit.",
+                                + "the model. Local servers ignore it; OpenAI only gets it with a "
+                                + "reasoning model (gpt-5, o-series), since it rejects it "
+                                + "elsewhere. Leave at 'default' to omit.",
                         LlmConfigType.CHAT));
 
         /** For the providers that also transcribe: the chat knob and the speech ones. */
-        static final List<AdditionalParamSpec> CHAT_AND_TRANSCRIPTION = concat(CHAT, SpeechParams.TRANSCRIPTION);
-
-        private static List<AdditionalParamSpec> concat(List<AdditionalParamSpec> a, List<AdditionalParamSpec> b) {
-            List<AdditionalParamSpec> all = new java.util.ArrayList<>(a);
-            all.addAll(b);
-            return List.copyOf(all);
-        }
+        static final List<AdditionalParamSpec> CHAT_AND_TRANSCRIPTION =
+                java.util.stream.Stream.concat(CHAT.stream(), SpeechParams.TRANSCRIPTION.stream()).toList();
 
         private ReasoningParams() {
         }

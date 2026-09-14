@@ -73,6 +73,29 @@ class ResponseAssemblerTest {
     }
 
     @Test
+    void reasoningMidAnswerClosesTheMessageFirst() {
+        List<ResponseEvent> events = new ArrayList<>();
+        assembler.subscribe(0, events::add);
+        assembler.accept(new StreamEvent.Token("Sure. "));
+        assembler.accept(new StreamEvent.Thinking("wait"));
+        assembler.accept(new StreamEvent.Token("42"));
+        assembler.accept(new StreamEvent.Done());
+
+        List<ConversationItemRecord> output = assembler.snapshot().output();
+        assertThat(output).hasSize(3);
+        assertThat(output.get(0).item()).isInstanceOf(ConversationItem.Message.class);
+        assertThat(output.get(1).item()).isEqualTo(new ConversationItem.Reasoning("wait", null));
+        assertThat(output.get(2).item()).isInstanceOf(ConversationItem.Message.class);
+        // every item is announced and finished at one and the same index
+        List<Long> added = events.stream().filter(e -> e instanceof ResponseEvent.OutputItemAdded)
+                .map(e -> ((ResponseEvent.OutputItemAdded) e).entry().seq()).toList();
+        List<Long> done = events.stream().filter(e -> e instanceof ResponseEvent.OutputItemDone)
+                .map(e -> ((ResponseEvent.OutputItemDone) e).entry().seq()).toList();
+        assertThat(added).containsExactly(1L, 2L, 3L);
+        assertThat(done).isEqualTo(added);
+    }
+
+    @Test
     void subAgentBecomesAgentCallPair() {
         UUID taskId = UUID.randomUUID();
         SessionId subSession = SessionId.random();

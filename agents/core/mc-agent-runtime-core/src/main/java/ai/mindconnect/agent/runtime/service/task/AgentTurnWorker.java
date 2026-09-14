@@ -363,12 +363,13 @@ public final class AgentTurnWorker implements TaskWorker {
         try {
             LlmAnswer answer = llm.ask(turnId.value(), session.id(),
                     messageLog.load(conversationId), List.of(), cancellation);
-            String text = answer.messages().stream()
+            TurnMessage draft = answer.messages().stream()
                     .filter(m -> m.type() == MessageType.CHAT)
-                    .map(TurnMessage::content)
-                    .findFirst().orElse("");
-            String reviewed = reviewer.review(text);
-            messageLog.append(conversationId, TurnMessage.assistant(reviewed));
+                    .findFirst().orElse(TurnMessage.assistant(""));
+            String reviewed = reviewer.review(draft.content());
+            // Same message, reviewed text: the reasoning that led to it stays.
+            messageLog.append(conversationId,
+                    new TurnMessage(draft.type(), draft.senderType(), reviewed, draft.metadata()));
             return new ForcedAnswer(reviewed, answer.usage());
         } catch (RuntimeException e) {
             log.warn("Forced final answer after MAX_ROUNDS failed: {}", e.getMessage());

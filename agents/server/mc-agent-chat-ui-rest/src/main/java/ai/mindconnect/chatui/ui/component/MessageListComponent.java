@@ -252,11 +252,8 @@ public final class MessageListComponent implements UiComponent {
                 }
                 // The thought that led to this answer sits right above it,
                 // after the tools — where it was while the turn streamed.
-                Object thinking = m.metadata() == null ? null : m.metadata().get("thinking");
-                if (thinking instanceof String thought && !thought.isBlank()) {
-                    var card = TaskCardComponent.historicThinking("task-think-" + m.id().value(), thought);
-                    list.item(((UiList) card.render()).getItems().get(0));
-                }
+                Thoughts.of(m).ifPresent(thought ->
+                        list.item(((UiList) Thoughts.card(m, thought).render()).getItems().get(0)));
             }
             list.item(messageItem(m, isUser));
             prevAgentSeq = m.sequenceNum();
@@ -394,7 +391,7 @@ public final class MessageListComponent implements UiComponent {
      * every delta — same shape as {@link #replaceBotPending(String, String)}.
      */
     public UiPatch.Operation replaceThinkingBody(String nodeId, String cumulativeText) {
-        return UiPatch.Operation.replace(TaskCardComponent.thinkingBodyId(nodeId),
+        return UiPatch.Operation.replace(TaskCardComponent.bodyId(nodeId),
                 TaskCardComponent.thinkingBody(nodeId, cumulativeText));
     }
 
@@ -458,12 +455,23 @@ public final class MessageListComponent implements UiComponent {
 
     /** The final assistant CHAT text in this component's history, or {@code null}. */
     public String lastAssistantText() {
+        return lastAssistantMessage().map(Message::content).orElse(null);
+    }
+
+    /**
+     * The card for the thought behind the final assistant answer, when it
+     * carried one — what a sub-agent's nested tree shows ahead of its answer,
+     * since that tree is built from task cards and never runs {@link #render()}.
+     */
+    public java.util.Optional<TaskCardComponent> lastAssistantThinkingCard() {
+        return lastAssistantMessage().flatMap(m -> Thoughts.of(m).map(thought -> Thoughts.card(m, thought)));
+    }
+
+    private java.util.Optional<Message> lastAssistantMessage() {
         return history.stream()
                 .filter(m -> m.type() == MessageType.CHAT)
                 .filter(m -> m.senderType() != ParticipantType.USER)
-                .max(Comparator.comparingInt(Message::sequenceNum))
-                .map(Message::content)
-                .orElse(null);
+                .max(Comparator.comparingInt(Message::sequenceNum));
     }
 
     // ── Internal: the pieces this list is assembled from ───────────────────

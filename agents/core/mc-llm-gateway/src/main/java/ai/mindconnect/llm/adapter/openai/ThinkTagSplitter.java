@@ -11,6 +11,15 @@ package ai.mindconnect.llm.adapter.openai;
  * stream handler and routes what is inside the tags to the thinking channel
  * and what is outside to the text channel.
  *
+ * <p>A thought comes before the answer, and that is the only place it is
+ * looked for: once any real text has gone out, a {@code <think>} is just
+ * text — a user asking what the tag does, or a quoted chat template, keeps
+ * its answer. A stray {@code </think>} is dropped wherever it appears, so a
+ * server whose template pre-filled the opening tag does not leak the closing
+ * one; the reasoning before it cannot be told from the answer without
+ * buffering the whole stream, and those servers usually parse it out
+ * themselves ({@code reasoning_content}).
+ *
  * <p>Deltas are small and cut anywhere, so a tag can straddle two of them
  * ({@code "<thi"} + {@code "nk>"}). The splitter keeps back the shortest
  * tail that could still turn out to be the start of the tag it is waiting
@@ -29,6 +38,8 @@ final class ThinkTagSplitter {
     }
 
     private boolean inside;
+    /** Whether non-blank answer text has gone out — after that, no thought can start. */
+    private boolean textReleased;
     private final StringBuilder held = new StringBuilder();
 
     /** Feeds the next content delta; returns the parts released by it. */
@@ -38,20 +49,40 @@ final class ThinkTagSplitter {
         StringBuilder text = new StringBuilder();
         StringBuilder thinking = new StringBuilder();
         while (true) {
-            String tag = inside ? CLOSE : OPEN;
-            StringBuilder out = inside ? thinking : text;
-            int at = held.indexOf(tag);
-            if (at >= 0) {
-                out.append(held, 0, at);
-                held.delete(0, at + tag.length());
-                inside = !inside;
+            if (inside) {
+                int at = held.indexOf(CLOSE);
+                if (at >= 0) {
+                    thinking.append(held, 0, at);
+                    held.delete(0, at + CLOSE.length());
+                    inside = false;
+                    continue;
+                }
+                release(thinking, partialTagLength(CLOSE));
+                break;
+            }
+            int close = held.indexOf(CLOSE);
+            int open = textReleased ? -1 : held.indexOf(OPEN);
+            if (open >= 0 && !held.substring(0, open).isBlank()) {
+                // Real text came first in this very delta: the tag is quoted, not a thought.
+                textReleased = true;
+                open = -1;
+            }
+            if (open >= 0 && (close < 0 || open < close)) {
+                text.append(held, 0, open);
+                held.delete(0, open + OPEN.length());
+                inside = true;
                 continue;
             }
-            int keep = partialTagLength(tag);
-            out.append(held, 0, held.length() - keep);
-            held.delete(0, held.length() - keep);
+            if (close >= 0) {
+                // A closing tag with no opening one: drop it, keep the text.
+                text.append(held, 0, close);
+                held.delete(0, close + CLOSE.length());
+                continue;
+            }
+            release(text, Math.max(partialTagLength(CLOSE), textReleased ? 0 : partialTagLength(OPEN)));
             break;
         }
+        if (!text.isEmpty() && !text.toString().isBlank()) textReleased = true;
         return new Split(nullIfEmpty(text), nullIfEmpty(thinking));
     }
 
@@ -61,6 +92,12 @@ final class ThinkTagSplitter {
         String rest = held.toString();
         held.setLength(0);
         return inside ? new Split(null, rest) : new Split(rest, null);
+    }
+
+    /** Moves everything but the last {@code keep} chars of {@code held} to {@code out}. */
+    private void release(StringBuilder out, int keep) {
+        out.append(held, 0, held.length() - keep);
+        held.delete(0, held.length() - keep);
     }
 
     /** Length of the longest tail of {@code held} that is a proper prefix of {@code tag}. */
