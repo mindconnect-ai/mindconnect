@@ -19,8 +19,10 @@ import java.util.Map;
  * Lists pending migrations (bundled initial-data that is new or differs from
  * what is stored), grouped into one collapsible section per entity type — the
  * same layout the tool catalog uses. Each changed record shows its field-level
- * differences as a Before/After table; each item has an Apply action and a
- * header "Apply all" applies every pending change at once.
+ * differences as a Before/After table; each item has an Apply action, each
+ * diff row an Apply of its own (that one field only, the rest of the stored
+ * record — an API key, say — is kept), and a header "Apply all" applies every
+ * pending change at once.
  */
 public final class MigrationListComponent implements UiComponent {
 
@@ -91,15 +93,23 @@ public final class MigrationListComponent implements UiComponent {
         return item;
     }
 
-    /** Field-level differences as a Before (stored) / After (bundled) table. */
+    /**
+     * Field-level differences as a Before (stored) / After (bundled) table.
+     * Every row carries its own Apply: the client fills {@code {id}} with the
+     * row id, which is the (URL-encoded) field name.
+     */
     private static UiTable diffTable(PendingMigration p) {
         var table = UiTable.of("migration-diff-" + p.id(), null)
                 .column(UiColumn.text("field", "Field"))
                 .column(UiColumn.text("before", "Before (stored)"))
-                .column(UiColumn.text("after", "After (bundled)"));
+                .column(UiColumn.text("after", "After (bundled)"))
+                .rowAction(UiAction.secondary("apply-field", "Apply").icon("check")
+                        .confirm("Apply only this field for '" + p.name() + "'? Everything else stays as stored.")
+                        .dispatch("POST", "/admin/api/migrations/apply-field?id=" + encode(p.id()) + "&field={id}"));
         table.withCssClass("migration-diff");
         for (FieldDiff d : p.diffs()) {
             table.row(Map.of(
+                    "id",     encode(d.field()),
                     "field",  d.field(),
                     "before", d.before() == null ? "—" : d.before(),
                     "after",  d.after()  == null ? "—" : d.after()));

@@ -1,0 +1,11 @@
+{
+  "id": "aaaaaaaa-0000-0000-0000-000000000001",
+  "name": "migration-field-test",
+  "provider": "ANTHROPIC",
+  "model": "new-model",
+  "baseUrl": "https://api.anthropic.com",
+  "apiKey": "bundled-placeholder-key",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 8192,
+  "contextWindowTokens": 200000
+}

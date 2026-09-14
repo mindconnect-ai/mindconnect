@@ -2,6 +2,8 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.common.util.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.workflow.domain.WorkflowData;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 
@@ -29,7 +32,13 @@ import java.util.Set;
  * <p>Where {@code ai.mindconnect.adminui.InitialDataLoader} silently imports new
  * records at startup and skips differing ones, this service surfaces every
  * pending change (new <em>and</em> changed) so an admin can review the diff in
- * the Migrations tab and apply or ignore each one individually.
+ * the Migrations tab and apply or ignore each one individually — as a whole, or
+ * one field at a time (see {@link #applyField}).
+ *
+ * <p>An LLM config's {@code apiKey} is compared by what it resolves to, not by
+ * its stored form: the store encrypts keys ({@code enc:…}) and seeds carry
+ * {@code ${ENV_VAR}} placeholders, so a byte-wise diff would flag every config
+ * forever. Key values are never shown in the diff, only whether they differ.
  *
  * <p>A pending migration is identified by a stable {@link PendingMigration#id()}
  * derived from its entity type and name, so the UI can round-trip an "apply"
@@ -96,15 +105,22 @@ public class MigrationService {
     private final AgentDefinitionRepository agentDefinitionRepository;
     private final WorkflowDataRepository workflowDataRepository;
     private final ObjectMapper objectMapper;
+    private final EncryptionHelper encryption;
 
+    /**
+     * @param encryption decrypts stored {@code enc:} keys for the diff; without
+     *                   it such keys cannot be compared and always count as different
+     */
     public MigrationService(LlmConfigRepository llmConfigRepository,
                             AgentDefinitionRepository agentDefinitionRepository,
                             WorkflowDataRepository workflowDataRepository,
-                            ObjectMapper objectMapper) {
+                            ObjectMapper objectMapper,
+                            Optional<EncryptionHelper> encryption) {
         this.llmConfigRepository = llmConfigRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.workflowDataRepository = workflowDataRepository;
         this.objectMapper = objectMapper;
+        this.encryption = encryption.orElseGet(EncryptionHelper::noEncryption);
     }
 
     // ── Read: pending list ──────────────────────────────────────────────────────
@@ -123,7 +139,8 @@ public class MigrationService {
         for (Resource resource : scan("classpath:initial-data/llm-configs/*.json")) {
             readEach(resource, LlmConfig.class, objectMapper).ifPresent(incoming -> {
                 Optional<LlmConfig> existing = llmConfigRepository.findByName(incoming.name());
-                pendingFor(EntityType.LLM_CONFIG, incoming.name(), existing.orElse(null), incoming, objectMapper)
+                LlmConfig compared = existing.map(stored -> withStoredKeyIfSame(stored, incoming)).orElse(incoming);
+                pendingFor(EntityType.LLM_CONFIG, incoming.name(), existing.orElse(null), compared, objectMapper)
                         .ifPresent(result::add);
             });
         }
@@ -204,45 +221,151 @@ public class MigrationService {
     }
 
     private boolean applyLlmConfig(String name) {
-        for (Resource resource : scan("classpath:initial-data/llm-configs/*.json")) {
-            Optional<LlmConfig> incoming = readEach(resource, LlmConfig.class, objectMapper)
-                    .filter(c -> c.name().equals(name));
-            if (incoming.isPresent()) {
-                llmConfigRepository.save(incoming.get());
-                log.info("Applied migration for LLM config '{}'", name);
-                return true;
-            }
-        }
-        return false;
+        Optional<LlmConfig> incoming = bundledLlmConfig(name);
+        if (incoming.isEmpty()) return false;
+        llmConfigRepository.save(incoming.get());
+        log.info("Applied migration for LLM config '{}'", name);
+        return true;
     }
 
     private boolean applyAgent(String name) {
-        for (Resource resource : scan("classpath:initial-data/agent-definitions/*.json")) {
-            Optional<AgentDefinition> incoming = readEach(resource, AgentDefinition.class, objectMapper)
-                    .filter(a -> a.name().equals(name));
-            if (incoming.isPresent()) {
-                agentDefinitionRepository.save(incoming.get());
-                log.info("Applied migration for agent '{}'", name);
-                return true;
-            }
-        }
-        return false;
+        Optional<AgentDefinition> incoming = bundledAgent(name);
+        if (incoming.isEmpty()) return false;
+        agentDefinitionRepository.save(incoming.get());
+        log.info("Applied migration for agent '{}'", name);
+        return true;
     }
 
     private boolean applyWorkflow(String id) {
+        Optional<WorkflowData> incoming = bundledWorkflow(id);
+        if (incoming.isEmpty()) return false;
+        workflowDataRepository.save(id, incoming.get());
+        log.info("Applied migration for workflow '{}'", id);
+        return true;
+    }
+
+    // ── Write: apply one field ──────────────────────────────────────────────────
+
+    /**
+     * Applies a single top-level field of a pending migration: the bundled value
+     * of {@code field} is copied into the stored record, everything else the
+     * stored record has stays as it is. This is how an admin takes, say, a new
+     * model name from the bundle without losing the API key that only the
+     * stored copy carries.
+     *
+     * <p>A field the bundled version dropped is removed from the stored record.
+     * NEW records have nothing stored to merge into and are not applicable.
+     *
+     * @return true if a stored record, a bundled record and the field were all
+     *         found and the merged record was saved
+     */
+    public boolean applyField(String migrationId, String field) {
+        int sep = migrationId.indexOf(':');
+        if (sep < 0) throw new IllegalArgumentException("Malformed migration id: " + migrationId);
+        EntityType type = EntityType.fromSlug(migrationId.substring(0, sep));
+        String name = migrationId.substring(sep + 1);
+
+        boolean applied = switch (type) {
+            case LLM_CONFIG -> bundledLlmConfig(name)
+                    .flatMap(incoming -> llmConfigRepository.findByName(name)
+                            .flatMap(stored -> mergeField(stored, incoming, field, LlmConfig.class, objectMapper)))
+                    .map(merged -> { llmConfigRepository.save(merged); return true; })
+                    .orElse(false);
+            case AGENT -> bundledAgent(name)
+                    .flatMap(incoming -> agentDefinitionRepository.findByName(name)
+                            .flatMap(stored -> mergeField(stored, incoming, field, AgentDefinition.class, objectMapper)))
+                    .map(merged -> { agentDefinitionRepository.save(merged); return true; })
+                    .orElse(false);
+            case WORKFLOW -> bundledWorkflow(name)
+                    .flatMap(incoming -> workflowDataRepository.findById(name)
+                            .flatMap(stored -> mergeField(stored, incoming, field, WorkflowData.class, WORKFLOW_MAPPER)))
+                    .map(merged -> { workflowDataRepository.save(name, merged); return true; })
+                    .orElse(false);
+        };
+        if (applied) log.info("Applied field '{}' of migration '{}'", field, migrationId);
+        return applied;
+    }
+
+    /**
+     * {@code stored} with only {@code field} taken from {@code incoming}, going
+     * through JSON so it works for every entity type alike. Empty when neither
+     * side has the field (nothing to apply — e.g. the diff's pseudo rows).
+     */
+    static <T> Optional<T> mergeField(T stored, T incoming, String field, Class<T> type, ObjectMapper mapper) {
+        try {
+            ObjectNode storedNode   = mapper.valueToTree(stored);
+            ObjectNode incomingNode = mapper.valueToTree(incoming);
+            if (!storedNode.has(field) && !incomingNode.has(field)) return Optional.empty();
+            JsonNode value = incomingNode.get(field);
+            if (value == null) storedNode.remove(field); else storedNode.set(field, value);
+            return Optional.of(mapper.treeToValue(storedNode, type));
+        } catch (Exception e) {
+            log.warn("Could not merge field '{}' into {}: {}", field, type.getSimpleName(), e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    // ── Read: bundled records ───────────────────────────────────────────────────
+
+    private Optional<LlmConfig> bundledLlmConfig(String name) {
+        for (Resource resource : scan("classpath:initial-data/llm-configs/*.json")) {
+            Optional<LlmConfig> incoming = readEach(resource, LlmConfig.class, objectMapper)
+                    .filter(c -> c.name().equals(name));
+            if (incoming.isPresent()) return incoming;
+        }
+        return Optional.empty();
+    }
+
+    private Optional<AgentDefinition> bundledAgent(String name) {
+        for (Resource resource : scan("classpath:initial-data/agent-definitions/*.json")) {
+            Optional<AgentDefinition> incoming = readEach(resource, AgentDefinition.class, objectMapper)
+                    .filter(a -> a.name().equals(name));
+            if (incoming.isPresent()) return incoming;
+        }
+        return Optional.empty();
+    }
+
+    private Optional<WorkflowData> bundledWorkflow(String id) {
         for (Resource resource : scan("classpath:initial-data/workflows/*.json")) {
             if (!id.equals(fileId(resource))) continue;
-            Optional<WorkflowData> incoming = readEach(resource, WorkflowData.class, WORKFLOW_MAPPER);
-            if (incoming.isPresent()) {
-                workflowDataRepository.save(id, incoming.get());
-                log.info("Applied migration for workflow '{}'", id);
-                return true;
-            }
+            return readEach(resource, WorkflowData.class, WORKFLOW_MAPPER);
         }
-        return false;
+        return Optional.empty();
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────
+
+    /**
+     * The bundled config carrying the stored key when both keys resolve to the
+     * same secret, so the diff does not report a difference that is only the
+     * store's encryption or a placeholder the environment fills in.
+     */
+    private LlmConfig withStoredKeyIfSame(LlmConfig stored, LlmConfig incoming) {
+        return sameSecret(stored.apiKey(), incoming.apiKey()) ? incoming.withApiKey(stored.apiKey()) : incoming;
+    }
+
+    private boolean sameSecret(String a, String b) {
+        return Objects.equals(plaintext(a), plaintext(b));
+    }
+
+    /** {@code ${VAR}} expanded and {@code enc:}/{@code plain:} stripped; the value itself when that fails. */
+    private String plaintext(String key) {
+        if (key == null) return null;
+        try {
+            return encryption.resolve(EnvVarResolver.resolve(key));
+        } catch (RuntimeException e) {
+            return key;
+        }
+    }
+
+    /** A secret's value never reaches the diff — only whether and how it is stored. */
+    static String maskSecret(JsonNode value) {
+        if (value == null) return null;
+        String text = value.asText();
+        if (EnvVarResolver.containsPlaceholder(text)) return text;
+        if (text.startsWith(EncryptionHelper.ENC)) return "(encrypted)";
+        return "••••••••";
+    }
 
     /** The seed's identity: its file name without the {@code .json} extension. */
     private static String fileId(Resource resource) {
@@ -286,7 +409,10 @@ public class MigrationService {
                 JsonNode oldVal = storedNode.get(field);
                 JsonNode newVal = incomingNode.get(field);
                 if (oldVal == null ? newVal == null : oldVal.equals(newVal)) continue;
-                diffs.add(new FieldDiff(field, render(oldVal), render(newVal)));
+                boolean secret = "apiKey".equals(field);
+                diffs.add(new FieldDiff(field,
+                        secret ? maskSecret(oldVal) : render(oldVal),
+                        secret ? maskSecret(newVal) : render(newVal)));
             }
             if (diffs.isEmpty()) {
                 diffs.add(new FieldDiff("(structural difference)", null, null));

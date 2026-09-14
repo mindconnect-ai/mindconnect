@@ -31,6 +31,13 @@ public class MigrationUiController {
         return list();
     }
 
+    /** Applies one field of a pending migration; the rest of the stored record is kept. */
+    @PostMapping("/apply-field")
+    public UiPage applyField(@RequestParam("id") String id, @RequestParam("field") String field) {
+        migrationService.applyField(id, field);
+        return list();
+    }
+
     @PostMapping("/apply-all")
     public UiPage applyAll() {
         migrationService.applyAll();
