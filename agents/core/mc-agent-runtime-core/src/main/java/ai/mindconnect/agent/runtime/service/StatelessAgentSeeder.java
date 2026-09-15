@@ -65,12 +65,61 @@ public class StatelessAgentSeeder {
 
     // ── fields ────────────────────────────────────────────────────────────────
     private final AgentDefinitionRepository repository;
+    private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigs;
     private final String defaultLlmConfigName;
 
     public StatelessAgentSeeder(AgentDefinitionRepository repository,
                                 String defaultLlmConfigName) {
+        this(repository, null, defaultLlmConfigName);
+    }
+
+    /**
+     * @param llmConfigs where to find an LLM config for a helper when none is configured:
+     *                   {@code agent-default} if the namespace has it, else its first config.
+     *                   Null means "only the configured name".
+     */
+    public StatelessAgentSeeder(AgentDefinitionRepository repository,
+                                ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigs,
+                                String defaultLlmConfigName) {
         this.repository = repository;
+        this.llmConfigs = llmConfigs;
         this.defaultLlmConfigName = defaultLlmConfigName;
+    }
+
+    /** Whether {@code name} is one of the helpers this seeder knows how to create. */
+    public static boolean knows(String name) {
+        return SEEDS.stream().anyMatch(entry -> entry.name().equals(name));
+    }
+
+    /**
+     * The helper named {@code name} in the repository this seeder writes to —
+     * created there if missing, so a namespace gets its helpers on first use.
+     * Empty when the name is not a helper of ours, or when no LLM config can be
+     * found to run it on.
+     */
+    public java.util.Optional<AgentDefinition> ensure(String name) {
+        java.util.Optional<AgentDefinition> existing = repository.findByName(name);
+        if (existing.isPresent()) return existing;
+        java.util.Optional<SeedEntry> seed = SEEDS.stream().filter(entry -> entry.name().equals(name)).findFirst();
+        if (seed.isEmpty()) return java.util.Optional.empty();
+        java.util.Optional<String> configName = llmConfigNameForHelpers();
+        if (configName.isEmpty()) {
+            log.warn("Cannot create stateless agent '{}': no LLM config to run it on", name);
+            return java.util.Optional.empty();
+        }
+        AgentDefinition def = AgentDefinition.create(seed.get().name(), seed.get().description(),
+                seed.get().systemPrompt(), null, configName.get());
+        repository.save(def);
+        log.info("Created stateless agent '{}' on first use (LLM config '{}')", name, configName.get());
+        return java.util.Optional.of(def);
+    }
+
+    /** The configured name, else {@code agent-default} where it exists, else the first config there is. */
+    private java.util.Optional<String> llmConfigNameForHelpers() {
+        if (defaultLlmConfigName != null) return java.util.Optional.of(defaultLlmConfigName);
+        if (llmConfigs == null) return java.util.Optional.empty();
+        if (llmConfigs.findByName("agent-default").isPresent()) return java.util.Optional.of("agent-default");
+        return llmConfigs.findAll().stream().map(ai.mindconnect.llm.domain.LlmConfig::name).findFirst();
     }
 
     /**

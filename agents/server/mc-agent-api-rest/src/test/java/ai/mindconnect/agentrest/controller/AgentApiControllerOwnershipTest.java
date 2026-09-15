@@ -177,7 +177,7 @@ class AgentApiControllerOwnershipTest {
         final List<String> calls = new CopyOnWriteArrayList<>();
 
         RecordingChatService(AgentSessionService sessions) {
-            super(sessions, null, null, null, null, null, null, null, null, null, null, null, null);
+            super(sessions, null, null, null, null, null, null, null, null, null, null);
         }
 
         @Override

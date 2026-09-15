@@ -85,13 +85,17 @@ public class DefaultAgentRuntimeConfig {
             AgentDefinitionRepository definitionRepository,
             LlmChat llmChat,
             PromptRenderer promptRenderer,
+            org.springframework.beans.factory.ObjectProvider<LlmConfigRepository> llmConfigs,
             @Value("${mindconnect.agent.stateless.llm-config-name:}") String defaultLlmConfigName) {
         String configName = defaultLlmConfigName.isBlank() ? null : defaultLlmConfigName;
         if (configName == null) {
-            log.warn("mindconnect.agent.stateless.llm-config-name not configured — " +
-                    "stateless tasks will only work if a matching AgentDefinition exists");
+            log.info("mindconnect.agent.stateless.llm-config-name not configured — a helper agent a namespace "
+                    + "lacks is created on first use with the namespace's agent-default (or first) LLM config");
         }
-        return new StatelessAgentTaskRunner(definitionRepository, llmChat, configName, promptRenderer);
+        // A namespace that never ran a helper (title generator, summarizers) gets it on first use.
+        var seeder = new ai.mindconnect.agent.runtime.service.StatelessAgentSeeder(
+                definitionRepository, llmConfigs.getIfAvailable(), configName);
+        return new StatelessAgentTaskRunner(definitionRepository, llmChat, configName, promptRenderer, seeder);
     }
 
     /**
@@ -344,15 +348,6 @@ public class DefaultAgentRuntimeConfig {
         return new ToolExecutor(advisors);
     }
 
-    /**
-     * Virtual-thread executor used by {@code AgentChatService.submitChat}. Sized
-     * implicitly by the JVM. Cleanly shut down with the Spring context.
-     */
-    @Bean(destroyMethod = "shutdown")
-    ExecutorService turnExecutor() {
-        return Executors.newVirtualThreadPerTaskExecutor();
-    }
-
     // ── Use-case services ──────────────────────────────────────────────────
 
     @Bean
@@ -486,7 +481,9 @@ public class DefaultAgentRuntimeConfig {
      * the executor-based turn before it; the JDBC store is the cluster path.
      */
     @Bean(destroyMethod = "close")
-    LocalTaskQueue taskQueue(AgentTurnWorker agentTurnWorker, ToolCallWorker toolCallWorker, ScopeSupplier scope) {
+    LocalTaskQueue taskQueue(AgentTurnWorker agentTurnWorker, ToolCallWorker toolCallWorker,
+                             ai.mindconnect.agent.runtime.service.task.SessionTitleWorker sessionTitleWorker,
+                             ScopeSupplier scope) {
         LocalTaskQueue queue = new LocalTaskQueue(new InMemoryTaskStore());
         // A failed task is otherwise visible only in the task dialog, and only while it is recent.
         queue.addListener(ai.mindconnect.taskqueue.LoggingTaskListener.failuresOnly());
@@ -497,7 +494,17 @@ public class DefaultAgentRuntimeConfig {
         toolCallWorker.attach(queue);                       // awaits sub-agent turns
         queue.register(AgentTurnWorker.TYPE, agentTurnWorker);
         queue.register(ToolCallWorker.TYPE, toolCallWorker);
+        queue.register(ai.mindconnect.agent.runtime.service.task.SessionTitleWorker.TYPE, sessionTitleWorker);
         return queue;
+    }
+
+    /** Names a chat after its first exchange — behind the turn, as a task of its own. */
+    @Bean
+    ai.mindconnect.agent.runtime.service.task.SessionTitleWorker sessionTitleWorker(
+            AgentSessionService sessionService, ConversationManager conversationManager,
+            AgentTaskRunner agentTaskRunner, UserChannels userChannels) {
+        return new ai.mindconnect.agent.runtime.service.task.SessionTitleWorker(
+                sessionService, conversationManager, agentTaskRunner, userChannels);
     }
 
     @Bean
@@ -544,18 +551,17 @@ public class DefaultAgentRuntimeConfig {
                                       MemoryStrategyFactory memoryStrategyFactory,
                                       WorkingMemoryRepository workingMemoryRepository,
                                       PromptRenderer promptRenderer,
-                                      AgentTaskRunner agentTaskRunner,
                                       SessionChannels sessionChannels,
                                       UserChannels userChannels,
                                       LocalTaskQueue taskQueue,
                                       ToolApprovalStore approvalStore,
-                                      ExecutorService turnExecutor,
                                       ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructionFiles,
-                                      ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog) {
+                                      ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog,
+                                      ScopeSupplier scope) {
         return new AgentChatService(sessionService, definitionRepository, conversationManager,
                 memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                agentTaskRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
-                instructionFiles, skillCatalog);
+                sessionChannels, userChannels, taskQueue, approvalStore,
+                instructionFiles, skillCatalog, scope);
     }
 
     /**
