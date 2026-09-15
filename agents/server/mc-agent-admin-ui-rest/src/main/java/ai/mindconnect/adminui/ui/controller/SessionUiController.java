@@ -3,7 +3,9 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.adminui.ui.page.MemoryPage;
 import ai.mindconnect.adminui.ui.page.TodosPage;
 import ai.mindconnect.adminui.ui.page.TracesPage;
-import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
+import ai.mindconnect.adminui.ui.component.RoundtripCardComponent;
+import ai.mindconnect.agent.runtime.domain.TraceId;
+import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
@@ -13,10 +15,10 @@ import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +32,9 @@ import java.util.List;
 @RestController
 @RequestMapping("/admin/api")
 public class SessionUiController {
+
+    /** DOM id of the per-call dialog; one open at a time, re-opening replaces it. */
+    static final String TRACE_DIALOG_ID = "trace-dialog";
 
     private static final Logger log = LoggerFactory.getLogger(SessionUiController.class);
 
@@ -159,63 +164,77 @@ public class SessionUiController {
     }
 
     /**
-     * Per-turn LLM call traces. Without {@code turnId}: full master-detail
-     * page (most recent turn pre-selected). With {@code turnId}: a UiPatch
-     * that swaps only the detail pane to show that turn's roundtrips.
+     * The LLM calls of the session and its sub-agents as a table — headers
+     * only, the payloads are loaded per row by {@link #getTrace}.
      */
     @GetMapping("/sessions/{sessionId}/traces")
     public ResponseEntity<?> getTraces(@PathVariable("sessionId") String sessionIdValue,
-                                        @RequestParam(value = "turnId", required = false) String turnIdValue,
                                         @RequestParam(value = "dialog", defaultValue = "false") boolean dialog) {
         SessionId sessionId = SessionId.of(sessionIdValue);
-        ChatTurnId turnId = turnIdValue == null || turnIdValue.isBlank()
-                ? null : ChatTurnId.of(turnIdValue);
         if (traceRepository == null) {
             return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
         }
 
         // Walk the session tree directly via parentSessionId: top-level
         // session + every sub-agent session (transitively) it spawned. For
-        // each session we know the conversationId, so we read traces and
-        // history straight from those known paths — no scanning every
-        // conversation directory on disk.
-        List<SessionId> sessionIds = collectSessionTree(sessionId);
-        List<LlmCallTrace> traces = new java.util.ArrayList<>();
-        for (SessionId sid : sessionIds) {
+        // each session we know the conversationId, so we read the headers
+        // straight from those known paths — no scanning every conversation
+        // directory on disk.
+        List<LlmCallTraceHeader> traces = new java.util.ArrayList<>();
+        for (SessionId sid : collectSessionTree(sessionId)) {
             try {
                 ConversationId convId = sessionRepository.findById(sid)
                         .map(s -> s.conversationId()).orElse(null);
                 if (convId == null) continue;
-                traces.addAll(traceRepository.findByConversation(convId));
+                traces.addAll(traceRepository.findHeadersByConversation(convId));
             } catch (Exception e) {
                 log.warn("Failed to load traces for session {}: {}", sid, e.getMessage());
             }
         }
-        traces.sort(java.util.Comparator.comparing(
-                LlmCallTrace::startedAt));
 
-        // History needs to span every session in the tree so the trace UI
-        // can show TOOL_RESULT messages alongside their tool calls.
-        List<Message> combinedHistory = new java.util.ArrayList<>();
-        for (SessionId sid : sessionIds) {
-            try {
-                combinedHistory.addAll(sessionService.loadHistory(sid));
-            } catch (Exception e) {
-                log.warn("Failed to load history for session {}: {}", sid, e.getMessage());
-            }
-        }
-
-        final List<LlmCallTrace> tracesFinal = traces;
-        final List<Message> historyFinal = combinedHistory;
         return sessionRepository.findById(sessionId)
                 .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
                         .map(agent -> {
-                            var page = new TracesPage(session, agent,
-                                    tracesFinal, historyFinal, turnId);
-                            if (turnId != null) return ResponseEntity.ok(page.selectTurn(turnId));
+                            var page = new TracesPage(session, agent, traces);
                             if (dialog) return sessionDialog(sessionId, "Traces", page.render());
                             return ResponseEntity.ok(page.render());
                         }))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * One LLM call in a dialog over the traces table: request, response
+     * and raw event stream. The tool results shown next to the call's tool
+     * calls come from the history of the session that issued the call —
+     * for a sub-agent's call that is the sub-agent's session, not the one
+     * in the path.
+     */
+    @GetMapping("/sessions/{sessionId}/traces/{traceId}")
+    public ResponseEntity<?> getTrace(@PathVariable("sessionId") String sessionIdValue,
+                                      @PathVariable("traceId") String traceIdValue) {
+        if (traceRepository == null) {
+            return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
+        }
+        return traceRepository.findById(TraceId.of(traceIdValue))
+                .map(trace -> {
+                    SessionId owner = trace.context() != null && trace.context().sessionId() != null
+                            ? trace.context().sessionId() : SessionId.of(sessionIdValue);
+                    List<Message> history;
+                    try {
+                        history = sessionService.loadHistory(owner);
+                    } catch (Exception e) {
+                        log.warn("Failed to load history for session {}: {}", owner, e.getMessage());
+                        history = List.of();
+                    }
+                    var card = new RoundtripCardComponent(trace,
+                            RoundtripCardComponent.indexToolResults(history));
+                    var dlg = UiDialog.of(card.title(), null, card.render());
+                    dlg.setId(TRACE_DIALOG_ID);
+                    dlg.withCssClass("sui-dialog--wide");
+                    return ResponseEntity.ok(UiPatch.of()
+                            .patch(UiPatch.Operation.remove(TRACE_DIALOG_ID))
+                            .patch(UiPatch.Operation.append("sui-dialogs", dlg)));
+                })
                 .orElse(ResponseEntity.notFound().build());
     }
 

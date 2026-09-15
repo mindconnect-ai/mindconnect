@@ -234,12 +234,12 @@ body {
     overflow-y: auto;
 }
 
-/* Indentation per nesting level for sub-agent roundtrip cards. */
-.trace-depth-1 { margin-left: 24px;  border-left: 3px solid var(--sui-color-border-strong); padding-left: 10px; }
-.trace-depth-2 { margin-left: 48px;  border-left: 3px solid var(--sui-color-text-subtle); padding-left: 10px; }
-.trace-depth-3 { margin-left: 72px;  border-left: 3px solid var(--sui-color-text-muted); padding-left: 10px; }
-.trace-depth-4 { margin-left: 96px;  border-left: 3px solid var(--sui-color-text-body); padding-left: 10px; }
-.trace-depth-5 { margin-left: 120px; border-left: 3px solid var(--sui-color-text-strong); padding-left: 10px; }
+/* Traces table: eleven columns have to fit the wide dialog, so cells are
+   tighter than the default table's; ids and numbers stay on one line, the
+   turn id in a monospace face so the calls of one turn line up at a glance. */
+.sui-table.trace-table th, .sui-table.trace-table td { padding: 5px 8px; font-size: 13px; white-space: nowrap; }
+.sui-table.trace-table .sui-sort-btn { padding: 4px 6px; font-size: 13px; }
+.sui-table.trace-table td[data-label="Turn"] { font-family: var(--sui-font-mono, monospace); font-size: 12px; }
 
 /* ── Embedded API explorer (Swagger UI in a UiIFrame) ──────────────────── */
 

@@ -152,6 +152,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** the **Traces dialog is a table** — one row per LLM call with
+  turn id, agent, model, duration, tokens and how it ended, newest first and
+  sortable by any column; sub-agent calls are rows like any other. Clicking a
+  row opens that call in its own dialog with request, response and raw event
+  stream. The master-detail view it replaces grouped calls per turn and hid
+  most of them behind previews; it also read every request and response
+  body just to draw the list, which the table no longer does.
 - **agents:** an agent's skills setting is a mode: **All skills** (the
   default — an agent that never set it, or was stored before the field,
   now has every skill instead of none), **Specific skills** (only the ones
