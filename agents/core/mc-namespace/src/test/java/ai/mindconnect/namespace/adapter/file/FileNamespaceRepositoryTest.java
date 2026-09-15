@@ -38,7 +38,18 @@ class FileNamespaceRepositoryTest {
         assertThat(Files.exists(dir.resolve("system/namespaces/acme.json"))).isTrue();
         assertThat(Files.readString(dir.resolve("system/namespaces/acme.json")))
                 .contains("\"id\" : \"acme\"")                       // ids are plain values in JSON
-                .contains("\"owner\" : \"david\"");
+                .contains("\"createdBy\" : \"david\"");
+    }
+
+    @Test
+    void aRecordWrittenWhenTheFieldWasStillCalledOwnerStillReads() throws Exception {
+        Files.createDirectories(dir.resolve("system/namespaces"));
+        Files.writeString(dir.resolve("system/namespaces/old.json"), """
+                {"id":"old","displayName":null,"owner":"david","createdAt":"2026-09-15T12:00:00Z","members":["david","alice"]}
+                """);
+
+        assertThat(new FileNamespaceRepository(dir, mapper).findById(new Namespace("old")))
+                .get().extracting(NamespaceDefinition::createdBy).isEqualTo(UserId.of("david"));
     }
 
     @Test

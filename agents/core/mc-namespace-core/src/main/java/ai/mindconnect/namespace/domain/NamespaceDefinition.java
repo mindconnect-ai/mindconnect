@@ -2,6 +2,7 @@ package ai.mindconnect.namespace.domain;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
+import com.fasterxml.jackson.annotation.JsonAlias;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
@@ -15,19 +16,19 @@ import java.util.Set;
  * <p>The id is the {@link Namespace} every adapter is bound to — the
  * directory name on disk, the partition column in Postgres. Members are the
  * n:m side of "a user can work in several namespaces": the record lists its
- * members, and a user's namespaces are the records that list them. The owner
- * created the namespace and is always a member.
+ * members, and a user's namespaces are the records that list them. The
+ * creator is always a member, and the one who invites others.
  *
  * @param id          the namespace, as the stores know it
  * @param displayName what to show; null falls back to the id
- * @param owner       who created it; null for the installation's default namespace
+ * @param createdBy   who created it; null for the installation's default namespace
  * @param createdAt   when it was created
- * @param members     who may work in it, the owner included
+ * @param members     who may work in it, the creator included
  */
 public record NamespaceDefinition(
         Namespace id,
         String displayName,
-        UserId owner,
+        @JsonAlias("owner") UserId createdBy,
         Instant createdAt,
         Set<UserId> members
 ) {
@@ -35,13 +36,13 @@ public record NamespaceDefinition(
         Objects.requireNonNull(id, "A namespace needs an id");
         Objects.requireNonNull(createdAt, "A namespace needs a creation time");
         Set<UserId> all = new LinkedHashSet<>(members == null ? Set.of() : members);
-        if (owner != null) all.add(owner);
+        if (createdBy != null) all.add(createdBy);
         members = Set.copyOf(all);
     }
 
-    /** A namespace {@code owner} just created, with the owner as its only member. */
-    public static NamespaceDefinition create(Namespace id, String displayName, UserId owner, Instant now) {
-        return new NamespaceDefinition(id, displayName, owner, now, Set.of());
+    /** A namespace {@code creator} just created, with the creator as its only member. */
+    public static NamespaceDefinition create(Namespace id, String displayName, UserId creator, Instant now) {
+        return new NamespaceDefinition(id, displayName, creator, now, Set.of());
     }
 
     /** The name to show: the display name, else the id. */
@@ -53,8 +54,8 @@ public record NamespaceDefinition(
         return user != null && members.contains(user);
     }
 
-    public boolean isOwner(UserId user) {
-        return owner != null && owner.equals(user);
+    public boolean isCreator(UserId user) {
+        return createdBy != null && createdBy.equals(user);
     }
 
     /** This namespace with {@code user} among its members. */
@@ -63,19 +64,19 @@ public record NamespaceDefinition(
         if (members.contains(user)) return this;
         Set<UserId> all = new LinkedHashSet<>(members);
         all.add(user);
-        return new NamespaceDefinition(id, displayName, owner, createdAt, all);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, all);
     }
 
-    /** This namespace without {@code user}; the owner cannot be removed. */
+    /** This namespace without {@code user}; the creator cannot be removed. */
     public NamespaceDefinition withoutMember(UserId user) {
         if (user == null || !members.contains(user)) return this;
-        if (isOwner(user)) throw new IllegalArgumentException("The owner of '" + id + "' cannot be removed");
+        if (isCreator(user)) throw new IllegalArgumentException("The creator of '" + id + "' cannot be removed");
         Set<UserId> all = new LinkedHashSet<>(members);
         all.remove(user);
-        return new NamespaceDefinition(id, displayName, owner, createdAt, all);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, all);
     }
 
     public NamespaceDefinition withDisplayName(String displayName) {
-        return new NamespaceDefinition(id, displayName, owner, createdAt, members);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, members);
     }
 }

@@ -40,7 +40,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   runs in the turn's namespace. The task monitor — the header badge, its
   dialog and the live updates — shows the tasks of the namespace you are in. In the Admin UI the header shows the current namespace:
   switch from the menu, create a new empty one and fill it from the Registry,
-  or open *Namespaces & members* to invite other users. The choice is
+  or open *Namespaces & members* to see who works where. Your profile lists
+  the namespaces you may work in, with *Switch to* and *Invite…* on each row;
+  the invite dialog takes the other user's user name (someone who never
+  signed in is refused). Only the creator of a namespace invites, removes members and
+  renames it. The choice is
   remembered per user, so it survives a new browser session and a restart. The default namespace
   (`mindconnect.namespace`, `local`) is open to every signed-in user, so an
   installation that never creates another behaves as before. API clients name

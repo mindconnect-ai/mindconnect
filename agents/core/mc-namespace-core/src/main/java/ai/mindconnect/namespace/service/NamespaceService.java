@@ -25,8 +25,8 @@ import java.util.regex.Pattern;
  *
  * <p>A namespace id is what the stores partition by — a directory name, a
  * column value, part of a URL — so it is kept simple: lower-case letters,
- * digits, {@code -} and {@code _}, at most 64 characters. Any member may
- * invite; only the owner may remove members.
+ * digits, {@code -} and {@code _}, at most 64 characters. Only the creator
+ * invites, removes members and renames; any member may leave.
  */
 public class NamespaceService {
 
@@ -89,12 +89,12 @@ public class NamespaceService {
     }
 
     /**
-     * Creates an empty namespace owned by {@code owner}.
+     * Creates an empty namespace, with {@code creator} as its first member.
      *
      * @throws IllegalArgumentException when the id is malformed or taken
      */
-    public NamespaceDefinition create(String id, String displayName, UserId owner) {
-        Objects.requireNonNull(owner, "owner");
+    public NamespaceDefinition create(String id, String displayName, UserId creator) {
+        Objects.requireNonNull(creator, "creator");
         String value = id == null ? "" : id.strip();
         if (!ID.matcher(value).matches()) {
             throw new IllegalArgumentException("A namespace id is 1–64 lower-case letters, digits, '-' or '_', got '" + id + "'");
@@ -104,34 +104,35 @@ public class NamespaceService {
             throw new IllegalArgumentException("Namespace '" + value + "' already exists");
         }
         String label = displayName == null || displayName.isBlank() ? null : displayName.strip();
-        NamespaceDefinition created = NamespaceDefinition.create(namespace, label, owner, Instant.now(clock));
+        NamespaceDefinition created = NamespaceDefinition.create(namespace, label, creator, Instant.now(clock));
         namespaces.save(created);
         return created;
     }
 
     /**
-     * Adds {@code invitee} to {@code id}. Any member may invite.
+     * Adds {@code invitee} to {@code id}. Only the creator invites.
      *
      * @throws IllegalArgumentException when the namespace does not exist, is the open default one,
-     *                                  or {@code inviter} is not a member
+     *                                  or {@code inviter} did not create it
      */
     public NamespaceDefinition invite(Namespace id, UserId inviter, UserId invitee) {
         Objects.requireNonNull(invitee, "invitee");
         NamespaceDefinition ns = memberOnly(id, inviter, "invite into");
+        if (!ns.isCreator(inviter)) throw new IllegalArgumentException("Only the creator of '" + id + "' invites");
         NamespaceDefinition updated = ns.withMember(invitee);
         if (updated != ns) namespaces.save(updated);
         return updated;
     }
 
     /**
-     * Removes {@code member} from {@code id}. The owner may remove anyone but themselves;
+     * Removes {@code member} from {@code id}. The creator may remove anyone but themselves;
      * any member may remove themselves.
      */
     public NamespaceDefinition removeMember(Namespace id, UserId actor, UserId member) {
         Objects.requireNonNull(member, "member");
         NamespaceDefinition ns = memberOnly(id, actor, "change");
-        if (!ns.isOwner(actor) && !actor.equals(member)) {
-            throw new IllegalArgumentException("Only the owner of '" + id + "' removes other members");
+        if (!ns.isCreator(actor) && !actor.equals(member)) {
+            throw new IllegalArgumentException("Only the creator of '" + id + "' removes other members");
         }
         NamespaceDefinition updated = ns.withoutMember(member);
         if (updated != ns) namespaces.save(updated);
@@ -140,7 +141,7 @@ public class NamespaceService {
 
     public NamespaceDefinition rename(Namespace id, UserId actor, String displayName) {
         NamespaceDefinition ns = memberOnly(id, actor, "rename");
-        if (!ns.isOwner(actor)) throw new IllegalArgumentException("Only the owner renames '" + id + "'");
+        if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator renames '" + id + "'");
         NamespaceDefinition updated = ns.withDisplayName(displayName == null || displayName.isBlank() ? null : displayName.strip());
         namespaces.save(updated);
         return updated;

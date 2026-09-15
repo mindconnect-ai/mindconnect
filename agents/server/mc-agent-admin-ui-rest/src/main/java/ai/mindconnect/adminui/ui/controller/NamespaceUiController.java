@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.adminui.service.NamespaceInvitations;
 import ai.mindconnect.adminui.ui.page.NamespacesPage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
@@ -34,7 +35,7 @@ import java.util.Map;
 
 /**
  * The namespaces screen and the header switcher's endpoints: switch, create,
- * invite, remove. Everything acts as the signed-in user — what they may
+ * invite (by user name), remove. Everything acts as the signed-in user — what they may
  * switch to, invite into or change is the {@link NamespaceService}'s answer,
  * not a permission of the screen.
  *
@@ -53,13 +54,15 @@ public class NamespaceUiController {
     private final NamespaceService namespaces;
     private final UserRepository users;
     private final UserService userService;
+    private final NamespaceInvitations invitations;
     private final ScopeSupplier scope;
 
     public NamespaceUiController(NamespaceService namespaces, UserRepository users, UserService userService,
-                                 ScopeSupplier scope) {
+                                 NamespaceInvitations invitations, ScopeSupplier scope) {
         this.namespaces = namespaces;
         this.users = users;
         this.userService = userService;
+        this.invitations = invitations;
         this.scope = scope;
     }
 
@@ -116,9 +119,9 @@ public class NamespaceUiController {
     public UiPage invite(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
                          @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
-        String invitee = new FormBody(raw).str("user");
+        String invitee;
         try {
-            namespaces.invite(new Namespace(id), me, UserId.of(invitee));
+            invitee = invitations.invite(new Namespace(id), me, new FormBody(raw).str("user")).label();
         } catch (IllegalArgumentException e) {
             return page(me).toast(UiToast.error(e.getMessage()).title("Not invited"));
         }

@@ -13,15 +13,15 @@ import ai.mindconnect.ui.model.UiTable;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.user.domain.User;
 
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
  * The namespaces the signed-in user may work in — the open default one and
- * every one they own or were invited into — each with its members, a form to
- * invite another user, and the way to create a new, empty namespace. Data
+ * every one they created or were invited into — each with its members, a form
+ * for the creator to invite another user by name, and the way to create a new,
+ * empty namespace. Data
  * for a new namespace comes from the Registry, or from the user's own
  * hands; nothing is copied.
  */
@@ -81,40 +81,44 @@ public final class NamespacesPage {
                         .confirm("Remove this member from the namespace? Their sessions there stay.")
                         .dispatch("DELETE", API + "/" + id + "/members/{id}"));
         if (!ns.id().equals(active)) {
-            table.action(UiAction.secondary("switch-" + id, "Work here").icon("arrow-right")
+            table.action(UiAction.secondary("switch-" + id, "Switch to").icon("arrow-right")
                     .dispatch("GET", API + "/switch/" + id));
         }
         for (UserId member : ns.members()) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", member.value());
             row.put("user", label(member));
-            row.put("role", ns.isOwner(member) ? "owner" : "member");
+            row.put("role", ns.isCreator(member) ? "creator" : "member");
             table.row(row);
         }
         card.child(table);
-        card.child(inviteForm(ns));
+        if (ns.isCreator(me)) {
+            card.child(inviteForm(ns));
+        }
         return card;
     }
 
-    private UiForm inviteForm(NamespaceDefinition ns) {
+    private static UiForm inviteForm(NamespaceDefinition ns) {
         String id = ns.id().value();
-        List<UiField.Option> candidates = new ArrayList<>();
-        for (User user : users) {
-            if (!ns.isMember(user.id())) {
-                candidates.add(UiField.Option.of(user.id().value(), label(user.id())));
-            }
+        return inviteForm("namespace-" + id + "-invite", null, id, null, API + "/" + id + "/members");
+    }
+
+    /**
+     * The form that invites a user into {@code id} by their user name; {@code error} keeps it
+     * open with the reason. {@code target} is where the form posts.
+     */
+    public static UiForm inviteForm(String formId, String title, String id, String error, String target) {
+        UiForm form = UiForm.of(formId, title)
+                .field(UiField.text("user", "Invite", null).asEditable().asRequired()
+                        .placeholder("user name, as they sign in")
+                        .hint("The user name at the identity provider. The person has to have signed in here once; "
+                                + "members see everything in the namespace."))
+                .action(UiAction.primary(formId + "-send", "Invite").icon("user-plus")
+                        .dispatch("POST", target, formId));
+        if (error != null) {
+            form.error(error);
         }
-        UiForm form = UiForm.of("namespace-" + id + "-invite", null);
-        if (candidates.isEmpty()) {
-            form.content(UiText.of("namespace-" + id + "-invite-none",
-                    "Everyone this installation knows is already a member. A user appears here after their first sign-in."));
-            return form;
-        }
-        return form
-                .field(UiField.select("user", "Invite", candidates.getFirst().getValue(), candidates).asEditable()
-                        .hint("Members see everything in the namespace and may invite others."))
-                .action(UiAction.primary("invite-" + id, "Invite").icon("user-plus")
-                        .dispatch("POST", API + "/" + id + "/members", "namespace-" + id + "-invite"));
+        return form;
     }
 
     private String label(UserId id) {

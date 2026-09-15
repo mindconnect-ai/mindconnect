@@ -51,16 +51,16 @@ class NamespaceServiceTest {
         assertThat(service.canAccess(ALICE, Namespace.DEFAULT)).isTrue();
         assertThat(service.forUser(ALICE)).extracting(NamespaceDefinition::id).containsExactly(Namespace.DEFAULT);
         assertThat(repository.findById(Namespace.DEFAULT)).isPresent()
-                .get().extracting(NamespaceDefinition::owner).isNull();
+                .get().extracting(NamespaceDefinition::createdBy).isNull();
     }
 
     @Test
-    void createMakesAnEmptyNamespaceOwnedByTheCreator() {
+    void createMakesAnEmptyNamespaceWithTheCreatorAsItsOnlyMember() {
         NamespaceDefinition acme = service.create("acme", "ACME Corp", DAVID);
 
         assertThat(acme.id()).isEqualTo(new Namespace("acme"));
         assertThat(acme.label()).isEqualTo("ACME Corp");
-        assertThat(acme.owner()).isEqualTo(DAVID);
+        assertThat(acme.createdBy()).isEqualTo(DAVID);
         assertThat(acme.members()).containsExactly(DAVID);
         assertThat(acme.createdAt()).isEqualTo(NOW);
         assertThat(service.forUser(DAVID)).extracting(NamespaceDefinition::id)
@@ -81,7 +81,7 @@ class NamespaceServiceTest {
     }
 
     @Test
-    void aMemberInvitesAndTheInviteeMayThenWorkThere() {
+    void theCreatorInvitesAndTheInviteeMayThenWorkThere() {
         service.create("acme", null, DAVID);
 
         assertThat(service.canAccess(ALICE, new Namespace("acme"))).isFalse();
@@ -93,11 +93,15 @@ class NamespaceServiceTest {
     }
 
     @Test
-    void anOutsiderCannotInvite() {
+    void onlyTheCreatorInvites() {
         service.create("acme", null, DAVID);
 
         assertThatThrownBy(() -> service.invite(new Namespace("acme"), ALICE, UserId.of("bob")))
                 .hasMessageContaining("not a member");
+        service.invite(new Namespace("acme"), DAVID, ALICE);
+        assertThatThrownBy(() -> service.invite(new Namespace("acme"), ALICE, UserId.of("bob")))
+                .hasMessageContaining("Only the creator");
+        assertThat(service.canAccess(UserId.of("bob"), new Namespace("acme"))).isFalse();
         assertThatThrownBy(() -> service.invite(Namespace.DEFAULT, DAVID, ALICE))
                 .hasMessageContaining("open to everyone");
         assertThatThrownBy(() -> service.invite(new Namespace("nope"), DAVID, ALICE))
@@ -105,26 +109,26 @@ class NamespaceServiceTest {
     }
 
     @Test
-    void theOwnerRemovesMembersAndMembersRemoveThemselves() {
+    void theCreatorRemovesMembersAndMembersRemoveThemselves() {
         service.create("acme", null, DAVID);
         Namespace acme = new Namespace("acme");
         service.invite(acme, DAVID, ALICE);
-        service.invite(acme, ALICE, UserId.of("bob"));
+        service.invite(acme, DAVID, UserId.of("bob"));
 
-        assertThatThrownBy(() -> service.removeMember(acme, ALICE, UserId.of("bob"))).hasMessageContaining("Only the owner");
+        assertThatThrownBy(() -> service.removeMember(acme, ALICE, UserId.of("bob"))).hasMessageContaining("Only the creator");
         service.removeMember(acme, ALICE, ALICE);
         service.removeMember(acme, DAVID, UserId.of("bob"));
 
         assertThat(repository.findById(acme).orElseThrow().members()).containsExactly(DAVID);
-        assertThatThrownBy(() -> service.removeMember(acme, DAVID, DAVID)).hasMessageContaining("owner");
+        assertThatThrownBy(() -> service.removeMember(acme, DAVID, DAVID)).hasMessageContaining("creator");
     }
 
     @Test
-    void onlyTheOwnerRenames() {
+    void onlyTheCreatorRenames() {
         service.create("acme", null, DAVID);
         service.invite(new Namespace("acme"), DAVID, ALICE);
 
-        assertThatThrownBy(() -> service.rename(new Namespace("acme"), ALICE, "x")).hasMessageContaining("Only the owner");
+        assertThatThrownBy(() -> service.rename(new Namespace("acme"), ALICE, "x")).hasMessageContaining("Only the creator");
         assertThat(service.rename(new Namespace("acme"), DAVID, "  ACME  ").label()).isEqualTo("ACME");
         assertThat(service.rename(new Namespace("acme"), DAVID, " ").label()).isEqualTo("acme");
     }
