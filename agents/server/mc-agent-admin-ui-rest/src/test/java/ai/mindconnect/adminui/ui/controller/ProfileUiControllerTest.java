@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.page.NamespacesPage;
 import ai.mindconnect.adminui.ui.page.ProfilePage;
-import ai.mindconnect.adminui.service.NamespaceInvitations;
+import ai.mindconnect.adminui.service.NamespaceMembers;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
@@ -50,7 +50,7 @@ class ProfileUiControllerTest {
     private final ProfileUiController controller = controller(true);
 
     private ProfileUiController controller(boolean authEnabled) {
-        return new ProfileUiController(tokens, users, namespaces, new NamespaceInvitations(namespaces, users),
+        return new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users),
                 ScopeSupplier.fixed(Namespace.DEFAULT), Clock.fixed(NOW, ZoneOffset.UTC), authEnabled);
     }
 
@@ -168,6 +168,51 @@ class ProfileUiControllerTest {
 
         assertThat(refused).contains("Only the creator");
         assertThat(namespaces.canAccess(UserId.of("carol"), new Namespace("acme"))).isFalse();
+    }
+
+    @Test
+    void aNonCreatorLearnsNothingAboutWhoIsAUserHere() throws Exception {
+        users.recordLogin(UserId.of("carol"), "sub-carol", null, null, null);
+        namespaces.create("acme", null, UserId.of("alice"));
+
+        String known = json(controller.invite(user("bob"), "acme", Map.of("user", "carol")));
+        String unknown = json(controller.invite(user("bob"), "acme", Map.of("user", "nobody")));
+
+        assertThat(known).contains("Only the creator").doesNotContain("Invite into");
+        assertThat(unknown).contains("Only the creator").doesNotContain("No user");
+    }
+
+    @Test
+    void aMemberLeavesAndTheCreatorDeletesWithEverythingInIt() throws Exception {
+        namespaces.create("acme", "ACME", UserId.of("alice"));
+        namespaces.invite(new Namespace("acme"), UserId.of("alice"), UserId.of("bob"));
+        users.selectNamespace(UserId.of("bob"), new Namespace("acme"));
+
+        assertThat(json(controller.leave(user("alice"), "acme"))).contains("Not left").contains("creator");
+        assertThat(json(controller.delete(user("bob"), "acme"))).contains("Not deleted").contains("Only the creator");
+
+        assertThat(json(controller.leave(user("bob"), "acme"))).contains("Left");
+        assertThat(namespaces.canAccess(UserId.of("bob"), new Namespace("acme"))).isFalse();
+        assertThat(users.activeNamespace(UserId.of("bob"))).contains(Namespace.DEFAULT);
+
+        assertThat(json(controller.delete(user("alice"), "acme"))).contains("Deleted");
+        assertThat(namespaces.find(new Namespace("acme"))).isEmpty();
+        assertThat(json(controller.delete(user("alice"), Namespace.DEFAULT.value()))).contains("Not deleted");
+    }
+
+    @Test
+    void leavingTheNamespaceYouAreInSendsYouToTheDefaultOne() {
+        namespaces.create("acme", null, UserId.of("alice"));
+        namespaces.invite(new Namespace("acme"), UserId.of("alice"), UserId.of("bob"));
+        users.selectNamespace(UserId.of("bob"), new Namespace("acme"));
+        ProfileUiController inAcme = new ProfileUiController(tokens, users, namespaces, new NamespaceMembers(namespaces, users),
+                ScopeSupplier.fixed(new Namespace("acme")), Clock.fixed(NOW, ZoneOffset.UTC), true);
+
+        var answer = inAcme.leave(user("bob"), "acme");
+
+        assertThat(answer.getStatusCode().value()).isEqualTo(303);
+        assertThat(answer.getHeaders().getLocation()).isEqualTo(NamespaceUiController.AFTER_SWITCH);
+        assertThat(users.activeNamespace(UserId.of("bob"))).contains(Namespace.DEFAULT);
     }
 
     private static OidcUser user(String name) {

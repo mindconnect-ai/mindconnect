@@ -14,9 +14,8 @@ import java.util.function.Supplier;
  * asks {@link #get()}.
  *
  * <p>A thread started <em>while bound</em> inherits the binding — the
- * ThreadLocal is inheritable, so the virtual threads a turn fans out to, the
- * per-task executor a chat turn awaits on and a run the workflow admin
- * streams all work where their parent did. What does not inherit is a
+ * ThreadLocal is inheritable, so the virtual threads a turn fans out to and
+ * a run the workflow admin streams work where their parent did. What does not inherit is a
  * thread created elsewhere: a pooled platform thread from start-up, the
  * queue's task threads (the task advisor binds those from the task's
  * payload). A pool that grows <em>during</em> a bound request would keep

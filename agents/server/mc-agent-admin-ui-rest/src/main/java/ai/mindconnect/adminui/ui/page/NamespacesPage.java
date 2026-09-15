@@ -82,7 +82,17 @@ public final class NamespacesPage {
                         .dispatch("DELETE", API + "/" + id + "/members/{id}"));
         if (!ns.id().equals(active)) {
             table.action(UiAction.secondary("switch-" + id, "Switch to").icon("arrow-right")
-                    .dispatch("GET", API + "/switch/" + id));
+                    .dispatch("POST", API + "/switch/" + id));
+        }
+        if (ns.isCreator(me)) {
+            table.action(UiAction.danger("delete-" + id, "Delete namespace").icon("delete")
+                    .confirm("Delete '" + ns.label() + "' with everything in it — agents, sessions, files, workflows, "
+                            + "vector stores, MCP servers? This cannot be undone.")
+                    .dispatch("DELETE", API + "/" + id));
+        } else {
+            table.action(UiAction.secondary("leave-" + id, "Leave").icon("log-out")
+                    .confirm("Leave '" + ns.label() + "'? You will need a new invitation to come back.")
+                    .dispatch("POST", API + "/" + id + "/leave"));
         }
         for (UserId member : ns.members()) {
             Map<String, Object> row = new LinkedHashMap<>();

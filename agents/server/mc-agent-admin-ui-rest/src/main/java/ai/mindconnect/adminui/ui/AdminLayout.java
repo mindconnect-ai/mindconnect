@@ -173,9 +173,9 @@ public final class AdminLayout {
                     .variant(UiMenuButton.Variant.BUTTON).align(UiMenuButton.Align.END);
             for (NamespaceSwitch.Entry entry : namespaces.entries()) {
                 boolean active = entry.id().equals(namespaces.activeId());
-                switcher.item(UiMenuItem.of("namespace-" + entry.id(), entry.label())
+                switcher.item(UiMenuItem.of("namespace-switch-" + entry.id(), entry.label())
                         .icon(active ? "check" : "layers").selected(active)
-                        .onClick(UiTrigger.api("GET", "/admin/api/namespaces/switch/" + entry.id())));
+                        .onClick(UiTrigger.api("POST", "/admin/api/namespaces/switch/" + entry.id())));
             }
             switcher.item(UiMenuItem.divider());
             switcher.item(UiMenuItem.of("namespace-new", "New namespace…").icon("add")

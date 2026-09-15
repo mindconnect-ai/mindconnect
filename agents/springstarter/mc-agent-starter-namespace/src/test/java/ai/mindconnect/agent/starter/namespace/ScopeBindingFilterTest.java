@@ -33,12 +33,17 @@ class ScopeBindingFilterTest {
     private final NamespaceService namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
     private final ScopeBindingFilter filter = new ScopeBindingFilter(bound, namespaces);
     private final AtomicReference<Scope> seen = new AtomicReference<>();
-    private final MockFilterChain chain = new MockFilterChain(new jakarta.servlet.http.HttpServlet() {
-        @Override
-        protected void service(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res) {
-            seen.set(bound.get());
-        }
-    });
+    private final MockFilterChain chain = freshChain();
+
+    /** A chain records one call only: a test that filters several requests takes a fresh one each time. */
+    private MockFilterChain freshChain() {
+        return new MockFilterChain(new jakarta.servlet.http.HttpServlet() {
+            @Override
+            protected void service(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res) {
+                seen.set(bound.get());
+            }
+        });
+    }
 
     @AfterEach
     void clearSecurityContext() {
@@ -102,6 +107,18 @@ class ScopeBindingFilterTest {
     }
 
     @Test
+    void aHeaderThatIsNoNamespaceIsA400NotA500() throws Exception {
+        signIn("david");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/sessions");
+        request.addHeader(ScopeBindingFilter.HEADER, "Not A Namespace");
+
+        MockHttpServletResponse response = run(request);
+
+        assertThat(response.getStatus()).isEqualTo(400);
+        assertThat(seen.get()).isNull();
+    }
+
+    @Test
     void aNonMemberNamingANamespaceGets403() throws Exception {
         namespaces.create("acme", null, UserId.of("david"));
         signIn("alice");
@@ -137,6 +154,28 @@ class ScopeBindingFilterTest {
 
         assertThat(seen.get().namespace()).isEqualTo(Namespace.DEFAULT);
         assertThat(NamespaceSelection.selected(request)).isEmpty();
+    }
+
+    @Test
+    void anApiCallNeverFollowsTheSessionOrTheRememberedChoice() throws Exception {
+        namespaces.create("acme", null, UserId.of("david"));
+        ai.mindconnect.user.service.UserService users = new ai.mindconnect.user.service.UserService(
+                new ai.mindconnect.user.adapter.memory.InMemoryUserRepository());
+        users.selectNamespace(UserId.of("david"), ACME);
+        ScopeBindingFilter remembering = new ScopeBindingFilter(bound, namespaces, users);
+        signIn("david");
+
+        for (String path : new String[]{"/api/v1/sessions", "/v1/responses"}) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", path);
+            NamespaceSelection.select(request, ACME);
+            remembering.doFilter(request, new MockHttpServletResponse(), freshChain());
+            assertThat(seen.get().namespace()).as(path).isEqualTo(Namespace.DEFAULT);
+        }
+
+        MockHttpServletRequest named = new MockHttpServletRequest("POST", "/v1/responses");
+        named.addHeader(ScopeBindingFilter.HEADER, "acme");
+        remembering.doFilter(named, new MockHttpServletResponse(), freshChain());
+        assertThat(seen.get().namespace()).isEqualTo(ACME);
     }
 
     @Test

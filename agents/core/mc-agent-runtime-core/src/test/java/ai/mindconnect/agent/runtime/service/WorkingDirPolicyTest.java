@@ -28,6 +28,19 @@ class WorkingDirPolicyTest {
     }
 
     @Test
+    void aTemplateReadPerCallFollowsWhateverItDependsOn() throws Exception {
+        String[] namespace = {"local"};
+        WorkingDirPolicy policy = WorkingDirPolicy.withinCurrent(
+                () -> tmp.resolve(namespace[0]).resolve("home").resolve(WorkingDirPolicy.USER_PLACEHOLDER).toString());
+
+        assertThat(policy.isPerUser()).isTrue();
+        assertThat(policy.forUser("alice").root()).isEqualTo(tmp.resolve("local/home/alice").toAbsolutePath().normalize());
+        namespace[0] = "acme";
+        assertThat(policy.forUser("alice").root()).isEqualTo(tmp.resolve("acme/home/alice").toAbsolutePath().normalize());
+        assertThat(Files.isDirectory(tmp.resolve("acme/home/alice"))).isTrue();
+    }
+
+    @Test
     void nothingStaysNothing() {
         var policy = WorkingDirPolicy.unrestricted();
         assertThat(policy.validate(null)).isNull();

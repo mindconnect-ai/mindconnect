@@ -79,6 +79,11 @@ public final class DefaultVectorStores implements VectorStores {
 
     // ── templates & instances (registry + built-in default) ───────────────
 
+    /** Forgets {@code namespace}'s registry; its settings directory is gone with the namespace. */
+    public void forget(Namespace namespace) {
+        registries.remove(namespace);
+    }
+
     @Override
     public FileVectorStoreRegistry registry(Namespace namespace) {
         return registries.computeIfAbsent(namespace,

@@ -13,6 +13,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -121,6 +122,52 @@ class NamespaceServiceTest {
 
         assertThat(repository.findById(acme).orElseThrow().members()).containsExactly(DAVID);
         assertThatThrownBy(() -> service.removeMember(acme, DAVID, DAVID)).hasMessageContaining("creator");
+    }
+
+    @Test
+    void aMemberLeavesButTheCreatorCannot() {
+        service.create("acme", null, DAVID);
+        service.invite(new Namespace("acme"), DAVID, ALICE);
+
+        service.leave(new Namespace("acme"), ALICE);
+        assertThat(service.canAccess(ALICE, new Namespace("acme"))).isFalse();
+        assertThatThrownBy(() -> service.leave(new Namespace("acme"), DAVID)).hasMessageContaining("creator");
+    }
+
+    @Test
+    void theCreatorDeletesTheNamespaceAfterEveryStorePurgedIt() {
+        List<Namespace> purged = new ArrayList<>();
+        NamespaceService withPurges = new NamespaceService(repository, Namespace.DEFAULT, Clock.fixed(NOW, ZoneOffset.UTC),
+                List.of(purged::add, purged::add));
+        withPurges.create("acme", null, DAVID);
+        withPurges.invite(new Namespace("acme"), DAVID, ALICE);
+
+        assertThatThrownBy(() -> withPurges.delete(new Namespace("acme"), ALICE)).hasMessageContaining("Only the creator");
+        assertThatThrownBy(() -> withPurges.delete(Namespace.DEFAULT, DAVID)).hasMessageContaining("open to everyone");
+        assertThat(repository.findById(new Namespace("acme"))).isPresent();
+
+        withPurges.delete(new Namespace("acme"), DAVID);
+
+        assertThat(purged).containsExactly(new Namespace("acme"), new Namespace("acme"));
+        assertThat(repository.findById(new Namespace("acme"))).isEmpty();
+        assertThat(withPurges.forUser(ALICE)).extracting(NamespaceDefinition::id).containsExactly(Namespace.DEFAULT);
+    }
+
+    @Test
+    void aStoreThatCannotPurgeKeepsTheRecordSoTheDeletionCanBeRetried() {
+        NamespaceService failing = new NamespaceService(repository, Namespace.DEFAULT, Clock.fixed(NOW, ZoneOffset.UTC),
+                List.of(ns -> { throw new IllegalStateException("disk gone"); }));
+        failing.create("acme", null, DAVID);
+
+        assertThatThrownBy(() -> failing.delete(new Namespace("acme"), DAVID))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("disk gone");
+        assertThat(repository.findById(new Namespace("acme"))).isPresent();
+    }
+
+    @Test
+    void theInstallationsOwnNamesAreReserved() {
+        assertThatThrownBy(() -> service.create("system", null, DAVID)).hasMessageContaining("reserved");
+        assertThatThrownBy(() -> service.create("ns", null, DAVID)).hasMessageContaining("reserved");
     }
 
     @Test

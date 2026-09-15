@@ -1,5 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
+import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.mcp.gateway.McpCatalog;
@@ -67,6 +68,13 @@ public class McpGatewayAutoConfiguration {
                 containerRuntime, McpStartPolicy.from(environment));
         gateways.seed(scope.getIfAvailable(ScopeSupplier::local).namespace(), "classpath:initial-data/mcp-servers/*.json");
         return gateways;
+    }
+
+    /** A deleted namespace's gateway is closed and forgotten; its registrations went with its directory. */
+    @Bean
+    @ConditionalOnBean(NamespacedMcpGateways.class)
+    public NamespacePurge mcpGatewayPurge(NamespacedMcpGateways gateways) {
+        return gateways::drop;
     }
 
     /** The registrations of the namespace a call works in. */

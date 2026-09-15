@@ -45,6 +45,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(LocalMcpGateway.class);
 
     private final McpServerRepository repository;
+    private final Namespace namespace;
     private final McpProxy proxy;
     private final McpSessionRegistry sessions;
     private final McpDiscoveryCache discoveryCache;
@@ -70,6 +71,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
                            String containerRuntime,
                            McpStartPolicy startPolicy) {
         this.repository = repository;
+        this.namespace = namespace;
         this.proxy = proxy;
         this.sessions = sessions;
         this.discoveryCache = new McpDiscoveryCache(storageDir, namespace);
@@ -109,7 +111,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
         McpEndpoint endpoint = endpoints.toEndpoint(registration.target());
         try {
             McpConnection connection = sessions.getOrOpen(
-                    caller.sessionId().value(), server.value(), endpoint);
+                    caller.sessionId().value(), providerKey(server), endpoint);
             return connection.callTool(toolName, arguments);
         } catch (McpGatewayException e) {
             throw e;
@@ -124,10 +126,21 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
         sessions.closeSession(caller.sessionId().value());
     }
 
-    /** Closes every pooled connection. The discovery cache on disk survives. */
+    /**
+     * Closes this namespace's pooled connections. The registry is shared by every
+     * namespace's gateway and shuts down with the application, not here; the
+     * discovery cache on disk survives.
+     */
     @Override
     public void close() {
-        sessions.shutdown();
+        for (McpServerRegistration registration : repository.findAll()) {
+            sessions.closeServer(providerKey(registration.id()));
+        }
+    }
+
+    /** The pool's key for a server: qualified by the namespace, since the pool serves every namespace. */
+    private String providerKey(McpServerId server) {
+        return namespace.value() + "/" + server.value();
     }
 
     /**
@@ -149,7 +162,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     void forget(McpServerId server) {
         toolsByServer.remove(server);
         discoveryCache.invalidate(server);
-        sessions.closeServer(server.value());
+        sessions.closeServer(providerKey(server));
         // Last: a lookup that read the version before this line sees the new
         // one next time and rebuilds; one that reads it after this line finds
         // the discovery already gone. Moved first, a lookup in between would

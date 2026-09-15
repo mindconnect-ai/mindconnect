@@ -139,8 +139,8 @@ public class ProfilePage extends AdminPage {
 
     /**
      * The user's namespaces: where they may work, with a way to switch there and, on
-     * every row, the invite action — which the controller answers with a dialog for a
-     * namespace the user created, and with a refusal for any other. The open default
+     * every row, the invite, leave and delete actions — the controller answers each
+     * with the dialog or the deed where the user may, and with the reason where not. The open default
      * namespace is listed like the others; nobody is invited into it.
      */
     public static UiNode namespaces(UserId me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
@@ -152,9 +152,16 @@ public class ProfilePage extends AdminPage {
                 .column(UiTable.Column.text("members", "Members"))
                 .column(UiTable.Column.text("created", "Created"))
                 .rowAction(UiAction.secondary("switch", "Switch to").icon("arrow-right")
-                        .dispatch("GET", NamespacesPage.API + "/switch/{id}"))
+                        .dispatch("POST", NamespacesPage.API + "/switch/{id}"))
                 .rowAction(UiAction.secondary("invite", "Invite…").icon("user-plus")
-                        .dispatch("GET", API + "/namespaces/{id}/invite"));
+                        .dispatch("GET", API + "/namespaces/{id}/invite"))
+                .rowAction(UiAction.secondary("leave", "Leave").icon("log-out")
+                        .confirm("Leave this namespace? You will need a new invitation to come back.")
+                        .dispatch("POST", API + "/namespaces/{id}/leave"))
+                .rowAction(UiAction.danger("delete", "Delete").icon("delete")
+                        .confirm("Delete this namespace with everything in it — agents, sessions, files, workflows, "
+                                + "vector stores, MCP servers? This cannot be undone.")
+                        .dispatch("DELETE", API + "/namespaces/{id}"));
         for (NamespaceDefinition ns : namespaces) {
             boolean isDefault = ns.id().equals(defaultNamespace);
             Map<String, Object> row = new LinkedHashMap<>();

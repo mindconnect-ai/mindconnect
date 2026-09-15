@@ -86,8 +86,9 @@ public class UserStream {
 
     @org.springframework.beans.factory.annotation.Autowired
     public UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
-                      org.springframework.beans.factory.ObjectProvider<ai.mindconnect.user.service.UserService> users) {
-        this(taskMonitor, userChannels, objectMapper, activeNamespaceOf(users.getIfAvailable()));
+                      org.springframework.beans.factory.ObjectProvider<ai.mindconnect.user.service.UserService> users,
+                      org.springframework.beans.factory.ObjectProvider<ai.mindconnect.namespace.service.NamespaceService> namespaces) {
+        this(taskMonitor, userChannels, objectMapper, activeNamespaceOf(users.getIfAvailable(), namespaces.getIfAvailable()));
     }
 
     UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
@@ -164,9 +165,13 @@ public class UserStream {
         log.debug("User stream attached for {} — {} open", userId, attached.size());
     }
 
+    /** The viewer's remembered namespace — while they may still work there; a member who was removed sees it no more. */
     private static java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespaceOf(
-            ai.mindconnect.user.service.UserService users) {
-        return users == null ? user -> Optional.empty() : users::activeNamespace;
+            ai.mindconnect.user.service.UserService users,
+            ai.mindconnect.namespace.service.NamespaceService namespaces) {
+        if (users == null) return user -> Optional.empty();
+        return user -> users.activeNamespace(user)
+                .filter(namespace -> namespaces == null || namespaces.canAccess(user, namespace));
     }
 
     public void detach(SseEmitter emitter) {

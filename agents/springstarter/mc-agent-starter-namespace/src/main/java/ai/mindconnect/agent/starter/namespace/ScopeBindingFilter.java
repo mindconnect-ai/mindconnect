@@ -28,10 +28,13 @@ import java.util.Optional;
  *
  * <p>The namespace comes, in this order, from the {@code /ns/{namespace}/}
  * prefix ({@link NamespacePathFilter}), the {@code X-Mindconnect-Namespace}
- * header, the browser session's selection ({@link NamespaceSelection}), the
- * namespace the user last chose (kept on their {@code User} record, so the
- * choice outlives the session and a restart), and otherwise the
- * installation's default namespace. A namespace named on the
+ * header, and otherwise — for the Admin UI only — the browser session's
+ * selection ({@link NamespaceSelection}) or the namespace the user last chose
+ * (kept on their {@code User} record, so the choice outlives the session and
+ * a restart), and finally the installation's default namespace. A call to
+ * the REST API or the Responses API ({@link #API_PREFIXES}) never looks at
+ * the session or the remembered choice: it works where it says, else in the
+ * default namespace. A namespace named on the
  * request that the caller may not work in is a {@code 403}; a stale session
  * selection is dropped and the default used. A request without a signed-in
  * user — the login page, a static resource — works in the default namespace.
@@ -62,6 +65,29 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
         this.users = users;
     }
 
+    /** The REST API and the Responses API, in front of which no session and no remembered choice count. */
+    public static final java.util.List<String> API_PREFIXES = java.util.List.of("/api/", "/v1/");
+
+    /**
+     * A program's call, not a browser's: it works in the namespace it names, else in
+     * the default one — never in the one the same user last chose in the Admin UI.
+     */
+    static boolean isApi(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String context = request.getContextPath();
+        if (context != null && !context.isEmpty() && path.startsWith(context)) path = path.substring(context.length());
+        for (String prefix : API_PREFIXES) {
+            if (path.startsWith(prefix)) return true;
+        }
+        return false;
+    }
+
+    /** The error page renders in the default namespace; a 403 or 400 from above must not repeat itself there. */
+    @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+        return true;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
@@ -71,7 +97,13 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
         }
         UserId user = SecurityCurrentUserResolver.userIdOf(SecurityContextHolder.getContext().getAuthentication())
                 .orElse(null);
-        Optional<Namespace> named = named(request);
+        Optional<Namespace> named;
+        try {
+            named = named(request);
+        } catch (IllegalArgumentException e) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
+            return;
+        }
         Namespace namespace;
         if (user == null) {
             namespace = namespaces.defaultNamespace();
@@ -84,7 +116,8 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
                 return;
             }
         } else {
-            namespace = chosen(request, user).orElseGet(namespaces::defaultNamespace);
+            namespace = isApi(request) ? namespaces.defaultNamespace()
+                    : chosen(request, user).orElseGet(namespaces::defaultNamespace);
         }
         response.setHeader(HEADER, namespace.value());
         try {

@@ -437,8 +437,10 @@ public class DefaultAgentRuntimeConfig {
             return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(workingDirRoot)
                     .withChoice(workingDirChoice);
         }
-        return ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
-                userHome.isConfigured() ? userHome.template() : baseDir)
+        // The users' home depends on the namespace of the call: read the template per call, not once here.
+        return (userHome.isConfigured()
+                ? ai.mindconnect.agent.runtime.service.WorkingDirPolicy.withinCurrent(userHome::template)
+                : ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(baseDir))
                 .withChoice(workingDirChoice);
     }
 

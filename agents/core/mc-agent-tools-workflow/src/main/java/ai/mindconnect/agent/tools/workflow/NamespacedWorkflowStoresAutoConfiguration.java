@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.workflow;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
@@ -70,16 +71,19 @@ public class NamespacedWorkflowStoresAutoConfiguration {
         @ConditionalOnMissingBean(WorkflowDataRepository.class)
         WorkflowDataRepository namespacedWorkflowDataRepository(DataSource dataSource, ScopeSupplier scope) {
             ai.mindconnect.jdbc.Sql sql = ai.mindconnect.jdbc.Sql.of(dataSource);
+            // The schema is shared (the namespace is a column): create it once here, not on each namespace's first call.
+            new ai.mindconnect.workflow.persistence.pg.PgWorkflowDataRepository(sql, Namespace.DEFAULT.value()).initSchema();
             return NamespaceRouted.route(WorkflowDataRepository.class, scope,
-                    ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowDataRepository(sql, ns.value()).initSchema());
+                    ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowDataRepository(sql, ns.value()));
         }
 
         @Bean
         @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
         WorkflowInstanceRepository namespacedWorkflowInstanceRepository(DataSource dataSource, ScopeSupplier scope) {
             ai.mindconnect.jdbc.Sql sql = ai.mindconnect.jdbc.Sql.of(dataSource);
+            new ai.mindconnect.workflow.persistence.pg.PgWorkflowInstanceRepository(sql, Namespace.DEFAULT.value()).initSchema();
             return NamespaceRouted.route(WorkflowInstanceRepository.class, scope,
-                    ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowInstanceRepository(sql, ns.value()).initSchema());
+                    ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowInstanceRepository(sql, ns.value()));
         }
     }
 

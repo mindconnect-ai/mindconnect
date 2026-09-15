@@ -1,9 +1,11 @@
 package ai.mindconnect.agent.starter.namespace;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
+import ai.mindconnect.namespace.adapter.file.FileNamespacePurge;
 import ai.mindconnect.namespace.adapter.file.FileNamespaceRepository;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
@@ -65,6 +67,13 @@ public class NamespaceAutoConfiguration {
         return new FileNamespaceRepository(Path.of(baseDir), objectMapper);
     }
 
+    /** Deleting a namespace removes {@code <mindconnect.data.base-dir>/<namespace>} — everything of it. */
+    @Bean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
+    NamespacePurge fileNamespacePurge(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new FileNamespacePurge(Path.of(baseDir));
+    }
+
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(name = "ai.mindconnect.namespace.adapter.pg.PgNamespaceRepository")
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
@@ -75,14 +84,22 @@ public class NamespaceAutoConfiguration {
         NamespaceRepository pgNamespaceRepository(ai.mindconnect.jdbc.Sql mindconnectSql) {
             return new ai.mindconnect.namespace.adapter.pg.PgNamespaceRepository(mindconnectSql).initSchema();
         }
+
+        /** Deleting a namespace removes its rows from every namespaced table and drops its pgvector tables. */
+        @Bean
+        NamespacePurge pgNamespacePurge(ai.mindconnect.jdbc.Sql mindconnectSql) {
+            return new ai.mindconnect.namespace.adapter.pg.PgNamespacePurge(mindconnectSql);
+        }
     }
 
     /** The default namespace — open to everyone — is {@code mindconnect.namespace}, like the fallback above. */
     @Bean
     @ConditionalOnMissingBean
     NamespaceService namespaceService(NamespaceRepository namespaces,
-                                      @Value("${mindconnect.namespace:local}") String defaultNamespace) {
-        return new NamespaceService(namespaces, new Namespace(defaultNamespace));
+                                      @Value("${mindconnect.namespace:local}") String defaultNamespace,
+                                      ObjectProvider<NamespacePurge> purges) {
+        return new NamespaceService(namespaces, new Namespace(defaultNamespace), java.time.Clock.systemUTC(),
+                purges.orderedStream().toList());
     }
 
     /** Before Spring Security ({@code -100}): matchers must see the path without the prefix. */

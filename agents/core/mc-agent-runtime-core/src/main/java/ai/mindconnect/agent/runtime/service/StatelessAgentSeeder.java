@@ -23,6 +23,7 @@ import java.util.List;
 public class StatelessAgentSeeder {
 
     private static final Logger log = LoggerFactory.getLogger(StatelessAgentSeeder.class);
+    private final java.util.concurrent.ConcurrentHashMap<String, Object> creating = new java.util.concurrent.ConcurrentHashMap<>();
 
     // ── built-in task names ───────────────────────────────────────────────────
     public static final String TOOL_SUMMARIZER        = "tool-summarizer";
@@ -100,6 +101,15 @@ public class StatelessAgentSeeder {
     public java.util.Optional<AgentDefinition> ensure(String name) {
         java.util.Optional<AgentDefinition> existing = repository.findByName(name);
         if (existing.isPresent()) return existing;
+        // Two first uses at once (a fan-out summarising two tool results) must not create two helpers of one name.
+        synchronized (creating.computeIfAbsent(name, n -> new Object())) {
+            existing = repository.findByName(name);
+            if (existing.isPresent()) return existing;
+            return create(name);
+        }
+    }
+
+    private java.util.Optional<AgentDefinition> create(String name) {
         java.util.Optional<SeedEntry> seed = SEEDS.stream().filter(entry -> entry.name().equals(name)).findFirst();
         if (seed.isEmpty()) return java.util.Optional.empty();
         java.util.Optional<String> configName = llmConfigNameForHelpers();

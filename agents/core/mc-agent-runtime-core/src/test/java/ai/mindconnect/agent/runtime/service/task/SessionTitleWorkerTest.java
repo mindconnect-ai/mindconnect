@@ -105,12 +105,15 @@ class SessionTitleWorkerTest {
     }
 
     @Test
-    void oneTitleTaskPerSession() {
+    void oneTitleTaskPerTurnSoALaterTurnMayNameWhatTheFirstCouldNot() {
         SessionId id = SessionId.random();
-        TaskSubmission first = SessionTitleWorker.submission(id, ChatTurnId.random());
-        TaskSubmission second = SessionTitleWorker.submission(id, ChatTurnId.random());
+        ChatTurnId turn = ChatTurnId.random();
+        TaskSubmission first = SessionTitleWorker.submission(id, turn);
+        TaskSubmission again = SessionTitleWorker.submission(id, turn);
+        TaskSubmission later = SessionTitleWorker.submission(id, ChatTurnId.random());
 
-        assertThat(first.id()).isEqualTo(second.id()).isEqualTo("task_title_" + id.value());
+        assertThat(first.id()).isEqualTo(again.id()).isEqualTo("task_title_" + id.value() + "_" + turn.value());
+        assertThat(later.id()).isNotEqualTo(first.id());
         assertThat(first.type()).isEqualTo(SessionTitleWorker.TYPE);
         assertThat(first.priority()).isEqualTo(2);
     }

@@ -31,6 +31,7 @@ import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.Subscription;
 import ai.mindconnect.agent.runtime.service.round.TurnMessage;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
 import ai.mindconnect.agent.runtime.service.turn.LocalChatTurnHandle;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
@@ -74,7 +75,8 @@ public class AgentChatService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentChatService.class);
 
-    /** Upper bound on one turn, sub-agents included — a safety net, not a target. */
+    /** Upper bound on one turn, sub-agents included — a safety net, not a target: a turn parked at a gate nobody answers. */
+    private static final java.time.Duration TURN_TIMEOUT = java.time.Duration.ofHours(3);
 
     private final AgentSessionService sessionService;
     private final AgentDefinitionRepository definitionRepository;
@@ -90,6 +92,10 @@ public class AgentChatService {
     private final ScopeSupplier scope;
     /** Turns a caller holds a handle for, by task id — completed from the queue's listener, no thread waits. */
     private final java.util.Map<String, CompletableFuture<String>> awaitingTurns = new ConcurrentHashMap<>();
+    /** Turns whose task ended but whose title task still runs, keyed by the title task's id. */
+    private final java.util.Map<String, PendingTitle> awaitingTitles = new ConcurrentHashMap<>();
+
+    private record PendingTitle(TaskRecord turn, CompletableFuture<String> outcome) {}
     private final ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions;
     private final ai.mindconnect.agent.runtime.skill.SkillCatalog skills;
 
@@ -159,7 +165,9 @@ public class AgentChatService {
      * Starts a chat turn: user message into the conversation, task onto the
      * queue, the caller's handler onto the turn's channel. The returned
      * handle's future resolves with the final answer once the task is
-     * terminal (title generation included, matching the old behaviour).
+     * terminal — title generation included: the title is a task of its own
+     * behind the turn, and the future waits for it, so a caller that reads the
+     * session right after the answer finds the chat named.
      */
     public ChatTurnHandle submitChat(SessionId sessionId, String userMessage,
                                      Consumer<StreamEvent> eventHandler) {
@@ -226,7 +234,9 @@ public class AgentChatService {
         CompletableFuture<String> outcome = new CompletableFuture<>();
         // Registered before the submit: a turn that ends before submit() returns still finds its future.
         awaitingTurns.put(submission.id(), outcome);
+        outcome.orTimeout(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
         CompletableFuture<String> future = outcome.whenComplete((response, error) -> {
+            awaitingTurns.remove(submission.id(), outcome);
             subscription.close();
             userChannels.publish(session.userId(),
                     new UserEvent.TurnFinished(sessionId, turnId, outcomeOf(error)));
@@ -239,6 +249,12 @@ public class AgentChatService {
             throw e;
         }
         userChannels.publish(session.userId(), new UserEvent.TurnStarted(sessionId, turnId));
+        // An untitled chat is named from this message, in parallel with the turn: the title
+        // task needs only what the user wrote, and the handle waits for it at the end. A
+        // sub-agent's session is no chat of the user's: it keeps the name its parent gave it.
+        if (session.title() == null && session.parentSessionId() == null) {
+            queue.submit(SessionTitleWorker.submission(sessionId, turnId));
+        }
         // An idempotent re-submit of a task that already ended fires no listener: read it off the queue.
         queue.get(submission.id()).filter(task -> task.status().terminal()).ifPresent(this::turnEnded);
         return new LocalChatTurnHandle(turnId, sessionId, future, () -> cancelChat(sessionId));
@@ -431,8 +447,37 @@ public class AgentChatService {
      * final render) works where the turn did.
      */
     void turnEnded(TaskRecord task) {
+        if (SessionTitleWorker.TYPE.equals(task.type())) {
+            PendingTitle pending = awaitingTitles.remove(task.id());
+            if (pending != null) completeInScope(pending.turn(), pending.outcome());
+            return;
+        }
         CompletableFuture<String> outcome = awaitingTurns.remove(task.id());
         if (outcome == null) return;
+        // A root turn that named its chat submitted a title task with a known id: the
+        // handle resolves once that one is done too, like the old executor waited for it.
+        String titleId = titleTaskOf(task);
+        if (titleId != null && queue.get(titleId).filter(t -> !t.status().terminal()).isPresent()) {
+            awaitingTitles.put(titleId, new PendingTitle(task, outcome));
+            // It may have ended between the check and the put: then nobody fires the listener for us.
+            if (queue.get(titleId).filter(t -> t.status().terminal()).isPresent()
+                    && awaitingTitles.remove(titleId) != null) {
+                completeInScope(task, outcome);
+            }
+            return;
+        }
+        completeInScope(task, outcome);
+    }
+
+    /** The id the turn's title task would have, or null when the payload does not say. */
+    private static String titleTaskOf(TaskRecord turn) {
+        Object session = turn.payload().get(AgentTurnWorker.SESSION_ID);
+        Object turnId = turn.payload().get(AgentTurnWorker.TURN_ID);
+        if (session == null || turnId == null) return null;
+        return SessionTitleWorker.taskIdFor(SessionId.of(session.toString()), ChatTurnId.of(turnId.toString()));
+    }
+
+    private void completeInScope(TaskRecord task, CompletableFuture<String> outcome) {
         Runnable complete = () -> completeFrom(task, outcome);
         if (scope instanceof ThreadBoundScope bound) {
             ScopeTaskAdvisor.scopeIfAny(task).ifPresentOrElse(s -> bound.runIn(s, complete), complete);

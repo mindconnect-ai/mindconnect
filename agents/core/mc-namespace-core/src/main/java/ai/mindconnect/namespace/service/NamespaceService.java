@@ -1,6 +1,8 @@
 package ai.mindconnect.namespace.service;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.NamespacePurge;
+import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
@@ -11,6 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -25,26 +28,43 @@ import java.util.regex.Pattern;
  *
  * <p>A namespace id is what the stores partition by — a directory name, a
  * column value, part of a URL — so it is kept simple: lower-case letters,
- * digits, {@code -} and {@code _}, at most 64 characters. Only the creator
- * invites, removes members and renames; any member may leave.
+ * digits, {@code -} and {@code _}, at most 64 characters, and not a name the
+ * installation uses for itself ({@code system} is where users, tokens and the
+ * namespaces live). Only the creator invites, removes members, renames and
+ * deletes; any member may leave.
+ *
+ * <p>Deleting a namespace runs every {@link NamespacePurge} the service was
+ * given — the stores remove what they hold for it — then drops the record and
+ * evicts the namespace from every routed port. A purge that fails keeps the
+ * record, so the deletion can be tried again.
  */
 public class NamespaceService {
 
     /** What an id may look like: safe as a directory name and as a path segment. */
     public static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9_-]{0,63}");
+    /** Ids no namespace may take: the installation's own directory, and the URL prefixes. */
+    public static final Set<String> RESERVED = Set.of("system", "ns", "api", "admin", "v1");
 
     private final NamespaceRepository namespaces;
     private final Namespace defaultNamespace;
     private final Clock clock;
+    private final List<NamespacePurge> purges;
 
     public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace) {
         this(namespaces, defaultNamespace, Clock.systemUTC());
     }
 
     public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace, Clock clock) {
+        this(namespaces, defaultNamespace, clock, List.of());
+    }
+
+    /** @param purges what each store does with a deleted namespace's data; may be empty */
+    public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace, Clock clock,
+                            List<NamespacePurge> purges) {
         this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
         this.defaultNamespace = Objects.requireNonNull(defaultNamespace, "defaultNamespace");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.purges = List.copyOf(Objects.requireNonNull(purges, "purges"));
     }
 
     /** The namespace every user may work in without being invited. */
@@ -99,6 +119,9 @@ public class NamespaceService {
         if (!ID.matcher(value).matches()) {
             throw new IllegalArgumentException("A namespace id is 1–64 lower-case letters, digits, '-' or '_', got '" + id + "'");
         }
+        if (RESERVED.contains(value)) {
+            throw new IllegalArgumentException("'" + value + "' is reserved; pick another id");
+        }
         Namespace namespace = new Namespace(value);
         if (defaultNamespace.equals(namespace) || namespaces.findById(namespace).isPresent()) {
             throw new IllegalArgumentException("Namespace '" + value + "' already exists");
@@ -137,6 +160,33 @@ public class NamespaceService {
         NamespaceDefinition updated = ns.withoutMember(member);
         if (updated != ns) namespaces.save(updated);
         return updated;
+    }
+
+    /** {@code actor} leaves {@code id}; the creator cannot leave, only delete. */
+    public NamespaceDefinition leave(Namespace id, UserId actor) {
+        return removeMember(id, actor, actor);
+    }
+
+    /**
+     * Deletes {@code id} with everything in it. Only the creator may; the default
+     * namespace cannot be deleted.
+     *
+     * @throws IllegalArgumentException when the namespace does not exist, is the default one,
+     *                                  or {@code actor} did not create it
+     * @throws IllegalStateException    when a store could not purge its data — the record stays, try again
+     */
+    public void delete(Namespace id, UserId actor) {
+        NamespaceDefinition ns = memberOnly(id, actor, "delete");
+        if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator deletes '" + id + "'");
+        for (NamespacePurge purge : purges) {
+            try {
+                purge.purge(id);
+            } catch (RuntimeException e) {
+                throw new IllegalStateException("Could not remove the data of '" + id + "': " + e.getMessage(), e);
+            }
+        }
+        namespaces.deleteById(id);
+        NamespaceRouted.evictEverywhere(id);
     }
 
     public NamespaceDefinition rename(Namespace id, UserId actor, String displayName) {

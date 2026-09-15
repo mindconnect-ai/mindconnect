@@ -6,6 +6,11 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.function.Function;
 
 /**
@@ -23,11 +28,15 @@ import java.util.function.Function;
  * </pre>
  *
  * <p>Instances are created lazily on the first call for a namespace and
- * kept for the life of the proxy; {@link #evict} drops one (a deleted
- * namespace). The factory may do set-up work — a Postgres adapter's
+ * kept for the life of the proxy; {@link #evict} drops one, and
+ * {@link #evictEverywhere} drops a namespace from every proxy of the process
+ * (a deleted namespace). The factory may do set-up work — a Postgres adapter's
  * {@code initSchema()} runs once per namespace and process.
  */
 public final class NamespaceRouted {
+
+    /** Every routed proxy of the process, weakly — a proxy lives as long as the bean holding it. */
+    private static final Set<Routed> ALL = Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
 
     private NamespaceRouted() {
     }
@@ -42,12 +51,22 @@ public final class NamespaceRouted {
             throw new IllegalArgumentException(port.getName() + " is not an interface — only ports can be routed");
         }
         Handler<T> handler = new Handler<>(port, scope, factory);
+        ALL.add(handler);
         return port.cast(Proxy.newProxyInstance(port.getClassLoader(), new Class<?>[]{port, Routed.class}, handler));
     }
 
     /** Forgets the instance for {@code namespace}; the next call builds a fresh one. */
     public static void evict(Object routed, Namespace namespace) {
         if (routed instanceof Routed r) r.evict(namespace);
+    }
+
+    /** Forgets {@code namespace} in every routed proxy of the process — after its data was purged. */
+    public static void evictEverywhere(Namespace namespace) {
+        List<Routed> all;
+        synchronized (ALL) {
+            all = new ArrayList<>(ALL);
+        }
+        all.forEach(r -> r.evict(namespace));
     }
 
     /** The handle a routed proxy also implements, for {@link #evict}. */
@@ -92,7 +111,14 @@ public final class NamespaceRouted {
 
         @Override
         public void evict(Namespace namespace) {
-            instances.remove(namespace);
+            T dropped = instances.remove(namespace);
+            if (dropped instanceof AutoCloseable closeable) {
+                try {
+                    closeable.close();
+                } catch (Exception ignored) {
+                    // best effort: the adapter is gone either way
+                }
+            }
         }
     }
 }

@@ -70,6 +70,15 @@ public final class NamespacedMcpGateways implements AutoCloseable {
         });
     }
 
+    /** Closes and forgets {@code namespace}'s gateway — after the namespace's directory was deleted. */
+    public void drop(Namespace namespace) {
+        Parts dropped = parts.remove(namespace);
+        if (dropped != null) {
+            dropped.gateway().close();
+            log.info("MCP gateway closed for deleted namespace '{}'", namespace.value());
+        }
+    }
+
     @Override
     public void close() {
         parts.values().forEach(p -> p.gateway().close());

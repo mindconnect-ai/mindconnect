@@ -554,6 +554,10 @@ public final class AgentRuntimeBuilder {
         toolWorker.attach(taskQueue);
         taskQueue.register(AgentTurnWorker.TYPE, turnWorker);
         taskQueue.register(ToolCallWorker.TYPE, toolWorker);
+        // A chat is named by a task of its own; the turn handle waits for it, so register the worker here too.
+        taskQueue.register(ai.mindconnect.agent.runtime.service.task.SessionTitleWorker.TYPE,
+                new ai.mindconnect.agent.runtime.service.task.SessionTitleWorker(
+                        sessionService, conversationManager, statelessRunner, userChannels));
         taskQueue.register(ai.mindconnect.agent.runtime.service.task.SessionTitleWorker.TYPE,
                 new ai.mindconnect.agent.runtime.service.task.SessionTitleWorker(
                         sessionService, conversationManager, statelessRunner, userChannels));

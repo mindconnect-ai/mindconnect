@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.controller;
 
-import ai.mindconnect.adminui.service.NamespaceInvitations;
+import ai.mindconnect.adminui.service.NamespaceMembers;
 import ai.mindconnect.adminui.ui.page.NamespacesPage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
@@ -54,15 +54,15 @@ public class NamespaceUiController {
     private final NamespaceService namespaces;
     private final UserRepository users;
     private final UserService userService;
-    private final NamespaceInvitations invitations;
+    private final NamespaceMembers members;
     private final ScopeSupplier scope;
 
     public NamespaceUiController(NamespaceService namespaces, UserRepository users, UserService userService,
-                                 NamespaceInvitations invitations, ScopeSupplier scope) {
+                                 NamespaceMembers members, ScopeSupplier scope) {
         this.namespaces = namespaces;
         this.users = users;
         this.userService = userService;
-        this.invitations = invitations;
+        this.members = members;
         this.scope = scope;
     }
 
@@ -71,8 +71,8 @@ public class NamespaceUiController {
         return page(userId(user));
     }
 
-    /** Enters {@code id} for the rest of the browser session. */
-    @GetMapping("/switch/{id}")
+    /** Enters {@code id} for the rest of the browser session — a POST: it changes what the user works in. */
+    @PostMapping("/switch/{id}")
     public ResponseEntity<Void> switchTo(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
                                          HttpServletRequest request) {
         UserId me = userId(user);
@@ -121,7 +121,7 @@ public class NamespaceUiController {
         UserId me = userId(user);
         String invitee;
         try {
-            invitee = invitations.invite(new Namespace(id), me, new FormBody(raw).str("user")).label();
+            invitee = members.invite(new Namespace(id), me, new FormBody(raw).str("user")).label();
         } catch (IllegalArgumentException e) {
             return page(me).toast(UiToast.error(e.getMessage()).title("Not invited"));
         }
@@ -133,11 +133,49 @@ public class NamespaceUiController {
                          @PathVariable("user") String member) {
         UserId me = userId(user);
         try {
-            namespaces.removeMember(new Namespace(id), me, UserId.of(member));
+            members.remove(new Namespace(id), me, UserId.of(member));
         } catch (IllegalArgumentException e) {
             return page(me).toast(UiToast.error(e.getMessage()).title("Not removed"));
         }
         return page(me).toast(UiToast.success(member + " is no longer a member of '" + id + "'.").title("Removed"));
+    }
+
+    /** The caller leaves {@code id}; leaving the current namespace lands in the default one. */
+    @PostMapping("/{id}/leave")
+    public ResponseEntity<Object> leave(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
+                                        HttpServletRequest request) {
+        UserId me = userId(user);
+        Namespace namespace = new Namespace(id);
+        try {
+            members.leave(namespace, me);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(page(me).toast(UiToast.error(e.getMessage()).title("Not left")));
+        }
+        return afterLeaving(request, me, namespace,
+                UiToast.success("You are no longer a member of '" + id + "'.").title("Left"));
+    }
+
+    /** Deletes {@code id} with everything in it; only its creator may. */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Object> delete(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
+                                         HttpServletRequest request) {
+        UserId me = userId(user);
+        Namespace namespace = new Namespace(id);
+        try {
+            members.delete(namespace, me);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.ok(page(me).toast(UiToast.error(e.getMessage()).title("Not deleted")));
+        }
+        return afterLeaving(request, me, namespace,
+                UiToast.success("Namespace '" + id + "' and everything in it are gone.").title("Deleted"));
+    }
+
+    private ResponseEntity<Object> afterLeaving(HttpServletRequest request, UserId me, Namespace left, UiToast toast) {
+        if (left.equals(scope.namespace())) {
+            enter(request, me, namespaces.defaultNamespace());
+            return ResponseEntity.status(HttpStatus.SEE_OTHER).location(AFTER_SWITCH).build();
+        }
+        return ResponseEntity.ok(page(me).toast(toast));
     }
 
     /** For this session, and remembered on the user for the next one and the next restart. */

@@ -1,9 +1,11 @@
 package ai.mindconnect.adminui.config;
 
+import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.vectorstore.tools.DefaultVectorStores;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -48,5 +50,13 @@ public class VectorStoreConfig {
                 return Optional.ofNullable(strings.get(key)).filter(s -> !s.isBlank());
             }
         }).orElseThrow(() -> new IllegalStateException("Vector store setup incomplete"));
+    }
+
+    /** A deleted namespace's vector-store registry is forgotten; its settings and tables go with the namespace. */
+    @Bean
+    NamespacePurge vectorStorePurge(VectorStores stores) {
+        return namespace -> {
+            if (stores instanceof DefaultVectorStores defaults) defaults.forget(namespace);
+        };
     }
 }

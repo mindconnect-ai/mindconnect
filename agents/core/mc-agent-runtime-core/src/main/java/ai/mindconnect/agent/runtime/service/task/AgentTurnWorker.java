@@ -348,11 +348,6 @@ public final class AgentTurnWorker implements TaskWorker {
         stream.accept(new StreamEvent.Done());
         afterTurn(memoryStrategy, def, session, auth);
         saveWorkingMemorySnapshot(memoryStrategy, def, session, auth);
-        // A root turn that answered an untitled chat names it — as a task of its
-        // own, a step behind the turns, stamped with this turn's scope.
-        if (depth == 0 && session.title() == null && finalText != null && !finalText.isBlank()) {
-            ctx.submitChild(SessionTitleWorker.submission(session.id(), turnId));
-        }
         return TaskOutcome.done(finalText);
     }
 

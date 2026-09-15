@@ -24,11 +24,12 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Names a chat after its first exchange — as a task of its own, behind the
- * turn that produced the exchange. The turn worker submits it as a child
- * once a root turn has answered an untitled session; the queue stamps it
- * with the turn's scope, keeps it across a restart, retries it, and shows
- * it in the task monitor like every other piece of work.
+ * Names a chat after the user's first message — as a task of its own,
+ * submitted together with the turn and run in parallel with it: the title
+ * needs only what the user wrote, and the answer, when it is already there,
+ * is welcome context. The queue stamps the task with the submitter's scope,
+ * keeps it across a restart and shows it in the task monitor like every
+ * other piece of work; the turn handle resolves once both are done.
  *
  * <p>Idempotent: a session that has a title by the time this runs — the
  * user named it while the model was thinking — keeps it, and the
@@ -56,9 +57,12 @@ public final class SessionTitleWorker implements TaskWorker {
         this.userChannels = userChannels;
     }
 
-    /** One title task per session: a second submission for the same session is the same task. */
-    public static String taskIdFor(SessionId sessionId) {
-        return "task_title_" + sessionId.value();
+    /**
+     * One title task per turn: a later turn of a chat that is still untitled — the first
+     * exchange named nothing — asks again; a re-submit for the same turn is the same task.
+     */
+    public static String taskIdFor(SessionId sessionId, ChatTurnId turnId) {
+        return "task_title_" + sessionId.value() + "_" + turnId.value();
     }
 
     /** Submitted by the turn worker as a child of the turn; a step behind fresh turns in priority. */
@@ -66,7 +70,7 @@ public final class SessionTitleWorker implements TaskWorker {
         Map<String, Object> payload = new HashMap<>();
         payload.put(SESSION_ID, sessionId.value());
         payload.put(TURN_ID, turnId.value());
-        return TaskSubmission.of(TYPE, payload).withId(taskIdFor(sessionId)).withPriority(2);
+        return TaskSubmission.of(TYPE, payload).withId(taskIdFor(sessionId, turnId)).withPriority(2);
     }
 
     @Override
@@ -85,7 +89,7 @@ public final class SessionTitleWorker implements TaskWorker {
         String title;
         try {
             String generated = agentTaskRunner.run(StatelessAgentSeeder.TITLE_GENERATOR,
-                    "User: " + userMessage + "\nAgent: " + answer);
+                    answer.isBlank() ? "User: " + userMessage : "User: " + userMessage + "\nAgent: " + answer);
             title = generated == null || generated.isBlank() ? userMessage : generated.strip();
         } catch (Exception e) {
             log.warn("Title generation failed for session {} — using the user's message: {}",
