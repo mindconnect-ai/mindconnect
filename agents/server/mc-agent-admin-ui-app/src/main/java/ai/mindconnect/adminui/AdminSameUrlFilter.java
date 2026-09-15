@@ -38,7 +38,8 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
     /** Sections whose controllers still live under /admin/api/<section>. */
     private static final List<String> LEGACY_SECTIONS = List.of(
             "/admin/agents", "/admin/sessions", "/admin/tools", "/admin/skills",
-            "/admin/llm-configs", "/admin/migrations", "/admin/api-explorer", "/admin/profile");
+            "/admin/llm-configs", "/admin/migrations", "/admin/api-explorer", "/admin/profile",
+            "/admin/namespaces");
 
     /** The chat lives under its own prefix: /chat/... → /chat/api/... */
     private static final List<String> CHAT_SECTION = List.of("/chat");

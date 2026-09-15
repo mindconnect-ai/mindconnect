@@ -49,13 +49,16 @@ public class WorkflowPostgresAutoConfiguration {
         return new HikariDataSource(config);
     }
 
+    /** Backs off when the host brings its own — the agents area hands out stores routed per namespace. */
     @Bean
+    @ConditionalOnMissingBean(WorkflowDataRepository.class)
     WorkflowDataRepository workflowDataRepository(DataSource dataSource,
                                                   @Value("${mindconnect.namespace:local}") String partition) {
         return new PgWorkflowDataRepository(Sql.of(dataSource), partition).initSchema();
     }
 
     @Bean
+    @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
     WorkflowInstanceRepository workflowInstanceRepository(DataSource dataSource,
                                                           @Value("${mindconnect.namespace:local}") String partition) {
         return new PgWorkflowInstanceRepository(Sql.of(dataSource), partition).initSchema();

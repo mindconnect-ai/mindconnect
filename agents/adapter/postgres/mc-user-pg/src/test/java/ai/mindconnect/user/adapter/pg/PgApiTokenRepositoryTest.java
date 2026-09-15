@@ -1,6 +1,5 @@
 package ai.mindconnect.user.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.user.domain.ApiToken;
@@ -14,7 +13,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PgApiTokenRepositoryTest {
 
-    private static final Namespace NS = new Namespace("test");
     private static final Instant AT = Instant.parse("2026-09-11T12:00:00Z");
 
     private Sql sql;
@@ -24,7 +22,7 @@ class PgApiTokenRepositoryTest {
     void setUp() {
         sql = Sql.of(TestDb.require());
         sql.execute("DROP TABLE IF EXISTS mc_api_token");
-        repo = new PgApiTokenRepository(sql, NS).initSchema();
+        repo = new PgApiTokenRepository(sql).initSchema();
     }
 
     private static ApiToken token(String owner, String hash) {
@@ -43,17 +41,6 @@ class PgApiTokenRepositoryTest {
         assertThat(repo.findByHash("hash-b")).contains(bobs);
         assertThat(repo.findByHash("nope")).isEmpty();
         assertThat(repo.findByUser(UserId.of("alice"))).containsExactly(alices);
-    }
-
-    @Test
-    void aRepositoryBoundToAnotherNamespaceSeesNothing() {
-        ApiToken alices = token("alice", "hash-a");
-        repo.save(alices);
-        var other = new PgApiTokenRepository(sql, new Namespace("other")).initSchema();
-
-        assertThat(other.findById(alices.id())).isEmpty();
-        assertThat(other.findByHash("hash-a")).isEmpty();
-        assertThat(other.findByUser(UserId.of("alice"))).isEmpty();
     }
 
     @Test

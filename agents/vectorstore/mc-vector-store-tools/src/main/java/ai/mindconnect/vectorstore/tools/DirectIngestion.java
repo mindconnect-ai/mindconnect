@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.vectorstore.VectorChunk;
 import ai.mindconnect.vectorstore.VectorStore;
 
@@ -21,13 +22,13 @@ public final class DirectIngestion {
      * Replaces {@code fileId}'s chunks in {@code store} with the freshly
      * chunked and embedded {@code text}. Returns a human-readable summary.
      */
-    public static String ingest(VectorStores stores, VectorStore store, String storeName,
+    public static String ingest(VectorStores stores, Namespace namespace, VectorStore store, String storeName,
                                 String fileId, String text) {
         List<String> pieces = DefaultChunker.chunk(text);
         if (pieces.isEmpty()) {
             return fileId + ": no text content to ingest.";
         }
-        List<float[]> vectors = stores.embedFor(storeName, pieces);
+        List<float[]> vectors = stores.embedFor(namespace, storeName, pieces);
         List<VectorChunk> chunks = new ArrayList<>(pieces.size());
         for (int i = 0; i < pieces.size(); i++) {
             chunks.add(new VectorChunk(fileId + ":" + i, fileId, i, pieces.get(i),

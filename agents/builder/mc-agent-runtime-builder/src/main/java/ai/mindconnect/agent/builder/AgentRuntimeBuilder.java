@@ -48,6 +48,7 @@ import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
 import ai.mindconnect.agent.runtime.port.out.TokenCounters;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
@@ -463,7 +464,9 @@ public final class AgentRuntimeBuilder {
                 new AgentToolsProvider());
         PromptRenderer promptRenderer = new PebblePromptRenderer(promptProviders);
         AgentTaskRunner statelessRunner = new StatelessAgentTaskRunner(
-                definitionRepository, llmChat, resolveDefaultLlmConfigName(), promptRenderer);
+                definitionRepository, llmChat, resolveDefaultLlmConfigName(), promptRenderer,
+                new ai.mindconnect.agent.runtime.service.StatelessAgentSeeder(
+                        definitionRepository, llmConfigRepository, resolveDefaultLlmConfigName()));
         ToolResultSummarizer summarizer = "llm".equalsIgnoreCase(toolResultSummarizer)
                 ? new LlmToolResultSummarizer(statelessRunner) : new RuleBasedToolResultSummarizer();
         // The file store — Postgres, or the filesystem one when the file-store
@@ -499,7 +502,9 @@ public final class AgentRuntimeBuilder {
                 .service(DynamicToolActivations.class, activations)
                 .service(LlmEmbeddings.class, embeddings)
                 .service(LlmConfigRepository.class, llmConfigRepository)
-                // The namespace the stores are bound to — for tools that open stores of their own (vector, workflow).
+                // Where this runtime works — one namespace for its whole life. Tools that
+                // open stores of their own (vector, workflow) take the namespace directly.
+                .service(ScopeSupplier.class, ScopeSupplier.fixed(namespace))
                 .service(Namespace.class, namespace);
         if (workflows != null) {
             PostgresWorkflows.register(env, workflows);
@@ -511,7 +516,6 @@ public final class AgentRuntimeBuilder {
 
         // 6. Turn pipeline + chat service — the turn runs as an agent.turn
         //    task on an in-process queue (concept 16).
-        ExecutorService turnExecutor = Executors.newVirtualThreadPerTaskExecutor();
         ToolExecutor toolExecutor = new ToolExecutor(List.of());
         LlmCallTraceRepository traceRepository = inMemory
                 ? new InMemoryLlmCallTraceRepository()
@@ -550,10 +554,17 @@ public final class AgentRuntimeBuilder {
         toolWorker.attach(taskQueue);
         taskQueue.register(AgentTurnWorker.TYPE, turnWorker);
         taskQueue.register(ToolCallWorker.TYPE, toolWorker);
+        // A chat is named by a task of its own; the turn handle waits for it, so register the worker here too.
+        taskQueue.register(ai.mindconnect.agent.runtime.service.task.SessionTitleWorker.TYPE,
+                new ai.mindconnect.agent.runtime.service.task.SessionTitleWorker(
+                        sessionService, conversationManager, statelessRunner, userChannels));
+        taskQueue.register(ai.mindconnect.agent.runtime.service.task.SessionTitleWorker.TYPE,
+                new ai.mindconnect.agent.runtime.service.task.SessionTitleWorker(
+                        sessionService, conversationManager, statelessRunner, userChannels));
         AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
                 conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                statelessRunner, sessionChannels, userChannels, taskQueue, approvalStore, turnExecutor,
-                instructionFiles, skillCatalog);
+                sessionChannels, userChannels, taskQueue, approvalStore,
+                instructionFiles, skillCatalog, ScopeSupplier.fixed(namespace));
 
         // 7. Seed configs, agents, workflows.
         for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);
@@ -564,7 +575,7 @@ public final class AgentRuntimeBuilder {
         AttachSupport attachSupport = AttachSupport.createIfPresent(
                 environment, activations, sessionRepository, embeddings, llmConfigRepository, workflows, fileStore, namespace);
         return new AgentRuntime(chatService, sessionService, definitionRepository,
-                llmConfigRepository, conversationManager, turnExecutor, attachSupport,
+                llmConfigRepository, conversationManager, attachSupport,
                 approvalStore);
     }
 

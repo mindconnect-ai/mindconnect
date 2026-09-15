@@ -38,7 +38,7 @@ class VectorStoreFileDownloadTest {
     @Test
     void theSignedInUserDownloadsTheirOwnFilesButNotSomebodyElses() throws Exception {
         FilesystemFileStore store = new FilesystemFileStore(dir, new Namespace("test"));
-        VectorStoreUiController controller = new VectorStoreUiController(null, null, store, null, currentUsers(), null);
+        VectorStoreUiController controller = new VectorStoreUiController(null, null, store, null, currentUsers(), null, ai.mindconnect.agent.ScopeSupplier.local());
         StoredFile alices = store.save("notes.txt", "text/plain", text("hello"), UserId.of("alice"));
         StoredFile legacy = store.save("old.txt", "text/plain", text("before creators"), null);
 

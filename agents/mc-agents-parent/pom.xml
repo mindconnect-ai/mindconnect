@@ -73,6 +73,11 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-starter-namespace</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-starter-file</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -99,6 +104,21 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-user-pg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-namespace-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-namespace</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-namespace-pg</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -79,8 +79,11 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       — `record XId(String value) implements EntityId` — never by a bare `UUID` or `String`;
       in JSON an id is its plain value. Ids, domain objects, ports and services carry no
       namespace: persistence adapters (File, Pg, the file-store and vector-store backends)
-      are bound to one namespace in their constructor or config, and the Spring starters set
-      it from `mindconnect.namespace` — one process serves one namespace
+      are bound to one namespace in their constructor or config; above them a `NamespaceRouted`
+      proxy picks the adapter for the namespace the `ScopeSupplier` names right now (`Scope` =
+      namespace + optional `UserId` + host attributes; a library embeds with `ScopeSupplier.fixed`,
+      a server binds a `ThreadBoundScope` per request and per queued task via `ScopeTaskAdvisor`;
+      `mindconnect.namespace` is only the fallback while not every entry point binds)
     - `mc-agent-runtime-core` / `mc-agent-runtime` (packages `ai.mindconnect.agent.runtime.*`):
       execution engine (turn loop, tool dispatch, sub-agent calls, approvals) / its adapters
       (file & in-memory repos, Pebble prompt renderer, tokenizer)

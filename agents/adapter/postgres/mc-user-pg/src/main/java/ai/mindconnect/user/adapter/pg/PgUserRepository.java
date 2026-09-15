@@ -1,6 +1,5 @@
 package ai.mindconnect.user.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
@@ -9,29 +8,25 @@ import ai.mindconnect.user.port.out.UserRepository;
 
 import javax.sql.DataSource;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
  * {@link UserRepository} on Postgres. Each user is one row of {@code mc_user},
- * keyed by {@code (namespace, id)}. The repository is bound to one namespace
- * and every statement matches it.
+ * keyed by the id alone: users are installation-wide, they are not inside a
+ * namespace.
  */
 public class PgUserRepository implements UserRepository {
 
     private final DocumentTable<User> users;
-    private final Namespace namespace;
 
-    public PgUserRepository(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgUserRepository(DataSource dataSource) {
+        this(Sql.of(dataSource));
     }
 
     /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
-    public PgUserRepository(Sql sql, Namespace namespace) {
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+    public PgUserRepository(Sql sql) {
         this.users = DocumentTable.of(User.class)
                 .table("mc_user")
-                .partitionKey("namespace", "TEXT", u -> namespace.value())
                 .id("id", "TEXT", u -> u.id().value())
                 .build(sql);
     }
@@ -44,12 +39,12 @@ public class PgUserRepository implements UserRepository {
 
     @Override
     public Optional<User> findById(UserId id) {
-        return users.findById(namespace.value(), id.value());
+        return users.findById(id.value());
     }
 
     @Override
     public List<User> findAll() {
-        return users.find("WHERE namespace = ? ORDER BY id", namespace.value());
+        return users.find("ORDER BY id");
     }
 
     @Override

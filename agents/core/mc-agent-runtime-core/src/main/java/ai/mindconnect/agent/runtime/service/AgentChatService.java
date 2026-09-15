@@ -31,7 +31,13 @@ import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.Subscription;
 import ai.mindconnect.agent.runtime.service.round.TurnMessage;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
 import ai.mindconnect.agent.runtime.service.turn.LocalChatTurnHandle;
+import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.ThreadBoundScope;
+import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
+import ai.mindconnect.taskqueue.TaskListener;
+import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.agent.runtime.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.common.PageRequest;
@@ -49,7 +55,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -69,8 +75,8 @@ public class AgentChatService {
 
     private static final Logger log = LoggerFactory.getLogger(AgentChatService.class);
 
-    /** Upper bound on one turn, sub-agents included — a safety net, not a target. */
-    private static final Duration TURN_TIMEOUT = Duration.ofHours(3);
+    /** Upper bound on one turn, sub-agents included — a safety net, not a target: a turn parked at a gate nobody answers. */
+    private static final java.time.Duration TURN_TIMEOUT = java.time.Duration.ofHours(3);
 
     private final AgentSessionService sessionService;
     private final AgentDefinitionRepository definitionRepository;
@@ -78,12 +84,18 @@ public class AgentChatService {
     private final MemoryStrategyFactory memoryStrategyFactory;
     private final WorkingMemoryRepository workingMemoryRepository;
     private final PromptRenderer promptRenderer;
-    private final AgentTaskRunner agentTaskRunner;
     private final SessionChannels sessionChannels;
     private final UserChannels userChannels;
     private final TaskQueue queue;
     private final ToolApprovalStore approvalStore;
-    private final ExecutorService turnExecutor;
+    /** Where this runtime works: a turn's handle is completed in the turn's own scope. */
+    private final ScopeSupplier scope;
+    /** Turns a caller holds a handle for, by task id — completed from the queue's listener, no thread waits. */
+    private final java.util.Map<String, CompletableFuture<String>> awaitingTurns = new ConcurrentHashMap<>();
+    /** Turns whose task ended but whose title task still runs, keyed by the title task's id. */
+    private final java.util.Map<String, PendingTitle> awaitingTitles = new ConcurrentHashMap<>();
+
+    private record PendingTitle(TaskRecord turn, CompletableFuture<String> outcome) {}
     private final ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions;
     private final ai.mindconnect.agent.runtime.skill.SkillCatalog skills;
 
@@ -93,17 +105,15 @@ public class AgentChatService {
                             MemoryStrategyFactory memoryStrategyFactory,
                             WorkingMemoryRepository workingMemoryRepository,
                             PromptRenderer promptRenderer,
-                            AgentTaskRunner agentTaskRunner,
                             SessionChannels sessionChannels,
                             UserChannels userChannels,
                             TaskQueue queue,
                             ToolApprovalStore approvalStore,
-                            ExecutorService turnExecutor,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions) {
         this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
-                workingMemoryRepository, promptRenderer, agentTaskRunner, sessionChannels, userChannels,
-                queue, approvalStore, turnExecutor, instructions,
-                ai.mindconnect.agent.runtime.skill.SkillCatalog.none());
+                workingMemoryRepository, promptRenderer, sessionChannels, userChannels,
+                queue, approvalStore, instructions,
+                ai.mindconnect.agent.runtime.skill.SkillCatalog.none(), ScopeSupplier.local());
     }
 
     public AgentChatService(AgentSessionService sessionService,
@@ -112,28 +122,32 @@ public class AgentChatService {
                             MemoryStrategyFactory memoryStrategyFactory,
                             WorkingMemoryRepository workingMemoryRepository,
                             PromptRenderer promptRenderer,
-                            AgentTaskRunner agentTaskRunner,
                             SessionChannels sessionChannels,
                             UserChannels userChannels,
                             TaskQueue queue,
                             ToolApprovalStore approvalStore,
-                            ExecutorService turnExecutor,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
-                            ai.mindconnect.agent.runtime.skill.SkillCatalog skills) {
+                            ai.mindconnect.agent.runtime.skill.SkillCatalog skills,
+                            ScopeSupplier scope) {
         this.sessionService = sessionService;
         this.definitionRepository = definitionRepository;
         this.conversationManager = conversationManager;
         this.memoryStrategyFactory = memoryStrategyFactory;
         this.workingMemoryRepository = workingMemoryRepository;
         this.promptRenderer = promptRenderer;
-        this.agentTaskRunner = agentTaskRunner;
         this.sessionChannels = sessionChannels;
         this.userChannels = userChannels;
         this.queue = queue;
         this.approvalStore = approvalStore;
-        this.turnExecutor = turnExecutor;
+        this.scope = scope == null ? ScopeSupplier.local() : scope;
         this.instructions = instructions;
         this.skills = skills == null ? ai.mindconnect.agent.runtime.skill.SkillCatalog.none() : skills;
+        // The queue tells us when a turn ended; no thread of ours waits for it.
+        if (queue != null) {
+            queue.addListener(new TaskListener() {
+                @Override public void onTerminal(TaskRecord task) { turnEnded(task); }
+            });
+        }
     }
 
     /**
@@ -151,7 +165,9 @@ public class AgentChatService {
      * Starts a chat turn: user message into the conversation, task onto the
      * queue, the caller's handler onto the turn's channel. The returned
      * handle's future resolves with the final answer once the task is
-     * terminal (title generation included, matching the old behaviour).
+     * terminal — title generation included: the title is a task of its own
+     * behind the turn, and the future waits for it, so a caller that reads the
+     * session right after the answer finds the chat named.
      */
     public ChatTurnHandle submitChat(SessionId sessionId, String userMessage,
                                      Consumer<StreamEvent> eventHandler) {
@@ -198,10 +214,7 @@ public class AgentChatService {
 
         // 2.+3. Listen on the turn's channel, make the turn a task — the queue
         //        is the only registry of running work, nothing is tracked here.
-        return startTurn(session, turnId, 0, eventHandler, response -> {
-            generateTitleIfNeeded(session, isFirstMessage, userMessage, response);
-            return response;
-        });
+        return startTurn(session, turnId, 0, eventHandler);
     }
 
     /**
@@ -214,20 +227,36 @@ public class AgentChatService {
      * every top-level turn passes through, whichever client submitted it.
      */
     private ChatTurnHandle startTurn(AgentSession session, ChatTurnId turnId, int run,
-                                     Consumer<StreamEvent> eventHandler,
-                                     java.util.function.UnaryOperator<String> afterCompletion) {
+                                     Consumer<StreamEvent> eventHandler) {
         SessionId sessionId = session.id();
         var subscription = sessionChannels.subscribeTurn(sessionId, turnId, eventHandler);
-        String taskId = queue.submit(AgentTurnWorker.submission(turnId, run, sessionId, 0, null));
+        TaskSubmission submission = AgentTurnWorker.submission(turnId, run, sessionId, 0, null);
+        CompletableFuture<String> outcome = new CompletableFuture<>();
+        // Registered before the submit: a turn that ends before submit() returns still finds its future.
+        awaitingTurns.put(submission.id(), outcome);
+        outcome.orTimeout(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+        CompletableFuture<String> future = outcome.whenComplete((response, error) -> {
+            awaitingTurns.remove(submission.id(), outcome);
+            subscription.close();
+            userChannels.publish(session.userId(),
+                    new UserEvent.TurnFinished(sessionId, turnId, outcomeOf(error)));
+        });
+        try {
+            queue.submit(submission);
+        } catch (RuntimeException e) {
+            awaitingTurns.remove(submission.id());
+            subscription.close();
+            throw e;
+        }
         userChannels.publish(session.userId(), new UserEvent.TurnStarted(sessionId, turnId));
-        CompletableFuture<String> future = CompletableFuture
-                .supplyAsync(() -> awaitResult(taskId), turnExecutor)
-                .whenComplete((response, error) -> {
-                    subscription.close();
-                    userChannels.publish(session.userId(),
-                            new UserEvent.TurnFinished(sessionId, turnId, outcomeOf(error)));
-                })
-                .thenApply(afterCompletion);
+        // An untitled chat is named from this message, in parallel with the turn: the title
+        // task needs only what the user wrote, and the handle waits for it at the end. A
+        // sub-agent's session is no chat of the user's: it keeps the name its parent gave it.
+        if (session.title() == null && session.parentSessionId() == null) {
+            queue.submit(SessionTitleWorker.submission(sessionId, turnId));
+        }
+        // An idempotent re-submit of a task that already ended fires no listener: read it off the queue.
+        queue.get(submission.id()).filter(task -> task.status().terminal()).ifPresent(this::turnEnded);
         return new LocalChatTurnHandle(turnId, sessionId, future, () -> cancelChat(sessionId));
     }
 
@@ -411,53 +440,65 @@ public class AgentChatService {
     }
 
     /** Blocks (a virtual thread) until the task is terminal and maps its ending. */
-    private String awaitResult(String taskId) {
-        TaskRecord terminal;
-        try {
-            terminal = queue.await(taskId, TURN_TIMEOUT);
-        } catch (ai.mindconnect.taskqueue.TaskQueueException e) {
-            // A turn parked at an approval gate can outwait any stream. The
-            // await gives up, the TASK keeps waiting — answering later still
-            // completes it; a reload then shows the persisted result.
-            log.warn("Stopped awaiting task {} ({}) — the task itself lives on", taskId, e.getMessage());
-            return "";
+    /**
+     * The queue's word that a task ended. A turn somebody holds a handle for
+     * gets its future completed — in the turn's own scope, so whatever the
+     * caller chained on the handle (the REST stream's close, the chat UI's
+     * final render) works where the turn did.
+     */
+    void turnEnded(TaskRecord task) {
+        if (SessionTitleWorker.TYPE.equals(task.type())) {
+            PendingTitle pending = awaitingTitles.remove(task.id());
+            if (pending != null) completeInScope(pending.turn(), pending.outcome());
+            return;
         }
+        CompletableFuture<String> outcome = awaitingTurns.remove(task.id());
+        if (outcome == null) return;
+        // A root turn that named its chat submitted a title task with a known id: the
+        // handle resolves once that one is done too, like the old executor waited for it.
+        String titleId = titleTaskOf(task);
+        if (titleId != null && queue.get(titleId).filter(t -> !t.status().terminal()).isPresent()) {
+            awaitingTitles.put(titleId, new PendingTitle(task, outcome));
+            // It may have ended between the check and the put: then nobody fires the listener for us.
+            if (queue.get(titleId).filter(t -> t.status().terminal()).isPresent()
+                    && awaitingTitles.remove(titleId) != null) {
+                completeInScope(task, outcome);
+            }
+            return;
+        }
+        completeInScope(task, outcome);
+    }
+
+    /** The id the turn's title task would have, or null when the payload does not say. */
+    private static String titleTaskOf(TaskRecord turn) {
+        Object session = turn.payload().get(AgentTurnWorker.SESSION_ID);
+        Object turnId = turn.payload().get(AgentTurnWorker.TURN_ID);
+        if (session == null || turnId == null) return null;
+        return SessionTitleWorker.taskIdFor(SessionId.of(session.toString()), ChatTurnId.of(turnId.toString()));
+    }
+
+    private void completeInScope(TaskRecord task, CompletableFuture<String> outcome) {
+        Runnable complete = () -> completeFrom(task, outcome);
+        if (scope instanceof ThreadBoundScope bound) {
+            ScopeTaskAdvisor.scopeIfAny(task).ifPresentOrElse(s -> bound.runIn(s, complete), complete);
+        } else {
+            complete.run();
+        }
+    }
+
+    private static void completeFrom(TaskRecord terminal, CompletableFuture<String> outcome) {
         if (terminal.status() == TaskStatus.CANCELLED
                 || (terminal.status() == TaskStatus.COMPLETED && "CANCELLED".equals(terminal.result()))) {
-            throw new CancellationException("Turn cancelled");
+            outcome.completeExceptionally(new CancellationException("Turn cancelled"));
+            return;
         }
         if (terminal.status() != TaskStatus.COMPLETED) {
             String reason = terminal.failure() != null
                     ? terminal.failure().message() : terminal.status().name();
-            throw new IllegalStateException("Chat turn failed: " + reason);
+            outcome.completeExceptionally(new IllegalStateException("Chat turn failed: " + reason));
+            return;
         }
-        return terminal.result() == null ? "" : terminal.result();
-    }
-
-    // ── Title generation ──────────────────────────────────────────────────
-
-    /**
-     * Generates a title for a brand-new session by asking a small helper agent
-     * to summarise the first user/agent exchange. Failures fall back to the
-     * user message itself.
-     */
-    private void generateTitleIfNeeded(AgentSession session, boolean isFirstMessage,
-                                       String userMessage, String response) {
-        if (!isFirstMessage || session.title() != null) return;
-        if (response == null || response.isBlank()) return;   // no exchange yet (approval wait)
-        String title;
-        try {
-            String input = "User: " + userMessage + "\nAgent: " + response;
-            String generated = agentTaskRunner.run(StatelessAgentSeeder.TITLE_GENERATOR, input);
-            title = (generated == null || generated.isBlank()) ? userMessage : generated;
-        } catch (Exception e) {
-            log.warn("Title generation failed — using user message as fallback: {}", e.getMessage());
-            title = userMessage;
-        }
-        // Only an untitled session takes the generated title: a name the user
-        // gave the chat while the title was being generated stays.
-        AgentSession titled = sessionService.titleIfUntitled(session.id(), title);
-        userChannels.publish(session.userId(), new UserEvent.SessionTitled(session.id(), titled.title()));
+        outcome.complete(terminal.result() == null ? "" : terminal.result());
     }
 
     // ── Memory ─────────────────────────────────────────────────────────────

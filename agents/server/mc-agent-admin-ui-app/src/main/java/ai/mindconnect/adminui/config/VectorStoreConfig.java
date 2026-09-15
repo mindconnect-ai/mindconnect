@@ -1,9 +1,11 @@
 package ai.mindconnect.adminui.config;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.NamespacePurge;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.vectorstore.tools.DefaultVectorStores;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -22,7 +24,7 @@ import java.util.Optional;
 public class VectorStoreConfig {
 
     @Bean
-    VectorStores vectorStores(LlmEmbeddings embeddings, LlmConfigRepository llmConfigs, Namespace namespace,
+    VectorStores vectorStores(LlmEmbeddings embeddings, LlmConfigRepository llmConfigs, ScopeSupplier scope,
                               @Value("${mindconnect.vector-store.backend:memory}") String backend,
                               @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
                               @Value("${mindconnect.vector-store.url:}") String url,
@@ -41,12 +43,20 @@ public class VectorStoreConfig {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) llmConfigs);
-                if (type == Namespace.class) return Optional.of((T) namespace);
+                if (type == ScopeSupplier.class) return Optional.of((T) scope);
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {
                 return Optional.ofNullable(strings.get(key)).filter(s -> !s.isBlank());
             }
         }).orElseThrow(() -> new IllegalStateException("Vector store setup incomplete"));
+    }
+
+    /** A deleted namespace's vector-store registry is forgotten; its settings and tables go with the namespace. */
+    @Bean
+    NamespacePurge vectorStorePurge(VectorStores stores) {
+        return namespace -> {
+            if (stores instanceof DefaultVectorStores defaults) defaults.forget(namespace);
+        };
     }
 }

@@ -101,8 +101,12 @@
         <module>agents/core/mc-user-core</module>
         <module>agents/core/mc-user</module>
         <module>agents/adapter/postgres/mc-user-pg</module>
+        <module>agents/core/mc-namespace-core</module>
+        <module>agents/core/mc-namespace</module>
+        <module>agents/adapter/postgres/mc-namespace-pg</module>
         <module>agents/springstarter/mc-agent-starter-file</module>
         <module>agents/springstarter/mc-agent-starter-postgres</module>
+        <module>agents/springstarter/mc-agent-starter-namespace</module>
         <module>agents/core/mc-credentials</module>
         <module>agents/core/mc-message-repository-core</module>
         <module>agents/core/mc-message-repository</module>

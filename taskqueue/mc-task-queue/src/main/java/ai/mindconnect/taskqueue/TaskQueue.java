@@ -66,5 +66,12 @@ public interface TaskQueue {
     /** Registers the worker for a task type; tasks of unregistered types stay QUEUED. */
     void register(String taskType, TaskWorker worker);
 
+    /**
+     * Observes the queue: every transition of every task, in-band but never
+     * in the way — a listener's exception is logged, not raised. The way a
+     * host learns that a task ended without a thread of its own waiting.
+     */
+    TaskQueue addListener(TaskListener listener);
+
     boolean hasRegisteredType(String type);
 }

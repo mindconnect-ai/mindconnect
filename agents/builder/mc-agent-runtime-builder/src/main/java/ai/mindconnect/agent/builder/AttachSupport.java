@@ -169,19 +169,19 @@ final class AttachSupport {
         }
         try {
             String storeName = "session-" + sessionId.value();
-            var template = stores.template("chat-uploads").orElseGet(() -> {
+            var template = stores.template(namespace, "chat-uploads").orElseGet(() -> {
                 var created = new ai.mindconnect.vectorstore.tools.VectorStoreTemplate(
                         "chat-uploads", environment.getOrDefault("vectorStoreBackend", "memory"),
                         Map.of(), environment.getOrDefault("vectorStoreEmbeddingConfig", "embeddings"),
                         null, Map.of("description", "Per-chat-session upload stores (auto-created)"));
-                stores.registry().saveTemplate(created);
+                stores.registry(namespace).saveTemplate(created);
                 return created;
             });
             // The store is the chat's user's: the vector tools reach it only on that user's behalf.
-            var store = stores.open(storeName, template.name(),
+            var store = stores.open(namespace, storeName, template.name(),
                     ai.mindconnect.vectorstore.tools.VectorStoreInstance.Scope.SESSION,
                     sessionId.value(), session.userId() == null ? null : session.userId().value());
-            var instance = stores.settingsFor(storeName);
+            var instance = stores.settingsFor(namespace, storeName);
             // A copy in the session's own directory, for the file tools and
             // for the ingestion workflow, which runs in the session's scope.
             java.util.Optional<java.nio.file.Path> copy = userHome()
@@ -202,7 +202,7 @@ final class AttachSupport {
                 String text = new String(fileStore.content(stored.id()).readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
                 message = ai.mindconnect.vectorstore.tools.DirectIngestion.ingest(
-                        stores, store, storeName, stored.name(), text);
+                        stores, namespace, store, storeName, stored.name(), text);
             }
 
             activations.activate(sessionId, attached.isPdf()

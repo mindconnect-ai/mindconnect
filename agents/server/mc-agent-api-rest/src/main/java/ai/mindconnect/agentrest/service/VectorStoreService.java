@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
@@ -52,14 +53,18 @@ public class VectorStoreService {
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
     private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path uploadBase;
+    /** Where a call works — every store call names the namespace. */
+    private final ScopeSupplier scope;
 
     public VectorStoreService(ObjectProvider<VectorStores> storesProvider,
                               ObjectProvider<FileStore> fileStoreProvider,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}")
-                              String toolsBaseDir) {
+                              String toolsBaseDir,
+                              ScopeSupplier scope) {
         this.storesProvider = storesProvider;
+        this.scope = scope;
         this.fileStoreProvider = fileStoreProvider;
         this.workflowsProvider = workflowsProvider;
         this.workflowInstancesProvider = workflowInstancesProvider;
@@ -69,39 +74,39 @@ public class VectorStoreService {
     // ── Templates ──────────────────────────────────────────────────────────
 
     public List<VectorStoreTemplate> templates() {
-        return stores().templates();
+        return stores().templates(scope.namespace());
     }
 
     public Optional<VectorStoreTemplate> template(String name) {
-        return stores().template(name);
+        return stores().template(scope.namespace(), name);
     }
 
     public void saveTemplate(VectorStoreTemplate template) {
-        stores().registry().saveTemplate(template);
+        stores().registry(scope.namespace()).saveTemplate(template);
     }
 
     public void deleteTemplate(String name) {
-        stores().registry().deleteTemplate(name);
+        stores().registry(scope.namespace()).deleteTemplate(name);
     }
 
     // ── Stores ─────────────────────────────────────────────────────────────
 
     public List<VectorStoreInstance> instances() {
-        return stores().registry().instances();
+        return stores().registry(scope.namespace()).instances();
     }
 
     public Optional<VectorStoreInstance> instance(String name) {
-        return stores().registry().instance(name);
+        return stores().registry(scope.namespace()).instance(name);
     }
 
     /** Registers (and creates on first use) a GLOBAL store from a template. */
     public Optional<VectorStoreInstance> createStore(String name, String template) {
-        stores().open(name.trim(), template, VectorStoreInstance.Scope.GLOBAL, null);
-        return stores().registry().instance(name.trim());
+        stores().open(scope.namespace(), name.trim(), template, VectorStoreInstance.Scope.GLOBAL, null);
+        return stores().registry(scope.namespace()).instance(name.trim());
     }
 
     public void deleteStore(String name) {
-        stores().registry().deleteInstance(name);
+        stores().registry(scope.namespace()).deleteInstance(name);
     }
 
     // ── Search & chunks ────────────────────────────────────────────────────
@@ -109,8 +114,8 @@ public class VectorStoreService {
     /** Embeds {@code query} with the store's embedding config and returns the top hits. */
     public List<Hit> search(String storeName, String query, int topK, double minScore) {
         VectorStores vs = stores();
-        float[] embedding = vs.embedFor(storeName, List.of(query)).get(0);
-        return vs.openWith(vs.settingsFor(storeName)).search(embedding, topK).stream()
+        float[] embedding = vs.embedFor(scope.namespace(), storeName, List.of(query)).get(0);
+        return vs.openWith(scope.namespace(), vs.settingsFor(scope.namespace(), storeName)).search(embedding, topK).stream()
                 .filter(h -> h.score() >= minScore)
                 .map(h -> new Hit(h.chunk().id(), h.chunk().fileId(), h.chunk().ordinal(),
                         h.chunk().text(), h.chunk().metadata(), h.score()))
@@ -124,8 +129,8 @@ public class VectorStoreService {
         String effectiveFileId = fileId != null && !fileId.isBlank() ? fileId : "api";
         String effectiveId = id != null && !id.isBlank() ? id
                 : effectiveFileId + ":" + UUID.randomUUID();
-        float[] embedding = vs.embedFor(storeName, List.of(text)).get(0);
-        vs.openWith(vs.settingsFor(storeName)).upsert(List.of(new VectorChunk(
+        float[] embedding = vs.embedFor(scope.namespace(), storeName, List.of(text)).get(0);
+        vs.openWith(scope.namespace(), vs.settingsFor(scope.namespace(), storeName)).upsert(List.of(new VectorChunk(
                 effectiveId, effectiveFileId, ordinal != null ? ordinal : 0, text,
                 metadata == null ? Map.of() : metadata, embedding)));
         return new UpsertedChunk(effectiveId, embedding.length);
@@ -151,7 +156,7 @@ public class VectorStoreService {
         Path target = dir.resolve(safeName);
         Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
 
-        VectorStoreInstance instance = vs.settingsFor(storeName);
+        VectorStoreInstance instance = vs.settingsFor(scope.namespace(), storeName);
         String workflowName = instance.ingestionWorkflow();
         if (workflowName != null && !workflowName.isBlank()) {
             var workflow = workflows().findById(workflowName).orElseThrow(() ->
@@ -162,7 +167,7 @@ public class VectorStoreService {
             return safeName + ": " + summarize(report);
         }
         String text = extractText(uploadBase, target);
-        return DirectIngestion.ingest(vs, vs.openWith(instance), storeName, safeName, text);
+        return DirectIngestion.ingest(vs, scope.namespace(), vs.openWith(scope.namespace(), instance), storeName, safeName, text);
     }
 
     /**

@@ -55,6 +55,8 @@ public class VectorStoreUiController {
     private static final String BASE = "/admin/vector-stores";
 
     private final VectorStores stores;
+    /** Where the request works — every store call names the namespace. */
+    private final ai.mindconnect.agent.ScopeSupplier scope;
     private final LlmConfigRepository llmConfigs;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService;
@@ -65,8 +67,10 @@ public class VectorStoreUiController {
                                       ai.mindconnect.filestore.FileStore fileStore,
                                       ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService,
                                       ai.mindconnect.agentrest.auth.CurrentUsers currentUsers,
-                                      ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess) {
+                                      ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess,
+                                      ai.mindconnect.agent.ScopeSupplier scope) {
         this.stores = stores;
+        this.scope = scope;
         this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
         this.vectorStoreService = vectorStoreService;
@@ -94,7 +98,7 @@ public class VectorStoreUiController {
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this template? Existing stores keep their copied settings.")
                         .dispatch("DELETE", "/admin/vector-stores/templates/{id}"));
-        for (VectorStoreTemplate t : stores.templates()) {
+        for (VectorStoreTemplate t : stores.templates(scope.namespace())) {
             templates.row(Map.of(
                     "id", t.name(),
                     "name", VectorStores.DEFAULT_TEMPLATE.equals(t.name()) ? t.name() + " (built-in)" : t.name(),
@@ -117,7 +121,7 @@ public class VectorStoreUiController {
                         .dispatch("DELETE", "/admin/vector-stores/stores/{id}"));
         ai.mindconnect.agent.UserId caller = currentUsers.require();
         Set<String> registered = new LinkedHashSet<>();
-        for (VectorStoreInstance i : stores.registry().instances()) {
+        for (VectorStoreInstance i : stores.registry(scope.namespace()).instances()) {
             registered.add(i.name());
             // A chat's upload store is its user's: nobody else sees it listed.
             if (!storeAccess.reachable(i, caller)) continue;
@@ -131,10 +135,10 @@ public class VectorStoreUiController {
         }
         // Stores that physically exist but were never registered (pre-template
         // era, or created outside the tools) — shown as implicit defaults.
-        for (String discovered : stores.discoverStores(
-                stores.templates().get(0).backend(), Map.of())) {
+        for (String discovered : stores.discoverStores(scope.namespace(), 
+                stores.templates(scope.namespace()).get(0).backend(), Map.of())) {
             if (registered.contains(discovered) || !storeAccess.reachable(discovered, null, caller)) continue;
-            VectorStoreInstance implicit = stores.settingsFor(discovered);
+            VectorStoreInstance implicit = stores.settingsFor(scope.namespace(), discovered);
             instances.row(Map.of(
                     "id", discovered,
                     "name", discovered + " (unregistered)",
@@ -301,7 +305,7 @@ public class VectorStoreUiController {
 
     private String chunkCount(VectorStoreInstance instance) {
         try {
-            return String.valueOf(stores.openWith(instance).chunkCount());
+            return String.valueOf(stores.openWith(scope.namespace(), instance).chunkCount());
         } catch (RuntimeException e) {
             return "?";
         }
@@ -326,9 +330,9 @@ public class VectorStoreUiController {
     @GetMapping("/templates/{name}/edit")
     public UiPage editTemplate(@PathVariable String name) {
         if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
-            return templateForm(stores.template(name).orElse(null), true);
+            return templateForm(stores.template(scope.namespace(), name).orElse(null), true);
         }
-        return templateForm(stores.registry().template(name).orElse(null), false);
+        return templateForm(stores.registry(scope.namespace()).template(name).orElse(null), false);
     }
 
     private static final String BUILT_IN_NOTE = "'" + VectorStores.DEFAULT_TEMPLATE
@@ -430,7 +434,7 @@ public class VectorStoreUiController {
                 body.str("ingestionWorkflow"), metadata)
                 .withVersion(VersionedForms.version(body));
         try {
-            stores.registry().saveTemplate(template);
+            stores.registry(scope.namespace()).saveTemplate(template);
         } catch (StaleVersionException e) {
             if (e.expectedVersion() == 0) {
                 return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("A template named '"
@@ -441,7 +445,7 @@ public class VectorStoreUiController {
                 return VersionedForms.changedMeanwhile("Template '" + templateName + "'");
             }
             // Nothing stored under this name: the edit renamed the template — a new one.
-            stores.registry().saveTemplate(template.withVersion(0L));
+            stores.registry(scope.namespace()).saveTemplate(template.withVersion(0L));
         }
         return list("templates").toast(UiToast.success("Template '" + templateName + "' saved."));
     }
@@ -462,7 +466,7 @@ public class VectorStoreUiController {
         if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
             return list("templates").toast(UiToast.error(BUILT_IN_NOTE));
         }
-        stores.registry().deleteTemplate(name);
+        stores.registry(scope.namespace()).deleteTemplate(name);
         return list("templates");
     }
 
@@ -470,7 +474,7 @@ public class VectorStoreUiController {
 
     @GetMapping("/stores/new")
     public UiPage newStore() {
-        List<UiField.Option> templateOptions = stores.templates().stream()
+        List<UiField.Option> templateOptions = stores.templates(scope.namespace()).stream()
                 .map(t -> UiField.Option.of(t.name(), t.name())).toList();
         UiForm form = UiForm.of("vs-store-form", "New Store")
                 .field(UiField.text("name", "Name", null).asEditable()
@@ -493,7 +497,7 @@ public class VectorStoreUiController {
             return list("stores").toast(UiToast.error(ai.mindconnect.agentrest.auth.VectorStoreAccess.RESERVED_NAME));
         }
         if (name != null && !name.isBlank()) {
-            stores.open(name.trim(), body.str("template"), VectorStoreInstance.Scope.GLOBAL, null);
+            stores.open(scope.namespace(), name.trim(), body.str("template"), VectorStoreInstance.Scope.GLOBAL, null);
         }
         return list("stores");
     }
@@ -509,8 +513,8 @@ public class VectorStoreUiController {
     }
 
     private UiPage storeDetail(String name, String lastQuery, UiNode searchResult, String message) {
-        VectorStoreInstance instance = stores.settingsFor(name);
-        VectorStore store = stores.openWith(instance);
+        VectorStoreInstance instance = stores.settingsFor(scope.namespace(), name);
+        VectorStore store = stores.openWith(scope.namespace(), instance);
 
         UiStack page = UiStack.of("vs-detail").gap(16);
         // The same header bar as every other detail screen: icon, the store's
@@ -660,7 +664,7 @@ public class VectorStoreUiController {
                              @org.springframework.web.bind.annotation.RequestParam("file") String fileId) {
         UiPage refused = refuseForeignStore(name);
         if (refused != null) return refused;
-        stores.openWith(stores.settingsFor(name)).deleteFile(fileId);
+        stores.openWith(scope.namespace(), stores.settingsFor(scope.namespace(), name)).deleteFile(fileId);
         return storeDetail(name, null, (UiNode) null);
     }
 
@@ -668,7 +672,7 @@ public class VectorStoreUiController {
     public UiPage deleteStore(@PathVariable String name) {
         UiPage refused = refuseForeignStore(name);
         if (refused != null) return refused;
-        stores.registry().deleteInstance(name);
+        stores.registry(scope.namespace()).deleteInstance(name);
         return list("stores");
     }
 
@@ -677,7 +681,7 @@ public class VectorStoreUiController {
      * another user's chat upload store; null when the caller may reach it.
      */
     private UiPage refuseForeignStore(String name) {
-        if (storeAccess.reachable(name, stores.registry().instance(name).orElse(null), currentUsers.require())) {
+        if (storeAccess.reachable(name, stores.registry(scope.namespace()).instance(name).orElse(null), currentUsers.require())) {
             return null;
         }
         return list("stores").toast(UiToast.error("There is no store '" + name + "'."));

@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.starter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.NamespaceRouted;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.message.adapter.file.FileConversationRepository;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.message.port.out.ConversationRepository;
@@ -14,7 +15,8 @@ import java.nio.file.Path;
 
 /**
  * Conversations and messages on the file system under
- * {@code messageStorageDir} ({@code mindconnect.data.base-dir}). Imported by
+ * {@code messageStorageDir/<namespace>} ({@code mindconnect.data.base-dir}),
+ * routed per namespace like every other store. Imported by
  * {@link FilePersistenceAutoConfiguration} when {@code mindconnect.persistence}
  * is {@code file}.
  */
@@ -27,12 +29,14 @@ public class FileMessageRepositoryConfig {
     }
 
     @Bean
-    ConversationRepository conversationRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        return new FileConversationRepository(messageStorageDir, objectMapper, namespace);
+    ConversationRepository conversationRepository(Path messageStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
+        return NamespaceRouted.route(ConversationRepository.class, scope,
+                ns -> new FileConversationRepository(messageStorageDir, objectMapper, ns));
     }
 
     @Bean
-    MessageRepository messageRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        return new FileMessageRepository(messageStorageDir, objectMapper, namespace);
+    MessageRepository messageRepository(Path messageStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
+        return NamespaceRouted.route(MessageRepository.class, scope,
+                ns -> new FileMessageRepository(messageStorageDir, objectMapper, ns));
     }
 }

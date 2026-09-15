@@ -40,15 +40,30 @@ public class StatelessAgentTaskRunner implements AgentTaskRunner {
     private final LlmChat chatUseCase;
     private final String defaultLlmConfigName;
     private final PromptRenderer promptRenderer;
+    /** Creates a missing helper on first use; null when the host has none. */
+    private final StatelessAgentSeeder seeder;
 
     public StatelessAgentTaskRunner(AgentDefinitionRepository definitionRepository,
                                     LlmChat chatUseCase,
                                     String defaultLlmConfigName,
                                     PromptRenderer promptRenderer) {
+        this(definitionRepository, chatUseCase, defaultLlmConfigName, promptRenderer, null);
+    }
+
+    /**
+     * @param seeder creates a helper that is missing where the runner looks — a namespace
+     *               that never ran one gets it on first use; null for "no such thing"
+     */
+    public StatelessAgentTaskRunner(AgentDefinitionRepository definitionRepository,
+                                    LlmChat chatUseCase,
+                                    String defaultLlmConfigName,
+                                    PromptRenderer promptRenderer,
+                                    StatelessAgentSeeder seeder) {
         this.definitionRepository = definitionRepository;
         this.chatUseCase = chatUseCase;
         this.defaultLlmConfigName = defaultLlmConfigName;
         this.promptRenderer = promptRenderer;
+        this.seeder = seeder;
     }
 
     @Override
@@ -105,6 +120,7 @@ public class StatelessAgentTaskRunner implements AgentTaskRunner {
 
     private ResolvedAgent resolve(String task) {
         return definitionRepository.findByName(task)
+                .or(() -> seeder == null ? java.util.Optional.empty() : seeder.ensure(task))
                 .map(d -> {
                     log.debug("Task '{}' resolved to AgentDefinition '{}'", task, d.name());
                     return new ResolvedAgent(d, d.name(), d.llmConfigName(), d.systemPrompt());

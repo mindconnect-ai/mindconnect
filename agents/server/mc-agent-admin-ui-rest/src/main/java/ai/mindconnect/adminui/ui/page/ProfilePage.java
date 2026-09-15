@@ -1,7 +1,9 @@
 package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -25,7 +27,9 @@ import java.util.Map;
 /**
  * The signed-in user's own page at {@code /admin/profile}, reached from the
  * avatar in the header: who they are signed in as, and the personal API
- * tokens they issued — the way a program calls the REST API as them.
+ * tokens they issued — the way a program calls the REST API as them — and
+ * the namespaces they may work in. A namespace they created has an invite
+ * action on its row, opening the dialog that invites another user by name.
  *
  * <p>A token's secret never appears here. It is shown once, in the dialog
  * that follows its creation ({@link #secretView}); the list knows only the
@@ -39,6 +43,9 @@ public class ProfilePage extends AdminPage {
 
     /** The token table — replaced in place after a token is created or revoked. */
     public static final String TOKENS_ID = "api-tokens";
+    /** The namespaces table — replaced in place after an invitation. */
+    public static final String NAMESPACES_ID = "profile-namespaces";
+    static final String INVITE_FORM_ID = "namespace-invite-form";
 
     /** What a user of an installation without authentication has to know before trusting a token to protect anything. */
     public static final String AUTH_OFF_NOTE = "Authentication is off on this installation: the API answers every "
@@ -57,21 +64,30 @@ public class ProfilePage extends AdminPage {
     private final String email;
     private final List<ApiToken> tokens;
     private final boolean authEnabled;
+    private final List<NamespaceDefinition> namespaces;
+    private final Namespace defaultNamespace;
+    private final Namespace active;
 
     /**
      * @param user        the stored user record; null before it was first recorded
      * @param displayName the name the login carries; null to fall back to the record
      * @param email       the e-mail the login carries; null to fall back to the record
      * @param authEnabled whether this installation checks tokens at all
+     * @param namespaces  the namespaces the user may work in, the default one first
+     * @param active      the namespace the user is in right now
      */
     public ProfilePage(UserId userId, User user, String displayName, String email, List<ApiToken> tokens,
-                       boolean authEnabled) {
+                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+                       Namespace active) {
         this.userId = userId;
         this.user = user;
         this.displayName = displayName;
         this.email = email;
         this.tokens = tokens;
         this.authEnabled = authEnabled;
+        this.namespaces = namespaces;
+        this.defaultNamespace = defaultNamespace;
+        this.active = active;
     }
 
     @Override
@@ -89,6 +105,7 @@ public class ProfilePage extends AdminPage {
             page.child(authOffNote("profile-auth-off"));
         }
         page.child(details)
+                .child(namespaces(userId, namespaces, defaultNamespace, active))
                 .child(tokenTable(tokens))
                 .child(help);
         return UiPage.of("/admin/profile", page);
@@ -118,6 +135,53 @@ public class ProfilePage extends AdminPage {
             table.row(row);
         }
         return table;
+    }
+
+    /**
+     * The user's namespaces: where they may work, with a way to switch there and, on
+     * every row, the invite, leave and delete actions — the controller answers each
+     * with the dialog or the deed where the user may, and with the reason where not. The open default
+     * namespace is listed like the others; nobody is invited into it.
+     */
+    public static UiNode namespaces(UserId me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+                                    Namespace active) {
+        UiTable table = UiTable.of(NAMESPACES_ID, "Namespaces").icon("layers")
+                .column(UiTable.Column.text("name", "Name"))
+                .column(UiTable.Column.text("namespace", "Id"))
+                .column(UiTable.Column.text("role", "Your role"))
+                .column(UiTable.Column.text("members", "Members"))
+                .column(UiTable.Column.text("created", "Created"))
+                .rowAction(UiAction.secondary("switch", "Switch to").icon("arrow-right")
+                        .dispatch("POST", NamespacesPage.API + "/switch/{id}"))
+                .rowAction(UiAction.secondary("invite", "Invite…").icon("user-plus")
+                        .dispatch("GET", API + "/namespaces/{id}/invite"))
+                .rowAction(UiAction.secondary("leave", "Leave").icon("log-out")
+                        .confirm("Leave this namespace? You will need a new invitation to come back.")
+                        .dispatch("POST", API + "/namespaces/{id}/leave"))
+                .rowAction(UiAction.danger("delete", "Delete").icon("delete")
+                        .confirm("Delete this namespace with everything in it — agents, sessions, files, workflows, "
+                                + "vector stores, MCP servers? This cannot be undone.")
+                        .dispatch("DELETE", API + "/namespaces/{id}"));
+        for (NamespaceDefinition ns : namespaces) {
+            boolean isDefault = ns.id().equals(defaultNamespace);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", ns.id().value());
+            row.put("name", ns.label() + (ns.id().equals(active) ? " (current)" : ""));
+            row.put("namespace", ns.id().value());
+            row.put("role", isDefault ? "everyone" : ns.isCreator(me) ? "creator" : "member");
+            row.put("members", isDefault ? "every signed-in user" : String.valueOf(ns.members().size()));
+            row.put("created", time(ns.createdAt()));
+            table.row(row);
+        }
+        return table;
+    }
+
+    /** The body of the invite dialog for {@code ns}; {@code error} keeps it open with the reason. */
+    public static UiForm inviteForm(NamespaceDefinition ns, String error) {
+        String id = ns.id().value();
+        return NamespacesPage.inviteForm(INVITE_FORM_ID, null, id, error, API + "/namespaces/" + id + "/members")
+                .action(UiAction.secondary("cancel", "Cancel")
+                        .dispatch("POST", API + "/namespaces/dialog/close"));
     }
 
     /** The form of the "New token" dialog; {@code error} is shown above the fields when set. */

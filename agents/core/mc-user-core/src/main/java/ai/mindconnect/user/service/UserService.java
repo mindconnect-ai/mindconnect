@@ -1,5 +1,6 @@
 package ai.mindconnect.user.service;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.port.out.UserRepository;
@@ -56,7 +57,8 @@ public class UserService {
                 orElse(displayName, existing.displayName()),
                 orElse(email, existing.email()),
                 existing.createdAt(),
-                existing.lastLoginAt());
+                existing.lastLoginAt(),
+                existing.activeNamespace());
         boolean changed = !merged.equals(existing);
         boolean stale = existing.lastLoginAt() == null
                 || Duration.between(existing.lastLoginAt(), now).compareTo(LOGIN_RESOLUTION) >= 0;
@@ -64,13 +66,38 @@ public class UserService {
             return existing;
         }
         User updated = new User(id, merged.subject(), merged.issuer(), merged.displayName(), merged.email(),
-                merged.createdAt() != null ? merged.createdAt() : now, now);
+                merged.createdAt() != null ? merged.createdAt() : now, now, merged.activeNamespace());
         users.save(updated);
         return updated;
     }
 
     public Optional<User> find(UserId id) {
         return users.findById(id);
+    }
+
+    /**
+     * Remembers the namespace {@code id} chose to work in. A user the
+     * installation has not seen sign in yet gets a record for it.
+     */
+    public void selectNamespace(UserId id, Namespace namespace) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(namespace, "namespace");
+        User existing = users.findById(id).orElse(null);
+        if (existing == null) {
+            Instant now = clock.instant();
+            users.save(new User(id, null, null, null, null, now, now, namespace.value()));
+            return;
+        }
+        if (!namespace.value().equals(existing.activeNamespace())) {
+            users.save(existing.withActiveNamespace(namespace.value()));
+        }
+    }
+
+    /** The namespace {@code id} last chose, if they ever chose one. */
+    public Optional<Namespace> activeNamespace(UserId id) {
+        return users.findById(id).map(User::activeNamespace)
+                .filter(value -> value != null && !value.isBlank())
+                .map(Namespace::new);
     }
 
     private static String orElse(String value, String fallback) {

@@ -14,7 +14,6 @@ import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 
-import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 /**
@@ -29,20 +28,18 @@ public final class AgentRuntime implements AutoCloseable {
     private final AgentDefinitionRepository definitionRepository;
     private final LlmConfigRepository llmConfigRepository;
     private final ConversationManager conversationManager;
-    private final ExecutorService turnExecutor;
     private final AttachSupport attachSupport;   // null when the file/vector modules are absent
     private final ToolApprovalStore approvalStore;
 
     AgentRuntime(AgentChatService chatService, AgentSessionService sessionService,
                  AgentDefinitionRepository definitionRepository, LlmConfigRepository llmConfigRepository,
-                 ConversationManager conversationManager, ExecutorService turnExecutor, AttachSupport attachSupport,
+                 ConversationManager conversationManager, AttachSupport attachSupport,
                  ToolApprovalStore approvalStore) {
         this.chatService = chatService;
         this.sessionService = sessionService;
         this.definitionRepository = definitionRepository;
         this.llmConfigRepository = llmConfigRepository;
         this.conversationManager = conversationManager;
-        this.turnExecutor = turnExecutor;
         this.attachSupport = attachSupport;
         this.approvalStore = approvalStore;
     }
@@ -206,6 +203,5 @@ public final class AgentRuntime implements AutoCloseable {
 
     @Override
     public void close() {
-        turnExecutor.shutdown();
     }
 }

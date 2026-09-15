@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.tools.mcp;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.MultiToolProvider;
@@ -19,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Exposes every registered MCP server's tools as agent tools. One provider
@@ -52,7 +55,9 @@ public final class McpMultiToolProvider implements MultiToolProvider {
     private record Catalog(long version, Map<String, Binding> bindings) {
     }
 
-    private volatile Catalog catalog;
+    /** One catalog per namespace: the routed gateway answers for the namespace of the call. */
+    private final Map<Namespace, Catalog> catalogs = new ConcurrentHashMap<>();
+    private volatile ScopeSupplier scope = ScopeSupplier.local();
 
     @Override
     public Set<String> toolNames() {
@@ -83,6 +88,7 @@ public final class McpMultiToolProvider implements MultiToolProvider {
     @Override
     public void bind(ToolEnvironment env) {
         this.gateway = env.get(McpGateway.class).orElse(null);
+        this.scope = env.get(ScopeSupplier.class).orElse(ScopeSupplier.local());
         if (gateway == null) {
             log.debug("no McpGateway available — MCP tools stay out of the catalog");
         }
@@ -125,13 +131,14 @@ public final class McpMultiToolProvider implements MultiToolProvider {
         if (current == null) {
             return Map.of();
         }
+        Namespace namespace = scope.namespace();
         long version = current.catalogVersion();
-        Catalog seen = catalog;
+        Catalog seen = catalogs.get(namespace);
         if (seen != null && seen.version() == version) {
             return seen.bindings();
         }
         synchronized (this) {
-            seen = catalog;
+            seen = catalogs.get(namespace);
             if (seen != null && seen.version() == version) {
                 return seen.bindings();
             }
@@ -150,8 +157,8 @@ public final class McpMultiToolProvider implements MultiToolProvider {
             // Not Map.copyOf: that returns an unordered map, and the SPI asks
             // toolNames() for a stable order — catalogs and pickers render it.
             Map<String, Binding> bindings = Collections.unmodifiableMap(discovered);
-            catalog = new Catalog(version, bindings);
-            log.info("MCP tools available: {}", discovered.keySet());
+            catalogs.put(namespace, new Catalog(version, bindings));
+            log.info("MCP tools available in namespace '{}': {}", namespace.value(), discovered.keySet());
             return bindings;
         }
     }

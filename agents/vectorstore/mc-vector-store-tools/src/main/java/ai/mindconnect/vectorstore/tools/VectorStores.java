@@ -2,15 +2,8 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.ToolEnvironment;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.vectorstore.VectorStore;
-import ai.mindconnect.vectorstore.VectorStoreBackend;
 
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +14,11 @@ import java.util.Optional;
  * which dictates backend + embedding model — so every store of a template is
  * dimension-consistent, and instances can be created on the fly (template +
  * name is all it takes).
+ *
+ * <p>A store lives in a namespace, and unlike the repositories this port is
+ * not routed: every call names the namespace it works in. The registry, the
+ * memory backend's files and the pgvector tables are all per namespace; the
+ * templates from the host's properties are shared.
  *
  * <p>The host's {@code mindconnect.vector-store.*} properties form the
  * built-in {@code default} template (not persisted, always present), so
@@ -33,85 +31,24 @@ import java.util.Optional;
  * {@code vectorStoreUrl} / {@code vectorStoreUser} / {@code vectorStorePassword},
  * {@code vectorStoreEmbeddingConfig} (default {@code embeddings}).
  */
-public final class VectorStores {
+public interface VectorStores {
 
-    public static final String DEFAULT_TEMPLATE = "default";
-
+    String DEFAULT_TEMPLATE = "default";
     /** The backend config key that names the namespace a store belongs to. */
-    public static final String NAMESPACE_KEY = "namespace";
-
-    private final List<VectorStoreBackend> backends;
-    private final VectorStoreTemplate defaultTemplate;
-    private final FileVectorStoreRegistry registry;
-    private final LlmEmbeddings embeddings;
-    private final LlmConfigRepository configs;
-    /** Handed to every backend as the {@code namespace} config key: a store lives in one namespace. */
-    private final Namespace namespace;
-
-    VectorStores(List<VectorStoreBackend> backends, VectorStoreTemplate defaultTemplate,
-                 FileVectorStoreRegistry registry, LlmEmbeddings embeddings, LlmConfigRepository configs,
-                 Namespace namespace) {
-        this.backends = backends;
-        this.defaultTemplate = defaultTemplate;
-        this.registry = registry;
-        this.embeddings = embeddings;
-        this.configs = configs;
-        this.namespace = namespace;
-    }
+    String NAMESPACE_KEY = "namespace";
 
     /** Empty when the environment lacks a backend or the embedding services. */
-    public static Optional<VectorStores> fromEnvironment(ToolEnvironment env) {
-        String type = env.getString("vectorStoreBackend").orElse("memory");
-        List<VectorStoreBackend> backends = VectorStoreBackend.discover();
-        LlmEmbeddings embeddings = env.get(LlmEmbeddings.class).orElse(null);
-        LlmConfigRepository configs = env.get(LlmConfigRepository.class).orElse(null);
-        boolean backendKnown = backends.stream().anyMatch(b -> type.equals(b.type()));
-        Namespace namespace = env.get(Namespace.class).orElse(null);
-        if (!backendKnown || embeddings == null || configs == null || namespace == null) {
-            org.slf4j.LoggerFactory.getLogger(VectorStores.class).warn(
-                    "Vector tools disabled: backend '{}' {}, LlmEmbeddings {}, LlmConfigRepository {}, Namespace {} "
-                    + "(discovered backends: {})",
-                    type, backendKnown ? "ok" : "not found",
-                    embeddings == null ? "missing" : "ok",
-                    configs == null ? "missing" : "ok",
-                    namespace == null ? "missing" : "ok",
-                    backends.stream().map(VectorStoreBackend::type).toList());
-            return Optional.empty();
-        }
-        Map<String, String> config = new HashMap<>();
-        env.getString("dataBaseDir").ifPresent(v -> config.put("baseDir", v));
-        env.getString("vectorStoreUrl").ifPresent(v -> config.put("url", v));
-        env.getString("vectorStoreUser").ifPresent(v -> config.put("user", v));
-        env.getString("vectorStorePassword").ifPresent(v -> config.put("password", v));
-        VectorStoreTemplate defaultTemplate = new VectorStoreTemplate(DEFAULT_TEMPLATE, type, config,
-                env.getString("vectorStoreEmbeddingConfig").orElse("embeddings"),
-                "file-ingestion",
-                Map.of("description", "Built-in template from mindconnect.vector-store.* properties"));
-        Path root = Path.of(config.getOrDefault("baseDir", "data")).resolve(namespace.value()).resolve("vector-stores");
-        return Optional.of(new VectorStores(backends, defaultTemplate,
-                new FileVectorStoreRegistry(root), embeddings, configs, namespace));
+    static Optional<VectorStores> fromEnvironment(ToolEnvironment env) {
+        return DefaultVectorStores.fromEnvironment(env);
     }
 
-    // ── templates & instances (registry + built-in default) ───────────────
+    /** The namespace's registry of templates and instances. */
+    FileVectorStoreRegistry registry(Namespace namespace);
 
-    public FileVectorStoreRegistry registry() {
-        return registry;
-    }
+    /** The built-in default plus every template persisted in the namespace. */
+    List<VectorStoreTemplate> templates(Namespace namespace);
 
-    /** The built-in default plus every persisted template. */
-    public List<VectorStoreTemplate> templates() {
-        List<VectorStoreTemplate> all = new ArrayList<>();
-        all.add(defaultTemplate);
-        all.addAll(registry.templates());
-        return all;
-    }
-
-    public Optional<VectorStoreTemplate> template(String name) {
-        if (name == null || name.isBlank() || DEFAULT_TEMPLATE.equals(name)) {
-            return Optional.of(defaultTemplate);
-        }
-        return registry.template(name);
-    }
+    Optional<VectorStoreTemplate> template(Namespace namespace, String name);
 
     /**
      * The effective settings for a store name: its registered instance, or a
@@ -119,11 +56,7 @@ public final class VectorStores {
      * own their settings — they were copied from the template at creation and
      * may have diverged since.
      */
-    public VectorStoreInstance settingsFor(String storeName) {
-        return registry.instance(storeName).orElseGet(() ->
-                VectorStoreInstance.fromTemplate(storeName, defaultTemplate,
-                        VectorStoreInstance.Scope.GLOBAL, null));
-    }
+    VectorStoreInstance settingsFor(Namespace namespace, String storeName);
 
     /**
      * Opens a store, registering the instance on the fly. For a NEW store the
@@ -131,80 +64,23 @@ public final class VectorStores {
      * scope); an EXISTING instance keeps its own settings — the request's
      * template is ignored, consistency beats convenience.
      */
-    public VectorStore open(String storeName, String templateName,
-                            VectorStoreInstance.Scope scope, String scopeRef) {
-        return open(storeName, templateName, scope, scopeRef, null);
-    }
+    VectorStore open(Namespace namespace, String storeName, String templateName,
+                     VectorStoreInstance.Scope scope, String scopeRef);
 
     /**
-     * Like {@link #open(String, String, VectorStoreInstance.Scope, String)}, for
+     * Like {@link #open(Namespace, String, String, VectorStoreInstance.Scope, String)}, for
      * a store that belongs to {@code owner} (a user id). Opened as a chat's
      * store ({@code SESSION} scope), an existing instance without an owner is
-     * claimed for that chat — see {@link #claimsChatStore}.
+     * claimed for that chat.
      */
-    public VectorStore open(String storeName, String templateName,
-                            VectorStoreInstance.Scope scope, String scopeRef, String owner) {
-        VectorStoreInstance instance = registry.instance(storeName).orElse(null);
-        if (instance == null) {
-            VectorStoreTemplate template = template(templateName).orElseThrow(() ->
-                    new IllegalArgumentException("Unknown vector store template '" + templateName + "'"));
-            instance = registry.registerInstance(
-                    VectorStoreInstance.fromTemplate(storeName, template, scope, scopeRef, owner));
-        } else if (claimsChatStore(instance, storeName, scope, scopeRef, owner)) {
-            instance = instance.asChatStore(scopeRef, owner);
-            registry.saveInstance(instance);
-        }
-        return openWith(instance);
-    }
-
-    /**
-     * Whether opening a store for its own chat records the chat and its user on
-     * an instance that lacks an owner: one registered before owners were
-     * recorded, or one registered under the chat's {@code session-} name with
-     * another scope (a tool wrote into it before any upload). An instance that
-     * has an owner, or that belongs to another session, is left alone.
-     */
-    private static boolean claimsChatStore(VectorStoreInstance instance, String storeName,
-                                           VectorStoreInstance.Scope scope, String scopeRef, String owner) {
-        if (owner == null || scopeRef == null || scope != VectorStoreInstance.Scope.SESSION
-                || instance.owner() != null) {
-            return false;
-        }
-        return instance.scope() == VectorStoreInstance.Scope.SESSION
-                ? scopeRef.equals(instance.scopeRef())
-                : storeName.equals(VectorTools.SESSION_STORE_PREFIX + scopeRef);
-    }
+    VectorStore open(Namespace namespace, String storeName, String templateName,
+                     VectorStoreInstance.Scope scope, String scopeRef, String owner);
 
     /** Opens by the instance's own settings (no registration side effects). */
-    public VectorStore openWith(VectorStoreInstance instance) {
-        VectorStoreBackend backend = backends.stream()
-                .filter(b -> instance.backend().equals(b.type()))
-                .findFirst().orElseThrow(() -> new IllegalStateException(
-                        "Backend '" + instance.backend() + "' of store '" + instance.name()
-                        + "' is not on the classpath"));
-        Map<String, String> config = new HashMap<>(defaultTemplate.backendConfig());
-        config.putAll(instance.backendConfig());
-        config.put(NAMESPACE_KEY, namespace.value());
-        return backend.open(instance.name(), config);
-    }
+    VectorStore openWith(Namespace namespace, VectorStoreInstance instance);
 
-    /** Store ids that physically exist on the given backend type. */
-    public List<String> discoverStores(String backendType, Map<String, String> backendConfig) {
-        VectorStoreBackend backend = backends.stream()
-                .filter(b -> backendType.equals(b.type()))
-                .findFirst().orElse(null);
-        if (backend == null) {
-            return List.of();
-        }
-        Map<String, String> config = new HashMap<>(defaultTemplate.backendConfig());
-        if (backendConfig != null) {
-            config.putAll(backendConfig);
-        }
-        config.put(NAMESPACE_KEY, namespace.value());
-        return backend.listStores(config);
-    }
-
-    // ── embedding ──────────────────────────────────────────────────────────
+    /** Store ids that physically exist on the given backend type, in the namespace. */
+    List<String> discoverStores(Namespace namespace, String backendType, Map<String, String> backendConfig);
 
     /**
      * Embeds with the instance's own embedding LlmConfig — through an alias to
@@ -212,12 +88,5 @@ public final class VectorStores {
      * a store pointed at {@code embeddings} must follow wherever that name is
      * pointed.
      */
-    public List<float[]> embedFor(String storeName, List<String> texts) {
-        String configName = settingsFor(storeName).embeddingConfig();
-        LlmConfig config = configs.findResolvedByName(configName)
-                .orElseThrow(() -> new IllegalStateException("No LlmConfig named '" + configName
-                        + "' (store '" + storeName + "') — create one pointing at an "
-                        + "embedding model, e.g. LM Studio's text-embedding-nomic-embed-text-v1.5"));
-        return embeddings.embed(config, texts);
-    }
+    List<float[]> embedFor(Namespace namespace, String storeName, List<String> texts);
 }

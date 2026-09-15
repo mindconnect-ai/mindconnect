@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.service;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -62,6 +63,8 @@ public class SessionFileService {
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
     private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path spoolBase;
+    /** Where a call works — every store call names the namespace. */
+    private final ScopeSupplier scope;
     /** Where a session's own directory is; unconfigured means the spool under the tools base dir. */
     private final ai.mindconnect.agent.runtime.service.UserHome userHome;
 
@@ -72,7 +75,9 @@ public class SessionFileService {
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
-                              ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome) {
+                              ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome,
+                              ScopeSupplier scope) {
+        this.scope = scope;
         this.fileStore = fileStore;
         this.storesProvider = storesProvider;
         this.activationsProvider = activationsProvider;
@@ -133,8 +138,8 @@ public class SessionFileService {
         if (stores == null) return Map.of();
         String storeName = "session-" + sessionId.value();
         try {
-            if (stores.registry().instance(storeName).isPresent()) {
-                return stores.openWith(stores.settingsFor(storeName)).listFiles();
+            if (stores.registry(scope.namespace()).instance(storeName).isPresent()) {
+                return stores.openWith(scope.namespace(), stores.settingsFor(scope.namespace(), storeName)).listFiles();
             }
         } catch (RuntimeException e) {
             // Store unreadable — report "no attachments" rather than break the chat,
@@ -159,7 +164,7 @@ public class SessionFileService {
             String storeName = "session-" + sessionId.value();
             for (String ingestedId : listAttachments(sessionId).keySet()) {
                 if (!Path.of(ingestedId).getFileName().toString().equals(fileName)) continue;
-                stores.openWith(stores.settingsFor(storeName)).deleteFile(ingestedId);
+                stores.openWith(scope.namespace(), stores.settingsFor(scope.namespace(), storeName)).deleteFile(ingestedId);
                 // A copy spooled under the tools base dir the old way carries
                 // its directory in the key; a bare name is a copy in the
                 // session's directory, removed below — never a file of that
@@ -263,17 +268,17 @@ public class SessionFileService {
                     stored.name() + ": vector stores are not configured in this application.");
         }
         String storeName = "session-" + sessionId.value();
-        VectorStoreTemplate template = stores.template(CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
+        VectorStoreTemplate template = stores.template(scope.namespace(), CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
             VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE,
                     "memory", Map.of(), "embeddings", "file-ingestion",
                     Map.of("description", "Per-chat-session upload stores (auto-created)"));
-            stores.registry().saveTemplate(created);
+            stores.registry(scope.namespace()).saveTemplate(created);
             return created;
         });
         // The store is the chat's user's: the vector tools reach it only on that user's behalf.
-        stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.value(),
+        stores.open(scope.namespace(), storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.value(),
                 session.userId() == null ? null : session.userId().value());
-        VectorStoreInstance instance = stores.settingsFor(storeName);
+        VectorStoreInstance instance = stores.settingsFor(scope.namespace(), storeName);
 
         try {
             // A copy in the session's own directory: the file tools read it
@@ -289,7 +294,7 @@ public class SessionFileService {
                 try (InputStream content = fileStore.content(stored.id())) {
                     text = new String(content.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                 }
-                DirectIngestion.ingest(stores, stores.openWith(instance), storeName, stored.name(), text);
+                DirectIngestion.ingest(stores, scope.namespace(), stores.openWith(scope.namespace(), instance), storeName, stored.name(), text);
             } else {
                 WorkflowDataRepository workflows = workflowsProvider.getIfAvailable();
                 WorkflowInstanceRepository workflowInstances = workflowInstancesProvider.getIfAvailable();

@@ -49,8 +49,22 @@ public class WorkflowApiController {
 
     private final WorkflowAdminService service;
 
+    /** What a run carries onto its worker thread: the host's, or nothing. */
+    private final ai.mindconnect.workflow.admin.run.RunThreadContext runContext;
+
     public WorkflowApiController(WorkflowAdminService service) {
+        this(service, ai.mindconnect.workflow.admin.run.RunThreadContext.NONE);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public WorkflowApiController(WorkflowAdminService service,
+                                 org.springframework.beans.factory.ObjectProvider<ai.mindconnect.workflow.admin.run.RunThreadContext> runContext) {
+        this(service, runContext.getIfAvailable(() -> ai.mindconnect.workflow.admin.run.RunThreadContext.NONE));
+    }
+
+    WorkflowApiController(WorkflowAdminService service, ai.mindconnect.workflow.admin.run.RunThreadContext runContext) {
         this.service = service;
+        this.runContext = runContext;
     }
 
     // ── Definitions ────────────────────────────────────────────────────────
@@ -166,7 +180,7 @@ public class WorkflowApiController {
 
         // The run is synchronous — hand it to a worker so the emitter can
         // stream while it executes.
-        Thread.ofVirtual().name("wf-run-stream-" + id).start(() -> {
+        Thread.ofVirtual().name("wf-run-stream-" + id).start(runContext.carry(() -> {
             try {
                 WorkflowRunService.RunReport report = service.run(wf, params, progress, persist);
                 emitter.send(org.springframework.web.servlet.mvc.method.annotation.SseEmitter
@@ -177,7 +191,7 @@ public class WorkflowApiController {
             } catch (Exception e) {
                 emitter.completeWithError(e);
             }
-        });
+        }));
         return emitter;
     }
 

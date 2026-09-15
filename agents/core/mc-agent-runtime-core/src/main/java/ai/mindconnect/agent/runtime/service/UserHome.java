@@ -27,9 +27,10 @@ import java.util.Optional;
  */
 public final class UserHome {
 
-    private final String template;
+    /** The template, asked for on every use: a host serving many namespaces answers per namespace. */
+    private final java.util.function.Supplier<String> template;
 
-    private UserHome(String template) {
+    private UserHome(java.util.function.Supplier<String> template) {
         this.template = template;
     }
 
@@ -41,7 +42,7 @@ public final class UserHome {
             throw new IllegalArgumentException("A users' home needs " + WorkingDirPolicy.USER_PLACEHOLDER
                     + " in it, so every user gets one of their own: " + t);
         }
-        return new UserHome(t);
+        return new UserHome(() -> t);
     }
 
     /** The conventional home under a namespace's data directory: {@code <dataDir>/home/{user}}. */
@@ -50,18 +51,30 @@ public final class UserHome {
                 : of(dataDir.resolve("home").resolve(WorkingDirPolicy.USER_PLACEHOLDER).toString());
     }
 
+    /**
+     * The conventional home under whatever data directory {@code dataDir} answers
+     * at the time of use — a server serving many namespaces answers with the one
+     * the current request works in, so every namespace has its own homes.
+     */
+    public static UserHome underCurrent(java.util.function.Supplier<Path> dataDir) {
+        return new UserHome(() -> {
+            Path dir = dataDir.get();
+            return dir == null ? null : dir.resolve("home").resolve(WorkingDirPolicy.USER_PLACEHOLDER).toString();
+        });
+    }
+
     /** No home for anyone. */
     public static UserHome none() {
-        return new UserHome(null);
+        return new UserHome(() -> null);
     }
 
     public boolean isConfigured() {
-        return template != null;
+        return template.get() != null;
     }
 
     /** The template as configured, {@code {user}} and all; {@code null} when none. */
     public String template() {
-        return template;
+        return template.get();
     }
 
     /** The user's home, created on first use; empty without one. */
@@ -95,6 +108,7 @@ public final class UserHome {
 
     /** The user's home as a path, nothing created; {@code null} without a home or a user. */
     private Path homePath(UserId userId) {
+        String template = template();
         if (template == null || userId == null || userId.value() == null || userId.value().isBlank()) return null;
         return WorkingDirPolicy.expand(template.replace(WorkingDirPolicy.USER_PLACEHOLDER,
                 WorkingDirPolicy.pathSafe(userId.value()))).toAbsolutePath().normalize();

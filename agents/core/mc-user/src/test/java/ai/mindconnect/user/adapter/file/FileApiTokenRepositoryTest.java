@@ -1,6 +1,5 @@
 package ai.mindconnect.user.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.user.domain.ApiToken;
 import ai.mindconnect.user.domain.ApiTokenId;
@@ -25,7 +24,7 @@ class FileApiTokenRepositoryTest {
 
     @Test
     void aTokenIsFoundByIdHashAndOwner() {
-        var repo = new FileApiTokenRepository(dir, new Namespace("test"));
+        var repo = new FileApiTokenRepository(dir);
         ApiToken alices = token("alice", "hash-a");
         ApiToken bobs = token("bob", "hash-b");
         repo.save(alices);
@@ -35,22 +34,12 @@ class FileApiTokenRepositoryTest {
         assertThat(repo.findByHash("hash-b")).contains(bobs);
         assertThat(repo.findByHash("nope")).isEmpty();
         assertThat(repo.findByUser(UserId.of("alice"))).containsExactly(alices);
-        assertThat(dir.resolve("test/system/api-tokens/" + alices.id().value() + ".json")).exists();
-    }
-
-    @Test
-    void anotherNamespaceSeesNothing() {
-        ApiToken alices = token("alice", "hash-a");
-        new FileApiTokenRepository(dir, new Namespace("test")).save(alices);
-
-        var other = new FileApiTokenRepository(dir, new Namespace("other"));
-        assertThat(other.findById(alices.id())).isEmpty();
-        assertThat(other.findByHash("hash-a")).isEmpty();
+        assertThat(dir.resolve("system/api-tokens/" + alices.id().value() + ".json")).exists();
     }
 
     @Test
     void recordingAUseUpdatesATokenButNeverBringsARevokedOneBack() {
-        var repo = new FileApiTokenRepository(dir, new Namespace("test"));
+        var repo = new FileApiTokenRepository(dir);
         ApiToken alices = token("alice", "hash-a");
         repo.save(alices);
 

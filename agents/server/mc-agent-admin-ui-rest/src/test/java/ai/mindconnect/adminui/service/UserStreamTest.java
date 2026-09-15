@@ -136,6 +136,44 @@ class UserStreamTest {
     }
 
     @Test
+    void theBoardFollowsTheNamespaceTheViewerMayStillWorkIn() throws Exception {
+        var remembered = new java.util.concurrent.atomic.AtomicReference<>(Optional.of(new ai.mindconnect.agent.Namespace("acme")));
+        var namespaced = new UserStream(Optional.of(monitor), userChannels, new ObjectMapper(), user -> remembered.get());
+        try {
+            var emitter = new CapturingEmitter();
+            namespaced.attach(emitter, "alice", ai.mindconnect.agent.Namespace.DEFAULT);
+
+            String acme = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
+                    AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
+                    ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "acme")));
+            assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+            assertThat(emitter.patchArrived.await(5, TimeUnit.SECONDS)).isTrue();
+            String frame = emitter.frames.stream().filter(f -> f.contains("event:patch")).reduce((a, b) -> b).orElseThrow();
+            assertThat(frame).as("in acme, alice sees her acme task").contains("task-" + acme);
+
+            // she was removed from acme: the remembered choice no longer counts, the board is the default namespace's
+            remembered.set(Optional.empty());
+            emitter.frames.clear();
+            String other = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
+                    AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
+                    ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "other")));
+            waitForFrames(emitter, 1);
+            String next = emitter.frames.stream().filter(f -> f.contains("event:patch")).reduce((a, b) -> b).orElseThrow();
+            assertThat(next).doesNotContain("task-" + acme).doesNotContain("task-" + other);
+        } finally {
+            namespaced.shutdown();
+        }
+    }
+
+    private static void waitForFrames(CapturingEmitter emitter, int count) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 5000;
+        while (emitter.frames.stream().filter(f -> f.contains("event:patch")).count() < count
+                && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20);
+        }
+    }
+
+    @Test
     void aUserEventBecomesAUserFrameOnThatUsersConnectionOnly() throws Exception {
         var alice = new CapturingEmitter();
         var bob = new CapturingEmitter();

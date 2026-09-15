@@ -140,4 +140,32 @@ class TaskMonitorTest {
         assertThat(snapshots.get(0).active()).extracting(TaskView::id).containsExactly(id);
         subscription.close();
     }
+
+    @Test
+    void theBoardOfANamespaceShowsItsOwnTasksAndTheUnstampedOnes() throws Exception {
+        String acme = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
+                AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
+                ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "acme")));
+        String other = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
+                AgentTurnWorker.SESSION_ID, SessionId.random().value(), AgentTurnWorker.DEPTH, 0,
+                ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor.NAMESPACE, "other")));
+        String unstamped = submitTurn();
+        assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+        ai.mindconnect.agent.Namespace ns = new ai.mindconnect.agent.Namespace("acme");
+
+        // A task between QUEUED and RUNNING is in neither list for an instant: wait until all three run.
+        Snapshot full = monitor.snapshot();
+        for (int i = 0; i < 100 && full.active().size() < 3; i++) {
+            Thread.sleep(20);
+            full = monitor.snapshot();
+        }
+        Snapshot board = full.in(ns);
+
+        assertThat(board.active()).extracting(TaskView::id).containsExactlyInAnyOrder(acme, unstamped);
+        assertThat(monitor.snapshot().active()).extracting(TaskView::id).contains(other);
+        assertThat(monitor.counts(ns).running() + monitor.counts(ns).waiting()).isEqualTo(2);
+        assertThat(monitor.counts().running() + monitor.counts().waiting()).isEqualTo(3);
+        assertThat(board.active().stream().filter(v -> v.id().equals(acme)).findFirst().orElseThrow().namespace())
+                .contains(ns);
+    }
 }

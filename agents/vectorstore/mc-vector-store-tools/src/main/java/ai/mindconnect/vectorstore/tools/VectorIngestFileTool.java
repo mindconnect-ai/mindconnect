@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.FileRoots;
@@ -29,11 +30,13 @@ import java.util.Map;
 public final class VectorIngestFileTool implements Tool {
 
     private final VectorStores stores;
+    private final Namespace namespace;
     private final FileRoots roots;
     private final ToolCallScope callScope;
 
-    VectorIngestFileTool(VectorStores stores, FileRoots roots, ToolCallScope callScope) {
+    VectorIngestFileTool(VectorStores stores, Namespace namespace, FileRoots roots, ToolCallScope callScope) {
         this.stores = stores;
+        this.namespace = namespace;
         this.roots = roots;
         this.callScope = callScope;
     }
@@ -72,7 +75,7 @@ public final class VectorIngestFileTool implements Tool {
         if (relative == null || storeName == null) {
             return "Error: 'path' and 'store' are required.";
         }
-        String denied = VectorTools.refusedStore(stores, storeName, callScope);
+        String denied = VectorTools.refusedStore(stores, namespace, storeName, callScope);
         if (denied != null) {
             return denied;
         }
@@ -89,10 +92,10 @@ public final class VectorIngestFileTool implements Tool {
             // The chat's own upload store is registered as the chat's, owned by its user.
             SessionId ownChat = VectorTools.ownChatStore(storeName, callScope);
             var store = ownChat == null
-                    ? stores.open(storeName, template, VectorStoreInstance.Scope.GLOBAL, null)
-                    : stores.open(storeName, template, VectorStoreInstance.Scope.SESSION, ownChat.value(),
+                    ? stores.open(namespace, storeName, template, VectorStoreInstance.Scope.GLOBAL, null)
+                    : stores.open(namespace, storeName, template, VectorStoreInstance.Scope.SESSION, ownChat.value(),
                             callScope.userId() == null ? null : callScope.userId().value());
-            return DirectIngestion.ingest(stores, store, storeName, relative, text);
+            return DirectIngestion.ingest(stores, namespace, store, storeName, relative, text);
         } catch (Exception e) {
             return "Error: vector_ingest_file failed for '" + relative + "': " + e.getMessage();
         }
@@ -145,7 +148,7 @@ public final class VectorIngestFileTool implements Tool {
             // The session's directories are where the files are; without a session, the configured default.
             String fallback = baseDir == null || baseDir.isBlank() ? System.getProperty("user.home") : baseDir;
             FileRoots roots = scope == null ? FileRoots.of(Path.of(fallback)) : scope.fileRoots(fallback);
-            return new VectorIngestFileTool(stores, roots, scope);
+            return new VectorIngestFileTool(stores, namespace.get(), roots, scope);
         }
     }
 }

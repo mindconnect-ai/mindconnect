@@ -37,10 +37,10 @@ public final class WorkingDirPolicy {
             + "(mindconnect.working-dirs.choice); every chat works in its own directory";
 
     private final Path root;
-    private final String template;
+    private final java.util.function.Supplier<String> template;
     private final boolean choice;
 
-    private WorkingDirPolicy(Path root, String template, boolean choice) {
+    private WorkingDirPolicy(Path root, java.util.function.Supplier<String> template, boolean choice) {
         this.root = root;
         this.template = template;
         this.choice = choice;
@@ -77,8 +77,16 @@ public final class WorkingDirPolicy {
      */
     public static WorkingDirPolicy within(String root) {
         if (root == null || root.isBlank()) return unrestricted();
-        if (root.contains(USER_PLACEHOLDER)) return new WorkingDirPolicy(null, root.trim(), true);
+        if (root.contains(USER_PLACEHOLDER)) return new WorkingDirPolicy(null, () -> root.trim(), true);
         return new WorkingDirPolicy(expand(root).toAbsolutePath().normalize(), null, true);
+    }
+
+    /**
+     * A per-user root whose template is read every time {@link #forUser} is called —
+     * for a template that depends on the namespace of the call, like the users' home.
+     */
+    public static WorkingDirPolicy withinCurrent(java.util.function.Supplier<String> template) {
+        return new WorkingDirPolicy(null, template, true);
     }
 
     /** Is the root per user — does it still need {@link #forUser}? */
@@ -96,7 +104,7 @@ public final class WorkingDirPolicy {
         if (userId == null || userId.isBlank()) {
             throw new IllegalArgumentException("A per-user working-dir root needs a user");
         }
-        Path userRoot = expand(template.replace(USER_PLACEHOLDER, pathSafe(userId))).toAbsolutePath().normalize();
+        Path userRoot = expand(template.get().replace(USER_PLACEHOLDER, pathSafe(userId))).toAbsolutePath().normalize();
         try {
             Files.createDirectories(userRoot);
         } catch (IOException e) {

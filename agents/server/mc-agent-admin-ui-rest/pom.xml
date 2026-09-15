@@ -49,6 +49,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user-core</artifactId>
         </dependency>
+        <!-- namespaces: the switcher in the header, the namespaces screen, the session selection -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-namespace</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user</artifactId>
@@ -92,6 +97,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-initial-data</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

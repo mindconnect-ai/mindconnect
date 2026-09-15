@@ -35,6 +35,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-postgres</artifactId>
         </dependency>
+        <!-- namespaces: /ns/{namespace}/… and X-Mindconnect-Namespace choose where a call works -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-namespace</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-persistence-pg</artifactId>
