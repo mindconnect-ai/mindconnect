@@ -217,9 +217,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   trace store keeps at most 50 traces per conversation, the cap the file store
   already had.
 - **agents:** the **Traces dialog is a table** — one row per LLM call with
-  turn id, agent, model, duration, tokens and how it ended, newest first and
-  sortable by any column; sub-agent calls are rows like any other. Clicking a
-  row opens that call in its own dialog with request, response and raw event
+  turn id, agent, model, duration, tokens and how it ended, newest first,
+  sortable by any column, paged by 20 and filtered by a search field (turn,
+  agent, model, finish, status); sub-agent calls are rows like any other.
+  Clicking a row opens that call in its own dialog with request, response and raw event
   stream. The master-detail view it replaces grouped calls per turn and hid
   most of them behind previews; it also read every request and response
   body just to draw the list, which the table no longer does.
