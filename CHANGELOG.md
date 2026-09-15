@@ -231,6 +231,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** an embedded runtime built with `AgentRuntimeBuilder` now **forgets
+  finished task trees** — a turn with its tool calls and sub-agent turns — at
+  the queue's next maintenance tick. The outcome lives in the conversation;
+  the task records only grew the process with every turn. `taskRetention(Duration)`
+  keeps them longer, `taskRetention(null)` for the life of the process, as
+  before. The Spring apps are unchanged. In the same spirit the in-memory LLM
+  trace store keeps at most 50 traces per conversation, the cap the file store
+  already had.
 - **agents:** the **Traces dialog is a table** — one row per LLM call with
   turn id, agent, model, duration, tokens and how it ended, newest first and
   sortable by any column; sub-agent calls are rows like any other. Clicking a
@@ -307,6 +315,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **deleting a session deletes its conversation, messages and LLM
+  traces** too. It used to remove the session's memory, summaries, todos and
+  directory but leave the transcript and every recorded LLM call behind,
+  unreachable and growing — in every persistence mode. `ConversationManager`
+  gained `deleteConversation`, `MessageRepository` `deleteByConversation` and
+  `ConversationRepository` `deleteById`; a custom adapter of either has to
+  implement them.
 - **agents:** the admin UI keeps its menu after saving an agent, an LLM
   config or a skill. Since saves started refusing a stale version, the detail
   page they answered with came back without the app shell, and the only way

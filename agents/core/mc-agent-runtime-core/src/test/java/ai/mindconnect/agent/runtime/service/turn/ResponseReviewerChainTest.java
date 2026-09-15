@@ -294,5 +294,6 @@ class ResponseReviewerChainTest {
         @Override public void updateTokenCount(ConversationId id, MessageId messageId, int tokenCount) { }
         @Override public void updateDurationMs(ConversationId id, MessageId messageId, long durationMs) { }
         @Override public int deleteMessages(ConversationId id, int fromSeq, int toSeq) { return 0; }
+        @Override public void deleteConversation(ConversationId id) { }
     }
 }

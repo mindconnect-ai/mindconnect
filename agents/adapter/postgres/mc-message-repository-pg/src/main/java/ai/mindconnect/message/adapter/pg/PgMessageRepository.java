@@ -119,4 +119,9 @@ public final class PgMessageRepository implements MessageRepository {
         messages.delete("WHERE namespace = ? AND conversation_id = ? AND seq BETWEEN ? AND ?",
                 namespace.value(), conversation.value(), fromSeq, toSeq);
     }
+
+    @Override
+    public void deleteByConversation(ConversationId conversation) {
+        messages.delete("WHERE namespace = ? AND conversation_id = ?", namespace.value(), conversation.value());
+    }
 }

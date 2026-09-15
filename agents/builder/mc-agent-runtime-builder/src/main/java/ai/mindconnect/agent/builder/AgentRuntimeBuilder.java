@@ -122,6 +122,7 @@ public class AgentRuntimeBuilder {
     private String toolResultSummarizer = "rule";
     /** null → the default mapper, reading media parts from the runtime's file store. */
     private LlmMessageMapper llmMessageMapper;
+    private java.time.Duration taskRetention = java.time.Duration.ZERO;
     private boolean built;
 
     private AgentRuntimeBuilder(Persistence persistence) {
@@ -226,6 +227,19 @@ public class AgentRuntimeBuilder {
     }
 
     // ── core settings ──────────────────────────────────────────────────────
+
+    /**
+     * How long finished task trees (a turn with its tool calls and sub-agent
+     * turns) stay readable on the queue. Default {@code Duration.ZERO}: forgotten
+     * at the next maintenance tick — the result is in the conversation, and an
+     * embedded runtime must not grow with every turn. {@code null} keeps every
+     * record for the life of the process, as the queue library does on its own.
+     */
+    public AgentRuntimeBuilder taskRetention(java.time.Duration keepFinished) {
+        requireNotBuilt();
+        this.taskRetention = keepFinished;
+        return this;
+    }
 
     public AgentRuntimeBuilder objectMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -409,6 +423,9 @@ public class AgentRuntimeBuilder {
                 var queue = new LocalTaskQueue(new InMemoryTaskStore());
                 // A failed task would otherwise leave no trace but a tool result saying so.
                 queue.addListener(LoggingTaskListener.failuresOnly());
+                // Finished task trees are forgotten at the next maintenance tick unless
+                // taskRetention() says otherwise — the turn's outcome lives in the conversation.
+                queue.withRetention(taskRetention);
                 return queue;
             });
         }
@@ -418,7 +435,8 @@ public class AgentRuntimeBuilder {
                 context.require(ConversationManager.class), context.require(WorkingMemoryRepository.class),
                 context.require(ConversationSummaryRepository.class), context.require(TodoListRepository.class),
                 context.require(ToolApprovalStore.class), context.require(UserChannels.class),
-                context.require(WorkingDirPolicy.class), context.require(UserHome.class)));
+                context.require(WorkingDirPolicy.class), context.require(UserHome.class),
+                context.require(LlmCallTraceRepository.class)));
         context.bean(AgentTurnWorker.class, () -> new AgentTurnWorker(
                 context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
