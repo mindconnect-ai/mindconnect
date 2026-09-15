@@ -108,6 +108,25 @@ jobs:
       matrix:
         area: ${{ fromJSON(needs.changes.outputs.matrix) }}
     name: build (${{ matrix.area }})
+    # Every area has Postgres-backed tests (mc-jdbc, the *-pg adapters, the JDBC task
+    # store, pgvector) that skip themselves without a database on localhost:5433 —
+    # the same one a developer starts with podman. Here it is a service container,
+    # so those tests run instead of being counted as skipped.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17-trixie
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      MC_JDBC_TEST_URL: jdbc:postgresql://localhost:5433/postgres
+      MC_PGVECTOR_TEST_URL: jdbc:postgresql://localhost:5433/postgres
     steps:
       - uses: actions/checkout@v5
 
