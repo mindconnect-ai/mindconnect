@@ -30,6 +30,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class VectorToolsTest {
 
+    private static final Namespace NS = new Namespace("test");
+
     @TempDir
     Path dir;
 
@@ -100,7 +102,7 @@ class VectorToolsTest {
     /** A chat's upload store as the upload pipeline registers it: session-scoped, owned by the chat's user. */
     private String uploadStore(String owner, SessionId chat) {
         String name = "session-" + chat.value();
-        stores().open(name, null, VectorStoreInstance.Scope.SESSION, chat.value(), owner);
+        stores().open(NS, name, null, VectorStoreInstance.Scope.SESSION, chat.value(), owner);
         return name;
     }
 
@@ -233,7 +235,7 @@ class VectorToolsTest {
     void anUploadStoreWithoutOwnerIsReachableFromItsOwnChatUntilItGetsOne() {
         SessionId oldChat = SessionId.random();
         String oldStore = "session-" + oldChat.value();
-        stores().open(oldStore, null, VectorStoreInstance.Scope.SESSION, oldChat.value());
+        stores().open(NS, oldStore, null, VectorStoreInstance.Scope.SESSION, oldChat.value());
 
         assertThat(tool(new VectorTools.SearchFactory(), chat("carol", oldChat))
                 .execute(Map.of("query", "container")))
@@ -246,7 +248,7 @@ class VectorToolsTest {
         assertThat(tool(new VectorTools.UpsertFactory(), chat("carol", oldChat))
                 .execute(chunk(oldStore, "notes", "container notes")))
                 .contains("Stored 1 chunk(s)");
-        assertThat(stores().registry().instance(oldStore).orElseThrow().owner()).isEqualTo("carol");
+        assertThat(stores().registry(NS).instance(oldStore).orElseThrow().owner()).isEqualTo("carol");
 
         assertThat(tool(new VectorTools.SearchFactory(), chat("carol", SessionId.random()))
                 .execute(Map.of("store", oldStore, "query", "container")))
@@ -266,7 +268,7 @@ class VectorToolsTest {
         assertThat(tool(new VectorTools.UpsertFactory(), chat("dave", davesChat))
                 .execute(chunk(davesStore, "early", "container notes")))
                 .contains("Stored 1 chunk(s)");
-        VectorStoreInstance registered = stores().registry().instance(davesStore).orElseThrow();
+        VectorStoreInstance registered = stores().registry(NS).instance(davesStore).orElseThrow();
         assertThat(registered.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
         assertThat(registered.scopeRef()).isEqualTo(davesChat.value());
         assertThat(registered.owner()).isEqualTo("dave");
@@ -277,19 +279,19 @@ class VectorToolsTest {
         // Registered under the chat's name as GLOBAL: the chat's pipeline claims it.
         SessionId erinsChat = SessionId.random();
         String erinsStore = "session-" + erinsChat.value();
-        stores().open(erinsStore, null, VectorStoreInstance.Scope.GLOBAL, null);
-        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "erin");
-        VectorStoreInstance claimed = stores().registry().instance(erinsStore).orElseThrow();
+        stores().open(NS, erinsStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(NS, erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "erin");
+        VectorStoreInstance claimed = stores().registry(NS).instance(erinsStore).orElseThrow();
         assertThat(claimed.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
         assertThat(claimed.scopeRef()).isEqualTo(erinsChat.value());
         assertThat(claimed.owner()).isEqualTo("erin");
         // An owned store is not claimed again, and nobody claims another chat's name.
-        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "mallory");
-        assertThat(stores().registry().instance(erinsStore).orElseThrow().owner()).isEqualTo("erin");
+        stores().open(NS, erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "mallory");
+        assertThat(stores().registry(NS).instance(erinsStore).orElseThrow().owner()).isEqualTo("erin");
         String franksStore = "session-" + SessionId.random().value();
-        stores().open(franksStore, null, VectorStoreInstance.Scope.GLOBAL, null);
-        stores().open(franksStore, null, VectorStoreInstance.Scope.SESSION, SessionId.random().value(), "mallory");
-        assertThat(stores().registry().instance(franksStore).orElseThrow().owner()).isNull();
+        stores().open(NS, franksStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(NS, franksStore, null, VectorStoreInstance.Scope.SESSION, SessionId.random().value(), "mallory");
+        assertThat(stores().registry(NS).instance(franksStore).orElseThrow().owner()).isNull();
     }
 
     @Test
@@ -309,7 +311,7 @@ class VectorToolsTest {
         assertThat(tool(new VectorIngestFileTool.Factory(), chat("alice", alicesChat))
                 .execute(Map.of("path", "doc.txt", "store", alicesStore)))
                 .contains("Stored");
-        assertThat(stores().registry().instance(alicesStore).orElseThrow().owner()).isEqualTo("alice");
+        assertThat(stores().registry(NS).instance(alicesStore).orElseThrow().owner()).isEqualTo("alice");
     }
 
     @Test

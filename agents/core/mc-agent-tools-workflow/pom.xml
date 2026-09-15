@@ -41,6 +41,19 @@
             <artifactId>mc-workflow-persistence</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- optional: routed Postgres workflow stores and the admin UI's run-thread hook, when the host has them -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence-pg</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-admin-rest</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-workflow-spi-lookup</artifactId>

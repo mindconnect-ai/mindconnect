@@ -1,2 +1,3 @@
 ai.mindconnect.agent.tools.workflow.McAgentWorkflowStepsAutoConfiguration
 ai.mindconnect.agent.tools.workflow.registry.WorkflowRegistryAutoConfiguration
+ai.mindconnect.agent.tools.workflow.NamespacedWorkflowStoresAutoConfiguration

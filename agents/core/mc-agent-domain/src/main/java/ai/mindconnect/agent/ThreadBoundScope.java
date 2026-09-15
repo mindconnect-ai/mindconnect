@@ -11,9 +11,17 @@ import java.util.function.Supplier;
  * <p>Whoever enters a unit of work binds it with {@link #runIn}: a servlet
  * filter around the request, the task advisor around a queued execution, a
  * seeding routine around its start-up work. Everything underneath merely
- * asks {@link #get()}. A thread hop (an executor, a stream, a warm-up
- * thread) carries the binding across with {@link #wrap}; nothing is
- * inherited on its own — a virtual thread starts unbound.
+ * asks {@link #get()}.
+ *
+ * <p>A thread started <em>while bound</em> inherits the binding — the
+ * ThreadLocal is inheritable, so the virtual threads a turn fans out to, the
+ * per-task executor a chat turn awaits on and a run the workflow admin
+ * streams all work where their parent did. What does not inherit is a
+ * thread created elsewhere: a pooled platform thread from start-up, the
+ * queue's task threads (the task advisor binds those from the task's
+ * payload). A pool that grows <em>during</em> a bound request would keep
+ * that request's scope on the new thread — create pools at start-up, or
+ * hand work to them through {@link #wrap}.
  *
  * <p>Unbound is an error: a server that forgot to bind would otherwise write
  * into a namespace nobody chose. A <em>fallback</em> can be given for the
@@ -22,7 +30,7 @@ import java.util.function.Supplier;
  */
 public class ThreadBoundScope implements ScopeSupplier {
 
-    private final ThreadLocal<Scope> bound = new ThreadLocal<>();
+    private final ThreadLocal<Scope> bound = new InheritableThreadLocal<>();
     private final Scope fallback;
 
     private ThreadBoundScope(Scope fallback) {

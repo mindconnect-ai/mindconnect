@@ -65,13 +65,49 @@ class ThreadBoundScopeTest {
     }
 
     @Test
-    void anotherThreadStartsUnbound() {
+    void aThreadStartedWhileBoundInheritsTheBinding() {
         ThreadBoundScope scope = ThreadBoundScope.strict();
-        AtomicReference<Boolean> boundOnOtherThread = new AtomicReference<>();
+        AtomicReference<Scope> seenOnChild = new AtomicReference<>();
 
-        scope.runIn(ACME, () -> join(Thread.ofVirtual().start(() -> boundOnOtherThread.set(scope.isBound()))));
+        scope.runIn(ACME, () -> join(Thread.ofVirtual().start(() -> seenOnChild.set(scope.get()))));
 
-        assertThat(boundOnOtherThread.get()).isFalse();
+        assertThat(seenOnChild.get()).isEqualTo(ACME);
+    }
+
+    @Test
+    void aThreadStartedBeforeTheBindingStaysUnbound() throws Exception {
+        ThreadBoundScope scope = ThreadBoundScope.strict();
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        pool.submit(() -> { }).get();                                    // the pool thread exists, unbound
+        AtomicReference<Boolean> boundOnPool = new AtomicReference<>();
+
+        scope.runIn(ACME, () -> {
+            try {
+                pool.submit(() -> boundOnPool.set(scope.isBound())).get();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+        pool.shutdown();
+
+        assertThat(boundOnPool.get()).isFalse();
+    }
+
+    @Test
+    void aPerTaskExecutorInheritsFromTheSubmittingThread() throws Exception {
+        ThreadBoundScope scope = ThreadBoundScope.strict();
+        java.util.concurrent.ExecutorService perTask = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
+        AtomicReference<Scope> seen = new AtomicReference<>();
+
+        scope.runIn(ACME, () -> {
+            try {
+                perTask.submit(() -> seen.set(scope.get())).get();
+            } catch (Exception e) {
+                throw new IllegalStateException(e);
+            }
+        });
+
+        assertThat(seen.get()).isEqualTo(ACME);
     }
 
     @Test

@@ -28,8 +28,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** **namespaces** — a server now serves any number of them, and a
   user works in one at a time. Everything lives inside a namespace (agents,
   LLM configs, skills, sessions, files, vector stores, workflows, MCP servers,
-  tool settings); only users, API tokens and the namespaces themselves are
-  installation-wide. In the Admin UI the header shows the current namespace:
+  tool settings, MCP registrations); only users, API tokens and the namespaces
+  themselves are installation-wide. Workflows, MCP servers and vector stores
+  follow the namespace of the request like every other store; a new namespace
+  starts without any of them (the bundled MCP registrations are seeded into the
+  default namespace only). In the Admin UI the header shows the current namespace:
   switch from the menu, create a new empty one and fill it from the Registry,
   or open *Namespaces & members* to invite other users. The choice is
   remembered per user, so it survives a new browser session and a restart. The default namespace

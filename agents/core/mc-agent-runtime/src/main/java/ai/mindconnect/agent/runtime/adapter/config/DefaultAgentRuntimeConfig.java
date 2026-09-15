@@ -229,11 +229,8 @@ public class DefaultAgentRuntimeConfig {
         var registryRef = new ai.mindconnect.agent.tool.ToolRegistryRef();
         MapToolEnvironment env = MapToolEnvironment.builder()
                 .service(AgentDefinitionRepository.class, definitionRepository)
-                // Where the runtime works. Tools that open stores of their own (vector,
-                // workflow) still take the namespace once, at start-up, until they are
-                // routed per namespace like the repositories; new tools ask the scope.
+                // Where the runtime works: tools ask the scope per call, stores are routed.
                 .service(ScopeSupplier.class, scope)
-                .service(Namespace.class, scope.namespace())
                 .service(ai.mindconnect.agent.tool.ToolRegistryRef.class, registryRef)
                 .service(DynamicToolActivations.class, dynamicToolActivations)
                 .service(AgentSessionRepository.class, sessionRepository)
@@ -376,9 +373,9 @@ public class DefaultAgentRuntimeConfig {
             @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
             ScopeSupplier scope) {
         if (usersHome == null) {
-            // Resolved once at start-up until the users' home is routed per namespace like the stores.
-            return ai.mindconnect.agent.runtime.service.UserHome.under(
-                    java.nio.file.Path.of(dataBaseDir).resolve(scope.namespace().value()).toAbsolutePath());
+            // Under the namespace the current request or task works in: every namespace has its own homes.
+            return ai.mindconnect.agent.runtime.service.UserHome.underCurrent(
+                    () -> java.nio.file.Path.of(dataBaseDir).resolve(scope.namespace().value()).toAbsolutePath());
         }
         return ai.mindconnect.agent.runtime.service.UserHome.of(usersHome);
     }

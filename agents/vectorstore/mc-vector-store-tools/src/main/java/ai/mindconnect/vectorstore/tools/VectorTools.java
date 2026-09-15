@@ -1,5 +1,6 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.AgentTool;
@@ -38,11 +39,17 @@ public final class VectorTools {
     /** Shared bind/availability logic for the three factories. */
     abstract static class BaseFactory implements ToolFactory {
         protected VectorStores stores;
+        /** Where a tool created now works: the host's scope, else a fixed namespace, else the default. */
+        protected java.util.function.Supplier<Namespace> namespace = () -> Namespace.DEFAULT;
 
         @Override public String group() { return "knowledge"; }
 
         @Override public void bind(ToolEnvironment env) {
             this.stores = VectorStores.fromEnvironment(env).orElse(null);
+            this.namespace = env.get(ai.mindconnect.agent.ScopeSupplier.class)
+                    .<java.util.function.Supplier<Namespace>>map(scope -> scope::namespace)
+                    .or(() -> env.get(Namespace.class).map(fixed -> () -> fixed))
+                    .orElse(() -> Namespace.DEFAULT);
         }
 
         @Override public boolean isAvailable() { return stores != null; }
@@ -51,27 +58,27 @@ public final class VectorTools {
     public static final class UpsertFactory extends BaseFactory {
         @Override public String name() { return "vector_upsert"; }
         @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-            return new UpsertTool(stores, scope);
+            return new UpsertTool(stores, namespace.get(), scope);
         }
     }
 
     public static final class SearchFactory extends BaseFactory {
         @Override public String name() { return "vector_search"; }
         @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-            return new SearchTool(stores, scope);
+            return new SearchTool(stores, namespace.get(), scope);
         }
     }
 
     public static final class DeleteFileFactory extends BaseFactory {
         @Override public String name() { return "vector_delete_file"; }
         @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-            return new DeleteFileTool(stores, scope);
+            return new DeleteFileTool(stores, namespace.get(), scope);
         }
     }
 
     // ── tools ──────────────────────────────────────────────────────────────
 
-    record UpsertTool(VectorStores stores, ToolCallScope callScope) implements Tool {
+    record UpsertTool(VectorStores stores, Namespace namespace, ToolCallScope callScope) implements Tool {
         @Override public String name() { return "vector_upsert"; }
 
         @Override public String description() {
@@ -105,7 +112,7 @@ public final class VectorTools {
                     || !(arguments.get("chunks") instanceof List<?> rawChunks) || rawChunks.isEmpty()) {
                 return "Error: 'store', 'file_id' and a non-empty 'chunks' array are required.";
             }
-            String denied = refusedStore(stores, storeName, callScope);
+            String denied = refusedStore(stores, namespace, storeName, callScope);
             if (denied != null) {
                 return denied;
             }
@@ -121,7 +128,7 @@ public final class VectorTools {
                 titles.add(map.get("title") instanceof String t ? t : "");
             }
             try {
-                List<float[]> vectors = stores.embedFor(storeName, texts);
+                List<float[]> vectors = stores.embedFor(namespace, storeName, texts);
                 List<VectorChunk> chunks = new ArrayList<>(texts.size());
                 for (int i = 0; i < texts.size(); i++) {
                     Map<String, String> metadata = titles.get(i).isBlank()
@@ -154,7 +161,7 @@ public final class VectorTools {
                 String owner = scope == VectorStoreInstance.Scope.SESSION
                         && callScope != null && callScope.userId() != null
                         ? callScope.userId().value() : null;
-                VectorStore store = stores.open(storeName, str(arguments, "template"), scope, scopeRef, owner);
+                VectorStore store = stores.open(namespace, storeName, str(arguments, "template"), scope, scopeRef, owner);
                 store.deleteFile(fileId);   // replace semantics
                 store.upsert(chunks);
                 return "Stored " + chunks.size() + " chunk(s) for file '" + fileId + "' in store '"
@@ -165,7 +172,7 @@ public final class VectorTools {
         }
     }
 
-    record SearchTool(VectorStores stores, ToolCallScope callScope) implements Tool {
+    record SearchTool(VectorStores stores, Namespace namespace, ToolCallScope callScope) implements Tool {
 
         @Override public String name() { return "vector_search"; }
 
@@ -205,14 +212,14 @@ public final class VectorTools {
                 }
                 storeName = sessionStoreName(chat);
             }
-            String denied = refusedStore(stores, storeName, callScope);
+            String denied = refusedStore(stores, namespace, storeName, callScope);
             if (denied != null) {
                 return denied;
             }
             int topK = clamp(arguments.get("top_k"), 5, 20);
             try {
-                float[] embedded = stores.embedFor(storeName, List.of(query)).get(0);
-                List<VectorStore.SearchHit> hits = stores.openWith(stores.settingsFor(storeName))
+                float[] embedded = stores.embedFor(namespace, storeName, List.of(query)).get(0);
+                List<VectorStore.SearchHit> hits = stores.openWith(namespace, stores.settingsFor(namespace, storeName))
                         .search(embedded, topK);
                 if (hits.isEmpty()) {
                     return "No results in store '" + storeName + "'. It may be empty — ingest "
@@ -238,7 +245,7 @@ public final class VectorTools {
         }
     }
 
-    record DeleteFileTool(VectorStores stores, ToolCallScope callScope) implements Tool {
+    record DeleteFileTool(VectorStores stores, Namespace namespace, ToolCallScope callScope) implements Tool {
         @Override public String name() { return "vector_delete_file"; }
 
         @Override public String description() {
@@ -258,12 +265,12 @@ public final class VectorTools {
             if (storeName == null || fileId == null) {
                 return "Error: 'store' and 'file_id' are required.";
             }
-            String denied = refusedStore(stores, storeName, callScope);
+            String denied = refusedStore(stores, namespace, storeName, callScope);
             if (denied != null) {
                 return denied;
             }
             try {
-                stores.openWith(stores.settingsFor(storeName)).deleteFile(fileId);
+                stores.openWith(namespace, stores.settingsFor(namespace, storeName)).deleteFile(fileId);
                 return "Removed file '" + fileId + "' from store '" + storeName + "'.";
             } catch (RuntimeException e) {
                 return "Error: vector_delete_file failed: " + e.getMessage();
@@ -309,8 +316,8 @@ public final class VectorTools {
      *
      * @return the tool's error text, or {@code null} when access is fine
      */
-    static String refusedStore(VectorStores stores, String storeName, ToolCallScope callScope) {
-        VectorStoreInstance registered = stores.registry().instance(storeName).orElse(null);
+    static String refusedStore(VectorStores stores, Namespace namespace, String storeName, ToolCallScope callScope) {
+        VectorStoreInstance registered = stores.registry(namespace).instance(storeName).orElse(null);
         boolean chatStore = storeName.startsWith(SESSION_STORE_PREFIX)
                 || (registered != null && registered.scope() == VectorStoreInstance.Scope.SESSION);
         if (!chatStore) {

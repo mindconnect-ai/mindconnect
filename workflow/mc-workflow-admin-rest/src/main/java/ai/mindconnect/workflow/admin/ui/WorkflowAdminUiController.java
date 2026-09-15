@@ -111,11 +111,16 @@ public class WorkflowAdminUiController {
     private final java.util.concurrent.ExecutorService runStreamExecutor =
             java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
 
+    /** What a run carries onto its worker thread: the host's, or nothing. */
+    private final ai.mindconnect.workflow.admin.run.RunThreadContext runContext;
+
     public WorkflowAdminUiController(ai.mindconnect.workflow.admin.service.WorkflowAdminService service,
                                    com.fasterxml.jackson.databind.ObjectMapper objectMapper,
                                    @org.springframework.beans.factory.annotation.Value(
                                            "${mindconnect.workflow-admin.browse-dir:${mindconnect.tools.base-dir:}}")
-                                   String browseDir) {
+                                   String browseDir,
+                                   org.springframework.beans.factory.ObjectProvider<ai.mindconnect.workflow.admin.run.RunThreadContext> runContext) {
+        this.runContext = runContext.getIfAvailable(() -> ai.mindconnect.workflow.admin.run.RunThreadContext.NONE);
         this.service = service;
         this.objectMapper = objectMapper;
         String dir = browseDir == null || browseDir.isBlank() ? System.getProperty("user.home") : browseDir;
@@ -801,7 +806,7 @@ public class WorkflowAdminUiController {
             }
             run.view.complete();
         } else if (run.started.compareAndSet(false, true)) {
-            runStreamExecutor.submit(() -> {
+            runStreamExecutor.submit(runContext.carry(() -> {
                 try {
                     WorkflowRunService.RunReport report;
                     if (run.snapshot != null) {
@@ -817,7 +822,7 @@ public class WorkflowAdminUiController {
                 } finally {
                     run.view.complete();
                 }
-            });
+            }));
         }
         return org.springframework.http.ResponseEntity.ok().body(emitter);
     }

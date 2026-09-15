@@ -56,8 +56,11 @@ class McpGatewayAutoConfigurationTest {
         runner().run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(McpGateway.class);
-            assertThat(context.getBean(McpGateway.class)).isInstanceOf(LocalMcpGateway.class);
+            assertThat(context).hasSingleBean(NamespacedMcpGateways.class);
             assertThat(context).hasSingleBean(McpRegistryAdmin.class);
+            // The gateway the application sees routes to one per namespace; the default namespace's is a local one.
+            assertThat(context.getBean(NamespacedMcpGateways.class).forNamespace(ai.mindconnect.agent.Namespace.DEFAULT).gateway())
+                    .isInstanceOf(LocalMcpGateway.class);
         });
     }
 
@@ -73,7 +76,7 @@ class McpGatewayAutoConfigurationTest {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(McpGateway.class);
             assertThat(context.getBean(McpGateway.class)).isInstanceOf(StubGateway.class);
-            assertThat(context).doesNotHaveBean(LocalMcpGateway.class);
+            assertThat(context).doesNotHaveBean(NamespacedMcpGateways.class);
             // No admin bean at all — not a bean that is null. The screen's
             // condition then fails and the screen stays away.
             assertThat(context).doesNotHaveBean(McpRegistryAdmin.class);
