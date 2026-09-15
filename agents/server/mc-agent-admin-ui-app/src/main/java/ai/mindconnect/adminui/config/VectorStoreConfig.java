@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.config;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -22,7 +23,7 @@ import java.util.Optional;
 public class VectorStoreConfig {
 
     @Bean
-    VectorStores vectorStores(LlmEmbeddings embeddings, LlmConfigRepository llmConfigs, Namespace namespace,
+    VectorStores vectorStores(LlmEmbeddings embeddings, LlmConfigRepository llmConfigs, ScopeSupplier scope,
                               @Value("${mindconnect.vector-store.backend:memory}") String backend,
                               @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
                               @Value("${mindconnect.vector-store.url:}") String url,
@@ -41,7 +42,9 @@ public class VectorStoreConfig {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) llmConfigs);
-                if (type == Namespace.class) return Optional.of((T) namespace);
+                // Resolved once at start-up until the vector stores take the namespace per call.
+                if (type == Namespace.class) return Optional.of((T) scope.namespace());
+                if (type == ScopeSupplier.class) return Optional.of((T) scope);
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {

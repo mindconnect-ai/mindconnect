@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.registry.spring;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.adapter.github.GitHubRegistryClient;
 import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
@@ -63,9 +63,10 @@ public class RegistryAutoConfiguration {
     public RegistrySourceRepository registrySourceRepository(
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
             @Value("${mindconnect.registry.default-source:}") String defaultSource,
-            ObjectProvider<Namespace> namespace) {
+            ObjectProvider<ScopeSupplier> scope) {
+        // Bound once at start-up until registry sources are routed per namespace like the stores.
         FileRegistrySourceRepository repository = new FileRegistrySourceRepository(
-                Path.of(dataBaseDir), namespace.getIfAvailable(() -> Namespace.DEFAULT));
+                Path.of(dataBaseDir), scope.getIfAvailable(ScopeSupplier::local).namespace());
         InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
         seed(repository, defaultSource);
         return repository;

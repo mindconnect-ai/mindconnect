@@ -31,6 +31,9 @@ import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
 import ai.mindconnect.agent.runtime.adapter.token.TokenCounterRegistry;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.ThreadBoundScope;
+import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
@@ -195,7 +198,7 @@ public class DefaultAgentRuntimeConfig {
                                AgentSessionRepository sessionRepository,
                                MessageRepository messageRepository,
                                TodoListService todoListService,
-                               Namespace namespace,
+                               ScopeSupplier scope,
                                @Value("${mindconnect.tools.tavily-api-key:}") String tavilyApiKey,
                                @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String baseDir,
                                @Value("${mindconnect.tools.disabled:}") String disabledTools,
@@ -226,8 +229,11 @@ public class DefaultAgentRuntimeConfig {
         var registryRef = new ai.mindconnect.agent.tool.ToolRegistryRef();
         MapToolEnvironment env = MapToolEnvironment.builder()
                 .service(AgentDefinitionRepository.class, definitionRepository)
-                // The namespace the stores are bound to — for tools that open stores of their own (vector, workflow).
-                .service(Namespace.class, namespace)
+                // Where the runtime works. Tools that open stores of their own (vector,
+                // workflow) still take the namespace once, at start-up, until they are
+                // routed per namespace like the repositories; new tools ask the scope.
+                .service(ScopeSupplier.class, scope)
+                .service(Namespace.class, scope.namespace())
                 .service(ai.mindconnect.agent.tool.ToolRegistryRef.class, registryRef)
                 .service(DynamicToolActivations.class, dynamicToolActivations)
                 .service(AgentSessionRepository.class, sessionRepository)
@@ -368,10 +374,11 @@ public class DefaultAgentRuntimeConfig {
     ai.mindconnect.agent.runtime.service.UserHome userHome(
             @Value("${mindconnect.users.home:#{null}}") String usersHome,
             @Value("${mindconnect.data.base-dir:data}") String dataBaseDir,
-            Namespace namespace) {
+            ScopeSupplier scope) {
         if (usersHome == null) {
+            // Resolved once at start-up until the users' home is routed per namespace like the stores.
             return ai.mindconnect.agent.runtime.service.UserHome.under(
-                    java.nio.file.Path.of(dataBaseDir).resolve(namespace.value()).toAbsolutePath());
+                    java.nio.file.Path.of(dataBaseDir).resolve(scope.namespace().value()).toAbsolutePath());
         }
         return ai.mindconnect.agent.runtime.service.UserHome.of(usersHome);
     }
@@ -482,10 +489,14 @@ public class DefaultAgentRuntimeConfig {
      * the executor-based turn before it; the JDBC store is the cluster path.
      */
     @Bean(destroyMethod = "close")
-    LocalTaskQueue taskQueue(AgentTurnWorker agentTurnWorker, ToolCallWorker toolCallWorker) {
+    LocalTaskQueue taskQueue(AgentTurnWorker agentTurnWorker, ToolCallWorker toolCallWorker, ScopeSupplier scope) {
         LocalTaskQueue queue = new LocalTaskQueue(new InMemoryTaskStore());
         // A failed task is otherwise visible only in the task dialog, and only while it is recent.
         queue.addListener(ai.mindconnect.taskqueue.LoggingTaskListener.failuresOnly());
+        // Every task carries the scope it was submitted in and runs bound to it — on
+        // first delivery, on a retry and on a wake-up. A fixed scope (an embedder's
+        // single namespace) has nothing to bind.
+        if (scope instanceof ThreadBoundScope bound) queue.addAdvisor(new ScopeTaskAdvisor(scope, bound));
         toolCallWorker.attach(queue);                       // awaits sub-agent turns
         queue.register(AgentTurnWorker.TYPE, agentTurnWorker);
         queue.register(ToolCallWorker.TYPE, toolCallWorker);

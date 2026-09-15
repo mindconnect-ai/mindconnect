@@ -1,7 +1,7 @@
 package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.initialdata.FileCopyInitialDataInstaller;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpGateway;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -54,12 +54,12 @@ public class McpGatewayAutoConfiguration {
     @ConditionalOnMissingBean
     public McpServerRepository mcpServerRepository(
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
-            ObjectProvider<Namespace> namespace) {
-        // Bound to the namespace this process serves, like every store, and
-        // seeded before anything is served: the first tool lookup happens
-        // while the tool registry is being built.
+            ObjectProvider<ScopeSupplier> scope) {
+        // Bound once at start-up until the gateway is routed per namespace like the
+        // stores, and seeded before anything is served: the first tool lookup
+        // happens while the tool registry is being built.
         FileMcpServerRepository repository = new FileMcpServerRepository(
-                storageRoot(dataBaseDir), namespace.getIfAvailable(() -> Namespace.DEFAULT));
+                storageRoot(dataBaseDir), scope.getIfAvailable(ScopeSupplier::local).namespace());
         new FileCopyInitialDataInstaller(repository.directory())
                 .install("classpath:initial-data/mcp-servers/*.json");
         return repository;
@@ -109,14 +109,14 @@ public class McpGatewayAutoConfiguration {
             McpServerRepository repository,
             McpProxy mcpProxy,
             McpSessionRegistry sessions,
-            ObjectProvider<Namespace> namespace,
+            ObjectProvider<ScopeSupplier> scope,
             Environment environment,
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
             @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime) {
         // Whether process and docker targets start is the installation's call:
         // mindconnect.mcp.allow-process / allow-docker, unset following sign-in.
         return new LocalMcpGateway(repository, mcpProxy, sessions,
-                storageRoot(dataBaseDir), namespace.getIfAvailable(() -> Namespace.DEFAULT),
+                storageRoot(dataBaseDir), scope.getIfAvailable(ScopeSupplier::local).namespace(),
                 containerRuntime, McpStartPolicy.from(environment));
     }
 

@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.starter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.NamespaceRouted;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.file.FileConversationSummaryRepository;
@@ -25,8 +26,10 @@ import java.nio.file.Path;
 
 /**
  * The runtime's repository ports on the file system, all rooted at
- * {@code agentStorageDir/<namespace>} ({@code mindconnect.data.base-dir},
- * {@code mindconnect.namespace}). Imported by
+ * {@code agentStorageDir/<namespace>} ({@code mindconnect.data.base-dir}).
+ * Which namespace a call goes to is the {@link ScopeSupplier}'s answer at
+ * that moment: every bean here is a {@link NamespaceRouted} proxy that keeps
+ * one file adapter per namespace. Imported by
  * {@link FilePersistenceAutoConfiguration} when {@code mindconnect.persistence}
  * is {@code file}; nothing here decides.
  */
@@ -34,13 +37,15 @@ import java.nio.file.Path;
 public class FileRepositoriesConfig {
 
     @Bean
-    AgentDefinitionRepository agentDefinitionRepository(Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        return new FileAgentDefinitionRepository(agentStorageDir, objectMapper, namespace);
+    AgentDefinitionRepository agentDefinitionRepository(Path agentStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
+        return NamespaceRouted.route(AgentDefinitionRepository.class, scope,
+                ns -> new FileAgentDefinitionRepository(agentStorageDir, objectMapper, ns));
     }
 
     @Bean
-    AgentSessionRepository agentSessionRepository(Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        return new FileAgentSessionRepository(agentStorageDir, objectMapper, namespace);
+    AgentSessionRepository agentSessionRepository(Path agentStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
+        return NamespaceRouted.route(AgentSessionRepository.class, scope,
+                ns -> new FileAgentSessionRepository(agentStorageDir, objectMapper, ns));
     }
 
     /**
@@ -49,23 +54,27 @@ public class FileRepositoriesConfig {
      * a file until somebody actually decides something.
      */
     @Bean
-    ToolRepository toolRepository(Path agentStorageDir, Namespace namespace) {
-        return new FileToolRepository(agentStorageDir, namespace);
+    ToolRepository toolRepository(Path agentStorageDir, ScopeSupplier scope) {
+        return NamespaceRouted.route(ToolRepository.class, scope,
+                ns -> new FileToolRepository(agentStorageDir, ns));
     }
 
     @Bean
-    WorkingMemoryRepository workingMemoryRepository(Path agentStorageDir, Namespace namespace) {
-        return new FileWorkingMemoryRepository(agentStorageDir, namespace);
+    WorkingMemoryRepository workingMemoryRepository(Path agentStorageDir, ScopeSupplier scope) {
+        return NamespaceRouted.route(WorkingMemoryRepository.class, scope,
+                ns -> new FileWorkingMemoryRepository(agentStorageDir, ns));
     }
 
     @Bean
-    ConversationSummaryRepository conversationSummaryRepository(Path agentStorageDir, Namespace namespace) {
-        return new FileConversationSummaryRepository(agentStorageDir, namespace);
+    ConversationSummaryRepository conversationSummaryRepository(Path agentStorageDir, ScopeSupplier scope) {
+        return NamespaceRouted.route(ConversationSummaryRepository.class, scope,
+                ns -> new FileConversationSummaryRepository(agentStorageDir, ns));
     }
 
     @Bean
-    TodoListRepository todoListRepository(Path agentStorageDir, Namespace namespace) {
-        return new FileTodoListRepository(agentStorageDir, namespace);
+    TodoListRepository todoListRepository(Path agentStorageDir, ScopeSupplier scope) {
+        return NamespaceRouted.route(TodoListRepository.class, scope,
+                ns -> new FileTodoListRepository(agentStorageDir, ns));
     }
 
     /**
@@ -75,8 +84,9 @@ public class FileRepositoriesConfig {
      */
     @Bean
     ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository(
-            Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        return new FileSkillRepository(agentStorageDir, objectMapper, namespace);
+            Path agentStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
+        return NamespaceRouted.route(ai.mindconnect.agent.runtime.skill.SkillRepository.class, scope,
+                ns -> new FileSkillRepository(agentStorageDir, objectMapper, ns));
     }
 
     /**
@@ -87,8 +97,9 @@ public class FileRepositoriesConfig {
      */
     @Bean
     LlmCallTraceRepository llmCallTraceRepository(
-            Path agentStorageDir, Namespace namespace,
+            Path agentStorageDir, ScopeSupplier scope,
             @Value("${mindconnect.agent.trace.max-per-session:50}") int maxPerSession) {
-        return new FileLlmCallTraceRepository(agentStorageDir, maxPerSession, namespace);
+        return NamespaceRouted.route(LlmCallTraceRepository.class, scope,
+                ns -> new FileLlmCallTraceRepository(agentStorageDir, maxPerSession, ns));
     }
 }

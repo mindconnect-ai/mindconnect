@@ -48,6 +48,7 @@ import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
 import ai.mindconnect.agent.runtime.port.out.TokenCounters;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
@@ -499,7 +500,9 @@ public final class AgentRuntimeBuilder {
                 .service(DynamicToolActivations.class, activations)
                 .service(LlmEmbeddings.class, embeddings)
                 .service(LlmConfigRepository.class, llmConfigRepository)
-                // The namespace the stores are bound to — for tools that open stores of their own (vector, workflow).
+                // Where this runtime works — one namespace for its whole life. Tools that
+                // open stores of their own (vector, workflow) take the namespace directly.
+                .service(ScopeSupplier.class, ScopeSupplier.fixed(namespace))
                 .service(Namespace.class, namespace);
         if (workflows != null) {
             PostgresWorkflows.register(env, workflows);
