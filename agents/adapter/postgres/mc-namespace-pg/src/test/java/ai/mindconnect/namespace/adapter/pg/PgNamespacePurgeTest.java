@@ -26,6 +26,7 @@ class PgNamespacePurgeTest {
 
     @AfterEach
     void tearDown() {
+        if (sql == null) return;   // the set-up skipped itself: no database here
         for (String table : new String[]{"mc_purge_test_ns", "mc_purge_test_wf", "vs_purgetest__docs", "vs_purgetest_other__docs"}) {
             sql.execute("DROP TABLE IF EXISTS " + table);
         }
