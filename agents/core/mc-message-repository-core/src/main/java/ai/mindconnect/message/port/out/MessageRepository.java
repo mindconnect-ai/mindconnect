@@ -60,4 +60,7 @@ public interface MessageRepository {
 
     /** Deletes all messages whose sequenceNum is in [fromSeq, toSeq] inclusive. */
     void deleteBySequenceRange(ConversationId conversation, int fromSeq, int toSeq);
+
+    /** Removes every message of the conversation; an unknown conversation is a no-op. */
+    void deleteByConversation(ConversationId conversation);
 }

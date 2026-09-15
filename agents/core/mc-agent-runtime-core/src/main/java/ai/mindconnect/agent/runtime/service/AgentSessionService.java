@@ -4,6 +4,7 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
@@ -56,6 +57,8 @@ public class AgentSessionService {
     private final WorkingDirPolicy workingDirPolicy;
     /** Where a session's own directory lives — none when the runtime has no users' home. */
     private final UserHome userHome;
+    /** Where the session's LLM call traces live; null when the runtime records none. */
+    private final LlmCallTraceRepository traceRepository;
 
     /** Without a working-directory policy: any existing directory may become a session's. */
     public AgentSessionService(AgentDefinitionRepository definitionRepository,
@@ -85,7 +88,26 @@ public class AgentSessionService {
                 workingDirPolicy, UserHome.none());
     }
 
-    /** The full constructor: with the users' home a session's own directory lives in. */
+    /** Without a trace repository: deleting a session leaves no traces to delete. */
+    public AgentSessionService(AgentDefinitionRepository definitionRepository,
+                                AgentSessionRepository sessionRepository,
+                                ConversationManager conversationManager,
+                                WorkingMemoryRepository workingMemoryRepository,
+                                ConversationSummaryRepository summaryRepository,
+                                TodoListRepository todoListRepository,
+                                ToolApprovalStore approvalStore,
+                                UserChannels userChannels,
+                                WorkingDirPolicy workingDirPolicy,
+                                UserHome userHome) {
+        this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
+                summaryRepository, todoListRepository, approvalStore, userChannels,
+                workingDirPolicy, userHome, null);
+    }
+
+    /**
+     * The full constructor: with the users' home a session's own directory lives
+     * in, and the trace repository whose records go when the session goes.
+     */
     public AgentSessionService(AgentDefinitionRepository definitionRepository,
                                 AgentSessionRepository sessionRepository,
                                 ConversationManager conversationManager,
@@ -95,7 +117,9 @@ public class AgentSessionService {
                                 ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore approvalStore,
                                 ai.mindconnect.agent.runtime.service.stream.UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy,
-                                UserHome userHome) {
+                                UserHome userHome,
+                                LlmCallTraceRepository traceRepository) {
+        this.traceRepository = traceRepository;
         this.workingDirPolicy = workingDirPolicy == null ? WorkingDirPolicy.unrestricted() : workingDirPolicy;
         this.userHome = userHome == null ? UserHome.none() : userHome;
         this.definitionRepository = definitionRepository;
@@ -431,9 +455,13 @@ public class AgentSessionService {
         summaryRepository.deleteByConversation(session.conversationId());
         todoListRepository.deleteBySession(sessionId);
         approvalStore.deleteForSession(sessionId);
+        if (traceRepository != null) traceRepository.deleteBySession(sessionId);
+        // The conversation is the session's own: its messages go with it, or they
+        // would pile up unreachable behind a session id nothing resolves any more.
+        conversationManager.deleteConversation(session.conversationId());
         sessionRepository.deleteById(sessionId);
         deleteOwnDirectory(session);
-        log.info("Deleted session {} and associated data", sessionId);
+        log.info("Deleted session {} with its conversation, traces and associated data", sessionId);
     }
 
     /**

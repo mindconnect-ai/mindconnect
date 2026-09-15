@@ -129,6 +129,7 @@ public final class AgentRuntimeBuilder {
     private final List<AgentDefinition> pendingAgentDefinitions = new ArrayList<>();
     private final List<ai.mindconnect.agent.runtime.skill.Skill> pendingSkills = new ArrayList<>();
     private final List<String> pendingWorkflowResources = new ArrayList<>();
+    private java.time.Duration taskRetention = java.time.Duration.ZERO;
 
     private AgentRuntimeBuilder(Mode mode, Path dataDir) {
         this(mode, dataDir, null);
@@ -216,6 +217,18 @@ public final class AgentRuntimeBuilder {
      * calls, results, attachment notices, and image / document parts as
      * content blocks when the model reads them.
      */
+    /**
+     * How long finished task trees (a turn with its tool calls and sub-agent
+     * turns) stay readable on the queue. Default {@code Duration.ZERO}: forgotten
+     * at the next maintenance tick — the result is in the conversation, and an
+     * embedded runtime must not grow with every turn. {@code null} keeps every
+     * record for the life of the process, as the queue library does on its own.
+     */
+    public AgentRuntimeBuilder taskRetention(java.time.Duration keepFinished) {
+        this.taskRetention = keepFinished;
+        return this;
+    }
+
     public AgentRuntimeBuilder llmMessageMapper(LlmMessageMapper mapper) {
         this.llmMessageMapper = mapper;
         return this;
@@ -533,7 +546,7 @@ public final class AgentRuntimeBuilder {
         AgentSessionService sessionService = new AgentSessionService(
                 definitionRepository, sessionRepository, conversationManager,
                 workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
-                userChannels, workingDirPolicy, userHome);
+                userChannels, workingDirPolicy, userHome, traceRepository);
         var sessionChannels = new SessionChannels();
         // Where a user's own standing instructions live; see InstructionFiles.
         var instructionFiles = ai.mindconnect.agent.runtime.service.prompt.InstructionFiles.of(
@@ -551,6 +564,10 @@ public final class AgentRuntimeBuilder {
                 new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
         // A failed task would otherwise leave no trace but a tool result saying so.
         taskQueue.addListener(ai.mindconnect.taskqueue.LoggingTaskListener.failuresOnly());
+        // Finished task trees are forgotten at the next maintenance tick unless
+        // taskRetention() says otherwise — the turn's outcome lives in the
+        // conversation, and an embedded runtime would otherwise grow with every turn.
+        taskQueue.withRetention(taskRetention);
         toolWorker.attach(taskQueue);
         taskQueue.register(AgentTurnWorker.TYPE, turnWorker);
         taskQueue.register(ToolCallWorker.TYPE, toolWorker);

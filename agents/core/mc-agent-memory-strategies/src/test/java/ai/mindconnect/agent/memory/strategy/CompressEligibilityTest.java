@@ -261,5 +261,8 @@ class CompressEligibilityTest {
         @Override public int deleteMessages(ConversationId conversationId, int fromSeq, int toSeq) {
             throw new UnsupportedOperationException();
         }
+        @Override public void deleteConversation(ConversationId conversationId) {
+            throw new UnsupportedOperationException();
+        }
     }
 }
