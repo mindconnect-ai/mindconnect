@@ -49,6 +49,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user-core</artifactId>
         </dependency>
+        <!-- namespaces: the switcher in the header, the namespaces screen, the session selection -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-namespace</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user</artifactId>

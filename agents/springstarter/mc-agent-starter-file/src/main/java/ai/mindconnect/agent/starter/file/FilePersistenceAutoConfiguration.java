@@ -82,18 +82,18 @@ public class FilePersistenceAutoConfiguration {
         return new EncryptingLlmConfigRepository(files, helper);
     }
 
-    /** The installation's users, under {@code <mindconnect.data.base-dir>/<namespace>/system/users}. */
+    /** The installation's users, under {@code <mindconnect.data.base-dir>/system/users} — installation-wide, not per namespace. */
     @Bean
     @ConditionalOnMissingBean(UserRepository.class)
-    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir, ScopeSupplier scope) {
-        return NamespaceRouted.route(UserRepository.class, scope, ns -> new FileUserRepository(Path.of(baseDir), ns));
+    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new FileUserRepository(Path.of(baseDir));
     }
 
-    /** Personal API tokens, stored as hashes under {@code <mindconnect.data.base-dir>/<namespace>/system/api-tokens}. */
+    /** Personal API tokens, stored as hashes under {@code <mindconnect.data.base-dir>/system/api-tokens} — installation-wide like their users. */
     @Bean
     @ConditionalOnMissingBean(ApiTokenRepository.class)
-    ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir, ScopeSupplier scope) {
-        return NamespaceRouted.route(ApiTokenRepository.class, scope, ns -> new FileApiTokenRepository(Path.of(baseDir), ns));
+    ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new FileApiTokenRepository(Path.of(baseDir));
     }
 
     /** Uploads: the {@code filesystem} backend under {@code <mindconnect.data.base-dir>/<namespace>/files} unless configured otherwise. */

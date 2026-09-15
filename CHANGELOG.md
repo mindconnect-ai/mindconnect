@@ -25,6 +25,25 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** **namespaces** — a server now serves any number of them, and a
+  user works in one at a time. Everything lives inside a namespace (agents,
+  LLM configs, skills, sessions, files, vector stores, workflows, MCP servers,
+  tool settings); only users, API tokens and the namespaces themselves are
+  installation-wide. In the Admin UI the header shows the current namespace:
+  switch from the menu, create a new empty one and fill it from the Registry,
+  or open *Namespaces & members* to invite other users. The choice is
+  remembered per user, so it survives a new browser session and a restart. The default namespace
+  (`mindconnect.namespace`, `local`) is open to every signed-in user, so an
+  installation that never creates another behaves as before. API clients name
+  the namespace in the address — `https://host/ns/acme/api/…` and, for
+  OpenAI-compatible clients, the base URL `https://host/ns/acme` — or in an
+  `X-Mindconnect-Namespace` header; the server answers with the namespace it
+  worked in under the same header, and with `403` when the caller is not a
+  member. Embedders see none of this: the builder still takes one namespace.
+  **Storage moved:** users and API tokens now live under
+  `<data.base-dir>/system/` (Postgres: without a `namespace` column) instead of
+  inside `local/`; on an existing install sign in again and re-issue tokens.
+
 - **agents:** the model's **reasoning is shown in the chat** — as a collapsed
   card above the answer, like a tool call, whose header runs while the model
   thinks and reads "thought for 4.2 s" once the first token arrives. Open it

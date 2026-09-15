@@ -17,7 +17,7 @@
     <description>
         File and in-memory adapters for the user ports of mc-user-core: one JSON
         document per user and per API token under
-        &lt;data&gt;/&lt;namespace&gt;/system/.
+        &lt;data&gt;/system/.
     </description>
 
     <dependencies>

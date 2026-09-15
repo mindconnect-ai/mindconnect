@@ -48,16 +48,23 @@ public interface AgentSessionRepository {
 
 In the Spring apps the file adapters come from the **`mc-agent-starter-file`**
 starter (`agents/springstarter/`), all rooted at one directory
-(`mindconnect.data.base-dir`, default `data/`) and, below it, the namespace
-the process runs in (`mindconnect.namespace`, default `local`) — so the data
-of a default install lives under `data/local/`. The LLM-config repository is
+(`mindconnect.data.base-dir`, default `data/`) and, below it, one directory per
+namespace — so the data of a default install lives under `data/local/`, and a
+namespace `acme` under `data/acme/`. Users, API tokens and the namespaces
+themselves are installation-wide and live under `data/system/`. The LLM-config repository is
 wrapped in an `EncryptingLlmConfigRepository` when the app has an
 `EncryptionHelper`, and LLM call traces live under `conversations/` with a
 `mindconnect.agent.trace.max-per-session` retention cap (default 50).
 
-Every adapter — file or Postgres — is bound to that one namespace when it is
-built. Nothing above the repositories names a namespace; a process serves
-exactly one.
+Every adapter — file or Postgres — is bound to one namespace when it is built;
+the starters hand out a routing proxy per port that keeps one adapter per
+namespace and forwards each call to the one the current `Scope` names. The
+scope is bound per request (from the `/ns/{namespace}/` prefix, the
+`X-Mindconnect-Namespace` header, or the namespace the user chose in the Admin
+UI) and per queued task; nothing above the repositories names a namespace.
+Threads that bind nothing — start-up seeding, say — work in
+`mindconnect.namespace` (default `local`), which is also the namespace every
+signed-in user may work in without an invitation.
 
 This makes the runtime zero-dependency: it boots and persists with nothing but a
 writable folder — no database, no migrations, ideal for local development and

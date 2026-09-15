@@ -1,6 +1,5 @@
 package ai.mindconnect.user.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.port.out.UserRepository;
@@ -17,7 +16,7 @@ import java.util.Optional;
 
 /**
  * {@link UserRepository} on the file system: one JSON document per user under
- * {@code <storageDir>/<namespace>/system/users/}.
+ * {@code <storageDir>/system/users/} — installation-wide, beside the namespaces.
  *
  * <p>A user id is whatever the identity provider calls the user — mixed case,
  * {@code @}, dots — so it is not a file name as it stands. The file is named
@@ -29,10 +28,9 @@ public class FileUserRepository implements UserRepository {
 
     private final FileDocuments<User> users;
 
-    public FileUserRepository(Path storageDir, Namespace namespace) {
-        Objects.requireNonNull(namespace, "namespace");
-        this.users = new FileDocuments<>(
-                storageDir.resolve(namespace.value()).resolve("system").resolve("users"), User.class);
+    public FileUserRepository(Path storageDir) {
+        Objects.requireNonNull(storageDir, "storageDir");
+        this.users = new FileDocuments<>(storageDir.resolve("system").resolve("users"), User.class);
     }
 
     @Override

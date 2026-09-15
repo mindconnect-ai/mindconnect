@@ -1,6 +1,5 @@
 package ai.mindconnect.user.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.user.domain.User;
 import org.junit.jupiter.api.Test;
@@ -23,28 +22,19 @@ class FileUserRepositoryTest {
     }
 
     @Test
-    void aUserSurvivesTheRoundTripInItsNamespacesDirectory() {
-        var repo = new FileUserRepository(dir, new Namespace("test"));
+    void aUserSurvivesTheRoundTripInTheSystemDirectory() {
+        var repo = new FileUserRepository(dir);
         User alice = user("alice");
         repo.save(alice);
 
         assertThat(repo.findById(UserId.of("alice"))).contains(alice);
         assertThat(repo.findAll()).containsExactly(alice);
-        assertThat(dir.resolve("test/system/users")).isDirectoryContaining("glob:**alice-*.json");
-    }
-
-    @Test
-    void anotherNamespaceSeesNothing() {
-        new FileUserRepository(dir, new Namespace("test")).save(user("alice"));
-
-        var other = new FileUserRepository(dir, new Namespace("other"));
-        assertThat(other.findById(UserId.of("alice"))).isEmpty();
-        assertThat(other.findAll()).isEmpty();
+        assertThat(dir.resolve("system/users")).isDirectoryContaining("glob:**alice-*.json");
     }
 
     @Test
     void idsThatAreNoFileNamesAndDifferOnlyInCaseStayApart() {
-        var repo = new FileUserRepository(dir, new Namespace("test"));
+        var repo = new FileUserRepository(dir);
         repo.save(user("Alice"));
         repo.save(user("alice"));
         repo.save(user("alice.smith@example.com"));
@@ -59,9 +49,9 @@ class FileUserRepositoryTest {
 
     @Test
     void anUnreadableFileIsSkipped() throws Exception {
-        var repo = new FileUserRepository(dir, new Namespace("test"));
+        var repo = new FileUserRepository(dir);
         repo.save(user("alice"));
-        Files.writeString(dir.resolve("test/system/users/broken-000000000000.json"), "{not json");
+        Files.writeString(dir.resolve("system/users/broken-000000000000.json"), "{not json");
 
         assertThat(repo.findAll()).extracting(User::id).containsExactly(UserId.of("alice"));
     }

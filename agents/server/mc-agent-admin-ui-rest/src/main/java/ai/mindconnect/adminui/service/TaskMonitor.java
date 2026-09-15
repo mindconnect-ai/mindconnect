@@ -7,7 +7,10 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
@@ -116,12 +119,32 @@ public class TaskMonitor implements TaskListener {
         return t;
     });
 
+    /** Where lookups run: a task's session lives in the task's namespace, and the board shows every namespace. */
+    private final ScopeSupplier scope;
+
+    /** A host without namespaces — lookups run wherever the repositories are bound. */
     public TaskMonitor(LocalTaskQueue queue,
                        AgentSessionRepository sessions,
                        AgentDefinitionRepository definitions) {
+        this(queue, sessions, definitions, (ScopeSupplier) null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public TaskMonitor(LocalTaskQueue queue,
+                       AgentSessionRepository sessions,
+                       AgentDefinitionRepository definitions,
+                       org.springframework.beans.factory.ObjectProvider<ScopeSupplier> scope) {
+        this(queue, sessions, definitions, scope.getIfAvailable());
+    }
+
+    TaskMonitor(LocalTaskQueue queue,
+                AgentSessionRepository sessions,
+                AgentDefinitionRepository definitions,
+                ScopeSupplier scope) {
         this.queue = queue;
         this.sessions = sessions;
         this.definitions = definitions;
+        this.scope = scope;
         queue.addListener(this);
     }
 
@@ -202,12 +225,15 @@ public class TaskMonitor implements TaskListener {
                           Map<SessionId, Optional<AgentSession>> sessionCache,
                           Map<AgentId, Optional<AgentDefinition>> definitionCache) {
         SessionId sessionId = sessionIdOf(task);
+        // The session and the agent live in the task's namespace: look them up there, whatever
+        // namespace the monitor's own thread is in. The caches stay correct because a session
+        // id is a UUID — the same id in two namespaces is not a case worth a compound key.
         Optional<AgentSession> session = sessionId == null
                 ? Optional.empty()
-                : sessionCache.computeIfAbsent(sessionId, this::findSession);
+                : sessionCache.computeIfAbsent(sessionId, id -> inScopeOf(task, () -> findSession(id)));
         Optional<AgentDefinition> agent = session
                 .map(AgentSession::agentDefinitionId)
-                .flatMap(id -> definitionCache.computeIfAbsent(id, this::findDefinition));
+                .flatMap(id -> definitionCache.computeIfAbsent(id, aid -> inScopeOf(task, () -> findDefinition(aid))));
 
         String agentName = agent.map(AgentDefinition::name).orElse(null);
         String label;
@@ -237,6 +263,14 @@ public class TaskMonitor implements TaskListener {
         Object rounds = task.state().get("rounds");
         if (rounds != null) out.append(" · round ").append(rounds);
         return out.toString();
+    }
+
+    /** Runs {@code body} bound to the namespace the task was submitted in, when there is one to bind. */
+    private <T> T inScopeOf(TaskRecord task, java.util.function.Supplier<T> body) {
+        if (scope instanceof ThreadBoundScope bound) {
+            return ScopeTaskAdvisor.scopeIfAny(task).map(s -> bound.runIn(s, body)).orElseGet(body);
+        }
+        return body.get();
     }
 
     private Optional<AgentSession> findSession(SessionId id) {

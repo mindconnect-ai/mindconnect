@@ -4,6 +4,7 @@ import ai.mindconnect.ui.model.UiAppShell;
 import ai.mindconnect.ui.model.UiHeader;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiMenu;
+import ai.mindconnect.ui.model.UiMenuButton;
 import ai.mindconnect.ui.model.UiMenuItem;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
@@ -35,6 +36,16 @@ public final class AdminLayout {
     private final boolean mcpGateway;
     /** Whether this host can browse registries — same idea as {@link #mcpGateway}. */
     private final boolean registry;
+    /** The namespaces the user may work in and the one they are in; null when the host has no namespaces. */
+    private NamespaceSwitch namespaces;
+
+    /**
+     * What the header's namespace switcher shows: the active namespace and
+     * every one the user may switch to, in the order the service lists them.
+     */
+    public record NamespaceSwitch(String activeId, String activeLabel, List<Entry> entries) {
+        public record Entry(String id, String label) {}
+    }
 
     /**
      * @param userName    display name of the current user (e.g. {@code "mc_user"})
@@ -87,6 +98,12 @@ public final class AdminLayout {
         this.taskStream = taskStream;
         this.mcpGateway = mcpGateway;
         this.registry = registry;
+    }
+
+    /** Adds the namespace switcher to the header; without it the shell shows no namespace at all. */
+    public AdminLayout namespaces(NamespaceSwitch namespaces) {
+        this.namespaces = namespaces;
+        return this;
     }
 
     /**
@@ -145,6 +162,26 @@ public final class AdminLayout {
             header.extra(live);
         } else if (taskBadge != null) {
             header.extra(taskBadge);
+        }
+        // Where the user works: the active namespace as a menu button, every
+        // namespace they may switch to below it. Switching is a GET the SPA
+        // follows through a redirect to the agents list, so the whole shell —
+        // this button included — is rendered afresh in the new namespace.
+        if (namespaces != null) {
+            UiMenuButton switcher = UiMenuButton.of("namespace-switch")
+                    .label(namespaces.activeLabel()).icon("layers")
+                    .variant(UiMenuButton.Variant.BUTTON).align(UiMenuButton.Align.END);
+            for (NamespaceSwitch.Entry entry : namespaces.entries()) {
+                boolean active = entry.id().equals(namespaces.activeId());
+                switcher.item(UiMenuItem.of("namespace-" + entry.id(), entry.label())
+                        .icon(active ? "check" : "layers").selected(active)
+                        .onClick(UiTrigger.api("GET", "/admin/api/namespaces/switch/" + entry.id())));
+            }
+            switcher.item(UiMenuItem.divider());
+            switcher.item(UiMenuItem.of("namespace-new", "New namespace…").icon("add")
+                    .onClick(UiTrigger.api("GET", "/admin/api/namespaces/new")));
+            switcher.item(UiMenuItem.link("namespace-manage", "Namespaces & members", "/admin/namespaces").icon("users"));
+            header.extra(switcher);
         }
         if (authEnabled) {
             header.extra(UiLink.of("logout", "/admin/logout", "Logout"));

@@ -49,9 +49,15 @@ the request. In Swagger UI, **Authorize** takes the token. See
 | `GET /api/sessions/{id}/history` | the persisted messages |
 | `DELETE /api/sessions/{id}` | delete the session |
 
-A server runs in one namespace, set with `mindconnect.namespace` (default
-`local`, `MC_NAMESPACE`); no endpoint names one. Ids travel as their plain
-value, in paths and in JSON.
+A server serves any number of namespaces. A call names the one it works in
+in the address — `/ns/{namespace}/api/…`, so an OpenAI-compatible client
+simply uses `https://host/ns/{namespace}` as its base URL — or in an
+`X-Mindconnect-Namespace` header; without either it works in the default
+namespace (`mindconnect.namespace`, `local`, `MC_NAMESPACE`), which every
+signed-in user may use. The response carries the namespace it worked in under
+the same header; naming one the caller is not a member of is a `403`. No
+endpoint takes a namespace parameter. Ids travel as their plain value, in
+paths and in JSON.
 
 Every user-scoped resource — a session and everything under
 `/api/sessions/{id}`, an uploaded file, a workspace, the user stream, a

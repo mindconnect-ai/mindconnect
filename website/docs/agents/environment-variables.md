@@ -36,7 +36,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | Property | Default | Notes |
 |----------|---------|-------|
 | `mindconnect.persistence` | `file` | `file` or `postgres` — bound to `MC_PERSISTENCE` in the apps' yaml. |
-| `mindconnect.namespace` | `local` | The one namespace every repository is bound to — bound to `MC_NAMESPACE` in the apps' yaml. |
+| `mindconnect.namespace` | `local` | The default namespace: open to every signed-in user, and where a request or thread works that names none — bound to `MC_NAMESPACE` in the apps' yaml. |
 | `mindconnect.postgres.*` | — | `url`, `username`, `password`, `pool-size` (default 10) for `postgres` mode; bound to `MC_POSTGRES_*`. |
 | `mindconnect.data.base-dir` | `data` | Root for **all** file persistence (definitions, configs, conversations, uploads, the users' homes); in `postgres` mode only the file-based side channels. |
 | `mindconnect.users.home` | `<data.base-dir>/<namespace>/home/{user}` | Each user's directory on the server — a path with `{user}` in it. `{user}` is the user id when it consists of letters, digits, `.`, `-` and `_` and does not start with a dot; any other id is reduced to those characters and gets `+` and a short hash of the id appended (`alice@example.com` → `alice_example.com+…`), so no two users share a directory. A session opened without a working directory works in its own directory under there (`sessions/<id>`), its uploads are put in `sessions/<id>/uploads` for the file tools, and it is the default root a working directory must lie under. Blank turns it off. |

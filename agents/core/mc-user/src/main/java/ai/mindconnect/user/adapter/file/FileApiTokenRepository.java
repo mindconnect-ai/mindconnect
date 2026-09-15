@@ -1,6 +1,5 @@
 package ai.mindconnect.user.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.user.domain.ApiToken;
 import ai.mindconnect.user.domain.ApiTokenId;
@@ -14,7 +13,7 @@ import java.util.Optional;
 
 /**
  * {@link ApiTokenRepository} on the file system: one JSON document per token
- * under {@code <storageDir>/<namespace>/system/api-tokens/<id>.json}. A lookup
+ * under {@code <storageDir>/system/api-tokens/<id>.json} — installation-wide, beside the namespaces. A lookup
  * by hash reads the directory — an installation has a handful of tokens per
  * user, not millions, and the Postgres adapter indexes the hash.
  *
@@ -26,10 +25,9 @@ public class FileApiTokenRepository implements ApiTokenRepository {
     private final FileDocuments<ApiToken> tokens;
     private final Object lock = new Object();
 
-    public FileApiTokenRepository(Path storageDir, Namespace namespace) {
-        Objects.requireNonNull(namespace, "namespace");
-        this.tokens = new FileDocuments<>(
-                storageDir.resolve(namespace.value()).resolve("system").resolve("api-tokens"), ApiToken.class);
+    public FileApiTokenRepository(Path storageDir) {
+        Objects.requireNonNull(storageDir, "storageDir");
+        this.tokens = new FileDocuments<>(storageDir.resolve("system").resolve("api-tokens"), ApiToken.class);
     }
 
     @Override

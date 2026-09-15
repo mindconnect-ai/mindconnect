@@ -8,11 +8,13 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.taskqueue.TaskAdvisor;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
+import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskSubmission;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Carries the submitter's {@link Scope} on every task and binds it again
@@ -71,13 +73,16 @@ public final class ScopeTaskAdvisor implements TaskAdvisor {
 
     /** The scope a task was submitted in, read back from its payload. */
     public static Scope scopeOf(TaskContext ctx) {
-        Map<String, Object> payload = ctx.task().payload();
+        return scopeIfAny(ctx.task()).orElseThrow(() -> new IllegalStateException("Task " + ctx.task().id()
+                + " (" + ctx.task().type() + ") carries no namespace — it was submitted past the scope advisor"));
+    }
+
+    /** The scope a task record carries, if it was stamped — a monitor reading tasks of every namespace asks this. */
+    public static Optional<Scope> scopeIfAny(TaskRecord task) {
+        Map<String, Object> payload = task.payload();
         Object namespace = payload.get(NAMESPACE);
-        if (namespace == null) {
-            throw new IllegalStateException("Task " + ctx.task().id() + " (" + ctx.task().type()
-                    + ") carries no namespace — it was submitted past the scope advisor");
-        }
+        if (namespace == null) return Optional.empty();
         Object user = payload.get(USER);
-        return Scope.of(new Namespace(namespace.toString()), user == null ? null : UserId.of(user.toString()));
+        return Optional.of(Scope.of(new Namespace(namespace.toString()), user == null ? null : UserId.of(user.toString())));
     }
 }

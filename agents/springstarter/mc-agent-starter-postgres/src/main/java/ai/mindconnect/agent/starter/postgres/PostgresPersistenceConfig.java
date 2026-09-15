@@ -195,12 +195,13 @@ public class PostgresPersistenceConfig {
     // ── users ───────────────────────────────────────────────────────────────
 
     @Bean
-    ai.mindconnect.user.port.out.UserRepository userRepository(Sql mindconnectSql, ScopeSupplier scope) {
-        return NamespaceRouted.route(ai.mindconnect.user.port.out.UserRepository.class, scope, ns -> new ai.mindconnect.user.adapter.pg.PgUserRepository(mindconnectSql, ns).initSchema());
+    /** Installation-wide, not per namespace: a user is the same person in every namespace. */
+    ai.mindconnect.user.port.out.UserRepository userRepository(Sql mindconnectSql) {
+        return new ai.mindconnect.user.adapter.pg.PgUserRepository(mindconnectSql).initSchema();
     }
 
     @Bean
-    ai.mindconnect.user.port.out.ApiTokenRepository apiTokenRepository(Sql mindconnectSql, ScopeSupplier scope) {
-        return NamespaceRouted.route(ai.mindconnect.user.port.out.ApiTokenRepository.class, scope, ns -> new ai.mindconnect.user.adapter.pg.PgApiTokenRepository(mindconnectSql, ns).initSchema());
+    ai.mindconnect.user.port.out.ApiTokenRepository apiTokenRepository(Sql mindconnectSql) {
+        return new ai.mindconnect.user.adapter.pg.PgApiTokenRepository(mindconnectSql).initSchema();
     }
 }
