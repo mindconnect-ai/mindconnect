@@ -78,12 +78,24 @@ public class TaskMonitor implements TaskListener {
     /** One task, resolved into words for a person: what it does and for whom. */
     public record TaskView(TaskRecord task, String label, String detail, String owner, SessionId sessionId) {
         public String id() { return task.id(); }
+        /** The namespace the task was submitted in; empty for a task nobody stamped. */
+        public Optional<ai.mindconnect.agent.Namespace> namespace() {
+            return ScopeTaskAdvisor.scopeIfAny(task).map(ai.mindconnect.agent.Scope::namespace);
+        }
         public TaskStatus status() { return task.status(); }
         public boolean active() { return !task.status().terminal(); }
     }
 
     /** The whole board at one instant. */
     public record Snapshot(List<TaskView> active, List<TaskView> recent, Instant at) {
+        /** The board as one namespace sees it: its own tasks, plus any nobody stamped. */
+        public Snapshot in(ai.mindconnect.agent.Namespace namespace) {
+            if (namespace == null) return this;
+            return new Snapshot(
+                    active.stream().filter(v -> v.namespace().map(namespace::equals).orElse(true)).toList(),
+                    recent.stream().filter(v -> v.namespace().map(namespace::equals).orElse(true)).toList(),
+                    at);
+        }
         public int runningCount() { return count(TaskStatus.RUNNING); }
         public int queuedCount() { return count(TaskStatus.QUEUED); }
         public int suspendedCount() { return count(TaskStatus.SUSPENDED); }
@@ -191,10 +203,25 @@ public class TaskMonitor implements TaskListener {
 
     /** The badge's numbers right now, for the page render. */
     public Counts counts() {
-        int running = queue.byStatus(TaskStatus.RUNNING, QUERY_LIMIT).size();
-        int waiting = queue.byStatus(TaskStatus.QUEUED, QUERY_LIMIT).size()
-                + queue.byStatus(TaskStatus.SUSPENDED, QUERY_LIMIT).size();
+        return counts(null);
+    }
+
+    /** The badge's numbers as one namespace sees them; null counts everything. */
+    public Counts counts(ai.mindconnect.agent.Namespace namespace) {
+        int running = countIn(TaskStatus.RUNNING, namespace);
+        int waiting = countIn(TaskStatus.QUEUED, namespace) + countIn(TaskStatus.SUSPENDED, namespace);
         return new Counts(running, waiting);
+    }
+
+    private int countIn(TaskStatus status, ai.mindconnect.agent.Namespace namespace) {
+        List<TaskRecord> records = queue.byStatus(status, QUERY_LIMIT);
+        if (namespace == null) return records.size();
+        return (int) records.stream().filter(task -> inNamespace(task, namespace)).count();
+    }
+
+    /** Whether {@code task} belongs to {@code namespace} — or to nobody, which every namespace sees. */
+    static boolean inNamespace(TaskRecord task, ai.mindconnect.agent.Namespace namespace) {
+        return ScopeTaskAdvisor.scopeIfAny(task).map(s -> s.namespace().equals(namespace)).orElse(true);
     }
 
     /** The board right now — for the dialog; the stream sends the same. */

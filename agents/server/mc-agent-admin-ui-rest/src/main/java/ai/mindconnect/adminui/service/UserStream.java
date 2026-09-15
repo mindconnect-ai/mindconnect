@@ -72,6 +72,8 @@ public class UserStream {
     private final UserChannels userChannels;
     private final ObjectMapper objectMapper;
     private final Map<SseEmitter, Attached> attached = new ConcurrentHashMap<>();
+    /** The namespace a user chose last — asked on every board frame, so a switch shows without a reload. */
+    private final java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespace;
     private final ScheduledExecutorService pulse = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "user-stream-heartbeat");
         t.setDaemon(true);
@@ -79,9 +81,21 @@ public class UserStream {
     });
 
     public UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper) {
+        this(taskMonitor, userChannels, objectMapper, user -> Optional.empty());
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
+                      org.springframework.beans.factory.ObjectProvider<ai.mindconnect.user.service.UserService> users) {
+        this(taskMonitor, userChannels, objectMapper, activeNamespaceOf(users.getIfAvailable()));
+    }
+
+    UserStream(Optional<TaskMonitor> taskMonitor, UserChannels userChannels, ObjectMapper objectMapper,
+               java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespace) {
         this.taskMonitor = taskMonitor.orElse(null);
         this.userChannels = userChannels;
         this.objectMapper = objectMapper;
+        this.activeNamespace = activeNamespace;
         pulse.scheduleWithFixedDelay(this::heartbeat, HEARTBEAT_SECONDS, HEARTBEAT_SECONDS, TimeUnit.SECONDS);
     }
 
@@ -108,18 +122,29 @@ public class UserStream {
      * be the heartbeat, 20 seconds away.
      */
     public void attach(SseEmitter emitter, String userId) {
+        attach(emitter, userId, null);
+    }
+
+    /**
+     * @param attachedIn the namespace the attaching request works in — what the board
+     *                   shows until the user chooses another; null shows every namespace
+     */
+    public void attach(SseEmitter emitter, String userId, ai.mindconnect.agent.Namespace attachedIn) {
         try {
             emitter.send(SseEmitter.event().comment("attached"));
         } catch (Exception e) {
             log.debug("User stream for {} could not be opened: {}", userId, e.toString());
             return;
         }
+        UserId viewer = UserId.of(userId);
         Subscription tasks = taskMonitor == null ? null : taskMonitor.subscribe(event -> {
             try {
+                // The board as this viewer sees it: the namespace they chose last, else the one they attached in.
+                ai.mindconnect.agent.Namespace namespace = activeNamespace.apply(viewer).orElse(attachedIn);
                 emitter.send(SseEmitter.event()
                         .id(Long.toString(event.seq()))
                         .name("patch")
-                        .data(json(TaskMonitorComponent.livePatch(event.value(), userId))));
+                        .data(json(TaskMonitorComponent.livePatch(event.value().in(namespace), userId))));
             } catch (Exception e) {
                 detach(emitter);
             }
@@ -137,6 +162,11 @@ public class UserStream {
         Attached previous = attached.put(emitter, new Attached(tasks, events));
         if (previous != null) previous.close();
         log.debug("User stream attached for {} — {} open", userId, attached.size());
+    }
+
+    private static java.util.function.Function<UserId, Optional<ai.mindconnect.agent.Namespace>> activeNamespaceOf(
+            ai.mindconnect.user.service.UserService users) {
+        return users == null ? user -> Optional.empty() : users::activeNamespace;
     }
 
     public void detach(SseEmitter emitter) {

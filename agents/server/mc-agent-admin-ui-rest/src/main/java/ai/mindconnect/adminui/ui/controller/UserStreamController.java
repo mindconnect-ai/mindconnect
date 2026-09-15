@@ -20,7 +20,10 @@ public class UserStreamController {
 
     private final UserStream userStream;
 
-    public UserStreamController(UserStream userStream) {
+    private final ai.mindconnect.agent.ScopeSupplier scope;
+
+    public UserStreamController(UserStream userStream, ai.mindconnect.agent.ScopeSupplier scope) {
+        this.scope = scope;
         this.userStream = userStream;
     }
 
@@ -29,7 +32,7 @@ public class UserStreamController {
         // Long-lived: it outlives every turn and every navigation. Idle time
         // is covered by the heartbeat.
         SseEmitter emitter = new SseEmitter(0L);
-        userStream.attach(emitter, userId(user));
+        userStream.attach(emitter, userId(user), scope.namespace());
         emitter.onCompletion(() -> userStream.detach(emitter));
         emitter.onError(t -> userStream.detach(emitter));
         emitter.onTimeout(() -> userStream.detach(emitter));

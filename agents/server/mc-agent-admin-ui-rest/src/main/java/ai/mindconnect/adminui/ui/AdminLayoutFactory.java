@@ -85,7 +85,7 @@ public class AdminLayoutFactory {
      */
     public AdminLayout current() {
         AdminLayout layout = new AdminLayout(currentUserName(), authEnabled, buildInfo.label(),
-                taskMonitor == null ? null : TaskMonitorComponent.badge(taskMonitor.counts()),
+                taskMonitor == null ? null : TaskMonitorComponent.badge(taskMonitor.counts(currentNamespace())),
                 UiPage.ActiveStream.of(UserStream.CHANNEL_ID, UserStream.STREAM_URL,
                         "Live updates", "/admin/agents"),
                 mcpRegistryAdmin.getIfAvailable() != null,
@@ -107,6 +107,12 @@ public class AdminLayoutFactory {
                 .findFirst().orElse(active.value());
         return Optional.of(new AdminLayout.NamespaceSwitch(active.value(), activeLabel,
                 mine.stream().map(ns -> new AdminLayout.NamespaceSwitch.Entry(ns.id().value(), ns.label())).toList()));
+    }
+
+    /** The namespace the request works in; null (everything) for a host without namespaces. */
+    private Namespace currentNamespace() {
+        ScopeSupplier current = scope.getIfAvailable();
+        return current == null ? null : current.namespace();
     }
 
     private String currentUserName() {

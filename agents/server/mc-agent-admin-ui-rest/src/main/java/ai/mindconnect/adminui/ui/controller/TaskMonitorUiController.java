@@ -24,16 +24,18 @@ import org.springframework.web.bind.annotation.RestController;
 public class TaskMonitorUiController {
 
     private final TaskMonitor monitor;
+    private final ai.mindconnect.agent.ScopeSupplier scope;
 
-    public TaskMonitorUiController(TaskMonitor monitor) {
+    public TaskMonitorUiController(TaskMonitor monitor, ai.mindconnect.agent.ScopeSupplier scope) {
         this.monitor = monitor;
+        this.scope = scope;
     }
 
     /** Opens the dialog with the board as it is right now. */
     @GetMapping
     public UiPatch open(@AuthenticationPrincipal OidcUser user) {
         UiDialog dialog = UiDialog.of("Task queue", null,
-                TaskMonitorComponent.body(monitor.snapshot(), userId(user)));
+                TaskMonitorComponent.body(monitor.snapshot().in(scope.namespace()), userId(user)));
         dialog.setId(TaskMonitorComponent.DIALOG_ID);
         return UiPatch.of()
                 .patch(UiPatch.Operation.remove(TaskMonitorComponent.DIALOG_ID))
