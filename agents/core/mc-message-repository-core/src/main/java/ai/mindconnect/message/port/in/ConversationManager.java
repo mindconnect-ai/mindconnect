@@ -98,4 +98,10 @@ public interface ConversationManager {
      * @return number of messages deleted
      */
     int deleteMessages(ConversationId conversation, int fromSeq, int toSeq);
+
+    /**
+     * Permanently deletes the conversation with all its messages. Unknown
+     * conversations are a no-op — a delete that finds nothing has succeeded.
+     */
+    void deleteConversation(ConversationId conversation);
 }

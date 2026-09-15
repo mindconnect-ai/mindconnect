@@ -125,6 +125,12 @@ public class ConversationService implements ConversationManager {
         return count;
     }
 
+    @Override
+    public void deleteConversation(ConversationId conversation) {
+        messageRepository.deleteByConversation(conversation);
+        conversationRepository.deleteById(conversation);
+    }
+
     private void requireConversation(ConversationId conversation) {
         conversationRepository.findById(conversation)
                 .orElseThrow(() -> DomainException.notFound("Conversation", conversation.toString()));

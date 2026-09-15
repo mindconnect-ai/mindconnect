@@ -76,4 +76,9 @@ public class InMemoryMessageRepository implements MessageRepository {
         store.removeIf(m -> m.conversationId().equals(conversationId)
                 && m.sequenceNum() >= fromSeq && m.sequenceNum() <= toSeq);
     }
+
+    @Override
+    public void deleteByConversation(ConversationId conversationId) {
+        store.removeIf(m -> m.conversationId().equals(conversationId));
+    }
 }

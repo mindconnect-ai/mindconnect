@@ -34,4 +34,9 @@ public class InMemoryConversationRepository implements ConversationRepository {
                 .limit(page.size())
                 .toList();
     }
+
+    @Override
+    public void deleteById(ConversationId id) {
+        store.remove(id);
+    }
 }

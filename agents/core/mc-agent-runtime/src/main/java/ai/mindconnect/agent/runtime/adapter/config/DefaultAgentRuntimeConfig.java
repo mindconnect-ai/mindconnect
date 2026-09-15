@@ -461,10 +461,11 @@ public class DefaultAgentRuntimeConfig {
                                              ToolApprovalStore approvalStore,
                                              UserChannels userChannels,
                                              ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy,
-                                             ai.mindconnect.agent.runtime.service.UserHome userHome) {
+                                             ai.mindconnect.agent.runtime.service.UserHome userHome,
+                                             LlmCallTraceRepository traceRepository) {
         return new AgentSessionService(definitionRepository, sessionRepository,
                 conversationManager, workingMemoryRepository, conversationSummaryRepository,
-                todoListRepository, approvalStore, userChannels, workingDirPolicy, userHome);
+                todoListRepository, approvalStore, userChannels, workingDirPolicy, userHome, traceRepository);
     }
 
     /**

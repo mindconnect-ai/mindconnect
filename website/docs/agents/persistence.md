@@ -72,7 +72,13 @@ single-node deployments.
 
 Besides the file adapters there is a full **in-memory** family
 (`InMemoryAgentSessionRepository`, `InMemoryMessageRepository`, …) used by the
-Spring-free `AgentRuntimeBuilder` and in tests.
+Spring-free `AgentRuntimeBuilder` and in tests. Two of them are bounded so that a
+long-lived embedded runtime does not grow with every turn: the trace store keeps
+at most 50 LLM call traces per conversation (the file store's cap), and the
+builder tells its task queue to forget finished task trees at the next
+maintenance tick — `taskRetention(Duration)` keeps them longer, `null` for the
+life of the process. Deleting a session takes its conversation, messages and
+traces with it, in every persistence mode.
 
 ## Postgres
 
