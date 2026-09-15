@@ -1,150 +1,152 @@
 package ai.mindconnect.agent.builder;
 
-import ai.mindconnect.agent.runtime.adapter.file.FileAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
-import ai.mindconnect.agent.runtime.adapter.file.FileConversationSummaryRepository;
-import ai.mindconnect.agent.runtime.adapter.file.FileTodoListRepository;
-import ai.mindconnect.agent.runtime.adapter.file.FileWorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.adapter.llm.LlmToolResultSummarizer;
-import ai.mindconnect.agent.runtime.adapter.file.FileLlmCallTraceRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.*;
-import ai.mindconnect.agent.runtime.adapter.token.TokenCounterRegistry;
-import ai.mindconnect.agent.runtime.adapter.rule.RuleBasedToolResultSummarizer;
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
-import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategyFactory;
-import ai.mindconnect.agent.runtime.port.out.PromptContextProvider;
-import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.memory.strategy.DefaultMemoryStrategyFactory;
 import ai.mindconnect.agent.runtime.adapter.filestore.FileStorePartContentReader;
-import ai.mindconnect.agent.runtime.adapter.pg.*;
-import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.port.out.ToolResultSummarizer;
+import ai.mindconnect.agent.runtime.adapter.llm.LlmToolResultSummarizer;
+import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
+import ai.mindconnect.agent.runtime.adapter.rule.RuleBasedToolResultSummarizer;
+import ai.mindconnect.agent.runtime.adapter.token.TokenCounterRegistry;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.feature.BeansToolEnvironment;
+import ai.mindconnect.agent.runtime.feature.DefaultFeatureContext;
+import ai.mindconnect.agent.runtime.feature.DefaultRuntimeBeans;
+import ai.mindconnect.agent.runtime.feature.FeatureException;
+import ai.mindconnect.agent.runtime.feature.FeatureRegistry;
+import ai.mindconnect.agent.runtime.feature.Persistence;
+import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
+import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategyFactory;
+import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
+import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
+import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmMessageMapper;
 import ai.mindconnect.agent.runtime.port.out.PartContentReader;
-import ai.mindconnect.agent.runtime.service.MessageToLlmMessageMapper;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
-import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
-import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
-import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
+import ai.mindconnect.agent.runtime.port.out.PromptContextProvider;
+import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
+import ai.mindconnect.agent.runtime.port.out.TokenCounters;
+import ai.mindconnect.agent.runtime.port.out.ToolResultSummarizer;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
-import ai.mindconnect.agent.tool.MapToolEnvironment;
-import ai.mindconnect.agent.tool.SpiToolRegistry;
+import ai.mindconnect.agent.runtime.service.MessageToLlmMessageMapper;
+import ai.mindconnect.agent.runtime.service.StatelessAgentSeeder;
 import ai.mindconnect.agent.runtime.service.StatelessAgentTaskRunner;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
-import ai.mindconnect.agent.tool.ToolRegistryRef;
-import ai.mindconnect.agent.memory.strategy.DefaultMemoryStrategyFactory;
+import ai.mindconnect.agent.runtime.service.UserHome;
+import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
+import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
-import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
-import ai.mindconnect.agent.runtime.port.out.TokenCounters;
+import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
+import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
+import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
-import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
-import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
-import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
-import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
-import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
-import ai.mindconnect.llm.adapter.openai.OpenAiEmbeddingsGateway;
+import ai.mindconnect.agent.runtime.skill.SkillCatalog;
+import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
+import ai.mindconnect.agent.tool.ToolAdvisor;
+import ai.mindconnect.agent.tool.ToolEnvironment;
+import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.port.in.LlmChat;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmGateway;
-import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
-import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.message.port.in.ConversationManager;
-import ai.mindconnect.message.port.out.MessageRepository;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.taskqueue.LoggingTaskListener;
+import ai.mindconnect.taskqueue.TaskQueue;
+import ai.mindconnect.taskqueue.local.LocalTaskQueue;
+import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import okhttp3.OkHttpClient;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.function.Consumer;
 
 /**
- * Assembles a complete, Spring-free {@link AgentRuntime} — the same object
- * graph the Spring apps wire via beans, built by hand so the runtime embeds
- * in any plain Java program:
+ * Assembles an {@link AgentRuntime} without Spring, the way an
+ * {@code ObjectMapper} is assembled: a core plus the {@link RuntimeFeature
+ * features} installed into it.
  *
  * <pre>{@code
- * try (AgentRuntime runtime = AgentRuntimeBuilder.useFilePersistence(Path.of("data"))
- *         .llmConfig(LlmConfig.lmStudio("chat", "google/gemma-4-e4b", "http://localhost:1234"))
- *         .agentDefinitionFromClasspath("demo-agent.json")
+ * try (AgentRuntime runtime = AgentRuntimeBuilder.useFilePersistence(Path.of("./data"))
+ *         .llmConfigFromClasspath("llm/openai.json")
+ *         .agentDefinitionFromClasspath("agents/demo-agent.json")
  *         .build()) {
  *     System.out.println(runtime.ask("demo-agent", "user", "Hello?", e -> {}));
  * }
  * }</pre>
  *
- * <p>Every aspect is configurable here, but the capability modules stay
- * optional Maven dependencies: tools are discovered via SPI from whatever
- * {@code mc-agent-tools-*} / {@code mc-vector-store-*} modules the client put
- * on its classpath, and their settings travel as plain environment strings
- * ({@link #property(String, String)} plus the named shortcuts). Typed APIs
- * that reference optional modules (e.g. {@link AgentRuntime#attachFile}) link
- * only when those modules are present.
+ * <p>The {@code use…} factories are batteries included: they install every
+ * feature module on the classpath ({@link #installFromClasspath()}) — the
+ * {@code mc-agent-runtime-feature-*} modules a client puts in its pom are the
+ * features its runtime has, each bringing its own capability modules. {@link #of(Persistence)} starts with the smallest runtime that
+ * chats — the turn loop with {@link CoreFeature}: LLM, messages, agents — and
+ * every further feature is an explicit {@link #install}. A feature installed
+ * under the name of one already there replaces it — that is how a configured
+ * instance takes the place of a default:
+ *
+ * <pre>{@code
+ * AgentRuntimeBuilder.useInMemoryPersistence()
+ *         .install(new CoreFeature().encryptionKey(key).llmConfig(openAi))
+ *         .install(new ToolsFeature().disabled("bash"))
+ *         .build();
+ * }</pre>
+ *
+ * <p>Settings that are plain strings ({@link #property}) reach every feature
+ * and the tools' environment; the named shortcuts below set the ones the
+ * shipped features read.
  */
-public final class AgentRuntimeBuilder {
+public class AgentRuntimeBuilder {
 
-    /** Persistence backend. */
-    private enum Mode { FILE, IN_MEMORY, POSTGRES }
-
-    private final Mode mode;
-    private final Path dataDir;   // in IN_MEMORY mode: a temp dir for file-rooted side channels
-    private final javax.sql.DataSource dataSource;   // POSTGRES only
+    private final Persistence persistence;
+    private final DefaultRuntimeBeans beans = new DefaultRuntimeBeans();
+    private final FeatureRegistry features = new FeatureRegistry();
+    private final AgentRuntime runtime = new AgentRuntime(beans, features);
+    private final DefaultFeatureContext context;
     private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private String namespaceName = Namespace.DEFAULT.value();
-    private String defaultLlmConfigName;
-    private String encryptionKey;
     private String toolResultSummarizer = "rule";
     /** null → the default mapper, reading media parts from the runtime's file store. */
     private LlmMessageMapper llmMessageMapper;
-    private final Map<String, String> environment = new LinkedHashMap<>();
-    private final List<LlmConfig> pendingLlmConfigs = new ArrayList<>();
-    private final List<AgentDefinition> pendingAgentDefinitions = new ArrayList<>();
-    private final List<ai.mindconnect.agent.runtime.skill.Skill> pendingSkills = new ArrayList<>();
-    private final List<String> pendingWorkflowResources = new ArrayList<>();
+    private boolean built;
 
-    private AgentRuntimeBuilder(Mode mode, Path dataDir) {
-        this(mode, dataDir, null);
+    private AgentRuntimeBuilder(Persistence persistence) {
+        this.persistence = persistence;
+        this.context = new DefaultFeatureContext(runtime, beans, persistence, objectMapper);
+        runtime.context(context);
+        context.property("defaultBaseDir", System.getProperty("user.home"));
+        context.property("dataBaseDir", persistence.dataDir().toString());
     }
 
-    private AgentRuntimeBuilder(Mode mode, Path dataDir, javax.sql.DataSource dataSource) {
-        this.mode = mode;
-        this.dataDir = dataDir;
-        this.dataSource = dataSource;
-        environment.put("defaultBaseDir", System.getProperty("user.home"));
-        environment.put("dataBaseDir", dataDir.toString());
+    // ── starting points ────────────────────────────────────────────────────
+
+    /**
+     * The smallest runtime that chats: the turn loop with {@link CoreFeature} —
+     * LLM, messages, agents; no tools, no skills. Every further feature is an
+     * explicit {@link #install}; the core one is reached with {@link #feature}
+     * to configure, or replaced by installing an instance of its class.
+     */
+    public static AgentRuntimeBuilder of(Persistence persistence) {
+        return new AgentRuntimeBuilder(persistence).install(new CoreFeature());
     }
 
-    /** Starts a builder with file persistence rooted at {@code dataDir}. */
+    /** Starts a builder with file persistence rooted at {@code dataDir}, every shipped feature installed. */
     public static AgentRuntimeBuilder useFilePersistence(Path dataDir) {
-        return new AgentRuntimeBuilder(Mode.FILE, dataDir);
+        return of(Persistence.file(dataDir)).installFromClasspath();
     }
 
     /**
@@ -154,12 +156,12 @@ public final class AgentRuntimeBuilder {
      * files, code-execution scratch — that have no database form.
      */
     public static AgentRuntimeBuilder usePostgres(javax.sql.DataSource dataSource, Path dataDir) {
-        return new AgentRuntimeBuilder(Mode.POSTGRES, dataDir, dataSource);
+        return of(Persistence.postgres(dataSource, dataDir)).installFromClasspath();
     }
 
     /** File persistence under a fresh temp directory (deleted by the OS, not by us). */
     public static AgentRuntimeBuilder useTempPersistence() {
-        return new AgentRuntimeBuilder(Mode.FILE, tempDir());
+        return useFilePersistence(tempDir());
     }
 
     /**
@@ -169,7 +171,7 @@ public final class AgentRuntimeBuilder {
      * still use a temp directory when their optional modules are present.
      */
     public static AgentRuntimeBuilder useInMemoryPersistence() {
-        return new AgentRuntimeBuilder(Mode.IN_MEMORY, tempDir());
+        return of(Persistence.inMemory(tempDir())).installFromClasspath();
     }
 
     private static Path tempDir() {
@@ -178,6 +180,49 @@ public final class AgentRuntimeBuilder {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    // ── features ───────────────────────────────────────────────────────────
+
+    /**
+     * Installs a feature. Its {@link RuntimeFeature#dependsOn() dependencies}
+     * must already be installed — a missing one is an error here, not an
+     * auto-install. A feature of a name already installed replaces it.
+     */
+    public AgentRuntimeBuilder install(RuntimeFeature feature) {
+        requireNotBuilt();
+        features.install(feature);
+        return this;
+    }
+
+    /**
+     * Installs every {@link RuntimeFeature} registered as a service
+     * ({@code META-INF/services/ai.mindconnect.agent.runtime.feature.RuntimeFeature})
+     * on the classpath, sorted by their dependencies — the way Jackson's
+     * {@code findAndRegisterModules} finds modules. Features already installed
+     * under the same name are kept, so a configured instance wins over a
+     * discovered default.
+     */
+    public AgentRuntimeBuilder installFromClasspath() {
+        requireNotBuilt();
+        List<RuntimeFeature> found = new ArrayList<>();
+        ServiceLoader.load(RuntimeFeature.class).forEach(feature -> {
+            if (features.byName(feature.name()).isEmpty()) found.add(feature);
+        });
+        features.installAll(found);
+        return this;
+    }
+
+    /** Configures an installed feature in place — a default one, or one installed earlier. */
+    public <F extends RuntimeFeature> AgentRuntimeBuilder configure(Class<F> feature, Consumer<F> configurer) {
+        requireNotBuilt();
+        configurer.accept(features.get(feature));
+        return this;
+    }
+
+    /** The installed feature of the given class — the same instance {@code runtime.feature(type)} returns after {@link #build()}. */
+    public <F extends RuntimeFeature> F feature(Class<F> type) {
+        return features.get(type);
     }
 
     // ── core settings ──────────────────────────────────────────────────────
@@ -195,91 +240,48 @@ public final class AgentRuntimeBuilder {
 
     /** LLM config for internal stateless tasks; defaults to the single registered config. */
     public AgentRuntimeBuilder defaultLlmConfigName(String name) {
-        this.defaultLlmConfigName = name;
-        return this;
+        return configure(CoreFeature.class, core -> core.defaultLlmConfigName(name));
     }
 
-    /** Enables at-rest encryption of stored LLM API keys (16-char AES key). */
     public AgentRuntimeBuilder encryptionKey(String secretKey) {
-        this.encryptionKey = secretKey;
-        return this;
+        return configure(CoreFeature.class, core -> core.encryptionKey(secretKey));
     }
 
-    /** {@code "rule"} (default, no LLM) or {@code "llm"} for tool-result summarization. */
+    /** {@code rule} (default) or {@code llm}: how oversized tool results are shortened. */
     public AgentRuntimeBuilder toolResultSummarizer(String type) {
         this.toolResultSummarizer = type;
         return this;
     }
 
-    /**
-     * How stored messages read to the model; the default renders text, tool
-     * calls, results, attachment notices, and image / document parts as
-     * content blocks when the model reads them.
-     */
     public AgentRuntimeBuilder llmMessageMapper(LlmMessageMapper mapper) {
         this.llmMessageMapper = mapper;
         return this;
     }
 
-    // ── tool environment (plain strings — works without optional modules) ──
+    // ── properties (plain strings — reach every feature and the tools) ─────
 
-    /**
-     * Sets one tool-environment string — the same keys the Spring apps feed
-     * from {@code mindconnect.*} properties: {@code defaultBaseDir},
-     * {@code tavilyApiKey}, {@code codeExecRuntime},
-     * {@code vectorStoreBackend}, {@code vectorStoreEmbeddingConfig}, ...
-     */
     public AgentRuntimeBuilder property(String key, String value) {
-        environment.put(key, value);
+        requireNotBuilt();
+        context.property(key, value);
         return this;
     }
 
-    /** Base directory file-rooted tools operate in (default: user home). */
     public AgentRuntimeBuilder toolsBaseDir(Path dir) {
         return property("defaultBaseDir", dir.toString());
     }
 
-    /**
-     * The root a session's working directory must lie under (default: the
-     * tools' base directory). {@code Path.of("/")} lets a session work
-     * anywhere — right for one user on their own machine, not for a server.
-     */
     public AgentRuntimeBuilder workingDirRoot(Path root) {
         return property("workingDirRoot", root.toString());
     }
 
-    /**
-     * Where each user's directory lives — a path with {@code {user}} in it.
-     * A session opened without a working directory works in its own
-     * directory under there, and its uploads are put there for the file
-     * tools. By default {@code <dataDir>/<namespace>/home/{user}}.
-     */
     public AgentRuntimeBuilder usersHome(String template) {
         return property("usersHome", template);
     }
 
-    /** The users' home for an environment: {@code usersHome} when set, else under the namespace's data directory. */
-    static ai.mindconnect.agent.runtime.service.UserHome userHomeOf(Map<String, String> environment, String namespace) {
-        String template = environment.get("usersHome");
-        return template != null && !template.isBlank()
-                ? ai.mindconnect.agent.runtime.service.UserHome.of(template)
-                : ai.mindconnect.agent.runtime.service.UserHome.under(
-                        Path.of(environment.get("dataBaseDir")).resolve(namespace));
-    }
-
-    /**
-     * Tools this runtime does not offer, whatever an agent names — on a
-     * shared server {@code bash} and {@code process_kill}, which nothing
-     * confines to a chat's directory.
-     */
     public AgentRuntimeBuilder disabledTools(String... toolNames) {
         return property("disabledTools", String.join(",", toolNames));
     }
 
-    /**
-     * Whether a user may choose a session's directories. Off, every session
-     * works in its own directory under the users' home and nothing else.
-     */
     public AgentRuntimeBuilder workingDirChoice(boolean allowed) {
         return property("workingDirChoice", Boolean.toString(allowed));
     }
@@ -288,17 +290,14 @@ public final class AgentRuntimeBuilder {
         return property("tavilyApiKey", key);
     }
 
-    /** Container runtime for code execution: {@code auto} | {@code docker} | {@code podman}. */
     public AgentRuntimeBuilder codeExecutionRuntime(String runtime) {
         return property("codeExecRuntime", runtime);
     }
 
-    /** Vector store backend ({@code memory} | {@code pgvector}) for the knowledge tools. */
     public AgentRuntimeBuilder vectorStoreBackend(String backend) {
         return property("vectorStoreBackend", backend);
     }
 
-    /** Name of the LlmConfig used for embeddings (default {@code embeddings}). */
     public AgentRuntimeBuilder embeddingConfigName(String name) {
         return property("vectorStoreEmbeddingConfig", name);
     }
@@ -306,8 +305,7 @@ public final class AgentRuntimeBuilder {
     // ── seeding ────────────────────────────────────────────────────────────
 
     public AgentRuntimeBuilder llmConfig(LlmConfig config) {
-        pendingLlmConfigs.add(config);
-        return this;
+        return configure(CoreFeature.class, core -> core.llmConfig(config));
     }
 
     public AgentRuntimeBuilder llmConfigFromClasspath(String resource) {
@@ -315,295 +313,160 @@ public final class AgentRuntimeBuilder {
     }
 
     public AgentRuntimeBuilder agentDefinition(AgentDefinition definition) {
-        pendingAgentDefinitions.add(definition);
-        return this;
+        return configure(CoreFeature.class, core -> core.agentDefinition(definition));
     }
 
     public AgentRuntimeBuilder agentDefinitionFromClasspath(String resource) {
         return agentDefinition(readClasspath(resource, AgentDefinition.class));
     }
 
-    /** Stores a skill agents with skills switched on can load. */
-    public AgentRuntimeBuilder skill(ai.mindconnect.agent.runtime.skill.Skill skill) {
-        pendingSkills.add(skill);
-        return this;
-    }
-
-    /**
-     * Stores a skill written as a {@code SKILL.md} on the classpath — front
-     * matter for name and description, the body for the instructions. The
-     * resource's base name is the fallback name when the front matter names
-     * none.
-     */
-    public AgentRuntimeBuilder skillFromClasspath(String resource) {
-        String fileName = Path.of(resource).getFileName().toString();
-        String fallback = fileName.endsWith(".md") ? fileName.substring(0, fileName.length() - 3) : fileName;
-        String content;
-        try (InputStream in = classpath(resource)) {
-            content = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to read classpath resource: " + resource, e);
-        }
-        var skill = ai.mindconnect.agent.runtime.skill.Skill.fromMarkdown(fallback, content,
-                ai.mindconnect.agent.runtime.skill.SkillSource.MANAGED, null);
-        if (skill == null) {
-            throw new IllegalArgumentException("Not a usable SKILL.md (no instructions, or a name that is "
-                    + "not lower-case letters, digits and dashes): " + resource);
-        }
-        return skill(skill);
-    }
-
-    /**
-     * Copies a workflow JSON from the classpath into the workflow directory
-     * (file name = resource base name) — e.g. the {@code file-ingestion}
-     * pipeline the attach support runs. Needs {@code mc-agent-tools-workflow}
-     * for workflows-as-tools and {@code mc-workflow-admin-rest} for
-     * {@link AgentRuntime#attachFile}.
-     */
-    public AgentRuntimeBuilder workflowFromClasspath(String resource) {
-        pendingWorkflowResources.add(resource);
-        return this;
-    }
+    // Skills and workflows are seeded on their features: builder.feature(SkillsFeature.class).skillFromClasspath(...),
+    // builder.feature(WorkflowsFeature.class).seed(...) — those modules are optional, so the builder does not name them.
 
     // ── build ──────────────────────────────────────────────────────────────
 
+    /**
+     * Configures every installed feature in installation order, wires the core
+     * around their beans, runs the start hooks and freezes the registry.
+     */
     public AgentRuntime build() {
-        boolean inMemory = mode == Mode.IN_MEMORY;
-        // One Sql for every Postgres store, around this builder's mapper, so
-        // the documents in the database are the JSON the file store writes.
-        ai.mindconnect.jdbc.Sql sql = mode == Mode.POSTGRES
-                ? ai.mindconnect.jdbc.Sql.of(dataSource, new ai.mindconnect.jdbc.Json(objectMapper))
-                : null;
-
-        // 1. Persistence — file-based rooted at dataDir, Postgres, or purely in-memory;
-        //    every store is bound to the one namespace this runtime runs in.
-        Namespace namespace = new Namespace(namespaceName);
-        WorkingMemoryRepository workingMemoryRepository = inMemory
-                ? new InMemoryWorkingMemoryRepository()
-                : sql != null ? new PgWorkingMemoryRepository(sql, namespace).initSchema()
-                : new FileWorkingMemoryRepository(dataDir, namespace);
-        ConversationSummaryRepository summaryRepository = inMemory
-                ? new InMemoryConversationSummaryRepository()
-                : sql != null ? new PgConversationSummaryRepository(sql, namespace).initSchema()
-                : new FileConversationSummaryRepository(dataDir, namespace);
-        TodoListRepository todoListRepository = inMemory
-                ? new InMemoryTodoListRepository()
-                : sql != null ? new PgTodoListRepository(sql, namespace).initSchema()
-                : new FileTodoListRepository(dataDir, namespace);
-        ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository = inMemory
-                ? new ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository()
-                : sql != null ? new ai.mindconnect.agent.runtime.adapter.pg.PgSkillRepository(sql, namespace).initSchema()
-                : new ai.mindconnect.agent.runtime.adapter.file.FileSkillRepository(dataDir, objectMapper, namespace);
-        AgentDefinitionRepository definitionRepository = inMemory
-                ? new InMemoryAgentDefinitionRepository()
-                : sql != null ? new PgAgentDefinitionRepository(sql, namespace).initSchema()
-                : new FileAgentDefinitionRepository(dataDir, objectMapper, namespace);
-        AgentSessionRepository sessionRepository = inMemory
-                ? new InMemoryAgentSessionRepository()
-                : sql != null ? new PgAgentSessionRepository(sql, namespace).initSchema()
-                : new FileAgentSessionRepository(dataDir, objectMapper, namespace);
-
-        // 2. Messages / conversations.
-        ConversationManager conversationManager;
-        MessageRepository messageRepository;
-        if (inMemory) {
-            var messageStore = new ai.mindconnect.message.adapter.memory.InMemoryMessageStore();
-            conversationManager = messageStore.conversationManager();
-            messageRepository = messageStore.messageRepository();
-        } else if (sql != null) {
-            var conversationRepository = new ai.mindconnect.message.adapter.pg.PgConversationRepository(sql, namespace).initSchema();
-            messageRepository = new ai.mindconnect.message.adapter.pg.PgMessageRepository(sql, namespace).initSchema();
-            conversationManager = new ai.mindconnect.message.service.ConversationService(
-                    conversationRepository, messageRepository);
-        } else {
-            var conversationRepository = new ai.mindconnect.message.adapter.file.FileConversationRepository(dataDir, objectMapper, namespace);
-            messageRepository = new ai.mindconnect.message.adapter.file.FileMessageRepository(dataDir, objectMapper, namespace);
-            conversationManager = new ai.mindconnect.message.service.ConversationService(
-                    conversationRepository, messageRepository);
+        requireNotBuilt();
+        built = true;
+        registerCoreSettings();
+        for (RuntimeFeature feature : features.all()) {
+            feature.configure(context);
         }
-
-        // 3. LLM layer: encrypted config repo + routing chat over all gateways.
-        EncryptionHelper encryption = new EncryptionHelper(encryptionKey);
-        // Without a key, skip the encrypting wrapper entirely — api keys are
-        // then stored plain, which the builder javadoc calls out.
-        LlmConfigRepository baseLlmConfigRepository = inMemory
-                ? new ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository()
-                : sql != null ? new ai.mindconnect.llm.adapter.pg.PgLlmConfigRepository(sql, namespace).initSchema()
-                : new FileLlmConfigRepository(dataDir, namespace);
-        LlmConfigRepository llmConfigRepository = encryptionKey == null
-                ? baseLlmConfigRepository
-                : new EncryptingLlmConfigRepository(baseLlmConfigRepository, encryption);
-        // Workflows follow the same switch when the workflow modules are on
-        // the classpath; otherwise (and in file mode) they stay files.
-        ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows =
-                sql != null && PostgresWorkflows.present() ? PostgresWorkflows.open(sql, namespace.value()) : null;
-        OkHttpClient httpClient = new OkHttpClient.Builder()
-                .connectTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(120, TimeUnit.SECONDS)
-                .writeTimeout(30, TimeUnit.SECONDS)
-                .build();
-        var openAi = new OpenAiCompatibleGateway(httpClient, objectMapper, encryption);
-        var claude = new ClaudeGateway(httpClient, objectMapper, encryption);
-        var azure = new AzureOpenAiGateway(httpClient, objectMapper, encryption);
-        var gemini = new GeminiGateway(httpClient, objectMapper, encryption);
-        Map<LlmProvider, LlmGateway> gateways = new HashMap<>();
-        for (LlmProvider provider : LlmProvider.values()) {
-            gateways.put(provider, openAi);   // OpenAI-compatible is the safe default
-        }
-        gateways.put(LlmProvider.ANTHROPIC, claude);
-        gateways.put(LlmProvider.AZURE_OPENAI, azure);
-        gateways.put(LlmProvider.GOOGLE_GEMINI, gemini);
-        LlmChat llmChat = new RoutingLlmChatService(llmConfigRepository, new DefaultLlmGatewayRegistry(gateways));
-        LlmEmbeddings embeddings = new OpenAiEmbeddingsGateway(httpClient, objectMapper, encryption);
-
-        // 4. Prompting, memory, stateless tasks.
-        TodoListService todoListService = new TodoListService(todoListRepository);
-        TokenCounters tokenCounterRegistry = new TokenCounterRegistry();
-        List<PromptContextProvider> promptProviders = List.of(
-                new CurrentDateProvider(), new AgentMetadataProvider(),
-                new AgentToolsProvider());
-        PromptRenderer promptRenderer = new PebblePromptRenderer(promptProviders);
-        AgentTaskRunner statelessRunner = new StatelessAgentTaskRunner(
-                definitionRepository, llmChat, resolveDefaultLlmConfigName(), promptRenderer,
-                new ai.mindconnect.agent.runtime.service.StatelessAgentSeeder(
-                        definitionRepository, llmConfigRepository, resolveDefaultLlmConfigName()));
-        ToolResultSummarizer summarizer = "llm".equalsIgnoreCase(toolResultSummarizer)
-                ? new LlmToolResultSummarizer(statelessRunner) : new RuleBasedToolResultSummarizer();
-        // The file store — Postgres, or the filesystem one when the file-store
-        // module is present — feeds media parts to the mapper and, further
-        // down, the attach support. Opened once, shared by both.
-        ai.mindconnect.filestore.FileStore fileStore = sql != null && PostgresFileStore.present()
-                ? PostgresFileStore.open(sql, namespace)
-                : AttachSupport.defaultFileStoreIfPresent(environment, namespace);
-        LlmMessageMapper messageMapper = llmMessageMapper != null
-                ? llmMessageMapper
-                : new MessageToLlmMessageMapper(fileStore != null
-                        ? new FileStorePartContentReader(fileStore)
-                        : PartContentReader.none());
-        MemoryStrategyFactory memoryStrategyFactory = new DefaultMemoryStrategyFactory(
-                conversationManager, summaryRepository, summarizer, statelessRunner,
-                tokenCounterRegistry, llmConfigRepository, messageMapper);
-
-        // 5. Tools: SPI over whatever capability modules are on the classpath.
-        // What an agent with skills switched on can load: the stored skills,
-        // the user's own SKILL.md files and the session project's. See SkillCatalog.
-        var skillCatalog = ai.mindconnect.agent.runtime.skill.SkillCatalog.of(
-                skillRepository, environment.getOrDefault("skillsUserDir", ""));
-        DynamicToolActivations activations = new DynamicToolActivations(sessionRepository, skillCatalog);
-        ToolRegistryRef registryRef = new ToolRegistryRef();
-        MapToolEnvironment.Builder env = MapToolEnvironment.builder()
-                .service(AgentDefinitionRepository.class, definitionRepository)
-                .service(AgentSessionRepository.class, sessionRepository)
-                .service(MessageRepository.class, messageRepository)
-                .service(ai.mindconnect.message.port.in.ConversationManager.class, conversationManager)
-                .service(TodoListService.class, todoListService)
-                .service(ai.mindconnect.agent.runtime.skill.SkillCatalog.class, skillCatalog)
-                .service(ToolRegistryRef.class, registryRef)
-                .service(DynamicToolActivations.class, activations)
-                .service(LlmEmbeddings.class, embeddings)
-                .service(LlmConfigRepository.class, llmConfigRepository)
-                // Where this runtime works — one namespace for its whole life. Tools that
-                // open stores of their own (vector, workflow) take the namespace directly.
-                .service(ScopeSupplier.class, ScopeSupplier.fixed(namespace))
-                .service(Namespace.class, namespace);
-        if (workflows != null) {
-            PostgresWorkflows.register(env, workflows);
-        }
-        environment.forEach(env::string);
-        ToolRegistry toolRegistry = ai.mindconnect.agent.tool.ConfiguredToolRegistry.of(
-                new SpiToolRegistry(env.build()), environment.get("disabledTools"));
-        registryRef.set(toolRegistry);
-
-        // 6. Turn pipeline + chat service — the turn runs as an agent.turn
-        //    task on an in-process queue (concept 16).
-        ToolExecutor toolExecutor = new ToolExecutor(List.of());
-        LlmCallTraceRepository traceRepository = inMemory
-                ? new InMemoryLlmCallTraceRepository()
-                : sql != null ? new PgLlmCallTraceRepository(sql, namespace).initSchema()
-                : new FileLlmCallTraceRepository(dataDir, namespace);
-        var approvalStore = new ToolApprovalStore();
-        var userChannels = new UserChannels();
-        // Where a session may work: under workingDirRoot when set, else in the
-        // user's own home — the same rule the Spring apps apply.
-        var userHome = userHomeOf(environment, namespaceName);
-        String workingDirRoot = environment.getOrDefault("workingDirRoot", "");
-        var workingDirPolicy = ai.mindconnect.agent.runtime.service.WorkingDirPolicy.within(
-                workingDirRoot.isBlank() ? userHome.template() : workingDirRoot)
-                .withChoice(!"false".equalsIgnoreCase(environment.getOrDefault("workingDirChoice", "true")));
-        AgentSessionService sessionService = new AgentSessionService(
-                definitionRepository, sessionRepository, conversationManager,
-                workingMemoryRepository, summaryRepository, todoListRepository, approvalStore,
-                userChannels, workingDirPolicy, userHome);
-        var sessionChannels = new SessionChannels();
-        // Where a user's own standing instructions live; see InstructionFiles.
-        var instructionFiles = ai.mindconnect.agent.runtime.service.prompt.InstructionFiles.of(
-                environment.getOrDefault("instructionsUserDir", ""));
-        var turnWorker = new AgentTurnWorker(
-                conversationManager, definitionRepository, sessionService,
-                memoryStrategyFactory, promptRenderer, toolRegistry, activations,
-                llmChat, traceRepository, sessionChannels,
-                statelessRunner, workingMemoryRepository, instructionFiles, skillCatalog);
-        var toolWorker = new ToolCallWorker(
-                conversationManager, definitionRepository, sessionService,
-                memoryStrategyFactory, toolRegistry, activations, toolExecutor, sessionChannels,
-                approvalStore, userChannels);
-        var taskQueue = new ai.mindconnect.taskqueue.local.LocalTaskQueue(
-                new ai.mindconnect.taskqueue.memory.InMemoryTaskStore());
-        // A failed task would otherwise leave no trace but a tool result saying so.
-        taskQueue.addListener(ai.mindconnect.taskqueue.LoggingTaskListener.failuresOnly());
-        toolWorker.attach(taskQueue);
-        taskQueue.register(AgentTurnWorker.TYPE, turnWorker);
-        taskQueue.register(ToolCallWorker.TYPE, toolWorker);
-        // A chat is named by a task of its own; the turn handle waits for it, so register the worker here too.
-        taskQueue.register(ai.mindconnect.agent.runtime.service.task.SessionTitleWorker.TYPE,
-                new ai.mindconnect.agent.runtime.service.task.SessionTitleWorker(
-                        sessionService, conversationManager, statelessRunner, userChannels));
-        taskQueue.register(ai.mindconnect.agent.runtime.service.task.SessionTitleWorker.TYPE,
-                new ai.mindconnect.agent.runtime.service.task.SessionTitleWorker(
-                        sessionService, conversationManager, statelessRunner, userChannels));
-        AgentChatService chatService = new AgentChatService(sessionService, definitionRepository,
-                conversationManager, memoryStrategyFactory, workingMemoryRepository, promptRenderer,
-                sessionChannels, userChannels, taskQueue, approvalStore,
-                instructionFiles, skillCatalog, ScopeSupplier.fixed(namespace));
-
-        // 7. Seed configs, agents, workflows.
-        for (LlmConfig config : pendingLlmConfigs) llmConfigRepository.save(config);
-        for (AgentDefinition definition : pendingAgentDefinitions) definitionRepository.save(definition);
-        for (var skill : pendingSkills) skillRepository.save(skill);
-        seedWorkflows(workflows);
-
-        AttachSupport attachSupport = AttachSupport.createIfPresent(
-                environment, activations, sessionRepository, embeddings, llmConfigRepository, workflows, fileStore, namespace);
-        return new AgentRuntime(chatService, sessionService, definitionRepository,
-                llmConfigRepository, conversationManager, attachSupport,
-                approvalStore);
+        registerCore();
+        beans.freeze();
+        context.start();
+        return runtime;
     }
 
-    private void seedWorkflows(ai.mindconnect.workflow.persistence.port.WorkflowDataRepository workflows) {
-        if (pendingWorkflowResources.isEmpty()) {
-            return;
+    /** What every feature may rely on before anything else: the namespace, the mapper, the Sql. */
+    private void registerCoreSettings() {
+        context.bean(Namespace.class, () -> new Namespace(namespaceName));
+        // Where this runtime works — one namespace for its whole life.
+        context.bean(ScopeSupplier.class, () -> ScopeSupplier.fixed(context.require(Namespace.class)));
+        context.bean(ObjectMapper.class, () -> objectMapper);
+        if (persistence instanceof Persistence.Postgres postgres) {
+            // One Sql for every Postgres store, around this builder's mapper, so
+            // the documents in the database are the JSON the file store writes.
+            context.bean(ai.mindconnect.jdbc.Sql.class, () -> ai.mindconnect.jdbc.Sql.of(
+                    postgres.dataSource(), new ai.mindconnect.jdbc.Json(objectMapper)));
         }
-        if (workflows != null) {
-            PostgresWorkflows.seed(workflows, pendingWorkflowResources);
-            return;
-        }
-        Path workflowDir = dataDir.resolve(namespaceName).resolve("workflows");
-        try {
-            Files.createDirectories(workflowDir);
-            for (String resource : pendingWorkflowResources) {
-                String name = Path.of(resource).getFileName().toString();
-                try (InputStream in = classpath(resource)) {
-                    Files.copy(in, workflowDir.resolve(name), StandardCopyOption.REPLACE_EXISTING);
-                }
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not seed workflows into " + workflowDir, e);
-        }
+        context.bean(ToolEnvironment.class, () -> new BeansToolEnvironment(beans, context::properties));
     }
 
-    private String resolveDefaultLlmConfigName() {
-        if (defaultLlmConfigName != null) return defaultLlmConfigName;
-        return pendingLlmConfigs.size() == 1 ? pendingLlmConfigs.get(0).name() : null;
+    /**
+     * The turn loop, against whatever the features registered. What the loop
+     * needs but no feature provided gets a null object here — a runtime
+     * without the tools feature offers its agents no tools, and chats.
+     */
+    private void registerCore() {
+        context.bean(TokenCounters.class, TokenCounterRegistry::new);
+        context.bean(PromptRenderer.class, () -> {
+            List<PromptContextProvider> providers = new ArrayList<>(List.of(
+                    new CurrentDateProvider(), new AgentMetadataProvider(), new AgentToolsProvider()));
+            providers.addAll(beans.all(PromptContextProvider.class));
+            return new PebblePromptRenderer(providers);
+        });
+        context.bean(AgentTaskRunner.class, () -> {
+            String defaultConfig = features.find(CoreFeature.class).map(CoreFeature::defaultLlmConfigName).orElse(null);
+            var definitions = context.require(AgentDefinitionRepository.class);
+            return new StatelessAgentTaskRunner(definitions, context.require(LlmChat.class), defaultConfig,
+                    context.require(PromptRenderer.class),
+                    new StatelessAgentSeeder(definitions, context.require(LlmConfigRepository.class), defaultConfig));
+        });
+        context.bean(ToolResultSummarizer.class, () -> "llm".equalsIgnoreCase(toolResultSummarizer)
+                ? new LlmToolResultSummarizer(context.require(AgentTaskRunner.class))
+                : new RuleBasedToolResultSummarizer());
+        context.bean(LlmMessageMapper.class, () -> llmMessageMapper != null ? llmMessageMapper
+                : new MessageToLlmMessageMapper(context.find(ai.mindconnect.filestore.FileStore.class)
+                        .<PartContentReader>map(FileStorePartContentReader::new)
+                        .orElse(PartContentReader.none())));
+        context.bean(MemoryStrategyFactory.class, () -> new DefaultMemoryStrategyFactory(
+                context.require(ConversationManager.class), context.require(ConversationSummaryRepository.class),
+                context.require(ToolResultSummarizer.class), context.require(AgentTaskRunner.class),
+                context.require(TokenCounters.class), context.require(LlmConfigRepository.class),
+                context.require(LlmMessageMapper.class)));
+        context.bean(ToolApprovalStore.class, ToolApprovalStore::new);
+        context.bean(UserChannels.class, UserChannels::new);
+        context.bean(SessionChannels.class, SessionChannels::new);
+
+        // Null objects for the features that are not installed.
+        if (!beans.has(SkillCatalog.class)) context.bean(SkillCatalog.class, SkillCatalog::none);
+        if (!beans.has(ToolRegistry.class)) context.instance(ToolRegistry.class, NO_TOOLS);
+        if (!beans.has(DynamicToolActivations.class)) {
+            context.bean(DynamicToolActivations.class, () -> new DynamicToolActivations(
+                    context.require(AgentSessionRepository.class), context.require(SkillCatalog.class)));
+        }
+        if (!beans.has(ToolExecutor.class)) {
+            context.bean(ToolExecutor.class, () -> new ToolExecutor(beans.all(ToolAdvisor.class)));
+        }
+        if (!beans.has(TaskQueue.class)) {
+            // The turn runs as a task on an in-process queue (concept 16).
+            context.bean(TaskQueue.class, () -> {
+                var queue = new LocalTaskQueue(new InMemoryTaskStore());
+                // A failed task would otherwise leave no trace but a tool result saying so.
+                queue.addListener(LoggingTaskListener.failuresOnly());
+                return queue;
+            });
+        }
+
+        context.bean(AgentSessionService.class, () -> new AgentSessionService(
+                context.require(AgentDefinitionRepository.class), context.require(AgentSessionRepository.class),
+                context.require(ConversationManager.class), context.require(WorkingMemoryRepository.class),
+                context.require(ConversationSummaryRepository.class), context.require(TodoListRepository.class),
+                context.require(ToolApprovalStore.class), context.require(UserChannels.class),
+                context.require(WorkingDirPolicy.class), context.require(UserHome.class)));
+        context.bean(AgentTurnWorker.class, () -> new AgentTurnWorker(
+                context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
+                context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
+                context.require(PromptRenderer.class), context.require(ToolRegistry.class),
+                context.require(DynamicToolActivations.class), context.require(LlmChat.class),
+                context.require(LlmCallTraceRepository.class), context.require(SessionChannels.class),
+                context.require(AgentTaskRunner.class), context.require(WorkingMemoryRepository.class),
+                context.require(InstructionFiles.class), context.require(SkillCatalog.class)));
+        context.bean(ToolCallWorker.class, () -> new ToolCallWorker(
+                context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
+                context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
+                context.require(ToolRegistry.class), context.require(DynamicToolActivations.class),
+                context.require(ToolExecutor.class), context.require(SessionChannels.class),
+                context.require(ToolApprovalStore.class), context.require(UserChannels.class)));
+        context.bean(SessionTitleWorker.class, () -> new SessionTitleWorker(
+                context.require(AgentSessionService.class), context.require(ConversationManager.class),
+                context.require(AgentTaskRunner.class), context.require(UserChannels.class)));
+        context.bean(AgentChatService.class, () -> new AgentChatService(
+                context.require(AgentSessionService.class), context.require(AgentDefinitionRepository.class),
+                context.require(ConversationManager.class), context.require(MemoryStrategyFactory.class),
+                context.require(WorkingMemoryRepository.class), context.require(PromptRenderer.class),
+                context.require(SessionChannels.class), context.require(UserChannels.class),
+                context.require(TaskQueue.class), context.require(ToolApprovalStore.class),
+                context.require(InstructionFiles.class), context.require(SkillCatalog.class),
+                context.require(ScopeSupplier.class)));
+
+        // The features' start hooks (schema, seeds) ran before this one: hooks run in registration order.
+        context.onStart(() -> {
+            TaskQueue queue = context.require(TaskQueue.class);
+            context.require(ToolCallWorker.class).attach(queue);
+            queue.register(AgentTurnWorker.TYPE, context.require(AgentTurnWorker.class));
+            queue.register(ToolCallWorker.TYPE, context.require(ToolCallWorker.class));
+            // A chat is named by a task of its own; the turn handle waits for it.
+            queue.register(SessionTitleWorker.TYPE, context.require(SessionTitleWorker.class));
+            context.require(AgentChatService.class);
+        });
+        context.onClose(() -> {
+            if (beans.find(TaskQueue.class).orElse(null) instanceof AutoCloseable closeable) closeable.close();
+        });
+    }
+
+    /** A registry that knows no tool: every resolve is empty, every listing blank. */
+    private static final ToolRegistry NO_TOOLS = (agentTool, scope) -> Optional.empty();
+
+    private void requireNotBuilt() {
+        if (built) {
+            throw new FeatureException("The runtime is built; the builder cannot be changed any more");
+        }
     }
 
     private <T> T readClasspath(String resource, Class<T> type) {
