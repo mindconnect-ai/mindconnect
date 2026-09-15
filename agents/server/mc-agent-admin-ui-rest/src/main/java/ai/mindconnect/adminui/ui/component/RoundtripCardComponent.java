@@ -3,33 +3,33 @@ package ai.mindconnect.adminui.ui.component;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
 import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.ui.ext.jsonviewer.UiJsonViewer;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiSection;
 import com.fasterxml.jackson.databind.JsonNode;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER;
 import static ai.mindconnect.chatui.ui.SessionUiCommons.codeBlock;
 
 /**
- * One LLM-call roundtrip rendered as a three-tab card:
+ * One LLM-call roundtrip: a line naming the ids it belongs to, then a
+ * three-tab card, in the order the call happened:
  * <ul>
+ *   <li><b>Request</b> — the verbatim provider request via the
+ *       json-viewer.</li>
  *   <li><b>Response</b> — prose first, then per-tool-call args
  *       (json-viewer) followed by the matching persisted tool-result
  *       block (collapsible). Errors short-circuit to a code-fenced
  *       error body.</li>
- *   <li><b>Request</b> — the verbatim provider request via the
- *       json-viewer.</li>
  *   <li><b>Raw SSE</b> — the captured event stream as a markdown code
  *       block.</li>
  * </ul>
- *
- * <p>Depth (sub-agent nesting) is rendered as a {@code trace-depth-N}
- * CSS class on the card so visual indentation matches the nesting
- * level.
  */
 public final class RoundtripCardComponent implements UiComponent {
 
@@ -37,13 +37,10 @@ public final class RoundtripCardComponent implements UiComponent {
      *  with a "[trimmed N chars]" marker. */
     private static final int TOOL_RESULT_MAX_CHARS = 5_000;
 
-    private final int globalIdx;
     private final LlmCallTrace trace;
     private final Map<String, Message> resultsByCallId;
 
-    public RoundtripCardComponent(int globalIdx, LlmCallTrace trace,
-                                   Map<String, Message> resultsByCallId) {
-        this.globalIdx = globalIdx;
+    public RoundtripCardComponent(LlmCallTrace trace, Map<String, Message> resultsByCallId) {
         this.trace = trace;
         this.resultsByCallId = resultsByCallId;
     }
@@ -53,21 +50,22 @@ public final class RoundtripCardComponent implements UiComponent {
         return "trace-r-" + (trace.id() == null ? "" : trace.id().value());
     }
 
-    @Override
-    public UiSection render() {
+    /** One line saying who called what, when, how long, how many tokens and how it ended. */
+    public String title() {
         int depth = trace.context() != null ? trace.context().depth() : 0;
         String agentLabel = trace.context() != null && trace.context().agentName() != null
                 ? trace.context().agentName() : "agent";
-
-        String header = "R" + globalIdx + " · "
-                + ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT.format(trace.startedAt())
+        return TraceTableComponent.TIME_FMT.format(trace.startedAt())
                 + (depth > 0 ? " · ↳ " + agentLabel : "")
                 + " · " + trace.modelName()
                 + " · " + trace.durationMs() + "ms"
                 + " · " + trace.promptTokens() + "+" + trace.completionTokens() + " tok"
                 + (trace.finishReason() != null ? " · " + trace.finishReason() : "")
                 + (trace.errorStatus() != null ? " · ✗ HTTP " + trace.errorStatus() : "");
+    }
 
+    @Override
+    public UiSection render() {
         UiNode requestNode = UiJsonViewer.of(id() + "-req-json", trace.requestJson())
                 .expandLevel(1);
         UiNode responseNode = buildResponseTab();
@@ -79,14 +77,51 @@ public final class RoundtripCardComponent implements UiComponent {
                     codeBlock(String.join("\n\n", trace.responseEvents()), null));
         }
 
-        var rt = UiSection.of(id(), header)
-                .section(id() + "-res", "Response", responseNode)
+        var tabs = UiSection.of(id() + "-tabs", null)
                 .section(id() + "-req", "Request", requestNode)
+                .section(id() + "-res", "Response", responseNode)
                 .section(id() + "-raw", "Raw SSE", rawNode);
-        if (depth > 0) {
-            rt.<UiSection>withCssClass("trace-depth-" + Math.min(depth, 5));
+        return UiSection.of(id(), null)
+                .section(id() + "-ctx", null, UiMarkdown.of(id() + "-ctx-md", contextLine()))
+                .section(id() + "-body", null, tabs);
+    }
+
+    /**
+     * The ids that place the call — turn, parent turn, session, trace —
+     * in full, for matching against log lines and files on disk. The
+     * dialog title has the summary; this has what the summary leaves out.
+     */
+    String contextLine() {
+        var ctx = trace.context();
+        var sb = new StringBuilder();
+        if (ctx != null) {
+            if (ctx.agentName() != null) sb.append("**").append(ctx.agentName()).append("** · ");
+            if (ctx.turnId() != null) sb.append("turn `").append(ctx.turnId().value()).append("` · ");
+            if (ctx.parentTurnId() != null) sb.append("parent turn `").append(ctx.parentTurnId().value()).append("` · ");
+            if (ctx.sessionId() != null) sb.append("session `").append(ctx.sessionId().value()).append("` · ");
         }
-        return rt;
+        if (trace.llmConfigName() != null) sb.append("config `").append(trace.llmConfigName()).append("` · ");
+        if (trace.id() != null) sb.append("trace `").append(trace.id().value()).append("`");
+        return sb.toString().replaceAll(" · $", "");
+    }
+
+    /**
+     * Indexes persisted TOOL_RESULT messages by their {@code toolCallId}
+     * so the response tab can show each tool call together with its own
+     * result block.
+     */
+    public static Map<String, Message> indexToolResults(List<Message> history) {
+        Map<String, Message> out = new HashMap<>();
+        if (history == null) return out;
+        for (Message m : history) {
+            if (m.type() != MessageType.TOOL_RESULT) continue;
+            try {
+                JsonNode node = MAPPER.readTree(m.content());
+                String id = node.path("toolCallId").asText("");
+                if (!id.isBlank()) out.put(id, m);
+            } catch (Exception ignored) { /* skip malformed entries */ }
+        }
+        return out;
     }
 
     /**
@@ -145,9 +180,8 @@ public final class RoundtripCardComponent implements UiComponent {
      * the actual result content. Routes JSON-shaped results through
      * the json-viewer, everything else through a markdown code-fence.
      * Long results are trimmed to {@link #TOOL_RESULT_MAX_CHARS} with
-     * a marker so the detail pane stays scrollable. Collapsed by
-     * default — operators scanning a turn don't need every result
-     * body open at once.
+     * a marker so the dialog stays scrollable. Collapsed by default —
+     * operators scanning a call don't need every result body open at once.
      */
     private void appendToolResult(UiSection stack, String tcId, Message resultMsg) {
         if (resultMsg == null) {
