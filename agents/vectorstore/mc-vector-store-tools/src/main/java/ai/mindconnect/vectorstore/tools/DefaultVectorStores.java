@@ -37,14 +37,23 @@ public final class DefaultVectorStores implements VectorStores {
     private final Path baseDir;
     private final LlmEmbeddings embeddings;
     private final LlmConfigRepository configs;
+    /** Who says which namespace the config repository answers for; null when it is bound for good. */
+    private final ai.mindconnect.agent.ScopeSupplier scope;
 
     DefaultVectorStores(List<VectorStoreBackend> backends, VectorStoreTemplate defaultTemplate,
                         Path baseDir, LlmEmbeddings embeddings, LlmConfigRepository configs) {
+        this(backends, defaultTemplate, baseDir, embeddings, configs, null);
+    }
+
+    DefaultVectorStores(List<VectorStoreBackend> backends, VectorStoreTemplate defaultTemplate,
+                        Path baseDir, LlmEmbeddings embeddings, LlmConfigRepository configs,
+                        ai.mindconnect.agent.ScopeSupplier scope) {
         this.backends = backends;
         this.defaultTemplate = defaultTemplate;
         this.baseDir = baseDir;
         this.embeddings = embeddings;
         this.configs = configs;
+        this.scope = scope;
     }
 
     /** Empty when the environment lacks a backend or the embedding services. */
@@ -74,7 +83,8 @@ public final class DefaultVectorStores implements VectorStores {
                 "file-ingestion",
                 Map.of("description", "Built-in template from mindconnect.vector-store.* properties"));
         return Optional.of(new DefaultVectorStores(backends, defaultTemplate,
-                Path.of(config.getOrDefault("baseDir", "data")), embeddings, configs));
+                Path.of(config.getOrDefault("baseDir", "data")), embeddings, configs,
+                env.get(ai.mindconnect.agent.ScopeSupplier.class).orElse(null)));
     }
 
     // ── templates & instances (registry + built-in default) ───────────────
@@ -212,10 +222,22 @@ public final class DefaultVectorStores implements VectorStores {
      * a store pointed at {@code embeddings} must follow wherever that name is
      * pointed.
      */
+    /**
+     * The config as {@code namespace} knows it. The repository is routed by the thread's
+     * scope, which is not necessarily the namespace asked for — a caller working across
+     * namespaces must not get its own namespace's embedding model for another's store.
+     */
+    private Optional<LlmConfig> configIn(Namespace namespace, String configName) {
+        if (scope instanceof ai.mindconnect.agent.ThreadBoundScope bound) {
+            return bound.runIn(ai.mindconnect.agent.Scope.of(namespace), () -> configs.findResolvedByName(configName));
+        }
+        return configs.findResolvedByName(configName);
+    }
+
     @Override
     public List<float[]> embedFor(Namespace namespace, String storeName, List<String> texts) {
         String configName = settingsFor(namespace, storeName).embeddingConfig();
-        LlmConfig config = configs.findResolvedByName(configName)
+        LlmConfig config = configIn(namespace, configName)
                 .orElseThrow(() -> new IllegalStateException("No LlmConfig named '" + configName
                         + "' (store '" + storeName + "') — create one pointing at an "
                         + "embedding model, e.g. LM Studio's text-embedding-nomic-embed-text-v1.5"));

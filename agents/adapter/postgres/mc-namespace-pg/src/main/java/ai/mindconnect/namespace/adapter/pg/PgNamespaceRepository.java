@@ -60,6 +60,11 @@ public class PgNamespaceRepository implements NamespaceRepository {
     }
 
     @Override
+    public boolean insert(NamespaceDefinition namespace) {
+        return namespaces.insert(namespace);
+    }
+
+    @Override
     public boolean deleteById(Namespace id) {
         return namespaces.deleteById(id.value());
     }

@@ -49,6 +49,7 @@ public class NamespaceService {
     private final Namespace defaultNamespace;
     private final Clock clock;
     private final List<NamespacePurge> purges;
+    private final java.util.concurrent.ConcurrentHashMap<Namespace, Object> locks = new java.util.concurrent.ConcurrentHashMap<>();
 
     public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace) {
         this(namespaces, defaultNamespace, Clock.systemUTC());
@@ -128,7 +129,9 @@ public class NamespaceService {
         }
         String label = displayName == null || displayName.isBlank() ? null : displayName.strip();
         NamespaceDefinition created = NamespaceDefinition.create(namespace, label, creator, Instant.now(clock));
-        namespaces.save(created);
+        if (!namespaces.insert(created)) {
+            throw new IllegalArgumentException("Namespace '" + value + "' already exists");
+        }
         return created;
     }
 
@@ -140,11 +143,13 @@ public class NamespaceService {
      */
     public NamespaceDefinition invite(Namespace id, UserId inviter, UserId invitee) {
         Objects.requireNonNull(invitee, "invitee");
-        NamespaceDefinition ns = memberOnly(id, inviter, "invite into");
-        if (!ns.isCreator(inviter)) throw new IllegalArgumentException("Only the creator of '" + id + "' invites");
-        NamespaceDefinition updated = ns.withMember(invitee);
-        if (updated != ns) namespaces.save(updated);
-        return updated;
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = memberOnly(id, inviter, "invite into");
+            if (!ns.isCreator(inviter)) throw new IllegalArgumentException("Only the creator of '" + id + "' invites");
+            NamespaceDefinition updated = ns.withMember(invitee);
+            if (updated != ns) namespaces.save(updated);
+            return updated;
+        }
     }
 
     /**
@@ -153,13 +158,15 @@ public class NamespaceService {
      */
     public NamespaceDefinition removeMember(Namespace id, UserId actor, UserId member) {
         Objects.requireNonNull(member, "member");
-        NamespaceDefinition ns = memberOnly(id, actor, "change");
-        if (!ns.isCreator(actor) && !actor.equals(member)) {
-            throw new IllegalArgumentException("Only the creator of '" + id + "' removes other members");
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = memberOnly(id, actor, "change");
+            if (!ns.isCreator(actor) && !actor.equals(member)) {
+                throw new IllegalArgumentException("Only the creator of '" + id + "' removes other members");
+            }
+            NamespaceDefinition updated = ns.withoutMember(member);
+            if (updated != ns) namespaces.save(updated);
+            return updated;
         }
-        NamespaceDefinition updated = ns.withoutMember(member);
-        if (updated != ns) namespaces.save(updated);
-        return updated;
     }
 
     /** {@code actor} leaves {@code id}; the creator cannot leave, only delete. */
@@ -190,11 +197,18 @@ public class NamespaceService {
     }
 
     public NamespaceDefinition rename(Namespace id, UserId actor, String displayName) {
-        NamespaceDefinition ns = memberOnly(id, actor, "rename");
-        if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator renames '" + id + "'");
-        NamespaceDefinition updated = ns.withDisplayName(displayName == null || displayName.isBlank() ? null : displayName.strip());
-        namespaces.save(updated);
-        return updated;
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = memberOnly(id, actor, "rename");
+            if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator renames '" + id + "'");
+            NamespaceDefinition updated = ns.withDisplayName(displayName == null || displayName.isBlank() ? null : displayName.strip());
+            namespaces.save(updated);
+            return updated;
+        }
+    }
+
+    /** Membership and name changes are read-modify-write on one record: one at a time per namespace, in this process. */
+    private Object lockFor(Namespace id) {
+        return locks.computeIfAbsent(id, n -> new Object());
     }
 
     private NamespaceDefinition memberOnly(Namespace id, UserId actor, String verb) {

@@ -59,6 +59,16 @@ public class FileNamespaceRepository implements NamespaceRepository {
     }
 
     @Override
+    public boolean insert(NamespaceDefinition namespace) {
+        try {
+            documents.create(namespace.id(), namespace);
+            return true;
+        } catch (ai.mindconnect.filerepo.DocumentExistsException alreadyThere) {
+            return false;
+        }
+    }
+
+    @Override
     public boolean deleteById(Namespace id) {
         return documents.delete(id);
     }

@@ -25,6 +25,13 @@ public interface NamespaceRepository {
     /** Creates or replaces. */
     void save(NamespaceDefinition namespace);
 
+    /**
+     * Creates, atomically: false — and nothing written — when a namespace with this id
+     * exists. Two users creating the same id at the same moment get one namespace, not
+     * the second one's record over the first's.
+     */
+    boolean insert(NamespaceDefinition namespace);
+
     /** Removes the record — not the namespace's data, which is the stores' business. */
     boolean deleteById(Namespace id);
 }

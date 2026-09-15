@@ -42,6 +42,16 @@ class FileNamespaceRepositoryTest {
     }
 
     @Test
+    void insertRefusesAnIdThatIsTaken() {
+        var repo = new FileNamespaceRepository(dir, mapper);
+
+        assertThat(repo.insert(acme())).isTrue();
+        assertThat(repo.insert(new NamespaceDefinition(new Namespace("acme"), "Other", UserId.of("bob"),
+                Instant.parse("2026-09-15T12:00:00Z"), Set.of()))).isFalse();
+        assertThat(repo.findById(new Namespace("acme"))).get().extracting(NamespaceDefinition::createdBy).isEqualTo(UserId.of("david"));
+    }
+
+    @Test
     void aRecordWrittenWhenTheFieldWasStillCalledOwnerStillReads() throws Exception {
         Files.createDirectories(dir.resolve("system/namespaces"));
         Files.writeString(dir.resolve("system/namespaces/old.json"), """

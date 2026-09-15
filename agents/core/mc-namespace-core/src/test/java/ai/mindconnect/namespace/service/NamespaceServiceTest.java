@@ -36,6 +36,8 @@ class NamespaceServiceTest {
 
         @Override public void save(NamespaceDefinition namespace) { byId.put(namespace.id(), namespace); }
 
+        @Override public synchronized boolean insert(NamespaceDefinition namespace) { return byId.putIfAbsent(namespace.id(), namespace) == null; }
+
         @Override public boolean deleteById(Namespace id) { return byId.remove(id) != null; }
     }
 
@@ -162,6 +164,24 @@ class NamespaceServiceTest {
         assertThatThrownBy(() -> failing.delete(new Namespace("acme"), DAVID))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("disk gone");
         assertThat(repository.findById(new Namespace("acme"))).isPresent();
+    }
+
+    @Test
+    void twoUsersCreatingTheSameIdAtOnceGetOneNamespace() throws Exception {
+        var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
+        var go = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.Callable<Boolean> david = () -> { go.await(); try { service.create("acme", null, DAVID); return true; } catch (IllegalArgumentException e) { return false; } };
+        java.util.concurrent.Callable<Boolean> alice = () -> { go.await(); try { service.create("acme", null, ALICE); return true; } catch (IllegalArgumentException e) { return false; } };
+        var first = pool.submit(david);
+        var second = pool.submit(alice);
+        go.countDown();
+
+        int created = (first.get() ? 1 : 0) + (second.get() ? 1 : 0);
+        pool.shutdown();
+
+        assertThat(created).isEqualTo(1);
+        assertThat(repository.findById(new Namespace("acme"))).get()
+                .satisfies(ns -> assertThat(ns.members()).containsExactly(ns.createdBy()));
     }
 
     @Test

@@ -37,6 +37,11 @@ public class InMemoryNamespaceRepository implements NamespaceRepository {
     }
 
     @Override
+    public boolean insert(NamespaceDefinition namespace) {
+        return byId.putIfAbsent(namespace.id(), namespace) == null;
+    }
+
+    @Override
     public boolean deleteById(Namespace id) {
         return byId.remove(id) != null;
     }

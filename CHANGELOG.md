@@ -56,7 +56,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the one at start-up; a turn waits at most three hours again; MCP tool catalogs and pooled
   connections are kept per namespace, so editing a server in one namespace
   no longer drops another's connections; a malformed `X-Mindconnect-Namespace`
-  header is a 400. A call to the REST API or the Responses API without a
+  header is a 400. Two users creating a namespace with the same id at the
+  same moment get one namespace, not the second record over the first; and
+  a store's embedding config is always read in the store's own namespace.
+  A call to the REST API or the Responses API without a
   namespace works in the default one — never in the one its user last chose
   in the Admin UI; only the Admin UI follows the session and the remembered
   choice. The choice is
