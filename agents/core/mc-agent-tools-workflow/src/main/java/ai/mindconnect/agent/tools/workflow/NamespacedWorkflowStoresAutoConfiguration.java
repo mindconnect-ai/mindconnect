@@ -46,7 +46,7 @@ public class NamespacedWorkflowStoresAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(WorkflowDataRepository.class)
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    WorkflowDataRepository workflowDataRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+    WorkflowDataRepository namespacedWorkflowDataRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
                                                   ScopeSupplier scope) {
         return NamespaceRouted.route(WorkflowDataRepository.class, scope,
                 ns -> new FileWorkflowDataRepository(Path.of(baseDir), ns.value()));
@@ -55,7 +55,7 @@ public class NamespacedWorkflowStoresAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-    WorkflowInstanceRepository workflowInstanceRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+    WorkflowInstanceRepository namespacedWorkflowInstanceRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
                                                           ScopeSupplier scope) {
         return NamespaceRouted.route(WorkflowInstanceRepository.class, scope,
                 ns -> new FileWorkflowInstanceRepository(Path.of(baseDir), ns.value()));
@@ -68,7 +68,7 @@ public class NamespacedWorkflowStoresAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean(WorkflowDataRepository.class)
-        WorkflowDataRepository workflowDataRepository(DataSource dataSource, ScopeSupplier scope) {
+        WorkflowDataRepository namespacedWorkflowDataRepository(DataSource dataSource, ScopeSupplier scope) {
             ai.mindconnect.jdbc.Sql sql = ai.mindconnect.jdbc.Sql.of(dataSource);
             return NamespaceRouted.route(WorkflowDataRepository.class, scope,
                     ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowDataRepository(sql, ns.value()).initSchema());
@@ -76,7 +76,7 @@ public class NamespacedWorkflowStoresAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
-        WorkflowInstanceRepository workflowInstanceRepository(DataSource dataSource, ScopeSupplier scope) {
+        WorkflowInstanceRepository namespacedWorkflowInstanceRepository(DataSource dataSource, ScopeSupplier scope) {
             ai.mindconnect.jdbc.Sql sql = ai.mindconnect.jdbc.Sql.of(dataSource);
             return NamespaceRouted.route(WorkflowInstanceRepository.class, scope,
                     ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowInstanceRepository(sql, ns.value()).initSchema());
