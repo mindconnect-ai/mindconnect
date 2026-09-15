@@ -4,6 +4,7 @@ import ai.mindconnect.adminui.ui.page.MemoryPage;
 import ai.mindconnect.adminui.ui.page.TodosPage;
 import ai.mindconnect.adminui.ui.page.TracesPage;
 import ai.mindconnect.adminui.ui.component.RoundtripCardComponent;
+import ai.mindconnect.adminui.ui.component.TraceTableComponent;
 import ai.mindconnect.agent.runtime.domain.TraceId;
 import ai.mindconnect.agent.runtime.domain.view.LlmCallTraceHeader;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
@@ -165,7 +166,8 @@ public class SessionUiController {
 
     /**
      * The LLM calls of the session and its sub-agents as a table — headers
-     * only, the payloads are loaded per row by {@link #getTrace}.
+     * only, the payloads are loaded per row by {@link #getTrace}. Search,
+     * sort and paging re-fetch just the table via {@link #tracesTable}.
      */
     @GetMapping("/sessions/{sessionId}/traces")
     public ResponseEntity<?> getTraces(@PathVariable("sessionId") String sessionIdValue,
@@ -174,12 +176,57 @@ public class SessionUiController {
         if (traceRepository == null) {
             return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
         }
+        List<LlmCallTraceHeader> traces = loadTraceHeaders(sessionId);
+        return sessionRepository.findById(sessionId)
+                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
+                        .map(agent -> {
+                            var page = new TracesPage(session, agent, traces);
+                            if (dialog) return sessionDialog(sessionId, "Traces", page.render());
+                            return ResponseEntity.ok(page.render());
+                        }))
+                .orElse(ResponseEntity.notFound().build());
+    }
 
-        // Walk the session tree directly via parentSessionId: top-level
-        // session + every sub-agent session (transitively) it spawned. For
-        // each session we know the conversationId, so we read the headers
-        // straight from those known paths — no scanning every conversation
-        // directory on disk.
+    /**
+     * The traces table alone, for the search field, the sortable column
+     * headers and the page buttons: a patch that replaces the table in
+     * place, so the dialog it sits in stays open. The page buttons and
+     * sort headers put {@code page}, {@code sort} and {@code dir} in the
+     * query string themselves; the search field posts its form to
+     * {@link #searchTraces} instead.
+     */
+    @GetMapping("/sessions/{sessionId}/traces/table")
+    public ResponseEntity<?> tracesTable(@PathVariable("sessionId") String sessionIdValue,
+                                         @RequestParam(value = "q", required = false) String q,
+                                         @RequestParam(value = "page", required = false) Integer page,
+                                         @RequestParam(value = "sort", required = false) String sort,
+                                         @RequestParam(value = "dir", required = false) String dir) {
+        if (traceRepository == null) {
+            return ResponseEntity.status(503).body("LLM call trace persistence is not enabled");
+        }
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        var query = TraceTableComponent.Query.of(q, page, sort, dir);
+        var table = new TraceTableComponent(sessionId, loadTraceHeaders(sessionId), query).render();
+        return ResponseEntity.ok(UiPatch.of()
+                .patch(UiPatch.Operation.replace(TraceTableComponent.tableId(sessionId), table)));
+    }
+
+    /** The search field posts its form here; a new search starts on page 1 and keeps the sort. */
+    @PostMapping("/sessions/{sessionId}/traces/search")
+    public ResponseEntity<?> searchTraces(@PathVariable("sessionId") String sessionIdValue,
+                                          @RequestBody java.util.Map<String, Object> raw) {
+        var form = new ai.mindconnect.chatui.ui.controller.FormBody(raw);
+        return tracesTable(sessionIdValue, form.str("q"), 1, form.str("sort"), form.str("dir"));
+    }
+
+    /**
+     * Walks the session tree directly via parentSessionId: top-level
+     * session + every sub-agent session (transitively) it spawned. For
+     * each session we know the conversationId, so we read the headers
+     * straight from those known paths — no scanning every conversation
+     * directory on disk.
+     */
+    private List<LlmCallTraceHeader> loadTraceHeaders(SessionId sessionId) {
         List<LlmCallTraceHeader> traces = new java.util.ArrayList<>();
         for (SessionId sid : collectSessionTree(sessionId)) {
             try {
@@ -191,15 +238,7 @@ public class SessionUiController {
                 log.warn("Failed to load traces for session {}: {}", sid, e.getMessage());
             }
         }
-
-        return sessionRepository.findById(sessionId)
-                .flatMap(session -> java.util.Optional.of(agentResolver.resolve(session))
-                        .map(agent -> {
-                            var page = new TracesPage(session, agent, traces);
-                            if (dialog) return sessionDialog(sessionId, "Traces", page.render());
-                            return ResponseEntity.ok(page.render());
-                        }))
-                .orElse(ResponseEntity.notFound().build());
+        return traces;
     }
 
     /**

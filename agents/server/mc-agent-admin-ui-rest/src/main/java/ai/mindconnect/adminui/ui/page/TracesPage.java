@@ -12,8 +12,9 @@ import java.util.List;
 
 /**
  * LLM-call-trace inspector page: the session's calls (including those of
- * its sub-agents) as one table, each row opening a detail dialog with the
- * request, the response and the raw event stream of that call.
+ * its sub-agents) as one searchable, sortable, paged table, each row
+ * opening a detail dialog with the request, the response and the raw
+ * event stream of that call.
  */
 public final class TracesPage extends AdminPage {
 
