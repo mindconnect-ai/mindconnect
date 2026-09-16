@@ -127,6 +127,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   current directory. Only a session without a working directory keeps a scratch
   directory. A chat that changes its directories gets a fresh container on the
   next call, with its files but without packages installed in the old one.
+  The bundled `default-chat` no longer mounts your home directory read-only at
+  `/mnt/host` for `code_execute`: the container sees the chat's directories and
+  nothing else, and its prompt tells the model to save files for you there. The
+  bundled definition changes for new installations; an existing `default-chat`
+  keeps its stored tool binding until you edit it.
 
 ## [0.8.2] - 2026-09-16
 
