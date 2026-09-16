@@ -1,6 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
@@ -13,6 +14,7 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.ui.model.UiList;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import ai.mindconnect.agent.SessionId;
 
 /**
@@ -56,22 +58,31 @@ public final class MessageComponent {
      * its name.
      */
     String withAttachmentChip(Message m) {
-        var attached = AttachmentNotice.announcedBy(m);
-        var removed = AttachmentNotice.detachedBy(m);
+        return userBubble(sessionId, AttachmentNotice.announcedBy(m), AttachmentNotice.detachedBy(m),
+                m.content(), m.parts());
+    }
+
+    /**
+     * The body of a user bubble from its pieces rather than a stored message —
+     * so the bubble a turn shows the moment it is sent carries the same
+     * attachment line and pictures the persisted message renders with later.
+     */
+    public static String userBubble(SessionId sessionId, List<String> attached, List<String> removed,
+                                    String text, List<ContentPart> parts) {
         StringBuilder out = new StringBuilder();
         if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(String.join(", ", attached)).append("*\n\n");
         if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(String.join(", ", removed)).append(" removed*\n\n");
-        out.append(m.content() == null ? "" : m.content());
-        if (m.parts() != null) {
-            for (var part : m.parts()) {
-                if (part instanceof ai.mindconnect.message.domain.ContentPart.Image image) {
+        out.append(text == null ? "" : text);
+        if (parts != null) {
+            for (var part : parts) {
+                if (part instanceof ContentPart.Image image) {
                     // A linked image: the thumbnail (sized by the chat's CSS)
                     // opens the original in a new tab — the markdown renderer
                     // gives every link target="_blank".
-                    String url = contentUrl(image.fileId());
+                    String url = contentUrl(sessionId, image.fileId());
                     out.append("\n\n[![").append(markdownSafe(image.name())).append("](")
                             .append(url).append(")](").append(url).append(")");
-                } else if (part instanceof ai.mindconnect.message.domain.ContentPart.File file) {
+                } else if (part instanceof ContentPart.File file) {
                     out.append("\n\n").append(icon("file-text")).append(" *").append(markdownSafe(file.name())).append("*");
                 }
             }
@@ -80,7 +91,7 @@ public final class MessageComponent {
     }
 
     /** Where the chat serves a file it holds, inline — see {@code ChatFilesUiController#content}. */
-    private String contentUrl(String fileId) {
+    private static String contentUrl(SessionId sessionId, String fileId) {
         return "/chat/api/sessions/" + sessionId.value() + "/chat-files/"
                 + java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8) + "/content";
     }

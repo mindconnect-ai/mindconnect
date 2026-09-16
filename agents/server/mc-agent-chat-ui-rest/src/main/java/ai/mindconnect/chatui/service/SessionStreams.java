@@ -6,13 +6,17 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 /**
  * One live {@link StreamBus} per chat session, outliving the turns that
@@ -100,28 +104,61 @@ public class SessionStreams {
     }
 
     /**
-     * The two patches that put a late joiner's DOM into the running turn's
-     * current state: the one that CREATES the streaming reply bubble, and
-     * the last one that filled it. Token patches carry the cumulative text
-     * and REPLACE the bubble, so those two are the whole state — but the
+     * The patches that put a late joiner's DOM into the running turn's
+     * current state: the cards nothing persisted yet can rebuild — a thought
+     * still streaming, each as one APPEND carrying the card as it is now —
+     * then the one that CREATES the streaming reply bubble, and the last one
+     * that filled it. Token and thinking patches carry the cumulative text
+     * and REPLACE what they fill, so these are the whole state — but a
      * replace lands nowhere if the joiner never saw the append that made
-     * the bubble.
+     * its target.
      *
      * <p>Rendered JSON rather than raw text on purpose: the producer has
      * the renderer, this layer must not grow one.
      */
-    public record CatchUp(String bubblePatch, String textPatch) { }
+    public record CatchUp(SequencedMap<String, String> cards, String bubblePatch, String textPatch) {
+
+        private static final CatchUp EMPTY = new CatchUp(new LinkedHashMap<>(), null, null);
+
+        /** The card APPENDs, in the order the cards came. */
+        public List<String> cardPatches() {
+            return List.copyOf(cards.values());
+        }
+
+        private CatchUp withCards(Consumer<SequencedMap<String, String>> change) {
+            var copy = new LinkedHashMap<>(cards);
+            change.accept(copy);
+            return new CatchUp(copy, bubblePatch, textPatch);
+        }
+    }
 
     private final Map<String, CatchUp> catchUps = new ConcurrentHashMap<>();
 
     /** The first token's patch — the one that appends the reply bubble. */
     public void rememberBubble(String channelId, String patchJson) {
-        catchUps.put(channelId, new CatchUp(patchJson, null));
+        catchUps.merge(channelId, new CatchUp(new LinkedHashMap<>(), patchJson, null),
+                (c, n) -> new CatchUp(c.cards(), patchJson, null));
     }
 
     /** The newest token patch; replaces the previous one. */
     public void rememberText(String channelId, String patchJson) {
-        catchUps.computeIfPresent(channelId, (k, c) -> new CatchUp(c.bubblePatch(), patchJson));
+        catchUps.computeIfPresent(channelId, (k, c) -> new CatchUp(c.cards(), c.bubblePatch(), patchJson));
+    }
+
+    /**
+     * The APPEND that recreates a live card as it is right now, keyed by its
+     * node id: a later call for the same card replaces the earlier one and
+     * keeps its place, so a joiner sees the cards in the order they came.
+     */
+    public void rememberCard(String channelId, String nodeId, String patchJson) {
+        if (patchJson == null) return;
+        catchUps.compute(channelId, (k, c) ->
+                (c == null ? CatchUp.EMPTY : c).withCards(cards -> cards.put(nodeId, patchJson)));
+    }
+
+    /** The card is on the persisted record now (or gone) — a joiner must not get it twice. */
+    public void forgetCard(String channelId, String nodeId) {
+        catchUps.computeIfPresent(channelId, (k, c) -> c.withCards(cards -> cards.remove(nodeId)));
     }
 
     /** What a client joining right now needs before the live feed. */

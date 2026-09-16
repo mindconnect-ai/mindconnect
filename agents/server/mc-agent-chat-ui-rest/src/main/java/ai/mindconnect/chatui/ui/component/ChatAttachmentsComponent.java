@@ -30,20 +30,57 @@ public final class ChatAttachmentsComponent {
     private ChatAttachmentsComponent() {}
 
     /**
-     * Stable id {@code chat-attachments} so attach/delete patches always have a target.
+     * Which of the chat's files a panel lists. The "+" menu keeps pictures and
+     * documents apart — Add images and Upload files — and each dialog shows
+     * only its own, so each kind is its own panel with its own stable id.
+     */
+    public enum Kind {
+        /** Everything that is not a picture: PDFs, text, office files. */
+        DOCUMENTS("chat-attachments", "Documents"),
+        /** Pictures only. */
+        IMAGES("chat-attachments-images", "Images");
+
+        private final String panelId;
+        private final String title;
+
+        Kind(String panelId, String title) {
+            this.panelId = panelId;
+            this.title = title;
+        }
+
+        /** The panel's node id — the target attach and remove patches replace. */
+        public String panelId() {
+            return panelId;
+        }
+
+        /** Whether a file belongs in this panel. */
+        public boolean holds(AttachedFile file) {
+            return (this == IMAGES) == file.isImage();
+        }
+
+        /** The files of this kind, in attach order. */
+        public List<AttachedFile> of(List<AttachedFile> files) {
+            return files.stream().filter(this::holds).toList();
+        }
+    }
+
+    /**
+     * The panel for one kind of file, under that kind's stable id so
+     * attach/delete patches always have a target.
      *
-     * @param files  the session's attached files, in attach order
+     * @param files  the session's attached files, in attach order — all of them; the kind picks its own
      * @param chunks ingested file id → searchable chunks, for the files that were indexed
      */
-    public static UiNode node(SessionId sessionId, List<AttachedFile> files, Map<String, Long> chunks) {
-        var panel = UiStack.of("chat-attachments").gap(4);
+    public static UiNode node(SessionId sessionId, Kind kind, List<AttachedFile> files, Map<String, Long> chunks) {
+        var panel = UiStack.of(kind.panelId()).gap(4);
+        files = kind.of(files);
         if (files.isEmpty()) {
             return panel;
         }
         Map<String, Long> chunksByName = new HashMap<>();
         chunks.forEach((ingestedId, count) ->
                 chunksByName.merge(Path.of(ingestedId).getFileName().toString(), count, Long::sum));
-        var table = UiTable.of("chat-attachments-table", "Attached Files (" + files.size() + ")")
+        var table = UiTable.of(kind.panelId() + "-table", kind.title + " (" + files.size() + ")")
                 .column(UiTable.Column.text("file", "File"))
                 .column(UiTable.Column.text("kind", "Kind"))
                 .column(UiTable.Column.text("reach", "Reaches the model as"))

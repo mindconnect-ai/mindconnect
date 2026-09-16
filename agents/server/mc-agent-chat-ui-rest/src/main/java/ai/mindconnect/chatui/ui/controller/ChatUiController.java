@@ -410,8 +410,8 @@ public class ChatUiController {
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
-                .withAttachmentCount(sessionFiles.attachments(session.id()).size())
-                .withToolCount(agent.tools() == null ? 0 : agent.tools().size())
+                .withAttachments(sessionFiles.attachments(session.id()))
+                .withAgentCounts(agent)
                 .withWorkingDir(session.workingDir())
                 .withDirChoice(sessionService.workingDirChoice());
         return UiPatch.Operation.replace(form.id(), form.render());
@@ -802,15 +802,18 @@ public class ChatUiController {
         // drop zone to add more. Uploads patch the list in place, so it stays
         // open and current while files arrive.
         //
-        // Pictures get their own entry in the "+" menu because that is what
-        // people go looking for, but not their own dialog: the same list and
-        // the same endpoint, with the file chooser narrowed to images. A
-        // second dialog would have shown a second, disagreeing copy of what
-        // is attached.
+        // Pictures and documents are kept apart, as in the "+" menu: each
+        // dialog lists only its own kind. The endpoint is the same, and so
+        // is the record behind both lists — two panels over one set of
+        // files, each under its own id, which the upload and remove patches
+        // both refresh.
+        var listed = imagesOnly
+                ? ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.Kind.IMAGES
+                : ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.Kind.DOCUMENTS;
         var body = ai.mindconnect.ui.model.UiStack.of("chat-attach-body");
         body.gap(12);
         body.child(ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent
-                .node(sessionId, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId)));
+                .node(sessionId, listed, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId)));
         body.child(ai.mindconnect.chatui.ui.page.ChatPage.attachZone(sessionId, imagesOnly));
         return ResponseEntity.ok(openDialog(imagesOnly ? "Add images" : "Attached files", body));
     }
@@ -1193,6 +1196,7 @@ public class ChatUiController {
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks);
+        page.withAttachments(sessionFiles.attachments(session.id()));
         page.withDirChoice(sessionService.workingDirChoice());
         // Every render hands the SPA this session's stream — whether or not
         // a turn is running. That is the whole point: a client with nothing
@@ -1459,8 +1463,13 @@ public class ChatUiController {
      * tool task, tool name and origin live in the ToolApprovalRepository. No new
      * stream: the turn never ended (it is suspended on the parked tool task)
      * and its original stream carries the continuation; this delivers the
-     * decision and refreshes the list so the card disappears. A STALE card
-     * (no store entry any more) delivers nothing — the refresh alone drops it.
+     * decision and removes the card. A STALE card (no store entry any more)
+     * delivers nothing — the removal alone drops it.
+     *
+     * <p>Only the card goes, never the whole list: the woken tool task streams
+     * its card into the page at once, and a list rebuilt from history — slower
+     * than that, and blind to a tool whose result is not saved yet — would
+     * land on top of it and wipe the running tool from the chat.
      */
     @PostMapping("/sessions/{sessionId}/approval")
     public ResponseEntity<UiPatch> approvalAnswered(@PathVariable("sessionId") String sessionIdValue,
@@ -1471,13 +1480,11 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
-        if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         boolean delivered = chatService.answerApproval(sessionId, callId, approved,
                 ApprovalScope.fromParam(scope));
         log.info("POST /chat/api/sessions/{}/approval call={} approved={} scope={} delivered={}",
                 sessionId.value(), callId, approved, scope, delivered);
-        return ResponseEntity.ok(buildChatPage(sessionOpt.get(), agentOpt.get()).headerOnly());
+        return ResponseEntity.ok(ai.mindconnect.chatui.ui.component.MessageListComponent.removeApprovalCard(callId));
     }
 
     /**
@@ -1529,8 +1536,26 @@ public class ChatUiController {
         // before streaming, so the now-deleted messages disappear from the
         // DOM instead of lingering until the end-of-turn refresh.
         var session = sessionOpt.get();
-        return runTurnStream(session, agentOpt.get(), text, true,
+        return runTurnStream(session, agentOpt.get(), parts, true,
                 handler -> chatService.submitChat(session.id(), parts, handler));
+    }
+
+    /**
+     * The user bubble a turn shows the moment it is sent, as the message will
+     * be stored: the attachments added or removed since the last turn are
+     * announced with it, and a fresh image or PDF rides along as a part — the
+     * same rules the runtime applies when it writes the message, read off the
+     * same session and history, so the picture is there before the answer
+     * rather than after the turn.
+     */
+    private String userBubble(AgentSession session,
+                              java.util.List<ai.mindconnect.message.domain.ContentPart> parts) {
+        var history = sessionService.loadHistory(session.id());
+        var attached = ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice.unannounced(session, history);
+        var removed = ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice.unannouncedRemovals(session, history);
+        var shown = ai.mindconnect.agent.runtime.service.prompt.AttachmentParts.withAttachments(parts, session, attached);
+        return ai.mindconnect.chatui.ui.component.MessageComponent.userBubble(session.id(), attached, removed,
+                ai.mindconnect.message.domain.ContentPart.textOf(parts), shown);
     }
 
     /**
@@ -1546,18 +1571,19 @@ public class ChatUiController {
     private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(AgentSession session,
                                                                           AgentDefinition agent,
                                                                           String text, boolean initialRefresh) {
-        return runTurnStream(session, agent, text, initialRefresh,
+        return runTurnStream(session, agent, ai.mindconnect.message.domain.ContentPart.text(text), initialRefresh,
                 handler -> chatService.submitChat(session.id(), text, handler));
     }
 
     /**
      * The streaming core, parameterised over WHAT starts the turn: a typed
-     * message ({@code text} echoed as a user bubble) or an approval answer
-     * ({@code text == null} — the card click is the input, nothing to echo).
+     * message ({@code userParts} echoed as a user bubble) or an approval answer
+     * ({@code userParts == null} — the card click is the input, nothing to echo).
      */
     private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(AgentSession session,
                                                                           AgentDefinition agent,
-                                                                          String text, boolean initialRefresh,
+                                                                          java.util.List<ai.mindconnect.message.domain.ContentPart> userParts,
+                                                                          boolean initialRefresh,
                                                                           java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
         SessionId sessionId = session.id();
         // Channel id == the id of the message-list container the patches
@@ -1607,8 +1633,8 @@ public class ChatUiController {
 
         // 1. Append user message (a typed turn) or just swap the form to
         //    streaming (an approval resume), add thinking indicator.
-        publishPatch(bus, text != null
-                ? liveView.streamStart(text, thinkingId)
+        publishPatch(bus, userParts != null
+                ? liveView.streamStart(userBubble(session, userParts), thinkingId)
                 : liveView.streamResume());
 
         // 2. Stream tokens + per-task cards.
@@ -1645,7 +1671,9 @@ public class ChatUiController {
             // A thought ends with whatever it led to: anything that is not
             // more thinking closes the open card of this scope.
             LiveThinking thinking = thinkingFor(thinkings, sessionId, null);
-            if (!(event instanceof StreamEvent.Thinking)) closeThinking(thinking, liveView, bus);
+            if (!(event instanceof StreamEvent.Thinking)) {
+                closeThinking(thinking, liveView, bus, event instanceof StreamEvent.Token);
+            }
             switch (event) {
                 case StreamEvent.Thinking th -> onThinking(thinking, null, th.text(), liveView, bus);
                 case StreamEvent.Token t -> {
@@ -1752,7 +1780,7 @@ public class ChatUiController {
                 String message = cause.getMessage() != null ? cause.getMessage() : cause.toString();
                 try {
                     // A thought the failure cut short must not keep running on screen.
-                    for (LiveThinking open : thinkings.values()) closeThinking(open, liveView, bus);
+                    for (LiveThinking open : thinkings.values()) closeThinking(open, liveView, bus, false);
                     publishPatch(bus, liveView.streamError(message));
                 } catch (Exception ignored) {}
                 try {
@@ -1818,14 +1846,27 @@ public class ChatUiController {
         private static final long PUBLISH_INTERVAL_MS = 120;
 
         private final String scopeKey;
+        private final String scope;
+        private final String channelId;
         private final StringBuilder text = new StringBuilder();
         private String nodeId;
         private long startedAt;
         private long lastPublishedAt;
         private int stretch;
 
-        LiveThinking(String scopeKey) {
+        LiveThinking(String scopeKey, String scope, String channelId) {
             this.scopeKey = scopeKey;
+            this.scope = scope;
+            this.channelId = channelId;
+        }
+
+        /** {@code null} for the top-level agent, else the sub-session id. */
+        String scope() {
+            return scope;
+        }
+
+        String channelId() {
+            return channelId;
         }
 
         boolean open() {
@@ -1871,29 +1912,54 @@ public class ChatUiController {
     private static LiveThinking thinkingFor(java.util.Map<String, LiveThinking> thinkings,
                                             SessionId sessionId, String scope) {
         String key = scope == null ? sessionId.value() : scope;
-        return thinkings.computeIfAbsent(key, LiveThinking::new);
+        return thinkings.computeIfAbsent(key, k -> new LiveThinking(k, scope,
+                ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId)));
     }
 
-    /** A reasoning delta: opens the scope's card on the first one, grows its body afterwards. */
+    /**
+     * A reasoning delta: opens the scope's card on the first one, grows its body afterwards.
+     *
+     * <p>Nothing persisted holds a thought until what it led to is saved, so a
+     * client that attaches meanwhile — back from another page — gets the card
+     * from the catch-up frames, as it is now; the body REPLACEs that follow
+     * would land nowhere without it.
+     */
     private void onThinking(LiveThinking thinking, String scope, String text, ChatPage liveView,
                             ai.mindconnect.chatui.service.StreamBus bus) {
         if (!thinking.open()) {
             thinking.start();
             thinking.append(text);
-            publishPatch(bus, appendCard(liveView, scope,
-                    TaskCardComponent.runningThinking(thinking.nodeId(), thinking.text())));
+            sessionStreams.rememberCard(thinking.channelId(), thinking.nodeId(), publishPatch(bus, appendCard(liveView, scope,
+                    TaskCardComponent.runningThinking(thinking.nodeId(), thinking.text()))));
             return;
         }
         if (thinking.append(text)) {
             publishPatch(bus, liveView.streamThinking(thinking.nodeId(), thinking.text()));
+            sessionStreams.rememberCard(thinking.channelId(), thinking.nodeId(), json(appendCard(liveView, scope,
+                    TaskCardComponent.runningThinking(thinking.nodeId(), thinking.text()))));
         }
     }
 
-    /** Ends the open thinking card, if any: header flips from running to "thought for". */
+    /**
+     * Ends the open thinking card, if any: header flips from running to "thought for".
+     *
+     * @param keepForJoiners the thought led to the streaming answer, which is
+     *                       saved — with the thought — only when the turn ends,
+     *                       so a joiner still needs the finished card; a thought
+     *                       that led to a tool call is saved with that call and
+     *                       rendered from history, so the catch-up drops it
+     */
     private void closeThinking(LiveThinking thinking, ChatPage liveView,
-                               ai.mindconnect.chatui.service.StreamBus bus) {
+                               ai.mindconnect.chatui.service.StreamBus bus, boolean keepForJoiners) {
         if (!thinking.open()) return;
-        publishPatch(bus, liveView.streamTaskUpdate(thinking.close()));
+        String nodeId = thinking.nodeId();
+        TaskCardComponent done = thinking.close();
+        publishPatch(bus, liveView.streamTaskUpdate(done));
+        if (keepForJoiners) {
+            sessionStreams.rememberCard(thinking.channelId(), nodeId, json(appendCard(liveView, thinking.scope(), done)));
+        } else {
+            sessionStreams.forgetCard(thinking.channelId(), nodeId);
+        }
     }
 
     /** Per-task state held while a turn is streaming. */
@@ -1949,7 +2015,7 @@ public class ChatUiController {
         // at the top level: anything but more thinking closes its card.
         String scope = scopeOf(parentTaskId, taskToSession);
         LiveThinking thinking = thinkingFor(thinkings, sessionId, scope);
-        if (!(inner instanceof StreamEvent.Thinking)) closeThinking(thinking, liveView, bus);
+        if (!(inner instanceof StreamEvent.Thinking)) closeThinking(thinking, liveView, bus, false);
 
         switch (inner) {
             case StreamEvent.Thinking th -> onThinking(thinking, scope, th.text(), liveView, bus);
@@ -2139,6 +2205,16 @@ public class ChatUiController {
      * reconnect-GET emitters from {@code /streams/{id}/sse}) sees it; the
      * ring buffer keeps the last N for late joiners.
      */
+    /** The patch as the stream would carry it, without publishing it; {@code null} if it does not serialise. */
+    private String json(UiPatch patch) {
+        try {
+            return objectMapper.writeValueAsString(patch);
+        } catch (Exception e) {
+            log.warn("Failed to serialise SSE patch", e);
+            return null;
+        }
+    }
+
     private String publishPatch(ai.mindconnect.chatui.service.StreamBus bus, UiPatch patch) {
         try {
             String json = objectMapper.writeValueAsString(patch);

@@ -495,6 +495,66 @@
     background: transparent;
 }
 
+/* ── Tool and thinking cards ──────────────────────────────────────────────
+   What the agent did on the way to an answer is a margin note, not a turn.
+   The app reads every collapsible summary at body size — right for a
+   catalog's group heading, where the summary IS the content — but in a
+   conversation a run of five tool calls then takes a screenful, each card a
+   full turn gap away from the next. Here, and only here, the cards go back
+   to the quiet shape: small muted type in the summary and the body, and
+   almost no gap between the cards of a run. The turn gap before and after
+   the run stays without a rule of its own: the margins of neighbouring list
+   items collapse, so next to a message the message's larger one wins. */
+.chat-container .sui-list-item:has(> .sui-list-item-main > details.sui-activity) {
+    margin-block: 2px;
+}
+
+.chat-container details.sui-activity > .sui-activity-summary {
+    font-size: var(--sui-text-xs, 12px);
+    font-weight: 400;
+    color: var(--sui-color-text-muted);
+    padding: 1px 0;
+}
+
+.chat-container details.sui-activity > .sui-activity-summary:hover {
+    color: var(--sui-color-text);
+}
+
+.chat-container details.sui-activity > .sui-activity-body {
+    padding: 2px 0 4px 12px;
+}
+
+/* The card body has no label of its own; the empty slot must not take a line. */
+.chat-container details.sui-activity > .sui-activity-body > .sui-list-item-label:empty {
+    display: none;
+}
+
+.chat-container .task-card-body {
+    font-size: var(--sui-text-xs, 12px);
+    padding: 6px 10px;
+    margin-top: 2px;
+    line-height: 1.45;
+}
+
+.chat-container .task-card-body pre {
+    margin: 2px 0 6px;
+    padding: 6px 8px;
+    font-size: 11px;
+}
+
+.chat-container .task-card-body code {
+    font-size: 11px;
+}
+
+.chat-container .task-card-body strong {
+    font-size: 10.5px;
+    margin-top: 2px;
+}
+
+.chat-container .sub-agent-children {
+    margin-top: 4px;
+}
+
 /* Who said it and when is context you want on demand, not a caption over
    every paragraph. It keeps its space (so nothing shifts when it appears)
    and fades in with the row. */
@@ -980,6 +1040,28 @@
 .chat-form .chat-plus .sui-menu-button-glyph .sui-icon {
     width: 20px;
     height: 20px;
+}
+
+/* How many files hang on the chat, on the "+"'s top-right shoulder — the
+   same pill the menu's entries carry, a size smaller. A sibling of the menu
+   (a menu button has no badge of its own), so it is laid over the corner and
+   lets clicks through to the "+" underneath. */
+.chat-form .chat-plus-count {
+    position: absolute;
+    inset-block-end: 34px;
+    inset-inline-start: 32px;
+    z-index: 4;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--sui-color-primary);
+    color: var(--sui-color-on-primary, #fff);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
+    pointer-events: none;
 }
 
 /* The popover itself: a little wider and a little softer than the

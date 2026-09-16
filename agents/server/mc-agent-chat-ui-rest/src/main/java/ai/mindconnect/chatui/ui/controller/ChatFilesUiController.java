@@ -129,16 +129,24 @@ public class ChatFilesUiController {
                     ? UiToast.success(result.message()).title("File attached")
                     : UiToast.error(result.message()).title("Attach failed"));
         }
-        patch.patch(UiPatch.Operation.replace("chat-attachments",
-                attachmentsPanel(sessionId)));
+        attachmentsPanels(sessionId).forEach(patch::patch);
         patch.patch(attachmentCountRefresh(sessionId));
         return patch;
     }
 
-    /** The attached-files panel: the session's record, with the chunks each ingested file produced. */
-    private ai.mindconnect.ui.model.UiNode attachmentsPanel(SessionId sessionId) {
-        return ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(
-                sessionId, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId));
+    /**
+     * Both attached-files panels, documents and images, refreshed from the
+     * session's record with the chunks each ingested file produced. Only one
+     * of them is on the page at a time — whichever dialog is open — and a
+     * REPLACE whose target is not there is skipped, so both always go out.
+     */
+    private List<UiPatch.Operation> attachmentsPanels(SessionId sessionId) {
+        var files = sessionFiles.attachments(sessionId);
+        var chunks = sessionFiles.listAttachments(sessionId);
+        return java.util.Arrays.stream(ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.Kind.values())
+                .map(kind -> UiPatch.Operation.replace(kind.panelId(),
+                        ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.node(sessionId, kind, files, chunks)))
+                .toList();
     }
 
     /** Detaches a file by name: its chunks leave the session store, an image leaves the record. */
@@ -148,9 +156,9 @@ public class ChatFilesUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         requireOwned(sessionId, user);
         sessionFiles.deleteAttachment(sessionId, fileName);
-        return UiPatch.of()
-                .patch(UiPatch.Operation.replace("chat-attachments",
-                        attachmentsPanel(sessionId)))
+        UiPatch patch = UiPatch.of();
+        attachmentsPanels(sessionId).forEach(patch::patch);
+        return patch
                 .patch(attachmentCountRefresh(sessionId))
                 .toast(UiToast.success("Removed from the conversation.").title("File removed"));
     }
@@ -178,8 +186,8 @@ public class ChatFilesUiController {
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         sessionId, agent == null ? null : agent.id(), streaming)
                 .withModelLabel(agent == null ? null : agent.llmConfigName())
-                .withAttachmentCount(sessionFiles.attachments(sessionId).size())
-                .withToolCount(agent == null || agent.tools() == null ? 0 : agent.tools().size())
+                .withAttachments(sessionFiles.attachments(sessionId))
+                .withAgentCounts(agent)
                 .withWorkingDir(session == null ? null : session.workingDir())
                 .withDirChoice(sessionService.workingDirChoice());
         return UiPatch.Operation.replace(form.id(), form.render());

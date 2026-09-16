@@ -7,6 +7,7 @@ import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
+import ai.mindconnect.llm.domain.ToolDefinition;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
@@ -73,6 +74,31 @@ class OpenAiGatewayReasoningTest {
                 Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
         assertThat(gateway.buildRequestNode(reasoning.resolved(encryption), request)
                 .path("reasoning_effort").asText()).isEqualTo("high");
+    }
+
+    @Test
+    void fromGpt56OnChatCompletionsToolsForceTheEffortToNone() throws Exception {
+        LlmConfig gpt56 = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI_CHAT_COMPLETIONS,
+                "gpt-5.6-luna", "https://api.openai.com", "sk-test", 0.7, 4096,
+                Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null).resolved(encryption);
+        LlmRequest withTools = new LlmRequest("openai", List.of(LlmMessage.user("hi")),
+                List.of(new ToolDefinition("get_time", "now", Map.of("type", "object"))),
+                -1, -1, true, Map.of());
+        assertThat(gateway.buildRequestNode(gpt56, withTools).path("reasoning_effort").asText()).isEqualTo("none");
+        // without tools the configured effort stays
+        assertThat(gateway.buildRequestNode(gpt56, request).path("reasoning_effort").asText()).isEqualTo("high");
+    }
+
+    @Test
+    void onlyGpt56AndLaterRefuseToolsWithReasoning() {
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.6")).isTrue();
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.6-luna")).isTrue();
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.10-mini")).isTrue();
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-6")).isTrue();
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.5")).isFalse();
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5-mini")).isFalse();
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-4o")).isFalse();
+        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("o3")).isFalse();
     }
 
     @Test

@@ -94,14 +94,32 @@ class ChatDialogActionUrlsTest {
 
     @Test
     void removingAnAttachmentKeepsTheRowPlaceholder() throws Exception {
-        String out = json(ChatAttachmentsComponent.node(SESSION,
-                List.of(new AttachedFile("f-1", "a.pdf", "application/pdf", 10),
-                        new AttachedFile("f-2", "photo.png", "image/png", 20)),
-                Map.of("a.pdf", 3L)));
+        String documents = json(ChatAttachmentsComponent.node(SESSION,
+                ChatAttachmentsComponent.Kind.DOCUMENTS, FILES, Map.of("a.pdf", 3L)));
+        String images = json(ChatAttachmentsComponent.node(SESSION,
+                ChatAttachmentsComponent.Kind.IMAGES, FILES, Map.of("a.pdf", 3L)));
 
-        assertThat(out).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/chat-files?file={id}\"");
-        assertThat(out).doesNotContain("%7Bid%7D");
-        assertThat(out).contains("document with the next message · 3 searchable chunks");
-        assertThat(out).contains("image with the next message");
+        assertThat(documents).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/chat-files?file={id}\"");
+        assertThat(documents).doesNotContain("%7Bid%7D");
+        assertThat(documents).contains("document with the next message · 3 searchable chunks");
+        assertThat(images).contains("image with the next message");
     }
+
+    /** Upload files lists the documents, Add images the pictures — never each other's. */
+    @Test
+    void documentsAndImagesAreListedApart() throws Exception {
+        String documents = json(ChatAttachmentsComponent.node(SESSION,
+                ChatAttachmentsComponent.Kind.DOCUMENTS, FILES, Map.of()));
+        String images = json(ChatAttachmentsComponent.node(SESSION,
+                ChatAttachmentsComponent.Kind.IMAGES, FILES, Map.of()));
+
+        assertThat(documents).contains("a.pdf").doesNotContain("photo.png")
+                .contains("\"id\":\"chat-attachments\"");
+        assertThat(images).contains("photo.png").doesNotContain("a.pdf")
+                .contains("\"id\":\"chat-attachments-images\"");
+    }
+
+    private static final List<AttachedFile> FILES = List.of(
+            new AttachedFile("f-1", "a.pdf", "application/pdf", 10),
+            new AttachedFile("f-2", "photo.png", "image/png", 20));
 }

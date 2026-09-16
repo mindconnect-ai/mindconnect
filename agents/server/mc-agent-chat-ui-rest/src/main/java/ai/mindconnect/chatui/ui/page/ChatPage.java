@@ -94,7 +94,7 @@ public final class ChatPage {
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
-                .withToolCount(agent.tools() == null ? 0 : agent.tools().size())
+                .withAgentCounts(agent)
                 .withWorkingDir(session.workingDir());
     }
 
@@ -179,9 +179,9 @@ public final class ChatPage {
 
 
 
-    /** The count the composer shows on its "+". */
-    public ChatPage withAttachmentCount(int count) {
-        this.chatForm.withAttachmentCount(count);
+    /** The files hanging on the conversation, counted on the composer's "+" and in its menu. */
+    public ChatPage withAttachments(java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> attachments) {
+        this.chatForm.withAttachments(attachments);
         return this;
     }
 
@@ -311,12 +311,12 @@ public final class ChatPage {
         return patch(chatForm.toStreaming());
     }
 
-    public UiPatch streamStart(String userText, String thinkingId) {
+    public UiPatch streamStart(String userBubble, String thinkingId) {
         // The thinking indicator lives in the composer's streaming state
         // (see ChatFormComponent#streamingForm) — nothing extra is appended
         // to the conversation, so the composer stays pinned in place.
         return patch(
-                messages.appendUserMessage(userText),
+                messages.appendUserMessage(userBubble),
                 chatForm.toStreaming());
     }
 

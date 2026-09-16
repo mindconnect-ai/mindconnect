@@ -155,6 +155,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** **the chat's "+" counts what the conversation holds, and keeps pictures
+  and documents apart.** The "+" carries the number of attached files; its menu
+  shows badges on Upload files (the documents), Add images (the pictures), Tools
+  and Sub-agents. The Upload files dialog lists only documents, the Add images
+  dialog only pictures. The file count no longer disappears from the menu after a
+  turn.
+- **agents:** **tool and thinking cards in the chat are compact again.** A run of
+  cards sits close together in small, muted type instead of a turn's gap and
+  body-size text per card. Collapsible summaries elsewhere in the admin UI keep
+  their size.
+- **agents:** **an image sent with a message shows in the chat right away.** The
+  bubble a turn shows the moment it is sent now carries the attachment line and
+  the pictures of the stored message, instead of the text alone until the turn
+  ended.
 - **agents:** **a new message ends a turn that waits for an approval.** The
   turn used to stay parked forever while the new one ran; now its waiting
   calls are closed as "Not approved: superseded by a new message" — no
@@ -172,6 +186,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **gpt-5.6 with tools works on `OPENAI_CHAT_COMPLETIONS`.** From gpt-5.6
+  on, OpenAI refuses function tools together with reasoning on Chat Completions,
+  and those models reason by default — every turn of an agent with tools ended in a
+  "Streaming error" (HTTP 400). A config that stays on Chat Completions now sends
+  `reasoning_effort: none` to these models when tools are offered; a configured
+  effort still applies to turns without tools. For reasoning and tools together,
+  use provider `OPENAI` (the Responses API).
+- **agents:** **a thought keeps streaming after you come back to the chat.** Leaving a
+  chat while the model was thinking — to the agents page and back — lost the
+  thinking card: it was not saved yet, so the page could not rebuild it, and the
+  updates that followed had nowhere to go. A client that attaches mid-turn now gets
+  the running (or just finished) thought along with the streaming reply.
+- **agents:** **an approved tool call stays in the chat.** Answering an approval
+  card rebuilt the whole message list, which wiped the card of the tool that had
+  just started running; it only came back when the turn ended. Now only the
+  approval card is removed.
 - **agents:** **a loaded skill is no longer evicted from the context.** With
   `toolResultEviction` on, a skill's text was replaced by a stub after the user's
   next message, and the model reloaded it with `fetch_tool_result` straight away —
