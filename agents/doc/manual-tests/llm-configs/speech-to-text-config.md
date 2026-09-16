@@ -1,7 +1,7 @@
 ---
 id: llm-configs-speech-to-text
 area: llm-configs
-requires: [server-9091, openai-key]
+requires: [server-9090, openai-key]
 duration: ~4 min
 last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
@@ -14,7 +14,7 @@ text.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `OPENAI_API_KEY` set in the environment the server was started with
   (otherwise: SKIPPED — or point Base URL at a local Whisper server and
   leave the key empty)
@@ -27,7 +27,7 @@ text.
 
 ## Setup
 
-1. Open http://localhost:9091/admin/llm-configs and click **+ New LLM Config**.
+1. Open http://localhost:9090/admin/llm-configs and click **+ New LLM Config**.
 
 ## Steps
 
@@ -63,7 +63,7 @@ text.
    from the URL):
 
    ```bash
-   curl -s -X POST http://localhost:9091/admin/api/llm-configs/{id}/test-audio \
+   curl -s -X POST http://localhost:9090/admin/api/llm-configs/{id}/test-audio \
      -F "audio=@/tmp/speech.wav;type=audio/wav" | grep -o '"text":"[^"]*"' | tail -2
    ```
 

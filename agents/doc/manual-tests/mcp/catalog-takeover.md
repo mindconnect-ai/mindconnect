@@ -1,7 +1,7 @@
 ---
 id: mcp-catalog-takeover
 area: mcp
-requires: [server-9091, internet, mcp-catalog-enabled]
+requires: [server-9090, internet, mcp-catalog-enabled]
 duration: ~4 min
 last-verified: never
 ---
@@ -14,7 +14,7 @@ name prefix that does not stutter.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - The host may reach `desktop.docker.com` (otherwise: SKIPPED)
 - The catalog is switched on: `MC_MCP_CATALOG_ENABLED=true` in the environment
   the server was started with (otherwise: SKIPPED — it is **off by default**,
@@ -22,7 +22,7 @@ name prefix that does not stutter.
 
 ## Steps
 
-1. http://localhost:9091/mcp-gateway.
+1. http://localhost:9090/mcp-gateway.
    **Expected:** A **Browse catalog** button is present next to
    **Register MCP Server**. (Absent ⇒ the catalog is off ⇒ SKIPPED.)
 2. Click **Browse catalog**.
@@ -49,7 +49,7 @@ name prefix that does not stutter.
 ## Cleanup
 
 - Nothing to undo if step 5 held. If a server was saved by accident:
-  http://localhost:9091/mcp-gateway → **Delete**.
+  http://localhost:9090/mcp-gateway → **Delete**.
 
 ## Notes
 

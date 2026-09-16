@@ -1,7 +1,7 @@
 ---
 id: coding-session-directory-uploads
 area: coding
-requires: [server-9091, tool-model, embedding-model]
+requires: [server-9090, tool-model, embedding-model]
 duration: ~6 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ can open it, and stays reachable after the chat moves to a project.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model, and the `embeddings`
   llm-config reaches an embeddings model (see `chat/file-upload.md`;
   otherwise: SKIPPED)
@@ -30,16 +30,16 @@ can open it, and stays reachable after the chat moves to a project.
    lines may be skipped).
 2. Create the upload:
    `printf 'Die Geheimzutat der Testsuppe ist Paprika.\n%.0s' 1 2 3 > /tmp/soup.md`
-3. Open http://localhost:9091/chat, **New chat**, **Model & tools** →
+3. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL.
 
 ## Steps
 
 1. Look at the composer's folder button, then open
-   http://localhost:9091/admin/sessions/<session-id>/memory — or, with
+   http://localhost:9090/admin/sessions/<session-id>/memory — or, with
    authentication off (the app's default),
-   `curl -s http://localhost:9091/api/sessions/<session-id>/memory | jq -r .systemPrompt`.
+   `curl -s http://localhost:9090/api/sessions/<session-id>/memory | jq -r .systemPrompt`.
    **Expected:** The button reads the session id. The system prompt's
    `## Working directory` section says
    `You are working in \`<…>/home/mc_user/sessions/<session-id>\``, and

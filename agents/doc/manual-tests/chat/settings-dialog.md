@@ -1,7 +1,7 @@
 ---
 id: chat-settings-dialog
 area: chat
-requires: [server-9091]
+requires: [server-9090]
 duration: ~6 min
 last-verified: never
 ---
@@ -19,7 +19,7 @@ dialog itself; it shows up two clicks away, in the "+" menu's Tools picker.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - The seeded agents are present (`default-chat`, `Poet`); a new chat runs on
   `default-chat`
 - Best run on a host WITHOUT Gmail credentials configured, which is the

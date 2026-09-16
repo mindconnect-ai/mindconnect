@@ -1,7 +1,7 @@
 ---
 id: chat-plus-menu
 area: chat
-requires: [server-9091]
+requires: [server-9090]
 duration: ~6 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ change the chat while staying open, and what the menu says about the chat
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - At least two agents registered besides the chat's own — the seeded set has
   several under `sub-agents` (otherwise step 6 is SKIPPED)
 - A small file to attach, any kind

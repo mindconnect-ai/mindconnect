@@ -1,7 +1,7 @@
 ---
 id: coding-project-instructions
 area: coding
-requires: [server-9091, tool-model]
+requires: [server-9090, tool-model]
 duration: ~6 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ user's own file comes first.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model (otherwise: SKIPPED)
 - `mindconnect.agent.instructions.user-dir` is unset (default
   `~/.mindconnect`)
@@ -27,14 +27,14 @@ user's own file comes first.
    lines may be skipped).
 2. Note whether the user file exists — never change it:
    `test -f ~/.mindconnect/AGENTS.md && echo present || echo absent`
-3. Open http://localhost:9091/chat, **New chat**, **Model & tools** →
+3. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**. Do NOT choose a folder yet.
    Note the session id from the URL.
 4. In a terminal, a shortcut for the prompt checks below (authentication
    off, the app's default; otherwise use the Memory page):
    ```bash
    SID=<session-id>
-   prompt() { curl -s "http://localhost:9091/api/sessions/$SID/memory" | jq -r .systemPrompt; }
+   prompt() { curl -s "http://localhost:9090/api/sessions/$SID/memory" | jq -r .systemPrompt; }
    ```
 
 ## Steps
@@ -44,7 +44,7 @@ user's own file comes first.
    "unknown".` — "the question" in the steps below.
    **Expected:** The answer is `unknown` (the chat works in its own session
    directory, which holds no instruction file).
-2. Open http://localhost:9091/admin/sessions/<session-id>/memory, or run
+2. Open http://localhost:9090/admin/sessions/<session-id>/memory, or run
    `prompt | grep '^## '`.
    **Expected:** The system prompt has NO `## Project instructions` section.
    If Setup 2 said `present`, it has a `## User instructions` section

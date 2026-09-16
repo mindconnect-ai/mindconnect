@@ -1,7 +1,7 @@
 ---
 id: mcp-broken-server-is-contained
 area: mcp
-requires: [server-9091]
+requires: [server-9090]
 duration: ~5 min
 last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
@@ -13,13 +13,13 @@ and does not take the catalog, the other servers or the running agents with it.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - At least one **working** MCP server registered — `manualfs` from
   `mcp/register-stdio-server.md` does
 
 ## Steps
 
-1. http://localhost:9091/mcp-gateway → **Register MCP Server**:
+1. http://localhost:9090/mcp-gateway → **Register MCP Server**:
    - **Id**: `manualbroken`
    - **Display name**: `Manual Test Broken`
    - **Tool name prefix**: `brk`
@@ -48,7 +48,7 @@ and does not take the catalog, the other servers or the running agents with it.
    missing command).
    **Expected:** The registration **saves** — a server that is unreachable
    right now is still a legitimate registration.
-6. Open http://localhost:9091/admin/tools.
+6. Open http://localhost:9090/admin/tools.
    **Expected:** The catalog renders. There is **no** `brk_*` tool, the
    `mfs_*` tools of the working server are **all still there**, and the built-in
    tools are unaffected. On the list page the broken row reads
@@ -58,7 +58,7 @@ and does not take the catalog, the other servers or the running agents with it.
 
 ## Cleanup
 
-- http://localhost:9091/mcp-gateway → `Manual Test Broken` → **Delete**.
+- http://localhost:9090/mcp-gateway → `Manual Test Broken` → **Delete**.
 
 ## Notes
 

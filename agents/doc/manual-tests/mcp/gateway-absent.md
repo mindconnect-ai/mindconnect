@@ -20,7 +20,7 @@ nobody serves, and agents that use no MCP tools keep working.
 ## Setup
 
 1. Note whether any MCP servers are registered
-   (http://localhost:9091/mcp-gateway) — they are only hidden here, not
+   (http://localhost:9090/mcp-gateway) — they are only hidden here, not
    deleted, and they come back in Cleanup.
 
 ## Steps
@@ -28,14 +28,14 @@ nobody serves, and agents that use no MCP tools keep working.
 1. Stop the server and start it again with the property set:
    `./agents/server/mc-agent-admin-ui-app/start.sh -Dspring-boot.run.arguments="--mindconnect.mcp.enabled=false"`
    **Expected:** The application starts. No error about missing MCP beans.
-2. Open http://localhost:9091/admin/agents and look at the sidebar.
+2. Open http://localhost:9090/admin/agents and look at the sidebar.
    **Expected:** **No** entry **MCP Servers**. Chat, Agents, Tools, LLM
    Configs, Workflows, Vector Stores, Migrations, API are all still there.
-3. Open http://localhost:9091/admin/tools.
+3. Open http://localhost:9090/admin/tools.
    **Expected:** The catalog renders with the built-in tools. **No**
    **Register MCP Server** button in its header — there is no gateway to
    register with. No `mfs_*` or other MCP tools.
-4. Navigate directly to http://localhost:9091/mcp-gateway.
+4. Navigate directly to http://localhost:9090/mcp-gateway.
    **Expected:** Not found. This is the correct outcome — and step 2 is the
    point: the sidebar no longer offers it.
 5. Open a chat with any agent that uses **built-in** tools only and use one.

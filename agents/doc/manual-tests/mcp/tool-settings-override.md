@@ -1,7 +1,7 @@
 ---
 id: mcp-tool-settings-override
 area: mcp
-requires: [server-9091, npx, lm-studio-tool-model]
+requires: [server-9090, npx, lm-studio-tool-model]
 duration: ~7 min
 last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
@@ -14,7 +14,7 @@ visible so the replacement can be compared against what it replaced.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - The server `manualfs` from `mcp/register-stdio-server.md` is registered
   (run that case's Setup and steps 1–4 first, or use any registered MCP server
   and substitute its tool names below)
@@ -23,7 +23,7 @@ visible so the replacement can be compared against what it replaced.
 
 ## Steps
 
-1. http://localhost:9091/admin/tools, search `mfs_read_text_file`, open the row
+1. http://localhost:9090/admin/tools, search `mfs_read_text_file`, open the row
    and click **Settings**.
    **Expected:** Dialog **Settings for mfs_read_text_file** with, in order:
    **Available to agents** (on), **What the tool says about itself**

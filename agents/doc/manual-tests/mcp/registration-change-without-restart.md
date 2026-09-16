@@ -1,7 +1,7 @@
 ---
 id: mcp-registration-change-without-restart
 area: mcp
-requires: [server-9091, npx]
+requires: [server-9090, npx]
 duration: ~5 min
 last-verified: never
 ---
@@ -14,24 +14,24 @@ rather than kept alive.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - The server `manualfs` from `mcp/register-stdio-server.md` is registered
 
 ## Steps
 
-1. http://localhost:9091/admin/tools, search `mfs`.
+1. http://localhost:9090/admin/tools, search `mfs`.
    **Expected:** The tools appear under section **Manual Test Filesystem**.
-2. http://localhost:9091/mcp-gateway → row `Manual Test Filesystem`. Change
+2. http://localhost:9090/mcp-gateway → row `Manual Test Filesystem`. Change
    **Display name** to `Renamed Filesystem` and click **Save**.
    **Expected:** The list shows `Renamed Filesystem`.
-3. Reload http://localhost:9091/admin/tools and search `mfs` — **without**
+3. Reload http://localhost:9090/admin/tools and search `mfs` — **without**
    restarting the server.
    **Expected:** The section is now called **Renamed Filesystem**. The tool
    names are unchanged (they follow the prefix, not the display name).
 4. Edit the registration again, switch **Enabled** off, **Save**.
    **Expected:** The row's line ends in `· disabled`, and it no longer names a
    tool count — a disabled server is not asked.
-5. Reload http://localhost:9091/admin/tools, search `mfs`.
+5. Reload http://localhost:9090/admin/tools, search `mfs`.
    **Expected:** **No** `mfs_*` tools at all — a disabled *server* takes its
    whole bundle out, which is different from a disabled *tool*
    (`mcp/disable-and-reenable-tool.md`).
@@ -47,14 +47,14 @@ rather than kept alive.
    There is no way to change it from this screen.
 9. Reach past the form — send a different prefix straight to the API:
    ```bash
-   curl -s -X POST localhost:9091/mcp-gateway/api/manualfs/save \
+   curl -s -X POST localhost:9090/mcp-gateway/api/manualfs/save \
      -H 'Content-Type: application/json' \
      -d '{"displayName":"Manual Test Filesystem","enabled":true,"toolNamePrefix":"mfs2",
           "target":"{\"type\":\"process\",\"command\":[\"/bin/echo\",\"hi\"],\"env\":{}}"}'
    ```
    **Expected:** The response carries a refusal naming both prefixes —
    "The tool name prefix is fixed after creation … It stays 'mfs'. Register a
-   new server to use 'mfs2'." Reload http://localhost:9091/admin/tools:
+   new server to use 'mfs2'." Reload http://localhost:9090/admin/tools:
    the tools are still `mfs_*`, and the registration is unchanged.
    A silently dropped field would be worse than a missing one — this one
    would take every agent's binding with it.

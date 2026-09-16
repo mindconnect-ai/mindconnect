@@ -1,7 +1,7 @@
 ---
 id: coding-read-edit-verify
 area: coding
-requires: [server-9091, tool-model, jdk-21]
+requires: [server-9090, tool-model, jdk-21]
 duration: ~6 min
 last-verified: never
 ---
@@ -14,7 +14,7 @@ through an approved `bash`, and leaves exactly the intended change on disk.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model — LM Studio or OpenAI
   (otherwise: SKIPPED)
 - `javac -version` prints 21 or newer in the shell the server was started
@@ -38,7 +38,7 @@ through an approved `bash`, and leaves exactly the intended change on disk.
    ```
    The last command prints `FAIL subtract(7, 3): expected 4, got 10` and
    `1 CHECK(S) FAILED`.
-2. Open http://localhost:9091/chat, click **New chat**, then **Model & tools**
+2. Open http://localhost:9090/chat, click **New chat**, then **Model & tools**
    in the composer; under **Agent** pick `coding-assistant` and click
    **Apply**.
 3. Click the composer's folder button, type the absolute path of

@@ -1,7 +1,7 @@
 ---
 id: coding-project-agents
 area: coding
-requires: [server-9091, tool-model, jdk-21]
+requires: [server-9090, tool-model, jdk-21]
 duration: ~8 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ project agent wins over a registered agent of the same name.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model (otherwise: SKIPPED)
 - The seeded `coding-assistant` is unchanged: its roster
   (`callableAgents`) is `explorer`, its `bash` needs approval
@@ -26,7 +26,7 @@ project agent wins over a registered agent of the same name.
 1. Copy the fixture as in `coding/read-edit-verify.md` Setup 1. It brings
    `checker`, `explorer` and `reader` in
    `~/mc-manual-tests/calc-project/.mindconnect/agents/`.
-2. Open http://localhost:9091/chat, **New chat**, **Model & tools** →
+2. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**; folder button → absolute path
    of `~/mc-manual-tests/calc-project` → **Open** → **Use this folder**.
    Note the session id from the URL.
@@ -40,7 +40,7 @@ project agent wins over a registered agent of the same name.
    `- explorer (this project): This project's own explorer — it outranks the registered agent of the same name.`
    `- reader (this project): Reads the code and answers questions about it. Read-only — it cannot change files.`
    The registered `explorer` is not listed a second time.
-2. Open http://localhost:9091/admin/sessions/<session-id>/traces, open the
+2. Open http://localhost:9090/admin/sessions/<session-id>/traces, open the
    most recent LLM call and look at its request body.
    **Expected:** The `run_agent` tool description ends with
    `Available to you: checker, explorer, reader.`
