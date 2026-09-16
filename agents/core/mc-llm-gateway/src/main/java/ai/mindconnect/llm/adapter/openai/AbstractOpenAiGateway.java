@@ -464,7 +464,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         // models, so nothing can be told from the name and the field is sent.
         Map<String, Object> params = LlmParams.merge(config, request);
         String reasoningEffort = LlmParams.string(params, "reasoning_effort");
-        boolean effortAccepted = config.provider() != LlmProvider.OPENAI || reasoning;
+        boolean effortAccepted = !OPENAI_ITSELF.contains(config.provider()) || reasoning;
         if (reasoningEffort != null && effortAccepted) {
             root.put("reasoning_effort", reasoningEffort);
         }
@@ -514,6 +514,10 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         return root;
     }
 
+    /** OpenAI's own API, whichever way a config reaches it. */
+    private static final Set<LlmProvider> OPENAI_ITSELF =
+            EnumSet.of(LlmProvider.OPENAI, LlmProvider.OPENAI_CHAT_COMPLETIONS);
+
     /**
      * The endpoints that take a {@code file} content block. It is OpenAI's
      * own extension of Chat Completions — OpenRouter mirrors it, Azure serves
@@ -521,7 +525,8 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
      * Groq, Mistral, …) rejects the request with a 400 for an unknown type.
      */
     private static final Set<LlmProvider> FILE_BLOCK_PROVIDERS =
-            EnumSet.of(LlmProvider.OPENAI, LlmProvider.AZURE_OPENAI, LlmProvider.OPENROUTER);
+            EnumSet.of(LlmProvider.OPENAI, LlmProvider.OPENAI_CHAT_COMPLETIONS,
+                    LlmProvider.AZURE_OPENAI, LlmProvider.OPENROUTER);
 
     /**
      * A user message with media as the Chat Completions content array: text

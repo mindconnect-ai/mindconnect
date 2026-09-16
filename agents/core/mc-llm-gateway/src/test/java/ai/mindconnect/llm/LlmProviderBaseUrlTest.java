@@ -30,6 +30,7 @@ class LlmProviderBaseUrlTest {
     @Test
     void theEndpointsAreTheOnesTheProvidersPublish() {
         assertThat(LlmProvider.OPENAI.defaultBaseUrl()).isEqualTo("https://api.openai.com");
+        assertThat(LlmProvider.OPENAI_CHAT_COMPLETIONS.defaultBaseUrl()).isEqualTo("https://api.openai.com");
         assertThat(LlmProvider.ANTHROPIC.defaultBaseUrl()).isEqualTo("https://api.anthropic.com");
         assertThat(LlmProvider.MISTRAL.defaultBaseUrl()).isEqualTo("https://api.mistral.ai");
         assertThat(LlmProvider.GROQ.defaultBaseUrl()).isEqualTo("https://api.groq.com/openai");

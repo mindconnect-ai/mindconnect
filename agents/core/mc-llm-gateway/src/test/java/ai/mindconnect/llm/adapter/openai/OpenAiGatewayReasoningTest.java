@@ -76,6 +76,23 @@ class OpenAiGatewayReasoningTest {
     }
 
     @Test
+    void openAiThroughChatCompletionsIsStillOpenAi() throws Exception {
+        LlmConfig nonReasoning = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI_CHAT_COMPLETIONS,
+                "gpt-4o", null, "sk-test", 0.7, 4096,
+                Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
+        assertThat(gateway.buildRequestNode(nonReasoning.resolved(encryption), request)
+                .has("reasoning_effort")).isFalse();
+        assertThat(gateway.endpointUrl(nonReasoning)).isEqualTo("https://api.openai.com/v1/chat/completions");
+        // the summary is a Responses API setting — nothing to offer here
+        assertThat(LlmProvider.OPENAI_CHAT_COMPLETIONS.additionalParams())
+                .extracting(ai.mindconnect.llm.domain.AdditionalParamSpec::key)
+                .contains("reasoning_effort").doesNotContain("reasoning_summary");
+        assertThat(LlmProvider.OPENAI.additionalParams())
+                .extracting(ai.mindconnect.llm.domain.AdditionalParamSpec::key)
+                .contains("reasoning_effort", "reasoning_summary");
+    }
+
+    @Test
     void reasoningContentFieldBecomesAThinkingDelta() {
         List<LlmStreamChunk> chunks = parse(
                 "{\"choices\":[{\"delta\":{\"reasoning_content\":\"Let me see\"}}]}",
