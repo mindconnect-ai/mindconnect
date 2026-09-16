@@ -10,6 +10,9 @@ import java.util.Locale;
  * form ({@code llm-config}), because a registry's index is written by hand and
  * {@code LLM_CONFIG} in JSON reads like a leaked Java constant.
  *
+ * <p>{@link #SKILL} is a {@code SKILL.md} rather than a JSON file: front matter
+ * with name, description and tools, then the instructions as Markdown.
+ *
  * <p>{@link #PACKAGE} is the odd one out: it installs nothing itself. Its file
  * is a manifest of other entries — "an assistant, the two sub-agents it calls,
  * their workflow and the LLM alias they all point at" — and the import service
@@ -20,6 +23,7 @@ public enum RegistryItemType {
     LLM_CONFIG("llm-config", "LLM config"),
     AGENT("agent", "Agent"),
     WORKFLOW("workflow", "Workflow"),
+    SKILL("skill", "Skill"),
     PACKAGE("package", "Package");
 
     private final String wireName;
@@ -52,12 +56,28 @@ public enum RegistryItemType {
         if (text == null || text.isBlank()) {
             throw new IllegalArgumentException("Registry entry has no type");
         }
+        RegistryItemType type = fromWireOrNull(text);
+        if (type == null) {
+            throw new IllegalArgumentException("Unknown registry entry type '" + text + "'");
+        }
+        return type;
+    }
+
+    /**
+     * {@link #fromWire} for a reader that can live with not knowing: the type,
+     * or {@code null} when the text names none this version has — the way an
+     * index written for a newer Mindconnect is read by an older one.
+     */
+    public static RegistryItemType fromWireOrNull(String text) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
         String normalised = text.strip().toLowerCase(Locale.ROOT).replace('_', '-');
         for (RegistryItemType type : values()) {
             if (type.wireName.equals(normalised)) {
                 return type;
             }
         }
-        throw new IllegalArgumentException("Unknown registry entry type '" + text + "'");
+        return null;
     }
 }
