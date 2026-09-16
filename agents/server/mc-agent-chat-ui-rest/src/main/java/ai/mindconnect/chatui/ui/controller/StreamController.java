@@ -145,11 +145,15 @@ public class StreamController {
             return ResponseEntity.ok().body(emitter);
         }
 
-        // A client that arrives mid-turn has no streaming bubble in its DOM,
-        // so every cumulative token REPLACE would land nowhere. The catch-up
-        // frames create it and fill it with the reply so far.
+        // A client that arrives mid-turn has neither the streaming bubble nor
+        // the thought still running in its DOM — nothing persisted builds them —
+        // so every cumulative REPLACE would land nowhere. The catch-up frames
+        // create them, filled with what has come so far.
         var prelude = new java.util.ArrayList<ai.mindconnect.chatui.service.StreamBus.Event>();
         sessionStreams.catchUp(channelId).ifPresent(c -> {
+            for (String card : c.cardPatches()) {
+                prelude.add(new ai.mindconnect.chatui.service.StreamBus.Event(0, "patch", card));
+            }
             if (c.bubblePatch() != null) {
                 prelude.add(new ai.mindconnect.chatui.service.StreamBus.Event(0, "patch", c.bubblePatch()));
             }

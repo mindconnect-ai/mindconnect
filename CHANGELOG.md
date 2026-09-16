@@ -169,6 +169,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   "Streaming error" (HTTP 400). With tools the gateway now sends
   `reasoning_effort: none` to these models; a configured effort still applies to
   turns without tools.
+- **agents:** **a thought keeps streaming after you come back to the chat.** Leaving a
+  chat while the model was thinking — to the agents page and back — lost the
+  thinking card: it was not saved yet, so the page could not rebuild it, and the
+  updates that followed had nowhere to go. A client that attaches mid-turn now gets
+  the running (or just finished) thought along with the streaming reply.
 - **agents:** **an approved tool call stays in the chat.** Answering an approval
   card rebuilt the whole message list, which wiped the card of the tool that had
   just started running; it only came back when the turn ended. Now only the

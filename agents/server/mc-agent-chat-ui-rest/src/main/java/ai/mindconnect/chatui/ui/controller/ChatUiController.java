@@ -1648,7 +1648,9 @@ public class ChatUiController {
             // A thought ends with whatever it led to: anything that is not
             // more thinking closes the open card of this scope.
             LiveThinking thinking = thinkingFor(thinkings, sessionId, null);
-            if (!(event instanceof StreamEvent.Thinking)) closeThinking(thinking, liveView, bus);
+            if (!(event instanceof StreamEvent.Thinking)) {
+                closeThinking(thinking, liveView, bus, event instanceof StreamEvent.Token);
+            }
             switch (event) {
                 case StreamEvent.Thinking th -> onThinking(thinking, null, th.text(), liveView, bus);
                 case StreamEvent.Token t -> {
@@ -1755,7 +1757,7 @@ public class ChatUiController {
                 String message = cause.getMessage() != null ? cause.getMessage() : cause.toString();
                 try {
                     // A thought the failure cut short must not keep running on screen.
-                    for (LiveThinking open : thinkings.values()) closeThinking(open, liveView, bus);
+                    for (LiveThinking open : thinkings.values()) closeThinking(open, liveView, bus, false);
                     publishPatch(bus, liveView.streamError(message));
                 } catch (Exception ignored) {}
                 try {
@@ -1821,14 +1823,27 @@ public class ChatUiController {
         private static final long PUBLISH_INTERVAL_MS = 120;
 
         private final String scopeKey;
+        private final String scope;
+        private final String channelId;
         private final StringBuilder text = new StringBuilder();
         private String nodeId;
         private long startedAt;
         private long lastPublishedAt;
         private int stretch;
 
-        LiveThinking(String scopeKey) {
+        LiveThinking(String scopeKey, String scope, String channelId) {
             this.scopeKey = scopeKey;
+            this.scope = scope;
+            this.channelId = channelId;
+        }
+
+        /** {@code null} for the top-level agent, else the sub-session id. */
+        String scope() {
+            return scope;
+        }
+
+        String channelId() {
+            return channelId;
         }
 
         boolean open() {
@@ -1874,29 +1889,54 @@ public class ChatUiController {
     private static LiveThinking thinkingFor(java.util.Map<String, LiveThinking> thinkings,
                                             SessionId sessionId, String scope) {
         String key = scope == null ? sessionId.value() : scope;
-        return thinkings.computeIfAbsent(key, LiveThinking::new);
+        return thinkings.computeIfAbsent(key, k -> new LiveThinking(k, scope,
+                ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId)));
     }
 
-    /** A reasoning delta: opens the scope's card on the first one, grows its body afterwards. */
+    /**
+     * A reasoning delta: opens the scope's card on the first one, grows its body afterwards.
+     *
+     * <p>Nothing persisted holds a thought until what it led to is saved, so a
+     * client that attaches meanwhile — back from another page — gets the card
+     * from the catch-up frames, as it is now; the body REPLACEs that follow
+     * would land nowhere without it.
+     */
     private void onThinking(LiveThinking thinking, String scope, String text, ChatPage liveView,
                             ai.mindconnect.chatui.service.StreamBus bus) {
         if (!thinking.open()) {
             thinking.start();
             thinking.append(text);
-            publishPatch(bus, appendCard(liveView, scope,
-                    TaskCardComponent.runningThinking(thinking.nodeId(), thinking.text())));
+            sessionStreams.rememberCard(thinking.channelId(), thinking.nodeId(), publishPatch(bus, appendCard(liveView, scope,
+                    TaskCardComponent.runningThinking(thinking.nodeId(), thinking.text()))));
             return;
         }
         if (thinking.append(text)) {
             publishPatch(bus, liveView.streamThinking(thinking.nodeId(), thinking.text()));
+            sessionStreams.rememberCard(thinking.channelId(), thinking.nodeId(), json(appendCard(liveView, scope,
+                    TaskCardComponent.runningThinking(thinking.nodeId(), thinking.text()))));
         }
     }
 
-    /** Ends the open thinking card, if any: header flips from running to "thought for". */
+    /**
+     * Ends the open thinking card, if any: header flips from running to "thought for".
+     *
+     * @param keepForJoiners the thought led to the streaming answer, which is
+     *                       saved — with the thought — only when the turn ends,
+     *                       so a joiner still needs the finished card; a thought
+     *                       that led to a tool call is saved with that call and
+     *                       rendered from history, so the catch-up drops it
+     */
     private void closeThinking(LiveThinking thinking, ChatPage liveView,
-                               ai.mindconnect.chatui.service.StreamBus bus) {
+                               ai.mindconnect.chatui.service.StreamBus bus, boolean keepForJoiners) {
         if (!thinking.open()) return;
-        publishPatch(bus, liveView.streamTaskUpdate(thinking.close()));
+        String nodeId = thinking.nodeId();
+        TaskCardComponent done = thinking.close();
+        publishPatch(bus, liveView.streamTaskUpdate(done));
+        if (keepForJoiners) {
+            sessionStreams.rememberCard(thinking.channelId(), nodeId, json(appendCard(liveView, thinking.scope(), done)));
+        } else {
+            sessionStreams.forgetCard(thinking.channelId(), nodeId);
+        }
     }
 
     /** Per-task state held while a turn is streaming. */
@@ -1952,7 +1992,7 @@ public class ChatUiController {
         // at the top level: anything but more thinking closes its card.
         String scope = scopeOf(parentTaskId, taskToSession);
         LiveThinking thinking = thinkingFor(thinkings, sessionId, scope);
-        if (!(inner instanceof StreamEvent.Thinking)) closeThinking(thinking, liveView, bus);
+        if (!(inner instanceof StreamEvent.Thinking)) closeThinking(thinking, liveView, bus, false);
 
         switch (inner) {
             case StreamEvent.Thinking th -> onThinking(thinking, scope, th.text(), liveView, bus);
@@ -2142,6 +2182,16 @@ public class ChatUiController {
      * reconnect-GET emitters from {@code /streams/{id}/sse}) sees it; the
      * ring buffer keeps the last N for late joiners.
      */
+    /** The patch as the stream would carry it, without publishing it; {@code null} if it does not serialise. */
+    private String json(UiPatch patch) {
+        try {
+            return objectMapper.writeValueAsString(patch);
+        } catch (Exception e) {
+            log.warn("Failed to serialise SSE patch", e);
+            return null;
+        }
+    }
+
     private String publishPatch(ai.mindconnect.chatui.service.StreamBus bus, UiPatch patch) {
         try {
             String json = objectMapper.writeValueAsString(patch);
