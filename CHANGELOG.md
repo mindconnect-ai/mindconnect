@@ -190,6 +190,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **the admin UI and the API server start on Postgres again.** With
+  `mindconnect.persistence=postgres` the application stopped at start-up with a
+  circular reference between `agentRuntime` and `toolRepository`: the runtime asked
+  the application for a tool repository, and the only one there was the runtime
+  starter's own export of it. The runtime now looks among the application's beans
+  only, never among the ones the starter hands out from the runtime itself.
 - **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
   turn left its thinking card, tool cards and reply bubble on the page, and the next
   turn reused their ids — its thought and its answer streamed into the cancelled
