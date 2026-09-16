@@ -1,6 +1,7 @@
 package ai.mindconnect.workflow.persistence.file;
 
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
+import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowRepositoryFactory;
 
 import java.nio.file.Path;
@@ -19,5 +20,10 @@ public class FileWorkflowRepositoryFactory implements WorkflowRepositoryFactory 
     @Override
     public WorkflowDataRepository workflowDataRepository() {
         return new FileWorkflowDataRepository(baseDir, partition);
+    }
+
+    @Override
+    public WorkflowInstanceRepository workflowInstanceRepository() {
+        return new FileWorkflowInstanceRepository(baseDir, partition);
     }
 }

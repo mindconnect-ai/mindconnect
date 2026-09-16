@@ -26,6 +26,10 @@
             <artifactId>mc-agent-runtime-feature-core</artifactId>
         </dependency>
         <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>

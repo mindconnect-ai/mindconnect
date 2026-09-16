@@ -28,7 +28,14 @@ public class DefaultRuntimeBeans implements RuntimeBeans {
     private final Map<Class<?>, Object> singletons = new LinkedHashMap<>();
     /** Types whose factory is running on the current thread's resolution chain — for cycle reports. */
     private final Set<Class<?>> resolving = new LinkedHashSet<>();
+    /** Consulted for a type nobody registered — a host container, for beans that live outside the runtime. */
+    private volatile java.util.function.Function<Class<?>, Optional<?>> fallback = type -> Optional.empty();
     private boolean frozen;
+
+    /** Where {@link #find} looks when no feature registered the type; the host's own beans, typically. */
+    public void fallback(java.util.function.Function<Class<?>, Optional<?>> fallback) {
+        this.fallback = fallback == null ? type -> Optional.empty() : fallback;
+    }
 
     public synchronized <T> void register(Class<T> type, Supplier<? extends T> factory) {
         requireOpen();
@@ -69,7 +76,7 @@ public class DefaultRuntimeBeans implements RuntimeBeans {
         Object built = singletons.get(type);
         if (built != null) return Optional.of((T) built);
         Supplier<?> factory = factories.get(type);
-        if (factory == null) return Optional.empty();
+        if (factory == null) return (Optional<T>) fallback.apply(type);
         if (!resolving.add(type)) {
             throw new FeatureException("Beans need each other to be built: "
                     + chain(type) + " → " + type.getSimpleName());

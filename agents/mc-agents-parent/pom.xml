@@ -83,6 +83,11 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-starter-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-file-store-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -244,6 +249,16 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-runtime-feature-namespace</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-runtime-feature-transcription</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

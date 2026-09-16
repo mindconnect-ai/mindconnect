@@ -2,7 +2,8 @@ package ai.mindconnect.agent.runtime.feature.skills;
 
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
-import ai.mindconnect.agent.runtime.port.out.AgentRepositoryFactory;
+import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
+import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.skill.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
@@ -63,7 +64,8 @@ public class SkillsFeature extends ConfigurableFeature {
     @Override
     protected void install(FeatureContext ctx) {
         if (userDir != null) ctx.property("skillsUserDir", userDir);
-        ctx.bean(SkillRepository.class, () -> ctx.require(AgentRepositoryFactory.class).skillRepository());
+        ctx.bean(SkillRepository.class, () -> ctx.require(NamespaceRouting.class).route(SkillRepository.class,
+                ns -> ctx.runtime().feature(CoreFeature.class).agentRepositories(ns).skillRepository()));
         ctx.bean(SkillCatalog.class, () -> SkillCatalog.of(
                 ctx.require(SkillRepository.class), ctx.property("skillsUserDir").orElse("")));
         ctx.onStart(() -> {

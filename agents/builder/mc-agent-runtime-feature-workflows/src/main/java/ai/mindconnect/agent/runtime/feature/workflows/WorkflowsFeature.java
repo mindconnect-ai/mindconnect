@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.feature.workflows;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
+import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
@@ -10,6 +11,7 @@ import ai.mindconnect.workflow.persistence.file.FileWorkflowRepositoryFactory;
 import ai.mindconnect.workflow.persistence.memory.InMemoryWorkflowRepositoryFactory;
 import ai.mindconnect.workflow.persistence.pg.PgWorkflowRepositoryFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
+import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowRepositoryFactory;
 
 import java.io.IOException;
@@ -18,6 +20,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Persisted workflows as tools: the workflow store the runtime and its tools
@@ -43,13 +46,16 @@ public class WorkflowsFeature extends ConfigurableFeature {
 
     @Override
     protected void install(FeatureContext ctx) {
-        ctx.bean(WorkflowRepositoryFactory.class, () -> switch (ctx.persistence()) {
-            case Persistence.InMemory m -> new InMemoryWorkflowRepositoryFactory();
-            case Persistence.File f -> new FileWorkflowRepositoryFactory(f.dataDir(), ctx.require(Namespace.class).value());
-            case Persistence.Postgres p -> new PgWorkflowRepositoryFactory(
-                    ctx.require(ai.mindconnect.jdbc.Sql.class), ctx.require(Namespace.class).value());
-        });
-        ctx.bean(WorkflowDataRepository.class, () -> ctx.require(WorkflowRepositoryFactory.class).workflowDataRepository());
+        // The factory per namespace: the persistence setting looked at once, the routing builds the rest.
+        Function<Namespace, WorkflowRepositoryFactory> factories = switch (ctx.persistence()) {
+            case Persistence.InMemory m -> ns -> new InMemoryWorkflowRepositoryFactory(m.dataDir(), ns.value());
+            case Persistence.File f -> ns -> new FileWorkflowRepositoryFactory(f.dataDir(), ns.value());
+            case Persistence.Postgres p -> ns -> new PgWorkflowRepositoryFactory(ctx.require(ai.mindconnect.jdbc.Sql.class), ns.value());
+        };
+        ctx.bean(WorkflowDataRepository.class, () -> ctx.require(NamespaceRouting.class).route(
+                WorkflowDataRepository.class, ns -> factories.apply(ns).workflowDataRepository()));
+        ctx.bean(WorkflowInstanceRepository.class, () -> ctx.require(NamespaceRouting.class).route(
+                WorkflowInstanceRepository.class, ns -> factories.apply(ns).workflowInstanceRepository()));
         ctx.onStart(() -> {
             if (resources.isEmpty()) return;
             var store = ctx.require(WorkflowDataRepository.class);

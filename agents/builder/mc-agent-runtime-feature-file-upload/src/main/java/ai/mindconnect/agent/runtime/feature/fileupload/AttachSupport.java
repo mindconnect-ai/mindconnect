@@ -5,8 +5,6 @@ import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.feature.RuntimeBeans;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
-import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,27 +62,11 @@ public class AttachSupport {
     public static AttachSupport create(Map<String, String> environment,
                                        DynamicToolActivations activations,
                                        AgentSessionRepository sessions,
-                                       LlmEmbeddings embeddings,
-                                       LlmConfigRepository llmConfigs,
+                                       ai.mindconnect.vectorstore.tools.VectorStores stores,
                                        RuntimeBeans beans,
                                        ai.mindconnect.filestore.FileStore fileStore,
                                        ai.mindconnect.agent.Namespace namespace,
                                        ai.mindconnect.agent.runtime.service.UserHome userHome) {
-        var env = new ai.mindconnect.agent.tool.ToolEnvironment() {
-            @Override @SuppressWarnings("unchecked")
-            public <T> Optional<T> get(Class<T> type) {
-                if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
-                if (type == LlmConfigRepository.class) return Optional.of((T) llmConfigs);
-                if (type == ai.mindconnect.agent.Namespace.class) return Optional.of((T) namespace);
-                return Optional.empty();
-            }
-            @Override public Optional<String> getString(String key) {
-                return Optional.ofNullable(environment.get(key)).filter(s -> !s.isBlank());
-            }
-        };
-        var stores = ai.mindconnect.vectorstore.tools.VectorStores.fromEnvironment(env)
-                .orElseThrow(() -> new IllegalStateException("The vector stores could not be opened from the"
-                        + " runtime's settings — see VectorStores.fromEnvironment"));
         return new AttachSupport(environment, activations, sessions, fileStore, stores, beans, namespace, userHome);
     }
 

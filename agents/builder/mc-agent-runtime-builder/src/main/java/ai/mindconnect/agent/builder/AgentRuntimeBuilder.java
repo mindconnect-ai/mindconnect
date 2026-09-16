@@ -14,6 +14,7 @@ import ai.mindconnect.agent.runtime.feature.DefaultFeatureContext;
 import ai.mindconnect.agent.runtime.feature.DefaultRuntimeBeans;
 import ai.mindconnect.agent.runtime.feature.FeatureException;
 import ai.mindconnect.agent.runtime.feature.FeatureRegistry;
+import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
@@ -59,6 +60,7 @@ import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.taskqueue.LoggingTaskListener;
+import ai.mindconnect.taskqueue.TaskAdvisor;
 import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;
@@ -241,6 +243,17 @@ public class AgentRuntimeBuilder {
         return this;
     }
 
+    /**
+     * Where {@code beans().find(type)} looks when no feature registered the type:
+     * a host container's beans, so that a tool from an optional module finds the
+     * host's service without any feature naming it.
+     */
+    public AgentRuntimeBuilder beanFallback(java.util.function.Function<Class<?>, java.util.Optional<?>> fallback) {
+        requireNotBuilt();
+        beans.fallback(fallback);
+        return this;
+    }
+
     public AgentRuntimeBuilder objectMapper(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
         return this;
@@ -361,6 +374,9 @@ public class AgentRuntimeBuilder {
         context.bean(Namespace.class, () -> new Namespace(namespaceName));
         // Where this runtime works — one namespace for its whole life.
         context.bean(ScopeSupplier.class, () -> ScopeSupplier.fixed(context.require(Namespace.class)));
+        // … and so every adapter is built once, for that namespace. A feature that binds the
+        // scope per call (the namespace feature) replaces both beans.
+        context.bean(NamespaceRouting.class, () -> NamespaceRouting.fixed(context.require(Namespace.class)));
         context.bean(ObjectMapper.class, () -> objectMapper);
         if (persistence instanceof Persistence.Postgres postgres) {
             // One Sql for every Postgres store, around this builder's mapper, so
@@ -426,6 +442,8 @@ public class AgentRuntimeBuilder {
                 // Finished task trees are forgotten at the next maintenance tick unless
                 // taskRetention() says otherwise — the turn's outcome lives in the conversation.
                 queue.withRetention(taskRetention);
+                // Every task carries the scope it was submitted in, is audited, … — whatever the features contributed.
+                beans.all(TaskAdvisor.class).forEach(queue::addAdvisor);
                 return queue;
             });
         }

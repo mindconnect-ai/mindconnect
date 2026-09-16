@@ -17,9 +17,17 @@ public class PgAgentRepositoryFactory implements AgentRepositoryFactory {
     private final Sql sql;
     private final Namespace namespace;
 
+    private final int maxTracesPerConversation;
+
     public PgAgentRepositoryFactory(Sql sql, Namespace namespace) {
+        this(sql, namespace, 50);
+    }
+
+    /** {@code maxTracesPerConversation}: the LLM call traces kept per conversation, oldest dropped; 0 keeps all. */
+    public PgAgentRepositoryFactory(Sql sql, Namespace namespace, int maxTracesPerConversation) {
         this.sql = sql;
         this.namespace = namespace;
+        this.maxTracesPerConversation = maxTracesPerConversation;
     }
 
     @Override public AgentDefinitionRepository agentDefinitionRepository() { return new PgAgentDefinitionRepository(sql, namespace).initSchema(); }
@@ -27,6 +35,6 @@ public class PgAgentRepositoryFactory implements AgentRepositoryFactory {
     @Override public WorkingMemoryRepository workingMemoryRepository() { return new PgWorkingMemoryRepository(sql, namespace).initSchema(); }
     @Override public ConversationSummaryRepository conversationSummaryRepository() { return new PgConversationSummaryRepository(sql, namespace).initSchema(); }
     @Override public TodoListRepository todoListRepository() { return new PgTodoListRepository(sql, namespace).initSchema(); }
-    @Override public LlmCallTraceRepository llmCallTraceRepository() { return new PgLlmCallTraceRepository(sql, namespace).initSchema(); }
+    @Override public LlmCallTraceRepository llmCallTraceRepository() { return new PgLlmCallTraceRepository(sql, maxTracesPerConversation, namespace).initSchema(); }
     @Override public SkillRepository skillRepository() { return new PgSkillRepository(sql, namespace).initSchema(); }
 }

@@ -37,6 +37,7 @@ its cross-cutting advisors, and it declares what it depends on.
 | `ToolsFeature` | `mc-agent-runtime-feature-tools` | the tool registry over the `mc-agent-tools-*` modules on the classpath, dynamic activation, the executor with every contributed `ToolAdvisor` | — |
 | `WorkflowsFeature` | `mc-agent-runtime-feature-workflows` | the workflow store the runtime and the workflow tools share — files, memory or Postgres, following the persistence — seeded from the classpath; brings `mc-agent-tools-workflow` | — |
 | `FileUploadFeature` | `mc-agent-runtime-feature-file-upload` | the file store (a directory or Postgres, following the persistence) and `attachFile` — indexing a document into the session's vector store; brings `mc-file-store` and `mc-vector-store-tools` | `ToolsFeature` |
+| `TranscriptionFeature` | `mc-agent-runtime-feature-transcription` | speech to text by LLM config name, over the OpenAI-compatible transcription endpoint | — |
 
 The core is always there: `of(persistence)` installs it, because a runtime without
 a model, a transcript or a session is not an agent runtime — which is why the
@@ -142,3 +143,27 @@ public class AuditFeature extends ConfigurableFeature {     // or implement Runt
 
 Register the class in `META-INF/services/ai.mindconnect.agent.runtime.feature.RuntimeFeature`
 and `installFromClasspath()` finds it; or `install(new AuditFeature())` by hand.
+
+## The same runtime in Spring Boot
+
+The server applications build their runtime the same way. `mc-agent-starter-runtime`
+is a Spring Boot starter whose auto-configuration runs the builder: the
+`Persistence` comes from the persistence starter of the application
+(`mc-agent-starter-file` or `mc-agent-starter-postgres`), the thread-bound scope
+from the namespace starter — then the `NamespaceFeature` is installed and the
+runtime works in the namespace of each request — and the settings are the
+`mindconnect.*` properties they always were (`mindconnect.tools.*`,
+`mindconnect.agent.*`, `mindconnect.vector-store.*`, …). The starter exports the
+runtime's beans to the context, so a controller injects `AgentChatService`,
+`LlmConfigRepository`, `ToolRegistry`, … as before, and every bean of the
+context is a fallback for the runtime's tools — a tool from an optional module
+finds the host's MCP gateway without the runtime naming it.
+
+An application contributes to the runtime with beans:
+
+```java
+@Bean RuntimeFeature audit() { return new AuditFeature(); }          // installed, replacing a shipped feature of the same name
+@Bean AgentRuntimeCustomizer noBash() { return b -> b.property("disabledTools", "bash"); }
+```
+
+and reaches it as `AgentRuntime` — `runtime.feature(CoreFeature.class)`, `runtime.beans()`.

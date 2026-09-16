@@ -1,19 +1,16 @@
 package ai.mindconnect.cli;
 
-import ai.mindconnect.agent.runtime.adapter.config.DefaultAgentRuntimeConfig;
-import ai.mindconnect.agent.runtime.adapter.config.TodoToolsConfig;
-import ai.mindconnect.message.adapter.file.MessageRepositoryConfig;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Import;
 
+/**
+ * The terminal client. In local mode the agent runtime comes from
+ * {@code mc-agent-starter-runtime}, on files, without an encryption key —
+ * a personal tool on a personal machine keeps its credentials plain.
+ */
 @SpringBootApplication
-@Import({
-    CliConfig.class,
-    MessageRepositoryConfig.class,
-    DefaultAgentRuntimeConfig.class,
-    TodoToolsConfig.class
-})
+@Import(CliConfig.class)
 public class AgentCliApplication {
 
     public static void main(String[] args) {

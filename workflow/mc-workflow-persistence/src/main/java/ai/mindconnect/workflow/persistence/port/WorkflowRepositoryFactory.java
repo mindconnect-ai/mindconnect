@@ -8,4 +8,7 @@ package ai.mindconnect.workflow.persistence.port;
 public interface WorkflowRepositoryFactory {
 
     WorkflowDataRepository workflowDataRepository();
+
+    /** The store of running and finished instances (their snapshots), in the same partition. */
+    WorkflowInstanceRepository workflowInstanceRepository();
 }
