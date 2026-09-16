@@ -42,6 +42,17 @@ class FileNamespaceRepositoryTest {
     }
 
     @Test
+    void theNamespacesVariablesSurviveTheRoundTrip() {
+        var repo = new FileNamespaceRepository(dir, mapper);
+        NamespaceDefinition acme = acme(UserId.of("alice")).withEnvironment(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
+        repo.save(acme);
+
+        assertThat(repo.findById(new Namespace("acme"))).contains(acme);
+        assertThat(repo.findById(new Namespace("acme"))).get().extracting(NamespaceDefinition::environment)
+                .isEqualTo(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
+    }
+
+    @Test
     void insertRefusesAnIdThatIsTaken() {
         var repo = new FileNamespaceRepository(dir, mapper);
 

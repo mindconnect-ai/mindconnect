@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.common.util.EnvVarResolver;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
@@ -352,7 +352,8 @@ public class MigrationService {
     private String plaintext(String key) {
         if (key == null) return null;
         try {
-            return encryption.resolve(EnvVarResolver.resolve(key));
+            // The process environment on purpose: the diff is the installation's, the same for whoever looks.
+            return encryption.resolve(EnvVarResolver.system().resolve(key));
         } catch (RuntimeException e) {
             return key;
         }

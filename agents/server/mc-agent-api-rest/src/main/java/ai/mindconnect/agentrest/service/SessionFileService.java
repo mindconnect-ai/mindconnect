@@ -65,6 +65,7 @@ public class SessionFileService {
     private final Path spoolBase;
     /** Where a call works — every store call names the namespace. */
     private final ScopeSupplier scope;
+    private final ai.mindconnect.common.env.EnvVarResolver environment;
     /** Where a session's own directory is; unconfigured means the spool under the tools base dir. */
     private final ai.mindconnect.agent.runtime.service.UserHome userHome;
 
@@ -76,8 +77,10 @@ public class SessionFileService {
                               ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
                               ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome,
-                              ScopeSupplier scope) {
+                              ScopeSupplier scope,
+                              ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
         this.scope = scope;
+        this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStore = fileStore;
         this.storesProvider = storesProvider;
         this.activationsProvider = activationsProvider;
@@ -305,7 +308,7 @@ public class SessionFileService {
                 var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                         new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                                 + "' not found"));
-                var runner = new WorkflowRunService(workflowInstances);
+                var runner = new WorkflowRunService(workflowInstances, environment::asMap);
                 ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
                 // The workflow's tool steps run on behalf of this chat's user and
                 // session — the calls its upload store accepts — and resolve their

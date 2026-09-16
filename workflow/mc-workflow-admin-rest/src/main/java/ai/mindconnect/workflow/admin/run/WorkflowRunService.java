@@ -24,6 +24,7 @@ import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.Set;
 
 /**
@@ -144,13 +145,21 @@ public class WorkflowRunService {
 
     /** Where a suspended run is written so it can be picked up later. May be null. */
     private final WorkflowInstanceRepository instances;
+    /** What a run's {@code env} variable holds — see {@link WorkflowExecutorService#withEnvironment}. */
+    private final Supplier<Map<String, String>> environment;
 
     public WorkflowRunService() {
         this(null);
     }
 
     public WorkflowRunService(WorkflowInstanceRepository instances) {
+        this(instances, WorkflowExecutorService::processEnvironment);
+    }
+
+    /** @param environment what a run's {@code env} variable holds; the process environment when null */
+    public WorkflowRunService(WorkflowInstanceRepository instances, Supplier<Map<String, String>> environment) {
         this.instances = instances;
+        this.environment = environment != null ? environment : WorkflowExecutorService::processEnvironment;
     }
 
     /** Runs a workflow from the start. */
@@ -196,7 +205,7 @@ public class WorkflowRunService {
         // SPI factory wires every WorkflowConfigurer on the classpath — so the
         // json:, javascript:, … resolvers are all active during the run.
         WorkflowContextFactory factory = SpiWorkflowContextFactory.create();
-        WorkflowExecutorService service = new WorkflowExecutorService(factory);
+        WorkflowExecutorService service = new WorkflowExecutorService(factory).withEnvironment(environment);
         service.addEventListener(recorder);
         if (extraListener != null) {
             service.addEventListener(extraListener);
@@ -238,7 +247,7 @@ public class WorkflowRunService {
 
         try {
             WorkflowInstance restored = WorkflowInstanceSnapshots.restore(wf, snapshot, context);
-            WorkflowResult result = new WorkflowExecutorService(factory)
+            WorkflowResult result = new WorkflowExecutorService(factory).withEnvironment(environment)
                     .continueWorkflow(restored, params == null ? Map.of() : params);
 
             // The same instance is saved again with its new status — resumed, not

@@ -14,6 +14,10 @@ the tools or the agent definitions knows the difference.
 
 ## Ports and adapters
 
+The runtime starter (`mc-agent-starter-runtime`) builds every store of the runtime from the
+`Persistence` a persistence starter declares — the starters themselves keep only what is
+installation-wide: the users and their API tokens.
+
 Each domain module also ships a **repository factory** for its ports —
 `AgentRepositoryFactory` (agent runtime), `MessageRepositoryFactory` (messages),
 `LlmRepositoryFactory` (LLM configs) — with one implementation per backend:

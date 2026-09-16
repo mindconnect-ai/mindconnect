@@ -1,28 +1,16 @@
 package ai.mindconnect.cli;
 
-import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
-
-import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
-import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
-import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
-import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
-import ai.mindconnect.llm.service.RoutingLlmChatService;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import okhttp3.OkHttpClient;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.nio.file.Path;
 import java.util.concurrent.TimeUnit;
 
+/** The CLI's own beans: its JSON and the HTTP client of the remote mode. The local runtime is the starter's. */
 @Configuration
 public class CliConfig {
 
@@ -43,53 +31,5 @@ public class CliConfig {
                 .readTimeout(120, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
                 .build();
-    }
-    // FOR LOCAL
-    @Bean
-    LlmConfigRepository llmConfigRepository(
-            @Value("${mindconnect.data.base-dir:data}") String baseDir,
-            ai.mindconnect.agent.ScopeSupplier scope) {
-        return ai.mindconnect.agent.NamespaceRouted.route(LlmConfigRepository.class, scope,
-                ns -> new FileLlmConfigRepository(Path.of(baseDir), ns));
-    }
-
-    @Bean
-    OpenAiCompatibleGateway openAiCompatibleGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper) {
-        return new OpenAiCompatibleGateway(okHttpClient, objectMapper, EncryptionHelper.noEncryption());
-    }
-
-    @Bean
-    ClaudeGateway claudeGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper) {
-        return new ClaudeGateway(okHttpClient, objectMapper, EncryptionHelper.noEncryption());
-    }
-
-    @Bean
-    AzureOpenAiGateway azureOpenAiGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper) {
-        return new AzureOpenAiGateway(okHttpClient, objectMapper, EncryptionHelper.noEncryption());
-    }
-
-    @Bean
-    GeminiGateway geminiGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper) {
-        return new GeminiGateway(okHttpClient, objectMapper, EncryptionHelper.noEncryption());
-    }
-
-    @Bean
-    RoutingLlmChatService llmService(LlmConfigRepository llmConfigRepository,
-                                     OpenAiCompatibleGateway openAiCompatibleGateway,
-                                     ClaudeGateway claudeGateway,
-                                     AzureOpenAiGateway azureOpenAiGateway,
-                                     GeminiGateway geminiGateway) {
-        var gateways = new java.util.HashMap<LlmProvider, ai.mindconnect.llm.port.out.LlmGateway>();
-        // Every provider speaks the OpenAI API unless it has an adapter of
-        // its own — so default them all to it and override the three that
-        // differ. A provider added to the enum is then routed by itself.
-        for (LlmProvider provider : LlmProvider.values()) {
-            gateways.put(provider, openAiCompatibleGateway);
-        }
-        gateways.put(LlmProvider.ANTHROPIC,     claudeGateway);
-        gateways.put(LlmProvider.AZURE_OPENAI,  azureOpenAiGateway);
-        gateways.put(LlmProvider.GOOGLE_GEMINI, geminiGateway);
-        var registry = new DefaultLlmGatewayRegistry(gateways);
-        return new RoutingLlmChatService(llmConfigRepository, registry);
     }
 }

@@ -98,7 +98,7 @@ class AgentRuntimeFeaturesTest {
             assertThat(runtime.beans().get(LlmConfigRepository.class).findByName("test-llm")).isPresent();
             assertThat(runtime.llmConfigs()).isSameAs(runtime.beans().get(LlmConfigRepository.class));
             assertThat(runtime.features().all()).extracting(RuntimeFeature::name)
-                    .containsExactly("core", "skills", "tools", "workflows", "file-upload");
+                    .containsExactly("core", "skills", "tools", "workflows", "file-upload", "transcription");
         }
     }
 
@@ -165,8 +165,8 @@ class AgentRuntimeFeaturesTest {
         try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence().install(audit).build()) {
             assertThat(runtime.feature(AuditFeature.class)).isSameAs(audit);
             assertThat(runtime.beans().get(AuditFeature.Audit.class).who()).isEqualTo("me");
-            assertThat(runtime.beans().all(ToolAdvisor.class)).containsExactly(audit.toolAdvisor);
-            assertThat(runtime.beans().all(TaskAdvisor.class)).containsExactly(audit.taskAdvisor);
+            assertThat(runtime.beans().all(ToolAdvisor.class)).contains(audit.toolAdvisor);   // beside the core's todo advisor
+            assertThat(runtime.beans().all(TaskAdvisor.class)).contains(audit.taskAdvisor);
             assertThat(runtime.beans().get(String.class)).startsWith("audit of ");
         }
     }
@@ -178,7 +178,7 @@ class AgentRuntimeFeaturesTest {
                 .build()) {
             var names = runtime.features().all().stream().map(RuntimeFeature::name).toList();
             assertThat(names).containsExactlyInAnyOrder(
-                    "core", "skills", "tools", "workflows", "file-upload");
+                    "core", "skills", "tools", "workflows", "file-upload", "transcription");
             assertThat(names.indexOf("tools")).isLessThan(names.indexOf("file-upload"));
         }
     }

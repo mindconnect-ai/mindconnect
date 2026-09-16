@@ -4,6 +4,7 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 
@@ -11,6 +12,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -204,6 +207,73 @@ public class NamespaceService {
             namespaces.save(updated);
             return updated;
         }
+    }
+
+    /**
+     * Replaces the variables of {@code id} with exactly {@code environment} —
+     * every name with a value; the caller has already merged an edit into the
+     * full set. Only the creator sets them: they are the namespace's shared
+     * secrets. Values go to the repository as given; an encrypting repository
+     * decorator makes them {@code enc:} at rest.
+     */
+    public NamespaceDefinition setEnvironment(Namespace id, UserId actor, Map<String, String> environment) {
+        EnvVarResolver.requireValid(environment);
+        synchronized (lockFor(id)) {
+            NamespaceDefinition updated = creatorOnly(id, actor).withEnvironment(environment);
+            namespaces.save(updated);
+            return updated;
+        }
+    }
+
+    /** Adds the variable {@code name}, or replaces its value; creator only, merged under the namespace's lock. */
+    public NamespaceDefinition putVariable(Namespace id, UserId actor, String name, String value) {
+        EnvVarResolver.requireValid(name, value);
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = creatorOnly(id, actor);
+            Map<String, String> merged = new LinkedHashMap<>(ns.environment());
+            merged.put(name, value);
+            NamespaceDefinition updated = ns.withEnvironment(merged);
+            namespaces.save(updated);
+            return updated;
+        }
+    }
+
+    /**
+     * Removes the variable {@code name}. Creator only, and the right to remove is
+     * checked before the name is looked at, so nobody learns which variables a
+     * namespace holds by asking to remove them.
+     *
+     * @return the namespace afterwards, empty when it had no variable of that name
+     */
+    public Optional<NamespaceDefinition> removeVariable(Namespace id, UserId actor, String name) {
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = creatorOnly(id, actor);
+            Map<String, String> merged = new LinkedHashMap<>(ns.environment());
+            if (merged.remove(name) == null) return Optional.empty();
+            NamespaceDefinition updated = ns.withEnvironment(merged);
+            namespaces.save(updated);
+            return Optional.of(updated);
+        }
+    }
+
+    /**
+     * The namespace, when {@code actor} created it — the variables of a namespace are
+     * its creator's to set, like renaming and deleting it. The default namespace is
+     * refused: nobody created it and everyone works there, so it has no variables of
+     * its own and a {@code ${VAR}} there means the server's environment.
+     */
+    private NamespaceDefinition creatorOnly(Namespace id, UserId actor) {
+        Objects.requireNonNull(actor, "actor");
+        if (defaultNamespace.equals(id)) {
+            throw new IllegalArgumentException("The default namespace '" + id + "' has no variables of its own"
+                    + " — it belongs to the installation, so set them in the server's environment");
+        }
+        NamespaceDefinition ns = namespaces.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("No namespace '" + id + "'"));
+        if (!ns.isCreator(actor)) {
+            throw new IllegalArgumentException("Only the creator sets the variables of '" + id + "'");
+        }
+        return ns;
     }
 
     /** Membership and name changes are read-modify-write on one record: one at a time per namespace, in this process. */

@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.LlmHttpErrors;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -33,12 +34,20 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final EncryptionHelper encryption;
+    private final EnvVarResolver env;
 
-    public OpenAiEmbeddingsGateway(OkHttpClient httpClient, ObjectMapper objectMapper,
-                                   EncryptionHelper encryption) {
+    /** Placeholders resolve from the process environment alone — the library and desktop case. */
+    public OpenAiEmbeddingsGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
+        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
+    }
+
+    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
+    public OpenAiEmbeddingsGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
+                                   EnvVarResolver env) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.encryption = encryption;
+        this.env = env;
     }
 
     @Override
@@ -46,7 +55,7 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
         if (texts.isEmpty()) {
             return List.of();
         }
-        config = config.resolved(encryption);
+        config = config.resolved(env, encryption);
 
         ObjectNode body = objectMapper.createObjectNode();
         body.put("model", config.model());

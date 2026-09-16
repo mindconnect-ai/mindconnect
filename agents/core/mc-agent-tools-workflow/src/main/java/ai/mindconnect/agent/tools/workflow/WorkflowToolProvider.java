@@ -1,5 +1,9 @@
 package ai.mindconnect.agent.tools.workflow;
 
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.workflow.execution.WorkflowExecutorService;
+import java.util.Map;
+import java.util.function.Supplier;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.Tool;
@@ -39,6 +43,8 @@ public final class WorkflowToolProvider implements MultiToolProvider {
     private static final Logger log = LoggerFactory.getLogger(WorkflowToolProvider.class);
 
     private WorkflowDataRepository repository;
+    /** What a run's {@code env} variable holds; the process environment unless the host provides {@link EnvVarResolver}. */
+    private Supplier<Map<String, String>> environment = WorkflowExecutorService::processEnvironment;
 
     @Override
     public String group() {
@@ -52,6 +58,9 @@ public final class WorkflowToolProvider implements MultiToolProvider {
      */
     @Override
     public void bind(ToolEnvironment env) {
+        environment = env.get(EnvVarResolver.class)
+                .<Supplier<Map<String, String>>>map(vars -> vars::asMap)
+                .orElse(WorkflowExecutorService::processEnvironment);
         Optional<WorkflowDataRepository> shared = env.get(WorkflowDataRepository.class);
         if (shared.isPresent()) {
             repository = shared.get();
@@ -108,6 +117,6 @@ public final class WorkflowToolProvider implements MultiToolProvider {
         // The run acts for this scope: its tool steps resolve their tools with it.
         // The tool catalog probes with null userId/sessionId, which a run tolerates.
         return repository.findById(workflowId)
-                .map(wf -> new WorkflowTool(repository, workflowId, wf, scope));
+                .map(wf -> new WorkflowTool(repository, workflowId, wf, scope, environment));
     }
 }

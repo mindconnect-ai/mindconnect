@@ -25,6 +25,22 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** **`mc-agent-starter-runtime`** — the Spring Boot applications now build
+  their agent runtime the way the embedded builder does: the core plus installed
+  features, configured from the `mindconnect.*` properties, with the runtime's beans
+  exported to the context. The persistence starters supply a `Persistence`
+  (and the installation-wide users and API tokens), the namespace starter the
+  thread-bound scope; `DefaultAgentRuntimeConfig`, `TodoToolsConfig` and
+  `MessageRepositoryConfig` are gone, and so are the LLM gateway beans the admin
+  and API apps declared themselves. An application contributes `RuntimeFeature`
+  beans (installed, replacing a shipped feature of the same name) and
+  `AgentRuntimeCustomizer` beans, and injects `AgentRuntime` to reach any bean or
+  feature. `mc-agent-runtime-feature-namespace` is the feature behind it: a runtime
+  that works in the namespace of the call, for any host that binds a scope;
+  `mc-agent-runtime-feature-transcription` is speech to text as a feature of its
+  own, installed by the starter, left out by a runtime that never hears audio. Every
+  domain module's repository factory can build for a namespace, and the tool
+  environment falls back to the host's beans.
 - **agents:** the embedded runtime is now **a core plus installed features**, the way
   a Jackson `ObjectMapper` is a core plus modules. `AgentRuntimeBuilder.of(persistence)`
   is the smallest runtime that chats — the `CoreFeature`: LLM, messages, agents, no tools;
@@ -48,6 +64,33 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `SkillsFeature` and `WorkflowsFeature`. The `use…()` factories still build
   the batteries-included runtime they always did, so nothing changes for a caller
   who does not install anything.
+- **agents:** **bring your own API key** — a `${VAR}` placeholder in an LLM config
+  no longer has to come from the server's environment. On the profile page every
+  user keeps *Your variables* (an `OPENAI_API_KEY` of their own, say), the creator
+  of a namespace keeps *Variables* for everyone working there, and a placeholder
+  takes the user's value first, then the namespace's, then the process
+  environment; values are encrypted at rest and never shown again. What a user
+  brought for themselves reaches a config's **`apiKey` only** — its `model`,
+  `baseUrl` and `name` resolve without anybody's personal variables, so nobody
+  redirects a shared config's endpoint to a host of their own while the
+  installation's key still travels with it. A namespace's variables are its
+  creator's to set, like renaming and deleting it; the **default namespace has
+  none of its own** — nobody created it and everyone works there — so a `${VAR}`
+  there means your own value, else the server's environment. The lookup itself
+  is a port now (`EnvVarResolver` in `mc-common`, with `system()`, `of(map)`,
+  `chain(…)`, `shared()` and `memoized()`; the static `EnvVarResolver.resolve(value)`
+  became `resolver.resolve(value)`): the gateways take one,
+  `AgentRuntimeBuilder.envVarResolver(…)` plugs a source of your own into an
+  embedded runtime, a runtime feature reads it with
+  `ctx.require(EnvVarResolver.class)`, and a Spring host may define its own
+  `EnvVarResolver` bean. Model listing and the workflow engine's `env` variable
+  (a run from the admin, a workflow tool in a chat, a vector-store ingestion)
+  resolve through the same chain; the migration diff stays on the process
+  environment, so it reads the same for whoever opens it.
+- **workflow:** `WorkflowExecutorService.withEnvironment(supplier)` — where the
+  built-in `env` variable comes from; the process environment plus system
+  properties as before when not set. `WorkflowRunService` and
+  `WorkflowAdminService` take the same supplier.
 
 ## [0.8.2] - 2026-09-16
 

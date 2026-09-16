@@ -17,6 +17,45 @@ export ANTHROPIC_API_KEY=sk-ant-...
 export TAVILY_API_KEY=tvly-...
 ```
 
+## Your own and your namespace's variables
+
+On a server several people share, a placeholder does not have to come from the
+process. A `${VAR}` in an LLM config is looked up in this order, and the first
+place that has it answers:
+
+1. **the user's own variables** — set on the profile page (avatar in the header
+   → *Your variables*), so everyone can bring their own API key;
+2. **the namespace's variables** — set by the namespace's creator on
+   *Namespaces & members*, one key for everyone working there;
+3. **the process environment** — what the server was started with.
+
+Two rules narrow that:
+
+- **Your own variables reach a config's API key, nothing else.** Its `model`,
+  `baseUrl` and `name` resolve from the namespace's variables and the process
+  alone. Otherwise anyone could point a shared config — whose key is still the
+  installation's — at an endpoint of their own.
+- **The default namespace has no variables of its own.** Nobody created it and
+  everyone works there, so it belongs to the installation: set its values in the
+  server's environment. A namespace you create carries variables for everyone in
+  it, and only its creator sets them — the same right as renaming or deleting it.
+
+The same chain feeds the workflow engine's built-in `env` variable: a workflow
+run from the admin, from a chat (as a tool) or as a vector-store ingestion reads
+`${env.OPENAI_API_KEY}` the same way.
+
+A config that says `${OPENAI_API_KEY}` therefore uses your key when you have
+one, the namespace's when it has one, and the server's otherwise; the
+`:default` of a placeholder is the last word. Values are stored encrypted with
+`MINDCONNECT_ENCRYPTION_SECRET_KEY` and are never shown again once saved — the
+tables list names only. Removing a variable lets the next place answer.
+
+The lookup is pluggable: the gateways take an `EnvVarResolver`, the servers
+wire the chain above (`UserEnvVarResolver`, `NamespaceEnvVarResolver`,
+`EnvVarResolver.system()`), a library gets the process environment unless it
+passes `AgentRuntimeBuilder.envVarResolver(…)` — a vault, say — and any Spring
+host may define an `EnvVarResolver` bean of its own.
+
 ## Core
 
 | Variable | Default | Notes |

@@ -42,6 +42,19 @@ class PgUserRepositoryTest {
     }
 
     @Test
+    void theUsersVariablesSurviveTheRoundTrip() {
+        User alice = user("alice").withEnvironment(java.util.Map.of("OPENAI_API_KEY", "enc:abc", "TAVILY_API_KEY", "enc:def"));
+        repo.save(alice);
+
+        assertThat(repo.findById(alice.id())).contains(alice);
+        assertThat(repo.findById(alice.id())).get().extracting(User::environment)
+                .isEqualTo(java.util.Map.of("OPENAI_API_KEY", "enc:abc", "TAVILY_API_KEY", "enc:def"));
+
+        repo.save(alice.withEnvironment(java.util.Map.of()));
+        assertThat(repo.findById(alice.id())).get().extracting(User::environment).isEqualTo(java.util.Map.of());
+    }
+
+    @Test
     void initSchemaIsIdempotent() {
         repo.save(user("alice"));
         new PgUserRepository(Sql.of(TestDb.require())).initSchema();

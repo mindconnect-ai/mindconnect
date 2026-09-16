@@ -46,6 +46,9 @@ public class ProfilePage extends AdminPage {
     /** The namespaces table — replaced in place after an invitation. */
     public static final String NAMESPACES_ID = "profile-namespaces";
     static final String INVITE_FORM_ID = "namespace-invite-form";
+    /** The variables table — replaced in place after a variable is added or removed. */
+    public static final String ENVIRONMENT_ID = "profile-environment";
+    static final String ENVIRONMENT_FORM_ID = "profile-environment-form";
 
     /** What a user of an installation without authentication has to know before trusting a token to protect anything. */
     public static final String AUTH_OFF_NOTE = "Authentication is off on this installation: the API answers every "
@@ -106,6 +109,7 @@ public class ProfilePage extends AdminPage {
         }
         page.child(details)
                 .child(namespaces(userId, namespaces, defaultNamespace, active))
+                .child(environment(user == null ? Map.of() : user.environment()))
                 .child(tokenTable(tokens))
                 .child(help);
         return UiPage.of("/admin/profile", page);
@@ -174,6 +178,23 @@ public class ProfilePage extends AdminPage {
             table.row(row);
         }
         return table;
+    }
+
+    /**
+     * The user's own variables: what {@code ${VAR}} placeholders in LLM configs — an API key —
+     * resolve to for them, before the namespace's and the server's values. Names only; a
+     * value is a secret and is never shown again.
+     */
+    public static UiNode environment(Map<String, String> environment) {
+        return NamespacesPage.environmentTable(ENVIRONMENT_ID, "Your variables", environment.keySet(),
+                API + "/environment",
+                "Remove this variable? A config that refers to it falls back to the namespace's or the server's value.");
+    }
+
+    /** The body of the "Add variable" dialog; {@code error} keeps it open with the reason. */
+    public static UiForm environmentForm(String error) {
+        return NamespacesPage.environmentForm(ENVIRONMENT_FORM_ID, error, API + "/environment",
+                API + "/environment/dialog/close");
     }
 
     /** The body of the invite dialog for {@code ns}; {@code error} keeps it open with the reason. */

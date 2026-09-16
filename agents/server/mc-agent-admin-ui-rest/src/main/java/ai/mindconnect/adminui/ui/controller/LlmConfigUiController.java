@@ -3,8 +3,10 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.agentrest.service.LlmConfigTestService;
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent;
 import ai.mindconnect.common.StaleVersionException;
-import ai.mindconnect.common.util.EnvVarResolver;
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import org.springframework.beans.factory.ObjectProvider;
 import ai.mindconnect.adminui.ui.component.LlmConfigTestComponent;
 import ai.mindconnect.adminui.ui.page.LlmConfigDetailPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigFormPage;
@@ -36,7 +38,7 @@ import java.util.Map;
 @RequestMapping("/admin/api/llm-configs")
 public class LlmConfigUiController {
 
-    private static final String MASKED_KEY = "••••••••";
+    private static final String MASKED_KEY = ai.mindconnect.adminui.ui.AdminPage.MASKED_VALUE;
 
     /**
      * What an LM Studio config stores as its key. LM Studio takes no key, the
@@ -48,6 +50,7 @@ public class LlmConfigUiController {
     private final LlmConfigRepository repository;
     private final LlmConfigTestService testService;
     private final EncryptionHelper encryption;
+    private final EnvVarResolver environment;
     private final LmStudioModelCatalog lmStudio;
     private final ProviderModelCatalog providerModels;
 
@@ -55,9 +58,10 @@ public class LlmConfigUiController {
     public LlmConfigUiController(LlmConfigRepository repository,
                                     LlmConfigTestService testService,
                                     EncryptionHelper encryption,
+                                    ObjectProvider<EnvVarResolver> environment,
                                     OkHttpClient httpClient,
                                     ObjectMapper objectMapper) {
-        this(repository, testService, encryption,
+        this(repository, testService, encryption, environment.getIfAvailable(EnvVarResolver::system),
                 new LmStudioModelCatalog(httpClient, objectMapper),
                 new ProviderModelCatalog(httpClient, objectMapper));
     }
@@ -67,17 +71,19 @@ public class LlmConfigUiController {
                           LlmConfigTestService testService,
                           EncryptionHelper encryption,
                           LmStudioModelCatalog lmStudio) {
-        this(repository, testService, encryption, lmStudio, new ProviderModelCatalog());
+        this(repository, testService, encryption, EnvVarResolver.system(), lmStudio, new ProviderModelCatalog());
     }
 
     LlmConfigUiController(LlmConfigRepository repository,
                           LlmConfigTestService testService,
                           EncryptionHelper encryption,
+                          EnvVarResolver environment,
                           LmStudioModelCatalog lmStudio,
                           ProviderModelCatalog providerModels) {
         this.repository = repository;
         this.testService = testService;
         this.encryption = encryption;
+        this.environment = environment;
         this.lmStudio = lmStudio;
         this.providerModels = providerModels;
     }
@@ -252,7 +258,7 @@ public class LlmConfigUiController {
         LlmConfig probe = new LlmConfig(LlmConfigId.random(), "probe", provider, null, baseUrl, key,
                 0, 0, Map.of(), null, false, null, null, null, LlmConfigType.CHAT, null);
         try {
-            return probe.resolved(encryption);
+            return probe.resolved(environment, encryption);
         } catch (RuntimeException e) {
             // A key that cannot be decrypted (a rotated secret) must not take
             // down the form — the listing simply fails and says why.

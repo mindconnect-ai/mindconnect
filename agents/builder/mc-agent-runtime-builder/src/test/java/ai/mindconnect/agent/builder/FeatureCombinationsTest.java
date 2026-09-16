@@ -9,6 +9,7 @@ import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.skills.SkillsFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
+import ai.mindconnect.agent.runtime.feature.transcription.TranscriptionFeature;
 import ai.mindconnect.agent.runtime.feature.workflows.WorkflowsFeature;
 import ai.mindconnect.agent.runtime.skill.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
@@ -117,6 +118,7 @@ class FeatureCombinationsTest {
         try (AgentRuntime explicit = core()
                      .install(new SkillsFeature()).install(new ToolsFeature())
                      .install(new WorkflowsFeature()).install(new FileUploadFeature())
+                     .install(new TranscriptionFeature())
                      .build();
              AgentRuntime factory = AgentRuntimeBuilder.useInMemoryPersistence().build()) {
             assertThat(names(explicit)).isEqualTo(names(factory));

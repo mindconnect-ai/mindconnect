@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.Optional;
 
 /**
@@ -43,9 +44,11 @@ final class WorkflowTool implements Tool {
     private final Schema params;
     private final String description;
     private final ToolCallScope scope;
+    private final Supplier<Map<String, String>> environment;
 
     WorkflowTool(WorkflowDataRepository repository, String workflowId, WorkflowData snapshot,
-                 ToolCallScope scope) {
+                 ToolCallScope scope, Supplier<Map<String, String>> environment) {
+        this.environment = environment;
         this.repository = repository;
         this.workflowId = workflowId;
         this.params = snapshot.getParams() != null ? snapshot.getParams() : Schema.object();
@@ -85,7 +88,7 @@ final class WorkflowTool implements Tool {
         }
 
         try {
-            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create()).withEnvironment(environment)
                     .executeWorkflow(wf, args,
                             scope == null ? Map.of() : Map.of(ToolCallScope.class.getName(), scope));
             if (result.isError()) {
