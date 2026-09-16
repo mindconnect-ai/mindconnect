@@ -172,6 +172,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   nothing else, and its prompt tells the model to save files for you there. The
   bundled definition changes for new installations; an existing `default-chat`
   keeps its stored tool binding until you edit it.
+  `code_execute` also describes itself correctly now: which image each language
+  runs in and that it carries only the standard library, where files go, that
+  installed packages go when the container is recreated, and its time and memory
+  limits. The bundled `default-chat` no longer overrides that description with a
+  fixed text of its own, which had kept all of it from the model.
 
 ## [0.8.2] - 2026-09-16
 

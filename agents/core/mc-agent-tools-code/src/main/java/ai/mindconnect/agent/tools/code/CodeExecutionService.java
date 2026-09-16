@@ -70,6 +70,11 @@ public final class CodeExecutionService implements AutoCloseable {
     private final Map<String, Session> sessions = new ConcurrentHashMap<>();
     private final ScheduledExecutorService reaper;
 
+    /** The limits every container runs under — the tool states them to the model. */
+    public Settings settings() {
+        return settings;
+    }
+
     public CodeExecutionService(ContainerCli cli, Settings settings) {
         this.cli = cli;
         this.settings = settings;
