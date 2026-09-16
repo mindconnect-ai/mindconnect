@@ -12,6 +12,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.StartupScope;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
@@ -50,19 +54,27 @@ public class InitialDataLoader implements ApplicationRunner {
     private final SkillRepository skillRepository;
     private final ObjectMapper objectMapper;
 
+    private final ScopeSupplier scope;
+    private final Namespace startupNamespace;
+
     public InitialDataLoader(LlmConfigRepository llmConfigRepository,
                              AgentDefinitionRepository agentDefinitionRepository,
                              SkillRepository skillRepository,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             org.springframework.beans.factory.ObjectProvider<ScopeSupplier> scope,
+                             @Value("${mindconnect.namespace:local}") String startupNamespace) {
+        this.scope = scope.getIfAvailable();
+        this.startupNamespace = new Namespace(startupNamespace);
         this.llmConfigRepository = llmConfigRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
         this.skillRepository = skillRepository;
         this.objectMapper = objectMapper;
     }
 
+    /** Seeds run in the default namespace: the main thread binds no scope of its own. */
     @Override
     public void run(ApplicationArguments args) {
-        load();
+        StartupScope.run(scope, startupNamespace, this::load);
     }
 
     /** Load without interactive prompts — existing differing records are skipped with a log warning. */

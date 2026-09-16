@@ -55,11 +55,24 @@ final class SubAgentCalls {
     /** Set once the queue exists — needed to await sub-agent turns. */
     private volatile TaskQueue queue;
 
+    private final SubAgentSupport support;
+
     SubAgentCalls(ConversationManager conversationManager,
                   AgentDefinitionRepository definitionRepository,
                   AgentSessionService sessionService,
                   MemoryStrategyFactory memoryStrategyFactory,
                   SessionChannels sessionChannels) {
+        this(conversationManager, definitionRepository, sessionService, memoryStrategyFactory, sessionChannels,
+                SubAgentSupport.enabled(AgentTurnWorker.MAX_DEPTH));
+    }
+
+    SubAgentCalls(ConversationManager conversationManager,
+                  AgentDefinitionRepository definitionRepository,
+                  AgentSessionService sessionService,
+                  MemoryStrategyFactory memoryStrategyFactory,
+                  SessionChannels sessionChannels,
+                  SubAgentSupport support) {
+        this.support = support == null ? SubAgentSupport.disabled() : support;
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
         this.sessionService = sessionService;
@@ -118,8 +131,11 @@ final class SubAgentCalls {
                                ChatTurnId parentTurnId,
                                int parentDepth, Consumer<StreamEvent> parentStream,
                                String toolCallId, int slot, Map<String, Object> arguments) {
-        if (parentDepth + 1 > AgentTurnWorker.MAX_DEPTH) {
-            return "Error: Sub-agent depth limit (" + AgentTurnWorker.MAX_DEPTH + ") exceeded";
+        if (!support.enabled()) {
+            return "Error: this runtime does not delegate to sub-agents (the sub-agents feature is not installed)";
+        }
+        if (parentDepth + 1 > support.maxDepth()) {
+            return "Error: Sub-agent depth limit (" + support.maxDepth() + ") exceeded";
         }
         String agentName = arg(arguments, "name");
         String message = arg(arguments, "message");
@@ -256,8 +272,11 @@ final class SubAgentCalls {
                                  ChatTurnId parentTurnId,
                                  int parentDepth, Consumer<StreamEvent> parentStream,
                                  String toolCallId, Map<String, Object> arguments) {
-        if (parentDepth + 1 > AgentTurnWorker.MAX_DEPTH) {
-            return "Error: Sub-agent depth limit (" + AgentTurnWorker.MAX_DEPTH + ") exceeded";
+        if (!support.enabled()) {
+            return "Error: this runtime does not delegate to sub-agents (the sub-agents feature is not installed)";
+        }
+        if (parentDepth + 1 > support.maxDepth()) {
+            return "Error: Sub-agent depth limit (" + support.maxDepth() + ") exceeded";
         }
         Object rawTasks = arguments.get("tasks");
         if (!(rawTasks instanceof List<?> taskList) || taskList.isEmpty()) {

@@ -7,6 +7,7 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
+import ai.mindconnect.agent.runtime.feature.subagents.SubAgentsFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.tool.AgentTool;
 
@@ -20,9 +21,10 @@ import java.util.List;
  * the repository's {@code mc.env} or the process environment). Both agents
  * are defined in code — no JSON, no Spring.
  *
- * <p>This runtime is the core plus one feature: {@link ToolsFeature} brings
+ * <p>This runtime is the core plus two features: {@link ToolsFeature} brings
  * the tool registry over the {@code mc-agent-tools-web} module on the
- * classpath. Delegation itself needs no feature — it is part of the core.
+ * classpath, and {@link SubAgentsFeature} is what lets an agent's roster turn
+ * into the {@code run_agent} tool at all.
  */
 public class AgentDelegationMain {
 
@@ -56,6 +58,7 @@ public class AgentDelegationMain {
 
         AgentRuntimeBuilder builder = AgentRuntimeBuilder.of(Persistence.inMemory())
                 .install(new ToolsFeature())                 // the web tools come from the classpath
+                .install(new SubAgentsFeature())              // … and this is what makes the roster callable
                 .property("tavilyApiKey", tavilyKey)         // a plain setting the web_search tool reads
                 .llmConfigFromClasspath("demo-llm-config.json");
         builder.feature(CoreFeature.class)                   // the same feature the shortcut above configured

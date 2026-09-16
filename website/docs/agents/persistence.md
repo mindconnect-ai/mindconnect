@@ -73,8 +73,10 @@ namespace and forwards each call to the one the current `Scope` names. The
 scope is bound per request (from the `/ns/{namespace}/` prefix, the
 `X-Mindconnect-Namespace` header, or the namespace the user chose in the Admin
 UI) and per queued task; nothing above the repositories names a namespace.
-Threads that bind nothing — start-up seeding, say — work in
-`mindconnect.namespace` (default `local`), which is also the namespace every
+Start-up work — the runtime build, the tool warm-up, the seed loaders — binds
+`mindconnect.namespace` (default `local`) explicitly; a thread that binds
+nothing and touches a store fails instead of working there quietly. That is
+also the namespace every
 signed-in user may work in without an invitation.
 
 This makes the runtime zero-dependency: it boots and persists with nothing but a
@@ -87,7 +89,8 @@ Spring-free `AgentRuntimeBuilder` and in tests. Two of them are bounded so that 
 long-lived embedded runtime does not grow with every turn: the trace store keeps
 at most 50 LLM call traces per conversation (the file store's cap), and the
 builder tells its task queue to forget finished task trees at the next
-maintenance tick — `taskRetention(Duration)` keeps them longer, `null` for the
+maintenance tick — `taskRetention(Duration)` keeps them longer (it reaches the
+task-queue feature too, when that is installed), `null` for the
 life of the process. Deleting a session takes its conversation, messages and
 traces with it, in every persistence mode.
 

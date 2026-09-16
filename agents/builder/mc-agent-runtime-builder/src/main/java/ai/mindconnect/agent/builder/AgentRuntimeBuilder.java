@@ -47,6 +47,7 @@ import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
+import ai.mindconnect.agent.runtime.service.task.SubAgentSupport;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
@@ -240,7 +241,9 @@ public class AgentRuntimeBuilder {
     public AgentRuntimeBuilder taskRetention(java.time.Duration keepFinished) {
         requireNotBuilt();
         this.taskRetention = keepFinished;
-        return this;
+        // The task-queue feature builds the queue when it is installed, so the setting travels as a
+        // property rather than staying a field only the core's own default queue would read.
+        return property("taskRetention", keepFinished == null ? KEEP_FOREVER : keepFinished.toString());
     }
 
     /**
@@ -426,6 +429,7 @@ public class AgentRuntimeBuilder {
         // Null objects for the features that are not installed.
         if (!beans.has(SkillCatalog.class)) context.bean(SkillCatalog.class, SkillCatalog::none);
         if (!beans.has(ToolRegistry.class)) context.instance(ToolRegistry.class, NO_TOOLS);
+        if (!beans.has(SubAgentSupport.class)) context.instance(SubAgentSupport.class, SubAgentSupport.disabled());
         if (!beans.has(DynamicToolActivations.class)) {
             context.bean(DynamicToolActivations.class, () -> new DynamicToolActivations(
                     context.require(AgentSessionRepository.class), context.require(SkillCatalog.class)));
@@ -434,7 +438,7 @@ public class AgentRuntimeBuilder {
             context.bean(ToolExecutor.class, () -> new ToolExecutor(beans.all(ToolAdvisor.class)));
         }
         if (!beans.has(TaskQueue.class)) {
-            // The turn runs as a task on an in-process queue (concept 16).
+            // The turn runs as a task on an in-process queue (concept 16); the task-queue feature replaces it.
             context.bean(TaskQueue.class, () -> {
                 var queue = new LocalTaskQueue(new InMemoryTaskStore());
                 // A failed task would otherwise leave no trace but a tool result saying so.
@@ -462,13 +466,15 @@ public class AgentRuntimeBuilder {
                 context.require(DynamicToolActivations.class), context.require(LlmChat.class),
                 context.require(LlmCallTraceRepository.class), context.require(SessionChannels.class),
                 context.require(AgentTaskRunner.class), context.require(WorkingMemoryRepository.class),
-                context.require(InstructionFiles.class), context.require(SkillCatalog.class)));
+                context.require(InstructionFiles.class), context.require(SkillCatalog.class),
+                context.require(SubAgentSupport.class)));
         context.bean(ToolCallWorker.class, () -> new ToolCallWorker(
                 context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
                 context.require(ToolRegistry.class), context.require(DynamicToolActivations.class),
                 context.require(ToolExecutor.class), context.require(SessionChannels.class),
-                context.require(ToolApprovalStore.class), context.require(UserChannels.class)));
+                context.require(ToolApprovalStore.class), context.require(UserChannels.class),
+                context.require(SubAgentSupport.class)));
         context.bean(SessionTitleWorker.class, () -> new SessionTitleWorker(
                 context.require(AgentSessionService.class), context.require(ConversationManager.class),
                 context.require(AgentTaskRunner.class), context.require(UserChannels.class)));
@@ -491,13 +497,17 @@ public class AgentRuntimeBuilder {
             queue.register(SessionTitleWorker.TYPE, context.require(SessionTitleWorker.class));
             context.require(AgentChatService.class);
         });
+        // Whoever registered the queue, the runtime that built it closes it — and only if it was built.
         context.onClose(() -> {
-            if (beans.find(TaskQueue.class).orElse(null) instanceof AutoCloseable closeable) closeable.close();
+            if (beans.ifBuilt(TaskQueue.class).orElse(null) instanceof AutoCloseable closeable) closeable.close();
         });
     }
 
     /** A registry that knows no tool: every resolve is empty, every listing blank. */
     private static final ToolRegistry NO_TOOLS = (agentTool, scope) -> Optional.empty();
+
+    /** Value of the {@code taskRetention} property that means "keep finished task trees for the life of the process". */
+    public static final String KEEP_FOREVER = "keep";
 
     private void requireNotBuilt() {
         if (built) {

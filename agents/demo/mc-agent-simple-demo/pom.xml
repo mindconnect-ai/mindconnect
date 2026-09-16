@@ -30,6 +30,10 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-subagents</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
         </dependency>
         <!-- Opt-in capabilities, exactly as a client would pick them: -->

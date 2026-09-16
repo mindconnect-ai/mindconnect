@@ -1,9 +1,5 @@
 package ai.mindconnect.agent.starter.file;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
 import ai.mindconnect.user.adapter.file.FileUserRepository;
@@ -23,6 +19,13 @@ import java.nio.file.Path;
  * per namespace. The runtime's stores are built by the runtime starter from
  * the {@link Persistence} declared here; this starter adds what is
  * installation-wide and not the runtime's — the users and their API tokens.
+ *
+ * <p>It declares no scope: an application works in one namespace unless it also
+ * has {@code mc-agent-starter-namespace}, which binds a scope per request and
+ * owns the {@code ThreadBoundScope} bean. A host without it — the CLI, an
+ * embedded server — gets a runtime fixed to {@code mindconnect.namespace},
+ * which is what a single-namespace application wants and what its own start-up
+ * threads can work with.
  * The default: {@code mindconnect.persistence=file}, or nothing at all.
  */
 @AutoConfiguration
@@ -33,17 +36,6 @@ public class FilePersistenceAutoConfiguration {
     @ConditionalOnMissingBean(Persistence.class)
     Persistence persistence(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
         return Persistence.file(Path.of(baseDir));
-    }
-
-    /**
-     * Where this server works: a scope bound per request by the namespace
-     * starter's filter and per task by the runtime; a thread neither binds
-     * works in {@code mindconnect.namespace} (default {@code local}).
-     */
-    @Bean
-    @ConditionalOnMissingBean(ScopeSupplier.class)
-    ThreadBoundScope scopeSupplier(@Value("${mindconnect.namespace:local}") String fallbackNamespace) {
-        return ThreadBoundScope.withFallback(Scope.of(new Namespace(fallbackNamespace)));
     }
 
     /** Installation-wide, not per namespace: a user is the same person in every namespace. */

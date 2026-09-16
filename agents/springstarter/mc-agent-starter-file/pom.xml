@@ -14,33 +14,13 @@
     <artifactId>mc-agent-starter-file</artifactId>
     <name>mc-agent-starter-file</name>
     <packaging>jar</packaging>
-    <description>
-        Spring Boot starter for file persistence — the default: every repository
-        port of the agent runtime, the message store, the LLM gateway and the
-        file store on the file system under mindconnect.data.base-dir.
-        Auto-configured; steps back for mindconnect.persistence=postgres.
-    </description>
+    <description>Spring Boot starter: file persistence for the agent runtime — the Persistence the runtime starter
+        builds every store from, the request scope, and the installation-wide users and API tokens on files.</description>
 
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-llm-gateway</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-file-store</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

@@ -48,14 +48,21 @@ public class NamespaceAutoConfiguration {
     /**
      * Where this server works: a {@link Scope} bound per request by the
      * {@link ScopeBindingFilter} and per queued task by the runtime's task
-     * advisor. A thread neither binds — a start-up routine, a stream's
-     * scheduler — works in {@code mindconnect.namespace} (default
-     * {@code local}) until those bind too and the fallback goes.
+     * advisor. It is <b>strict</b> — a thread that touches a store without a
+     * bound scope fails instead of quietly working in the default namespace,
+     * because on a server that silence is a leak between namespaces. Start-up
+     * routines therefore bind {@code mindconnect.namespace} explicitly: the
+     * runtime build and the tool warm-up do it in the runtime starter, the seed
+     * loaders in the application. A single-namespace host installs this starter
+     * not at all and gets a fixed scope instead.
      */
     @Bean
     @ConditionalOnMissingBean(ScopeSupplier.class)
-    ThreadBoundScope scopeSupplier(@Value("${mindconnect.namespace:local}") String fallbackNamespace) {
-        return ThreadBoundScope.withFallback(Scope.of(new Namespace(fallbackNamespace)));
+    ThreadBoundScope scopeSupplier() {
+        // Strict: a thread that works unbound is a bug, not a request for the default namespace.
+        // Requests bind through the namespace filter, tasks through the runtime's advisor, start-up
+        // routines explicitly in mindconnect.namespace (see the runtime starter and the seed loaders).
+        return ThreadBoundScope.strict();
     }
 
     /** The namespaces of the installation under {@code <mindconnect.data.base-dir>/system/namespaces}. */

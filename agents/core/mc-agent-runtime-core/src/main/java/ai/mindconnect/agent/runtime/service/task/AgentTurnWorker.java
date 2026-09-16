@@ -100,6 +100,7 @@ public final class AgentTurnWorker implements TaskWorker {
     private final WorkingMemoryRepository workingMemoryRepository;
     private final InstructionFiles instructions;
     private final SkillCatalog skills;
+    private final SubAgentSupport subAgents;
 
     public AgentTurnWorker(ConversationManager conversationManager,
                            AgentDefinitionRepository definitionRepository,
@@ -134,6 +135,29 @@ public final class AgentTurnWorker implements TaskWorker {
                            WorkingMemoryRepository workingMemoryRepository,
                            InstructionFiles instructions,
                            SkillCatalog skills) {
+        this(conversationManager, definitionRepository, sessionService, memoryStrategyFactory,
+                promptRenderer, toolRegistry, dynamicToolActivations, llmChat, traceRepository,
+                sessionChannels, agentTaskRunner, workingMemoryRepository, instructions, skills,
+                SubAgentSupport.enabled(MAX_DEPTH));
+    }
+
+    /** With the runtime's say on delegation — see {@link SubAgentSupport}. */
+    public AgentTurnWorker(ConversationManager conversationManager,
+                           AgentDefinitionRepository definitionRepository,
+                           AgentSessionService sessionService,
+                           MemoryStrategyFactory memoryStrategyFactory,
+                           PromptRenderer promptRenderer,
+                           ToolRegistry toolRegistry,
+                           DynamicToolActivations dynamicToolActivations,
+                           LlmChat llmChat,
+                           LlmCallTraceRepository traceRepository,
+                           SessionChannels sessionChannels,
+                           AgentTaskRunner agentTaskRunner,
+                           WorkingMemoryRepository workingMemoryRepository,
+                           InstructionFiles instructions,
+                           SkillCatalog skills,
+                           SubAgentSupport subAgents) {
+        this.subAgents = subAgents == null ? SubAgentSupport.disabled() : subAgents;
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
         this.sessionService = sessionService;
@@ -225,9 +249,9 @@ public final class AgentTurnWorker implements TaskWorker {
         int depth = ((Number) ctx.task().payload().getOrDefault(DEPTH, 0)).intValue();
         String parentTurn = optionalString(ctx, PARENT_TURN_ID);
         ChatTurnId parentTurnId = parentTurn == null ? null : ChatTurnId.of(parentTurn);
-        if (depth > MAX_DEPTH) {
+        if (depth > 0 && depth > subAgents.maxDepth()) {
             throw new IllegalStateException(
-                    "Sub-agent depth limit (" + MAX_DEPTH + ") exceeded at depth " + depth);
+                    "Sub-agent depth limit (" + subAgents.maxDepth() + ") exceeded at depth " + depth);
         }
 
         AgentSession session = sessionService.findSession(sessionId);
@@ -279,7 +303,8 @@ public final class AgentTurnWorker implements TaskWorker {
 
         // A sub-agent's tools see the chat that started the chain: the user's uploads are there.
         SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session,
-                session.parentSessionId() == null ? session.id() : sessionService.rootSession(session.id()).id());
+                session.parentSessionId() == null ? session.id() : sessionService.rootSession(session.id()).id(),
+                subAgents);
         QueuedAgentRoundToolExecutor executor = new QueuedAgentRoundToolExecutor(
                 ctx, conversationManager, sessionService, def, session, turnId, run, conversationId, depth);
 
