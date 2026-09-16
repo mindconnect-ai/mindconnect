@@ -234,6 +234,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   off at `max_output_tokens` in the middle of a tool call reports `LENGTH` instead of
   running the call with broken arguments; and GPT models after 5 are treated as
   reasoning models.
+- **agents:** **parallel sub-agents no longer corrupt the chat's live cards.** Agents
+  run with `run_agents` report from several threads at once, and the chat kept its live
+  cards in structures only one thread may touch — a card could stay "running" for good,
+  or an update fail inside the stream. Events of a turn are now handled one at a time.
+  A client that joins a turn after a tool call also no longer sees the thought before
+  that call twice.
 - **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
   turn left its thinking card, tool cards and reply bubble on the page, and the next
   turn reused their ids — its thought and its answer streamed into the cancelled

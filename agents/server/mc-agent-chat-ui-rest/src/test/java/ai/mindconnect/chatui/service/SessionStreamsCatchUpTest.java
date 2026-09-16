@@ -45,6 +45,19 @@ class SessionStreamsCatchUpTest {
         assertThat(streams.catchUp("c").orElseThrow().cardPatches()).isEmpty();
     }
 
+    /** A tool call puts the top-level thoughts on the record; a sub-agent's live thought stays. */
+    @Test
+    void thoughtsOnTheRecordAreForgottenByPrefix() {
+        streams.turnStarted("c");
+        streams.rememberCard("c", "task-think-s1-a", "{top a}");
+        streams.rememberCard("c", "task-think-s1-b", "{top b}");
+        streams.rememberCard("c", "task-think-sub7-c", "{sub}");
+
+        streams.forgetCardsStartingWith("c", "task-think-s1-");
+
+        assertThat(streams.catchUp("c").orElseThrow().cardPatches()).containsExactly("{sub}");
+    }
+
     @Test
     void theNextTurnStartsClean() {
         streams.turnStarted("c");

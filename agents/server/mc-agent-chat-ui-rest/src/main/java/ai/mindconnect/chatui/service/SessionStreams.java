@@ -161,6 +161,11 @@ public class SessionStreams {
         catchUps.computeIfPresent(channelId, (k, c) -> c.withCards(cards -> cards.remove(nodeId)));
     }
 
+    /** Every remembered card whose node id starts with {@code prefix} — they all reached the record at once. */
+    public void forgetCardsStartingWith(String channelId, String prefix) {
+        catchUps.computeIfPresent(channelId, (k, c) -> c.withCards(cards -> cards.keySet().removeIf(id -> id.startsWith(prefix))));
+    }
+
     /** What a client joining right now needs before the live feed. */
     public Optional<CatchUp> catchUp(String channelId) {
         return Optional.ofNullable(catchUps.get(channelId));

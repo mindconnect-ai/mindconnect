@@ -1674,7 +1674,7 @@ public class ChatUiController {
         java.util.List<ai.mindconnect.chatui.ui.component.TaskCardComponent> reviewerVerdicts =
                 new java.util.concurrent.CopyOnWriteArrayList<>();
 
-        ChatTurnHandle turn = turnStarter.apply(event -> {
+        java.util.function.Consumer<StreamEvent> onEvent = event -> {
             // A thought ends with whatever it led to: anything that is not
             // more thinking closes the open card of this scope.
             LiveThinking thinking = thinkingFor(thinkings, sessionId, null);
@@ -1718,9 +1718,15 @@ public class ChatUiController {
                                     .format(java.time.Instant.now()));
                     publishPatch(bus, liveView.appendApprovalCard(card));
                 }
-                case StreamEvent.ToolCallStarted s ->
+                case StreamEvent.ToolCallStarted s -> {
+                    // The model's round is on the record now: the message that carries
+                    // this call carries the thought before it too — also one that led to
+                    // text first. History renders that thought, so a joiner must not get
+                    // the live card on top of it.
+                    sessionStreams.forgetCardsStartingWith(channelId, "task-think-" + sessionId.value() + "-");
                     startToolCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
                             null, s.toolName(), s.arguments());
+                }
                 case StreamEvent.ToolCallResult r ->
                     finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
                             null, r.toolName(), r.result(), r.durationMs(), false);
@@ -1770,6 +1776,17 @@ public class ChatUiController {
                 default -> {}
             }
             logEvent(event, agent.name());
+        };
+        // One event at a time. Parallel sub-agents (run_agents) deliver their events from
+        // several task-queue workers at once, and the live state above — the thinking
+        // cards, the open tasks, the reply so far — lives in plain maps and fields: a
+        // lost entry left a card running for good, and iterating while another thread
+        // wrote threw inside the handler.
+        final Object liveLock = new Object();
+        ChatTurnHandle turn = turnStarter.apply(event -> {
+            synchronized (liveLock) {
+                onEvent.accept(event);
+            }
         });
 
         // 3. When the turn completes, replace placeholders with persisted
@@ -1787,7 +1804,9 @@ public class ChatUiController {
                 String message = cause.getMessage() != null ? cause.getMessage() : cause.toString();
                 try {
                     // A thought the failure cut short must not keep running on screen.
-                    for (LiveThinking open : thinkings.values()) closeThinking(open, liveView, bus, false);
+                    synchronized (liveLock) {
+                        for (LiveThinking open : thinkings.values()) closeThinking(open, liveView, bus, false);
+                    }
                     publishPatch(bus, liveView.streamError(message));
                 } catch (Exception ignored) {}
                 try {
