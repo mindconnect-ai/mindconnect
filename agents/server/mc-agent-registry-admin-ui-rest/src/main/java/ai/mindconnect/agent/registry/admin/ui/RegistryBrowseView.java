@@ -37,7 +37,7 @@ final class RegistryBrowseView {
     /** The rubrics in the order they earn attention: what you chat with, what it runs on, then the rest. */
     static final List<RegistryItemType> GROUP_ORDER = List.of(
             RegistryItemType.AGENT, RegistryItemType.LLM_CONFIG,
-            RegistryItemType.WORKFLOW, RegistryItemType.PACKAGE);
+            RegistryItemType.WORKFLOW, RegistryItemType.SKILL, RegistryItemType.PACKAGE);
 
     private final RegistrySource source;
     private final RegistryIndex index;
@@ -95,7 +95,18 @@ final class RegistryBrowseView {
         // agent list and the tool catalog.
         boolean open = type != null || (query != null && !query.isBlank());
         addGrouped(list, "registry-group-", entries, open, entry -> row(base, entry));
+        if (index.unknownEntries() > 0) {
+            list.item(UiList.Item.of("unknown-entries", unknownEntriesLine(index.unknownEntries()))
+                    .icon("info")
+                    .description("The registry lists them for a newer Mindconnect than this one; "
+                            + "they are not shown."));
+        }
         return UiStack.of(STACK_ID).child(list);
+    }
+
+    static String unknownEntriesLine(int count) {
+        return count == 1 ? "1 entry of a kind this version does not know"
+                : count + " entries of a kind this version does not know";
     }
 
     private UiList.Item row(String base, RegistryEntry entry) {
@@ -153,6 +164,7 @@ final class RegistryBrowseView {
             case AGENT -> "Agents";
             case LLM_CONFIG -> "LLM configs";
             case WORKFLOW -> "Workflows";
+            case SKILL -> "Skills";
             case PACKAGE -> "Packages";
         };
     }
@@ -201,6 +213,7 @@ final class RegistryBrowseView {
             case LLM_CONFIG -> "ai";
             case AGENT -> "bot";
             case WORKFLOW -> "branch";
+            case SKILL -> "graduation-cap";
             case PACKAGE -> "box";
         };
     }

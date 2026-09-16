@@ -109,6 +109,17 @@ class AgentDefinitionInstallerTest {
     }
 
     @Test
+    void references_to_a_skill_are_the_agents_naming_it_not_the_ones_loading_all() {
+        repository.save(AgentDefinition.create("writer", "", "p", null, "default")
+                .withSkills(AgentDefinition.SkillsConfig.specific(List.of("weekly-report"))));
+        repository.save(AgentDefinition.create("everything", "", "p", null, "default")
+                .withSkills(new AgentDefinition.SkillsConfig(AgentDefinition.SkillsConfig.Mode.ALL, List.of())));
+
+        assertThat(installer.referencesTo(RegistryItemType.SKILL, "weekly-report")).containsExactly("writer");
+        assertThat(installer.referencesTo(RegistryItemType.SKILL, "other")).isEmpty();
+    }
+
+    @Test
     void remove_deletes_the_agent_of_the_entrys_name_and_skips_when_there_is_none() {
         repository.save(AgentDefinition.create("web-researcher", "mine", "my prompt", null, "default"));
 

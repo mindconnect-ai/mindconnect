@@ -316,6 +316,11 @@ final class RegistryEntryView {
             case LLM_CONFIG -> "An LLM config names a provider and a base URL — the address this "
                     + "installation would send prompts to. An API key in the file is dropped on "
                     + "import; set your own, or point the config at a ${ENV_VAR}.";
+            case SKILL -> "A skill is instructions an agent loads on demand — steps to follow, "
+                    + "commands to run, files to write. Imported, it is offered to every agent "
+                    + "whose skills mode is ALL. Read it before you let an agent load it."
+                    + "\nA skill from a registry is its SKILL.md alone: files beside it in the "
+                    + "repository are not brought along.";
             case PACKAGE -> "A package installs several entities at once — agents with their "
                     + "prompts, workflows that run, the LLM configs they point at. Nothing is "
                     + "run by importing it, but everything in it is here afterwards.";
