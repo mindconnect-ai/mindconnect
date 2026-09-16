@@ -1,7 +1,7 @@
 ---
 id: chat-dictation
 area: chat
-requires: [server-9091, openai-key, microphone]
+requires: [server-9090, openai-key, microphone]
 duration: ~4 min
 last-verified: never (the browser path was verified with a stubbed recorder on 2026-09-09; a real microphone has not been through it)
 ---
@@ -13,7 +13,7 @@ input, and nothing is sent until the person who spoke presses Send.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - An LLM config named `speech-to-text` — the seeded one, or an alias of that
   name pointing at a speech-to-text config. Its key must work; test it once on
   its own detail page (otherwise: SKIPPED)
@@ -23,7 +23,7 @@ input, and nothing is sent until the person who spoke presses Send.
 
 ## Setup
 
-1. Open http://localhost:9091/chat and start a session with any agent.
+1. Open http://localhost:9090/chat and start a session with any agent.
 
 ## Steps
 

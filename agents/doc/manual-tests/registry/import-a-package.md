@@ -1,7 +1,7 @@
 ---
 id: registry-import-a-package
 area: registry
-requires: [server-9091, internet]
+requires: [server-9090, internet]
 duration: ~8 min
 last-verified: never
 ---
@@ -14,7 +14,7 @@ second import changes nothing unless overwrite is asked for.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - Outbound HTTPS to raw.githubusercontent.com (otherwise: SKIPPED)
 - A public GitHub repository holding the contents of
   `agents/doc/registry-example/` at its root — push that directory as-is. Its
@@ -28,7 +28,7 @@ second import changes nothing unless overwrite is asked for.
 
 ## Steps
 
-1. http://localhost:9091/registry → **Add registry**. Type `<REGISTRY>` into
+1. http://localhost:9090/registry → **Add registry**. Type `<REGISTRY>` into
    **Repository**, leave everything else empty, **Save**.
    **Expected:** Back on the list, one row, named `<REGISTRY>`, subtitle
    `<REGISTRY>@main`.
@@ -44,12 +44,12 @@ second import changes nothing unless overwrite is asked for.
    **Expected:** The entry screen comes back with a report under it:
    `4 imported`, one line each for the LLM config, the agent, the workflow and
    the skill, in that order — the config before the agent that requires it.
-6. http://localhost:9091/admin/agents and http://localhost:9091/admin/llm-configs
-   and http://localhost:9091/workflow-admin.
+6. http://localhost:9090/admin/agents and http://localhost:9090/admin/llm-configs
+   and http://localhost:9090/workflow-admin.
    **Expected:** `changelog-writer` is in the agent list with the prompt from
    the file, `example-default` is in the LLM configs with its API key showing
    the `${ANTHROPIC_API_KEY}` placeholder rather than a key, and `greeting` is
-   in the workflow list. http://localhost:9091/admin/skills lists
+   in the workflow list. http://localhost:9090/admin/skills lists
    `changelog-style` with the instructions from the file.
 7. Open the agent `changelog-writer` and change its description to `mine`. Save.
    Back to the registry, **Release kit**, **Import** again.
@@ -66,7 +66,7 @@ second import changes nothing unless overwrite is asked for.
 
 - Delete the agent `changelog-writer`, the LLM config `example-default`, the
   workflow `greeting` and the skill `changelog-style`.
-- Remove the registry from http://localhost:9091/registry.
+- Remove the registry from http://localhost:9090/registry.
 
 ## Notes
 

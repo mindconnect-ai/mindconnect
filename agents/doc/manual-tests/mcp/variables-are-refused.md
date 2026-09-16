@@ -1,7 +1,7 @@
 ---
 id: mcp-variables-are-refused
 area: mcp
-requires: [server-9091, server-restartable]
+requires: [server-9090, server-restartable]
 duration: ~5 min
 last-verified: never
 ---
@@ -28,7 +28,7 @@ without a placeholder is used as entered.
 
 ## Steps
 
-1. http://localhost:9091/mcp-gateway → **Register MCP Server**:
+1. http://localhost:9090/mcp-gateway → **Register MCP Server**:
    - **Id**: `envtest`
    - **Display name**: `Env Test`
    - **Tool name prefix**: `envt`
@@ -72,7 +72,7 @@ without a placeholder is used as entered.
 
 ## Cleanup
 
-- http://localhost:9091/mcp-gateway → delete `Env Test` and the http test server.
+- http://localhost:9090/mcp-gateway → delete `Env Test` and the http test server.
 - Restart the admin UI without `MC_TEST_SECRET`.
 
 ## Notes

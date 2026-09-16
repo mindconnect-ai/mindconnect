@@ -1,7 +1,7 @@
 ---
 id: mcp-register-http-server
 area: mcp
-requires: [server-9091, npx]
+requires: [server-9090, npx]
 duration: ~6 min
 last-verified: never
 ---
@@ -13,7 +13,7 @@ pasted token off the wire holds: `http://` is allowed for localhost only.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `npx` on PATH (otherwise: SKIPPED)
 
 ## Setup
@@ -26,7 +26,7 @@ pasted token off the wire holds: `http://` is allowed for localhost only.
 
 ## Steps
 
-1. http://localhost:9091/mcp-gateway → **Register MCP Server**. Fill in:
+1. http://localhost:9090/mcp-gateway → **Register MCP Server**. Fill in:
    - **Id**: `manualhttp`
    - **Display name**: `Manual Test Everything`
    - **Tool name prefix**: `mev`
@@ -39,7 +39,7 @@ pasted token off the wire holds: `http://` is allowed for localhost only.
    **Expected:** Result below the form within ~2 s, listing the server's tools
    (`echo`, `add`, `printEnv`, … — 10 or more), with a duration in ms. The
    form still holds everything typed.
-3. Click **Save**, then open http://localhost:9091/admin/tools and search `mev`.
+3. Click **Save**, then open http://localhost:9090/admin/tools and search `mev`.
    **Expected:** Section **Manual Test Everything** under group **Mcp**, with
    `mev_echo` among the tools.
 4. Open `mev_echo` and click **Test**. Enter arguments
@@ -47,7 +47,7 @@ pasted token off the wire holds: `http://` is allowed for localhost only.
    **Expected:** The result contains `manual test`. Round trip well under a
    second — the connection is pooled, not a fresh process per call.
 5. Now the security rule. Go back to
-   http://localhost:9091/mcp-gateway → row `Manual Test Everything`, and change
+   http://localhost:9090/mcp-gateway → row `Manual Test Everything`, and change
    **Target (JSON)** to a remote host over plain http:
    ```json
    { "type": "http", "url": "http://mcp.example.com/mcp", "headers": {} }
@@ -63,7 +63,7 @@ pasted token off the wire holds: `http://` is allowed for localhost only.
 
 ## Cleanup
 
-- http://localhost:9091/mcp-gateway → `Manual Test Everything` → **Delete**.
+- http://localhost:9090/mcp-gateway → `Manual Test Everything` → **Delete**.
 - Stop the `server-everything` process (Ctrl-C in its terminal).
 
 ## Notes

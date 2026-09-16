@@ -1,7 +1,7 @@
 ---
 id: approval-allow-once
 area: approval
-requires: [server-9091, lm-studio-tool-model]
+requires: [server-9090, lm-studio-tool-model]
 duration: ~3 min
 last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
@@ -14,7 +14,7 @@ later call of the same tool asks again.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded (otherwise: SKIPPED)
 
 ## Setup

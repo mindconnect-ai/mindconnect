@@ -1,7 +1,7 @@
 ---
 id: chat-landing-and-new-chats
 area: chat
-requires: [server-9091]
+requires: [server-9090]
 duration: ~4 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ is opened.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 with authentication off, the
+- Admin UI running at http://localhost:9090 with authentication off, the
   app's default (otherwise: SKIPPED — the REST steps act as the dev user
   `mc_user`)
 - No model is needed: nothing is sent to one.
@@ -23,18 +23,18 @@ is opened.
 ## Setup
 
 1. Note the id of the seeded `default-chat` agent:
-   `AID=$(curl -s http://localhost:9091/api/agents | jq -r '.[] | select(.name=="default-chat") | .id')`
+   `AID=$(curl -s http://localhost:9090/api/agents | jq -r '.[] | select(.name=="default-chat") | .id')`
 
 ## Steps
 
-1. Open http://localhost:9091/chat and click **New chat** (in the empty state,
+1. Open http://localhost:9090/chat and click **New chat** (in the empty state,
    or at the top of the chat list). Note the id from the URL as `<mine>`.
    **Expected:** The URL is `/chat/sessions/<mine>`. In the chat list (the
    history button left of the conversation's title) its row is selected and
    shows an age such as `1m`, not `new`.
 2. Keep the chat list open. From a terminal, start a chat elsewhere:
    ```bash
-   curl -s -X POST http://localhost:9091/api/sessions -H 'content-type: application/json' \
+   curl -s -X POST http://localhost:9090/api/sessions -H 'content-type: application/json' \
         -d "{\"agentId\":\"$AID\",\"userId\":\"mc_user\"}" | jq -r .id
    ```
    Note the printed id as `<elsewhere>`.

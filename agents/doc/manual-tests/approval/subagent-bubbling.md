@@ -1,7 +1,7 @@
 ---
 id: approval-subagent-bubbling
 area: approval
-requires: [server-9091, lm-studio-tool-model]
+requires: [server-9090, lm-studio-tool-model]
 duration: ~8 min
 last-verified: never
 ---
@@ -14,7 +14,7 @@ resumes the sub-turn, and the root turn continues on its ORIGINAL stream.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded (otherwise: SKIPPED)
 - A delegating agent (e.g. `research-lead` with `run_agent`) whose SUB-agent
   (e.g. `web-researcher`) has a tool available.

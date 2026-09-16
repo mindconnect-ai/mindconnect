@@ -1,7 +1,7 @@
 ---
 id: memory-auto-compact-eviction
 area: memory
-requires: [server-9091, lm-studio-tool-model]
+requires: [server-9090, lm-studio-tool-model]
 duration: ~8 min
 last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
@@ -15,7 +15,7 @@ window (store untouched), and the agent can reload them via
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded (otherwise: SKIPPED)
 
 ## Setup

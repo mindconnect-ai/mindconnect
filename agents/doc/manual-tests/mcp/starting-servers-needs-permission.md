@@ -1,7 +1,7 @@
 ---
 id: mcp-starting-servers-needs-permission
 area: mcp
-requires: [server-9091, server-restartable]
+requires: [server-9090, server-restartable]
 duration: ~10 min
 last-verified: 2026-09-11 (working tree on e0d19d7, branch fix/mcp-review-1-4, port 9097, probes sent to /mcp-gateway/api/probe instead of through the form)
 ---
@@ -31,7 +31,7 @@ container daemon), never the secrets of the admin UI process.
 
 ## Steps
 
-1. http://localhost:9091/mcp-gateway → **Register MCP Server**:
+1. http://localhost:9090/mcp-gateway → **Register MCP Server**:
    - **Id**: `envdump`
    - **Tool name prefix**: `envdump`
    - **Target (JSON)**:
@@ -66,7 +66,7 @@ container daemon), never the secrets of the admin UI process.
 
 ## Cleanup
 
-- http://localhost:9091/mcp-gateway → delete `envdump` if it was saved.
+- http://localhost:9090/mcp-gateway → delete `envdump` if it was saved.
 - Restart the admin UI without `MC_TEST_SECRET`.
 
 ## Notes

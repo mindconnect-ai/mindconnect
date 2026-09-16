@@ -1,7 +1,7 @@
 ---
 id: coding-bash-background-and-cancel
 area: coding
-requires: [server-9091, tool-model, jdk-21]
+requires: [server-9090, tool-model, jdk-21]
 duration: ~6 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ killed with everything it started.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model (otherwise: SKIPPED)
 - `jwebserver` (ships with the JDK) is on the PATH of the shell the server
   was started from (otherwise: SKIPPED, or use the fallback in Notes)
@@ -26,7 +26,7 @@ killed with everything it started.
 
 1. Copy the fixture as in `coding/read-edit-verify.md` Setup 1 (the `git`
    lines may be skipped).
-2. Open http://localhost:9091/chat, **New chat**, **Model & tools** →
+2. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL — `<session dir>` below is
    `<data.base-dir>/local/home/mc_user/sessions/<session-id>`.

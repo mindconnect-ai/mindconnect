@@ -10,6 +10,7 @@ regression checklist after larger rework.
 ```
 manual-tests/
   README.md            ← this file: conventions + how to execute + how to report
+  HARNESS.md           ← driving the suite from a scripted browser, for an LLM
   _template.md         ← copy for new test cases
   <area>/              ← one directory per feature area (approval/, cancel/, memory/)
     <case>.md          ← one file per test case

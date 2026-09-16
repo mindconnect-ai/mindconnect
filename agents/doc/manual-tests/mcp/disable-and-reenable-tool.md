@@ -1,7 +1,7 @@
 ---
 id: mcp-disable-and-reenable-tool
 area: mcp
-requires: [server-9091]
+requires: [server-9090]
 duration: ~4 min
 last-verified: never
 ---
@@ -13,22 +13,22 @@ catalog, so it can be switched back on from the UI.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - Any registered MCP server, or just use the built-in `glob` — the mechanism is
   the same for both, and that is the point of the tool repository
 
 ## Steps
 
-1. http://localhost:9091/admin/tools, search `glob`.
+1. http://localhost:9090/admin/tools, search `glob`.
    **Expected:** A row `glob — Finds files by name pattern …`.
 2. Open the row → **Settings** → switch **Available to agents** off → **Save**.
    **Expected:** Message "Saved."
-3. Close the dialog and reload http://localhost:9091/admin/tools, search `glob`
+3. Close the dialog and reload http://localhost:9090/admin/tools, search `glob`
    again.
    **Expected:** **The row is still there**, and its summary reads
    `glob  (off) — Finds files by name pattern …`. Its description is still
    shown — a disabled tool is displayed as its source defines it.
-   Machine check: `curl -s localhost:9091/admin/api/tools | grep -c 'glob  (off)'`
+   Machine check: `curl -s localhost:9090/admin/api/tools | grep -c 'glob  (off)'`
    → `1`
 4. Open the row → **Settings**.
    **Expected:** The dialog opens, and **Available to agents** is **off**.

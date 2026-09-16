@@ -1,7 +1,7 @@
 ---
 id: skills-load-and-precedence
 area: skills
-requires: [server-9091, tool-model]
+requires: [server-9090, tool-model]
 duration: ~10 min
 last-verified: never
 ---
@@ -16,13 +16,13 @@ an agent with skills off sees neither.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model (otherwise: SKIPPED)
 - The seeded `coding-assistant` agent exists and is unchanged
 
 ## Setup
 
-1. http://localhost:9091/admin/skills → **New Skill**. Fill in:
+1. http://localhost:9090/admin/skills → **New Skill**. Fill in:
    - **Name** `manual-test-greeting`
    - **Description** `Use when greeting somebody by name`
    - **Instructions**
@@ -43,21 +43,21 @@ an agent with skills off sees neither.
    Say nothing else.
    MD
    ```
-3. http://localhost:9091/admin/agents → `coding-assistant` → **Edit** →
+3. http://localhost:9090/admin/agents → `coding-assistant` → **Edit** →
    **Enable Skills** on, **Skills** empty (= all) → **Save**.
 
 ## Steps
 
 1. On the agent's detail page, read the **Skills** row.
    **Expected:** `all skills`.
-2. Open http://localhost:9091/chat, **New chat**, **Model & tools** →
+2. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**. Do **not** choose a folder.
    Send: `Greet Alice by name.`
    **Expected:** A `skill` tool card with argument
    `{"name": "manual-test-greeting"}`, and the answer
    `Salutations, Alice, from the installation.`
 3. Open the session's working memory: the session id is in the chat URL, then
-   http://localhost:9091/admin/sessions/&lt;id&gt; → **Memory**.
+   http://localhost:9090/admin/sessions/&lt;id&gt; → **Memory**.
    **Expected:** The system prompt contains a `## Skills` section with the line
    `- manual-test-greeting: Use when greeting somebody by name`, and does
    **not** contain the word `Salutations` — the instructions are not in the
@@ -85,7 +85,7 @@ an agent with skills off sees neither.
 
 ## Cleanup
 
-- http://localhost:9091/admin/skills → delete `manual-test-greeting` (and the
+- http://localhost:9090/admin/skills → delete `manual-test-greeting` (and the
   second skill from step 7, if created).
 - `rm -rf ~/mc-manual-tests/skills-project`
 - `coding-assistant` → **Edit** → **Enable Skills** off, **Skills** empty →

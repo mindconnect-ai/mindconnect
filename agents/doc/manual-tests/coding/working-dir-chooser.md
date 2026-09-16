@@ -1,7 +1,7 @@
 ---
 id: coding-working-dir-chooser
 area: coding
-requires: [server-9091, tool-model]
+requires: [server-9090, tool-model]
 duration: ~6 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ chat's working directory and additional directories, and the choice reaches
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - The `server` profile is not active — it removes the folder button and
   `bash` (see `coding/server-profile.md`; otherwise: SKIPPED)
 - `agent-default` points at a tool-capable model (otherwise: SKIPPED)
@@ -29,7 +29,7 @@ chat's working directory and additional directories, and the choice reaches
 1. Copy the fixture as in `coding/read-edit-verify.md` Setup 1 (the `git`
    lines may be skipped).
 2. `rm -rf ~/mc-manual-tests/calc-project/scratch`
-3. Open http://localhost:9091/chat, **New chat**, **Model & tools** →
+3. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL (`/chat/sessions/<session-id>`).
 
@@ -84,9 +84,9 @@ chat's working directory and additional directories, and the choice reaches
 12. Send: `Run pwd with bash and show me its output.` When the
     **Approval required** card appears, click **Allow once**.
     **Expected:** The `bash` card prints `<home>/mc-manual-tests/calc-project`.
-13. Open http://localhost:9091/admin/sessions/<session-id>/memory, or from a
+13. Open http://localhost:9090/admin/sessions/<session-id>/memory, or from a
     terminal:
-    `curl -s http://localhost:9091/api/sessions/<session-id>/memory | jq -r .systemPrompt | grep -A3 '^## Working directory'`
+    `curl -s http://localhost:9090/api/sessions/<session-id>/memory | jq -r .systemPrompt | grep -A3 '^## Working directory'`
     **Expected:** The system prompt has a `## Working directory` section:
     ``You are working in `<home>/mc-manual-tests/calc-project`.`` followed by
     `You may also use these directories, by absolute path:` and a line with

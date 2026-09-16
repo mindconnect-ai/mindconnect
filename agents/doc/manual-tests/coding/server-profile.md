@@ -1,7 +1,7 @@
 ---
 id: coding-server-profile
 area: coding
-requires: [server-9091, tool-model, embedding-model]
+requires: [server-9090, tool-model, embedding-model]
 duration: ~8 min
 last-verified: never
 ---
@@ -15,7 +15,7 @@ where attached files still land, and deleting a chat removes that directory.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 with `server` added to the active
+- Admin UI running at http://localhost:9090 with `server` added to the active
   profiles, e.g. `SPRING_PROFILES_ACTIVE=server` (next to any profile it
   already runs with); `MC_TOOLS_DISABLED` is unset (otherwise: SKIPPED)
 - The startup log has the line
@@ -34,11 +34,11 @@ where attached files still land, and deleting a chat removes that directory.
 
 ## Steps
 
-1. Open http://localhost:9091/admin/tools.
+1. Open http://localhost:9090/admin/tools.
    **Expected:** Neither `bash` nor `process_kill` is listed; `file_read`,
    `grep` and the other file tools are. The shell's group is gone if nothing
    else was in it.
-2. Open http://localhost:9091/chat, **New chat**, **Model & tools** →
+2. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL.
    **Expected:** The composer has the attach, microphone, model and send
@@ -53,11 +53,11 @@ where attached files still land, and deleting a chat removes that directory.
    lists `soup.md`.
 5. Try to choose a directory through the API:
    ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:9091/api/directories?userId=mc_user"
+   curl -s -o /dev/null -w '%{http_code}\n' "http://localhost:9090/api/directories?userId=mc_user"
    curl -s -o /dev/null -w '%{http_code}\n' -X PUT -H 'Content-Type: application/json' \
-     -d '{"workingDir":"/tmp"}' http://localhost:9091/api/sessions/<session-id>/working-dir
+     -d '{"workingDir":"/tmp"}' http://localhost:9090/api/sessions/<session-id>/working-dir
    curl -s -o /dev/null -w '%{http_code}\n' -X POST -H 'Content-Type: application/json' \
-     -d '{"agentId":"agent-default","userId":"mc_user","workingDir":"/tmp"}' http://localhost:9091/api/sessions
+     -d '{"agentId":"agent-default","userId":"mc_user","workingDir":"/tmp"}' http://localhost:9090/api/sessions
    ```
    **Expected:** `400` three times; the server log names
    `mindconnect.working-dirs.choice`. The same `POST` without `workingDir`
@@ -70,7 +70,7 @@ where attached files still land, and deleting a chat removes that directory.
 ## Cleanup
 
 - Delete the session opened by the `POST` without `workingDir` in step 5
-  (`curl -X DELETE http://localhost:9091/api/sessions/<id>`).
+  (`curl -X DELETE http://localhost:9090/api/sessions/<id>`).
 - `rm /tmp/soup.md`
 - Restart the admin UI without the `server` profile before running the other
   `coding/` cases.

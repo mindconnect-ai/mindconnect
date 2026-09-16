@@ -1,7 +1,7 @@
 ---
 id: mcp-register-stdio-server
 area: mcp
-requires: [server-9091, npx, lm-studio-tool-model]
+requires: [server-9090, npx, lm-studio-tool-model]
 duration: ~8 min
 last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
 ---
@@ -14,7 +14,7 @@ actually calls it.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 - `npx` on PATH; the machine may reach the npm registry once (otherwise: SKIPPED)
 - LM Studio running with a tool-capable LLM loaded (otherwise: SKIPPED)
 
@@ -25,7 +25,7 @@ actually calls it.
 
 ## Steps
 
-1. Open http://localhost:9091/mcp-gateway.
+1. Open http://localhost:9090/mcp-gateway.
    **Expected:** Page **MCP Servers** with a **Register MCP Server** button.
    No error banner.
 2. Click **Register MCP Server**. Fill in:
@@ -50,13 +50,13 @@ actually calls it.
    **Expected:** Back on **MCP Servers**; a row `Manual Test Filesystem` whose
    line names the transport, the whole command, the tool count and the prefix:
    `process npx -y @modelcontextprotocol/server-filesystem /tmp/mcp-manual · N tool(s) · prefix mfs_`
-5. Open http://localhost:9091/admin/tools and search for `mfs`.
+5. Open http://localhost:9090/admin/tools and search for `mfs`.
    **Expected:** Group **Mcp** contains a collapsible section
    **Manual Test Filesystem  (N)** holding `mfs_read_text_file`,
    `mfs_list_directory` and the rest. Each tool has a description and a
    parameters table — not an empty row.
-   Alternatively: `curl -s localhost:9091/admin/api/tools | grep -c mfs_`
-6. Create an agent at http://localhost:9091/admin/agents (**New agent**), name
+   Alternatively: `curl -s localhost:9090/admin/api/tools | grep -c mfs_`
+6. Create an agent at http://localhost:9090/admin/agents (**New agent**), name
    `MCP Manual`, and add the tools `mfs_list_directory` and
    `mfs_read_text_file`. Save.
    **Expected:** Both appear in the tool dropdown under `Mcp · mfs_…` and the
@@ -68,7 +68,7 @@ actually calls it.
 
 ## Cleanup
 
-- http://localhost:9091/mcp-gateway → row `Manual Test Filesystem` → **Delete**.
+- http://localhost:9090/mcp-gateway → row `Manual Test Filesystem` → **Delete**.
 - Delete the agent `MCP Manual` and its sessions.
 - `rm -rf /tmp/mcp-manual`
 

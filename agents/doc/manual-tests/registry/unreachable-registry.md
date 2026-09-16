@@ -1,7 +1,7 @@
 ---
 id: registry-unreachable
 area: registry
-requires: [server-9091]
+requires: [server-9090]
 duration: ~4 min
 last-verified: never
 ---
@@ -14,11 +14,11 @@ imported, alone.
 
 ## Preconditions
 
-- Admin UI running at http://localhost:9091 (otherwise: SKIPPED)
+- Admin UI running at http://localhost:9090 (otherwise: SKIPPED)
 
 ## Steps
 
-1. http://localhost:9091/registry → **Add registry**, **Repository**
+1. http://localhost:9090/registry → **Add registry**, **Repository**
    `mindconnect-ai/this-does-not-exist`, **Save**, then open the row.
    **Expected:** A screen headed with the registry's name saying it cannot read
    `mindconnect-ai/this-does-not-exist@main`, naming the missing file and
@@ -34,7 +34,7 @@ imported, alone.
    `mindconnect-ai/mindconnect`, and open it.
    **Expected:** Cannot read … `registry.json`. The other registries in the list
    are unaffected.
-5. Go to http://localhost:9091/admin/agents.
+5. Go to http://localhost:9090/admin/agents.
    **Expected:** Unchanged — a registry that cannot be read imports nothing and
    breaks nothing.
 
