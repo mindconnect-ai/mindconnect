@@ -142,3 +142,27 @@ public class AuditFeature extends ConfigurableFeature {     // or implement Runt
 
 Register the class in `META-INF/services/ai.mindconnect.agent.runtime.feature.RuntimeFeature`
 and `installFromClasspath()` finds it; or `install(new AuditFeature())` by hand.
+
+## The same runtime in Spring Boot
+
+The server applications build their runtime the same way. `mc-agent-starter-runtime`
+is a Spring Boot starter whose auto-configuration runs the builder: the
+`Persistence` comes from the persistence starter of the application
+(`mc-agent-starter-file` or `mc-agent-starter-postgres`), the thread-bound scope
+from the namespace starter — then the `NamespaceFeature` is installed and the
+runtime works in the namespace of each request — and the settings are the
+`mindconnect.*` properties they always were (`mindconnect.tools.*`,
+`mindconnect.agent.*`, `mindconnect.vector-store.*`, …). The starter exports the
+runtime's beans to the context, so a controller injects `AgentChatService`,
+`LlmConfigRepository`, `ToolRegistry`, … as before, and every bean of the
+context is a fallback for the runtime's tools — a tool from an optional module
+finds the host's MCP gateway without the runtime naming it.
+
+An application contributes to the runtime with beans:
+
+```java
+@Bean RuntimeFeature audit() { return new AuditFeature(); }          // installed, replacing a shipped feature of the same name
+@Bean AgentRuntimeCustomizer noBash() { return b -> b.property("disabledTools", "bash"); }
+```
+
+and reaches it as `AgentRuntime` — `runtime.feature(CoreFeature.class)`, `runtime.beans()`.

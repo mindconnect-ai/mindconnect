@@ -165,8 +165,8 @@ class AgentRuntimeFeaturesTest {
         try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence().install(audit).build()) {
             assertThat(runtime.feature(AuditFeature.class)).isSameAs(audit);
             assertThat(runtime.beans().get(AuditFeature.Audit.class).who()).isEqualTo("me");
-            assertThat(runtime.beans().all(ToolAdvisor.class)).containsExactly(audit.toolAdvisor);
-            assertThat(runtime.beans().all(TaskAdvisor.class)).containsExactly(audit.taskAdvisor);
+            assertThat(runtime.beans().all(ToolAdvisor.class)).contains(audit.toolAdvisor);   // beside the core's todo advisor
+            assertThat(runtime.beans().all(TaskAdvisor.class)).contains(audit.taskAdvisor);
             assertThat(runtime.beans().get(String.class)).startsWith("audit of ");
         }
     }

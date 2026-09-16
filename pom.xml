@@ -55,6 +55,7 @@
         <module>agents/builder/mc-agent-runtime-feature-tools</module>
         <module>agents/builder/mc-agent-runtime-feature-workflows</module>
         <module>agents/builder/mc-agent-runtime-feature-file-upload</module>
+        <module>agents/builder/mc-agent-runtime-feature-namespace</module>
         <module>agents/builder/mc-agent-runtime-builder</module>
         <module>agents/demo/mc-agent-simple-demo</module>
         <module>common/mc-pathaccessor</module>
@@ -112,6 +113,7 @@
         <module>agents/springstarter/mc-agent-starter-file</module>
         <module>agents/springstarter/mc-agent-starter-postgres</module>
         <module>agents/springstarter/mc-agent-starter-namespace</module>
+        <module>agents/springstarter/mc-agent-starter-runtime</module>
         <module>agents/core/mc-credentials</module>
         <module>agents/core/mc-message-repository-core</module>
         <module>agents/core/mc-message-repository</module>

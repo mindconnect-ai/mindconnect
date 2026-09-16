@@ -20,10 +20,18 @@ public class FileAgentRepositoryFactory implements AgentRepositoryFactory {
     private final ObjectMapper objectMapper;
     private final Namespace namespace;
 
+    private final int maxTracesPerConversation;
+
     public FileAgentRepositoryFactory(Path baseDir, ObjectMapper objectMapper, Namespace namespace) {
+        this(baseDir, objectMapper, namespace, FileLlmCallTraceRepository.DEFAULT_MAX_PER_SESSION);
+    }
+
+    /** {@code maxTracesPerConversation}: the LLM call traces kept per conversation, oldest dropped; 0 keeps all. */
+    public FileAgentRepositoryFactory(Path baseDir, ObjectMapper objectMapper, Namespace namespace, int maxTracesPerConversation) {
         this.baseDir = baseDir;
         this.objectMapper = objectMapper;
         this.namespace = namespace;
+        this.maxTracesPerConversation = maxTracesPerConversation;
     }
 
     @Override public AgentDefinitionRepository agentDefinitionRepository() { return new FileAgentDefinitionRepository(baseDir, objectMapper, namespace); }
@@ -31,6 +39,6 @@ public class FileAgentRepositoryFactory implements AgentRepositoryFactory {
     @Override public WorkingMemoryRepository workingMemoryRepository() { return new FileWorkingMemoryRepository(baseDir, namespace); }
     @Override public ConversationSummaryRepository conversationSummaryRepository() { return new FileConversationSummaryRepository(baseDir, namespace); }
     @Override public TodoListRepository todoListRepository() { return new FileTodoListRepository(baseDir, namespace); }
-    @Override public LlmCallTraceRepository llmCallTraceRepository() { return new FileLlmCallTraceRepository(baseDir, namespace); }
+    @Override public LlmCallTraceRepository llmCallTraceRepository() { return new FileLlmCallTraceRepository(baseDir, maxTracesPerConversation, namespace); }
     @Override public SkillRepository skillRepository() { return new FileSkillRepository(baseDir, objectMapper, namespace); }
 }

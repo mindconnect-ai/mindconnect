@@ -109,8 +109,10 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     `mc-vector-store-pgvector`, `mc-vector-store-tools`, `mc-file-store-core` / `mc-file-store`
   - `adapter/` — alternative implementations of the core ports; `postgres/mc-*-pg`
     modules store domain objects as JSONB documents via `common/mc-jdbc`
-  - `springstarter/` — Spring Boot starters: `mc-agent-starter-file` (default) and
-    `mc-agent-starter-postgres`; `mindconnect.persistence` picks
+  - `springstarter/` — Spring Boot starters: `mc-agent-starter-runtime` builds the runtime
+    from the features and exports its beans; `mc-agent-starter-file` (default) and
+    `mc-agent-starter-postgres` supply the `Persistence` (`mindconnect.persistence` picks)
+    plus users and tokens; `mc-agent-starter-namespace` the per-request scope
   - `builder/mc-agent-runtime-builder` + `demo/mc-agent-simple-demo` — Spring-free
     embedding facade and runnable examples. The builder assembles a core plus installed
     `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); the

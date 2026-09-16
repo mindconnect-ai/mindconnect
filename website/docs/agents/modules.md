@@ -80,6 +80,7 @@ tables, typed rows, transactions — no ORM). See [Persistence](./persistence.md
 
 | Module | Purpose |
 |--------|---------|
+| `mc-agent-starter-runtime` | Builds the runtime for a Spring Boot application from the same features the embedded builder installs, configured from the `mindconnect.*` properties, and exports its beans; the persistence starters supply the `Persistence`, the namespace starter the scope. |
 | `mc-agent-starter-file` | File persistence, the default: every repository port, the LLM-config store and the file store under `mindconnect.data.base-dir`. |
 | `mc-agent-starter-postgres` | `mindconnect.persistence=postgres`: every port from one pooled `DataSource`, tables created on start. |
 
@@ -95,6 +96,7 @@ next step.
 | `mc-agent-runtime-builder` | Spring-free `AgentRuntimeBuilder` facade for embedding the runtime in any Java program; every capability module (tools, vector stores, file store, workflows) is optional. |
 | `mc-agent-runtime-feature-core` | The `CoreFeature` every builder installs: the LLM layer, conversations and messages, agent definitions and sessions. `AgentRuntimeBuilder.of(persistence)` with it alone is the smallest runtime that chats. |
 | `mc-agent-runtime-feature-skills`, `-tools`, `-workflows`, `-file-upload` | Optional features, one Maven module each, registered as services so `installFromClasspath()` finds them: stored skills, the tool registry over the `mc-agent-tools-*` modules, persisted workflows, files attached to a chat. See [Embedding the runtime](./embedding.md). |
+| `mc-agent-runtime-feature-namespace` | The namespace of the current call instead of one for the runtime's life: a thread-bound scope, every repository routed to the namespace's adapter, tasks that carry their scope. Installed explicitly by a host that binds the scope — the Spring starter does. |
 | `mc-agent-simple-demo` | Runnable embedding examples: a minimal chat, and a chat with an attached file searched through the session's vector store. |
 
 ## `server/` — deployable Spring Boot services
