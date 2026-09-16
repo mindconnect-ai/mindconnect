@@ -1,4 +1,10 @@
----
+| `mindconnect.namespace` | `local` | The default namespace: open to every signed-in user, and the one start-up work runs in — the runtime build, the tool warm-up, the seed loaders. A request or task that names none does **not** land here: with the namespace starter the scope is strict and an unbound thread that touches a store fails instead, because on a server that silence is a leak between namespaces. Bound to `MC_NAMESPACE` in the apps' yaml. |
+| `mindconnect.agent.sub-agents.max-depth` | `5` | How deep a chain of sub-agents may go before a turn is refused. Delegation itself comes from `mc-agent-runtime-feature-subagents`; without that module on the classpath an agent's roster yields no `run_agent`. |
+| `mindconnect.task-queue.retention` | — | How long finished task trees stay readable (ISO-8601, e.g. `PT1H`). Unset keeps them, which is what the Admin UI's task monitor reads. |
+| `mindconnect.task-queue.maintenance-interval` | `PT20S` | How often the queue renews leases, reclaims dead ones and applies the retention. |
+| `mindconnect.task-queue.store` | `memory` | `memory`, or `jdbc` for a store in the runtime's Postgres that several nodes share, each claiming with a lease. `jdbc` needs `mindconnect.persistence=postgres`. |
+| `mindconnect.task-queue.node-id` | host and pid | This node's name on a shared store. |
+| `mindconnect.task-queue.lease` | `PT30S` | How long a claim on a shared store holds before another node may take the task over. |---
 title: Environment variables
 sidebar_position: 10
 ---

@@ -1,6 +1,8 @@
 package ai.mindconnect.agent.starter.runtime;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.StartupScope;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
@@ -10,6 +12,8 @@ import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.namespace.NamespaceFeature;
 import ai.mindconnect.agent.runtime.feature.skills.SkillsFeature;
+import ai.mindconnect.agent.runtime.feature.subagents.SubAgentsFeature;
+import ai.mindconnect.agent.runtime.feature.taskqueue.TaskQueueFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.runtime.feature.transcription.TranscriptionFeature;
 import ai.mindconnect.agent.runtime.feature.workflows.WorkflowsFeature;
@@ -64,6 +68,7 @@ import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.core.env.Environment;
 
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.Optional;
 
 /**
@@ -139,7 +144,17 @@ public class AgentRuntimeAutoConfiguration {
         builder.install(tools)
                 .install(new WorkflowsFeature())
                 .install(new FileUploadFeature())
-                .install(new TranscriptionFeature());   // the chat's voice input
+                .install(new TranscriptionFeature())   // the chat's voice input
+                .install(new SubAgentsFeature().maxDepth(env.getProperty("mindconnect.agent.sub-agents.max-depth", Integer.class, 5)));
+        // The queue: as the Spring runtime always ran it — in memory, finished tasks kept for the task
+        // monitor (retention unset = keep) — unless mindconnect.task-queue.* says otherwise.
+        TaskQueueFeature queue = new TaskQueueFeature()
+                .retention(env.getProperty("mindconnect.task-queue.retention", Duration.class));
+        Optional.ofNullable(env.getProperty("mindconnect.task-queue.maintenance-interval", Duration.class)).ifPresent(queue::maintenanceInterval);
+        if ("jdbc".equalsIgnoreCase(env.getProperty("mindconnect.task-queue.store", "memory"))) queue.jdbc();
+        Optional.ofNullable(blankToNull(env.getProperty("mindconnect.task-queue.node-id"))).ifPresent(queue::nodeId);
+        Optional.ofNullable(env.getProperty("mindconnect.task-queue.lease", Duration.class)).ifPresent(queue::lease);
+        builder.install(queue);
         builder.property("defaultBaseDir", env.getProperty("mindconnect.tools.base-dir", System.getProperty("user.home")))
                 .property("tavilyApiKey", env.getProperty("mindconnect.tools.tavily-api-key", ""))
                 .property("codeExecRuntime", env.getProperty("mindconnect.code-exec.runtime", "auto"))
@@ -165,7 +180,9 @@ public class AgentRuntimeAutoConfiguration {
         features.orderedStream().forEach(builder::install);
         customizers.orderedStream().forEach(c -> c.customize(builder));
 
-        AgentRuntime runtime = builder.build();
+        // Start-up work — schema, seeds, the first look at the stores — runs in the default namespace;
+        // a strict scope would otherwise refuse the unbound main thread.
+        AgentRuntime runtime = StartupScope.call(scope, new Namespace(namespace), builder::build);
         log.info("Agent runtime built: persistence {}, namespace {}, features {}",
                 persistence.getClass().getSimpleName(), scope != null ? "per call" : namespace,
                 runtime.features().all().stream().map(RuntimeFeature::name).toList());
@@ -174,8 +191,11 @@ public class AgentRuntimeAutoConfiguration {
 
     /** The tools bind their providers once the context is up — not while it is still refreshing. */
     @Bean
-    ApplicationListener<ContextRefreshedEvent> toolWarmUp(AgentRuntime runtime) {
-        return event -> runtime.features().find(ToolsFeature.class).ifPresent(ToolsFeature::warmUp);
+    ApplicationListener<ContextRefreshedEvent> toolWarmUp(AgentRuntime runtime, ObjectProvider<ThreadBoundScope> boundScope,
+                                                          Environment env) {
+        Namespace startup = new Namespace(env.getProperty("mindconnect.namespace", "local"));
+        return event -> StartupScope.run(boundScope.getIfAvailable(), startup,
+                () -> runtime.features().find(ToolsFeature.class).ifPresent(ToolsFeature::warmUp));
     }
 
     private static String blankToNull(String value) {
@@ -183,6 +203,15 @@ public class AgentRuntimeAutoConfiguration {
     }
 
     // ── the runtime's beans, for the application's own beans to inject ─────
+
+    /**
+     * The scope the runtime works in, for the application's own beans to inject.
+     * Only when nothing else declares one: with the namespace starter present its
+     * {@link ThreadBoundScope} is both this bean and the runtime's.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ScopeSupplier.class)
+    ScopeSupplier scopeSupplier(AgentRuntime r) { return r.beans().get(ScopeSupplier.class); }
 
     @Bean AgentChatService agentChatService(AgentRuntime r) { return r.beans().get(AgentChatService.class); }
     @Bean AgentSessionService agentSessionService(AgentRuntime r) { return r.beans().get(AgentSessionService.class); }

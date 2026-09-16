@@ -89,6 +89,7 @@ public final class ToolCallWorker implements TaskWorker {
     private final UserChannels userChannels;
     private final ToolApprovalStore approvalStore;
     private final SubAgentCalls subAgents;
+    private final SubAgentSupport subAgentSupport;
 
     public ToolCallWorker(ConversationManager conversationManager,
                           AgentDefinitionRepository definitionRepository,
@@ -100,6 +101,24 @@ public final class ToolCallWorker implements TaskWorker {
                           SessionChannels sessionChannels,
                           ToolApprovalStore approvalStore,
                           UserChannels userChannels) {
+        this(conversationManager, definitionRepository, sessionService, memoryStrategyFactory, toolRegistry,
+                dynamicToolActivations, toolExecutor, sessionChannels, approvalStore, userChannels,
+                SubAgentSupport.enabled(AgentTurnWorker.MAX_DEPTH));
+    }
+
+    /** With the runtime's say on delegation — see {@link SubAgentSupport}. */
+    public ToolCallWorker(ConversationManager conversationManager,
+                          AgentDefinitionRepository definitionRepository,
+                          AgentSessionService sessionService,
+                          MemoryStrategyFactory memoryStrategyFactory,
+                          ToolRegistry toolRegistry,
+                          DynamicToolActivations dynamicToolActivations,
+                          ToolExecutor toolExecutor,
+                          SessionChannels sessionChannels,
+                          ToolApprovalStore approvalStore,
+                          UserChannels userChannels,
+                          SubAgentSupport subAgentSupport) {
+        this.subAgentSupport = subAgentSupport == null ? SubAgentSupport.disabled() : subAgentSupport;
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
         this.sessionService = sessionService;
@@ -111,7 +130,7 @@ public final class ToolCallWorker implements TaskWorker {
         this.approvalStore = approvalStore;
         this.userChannels = userChannels;
         this.subAgents = new SubAgentCalls(conversationManager, definitionRepository,
-                sessionService, memoryStrategyFactory, sessionChannels);
+                sessionService, memoryStrategyFactory, sessionChannels, this.subAgentSupport);
     }
 
     /** Wires the queue in after construction; must happen before the first task runs. */
@@ -335,7 +354,8 @@ public final class ToolCallWorker implements TaskWorker {
                                    String callId, String toolName, Map<String, Object> arguments) {
         // A sub-agent's tools see the chat that started the chain: the user's uploads are there.
         SessionTools tools = new SessionTools(toolRegistry, dynamicToolActivations, def, session,
-                session.parentSessionId() == null ? session.id() : sessionService.rootSession(session.id()).id());
+                session.parentSessionId() == null ? session.id() : sessionService.rootSession(session.id()).id(),
+                subAgentSupport);
         ToolExecutor.Context toolContext = new ToolExecutor.Context(
                 stream, session.conversationId(), def.id(), tokenCounter,
                 session.userId(), session.id());

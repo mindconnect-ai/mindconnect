@@ -5,6 +5,10 @@ import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import org.springframework.boot.ApplicationArguments;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.StartupScope;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
@@ -29,12 +33,24 @@ public class InitialWorkflowLoader implements ApplicationRunner {
     private final JacksonWorkflowSerializer serializer =
             new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create());
 
-    public InitialWorkflowLoader(WorkflowDataRepository workflows) {
+    private final ScopeSupplier scope;
+    private final Namespace startupNamespace;
+
+    public InitialWorkflowLoader(WorkflowDataRepository workflows,
+                                 org.springframework.beans.factory.ObjectProvider<ScopeSupplier> scope,
+                                 @Value("${mindconnect.namespace:local}") String startupNamespace) {
         this.workflows = workflows;
+        this.scope = scope.getIfAvailable();
+        this.startupNamespace = new Namespace(startupNamespace);
     }
 
+    /** Seeds run in the default namespace: the main thread binds no scope of its own. */
     @Override
     public void run(ApplicationArguments args) {
+        StartupScope.run(scope, startupNamespace, this::seed);
+    }
+
+    private void seed() {
         new ImportInitialDataInstaller(
                 workflows::exists,
                 (id, resource) -> {

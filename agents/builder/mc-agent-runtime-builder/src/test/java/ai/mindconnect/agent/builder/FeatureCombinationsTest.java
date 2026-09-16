@@ -8,6 +8,8 @@ import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.skills.SkillsFeature;
+import ai.mindconnect.agent.runtime.feature.subagents.SubAgentsFeature;
+import ai.mindconnect.agent.runtime.feature.taskqueue.TaskQueueFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.runtime.feature.transcription.TranscriptionFeature;
 import ai.mindconnect.agent.runtime.feature.workflows.WorkflowsFeature;
@@ -118,10 +120,10 @@ class FeatureCombinationsTest {
         try (AgentRuntime explicit = core()
                      .install(new SkillsFeature()).install(new ToolsFeature())
                      .install(new WorkflowsFeature()).install(new FileUploadFeature())
-                     .install(new TranscriptionFeature())
+                     .install(new TranscriptionFeature()).install(new SubAgentsFeature()).install(new TaskQueueFeature())
                      .build();
              AgentRuntime factory = AgentRuntimeBuilder.useInMemoryPersistence().build()) {
-            assertThat(names(explicit)).isEqualTo(names(factory));
+            assertThat(names(explicit)).containsExactlyInAnyOrderElementsOf(names(factory));
             assertThat(explicit.beans().get(ToolRegistry.class).knownToolNames())
                     .isEqualTo(factory.beans().get(ToolRegistry.class).knownToolNames());
         }

@@ -65,10 +65,11 @@ public class RegistryAutoConfiguration {
     public RegistrySourceRepository registrySourceRepository(
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
             @Value("${mindconnect.registry.default-source:}") String defaultSource,
-            ObjectProvider<ScopeSupplier> scope) {
+            ObjectProvider<ScopeSupplier> scope,
+            @Value("${mindconnect.namespace:local}") String defaultNamespace) {
         // Bound once at start-up until registry sources are routed per namespace like the stores.
         FileRegistrySourceRepository repository = new FileRegistrySourceRepository(
-                Path.of(dataBaseDir), scope.getIfAvailable(ScopeSupplier::local).namespace());
+                Path.of(dataBaseDir), seedNamespace(scope, defaultNamespace));
         InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
         seed(repository, defaultSource);
         return repository;
@@ -136,5 +137,17 @@ public class RegistryAutoConfiguration {
     public RegistryService registryService(RegistrySourceRepository sources, RegistryClient client,
                                            ObjectProvider<RegistryInstaller> installers) {
         return new RegistryService(sources, client, installers.orderedStream().toList());
+    }
+    /**
+     * Where bundled data is seeded: the namespace a fixed scope names — a
+     * single-namespace host chose it — and otherwise the installation default,
+     * because a thread-bound scope binds nothing at start-up.
+     */
+    private static ai.mindconnect.agent.Namespace seedNamespace(
+            ObjectProvider<ScopeSupplier> scope, String defaultNamespace) {
+        ScopeSupplier supplier = scope.getIfAvailable();
+        return supplier == null || supplier instanceof ai.mindconnect.agent.ThreadBoundScope
+                ? new ai.mindconnect.agent.Namespace(defaultNamespace)
+                : supplier.namespace();
     }
 }

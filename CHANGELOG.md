@@ -41,6 +41,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
   own, installed by the starter, left out by a runtime that never hears audio. Every
   domain module's repository factory can build for a namespace, and the tool
   environment falls back to the host's beans.
+- **agents:** two more features. **`SubAgentsFeature`** (`mc-agent-runtime-feature-subagents`)
+  is delegation: an agent's roster yields `run_agent`/`run_agents` only with it
+  installed, and `maxDepth` bounds the chain (`mindconnect.agent.sub-agents.max-depth`
+  in Spring, default 5). **`TaskQueueFeature`** (`mc-agent-runtime-feature-taskqueue`)
+  configures the queue the turns run on — `retention`, `maintenanceInterval`, and
+  `jdbc()` for a `JdbcTaskStore` shared across nodes on Postgres; in Spring
+  `mindconnect.task-queue.{retention,maintenance-interval,store,node-id,lease}`,
+  with the store in memory and finished tasks kept, as before.
+- **agents:** the server's scope is **strict**: a thread that touches a store without
+  a bound namespace fails instead of silently working in `mindconnect.namespace`.
+  Requests bind through the namespace filter, tasks through the runtime; start-up
+  routines (the runtime build, the tool warm-up, the seed loaders, the MCP and
+  registry seeds) bind the default namespace explicitly. A custom start-up routine
+  that reads a repository has to do the same (`scope.runIn(Scope.of(ns), …)`).
 - **agents:** the embedded runtime is now **a core plus installed features**, the way
   a Jackson `ObjectMapper` is a core plus modules. `AgentRuntimeBuilder.of(persistence)`
   is the smallest runtime that chats — the `CoreFeature`: LLM, messages, agents, no tools;

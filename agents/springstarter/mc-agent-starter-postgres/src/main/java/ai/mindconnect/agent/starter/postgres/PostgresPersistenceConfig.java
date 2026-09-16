@@ -1,9 +1,5 @@
 package ai.mindconnect.agent.starter.postgres;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.jdbc.Json;
 import ai.mindconnect.jdbc.Sql;
@@ -34,7 +30,7 @@ import javax.sql.DataSource;
  *
  * <p>Every store is routed per namespace: the bean is a {@link NamespaceRouted}
  * proxy, the adapter behind it is built — schema included — for the namespace
- * the {@link ScopeSupplier} names when a call comes in.
+ * the scope of the call names, when the namespace starter binds one.
  *
  * <pre>
  * mindconnect:
@@ -64,19 +60,6 @@ public class PostgresPersistenceConfig {
         config.setPoolName("mindconnect");
         log.info("Persistence: postgres at {}", url.replaceAll("password=[^&]*", "password=***"));
         return new HikariDataSource(config);
-    }
-
-    /**
-     * Where this server works: a {@link Scope} bound to the thread per
-     * request or per queued task. Until every entry point binds one, an
-     * unbound thread works in {@code mindconnect.namespace} (default
-     * {@code local}); that fallback goes once the request filter and the
-     * start-up routines bind, and an unbound thread becomes an error.
-     */
-    @Bean
-    @ConditionalOnMissingBean(ScopeSupplier.class)
-    ThreadBoundScope scopeSupplier(@Value("${mindconnect.namespace:local}") String fallbackNamespace) {
-        return ThreadBoundScope.withFallback(Scope.of(new Namespace(fallbackNamespace)));
     }
 
     @Bean

@@ -6,6 +6,8 @@ import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agentrest.service.SessionFileService;
+import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.chatui.service.SessionOwnership;
 
@@ -82,6 +84,7 @@ class ChatFileUploadSmokeTest {
     @Autowired AgentSessionRepository sessions;
     @Autowired AgentSessionService sessionService;
     @Autowired SessionFileService sessionFiles;
+    @Autowired ThreadBoundScope scope;
 
     /** True when LM Studio answers and has a loaded embeddings model. */
     static boolean embeddingsUp() {
@@ -99,8 +102,13 @@ class ChatFileUploadSmokeTest {
         }
     }
 
+    /** The test thread is an entry point of its own: what it reads from the stores it reads in the default namespace. */
     @Test
     void uploadIngestsIntoTheSessionStoreAndAnnouncesTheFile() throws Exception {
+        scope.callIn(Scope.local(), () -> { uploadIngestsAndAnnounces(); return null; });
+    }
+
+    private void uploadIngestsAndAnnounces() throws Exception {
         assumeTrue(embeddingsUp(),
                 "LM Studio is not running at " + LM_STUDIO + " or no embeddings model is loaded");
 

@@ -107,6 +107,17 @@ public class DefaultRuntimeBeans implements RuntimeBeans {
         return (List<T>) List.copyOf(contributions.getOrDefault(type, List.of()));
     }
 
+    /**
+     * The bean of the given type <em>if it has already been built</em> — never
+     * building it. What a close hook asks: a runtime that never resolved a
+     * resource has nothing to release, and resolving one to close it would
+     * start what shutdown is ending.
+     */
+    @SuppressWarnings("unchecked")
+    public synchronized <T> Optional<T> ifBuilt(Class<T> type) {
+        return Optional.ofNullable((T) singletons.get(type));
+    }
+
     /** The beans built so far, in build order — for closing resources and for diagnostics. */
     public synchronized List<Object> built() {
         return List.copyOf(singletons.values());

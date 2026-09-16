@@ -31,6 +31,7 @@ public final class SessionTools implements ToolDefinitionProvider {
     private final AgentDefinition def;
     private final AgentSession session;
     private final SessionId rootSessionId;
+    private final SubAgentSupport subAgents;
 
     /** The toolset of a session that is its own root — a chat, not a sub-agent. */
     public SessionTools(ToolRegistry toolRegistry, DynamicToolActivations dynamicToolActivations,
@@ -44,6 +45,15 @@ public final class SessionTools implements ToolDefinitionProvider {
      */
     public SessionTools(ToolRegistry toolRegistry, DynamicToolActivations dynamicToolActivations,
                         AgentDefinition def, AgentSession session, SessionId rootSessionId) {
+        this(toolRegistry, dynamicToolActivations, def, session, rootSessionId,
+                SubAgentSupport.enabled(AgentTurnWorker.MAX_DEPTH));
+    }
+
+    /** With the runtime's say on delegation: without it, no agent gets the inline delegation tools. */
+    public SessionTools(ToolRegistry toolRegistry, DynamicToolActivations dynamicToolActivations,
+                        AgentDefinition def, AgentSession session, SessionId rootSessionId,
+                        SubAgentSupport subAgents) {
+        this.subAgents = subAgents == null ? SubAgentSupport.disabled() : subAgents;
         this.toolRegistry = toolRegistry;
         this.dynamicToolActivations = dynamicToolActivations;
         this.def = def;
@@ -60,6 +70,7 @@ public final class SessionTools implements ToolDefinitionProvider {
     public List<Tool> liveTool(String toolName) {
         List<AgentTool> refs = dynamicToolActivations.effectiveRefs(def, session.id()).stream()
                 .filter(ref -> toolName.equals(ref.name()))
+                .filter(this::offered)
                 .toList();
         return toolRegistry.resolveAll(refs, scope());
     }
@@ -71,6 +82,7 @@ public final class SessionTools implements ToolDefinitionProvider {
         List<AgentTool> refs = dynamicToolActivations.effectiveRefs(def, session.id()).stream()
                 .filter(ref -> !InlineAgentTools.RUN_AGENT.equals(ref.name())
                         && !InlineAgentTools.RUN_AGENTS.equals(ref.name()))
+                .filter(this::offered)
                 .toList();
         return toolRegistry.resolveAll(refs, scope());
     }
@@ -104,6 +116,15 @@ public final class SessionTools implements ToolDefinitionProvider {
                 session.workingDir(), session.additionalDirs());
     }
 
+    /**
+     * A runtime that does not delegate offers nothing about delegating: without
+     * the sub-agents feature {@code list_agents} would name callable agents the
+     * model cannot then call, and it would keep trying.
+     */
+    private boolean offered(AgentTool ref) {
+        return subAgents.enabled() || !"list_agents".equals(ref.name());
+    }
+
     /** Whether {@code toolName} is one of the inline delegation tools, and this agent delegates. */
     public boolean isInline(String toolName) {
         return (InlineAgentTools.RUN_AGENT.equals(toolName)
@@ -116,6 +137,6 @@ public final class SessionTools implements ToolDefinitionProvider {
      * outside the roster, being part of the directory the agent works in.
      */
     private boolean delegating() {
-        return def.delegates() || !projectAgents().isEmpty();
+        return subAgents.enabled() && (def.delegates() || !projectAgents().isEmpty());
     }
 }

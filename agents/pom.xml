@@ -27,6 +27,7 @@
         <module>../common/mc-jdbc</module>
         <module>../common/mc-file-repo</module>
         <module>../taskqueue/mc-task-queue</module>
+        <module>../taskqueue/mc-task-queue-jdbc</module>
         <module>core/mc-agent-domain</module>
         <module>vectorstore/mc-vector-store</module>
         <module>vectorstore/mc-vector-store-pgvector</module>
@@ -40,6 +41,8 @@
         <module>builder/mc-agent-runtime-feature-file-upload</module>
         <module>builder/mc-agent-runtime-feature-namespace</module>
         <module>builder/mc-agent-runtime-feature-transcription</module>
+        <module>builder/mc-agent-runtime-feature-taskqueue</module>
+        <module>builder/mc-agent-runtime-feature-subagents</module>
         <module>builder/mc-agent-runtime-builder</module>
         <module>demo/mc-agent-simple-demo</module>
 

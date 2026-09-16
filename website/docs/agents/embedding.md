@@ -1,4 +1,4 @@
----
+| `TaskQueueFeature` | `mc-agent-runtime-feature-taskqueue` | the queue the turns run on, configured: `retention`, `maintenanceInterval`, and `jdbc()` for a store shared across nodes on Postgres | — |---
 title: Embedding the runtime
 description: Build an agent runtime in plain Java from a core plus installed features — the way an ObjectMapper is a core plus modules.
 ---
@@ -38,6 +38,8 @@ its cross-cutting advisors, and it declares what it depends on.
 | `WorkflowsFeature` | `mc-agent-runtime-feature-workflows` | the workflow store the runtime and the workflow tools share — files, memory or Postgres, following the persistence — seeded from the classpath; brings `mc-agent-tools-workflow` | — |
 | `FileUploadFeature` | `mc-agent-runtime-feature-file-upload` | the file store (a directory or Postgres, following the persistence) and `attachFile` — indexing a document into the session's vector store; brings `mc-file-store` and `mc-vector-store-tools` | `ToolsFeature` |
 | `TranscriptionFeature` | `mc-agent-runtime-feature-transcription` | speech to text by LLM config name, over the OpenAI-compatible transcription endpoint | — |
+| `SubAgentsFeature` | `mc-agent-runtime-feature-subagents` | agents delegating to agents: the inline `run_agent`/`run_agents` tools, sub-agent sessions, the recursion depth (`maxDepth`); without it a roster is ignored | `ToolsFeature` |
+| `TaskQueueFeature` | `mc-agent-runtime-feature-taskqueue` | the queue the turns run on, configured: `retention`, `maintenanceInterval`, and `jdbc()` for a store shared across nodes on Postgres | — |
 
 The core is always there: `of(persistence)` installs it, because a runtime without
 a model, a transcript or a session is not an agent runtime — which is why the
