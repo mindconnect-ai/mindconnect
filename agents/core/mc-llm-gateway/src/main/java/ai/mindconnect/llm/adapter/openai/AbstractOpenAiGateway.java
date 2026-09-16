@@ -464,13 +464,14 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         // models, so nothing can be told from the name and the field is sent.
         Map<String, Object> params = LlmParams.merge(config, request);
         String reasoningEffort = LlmParams.string(params, "reasoning_effort");
-        boolean effortAccepted = config.provider() != LlmProvider.OPENAI || reasoning;
-            // From gpt-5.6 on, OpenAI refuses function tools together with reasoning
+        boolean effortAccepted = !OPENAI_ITSELF.contains(config.provider()) || reasoning;
+        // From gpt-5.6 on, OpenAI refuses function tools together with reasoning
         // on Chat Completions (HTTP 400) — and those models reason by default,
         // so leaving the field out is refused too. With tools the effort has to
-        // be "none"; only the Responses API would keep reasoning and tools.
+        // be "none" here; a config that wants both goes through the Responses
+        // API (provider OPENAI), and only OPENAI_CHAT_COMPLETIONS lands here.
         boolean tools = request.tools() != null && !request.tools().isEmpty();
-        if (config.provider() == LlmProvider.OPENAI && tools
+        if (OPENAI_ITSELF.contains(config.provider()) && tools
                 && OpenAiModels.refusesToolsWithReasoningOnChat(config.model())) {
             if (reasoningEffort != null && !"none".equals(reasoningEffort)) {
                 log.debug("{} takes no reasoning with tools on Chat Completions — sending reasoning_effort=none instead of {}",
@@ -527,6 +528,10 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         return root;
     }
 
+    /** OpenAI's own API, whichever way a config reaches it. */
+    private static final Set<LlmProvider> OPENAI_ITSELF =
+            EnumSet.of(LlmProvider.OPENAI, LlmProvider.OPENAI_CHAT_COMPLETIONS);
+
     /**
      * The endpoints that take a {@code file} content block. It is OpenAI's
      * own extension of Chat Completions — OpenRouter mirrors it, Azure serves
@@ -534,7 +539,8 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
      * Groq, Mistral, …) rejects the request with a 400 for an unknown type.
      */
     private static final Set<LlmProvider> FILE_BLOCK_PROVIDERS =
-            EnumSet.of(LlmProvider.OPENAI, LlmProvider.AZURE_OPENAI, LlmProvider.OPENROUTER);
+            EnumSet.of(LlmProvider.OPENAI, LlmProvider.OPENAI_CHAT_COMPLETIONS,
+                    LlmProvider.AZURE_OPENAI, LlmProvider.OPENROUTER);
 
     /**
      * A user message with media as the Chat Completions content array: text

@@ -36,6 +36,7 @@ import ai.mindconnect.llm.adapter.pg.PgLlmRepositoryFactory;
 import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
 import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
+import ai.mindconnect.llm.adapter.openai.OpenAiResponsesGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiEmbeddingsGateway;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
@@ -252,6 +253,8 @@ public class CoreFeature extends ConfigurableFeature {
             for (LlmProvider provider : LlmProvider.values()) {
                 gateways.put(provider, openAi);   // OpenAI-compatible is the safe default
             }
+            // OpenAI itself speaks the Responses API: only there do tools and reasoning go together.
+            gateways.put(LlmProvider.OPENAI, new OpenAiResponsesGateway(http, mapper, encryption, env));
             gateways.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, mapper, encryption, env));
             gateways.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, mapper, encryption, env));
             gateways.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, mapper, encryption, env));

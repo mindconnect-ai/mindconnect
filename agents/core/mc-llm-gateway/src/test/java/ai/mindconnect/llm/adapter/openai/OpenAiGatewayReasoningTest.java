@@ -77,8 +77,8 @@ class OpenAiGatewayReasoningTest {
     }
 
     @Test
-    void fromGpt56OnToolsForceTheEffortToNone() throws Exception {
-        LlmConfig gpt56 = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
+    void fromGpt56OnChatCompletionsToolsForceTheEffortToNone() throws Exception {
+        LlmConfig gpt56 = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI_CHAT_COMPLETIONS,
                 "gpt-5.6-luna", "https://api.openai.com", "sk-test", 0.7, 4096,
                 Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null).resolved(encryption);
         LlmRequest withTools = new LlmRequest("openai", List.of(LlmMessage.user("hi")),
@@ -99,6 +99,23 @@ class OpenAiGatewayReasoningTest {
         assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5-mini")).isFalse();
         assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-4o")).isFalse();
         assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("o3")).isFalse();
+    }
+
+    @Test
+    void openAiThroughChatCompletionsIsStillOpenAi() throws Exception {
+        LlmConfig nonReasoning = new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI_CHAT_COMPLETIONS,
+                "gpt-4o", null, "sk-test", 0.7, 4096,
+                Map.of("reasoning_effort", "high"), 128_000, false, null, null, null, null, null);
+        assertThat(gateway.buildRequestNode(nonReasoning.resolved(encryption), request)
+                .has("reasoning_effort")).isFalse();
+        assertThat(gateway.endpointUrl(nonReasoning)).isEqualTo("https://api.openai.com/v1/chat/completions");
+        // the summary is a Responses API setting — nothing to offer here
+        assertThat(LlmProvider.OPENAI_CHAT_COMPLETIONS.additionalParams())
+                .extracting(ai.mindconnect.llm.domain.AdditionalParamSpec::key)
+                .contains("reasoning_effort").doesNotContain("reasoning_summary");
+        assertThat(LlmProvider.OPENAI.additionalParams())
+                .extracting(ai.mindconnect.llm.domain.AdditionalParamSpec::key)
+                .contains("reasoning_effort", "reasoning_summary");
     }
 
     @Test
