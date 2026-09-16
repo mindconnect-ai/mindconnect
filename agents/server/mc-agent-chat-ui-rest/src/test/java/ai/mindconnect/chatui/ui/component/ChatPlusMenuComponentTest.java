@@ -30,7 +30,7 @@ class ChatPlusMenuComponentTest {
 
     @Test
     void itOffersFilesImagesToolsAndSubAgents() throws Exception {
-        String out = json(ChatPlusMenuComponent.menu(SESSION, 0, 0));
+        String out = json(ChatPlusMenuComponent.menu(SESSION, ChatPlusMenuComponent.Counts.NONE));
 
         // Files is the attach dialog's default, so it keeps the bare route.
         assertThat(out).contains("\"url\":\"" + base() + "/attach-dialog\"");
@@ -45,17 +45,30 @@ class ChatPlusMenuComponentTest {
      */
     @Test
     void theMenuOpensFromTheLeftEdge() throws Exception {
-        assertThat(json(ChatPlusMenuComponent.menu(SESSION, 0, 0))).contains("\"align\":\"START\"");
+        assertThat(json(ChatPlusMenuComponent.menu(SESSION, ChatPlusMenuComponent.Counts.NONE))).contains("\"align\":\"START\"");
     }
 
     /** A count of zero is not a badge: an empty "0" on a fresh chat is noise. */
     @Test
     void countsShowOnlyOnceThereIsSomethingToCount() throws Exception {
-        assertThat(json(ChatPlusMenuComponent.menu(SESSION, 0, 0)))
+        assertThat(json(ChatPlusMenuComponent.menu(SESSION, ChatPlusMenuComponent.Counts.NONE)))
                 .doesNotContain("\"badge\"");
 
-        String out = json(ChatPlusMenuComponent.menu(SESSION, 2, 7));
+        String out = json(ChatPlusMenuComponent.menu(SESSION, new ChatPlusMenuComponent.Counts(5, 2, 7, 3)));
+        assertThat(out).contains("\"badge\":\"5\"");
         assertThat(out).contains("\"badge\":\"2\"");
         assertThat(out).contains("\"badge\":\"7\"");
+        assertThat(out).contains("\"badge\":\"3\"");
+    }
+
+    /** The "+" itself carries the file count, and nothing on a chat without files. */
+    @Test
+    void theFileCountSitsOnThePlus() throws Exception {
+        assertThat(ChatPlusMenuComponent.fileCount(SESSION, ChatPlusMenuComponent.Counts.NONE)).isNull();
+
+        String out = json(ChatPlusMenuComponent.fileCount(SESSION, new ChatPlusMenuComponent.Counts(3, 1, 0, 0)));
+        assertThat(out).contains("\"id\":\"chat-plus-" + SESSION_VALUE + "-count\"");
+        assertThat(out).contains("\"4\"");
+        assertThat(out).contains("chat-plus-count");
     }
 }

@@ -410,8 +410,8 @@ public class ChatUiController {
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
-                .withAttachmentCount(sessionFiles.attachments(session.id()).size())
-                .withToolCount(agent.tools() == null ? 0 : agent.tools().size())
+                .withAttachments(sessionFiles.attachments(session.id()))
+                .withAgentCounts(agent)
                 .withWorkingDir(session.workingDir())
                 .withDirChoice(sessionService.workingDirChoice());
         return UiPatch.Operation.replace(form.id(), form.render());
@@ -802,15 +802,18 @@ public class ChatUiController {
         // drop zone to add more. Uploads patch the list in place, so it stays
         // open and current while files arrive.
         //
-        // Pictures get their own entry in the "+" menu because that is what
-        // people go looking for, but not their own dialog: the same list and
-        // the same endpoint, with the file chooser narrowed to images. A
-        // second dialog would have shown a second, disagreeing copy of what
-        // is attached.
+        // Pictures and documents are kept apart, as in the "+" menu: each
+        // dialog lists only its own kind. The endpoint is the same, and so
+        // is the record behind both lists — two panels over one set of
+        // files, each under its own id, which the upload and remove patches
+        // both refresh.
+        var listed = imagesOnly
+                ? ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.Kind.IMAGES
+                : ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent.Kind.DOCUMENTS;
         var body = ai.mindconnect.ui.model.UiStack.of("chat-attach-body");
         body.gap(12);
         body.child(ai.mindconnect.chatui.ui.component.ChatAttachmentsComponent
-                .node(sessionId, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId)));
+                .node(sessionId, listed, sessionFiles.attachments(sessionId), sessionFiles.listAttachments(sessionId)));
         body.child(ai.mindconnect.chatui.ui.page.ChatPage.attachZone(sessionId, imagesOnly));
         return ResponseEntity.ok(openDialog(imagesOnly ? "Add images" : "Attached files", body));
     }
@@ -1193,6 +1196,7 @@ public class ChatUiController {
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks);
+        page.withAttachments(sessionFiles.attachments(session.id()));
         page.withDirChoice(sessionService.workingDirChoice());
         // Every render hands the SPA this session's stream — whether or not
         // a turn is running. That is the whole point: a client with nothing

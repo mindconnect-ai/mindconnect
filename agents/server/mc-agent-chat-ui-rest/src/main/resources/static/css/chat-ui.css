@@ -982,6 +982,28 @@
     height: 20px;
 }
 
+/* How many files hang on the chat, on the "+"'s top-right shoulder — the
+   same pill the menu's entries carry, a size smaller. A sibling of the menu
+   (a menu button has no badge of its own), so it is laid over the corner and
+   lets clicks through to the "+" underneath. */
+.chat-form .chat-plus-count {
+    position: absolute;
+    inset-block-end: 34px;
+    inset-inline-start: 32px;
+    z-index: 4;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: var(--sui-color-primary);
+    color: var(--sui-color-on-primary, #fff);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 16px;
+    text-align: center;
+    pointer-events: none;
+}
+
 /* The popover itself: a little wider and a little softer than the
    framework's default kebab menu, because these are sentences ("Upload
    files") rather than verbs, and it opens over the conversation. */

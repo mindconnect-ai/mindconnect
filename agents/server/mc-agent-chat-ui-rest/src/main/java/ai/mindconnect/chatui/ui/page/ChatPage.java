@@ -94,7 +94,7 @@ public final class ChatPage {
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
-                .withToolCount(agent.tools() == null ? 0 : agent.tools().size())
+                .withAgentCounts(agent)
                 .withWorkingDir(session.workingDir());
     }
 
@@ -179,9 +179,9 @@ public final class ChatPage {
 
 
 
-    /** The count the composer shows on its "+". */
-    public ChatPage withAttachmentCount(int count) {
-        this.chatForm.withAttachmentCount(count);
+    /** The files hanging on the conversation, counted on the composer's "+" and in its menu. */
+    public ChatPage withAttachments(java.util.List<ai.mindconnect.agent.runtime.domain.AttachedFile> attachments) {
+        this.chatForm.withAttachments(attachments);
         return this;
     }
 

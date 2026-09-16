@@ -13,6 +13,8 @@ import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiPatch;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.SessionId;
 
 /**
@@ -74,26 +76,38 @@ public final class ChatFormComponent implements UiComponent {
         return streaming ? streamingForm() : idleForm();
     }
 
-    /** How many files hang on this conversation — shown on the "+". */
-    private int attachmentCount;
+    /** How many documents and how many pictures hang on this conversation. */
+    private int documentCount;
+    private int imageCount;
 
-    /** Puts the file count on the attach button, so it is visible while typing. */
-    public ChatFormComponent withAttachmentCount(int count) {
-        this.attachmentCount = Math.max(count, 0);
+    /**
+     * Puts the file count on the "+" — so it is visible while typing — and the
+     * document and picture counts on the menu's Upload files and Add images entries.
+     */
+    public ChatFormComponent withAttachments(java.util.List<AttachedFile> attachments) {
+        this.imageCount = attachments == null ? 0
+                : (int) attachments.stream().filter(AttachedFile::isImage).count();
+        this.documentCount = attachments == null ? 0 : attachments.size() - imageCount;
         return this;
     }
 
-    /** How many tools this chat offers up front — shown on the "+" menu. */
+    /** How many tools this chat offers up front, and how many agents it may call. */
     private int toolCount;
+    private int subAgentCount;
 
     /**
-     * Puts the tool count on the "+" menu's Tools entry, so what the chat can
-     * reach for is readable from the composer rather than from a dialog two
-     * clicks in.
+     * Puts the tool and sub-agent counts on the "+" menu's entries, so what
+     * the chat can reach for is readable from the composer rather than from a
+     * dialog two clicks in. {@code agent} is the chat's effective agent.
      */
-    public ChatFormComponent withToolCount(int count) {
-        this.toolCount = Math.max(count, 0);
+    public ChatFormComponent withAgentCounts(AgentDefinition agent) {
+        this.toolCount = agent == null || agent.tools() == null ? 0 : agent.tools().size();
+        this.subAgentCount = agent == null ? 0 : agent.effectiveCallableAgents().size();
         return this;
+    }
+
+    private ChatPlusMenuComponent.Counts counts() {
+        return new ChatPlusMenuComponent.Counts(documentCount, imageCount, toolCount, subAgentCount);
     }
 
     /**
@@ -108,7 +122,7 @@ public final class ChatFormComponent implements UiComponent {
      * always been.
      */
     private ai.mindconnect.ui.model.UiNode plusMenu() {
-        return ChatPlusMenuComponent.menu(sessionId, attachmentCount, toolCount);
+        return ChatPlusMenuComponent.menu(sessionId, counts());
     }
 
     /** What the composer's model button says — the chat's current model. */
@@ -210,6 +224,10 @@ public final class ChatFormComponent implements UiComponent {
                 // the sprite tokens the glyphs.
                 .content(plusMenu())
                 .action(recordAction());
+        var countBadge = ChatPlusMenuComponent.fileCount(sessionId, counts());
+        if (countBadge != null) {
+            form = form.content(countBadge);
+        }
         if (dirChoice) {
             form = form.action(dirAction());
         }
