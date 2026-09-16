@@ -78,7 +78,7 @@ public final class ApprovalCardComponent {
         params.item(UiList.Item.of("approval-params-" + callId, "Parameters")
                 .collapsible("show", false)
                 .content(UiMarkdown.of("approval-args-" + callId,
-                        "```json\n" + argsJson + "\n```")));
+                        MarkdownText.fenced("json", argsJson))));
         var buttons = ai.mindconnect.ui.model.UiStack.of(
                         UiAction.danger("approval-deny-" + callId, "Deny")
                                 .onClick(answer(sessionId, callId, false, "once")),

@@ -187,6 +187,13 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **HTML in a conversation no longer breaks the chat.** An answer, a
+  thought, a tool's output or a user message that contained HTML or JSX outside a
+  code block was rendered as real elements — an unclosed `<div>` swallowed the rest
+  of the conversation and the layout fell apart, and markup like `<img onerror>`
+  could run script. Such text now shows as text; code blocks and inline code render
+  as before, and tool output that itself contains a code fence stays inside its
+  block.
 - **agents:** **gpt-5.6 with tools works on `OPENAI_CHAT_COMPLETIONS`.** From gpt-5.6
   on, OpenAI refuses function tools together with reasoning on Chat Completions,
   and those models reason by default — every turn of an agent with tools ended in a

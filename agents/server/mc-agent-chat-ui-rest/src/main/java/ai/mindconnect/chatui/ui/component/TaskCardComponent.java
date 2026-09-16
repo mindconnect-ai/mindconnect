@@ -213,7 +213,7 @@ public final class TaskCardComponent implements UiComponent {
 
     /** The body node: the reasoning so far, or an ellipsis before the first word. */
     public static UiMarkdown thinkingBody(String nodeId, String text) {
-        return UiMarkdown.of(bodyId(nodeId), text == null || text.isBlank() ? "…" : text)
+        return UiMarkdown.of(bodyId(nodeId), text == null || text.isBlank() ? "…" : MarkdownText.safe(text))
                 .<UiMarkdown>withCssClass("task-card-body thinking-card-body");
     }
 
@@ -324,7 +324,7 @@ public final class TaskCardComponent implements UiComponent {
     public static UiMarkdown subAgentAnswer(String taskId, String finalText) {
         String md = (finalText == null || finalText.isBlank())
                 ? "_Sub-agent finished (no text output)._"
-                : finalText;
+                : MarkdownText.safe(finalText);
         return UiMarkdown.of("subanswer-" + taskId, md)
                 .<UiMarkdown>withCssClass("sub-agent-answer bot-message");
     }
@@ -373,7 +373,7 @@ public final class TaskCardComponent implements UiComponent {
         String answer = (finalTextMarkdown != null && !finalTextMarkdown.isBlank())
                 ? finalTextMarkdown : resultText;
         if (answer != null && !answer.isBlank()) {
-            stack.child(UiMarkdown.of("subanswer-" + taskId, answer)
+            stack.child(UiMarkdown.of("subanswer-" + taskId, MarkdownText.safe(answer))
                     .<UiMarkdown>withCssClass("sub-agent-answer bot-message"));
         }
         String header = running ? runningSubAgentHeader(agentName)
@@ -438,10 +438,10 @@ public final class TaskCardComponent implements UiComponent {
     public static String taskCardBody(String inputJsonOrText, String output) {
         StringBuilder md = new StringBuilder();
         if (inputJsonOrText != null && !inputJsonOrText.isBlank()) {
-            md.append("**Input**\n\n```\n").append(inputJsonOrText).append("\n```\n\n");
+            md.append("**Input**\n\n").append(MarkdownText.fenced(inputJsonOrText)).append("\n\n");
         }
         if (output != null && !output.isBlank()) {
-            md.append("**Output**\n\n```\n").append(output).append("\n```\n");
+            md.append("**Output**\n\n").append(MarkdownText.fenced(output)).append("\n");
         }
         if (md.length() == 0) md.append("_(no input/output)_");
         return md.toString();
