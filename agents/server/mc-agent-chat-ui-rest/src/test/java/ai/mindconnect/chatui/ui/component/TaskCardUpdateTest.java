@@ -40,6 +40,23 @@ class TaskCardUpdateTest {
         assertThat(json(running.render())).contains("\"collapseSummaryId\":\"task-tool-top-0-bash-summary\"");
     }
 
+    /** Everything still running wears the same monochrome ⧖ — the ⏳ emoji drew in colour and wider. */
+    @Test
+    void everythingRunningWearsTheHourglass() {
+        assertThat(TaskCardComponent.runningToolHeader("bash")).isEqualTo("⧖ bash — running…");
+        assertThat(TaskCardComponent.runningReviewerHeader("critic")).isEqualTo("⧖ critic — reviewing…");
+        assertThat(TaskCardComponent.runningSubAgentHeader("planner")).isEqualTo("⧖ ↳ planner — running…");
+        assertThat(TaskCardComponent.runningToolHeader("bash")).doesNotContain("⏳");
+    }
+
+    /** A thought carries a marker like a tool's, so its words line up with the tool names around it. */
+    @Test
+    void aRunningThoughtIsMarkedAndAFinishedOneChecked() throws Exception {
+        assertThat(json(TaskCardComponent.runningThinking("t", "").render())).contains("⧖ thinking…");
+        assertThat(json(TaskCardComponent.doneThinking("t", "x", 4000).render())).contains("✓ thought for 4.0 s");
+        assertThat(json(TaskCardComponent.historicThinking("t", "x", null).render())).contains("✓ thought\"");
+    }
+
     @Test
     void aSubAgentCardKeepsItsOwnSummaryId() {
         var card = new TaskCardComponent("task-sub-1", "planner", "…", true);

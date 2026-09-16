@@ -78,7 +78,7 @@ public class ChatSubAgentTestComponent {
                         + (result.ok() ? "chat-subagent-test-result--ok" : "chat-subagent-test-result--err"))
                 .child(UiText.of(BODY_ID + "-meta", meta).<UiText>withCssClass("chat-picker-hint"))
                 .child(result.ok()
-                        ? UiMarkdown.of(BODY_ID + "-answer", text)
+                        ? UiMarkdown.of(BODY_ID + "-answer", MarkdownText.safe(text))
                         : UiText.of(BODY_ID + "-answer", text));
     }
 }

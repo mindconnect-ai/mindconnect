@@ -284,7 +284,7 @@ public final class MessageListComponent implements UiComponent {
         var wrapper = UiList.of(id + "-wrapper", null);
         wrapper.item(UiList.Item.of(id, "Error")
                 .content(UiMarkdown.of(id + "-md",
-                                "⚠️ **The turn failed:** " + message)
+                                "⚠️ **The turn failed:** " + MarkdownText.safe(message))
                         .withCssClass("bot-message error-message")));
         return UiPatch.Operation.append(id(), wrapper);
     }
@@ -373,7 +373,7 @@ public final class MessageListComponent implements UiComponent {
      */
     public UiPatch.Operation replaceBotPending(String pendingId, String cumulativeText) {
         return UiPatch.Operation.replace(pendingBodyId(pendingId),
-                UiMarkdown.of(pendingBodyId(pendingId), cumulativeText)
+                UiMarkdown.of(pendingBodyId(pendingId), MarkdownText.safe(cumulativeText))
                         .<UiMarkdown>withCssClass("bot-message"));
     }
 

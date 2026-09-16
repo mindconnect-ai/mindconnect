@@ -1593,8 +1593,15 @@ public class ChatUiController {
         String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId);
         String returnHref = "/chat/sessions/" + sessionId.value();
         String streamLabel = agent.name() != null ? agent.name() : "Agent";
-        String pendingId  = "bot-pending-"  + sessionId.value();
-        String thinkingId = "bot-thinking-" + sessionId.value();
+        // Every node this turn puts on the page carries an id no earlier turn
+        // used. A turn that fails or is cancelled leaves its live nodes where
+        // they are — there is no rebuild to swap them for history — and the
+        // next turn's patches, aimed at a reused id, landed in the first
+        // element with it: the old turn's card or reply bubble, while the new
+        // one sat empty below.
+        String turnKey = liveNodeKey();
+        String pendingId  = "bot-pending-"  + sessionId.value() + "-" + turnKey;
+        String thinkingId = "bot-thinking-" + sessionId.value() + "-" + turnKey;
 
         // The streaming-time page is built once with the pre-turn history;
         // it owns the form / message-list / task-card patch shapes the
@@ -1736,7 +1743,7 @@ public class ChatUiController {
                 // a card the chat just sits there, which is what made a
                 // finished-looking turn feel stuck.
                 case StreamEvent.Reviewing rv -> {
-                    String node = reviewerNodeId(sessionId, rv.reviewerName());
+                    String node = reviewerNodeId(sessionId, turnKey, rv.reviewerName());
                     publishPatch(bus, appendCard(liveView, null,
                             ai.mindconnect.chatui.ui.component.TaskCardComponent
                                     .runningReviewer(node, rv.reviewerName())));
@@ -1744,7 +1751,7 @@ public class ChatUiController {
                 }
                 case StreamEvent.ReviewerDecision rd -> {
                     var verdictCard = ai.mindconnect.chatui.ui.component.TaskCardComponent.doneReviewer(
-                            reviewerNodeId(sessionId, rd.reviewerName()),
+                            reviewerNodeId(sessionId, turnKey, rd.reviewerName()),
                             rd.reviewerName(), String.valueOf(rd.verdict()),
                             reviewerDetail.get(LAST_REVISION));
                     publishPatch(bus, liveView.streamTaskUpdate(verdictCard));
@@ -1852,7 +1859,6 @@ public class ChatUiController {
         private String nodeId;
         private long startedAt;
         private long lastPublishedAt;
-        private int stretch;
 
         LiveThinking(String scopeKey, String scope, String channelId) {
             this.scopeKey = scopeKey;
@@ -1883,7 +1889,9 @@ public class ChatUiController {
 
         /** Opens a new card; returns its node id. */
         String start() {
-            nodeId = "task-think-" + scopeKey + "-" + (stretch++);
+            // Never reused: a count per turn restarted at 0 and collided with
+            // the card a cancelled turn left on the page.
+            nodeId = "task-think-" + scopeKey + "-" + liveNodeKey();
             startedAt = System.currentTimeMillis();
             lastPublishedAt = startedAt;
             text.setLength(0);
@@ -2068,8 +2076,21 @@ public class ChatUiController {
      * card are the same node — the verdict REPLACEs the "reviewing…" header
      * instead of appending a second entry.
      */
-    private static String reviewerNodeId(SessionId sessionId, String reviewerName) {
-        return "task-review-" + sessionId.value() + "-" + reviewerName.replaceAll("[^A-Za-z0-9_-]", "-");
+    private static String reviewerNodeId(SessionId sessionId, String turnKey, String reviewerName) {
+        return "task-review-" + sessionId.value() + "-" + turnKey + "-"
+                + reviewerName.replaceAll("[^A-Za-z0-9_-]", "-");
+    }
+
+    /**
+     * Seeds the keys of live nodes. Started from the clock so a server that
+     * restarts does not hand out the ids of the nodes a page still shows.
+     */
+    private static final java.util.concurrent.atomic.AtomicLong LIVE_NODE_SEQ =
+            new java.util.concurrent.atomic.AtomicLong(System.currentTimeMillis());
+
+    /** A short key no other live node in this JVM — this turn or an earlier one — has had. */
+    private static String liveNodeKey() {
+        return Long.toString(LIVE_NODE_SEQ.incrementAndGet(), 36);
     }
 
     private void startToolCard(ChatPage liveView,
@@ -2079,7 +2100,9 @@ public class ChatUiController {
                                java.util.Map<java.util.UUID, SessionId> taskToSession,
                                java.util.UUID parentTaskId, String toolName, java.util.Map<String, Object> arguments) {
         String scope = scopeOf(parentTaskId, taskToSession);
-        String key  = "tool-" + (scope == null ? "top" : scope) + "-" + liveTasks.size() + "-" + toolName;
+        // A key of its own rather than the count of this turn's tools, which
+        // restarted at 0 and collided with a card a cancelled turn left behind.
+        String key  = "tool-" + (scope == null ? "top" : scope) + "-" + liveNodeKey() + "-" + toolName;
         String node = "task-" + key;
         liveTasks.put(key, new LiveTask(node, toolName, false, arguments, parentTaskId));
         openTaskNodeId[0] = null;

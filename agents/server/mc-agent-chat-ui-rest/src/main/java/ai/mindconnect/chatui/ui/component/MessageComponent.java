@@ -70,9 +70,9 @@ public final class MessageComponent {
     public static String userBubble(SessionId sessionId, List<String> attached, List<String> removed,
                                     String text, List<ContentPart> parts) {
         StringBuilder out = new StringBuilder();
-        if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(String.join(", ", attached)).append("*\n\n");
-        if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(String.join(", ", removed)).append(" removed*\n\n");
-        out.append(text == null ? "" : text);
+        if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(MarkdownText.safe(String.join(", ", attached))).append("*\n\n");
+        if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(MarkdownText.safe(String.join(", ", removed))).append(" removed*\n\n");
+        out.append(text == null ? "" : MarkdownText.safe(text));
         if (parts != null) {
             for (var part : parts) {
                 if (part instanceof ContentPart.Image image) {
@@ -154,7 +154,7 @@ public final class MessageComponent {
     private UiList.Item reshownItem(Message m) {
         Object name = m.metadata() == null ? null
                 : m.metadata().get(ViewAttachmentTool.ATTACHMENT);
-        String line = icon("repeat") + " *" + markdownSafe(name == null ? "attachment" : name.toString())
+        String line = icon("repeat") + " *" + markdownSafe(MarkdownText.safe(name == null ? "attachment" : name.toString()))
                 + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
         return UiList.Item.of(m.id().value(), "")
                 .content(UiMarkdown.of("msg-" + m.id().value(), line).withCssClass("reshown-message"));
