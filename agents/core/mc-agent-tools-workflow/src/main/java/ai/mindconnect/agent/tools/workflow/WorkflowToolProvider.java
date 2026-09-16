@@ -59,7 +59,7 @@ public final class WorkflowToolProvider implements MultiToolProvider {
     @Override
     public void bind(ToolEnvironment env) {
         environment = env.get(EnvVarResolver.class)
-                .<Supplier<Map<String, String>>>map(vars -> vars::asMap)
+                .<Supplier<Map<String, String>>>map(vars -> vars.shared()::asMap)
                 .orElse(WorkflowExecutorService::processEnvironment);
         Optional<WorkflowDataRepository> shared = env.get(WorkflowDataRepository.class);
         if (shared.isPresent()) {

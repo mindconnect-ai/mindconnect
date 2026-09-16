@@ -76,10 +76,43 @@ public class EncryptionHelper {
     }
 
     /**
+     * {@code plain} encrypted for storage, keeping every entry of {@code stored}
+     * that no longer decrypts and that {@code plain} does not name.
+     *
+     * <p>A value that does not decrypt is left out when a record is read (see
+     * {@link #decryptValues}), so a record saved back after any change — a
+     * login stamp, another variable — would otherwise lose it for good. With a
+     * wrong or rotated key at start-up that deleted every user's variables on
+     * their next login, and putting the right key back brought nothing back. The
+     * unreadable ciphertext stays as it was until its name is set again.
+     */
+    public Map<String, String> encryptValuesKeepingUnreadable(Map<String, String> plain, Map<String, String> stored) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (stored != null) {
+            stored.forEach((name, value) -> {
+                if (!plain.containsKey(name) && !decrypts(value)) out.put(name, value);
+            });
+        }
+        out.putAll(encryptValues(plain));
+        return out;
+    }
+
+    /** Whether {@code stored} reads back with this key — a plain value always does. */
+    public boolean decrypts(String stored) {
+        try {
+            resolve(stored);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
+
+    /**
      * Every value {@link #resolve resolved} to plaintext. A value that no longer
      * decrypts — the key was rotated — is left out with a warning naming
      * {@code owner} and the entry, rather than failing everything else the
-     * owner stored.
+     * owner stored. A repository that saves such a record back keeps the
+     * unreadable value with {@link #encryptValuesKeepingUnreadable}.
      */
     public Map<String, String> decryptValues(Map<String, String> stored, String owner) {
         Map<String, String> plain = new LinkedHashMap<>();

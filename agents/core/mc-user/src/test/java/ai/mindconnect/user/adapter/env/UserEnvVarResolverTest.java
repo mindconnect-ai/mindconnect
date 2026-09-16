@@ -59,6 +59,28 @@ class UserEnvVarResolverTest {
         assertThat(users.findById(ALICE)).get().extracting(User::environment).isEqualTo(Map.of("GOOD", "v"));
     }
 
+    /**
+     * A wrong or rotated key must not destroy what it cannot read: the record is saved back
+     * after any change (a login stamp, another variable), and the unreadable value used to
+     * go with it — gone for good even once the right key was back.
+     */
+    @Test
+    void aValueTheKeyNoLongerDecryptsSurvivesASaveAndReadsAgainWithTheRightKey() {
+        EncryptionHelper original = new EncryptionHelper("fedcba9876543210");
+        store.save(alice(Map.of("STALE", original.encryptTagged("w"))));
+
+        users.save(users.findById(ALICE).orElseThrow().withEnvironment(Map.of("NEW", "n")));
+
+        assertThat(store.findById(ALICE).orElseThrow().environment()).containsKeys("STALE", "NEW");
+        assertThat(users.findById(ALICE)).get().extracting(User::environment).isEqualTo(Map.of("NEW", "n"));
+        assertThat(new EncryptingUserRepository(store, original).findById(ALICE)).get()
+                .extracting(u -> u.environment().get("STALE")).isEqualTo("w");
+
+        users.save(users.findById(ALICE).orElseThrow().withEnvironment(Map.of("NEW", "n", "STALE", "replaced")));
+        assertThat(users.findById(ALICE)).get().extracting(User::environment)
+                .isEqualTo(Map.of("NEW", "n", "STALE", "replaced"));
+    }
+
     @Test
     void workOnNobodysBehalfAndAnUnknownUserGetNothing() {
         users.save(alice(Map.of("KEY", "v")));

@@ -164,7 +164,7 @@ public class VectorStoreService {
         if (workflowName != null && !workflowName.isBlank()) {
             var workflow = workflows().findById(workflowName).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + workflowName + "' not found"));
-            var report = new WorkflowRunService(workflowInstances(), environment::asMap)
+            var report = new WorkflowRunService(workflowInstances(), environment.shared()::asMap)
                     .run(workflow, Map.of("file", uploadBase.relativize(target).toString(),
                             "store", storeName));
             return safeName + ": " + summarize(report);

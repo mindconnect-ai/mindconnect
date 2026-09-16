@@ -199,6 +199,41 @@ class WorkflowToolProviderTest {
         assertThat(tool.execute(Map.of("name", "David"))).isEqualTo("Servus David!");
     }
 
+    /**
+     * A workflow's {@code env} is the shared view: the namespace's and the server's values,
+     * never what the calling user stored for themselves. Otherwise anyone who can write a
+     * workflow that another user's agent calls reads that user's API keys.
+     */
+    @Test
+    void aWorkflowSeesSharedVariablesButNotTheCallersOwn() {
+        repository.save("env-probe", envProbe());
+        ai.mindconnect.common.env.EnvVarResolver personal = new ai.mindconnect.common.env.EnvVarResolver() {
+            @Override public Optional<String> get(String name) { return Optional.ofNullable(asMap().get(name)); }
+            @Override public Map<String, String> asMap() { return Map.of("PROBE", "users-own-secret"); }
+            @Override public boolean personal() { return true; }
+        };
+        provider.bind(MapToolEnvironment.builder()
+                .string("dataBaseDir", dir.toString())
+                .service(Namespace.class, new Namespace("test"))
+                .service(ai.mindconnect.common.env.EnvVarResolver.class, ai.mindconnect.common.env.EnvVarResolver.chain(
+                        personal, ai.mindconnect.common.env.EnvVarResolver.of(Map.of("PROBE", "namespace-value"))))
+                .build());
+
+        assertThat(tool("workflow_env-probe").execute(Map.of())).isEqualTo("namespace-value");
+    }
+
+    private static WorkflowData envProbe() {
+        AssignVariablesData read = new AssignVariablesData();
+        read.setName("read");
+        read.setAssignResultToVar("probe");
+        read.getVariableAssignments().add(new VariableAssignment("probe", "${env.PROBE}"));
+        WorkflowData wf = new WorkflowData();
+        wf.setName("env-probe");
+        wf.setResultFrom("probe");
+        wf.addSteps(read);
+        return wf;
+    }
+
     @Test
     void unknownWorkflowYieldsNoTool() {
         assertThat(provider.create("workflow_nope",

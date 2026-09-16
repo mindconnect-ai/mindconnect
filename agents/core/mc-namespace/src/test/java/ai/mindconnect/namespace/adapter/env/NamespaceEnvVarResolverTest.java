@@ -62,4 +62,16 @@ class NamespaceEnvVarResolverTest {
         namespaces.save(plain);
         assertThat(store.findById(ACME)).contains(plain);
     }
+
+    /** Renaming with a key that cannot read a stored value keeps that value instead of deleting it. */
+    @Test
+    void aValueTheKeyNoLongerDecryptsSurvivesARename() {
+        String stale = new EncryptionHelper("fedcba9876543210").encryptTagged("w");
+        store.save(acme(Map.of("STALE", stale, "GOOD", ENCRYPTION.encryptTagged("v"))));
+
+        namespaces.save(namespaces.findById(ACME).orElseThrow().withDisplayName("Acme Inc."));
+
+        assertThat(store.findById(ACME).orElseThrow().environment()).containsEntry("STALE", stale).containsKey("GOOD");
+        assertThat(namespaces.findById(ACME)).get().extracting(NamespaceDefinition::environment).isEqualTo(Map.of("GOOD", "v"));
+    }
 }

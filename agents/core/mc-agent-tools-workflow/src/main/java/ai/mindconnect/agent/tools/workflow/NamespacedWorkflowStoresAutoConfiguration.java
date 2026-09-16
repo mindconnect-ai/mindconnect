@@ -103,7 +103,7 @@ public class NamespacedWorkflowStoresAutoConfiguration {
                 WorkflowDataRepository store, WorkflowInstanceRepository instances,
                 ObjectProvider<EnvVarResolver> environment) {
             EnvVarResolver vars = environment.getIfAvailable(EnvVarResolver::system);
-            return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances, vars::asMap);
+            return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances, vars.shared()::asMap);
         }
 
         /** A streamed run works in the namespace of the request that started it. */

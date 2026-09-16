@@ -196,6 +196,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
   the application for a tool repository, and the only one there was the runtime
   starter's own export of it. The runtime now looks among the application's beans
   only, never among the ones the starter hands out from the runtime itself.
+- **agents:** **a wrong encryption key no longer deletes users' and namespaces'
+  variables.** A stored value that did not decrypt was left out when the record was
+  read and then saved back without it — on a user's next login, or when a namespace
+  was renamed — so starting once with a wrong or rotated
+  `MINDCONNECT_ENCRYPTION_SECRET_KEY` deleted them for good. Unreadable values are
+  now kept as they are until their name is set again, and read again once the right
+  key is back.
+- **agents:** **a workflow no longer sees the calling user's own variables.** A
+  workflow's `env` held the whole variable chain, including what the user running the
+  agent stored for themselves — so a workflow written by one user and called by
+  another's agent could read that user's API keys. It now gets the shared view, the
+  namespace's and the server's values, like a config's non-secret fields.
 - **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
   turn left its thinking card, tool cards and reply bubble on the page, and the next
   turn reused their ids — its thought and its answer streamed into the cancelled
