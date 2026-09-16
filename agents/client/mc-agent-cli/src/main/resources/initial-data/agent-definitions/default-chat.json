@@ -182,7 +182,7 @@
       "id": "00000003-0000-0000-0000-000000000070",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
       "name": "code_execute",
-      "description": "Runs a program in an isolated container and returns exit code, stdout and stderr. The chat's directories are mounted writable under their own paths, so files it writes land where the user finds them. Use it for calculations, data wrangling, quick scripts and generating files.",
+      "description": null,
       "overrides": {},
       "enabled": true,
       "deferred": false,

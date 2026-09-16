@@ -50,44 +50,71 @@ public final class CodeExecuteTool implements Tool {
         return "code_execute";
     }
 
+    /**
+     * What the model needs to write a program that works the first time:
+     * which interpreters, what is installed, where files go, what survives a
+     * call and what the limits are. Built from the actual settings, so a
+     * binding must not replace it with a fixed text.
+     */
     @Override
     public String description() {
-        String networkNote = "none".equals(network)
-                ? "There is NO network access: no HTTP requests and no pip/npm installs — only the "
-                + "packages already in the image are available. "
-                : "Network access is enabled: HTTP requests and package installs (pip/npm) work, and "
-                + "installed packages persist for this session. ";
-        return "Executes a program in an isolated container and returns exit code, stdout and stderr. "
-                + "Languages: " + String.join(", ", languages.keySet()) + ". "
-                + networkNote
+        return "Runs a program in a container and returns its exit code, stdout and stderr. "
+                + languagesNote()
+                + networkNote()
+                + filesNote()
                 + mountNote()
-                + "Each call runs a fresh interpreter process, so variables do NOT carry over between calls — "
-                + "but the working directory /workspace persists for this session. "
-                + workspaceNote();
+                + lifecycleNote();
+    }
+
+    /** The interpreters and their images — what is installed is what the image ships, nothing more. */
+    private String languagesNote() {
+        String each = String.join("; ", languages.values().stream()
+                .map(l -> l.name() + " (image " + l.image() + ")").toList());
+        return "The program is passed as code and read from stdin: " + each + ". Only what the image ships "
+                + "is installed; the default slim images carry the standard library and nothing else. ";
+    }
+
+    private String networkNote() {
+        return "none".equals(network)
+                ? "There is no network: no HTTP requests, no pip or npm installs. "
+                : "Network is on: HTTP requests work, and so do pip and npm installs. ";
     }
 
     /**
      * Which of the chat's directories the code sees, and where — so it writes
      * where the user looks and names the path they will find.
      */
-    private String workspaceNote() {
+    private String filesNote() {
         Path working = dirs.workingDir();
         if (working == null) {
-            return "Write files to /workspace to pass data between calls.";
+            return "The current directory is /workspace, private to this chat; files there stay between "
+                    + "calls, but nobody else can open them. ";
         }
-        StringBuilder note = new StringBuilder("The chat's working directory ").append(working)
-                .append(" is mounted WRITABLE under that same path and as /workspace, and is the current "
-                        + "directory; ");
+        StringBuilder note = new StringBuilder("The current directory is the chat's working directory ")
+                .append(working).append(", mounted writable under that same path (also as /workspace)");
         if (!dirs.additionalDirs().isEmpty()) {
-            note.append("so are its other directories, each under its own path: ")
-                    .append(String.join(", ", dirs.additionalDirs().stream().map(Path::toString).toList()))
-                    .append(". ");
-        } else {
-            note.append("no other host directory is visible. ");
+            note.append("; so are the chat's other directories, each under its own path: ")
+                    .append(String.join(", ", dirs.additionalDirs().stream().map(Path::toString).toList()));
         }
-        return note.append("Paths are the same as for the other file tools: save files there to pass data "
-                        + "between calls and to hand them to the user, and tell the user the host path, e.g. ")
-                .append(working.resolve("report.pptx")).append(".").toString();
+        return note.append(". Paths mean the same here as for the other file tools. Save a file the user "
+                        + "should get there and give them its full path, e.g. ")
+                .append(working.resolve("report.pptx")).append(". ").toString();
+    }
+
+    /** What survives a call, and the limits a call runs under. */
+    private String lifecycleNote() {
+        var settings = service.settings();
+        return "Every call is a fresh process: variables do not carry over, files do. The container is "
+                + "recreated after " + minutes(settings.idleTimeout()) + " without a call and when the chat's "
+                + "directories change, and installed packages go with it. A call may run "
+                + settings.execTimeout().toSeconds() + " seconds with " + settings.memory() + " of memory; "
+                + "one that runs longer is stopped.";
+    }
+
+    private static String minutes(java.time.Duration duration) {
+        long minutes = duration.toMinutes();
+        return minutes >= 1 ? minutes + (minutes == 1 ? " minute" : " minutes")
+                : duration.toSeconds() + " seconds";
     }
 
     /**
@@ -98,10 +125,9 @@ public final class CodeExecuteTool implements Tool {
         if (mount == null) {
             return "";
         }
-        return "The host directory " + mount.dir() + " is mounted at " + HostMount.MOUNT_POINT
-                + (mount.readOnly() ? " READ-ONLY" : " and is WRITABLE")
-                + " — read the user's own files from there. "
-                + "Paths outside it do not exist inside the container. ";
+        return "The host directory " + mount.dir() + " is also mounted at " + HostMount.MOUNT_POINT
+                + (mount.readOnly() ? ", read-only: read files from there, do not save any. "
+                        : ", writable. ");
     }
 
     @Override

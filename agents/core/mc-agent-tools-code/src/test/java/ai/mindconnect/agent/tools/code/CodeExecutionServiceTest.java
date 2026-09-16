@@ -166,6 +166,23 @@ class CodeExecutionServiceTest {
     }
 
     @Test
+    void theDescriptionStatesImagesDirectoriesAndLimits() throws IOException {
+        var svc = newService(stub(0, ""), Duration.ofSeconds(45));
+        Path work = Files.createDirectories(dir.resolve("described")).toAbsolutePath();
+
+        String description = new CodeExecuteTool(svc, CodeLanguages.defaults(), "session-d", "none", null,
+                new SessionDirs(work, List.of())).description();
+
+        assertThat(description).contains("python (image python:3.12-slim)")
+                .contains("There is no network")
+                .contains("The current directory is the chat's working directory " + work)
+                .contains(work.resolve("report.pptx").toString())
+                .contains("45 seconds with 256m of memory")
+                .contains("recreated after 10 minutes")
+                .doesNotContain("/mnt/host");
+    }
+
+    @Test
     void goneRootAndSystemDirectoriesAreNeverMounted() throws IOException {
         Path work = Files.createDirectories(dir.resolve("work")).toAbsolutePath();
 
@@ -278,14 +295,14 @@ class CodeExecutionServiceTest {
         var agentTool = AgentTool.of("code_execute", null, Map.of("network", "bridge"));
         Tool bridged = factory.create(agentTool,
                 new ToolCallScope(UserId.of("u"), SessionId.random(), null));
-        assertThat(bridged.description()).contains("Network access is enabled");
+        assertThat(bridged.description()).contains("Network is on");
         bridged.execute(Map.of("language", "python", "code", "print(1)"));
         assertThat(calls()).anySatisfy(c -> assertThat(c).startsWith("run ").contains("--network bridge"));
 
         var invalid = AgentTool.of("code_execute", null, Map.of("network", "host"));
         Tool fallback = factory.create(invalid,
                 new ToolCallScope(UserId.of("u"), SessionId.random(), null));
-        assertThat(fallback.description()).contains("NO network access");
+        assertThat(fallback.description()).contains("There is no network");
     }
 
     @Test
