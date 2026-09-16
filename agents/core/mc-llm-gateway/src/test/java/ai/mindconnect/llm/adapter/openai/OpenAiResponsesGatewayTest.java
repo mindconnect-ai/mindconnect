@@ -206,6 +206,138 @@ class OpenAiResponsesGatewayTest {
                 .hasMessageContaining("bad input");
     }
 
+    // ── robustness (code review of main since v0.8.2) ───────────────────────
+
+    /** Cut off at max_output_tokens in the middle of a call's arguments: LENGTH, not a call to run with broken JSON. */
+    @Test
+    void aResponseCutOffDuringAToolCallEndsWithLength() {
+        var state = new OpenAiResponsesGateway.StreamState();
+        parse(state,
+                "{\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"call_id\":\"c1\",\"name\":\"calc\"},\"output_index\":0}",
+                "{\"type\":\"response.function_call_arguments.delta\",\"delta\":\"{\\\"expr\\\": \\\"1+\",\"output_index\":0}",
+                "{\"type\":\"response.incomplete\",\"response\":{\"incomplete_details\":{\"reason\":\"max_output_tokens\"}}}");
+        assertThat(state.finish()).isEqualTo(FinishReason.LENGTH);
+    }
+
+    @Test
+    void everyGptAfterFiveIsAReasoningModel() {
+        assertThat(OpenAiModels.isReasoningModel("gpt-6")).isTrue();
+        assertThat(OpenAiModels.isReasoningModel("gpt-7.1-mini")).isTrue();
+        assertThat(OpenAiModels.isReasoningModel("gpt-4.1")).isFalse();
+        assertThat(OpenAiModels.isReasoningModel("gpt-4o")).isFalse();
+    }
+
+    /**
+     * A stream the other side closed before a completed/incomplete/failed event is not a
+     * finished answer: reporting STOP stored half a reply as final.
+     */
+    @Test
+    void aStreamThatEndsWithoutACompletedEventFails() throws Exception {
+        try (FakeResponses server = new FakeResponses()) {
+            server.answer(200, "data: {\"type\":\"response.output_text.delta\",\"delta\":\"Half an\",\"output_index\":0}\n\n");
+            List<LlmStreamChunk> chunks = new ArrayList<>();
+
+            assertThatThrownBy(() -> gateway.chatStreaming(server.config("gpt-4.1"), textRequest(), chunks::add,
+                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP))
+                    .isInstanceOf(ai.mindconnect.llm.domain.LlmTransientException.class)
+                    .hasMessageContaining("ended before the response completed");
+            assertThat(chunks).noneMatch(c -> c instanceof LlmStreamChunk.Done);
+        }
+    }
+
+    /**
+     * An organization OpenAI does not give reasoning summaries answers the default request
+     * with HTTP 400. The call goes again without the summary, and the next call skips the
+     * summary straight away.
+     */
+    @Test
+    void aRefusedDefaultSummaryIsDroppedAndTheCallRepeated() throws Exception {
+        try (FakeResponses server = new FakeResponses()) {
+            String refusal = "{\"error\":{\"message\":\"Your organization must be verified to generate reasoning summaries.\","
+                    + "\"type\":\"invalid_request_error\",\"param\":\"reasoning.summary\"}}";
+            String answer = "data: {\"type\":\"response.output_text.delta\",\"delta\":\"ok\",\"output_index\":0}\n\n"
+                    + "data: {\"type\":\"response.completed\",\"response\":{\"usage\":{\"input_tokens\":3,\"output_tokens\":1}}}\n\n";
+            server.answer(400, refusal);
+            server.answer(200, answer);
+            server.answer(200, answer);
+            List<LlmStreamChunk> chunks = new ArrayList<>();
+            LlmConfig config = server.config("gpt-5.6");
+
+            gateway.chatStreaming(config, textRequest(), chunks::add,
+                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP);
+            gateway.chatStreaming(config, textRequest(), c -> {},
+                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP);
+
+            assertThat(chunks).contains(new LlmStreamChunk.TextDelta("ok"));
+            assertThat(server.bodies()).hasSize(3);
+            assertThat(server.bodies().get(0)).contains("\"summary\":\"auto\"");
+            assertThat(server.bodies().get(1)).doesNotContain("\"summary\"");
+            assertThat(server.bodies().get(2)).as("remembered for the endpoint").doesNotContain("\"summary\"");
+        }
+    }
+
+    /** A summary the config asks for is its owner's choice: a refusal fails the call instead of being hidden. */
+    @Test
+    void aConfiguredSummaryIsNotDroppedSilently() throws Exception {
+        try (FakeResponses server = new FakeResponses()) {
+            server.answer(400, "{\"error\":{\"message\":\"Your organization must be verified to generate reasoning summaries.\"}}");
+            LlmConfig config = server.config("gpt-5.6", Map.of("reasoning_summary", "detailed"));
+
+            assertThatThrownBy(() -> gateway.chatStreaming(config, textRequest(), c -> {},
+                    ai.mindconnect.common.Cancellation.none(), ai.mindconnect.llm.port.in.LlmCallListener.NOOP))
+                    .hasMessageContaining("400");
+            assertThat(server.bodies()).hasSize(1);
+        }
+    }
+
+    private static LlmRequest textRequest() {
+        return LlmRequest.streaming("openai", List.of(LlmMessage.user("hi")));
+    }
+
+    /** A local /v1/responses that answers from a queue and keeps every request body. */
+    private final class FakeResponses implements AutoCloseable {
+        private final com.sun.net.httpserver.HttpServer server;
+        private final java.util.Deque<Object[]> answers = new java.util.concurrent.ConcurrentLinkedDeque<>();
+        private final List<String> bodies = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        FakeResponses() throws java.io.IOException {
+            server = com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+            server.createContext("/v1/responses", exchange -> {
+                bodies.add(new String(exchange.getRequestBody().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8));
+                Object[] next = answers.poll();
+                int status = next == null ? 500 : (int) next[0];
+                byte[] payload = (next == null ? "" : (String) next[1]).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(status, payload.length);
+                exchange.getResponseBody().write(payload);
+                exchange.close();
+            });
+            server.start();
+        }
+
+        void answer(int status, String body) {
+            answers.add(new Object[]{status, body});
+        }
+
+        List<String> bodies() {
+            return bodies;
+        }
+
+        LlmConfig config(String model) {
+            return config(model, Map.of());
+        }
+
+        LlmConfig config(String model, Map<String, Object> params) {
+            return new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,
+                    model, "http://127.0.0.1:" + server.getAddress().getPort(), "sk-test", 0.7, 4096, params, 128_000,
+                    false, null, null, null, null, null);
+        }
+
+        @Override
+        public void close() {
+            server.stop(0);
+        }
+    }
+
     private List<LlmStreamChunk> parse(OpenAiResponsesGateway.StreamState state, String... payloads) {
         List<LlmStreamChunk> chunks = new ArrayList<>();
         for (String payload : payloads) gateway.parseEvent(payload, state, chunks::add);

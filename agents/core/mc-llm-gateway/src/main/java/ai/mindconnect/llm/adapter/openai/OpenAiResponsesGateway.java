@@ -97,12 +97,43 @@ public class OpenAiResponsesGateway implements LlmGateway {
         this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
     }
 
+    /**
+     * The endpoints (base URL and key) OpenAI refused a reasoning summary to — an organization
+     * that is not verified gets HTTP 400 for any request that asks for one. The summary is on
+     * by default, so without remembering that, every call of such a key failed once more.
+     */
+    private final java.util.Set<String> summariesRefused = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /** Thrown inside one attempt when OpenAI refuses the default summary; the call is made again without it. */
+    private static final class SummaryRefused extends RuntimeException {
+        SummaryRefused() {
+            super("reasoning summary refused", null, false, false);
+        }
+    }
+
     @Override
     public void chatStreaming(LlmConfig config, LlmRequest request,
                               Consumer<LlmStreamChunk> handler,
                               Cancellation cancellation,
                               LlmCallListener listener) {
-        config = config.resolved(env, encryption);
+        LlmConfig resolved = config.resolved(env, encryption);
+        String endpoint = resolved.provider().baseUrlOr(resolved.baseUrl()) + "|" + java.util.Objects.hashCode(resolved.apiKey());
+        try {
+            stream(resolved, request, handler, cancellation, listener, summariesRefused.contains(endpoint));
+        } catch (SummaryRefused refused) {
+            log.warn("OpenAI refused a reasoning summary for model {} (organization not verified?) — "
+                    + "asking again without one; set additionalParams.reasoning_summary=none to skip the attempt",
+                    resolved.model());
+            summariesRefused.add(endpoint);
+            stream(resolved, request, handler, cancellation, listener, true);
+        }
+    }
+
+    private void stream(LlmConfig config, LlmRequest request,
+                        Consumer<LlmStreamChunk> handler,
+                        Cancellation cancellation,
+                        LlmCallListener listener,
+                        boolean omitDefaultSummary) {
         long start = System.currentTimeMillis();
         Instant startedAt = Instant.ofEpochMilli(start);
         log.debug("LLM stream (responses) → model={} messages={} tools={}", config.model(),
@@ -116,7 +147,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
 
         String body;
         try {
-            ObjectNode requestNode = buildRequestNode(config, request);
+            ObjectNode requestNode = buildRequestNode(config, request, omitDefaultSummary);
             try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
             if (AbstractOpenAiGateway.wire.isDebugEnabled()) {
                 AbstractOpenAiGateway.wire.debug("→ responses request:\n{}", prettyRequestJson);
@@ -140,6 +171,10 @@ public class OpenAiResponsesGateway implements LlmGateway {
             if (!response.isSuccessful()) {
                 errorStatus = response.code();
                 errorBody = response.body() != null ? response.body().string() : "(no body)";
+                if (errorStatus == 400 && !omitDefaultSummary && defaultSummaryRequested(config, request)
+                        && errorBody.toLowerCase(java.util.Locale.ROOT).contains("summar")) {
+                    throw new SummaryRefused();
+                }
                 LlmHttpErrors.logHttpError(log, "OpenAI Responses", config, errorStatus,
                         response.header("retry-after"), errorBody);
                 if (LlmTransientException.isTransient(errorStatus)) {
@@ -166,6 +201,15 @@ public class OpenAiResponsesGateway implements LlmGateway {
                 }
                 if (block.length() > 0 && !cancelledClean) onBlock(block.toString(), state, handler);
             }
+            // A connection a proxy closed cleanly ends the read like a finished response would.
+            // Without a completed, incomplete or failed event nothing says the answer is whole —
+            // reporting STOP stored half a reply as final.
+            if (!cancelledClean && !state.terminal) {
+                throw new LlmTransientException(502, 0,
+                        "OpenAI Responses stream for model " + config.model() + " ended before the response completed");
+            }
+        } catch (SummaryRefused e) {
+            throw e;
         } catch (IOException e) {
             if (call.isCanceled()) {
                 cancelledClean = true;
@@ -206,6 +250,20 @@ public class OpenAiResponsesGateway implements LlmGateway {
 
     /** The {@code POST /v1/responses} body. Package-private for tests of the wire JSON. */
     ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) {
+        return buildRequestNode(config, request, false);
+    }
+
+    /** Whether the request asks for a summary nobody configured — the default the gateway may drop. */
+    static boolean defaultSummaryRequested(LlmConfig config, LlmRequest request) {
+        return OpenAiModels.isReasoningModel(config.model())
+                && LlmParams.string(LlmParams.merge(config, request), "reasoning_summary") == null;
+    }
+
+    /**
+     * @param omitDefaultSummary leave out the summary the gateway asks for by default — for an
+     *                           endpoint OpenAI refused one to; a configured summary is sent as set
+     */
+    ObjectNode buildRequestNode(LlmConfig config, LlmRequest request, boolean omitDefaultSummary) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", config.model());
         root.put("stream", true);
@@ -227,7 +285,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
             // A readable summary of the reasoning, shown in the chat as the thought —
             // "none" for an organization OpenAI refuses summaries to.
             String summary = LlmParams.string(params, "reasoning_summary");
-            if (summary == null) summary = "auto";
+            if (summary == null) summary = omitDefaultSummary ? "none" : "auto";
             if (!"none".equals(summary)) reasoningNode.put("summary", summary);
             // What the model thought must go back with its tool calls; with
             // store=false only the encrypted content can carry it.
@@ -334,10 +392,17 @@ public class OpenAiResponsesGateway implements LlmGateway {
         int inputTokens;
         int outputTokens;
         boolean incompleteForLength;
+        /** A completed or incomplete event arrived — the response is over, not just the connection. */
+        boolean terminal;
 
+        /**
+         * LENGTH before TOOL_CALLS: a response cut off at max_output_tokens may end in the
+         * middle of a call's arguments, and running that call with the empty arguments its
+         * broken JSON falls back to would act on a request the model never finished.
+         */
         FinishReason finish() {
-            if (!toolCalls.isEmpty()) return FinishReason.TOOL_CALLS;
-            return incompleteForLength ? FinishReason.LENGTH : FinishReason.STOP;
+            if (incompleteForLength) return FinishReason.LENGTH;
+            return toolCalls.isEmpty() ? FinishReason.STOP : FinishReason.TOOL_CALLS;
         }
     }
 
@@ -420,6 +485,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
                 state.outputTokens = usage.path("output_tokens").asInt(0);
                 state.incompleteForLength = "max_output_tokens".equals(
                         response.path("incomplete_details").path("reason").asText(null));
+                state.terminal = true;
             }
             case "response.failed" -> throw new RuntimeException("LLM stream reported an error: "
                     + errorMessage(event.path("response").path("error")));

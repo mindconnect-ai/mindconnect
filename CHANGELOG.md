@@ -222,6 +222,18 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** **`mindconnect.file-store.backend` is honoured on Postgres again.** A
   Postgres installation that kept its uploads on a volume (`filesystem`) had them put
   into the database instead.
+- **agents:** **OpenAI reasoning models work for organizations without reasoning
+  summaries.** The Responses gateway asks for a summary by default, and OpenAI refuses
+  one to an organization that is not verified — every call failed with HTTP 400 until
+  `reasoning_summary=none` was set. The call is now repeated without the summary, and
+  the gateway remembers that for the endpoint. A summary a config asks for explicitly
+  still fails loudly.
+- **agents:** **a cut-off OpenAI response is no longer taken for a finished one.** A
+  Responses stream that ends without its completed event (a proxy closing the
+  connection) fails the call instead of storing half an answer as final; an answer cut
+  off at `max_output_tokens` in the middle of a tool call reports `LENGTH` instead of
+  running the call with broken arguments; and GPT models after 5 are treated as
+  reasoning models.
 - **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
   turn left its thinking card, tool cards and reply bubble on the page, and the next
   turn reused their ids — its thought and its answer streamed into the cancelled
