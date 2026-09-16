@@ -90,4 +90,13 @@ class DirectoryPickerComponentTest {
         assertThat(DirectoryPickerComponent.name("/srv/users/u/app")).isEqualTo("app");
         assertThat(DirectoryPickerComponent.name("/")).isEqualTo("/");
     }
+
+    @Test
+    void theChatsOwnDirectoryIsNotNamedByItsSessionId() {
+        SessionId session = SessionId.random();
+
+        assertThat(DirectoryPickerComponent.label("/home/u/sessions/" + session.value(), session))
+                .isEqualTo(DirectoryPickerComponent.SESSION_DIR);
+        assertThat(DirectoryPickerComponent.label("/srv/users/u/app", session)).isEqualTo("app");
+    }
 }

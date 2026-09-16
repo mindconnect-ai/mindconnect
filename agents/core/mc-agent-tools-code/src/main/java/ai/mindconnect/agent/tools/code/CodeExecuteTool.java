@@ -3,6 +3,7 @@ package ai.mindconnect.agent.tools.code;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.code.CodeLanguages.CodeLanguage;
 
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,8 @@ public final class CodeExecuteTool implements Tool {
     private final String network;
     /** Host directory visible inside the container, or {@code null} for none. */
     private final HostMount mount;
+    /** The chat's directories, mounted under their host paths; the working directory also at {@code /workspace}. */
+    private final SessionDirs dirs;
 
     public CodeExecuteTool(CodeExecutionService service, Map<String, CodeLanguage> languages,
                            String sessionKey, String network) {
@@ -29,7 +32,13 @@ public final class CodeExecuteTool implements Tool {
 
     public CodeExecuteTool(CodeExecutionService service, Map<String, CodeLanguage> languages,
                            String sessionKey, String network, HostMount mount) {
+        this(service, languages, sessionKey, network, mount, SessionDirs.none());
+    }
+
+    public CodeExecuteTool(CodeExecutionService service, Map<String, CodeLanguage> languages,
+                           String sessionKey, String network, HostMount mount, SessionDirs dirs) {
         this.mount = mount;
+        this.dirs = dirs == null ? SessionDirs.none() : dirs;
         this.service = service;
         this.languages = languages;
         this.sessionKey = sessionKey;
@@ -54,7 +63,31 @@ public final class CodeExecuteTool implements Tool {
                 + mountNote()
                 + "Each call runs a fresh interpreter process, so variables do NOT carry over between calls — "
                 + "but the working directory /workspace persists for this session. "
-                + "Write files to /workspace to pass data between calls.";
+                + workspaceNote();
+    }
+
+    /**
+     * Which of the chat's directories the code sees, and where — so it writes
+     * where the user looks and names the path they will find.
+     */
+    private String workspaceNote() {
+        Path working = dirs.workingDir();
+        if (working == null) {
+            return "Write files to /workspace to pass data between calls.";
+        }
+        StringBuilder note = new StringBuilder("The chat's working directory ").append(working)
+                .append(" is mounted WRITABLE under that same path and as /workspace, and is the current "
+                        + "directory; ");
+        if (!dirs.additionalDirs().isEmpty()) {
+            note.append("so are its other directories, each under its own path: ")
+                    .append(String.join(", ", dirs.additionalDirs().stream().map(Path::toString).toList()))
+                    .append(". ");
+        } else {
+            note.append("no other host directory is visible. ");
+        }
+        return note.append("Paths are the same as for the other file tools: save files there to pass data "
+                        + "between calls and to hand them to the user, and tell the user the host path, e.g. ")
+                .append(working.resolve("report.pptx")).append(".").toString();
     }
 
     /**
@@ -101,7 +134,7 @@ public final class CodeExecuteTool implements Tool {
         }
         CodeExecutionService.ExecResult result;
         try {
-            result = service.execute(sessionKey, language, network, mount, source);
+            result = service.execute(sessionKey, language, network, mount, dirs, source);
         } catch (RuntimeException e) {
             return "Error: code execution failed: " + e.getMessage();
         }

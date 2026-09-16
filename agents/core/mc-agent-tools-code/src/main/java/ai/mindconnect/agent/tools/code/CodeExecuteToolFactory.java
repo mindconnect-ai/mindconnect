@@ -121,7 +121,18 @@ public final class CodeExecuteToolFactory implements ToolFactory {
         // for everything unlisted or invalid.
         String network = agentTool == null ? defaultNetwork
                 : networkOrDefault(String.valueOf(agentTool.overrides().getOrDefault("network", "")), defaultNetwork);
-        return new CodeExecuteTool(service, languages, sessionKey(scope), network, mount(agentTool));
+        return new CodeExecuteTool(service, languages, sessionKey(scope), network, mount(agentTool),
+                dirs(scope));
+    }
+
+    /**
+     * The chat's directories, which the container mounts under their host
+     * paths — what the code writes is then where {@code bash}, the file tools
+     * and the user's Files dialog look. None without a scope: the container
+     * keeps a scratch directory of its own.
+     */
+    private static SessionDirs dirs(ToolCallScope scope) {
+        return scope == null ? SessionDirs.none() : SessionDirs.of(scope.workingDir(), scope.additionalDirs());
     }
 
     /**

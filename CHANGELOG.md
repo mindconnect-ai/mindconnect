@@ -25,6 +25,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** **a Files dialog in the chat** — next to Working Memory, Traces and
+  Todos. It lists the session's directories (the working directory, the
+  additional ones and the session's own) and lets you open their folders, view a
+  file and download it, so what the agent produced with `bash` or `code_execute`
+  reaches you again, the way the Workspace dialog did before the workspace tools
+  were removed. Only the session's owner sees anything, nothing outside those
+  directories is reachable (`..` and symbolic links included), and HTML or SVG is
+  shown as source rather than rendered.
 - **agents:** **`mc-agent-starter-runtime`** — the Spring Boot applications now build
   their agent runtime the way the embedded builder does: the core plus installed
   features, configured from the `mindconnect.*` properties, with the runtime's beans
@@ -105,6 +113,20 @@ fresh empty one, so nothing has to be moved by hand at release time.
   built-in `env` variable comes from; the process environment plus system
   properties as before when not set. `WorkflowRunService` and
   `WorkflowAdminService` take the same supplier.
+
+### Changed
+
+- **agents:** **`code_execute` works in the chat's directories.** Its container's
+  `/workspace` used to be a scratch directory of its own under the data
+  directory, so a file the code wrote — a chart, a PowerPoint — was out of reach
+  of `bash`, the file tools and the user, and an agent telling you where it saved
+  it named a path that did not exist. The chat's working directory (its own
+  directory unless one was chosen) and its additional directories are now
+  mounted writable under their own host paths, so a path means the same inside
+  the container and out; the working directory is also `/workspace` and the
+  current directory. Only a session without a working directory keeps a scratch
+  directory. A chat that changes its directories gets a fresh container on the
+  next call, with its files but without packages installed in the old one.
 
 ## [0.8.2] - 2026-09-16
 

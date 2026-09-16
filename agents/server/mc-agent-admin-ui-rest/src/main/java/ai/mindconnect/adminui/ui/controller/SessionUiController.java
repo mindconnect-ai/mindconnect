@@ -86,13 +86,13 @@ public class SessionUiController {
     }
 
     /**
-     * Wraps a session tool page (memory / traces / todos) in a
+     * Wraps a session tool page (memory / traces / todos / files) in a
      * wide dialog over whatever is on screen — a remove+append patch on the
      * body-level dialog host (same pattern as the tool-test dialogs). The
      * chat page underneath is never re-rendered, so scroll position and
      * stream state survive; × and backdrop close client-side.
      */
-    private ResponseEntity<UiPatch> sessionDialog(SessionId sessionId, String title, UiPage inner) {
+    static ResponseEntity<UiPatch> sessionDialog(SessionId sessionId, String title, UiPage inner) {
         var dlg = ai.mindconnect.ui.model.UiDialog.of(title, null, inner.getNode());
         dlg.setId("session-dialog");
         dlg.withCssClass("sui-dialog--wide");

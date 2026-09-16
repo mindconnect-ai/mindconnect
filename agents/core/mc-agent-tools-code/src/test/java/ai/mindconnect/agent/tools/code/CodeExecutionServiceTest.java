@@ -125,6 +125,79 @@ class CodeExecutionServiceTest {
     }
 
     @Test
+    void theChatsDirectoriesAreMountedUnderTheirOwnPaths_theWorkingOneAlsoAsWorkspace() throws IOException {
+        var svc = newService(stub(0, ""), Duration.ofSeconds(10));
+        Path work = Files.createDirectories(dir.resolve("work")).toAbsolutePath();
+        Path docs = Files.createDirectories(dir.resolve("docs")).toAbsolutePath();
+
+        svc.execute("session-w", python(), "none", null, new SessionDirs(work, List.of(docs)), "print(1)");
+
+        String run = calls().stream().filter(c -> c.startsWith("run ")).findFirst().orElseThrow();
+        assertThat(run).contains("--workdir " + work)
+                .contains("-v " + work + ":/workspace")
+                .contains("-v " + work + ":" + work)
+                .contains("-v " + docs + ":" + docs)
+                .doesNotContain(":ro");
+        assertThat(dir.resolve("scratch/session-w")).as("no scratch directory needed").doesNotExist();
+    }
+
+    @Test
+    void changedDirectoriesGetAFreshContainer() throws IOException {
+        var svc = newService(stub(0, ""), Duration.ofSeconds(10));
+        Path work = Files.createDirectories(dir.resolve("work"));
+        Path docs = Files.createDirectories(dir.resolve("docs"));
+
+        svc.execute("session-x", python(), "none", null, new SessionDirs(work, List.of()), "print(1)");
+        svc.execute("session-x", python(), "none", null, new SessionDirs(work, List.of()), "print(2)");
+        svc.execute("session-x", python(), "none", null, new SessionDirs(work, List.of(docs)), "print(3)");
+
+        assertThat(calls().stream().filter(c -> c.startsWith("run ")).toList()).hasSize(2);
+    }
+
+    @Test
+    void withoutAWorkingDirectoryTheWorkspaceIsAScratchDirectory() throws IOException {
+        var svc = newService(stub(0, ""), Duration.ofSeconds(10));
+
+        svc.execute("session-s", python(), "none", null, SessionDirs.none(), "print(1)");
+
+        String run = calls().stream().filter(c -> c.startsWith("run ")).findFirst().orElseThrow();
+        assertThat(run).contains("--workdir /workspace")
+                .contains("-v " + dir.resolve("scratch/session-s").toAbsolutePath() + ":/workspace");
+    }
+
+    @Test
+    void goneRootAndSystemDirectoriesAreNeverMounted() throws IOException {
+        Path work = Files.createDirectories(dir.resolve("work")).toAbsolutePath();
+
+        var dirs = new SessionDirs(dir.resolve("gone"),
+                List.of(Path.of("/"), Path.of("/proc"), Path.of("/dev"), work, work));
+
+        assertThat(dirs.workingDir()).isNull();
+        assertThat(dirs.additionalDirs()).containsExactly(work);
+    }
+
+    @Test
+    void theFactoryMountsTheScopesDirectories() throws IOException {
+        Path stub = stub(0, "");
+        Path work = Files.createDirectories(dir.resolve("chat-dir")).toAbsolutePath();
+        Path docs = Files.createDirectories(dir.resolve("chat-docs")).toAbsolutePath();
+        var factory = new CodeExecuteToolFactory();
+        factory.bind(env(Map.of(
+                "codeExecRuntime", stub.toString(),
+                "dataBaseDir", dir.resolve("data").toString())));
+        service = null;
+
+        Tool tool = factory.create(AgentTool.of("code_execute"), new ToolCallScope(
+                UserId.of("u"), SessionId.random(), null, null, work.toString(), List.of(docs.toString())));
+        tool.execute(Map.of("language", "python", "code", "print(1)"));
+
+        assertThat(tool.description()).contains(work.toString()).contains(docs.toString());
+        assertThat(calls()).anySatisfy(c -> assertThat(c).startsWith("run ")
+                .contains("-v " + work + ":/workspace")
+                .contains("-v " + docs + ":" + docs));
+    }
+
+    @Test
     void differentSessionsGetDifferentContainers() throws IOException {
         var svc = newService(stub(0, ""), Duration.ofSeconds(10));
 

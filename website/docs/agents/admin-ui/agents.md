@@ -75,7 +75,10 @@ streamed responses, tool calls and sub-agent runs. The chat view also offers:
   an approve/deny card;
 - **Regenerate** a turn, **delete from a message onward**, and clear the chat;
 - inspectors for **working memory** (with a manual Compress action),
-  **traces**, **todos** and the **workspace** (with file download);
+  **traces**, **todos** and **files** — the session's directories (working
+  directory, additional directories, its own) to browse, with view and download
+  for what the agent wrote there with `bash` or `code_execute`; only the
+  session's owner sees them;
 - a **Parent Session** link when you're inside a sub-agent's session.
 
 ## See also
