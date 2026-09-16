@@ -32,7 +32,8 @@ fresh empty one, so nothing has to be moved by hand at release time.
   shows up in the chat as the thought. New `additionalParams.reasoning_summary`
   (`auto` default, `concise`, `detailed`, `none`) — set `none` if OpenAI refuses
   summaries to your organization. Other OpenAI-compatible providers and Azure are
-  unchanged.
+  unchanged. A config that has to stay on Chat Completions picks the new provider
+  `OPENAI_CHAT_COMPLETIONS`.
 - **agents:** **`presentation-builder`, a sub-agent for PowerPoint decks**, bundled
   with the `pptx-builder` skill and callable from `default-chat`. The chat hands it
   a brief — the outline and facts, or the path of a deck to revise — and gets back

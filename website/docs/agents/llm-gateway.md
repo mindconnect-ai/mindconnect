@@ -100,12 +100,13 @@ for: it is the case an admin can fix from the Admin UI.
 | Gateway | Providers it serves |
 |---------|---------------------|
 | `ClaudeGateway` | Anthropic (Claude) |
-| `OpenAiResponsesGateway` | OpenAI itself, through the Responses API (`/v1/responses`) |
-| `OpenAiCompatibleGateway` | Every OpenAI-compatible API — LM Studio, Groq, Ollama, Mistral, DeepSeek, xAI (Grok), Moonshot (Kimi), Together, OpenRouter, Perplexity, Fireworks |
+| `OpenAiResponsesGateway` | OpenAI itself (`OPENAI`), through the Responses API (`/v1/responses`) |
+| `OpenAiCompatibleGateway` | OpenAI through Chat Completions (`OPENAI_CHAT_COMPLETIONS`) and every OpenAI-compatible API — LM Studio, Groq, Ollama, Mistral, DeepSeek, xAI (Grok), Moonshot (Kimi), Together, OpenRouter, Perplexity, Fireworks |
 | `AzureOpenAiGateway` | Azure OpenAI |
 | `GeminiGateway` | Google Gemini |
 
-The `LlmProvider` enum lists all wired providers: `OPENAI`, `ANTHROPIC`,
+The `LlmProvider` enum lists all wired providers: `OPENAI`,
+`OPENAI_CHAT_COMPLETIONS`, `ANTHROPIC`,
 `AZURE_OPENAI`, `GOOGLE_GEMINI`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`,
 `XAI` (Grok), `MOONSHOT` (Kimi), `TOGETHER`, `OPENROUTER`, `PERPLEXITY`,
 `FIREWORKS`, `LM_STUDIO`. Each constant also carries the provider's own
@@ -124,6 +125,11 @@ it led to. A config's `reasoning_summary` (`auto` by default, `concise`,
 `detailed`, `none`) picks the readable summary shown in the chat; OpenAI hands
 summaries only to verified organizations, so `none` is the setting for one it
 refuses.
+
+A config that has to stay on Chat Completions — a proxy that knows nothing
+else, or a comparison — picks `OPENAI_CHAT_COMPLETIONS` instead: same endpoint
+host, same models, the OpenAI-compatible gateway. From gpt-5.6 on, tools and
+reasoning do not go together there.
 
 ### Decorator gateways
 

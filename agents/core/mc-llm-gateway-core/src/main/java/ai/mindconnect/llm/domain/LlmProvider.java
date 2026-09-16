@@ -16,6 +16,15 @@ public enum LlmProvider {
     OPENAI("https://api.openai.com",
             Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS),
             ReasoningParams.OPENAI),
+    /**
+     * OpenAI through Chat Completions instead of the Responses API that
+     * {@link #OPENAI} speaks — for a proxy that only knows Chat Completions,
+     * or to compare. Chat only; from gpt-5.6 on OpenAI refuses tools together
+     * with reasoning here.
+     */
+    OPENAI_CHAT_COMPLETIONS("https://api.openai.com",
+            Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS),
+            ReasoningParams.CHAT),
     /** No default: the endpoint is the customer's own resource, {@code https://<resource>.openai.azure.com}. */
     AZURE_OPENAI(null, Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION), ReasoningParams.CHAT),
     GROQ("https://api.groq.com/openai", Set.of(LlmCapability.TOOL_CALLING),
