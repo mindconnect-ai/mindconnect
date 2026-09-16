@@ -6,6 +6,7 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.starter.namespace.NamespaceSelection;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
+import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.user.adapter.memory.InMemoryUserRepository;
 import ai.mindconnect.user.service.UserService;
@@ -116,6 +117,27 @@ class NamespaceUiControllerTest {
         assertThat(alices).contains("ACME").doesNotContain("beta").contains("Delete namespace").doesNotContain("\"Leave\"");
         assertThat(bobs).contains("ACME").contains("\"Leave\"").doesNotContain("Delete namespace")
                 .doesNotContain("namespace-acme-invite");
+    }
+
+    @Test
+    void onlyTheCreatorSetsANamespacesVariables_andAValueIsNeverShown() throws Exception {
+        namespaces.create("acme", null, UserId.of("alice"));
+        namespaces.invite(ACME, UserId.of("alice"), UserId.of("bob"));
+
+        assertThat(json(controller.newVariable(user("bob"), "acme"))).contains("Only the creator");
+        assertThat(json(controller.newVariable(user("alice"), "acme"))).contains("Add variable to");
+
+        String added = json(controller.addVariable(user("alice"), "acme", Map.of("name", "OPENAI_API_KEY", "value", "sk-acme")));
+
+        assertThat(added).contains("OPENAI_API_KEY").contains("Variable saved").doesNotContain("sk-acme");
+        assertThat(namespaces.find(ACME)).get().extracting(NamespaceDefinition::environment)
+                .isEqualTo(Map.of("OPENAI_API_KEY", "sk-acme"));
+        assertThat(json(controller.addVariable(user("bob"), "acme", Map.of("name", "X", "value", "y")))).contains("Only the creator");
+        assertThat(json(controller.page(user("alice")))).contains("OPENAI_API_KEY").doesNotContain("sk-acme");
+
+        assertThat(json(controller.removeVariable(user("alice"), "acme", "OPENAI_API_KEY"))).contains("Variable removed");
+        assertThat(namespaces.find(ACME)).get().extracting(NamespaceDefinition::environment).isEqualTo(Map.of());
+        assertThat(json(controller.removeVariable(user("alice"), "acme", "OPENAI_API_KEY"))).contains("Nothing removed");
     }
 
     private static OidcUser user(String name) {

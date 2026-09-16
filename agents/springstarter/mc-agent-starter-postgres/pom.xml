@@ -56,6 +56,10 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user-pg</artifactId>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user</artifactId>
+        </dependency>
         <!-- the namespaces of the installation, in Postgres like everything else -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

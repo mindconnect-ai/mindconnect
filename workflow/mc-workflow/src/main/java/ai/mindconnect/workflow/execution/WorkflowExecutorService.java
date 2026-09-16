@@ -4,6 +4,7 @@ import ai.mindconnect.workflow.domain.WorkflowData;
 import lombok.Data;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * Primary entry point for executing workflows.
@@ -17,9 +18,29 @@ public class WorkflowExecutorService {
 
     private final WorkflowContextFactory contextFactory;
     private List<WorkflowEventListener> eventListeners = new ArrayList<>();
+    /** What the built-in {@code env} variable holds; the process environment unless the host says otherwise. */
+    private Supplier<Map<String, String>> environment = WorkflowExecutorService::processEnvironment;
 
     public WorkflowExecutorService(WorkflowContextFactory contextFactory) {
         this.contextFactory = contextFactory;
+    }
+
+    /**
+     * Where the built-in {@code env} variable comes from. By default it is the
+     * process environment plus the system properties; a server that keeps
+     * variables per user or per tenant hands in its own supplier, asked once per
+     * run, so {@code ${env.OPENAI_API_KEY}} means the caller's key there.
+     */
+    public WorkflowExecutorService withEnvironment(Supplier<Map<String, String>> environment) {
+        this.environment = Objects.requireNonNull(environment, "environment");
+        return this;
+    }
+
+    /** The process environment with the system properties filled in where a name is not set. */
+    public static Map<String, String> processEnvironment() {
+        Map<String, String> env = new LinkedHashMap<>(System.getenv());
+        System.getProperties().forEach((k, v) -> env.putIfAbsent(String.valueOf(k), String.valueOf(v)));
+        return env;
     }
 
     // -----------------------------------------------------------------------
@@ -65,9 +86,7 @@ public class WorkflowExecutorService {
         WorkflowInstance instance = new WorkflowInstance();
         instance.init(workflowData, null, context);
         // Add all environment vars to scope
-        Map<String, String> env = new LinkedHashMap<>(System.getenv());
-        var props = System.getProperties().entrySet().stream().map(e -> Map.entry(String.valueOf(e.getKey()), String.valueOf(e.getValue())));
-        props.forEach(e -> env.putIfAbsent(e.getKey(), e.getValue()));
+        Map<String, String> env = new LinkedHashMap<>(environment.get());
         instance.getVariableScope().assignValue("env", env, context.getExpressionResolver());
         instance.assignParams(params);
         injectBuiltins(instance);
@@ -98,7 +117,8 @@ public class WorkflowExecutorService {
     /**
      * Injects built-in variables that are always available in every workflow:
      * <ul>
-     *   <li>{@code env} — an unmodifiable view of {@link System#getenv()}, so that
+     *   <li>{@code env} — an unmodifiable view of the environment (see
+     *       {@link #withEnvironment}; the process environment by default), so that
      *       expressions like {@code ${env.HOSTNAME}} or {@code env.MY_SECRET} work
      *       out of the box without the caller having to pass them as params.</li>
      * </ul>
@@ -108,7 +128,7 @@ public class WorkflowExecutorService {
     private void injectBuiltins(WorkflowInstance instance) {
         // Only inject if not already provided by the caller
         if (instance.getVariableScope().getVariable("env") == null) {
-            instance.assignParam("env", Collections.unmodifiableMap(System.getenv()));
+            instance.assignParam("env", Collections.unmodifiableMap(environment.get()));
         }
     }
 

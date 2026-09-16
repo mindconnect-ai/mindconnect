@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.domain;
 
-import ai.mindconnect.common.util.EnvVarResolver;
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.env.EnvVarResolver;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -385,30 +386,35 @@ public record LlmConfig(
      * Returns a copy with all {@code ${VAR_NAME}} / {@code ${VAR_NAME:default}}
      * placeholders expanded across every string field ({@code name},
      * {@code model}, {@code baseUrl}, {@code apiKey}), from the process
-     * environment alone. Call this at the point of use (e.g. in a gateway),
-     * not at save time, so the raw placeholder is preserved in storage.
-     *
-     * <p>Prefer {@link #resolved(java.util.Map)} when the caller has settings of
-     * its own to resolve against: this one sees only the process environment.
+     * environment alone — the library and desktop case. Call this at the point
+     * of use (e.g. in a gateway), not at save time, so the raw placeholder is
+     * preserved in storage.
      */
     public LlmConfig resolved() {
-        return resolved(System.getenv());
+        return resolved(EnvVarResolver.system());
     }
 
     /**
-     * The same, resolved against {@code env} — the tenant's settings layered
-     * over the process environment, in that order. What a tenant sets wins;
-     * what only the installation sets still resolves; a placeholder's own
-     * {@code :default} is the last word.
+     * The same, resolved against {@code env} — on a server the chain of the
+     * user's, the namespace's and the process's variables, in that order.
+     * The {@code apiKey} takes the first source that has it, the user's own
+     * included; {@code name}, {@code model} and {@code baseUrl} resolve from
+     * {@link EnvVarResolver#shared()} — the same chain without anybody's
+     * personal variables — so a user brings their own key, never their own
+     * endpoint for a config that may still carry the installation's key. A
+     * placeholder's own {@code :default} is the last word. Each variable is
+     * read once, however often the fields refer to it.
      */
-    public LlmConfig resolved(java.util.Map<String, String> env) {
+    public LlmConfig resolved(EnvVarResolver env) {
+        EnvVarResolver secrets = env.memoized();
+        EnvVarResolver settings = secrets.shared();
         return new LlmConfig(
                 id,
-                EnvVarResolver.resolve(name, env),
+                settings.resolve(name),
                 provider,
-                EnvVarResolver.resolve(model, env),
-                EnvVarResolver.resolve(baseUrl, env),
-                EnvVarResolver.resolve(apiKey, env),
+                settings.resolve(model),
+                settings.resolve(baseUrl),
+                secrets.resolve(apiKey),
                 defaultTemperature,
                 maxOutputTokens,
                 additionalParams,
@@ -424,16 +430,20 @@ public record LlmConfig(
     }
 
     /**
-     * Convenience: resolves env-var placeholders then decrypts the API key via
-     * the given {@link ai.mindconnect.common.util.encryption.EncryptionHelper}.
-     * Gateways call this once at the top of {@code chatStreaming}.
+     * Convenience: resolves placeholders from the process environment, then
+     * decrypts the API key via the given
+     * {@link ai.mindconnect.common.util.encryption.EncryptionHelper}.
      */
     public LlmConfig resolved(ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
-        return resolved(System.getenv(), encryption);
+        return resolved(EnvVarResolver.system(), encryption);
     }
 
-    /** Resolves against {@code env}, then decrypts the API key. */
-    public LlmConfig resolved(java.util.Map<String, String> env,
+    /**
+     * Resolves against {@code env}, then decrypts the API key. Gateways call
+     * this once at the top of {@code chatStreaming}, with the
+     * {@link EnvVarResolver} they were built with.
+     */
+    public LlmConfig resolved(EnvVarResolver env,
                               ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
         LlmConfig r = resolved(env);
         return r.withApiKey(encryption.resolve(r.apiKey()));

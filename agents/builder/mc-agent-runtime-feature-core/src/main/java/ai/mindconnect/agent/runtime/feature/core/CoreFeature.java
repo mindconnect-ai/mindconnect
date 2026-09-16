@@ -26,6 +26,7 @@ import ai.mindconnect.agent.runtime.tools.todo.TodoListPromptContextProvider;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.agent.runtime.port.out.PromptContextProvider;
 import ai.mindconnect.agent.tool.ToolAdvisor;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
@@ -243,20 +244,23 @@ public class CoreFeature extends ConfigurableFeature {
         ctx.bean(LlmGatewayRegistry.class, () -> {
             var http = ctx.require(OkHttpClient.class);
             var mapper = ctx.objectMapper();
-            var openAi = new OpenAiCompatibleGateway(http, mapper, encryption);
+            // Placeholders in a config resolve through whatever the host gave the runtime:
+            // the process environment, or a chain that asks the user and the namespace first.
+            var env = ctx.require(EnvVarResolver.class);
+            var openAi = new OpenAiCompatibleGateway(http, mapper, encryption, env);
             Map<LlmProvider, LlmGateway> gateways = new HashMap<>();
             for (LlmProvider provider : LlmProvider.values()) {
                 gateways.put(provider, openAi);   // OpenAI-compatible is the safe default
             }
-            gateways.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, mapper, encryption));
-            gateways.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, mapper, encryption));
-            gateways.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, mapper, encryption));
+            gateways.put(LlmProvider.ANTHROPIC, new ClaudeGateway(http, mapper, encryption, env));
+            gateways.put(LlmProvider.AZURE_OPENAI, new AzureOpenAiGateway(http, mapper, encryption, env));
+            gateways.put(LlmProvider.GOOGLE_GEMINI, new GeminiGateway(http, mapper, encryption, env));
             return new DefaultLlmGatewayRegistry(gateways);
         });
         ctx.bean(LlmChat.class, () -> new RoutingLlmChatService(
                 ctx.require(LlmConfigRepository.class), ctx.require(LlmGatewayRegistry.class)));
         ctx.bean(LlmEmbeddings.class, () -> new OpenAiEmbeddingsGateway(
-                ctx.require(OkHttpClient.class), ctx.objectMapper(), encryption));
+                ctx.require(OkHttpClient.class), ctx.objectMapper(), encryption, ctx.require(EnvVarResolver.class)));
         ctx.onStart(() -> {
             var repository = ctx.require(LlmConfigRepository.class);
             llmConfigs.forEach(repository::save);

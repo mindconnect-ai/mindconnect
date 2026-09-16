@@ -183,6 +183,12 @@ How it works:
   no secret is ever written to disk in the config.
 - If you do enter a literal API key, it is stored **encrypted**, not in clear
   text.
+- On a server several people share, the `apiKey` is looked up in **your own
+  variables** first (profile page → *Your variables*), then the **namespace's**
+  (set by its creator), then the process environment — so everyone can bring
+  their own key. The other fields skip your own variables: `model` and `baseUrl`
+  resolve from the namespace and the process alone. See
+  [Environment variables](../environment-variables.md#your-own-and-your-namespaces-variables).
 
 So to use Anthropic, you set the config's `apiKey` to `${ANTHROPIC_API_KEY}`
 (the bundled `claude-default` already does this) and export the variable before

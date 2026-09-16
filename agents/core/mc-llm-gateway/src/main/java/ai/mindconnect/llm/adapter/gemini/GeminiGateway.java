@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.gemini;
 
 import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.LlmHttpErrors;
 import ai.mindconnect.llm.adapter.TraceRedaction;
@@ -52,12 +53,21 @@ public class GeminiGateway implements LlmGateway {
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final EncryptionHelper encryption;
+    private final EnvVarResolver env;
     private final ObjectWriter prettyWriter;
 
+    /** Placeholders resolve from the process environment alone — the library and desktop case. */
     public GeminiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
+        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
+    }
+
+    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
+    public GeminiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
+                         EnvVarResolver env) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.encryption = encryption;
+        this.env = env;
         this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
     }
 
@@ -66,7 +76,7 @@ public class GeminiGateway implements LlmGateway {
                               Consumer<LlmStreamChunk> handler,
                               Cancellation cancellation,
                               LlmCallListener listener) {
-        config = config.resolved(encryption);
+        config = config.resolved(env, encryption);
         int msgCount = request.messages() == null ? 0 : request.messages().size();
         int toolCount = request.tools() == null ? 0 : request.tools().size();
         log.debug("Gemini stream → model={} messages={} tools={}", config.model(), msgCount, toolCount);

@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,8 +18,15 @@ public class AzureOpenAiGateway extends AbstractOpenAiGateway {
 
     private static final String API_VERSION = "2024-02-01";
 
+    /** Placeholders resolve from the process environment alone — the library and desktop case. */
     public AzureOpenAiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
-        super(httpClient, objectMapper, encryption);
+        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
+    }
+
+    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
+    public AzureOpenAiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
+                              EnvVarResolver env) {
+        super(httpClient, objectMapper, encryption, env);
     }
 
     @Override

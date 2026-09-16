@@ -33,6 +33,19 @@ class FileUserRepositoryTest {
     }
 
     @Test
+    void theUsersVariablesSurviveTheRoundTrip_andAnOldRecordWithoutThemReadsAsEmpty() throws Exception {
+        var repo = new FileUserRepository(dir);
+        User alice = user("alice").withEnvironment(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
+        repo.save(alice);
+
+        assertThat(repo.findById(UserId.of("alice"))).contains(alice);
+
+        java.nio.file.Path file = java.nio.file.Files.list(dir.resolve("system/users")).findFirst().orElseThrow();
+        java.nio.file.Files.writeString(file, java.nio.file.Files.readString(file).replaceAll(",?\\s*\"environment\"\\s*:\\s*\\{[^}]*\\}", ""));
+        assertThat(repo.findById(UserId.of("alice"))).get().extracting(User::environment).isEqualTo(java.util.Map.of());
+    }
+
+    @Test
     void idsThatAreNoFileNamesAndDifferOnlyInCaseStayApart() {
         var repo = new FileUserRepository(dir);
         repo.save(user("Alice"));

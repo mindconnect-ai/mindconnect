@@ -215,6 +215,24 @@ class ProfileUiControllerTest {
         assertThat(users.activeNamespace(UserId.of("bob"))).contains(Namespace.DEFAULT);
     }
 
+    @Test
+    void aUserAddsAndRemovesTheirOwnVariables_andNeverSeesAValueAgain() throws Exception {
+        assertThat(json(controller.newVariable())).contains("Add variable");
+
+        String added = json(controller.addVariable(user("alice"), Map.of("name", " OPENAI_API_KEY ", "value", "sk-secret")));
+
+        assertThat(added).contains("OPENAI_API_KEY").contains("Variable saved").doesNotContain("sk-secret");
+        assertThat(users.environment(UserId.of("alice"))).containsEntry("OPENAI_API_KEY", "sk-secret");
+        assertThat(json(controller.profile(user("alice")))).contains("OPENAI_API_KEY").doesNotContain("sk-secret");
+
+        assertThat(json(controller.addVariable(user("alice"), Map.of("name", "not a name", "value", "x"))))
+                .contains("not a variable name");
+
+        assertThat(json(controller.removeVariable(user("alice"), "OPENAI_API_KEY"))).contains("Variable removed");
+        assertThat(users.environment(UserId.of("alice"))).isEmpty();
+        assertThat(json(controller.removeVariable(user("alice"), "OPENAI_API_KEY"))).contains("Nothing removed");
+    }
+
     private static OidcUser user(String name) {
         OidcIdToken idToken = OidcIdToken.withTokenValue("id").subject("sub-" + name)
                 .claim(StandardClaimNames.PREFERRED_USERNAME, name)
