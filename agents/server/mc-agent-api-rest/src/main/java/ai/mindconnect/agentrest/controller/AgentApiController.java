@@ -58,6 +58,9 @@ public class AgentApiController {
 
     private static final Logger log = LoggerFactory.getLogger(AgentApiController.class);
 
+    /** How long a finished turn's stream waits for its Done frame before it closes anyway. */
+    private static final java.time.Duration DONE_GRACE = java.time.Duration.ofSeconds(5);
+
     private final AgentRegistryService registryService;
     private final AgentSessionService sessionService;
     private final AgentChatService chatService;
@@ -344,18 +347,34 @@ public class AgentApiController {
      */
     private SseEmitter streamTurn(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
         SseEmitter emitter = new SseEmitter(120_000L);
+        // Set once the turn's Done frame has gone out to this client.
+        java.util.concurrent.CompletableFuture<Void> doneSent = new java.util.concurrent.CompletableFuture<>();
 
-        ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> sendFrame(emitter,
-                StreamEventFrame.from(event)));
+        ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> {
+            sendFrame(emitter, StreamEventFrame.from(event));
+            if (event instanceof ai.mindconnect.agent.runtime.domain.StreamEvent.Done) {
+                doneSent.complete(null);
+            }
+        });
 
         turn.outcome().thenAccept(result -> {
             if (result.isIncomplete()) {
                 sendFrame(emitter, IncompleteFrame.of(result.turnId().value(), result.pendingApprovals()));
             }
         });
-        // Close the stream when the turn finishes (success or failure). The
-        // service runs the turn on its own executor; we just observe.
-        turn.result().whenComplete((response, error) -> endStream(emitter, sessionId, error));
+        // Close the stream when the turn finishes (success or failure). The turn's future
+        // completes on the queue's thread while its last events still travel on the
+        // subscription's own: closing right away cut off the end of a fast final round —
+        // the last text and the Done frame hit a completed emitter. So a successful turn
+        // closes once its Done has been sent, or after a short grace if a Done never comes.
+        turn.result().whenComplete((response, error) -> {
+            if (error != null) {
+                endStream(emitter, sessionId, error);
+                return;
+            }
+            doneSent.completeOnTimeout(null, DONE_GRACE.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .whenComplete((ignored, e) -> endStream(emitter, sessionId, null));
+        });
 
         return emitter;
     }

@@ -240,6 +240,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   or an update fail inside the stream. Events of a turn are now handled one at a time.
   A client that joins a turn after a tool call also no longer sees the thought before
   that call twice.
+- **agents:** **the REST chat stream no longer loses the end of an answer.**
+  `POST /api/sessions/{id}/chat` closed its Server-Sent Events stream the moment the
+  turn finished, while the last text deltas and the `done` frame were still on their
+  way — a fast final round could reach the client without its ending. The stream now
+  closes once its `done` frame has been sent.
 - **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
   turn left its thinking card, tool cards and reply bubble on the page, and the next
   turn reused their ids — its thought and its answer streamed into the cancelled
