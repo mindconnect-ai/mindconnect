@@ -117,8 +117,14 @@ public enum OpenAiModels {
         }
         // Heuristic fallback for unknown / future models not listed above
         String lower = modelId.toLowerCase();
-        return lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("o5")
-                || lower.startsWith("gpt-5");
+        if (lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("o5")
+                || lower.startsWith("gpt-5")) {
+            return true;
+        }
+        // Every GPT generation after 5 reasons too; only matching "gpt-5" left a gpt-6 with a
+        // temperature it refuses and without the reasoning its tool rounds need.
+        Matcher m = GPT_VERSION.matcher(lower);
+        return m.matches() && Integer.parseInt(m.group(1)) > 5;
     }
 
     private static final Pattern GPT_VERSION =
