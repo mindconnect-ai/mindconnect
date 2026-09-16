@@ -88,6 +88,13 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- The examples attach files, so the runtime they build needs the file-upload feature. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

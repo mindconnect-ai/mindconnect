@@ -14,6 +14,13 @@ the tools or the agent definitions knows the difference.
 
 ## Ports and adapters
 
+Each domain module also ships a **repository factory** for its ports —
+`AgentRepositoryFactory` (agent runtime), `MessageRepositoryFactory` (messages),
+`LlmRepositoryFactory` (LLM configs) — with one implementation per backend:
+`FileAgentRepositoryFactory`, `InMemoryAgentRepositoryFactory`,
+`PgAgentRepositoryFactory`, and so on. Whoever assembles a runtime picks the
+factory once for the backend it wants; the repositories come from it.
+
 The runtime follows a hexagonal (ports-and-adapters) design. Each persisted
 concept is an interface in `port/out`, and the file-based default is the
 matching adapter in `adapter/file`:

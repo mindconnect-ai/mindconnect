@@ -93,6 +93,8 @@ next step.
 | Module | Purpose |
 |--------|---------|
 | `mc-agent-runtime-builder` | Spring-free `AgentRuntimeBuilder` facade for embedding the runtime in any Java program; every capability module (tools, vector stores, file store, workflows) is optional. |
+| `mc-agent-runtime-feature-core` | The `CoreFeature` every builder installs: the LLM layer, conversations and messages, agent definitions and sessions. `AgentRuntimeBuilder.of(persistence)` with it alone is the smallest runtime that chats. |
+| `mc-agent-runtime-feature-skills`, `-tools`, `-workflows`, `-file-upload` | Optional features, one Maven module each, registered as services so `installFromClasspath()` finds them: stored skills, the tool registry over the `mc-agent-tools-*` modules, persisted workflows, files attached to a chat. See [Embedding the runtime](./embedding.md). |
 | `mc-agent-simple-demo` | Runnable embedding examples: a minimal chat, and a chat with an attached file searched through the session's vector store. |
 
 ## `server/` — deployable Spring Boot services

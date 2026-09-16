@@ -33,6 +33,11 @@
         <module>vectorstore/mc-vector-store-tools</module>
         <module>vectorstore/mc-file-store-core</module>
         <module>vectorstore/mc-file-store</module>
+        <module>builder/mc-agent-runtime-feature-core</module>
+        <module>builder/mc-agent-runtime-feature-skills</module>
+        <module>builder/mc-agent-runtime-feature-tools</module>
+        <module>builder/mc-agent-runtime-feature-workflows</module>
+        <module>builder/mc-agent-runtime-feature-file-upload</module>
         <module>builder/mc-agent-runtime-builder</module>
         <module>demo/mc-agent-simple-demo</module>
 

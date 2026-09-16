@@ -149,10 +149,10 @@ like a project's [`AGENTS.md`](./prompt-renderer.md).
 ## Embedding without Spring
 
 ```java
-AgentRuntime runtime = AgentRuntimeBuilder.fileBased(dataDir)
-        .skillFromClasspath("skills/weekly-report.md")
-        .agentDefinition(agent.withSkills(AgentDefinition.SkillsConfig.all()))
-        .build();
+AgentRuntimeBuilder builder = AgentRuntimeBuilder.useFilePersistence(dataDir)   // mc-agent-runtime-feature-skills on the classpath
+        .agentDefinition(agent.withSkills(AgentDefinition.SkillsConfig.all()));
+builder.feature(SkillsFeature.class).skillFromClasspath("skills/weekly-report.md");
+AgentRuntime runtime = builder.build();
 ```
 
 ## Skills, tools and sub-agents
