@@ -13,7 +13,7 @@ import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 
-import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 

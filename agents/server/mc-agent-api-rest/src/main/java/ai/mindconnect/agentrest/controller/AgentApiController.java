@@ -10,7 +10,7 @@ import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.dto.CreateAgentRequest;
@@ -18,6 +18,7 @@ import ai.mindconnect.agentrest.dto.StartSessionRequest;
 import ai.mindconnect.agentrest.dto.AttachedFrame;
 import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
+import ai.mindconnect.agentrest.dto.IncompleteFrame;
 import ai.mindconnect.agentrest.dto.StreamEventFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
 import ai.mindconnect.agent.AgentId;
@@ -336,42 +337,56 @@ public class AgentApiController {
         };
     }
 
-    /** Starts the turn and streams it as Server-Sent Events until it ends. */
+    /**
+     * Starts the turn and streams it as Server-Sent Events until it ends. A turn
+     * that waits at the approval gate announces it with an {@code incomplete}
+     * frame; the stream stays open and carries the turn on once somebody answers.
+     */
     private SseEmitter streamTurn(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts) {
         SseEmitter emitter = new SseEmitter(120_000L);
 
-        ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> {
-            try {
-                emitter.send(SseEmitter.event().data(
-                        compactMapper.writeValueAsString(StreamEventFrame.from(event)),
-                        MediaType.APPLICATION_JSON));
-            } catch (Exception e) {
-                emitter.completeWithError(e);
+        ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> sendFrame(emitter,
+                StreamEventFrame.from(event)));
+
+        turn.outcome().thenAccept(result -> {
+            if (result.isIncomplete()) {
+                sendFrame(emitter, IncompleteFrame.of(result.turnId().value(), result.pendingApprovals()));
             }
         });
-
         // Close the stream when the turn finishes (success or failure). The
         // service runs the turn on its own executor; we just observe.
-        turn.result().whenComplete((response, error) -> {
-            if (error != null) {
-                Throwable cause = (error.getCause() != null) ? error.getCause() : error;
-                log.error("Chat error for session {}: {}", sessionId, cause.getMessage());
-                try {
-                    emitter.send(SseEmitter.event().data(
-                            compactMapper.writeValueAsString(
-                                    new StreamEventFrame("error", cause.getMessage(),
-                                            null, null, null, null, null, null, null, null, null,
-                                            null, null, null, null, null, null)),
-                            MediaType.APPLICATION_JSON));
-                } catch (Exception ignored) {}
-                emitter.completeWithError(cause);
-            } else {
-                log.info("Chat complete for session {}", sessionId);
-                emitter.complete();
-            }
-        });
+        turn.result().whenComplete((response, error) -> endStream(emitter, sessionId, error));
 
         return emitter;
+    }
+
+    /** One frame as JSON; a stream that broke is closed with the failure. */
+    private void sendFrame(SseEmitter emitter, Object frame) {
+        try {
+            emitter.send(SseEmitter.event().data(compactMapper.writeValueAsString(frame),
+                    MediaType.APPLICATION_JSON));
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+    }
+
+    private void endStream(SseEmitter emitter, SessionId sessionId, Throwable error) {
+        if (error != null) {
+            Throwable cause = (error.getCause() != null) ? error.getCause() : error;
+            log.error("Chat error for session {}: {}", sessionId, cause.getMessage());
+            try {
+                emitter.send(SseEmitter.event().data(
+                        compactMapper.writeValueAsString(
+                                new StreamEventFrame("error", cause.getMessage(),
+                                        null, null, null, null, null, null, null, null, null,
+                                        null, null, null, null, null, null)),
+                        MediaType.APPLICATION_JSON));
+            } catch (Exception ignored) {}
+            emitter.completeWithError(cause);
+        } else {
+            log.info("Chat complete for session {}", sessionId);
+            emitter.complete();
+        }
     }
 
     @Operation(tags = "Sessions", summary = "Attach to the caller's event stream",
@@ -581,6 +596,42 @@ public class AgentApiController {
         log.info("POST /api/sessions/{}/approvals/{} approved={} scope={} → delivered={}",
                 sessionId, callId, approved, scope, delivered);
         return delivered ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
+    }
+
+    @Operation(tags = "Sessions", summary = "Answer an approval request and stream the turn on",
+            description = "Like POST …/approvals/{callId}, but the response is the continuation: "
+                    + "the same turn as Server-Sent Events from where the caller's stream reported "
+                    + "the question, including whatever happened meanwhile. It ends with Done when "
+                    + "the turn completes, or with an incomplete frame listing the questions it "
+                    + "still waits on — answer the next one the same way. 404 for a stale card.")
+    @PostMapping(value = "/sessions/{sessionId}/approvals/{callId}/continue",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public ResponseEntity<SseEmitter> answerApprovalAndContinue(@PathVariable String sessionId,
+                                                                @PathVariable String callId,
+                                                                @RequestParam boolean approved,
+                                                                @RequestParam(defaultValue = "once") String scope,
+                                                                @CurrentUser UserId caller) {
+        SessionId id = owned(sessionId, caller);
+        SseEmitter emitter = new SseEmitter(120_000L);
+        java.util.function.Consumer<ai.mindconnect.agent.runtime.domain.StreamEvent> frames =
+                event -> sendFrame(emitter, StreamEventFrame.from(event));
+        var continued = approved
+                ? chatService.approve(id, callId, ApprovalScope.fromParam(scope), frames)
+                : chatService.deny(id, callId, frames);
+        log.info("POST /api/sessions/{}/approvals/{}/continue approved={} scope={} → continued={}",
+                sessionId, callId, approved, scope, continued.isPresent());
+        if (continued.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        continued.get().outcome().whenComplete((result, error) -> {
+            if (error == null && result.isIncomplete()) {
+                sendFrame(emitter, IncompleteFrame.of(result.turnId().value(), result.pendingApprovals()));
+                emitter.complete();
+            } else {
+                endStream(emitter, id, error);
+            }
+        });
+        return ResponseEntity.ok(emitter);
     }
 
     /**

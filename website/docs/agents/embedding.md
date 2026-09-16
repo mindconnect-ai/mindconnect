@@ -86,6 +86,36 @@ classpath, sorted by their dependencies — the shipped ones and your own.
   instance stays reachable — for its settings and its beans — and what changes at
   runtime is data, through the beans: `runtime.llmConfigs().save(config)`.
 
+## Tools that need an approval
+
+`runtime.chat(…)` waits for the final answer, and a tool marked
+`needsApproval` makes it wait for a human first. `runtime.send(…)` stops
+there instead: it returns a `TurnResult` that is `INCOMPLETE` and lists the
+open questions, and `approve` or `deny` continue the same turn — until it
+completes or asks again.
+
+```java
+TurnResult result = runtime.send(session.id(), "Clean up the temp directory", events);
+while (result.isIncomplete()) {
+    ToolApproval question = result.pendingApprovals().get(0);
+    result = askUser(question)
+            ? runtime.approve(session.id(), question.callId(), ApprovalScope.ONCE, events)
+            : runtime.deny(session.id(), question.callId(), events);
+}
+System.out.println(result.text());
+```
+
+The turn does not end while it waits — the tool call is parked, nothing holds
+a thread — so the question may be answered from anywhere, much later. A
+question a sub-agent raises reaches the session you sent to. `events` hears
+each stretch of the turn once: `send` stops at the question, and the
+continuation picks up from there. Sending a new message instead ends the
+waiting turn, its parked calls closed as not approved.
+
+The non-blocking form is on the chat service: `chatService().sendChat(…)`
+returns a handle whose `outcome()` completes at the question, and
+`approve`/`deny` return the handle of the continuation.
+
 ## Reaching the beans
 
 Everything a feature registers is reachable after `build()`, decorated the way

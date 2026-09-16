@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.service.approval;
 
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.agent.SessionId;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

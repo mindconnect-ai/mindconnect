@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.service.approval;
 
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.agent.SessionId;
 import java.util.Comparator;
 import java.util.List;
@@ -8,27 +9,26 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The registry of OPEN sub-agent approval questions — ONE truth per card:
- * an entry exists exactly while a bubbled request awaits its human answer.
- * Replaces the old copy mechanism (request/response messages mirrored into
- * the root conversation), which left two truths that could drift apart and
- * produced stale cards.
+ * The registry of OPEN approval questions — ONE truth per card: an entry
+ * exists exactly while a parked tool call awaits its human answer, whether
+ * the root agent made the call or a sub-agent below it.
  *
- * <p>Lifecycle: {@code SubAgentCalls} registers on bubbling (idempotent per
- * chat and callId — a woken-without-answer task registers nothing twice), the
- * root chat renders its cards from {@link #openForRoot}, the routed answer
- * {@link #delete}s. Cleanup beyond the happy path: cancel of the root chat,
- * the next user turn on the root session, and session deletion.
+ * <p>Lifecycle: the approval gate in {@code ToolCallWorker} registers when it
+ * parks a call (idempotent per chat and callId — a woken-without-answer task
+ * registers nothing twice), the root chat renders its cards from
+ * {@link #openForRoot}, the answer {@link #delete}s. Cleanup beyond the happy
+ * path: cancel of the root chat, a new message that supersedes the waiting
+ * turn, and session deletion.
  *
  * <p>Keyed by the chat that shows the card <em>and</em> the call id. The call
  * id comes from the model provider and is unique only within one response, so
  * it never addresses a question on its own: an answer names the root session
  * it was given in, and a call id from another chat finds nothing.
  *
- * <p>In-memory ON PURPOSE: entries point at live task ids, and the queue's
- * tasks are in-memory too — an entry that outlived a restart would be a
- * stale card pointing at a task that no longer exists, the very thing this
- * store abolishes. Thread-safe.
+ * <p>In-memory: entries point at live task ids. With a persistent task store
+ * a parked task outlives a restart while its entry does not — the question is
+ * then unanswerable until the store persists too (concept 33, step 4).
+ * Thread-safe.
  */
 public final class ToolApprovalStore {
 

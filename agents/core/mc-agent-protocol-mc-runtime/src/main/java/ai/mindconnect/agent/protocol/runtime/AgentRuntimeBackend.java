@@ -20,6 +20,8 @@ import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
@@ -127,6 +129,31 @@ public final class AgentRuntimeBackend {
 
     private static Supplier<UserId> fixed(UserId user) {
         return () -> user;
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON =
+            new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * An open question as the protocol names it. The request id is the call id the
+     * runtime waits on, so an {@code ApprovalResponse} carrying it answers exactly that call.
+     */
+    static ConversationItem.ApprovalRequest toApprovalRequest(ToolApproval approval) {
+        Map<String, Object> arguments = Map.of();
+        try {
+            Object parsed = JSON.readValue(approval.content(), Map.class).get("arguments");
+            if (parsed instanceof Map<?, ?> map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> typed = (Map<String, Object>) map;
+                arguments = typed;
+            }
+        } catch (Exception e) {
+            // a card whose content is not the usual JSON still names its tool
+        }
+        return new ConversationItem.ApprovalRequest(approval.callId(),
+                ConversationItem.ApprovalRequest.TOOL_APPROVAL,
+                Map.of("callId", approval.callId(), "name", approval.toolName(), "arguments", arguments),
+                null);
     }
 
     /**
@@ -247,30 +274,46 @@ public final class AgentRuntimeBackend {
             String responseId = "resp_" + UUID.randomUUID();
             ResponseAssembler assembler = new ResponseAssembler(responseId,
                     session.conversationId().value(), request.sessionId(), agentName);
+
+            // The turn stops at the approval gate: this response ends INCOMPLETE with the
+            // questions, and the answer — an ApprovalResponse as the next input — continues
+            // the same turn as a new response.
+            ChatTurnHandle handle;
+            if (request.input().size() == 1
+                    && request.input().get(0) instanceof ConversationItem.ApprovalResponse answer) {
+                handle = (answer.approved()
+                        ? chat.approve(session.id(), answer.requestId(), ApprovalScope.ONCE, assembler::accept)
+                        : chat.deny(session.id(), answer.requestId(), assembler::accept))
+                        .orElseThrow(() -> new RuntimeBackendException("No open approval request "
+                                + answer.requestId() + " in session " + request.sessionId()));
+            } else {
+                handle = chat.sendChat(session.id(), prepareInput(request), assembler::accept);
+            }
             owners.put(responseId, session.userId());
             assemblers.put(responseId, assembler);
-
-            ChatTurnHandle handle = chat.submitChat(
-                    session.id(), prepareInput(request), assembler::accept);
             handles.put(responseId, handle);
             assembler.addMetadata("mc.turnId", handle.id().value());
-            handle.result().whenComplete((text, ex) -> {
+            var settled = handle.outcome().whenComplete((result, ex) -> {
                 if (ex instanceof CancellationException
                         || ex != null && ex.getCause() instanceof CancellationException) {
                     assembler.cancelled();
                 } else if (ex != null) {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     assembler.fail(cause.getMessage());
+                } else if (result.isIncomplete()) {
+                    assembler.waitingForApproval(result.pendingApprovals().stream()
+                            .map(AgentRuntimeBackend::toApprovalRequest).toList());
                 }
-                // success: StreamEvent.Done already completed the assembler
+                // completed: StreamEvent.Done already completed the assembler
             });
 
             if (request.background()) {
                 return assembler.snapshot();
             }
-            handle.result().exceptionally(ex -> null).join();   // outcome is in the assembler
+            settled.exceptionally(ex -> null).join();   // outcome is in the assembler once this settled
             return assembler.snapshot();
         }
+
 
         @Override
         public Optional<Response> get(String responseId) {
@@ -312,7 +355,7 @@ public final class AgentRuntimeBackend {
             if (request.input().size() != 1
                     || !(request.input().get(0) instanceof ConversationItem.Message message)) {
                 throw new RuntimeBackendException("The runtime backend currently accepts exactly "
-                        + "one user message as input (approvals come with the native item store)");
+                        + "one user message or one approval response as input");
             }
             SessionId sessionId = SessionId.of(request.sessionId());
             StringBuilder text = new StringBuilder();

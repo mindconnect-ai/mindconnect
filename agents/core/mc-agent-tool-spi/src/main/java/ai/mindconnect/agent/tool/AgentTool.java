@@ -46,8 +46,9 @@ public record AgentTool(
         boolean deferred,
         /**
          * A human must approve every call of this tool before it runs — the
-         * turn ends {@code INCOMPLETE(WAITING_FOR_APPROVAL)} and the answer
-         * arrives as input of the next turn (concept 16). The approval
+         * call waits at the approval gate while the turn stays alive, a caller
+         * that sends with {@code sendChat} sees the turn INCOMPLETE, and the
+         * answer continues the same turn. The approval
          * memory is per tool NAME and per session ("allow for this
          * session"), never per parameter set — the request always shows the
          * concrete arguments, only the memory is coarse. Default

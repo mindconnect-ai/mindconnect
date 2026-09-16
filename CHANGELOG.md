@@ -105,6 +105,29 @@ fresh empty one, so nothing has to be moved by hand at release time.
   built-in `env` variable comes from; the process environment plus system
   properties as before when not set. `WorkflowRunService` and
   `WorkflowAdminService` take the same supplier.
+- **agents:** **a turn that waits for an approval can say so.** A tool marked
+  `needsApproval` used to leave the caller waiting for the final answer until
+  somebody answered the card elsewhere. `AgentRuntime.send(…)` returns as soon
+  as a call waits, with a `TurnResult` that is `INCOMPLETE` and lists the open
+  questions; `approve(…)` and `deny(…)` continue the same turn and return its
+  answer or the next question. Underneath, `ChatTurnHandle.outcome()` completes
+  at the question, and `AgentChatService.sendChat`, `approve` and `deny` are the
+  non-blocking forms. Over REST the chat stream ends a waiting stretch with an
+  `incomplete` frame, and `POST /api/sessions/{id}/approvals/{callId}/continue`
+  answers and streams the turn on. The runtime protocol backend ends such a
+  response `INCOMPLETE(WAITING_FOR_APPROVAL)` with an `ApprovalRequest` item,
+  and an `ApprovalResponse` as the next input continues the turn.
+
+### Changed
+
+- **agents:** **a new message ends a turn that waits for an approval.** The
+  turn used to stay parked forever while the new one ran; now its waiting
+  calls are closed as "Not approved: superseded by a new message" — no
+  further model round, so nothing from it lands in the new turn — before the
+  new message is written.
+- **agents:** `ToolApproval` moved from `ai.mindconnect.agent.runtime.service.approval`
+  to `ai.mindconnect.agent.runtime.domain`, next to the new `TurnResult`. Code that
+  reads open approvals needs the new import; the JSON is unchanged.
 
 ## [0.8.2] - 2026-09-16
 
