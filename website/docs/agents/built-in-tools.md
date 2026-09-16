@@ -122,7 +122,7 @@ file tools).
 
 | Tool | Description | Needs |
 |------|-------------|-------|
-| `code_execute` | Runs code in a disposable **container sandbox** (docker/podman). | A container runtime; limits via `mindconnect.code-exec.*` (`runtime`, `network`, `languages`, `memory`, `cpus`, `timeout-seconds`, `idle-seconds`) |
+| `code_execute` | Runs code in a disposable **container sandbox** (docker/podman). The chat's working and additional directories are mounted writable under their own host paths (the working one also as `/workspace`), so files it writes are where `bash`, the file tools and the chat's Files dialog find them; a session without a working directory gets a scratch directory. | A container runtime; limits via `mindconnect.code-exec.*` (`runtime`, `network`, `languages`, `memory`, `cpus`, `timeout-seconds`, `idle-seconds`) |
 
 ## Knowledge tools (`mc-vector-store-tools`)
 

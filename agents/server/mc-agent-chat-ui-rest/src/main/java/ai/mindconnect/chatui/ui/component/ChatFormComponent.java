@@ -151,7 +151,7 @@ public final class ChatFormComponent implements UiComponent {
      * as what it runs on.
      */
     private UiAction dirAction() {
-        String label = workingDir == null ? "Directory" : DirectoryPickerComponent.name(workingDir);
+        String label = workingDir == null ? "Directory" : DirectoryPickerComponent.label(workingDir, sessionId);
         return UiAction.secondary("dir", label).icon("folder")
                 .onClick(trigger(on(ChatUiController.class).dirDialog(sessionId, null)))
                 .<UiAction>withCssClass("chat-model-btn");

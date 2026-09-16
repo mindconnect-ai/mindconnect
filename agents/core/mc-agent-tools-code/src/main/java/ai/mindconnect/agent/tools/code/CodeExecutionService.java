@@ -24,9 +24,13 @@ import java.util.concurrent.TimeUnit;
  * {@code container.id} does: files under {@code /workspace} and installed
  * packages survive between calls; a fresh interpreter process runs each time.
  *
- * <p>Isolation per container: no network, memory/cpu limits, and a bind mount
- * of one session-private scratch directory. That scratch directory is the only
- * host filesystem the container sees unless an operator mounts a second one
+ * <p>Isolation per container: no network, memory/cpu limits, and bind mounts of
+ * the chat's own directories only ({@link SessionDirs}) — its working directory
+ * as {@code /workspace} and every directory under its host path, so what the
+ * code writes lands where the file tools and the user find it. A session
+ * without a working directory gets a private scratch directory as
+ * {@code /workspace} instead. Nothing else of the host is visible unless an
+ * operator mounts a further directory
  * (see {@link HostMount}) — which is a deliberate hole in the isolation, opened
  * per agent binding and read-only by default.
  * Idle containers are reaped after a timeout; everything carries a label so
@@ -88,18 +92,32 @@ public final class CodeExecutionService implements AutoCloseable {
      */
     public ExecResult execute(String sessionKey, CodeLanguage language, String network,
                               HostMount mount, String code) {
-        // The mount joins the key for the same reason the network does: it is
+        return execute(sessionKey, language, network, mount, SessionDirs.none(), code);
+    }
+
+    /**
+     * Same, in the chat's directories: each mounted writable under its host
+     * path, the working directory also as {@code /workspace}. Without a
+     * working directory {@code /workspace} is a session-private scratch
+     * directory.
+     */
+    public ExecResult execute(String sessionKey, CodeLanguage language, String network,
+                              HostMount mount, SessionDirs dirs, String code) {
+        SessionDirs mounted = dirs == null ? SessionDirs.none() : dirs;
+        // The mounts join the key for the same reason the network does: they are
         // fixed when the container starts, so two bindings that disagree about
-        // it must not end up sharing one container.
-        String key = sessionKey + ":" + language.name() + ":" + network + ":" + HostMount.key(mount);
-        Session session = sessions.computeIfAbsent(key, k -> start(sessionKey, language, network, mount));
+        // them — or a chat that changed its directories — must not end up in one
+        // container.
+        String key = sessionKey + ":" + language.name() + ":" + network + ":" + HostMount.key(mount)
+                + ":" + mounted.key();
+        Session session = sessions.computeIfAbsent(key, k -> start(sessionKey, language, network, mount, mounted));
         long begin = System.currentTimeMillis();
         ContainerCli.Result result = exec(session, language, code);
         if (containerGone(result)) {
             // Removed behind our back (manual prune, engine restart) — one retry
             // with a fresh container.
             sessions.remove(key, session);
-            session = sessions.computeIfAbsent(key, k -> start(sessionKey, language, network, mount));
+            session = sessions.computeIfAbsent(key, k -> start(sessionKey, language, network, mount, mounted));
             begin = System.currentTimeMillis();
             result = exec(session, language, code);
         }
@@ -118,16 +136,23 @@ public final class CodeExecutionService implements AutoCloseable {
         return cli.run(settings.execTimeout(), code, args.toArray(String[]::new));
     }
 
-    private Session start(String sessionKey, CodeLanguage language, String network, HostMount mount) {
-        Path scratch = scratchDir(sessionKey);
+    private Session start(String sessionKey, CodeLanguage language, String network, HostMount mount,
+                          SessionDirs dirs) {
+        Path workspace = dirs.workingDir() != null ? dirs.workingDir() : scratchDir(sessionKey);
+        String workdir = dirs.workingDir() != null ? dirs.workingDir().toString() : SessionDirs.WORKSPACE;
         List<String> args = new ArrayList<>(List.of(
                 "run", "-d",
                 "--label", LABEL + "=1",
                 "--network", network,
                 "--memory", settings.memory(),
                 "--cpus", settings.cpus(),
-                "--workdir", "/workspace",
-                "-v", scratch.toAbsolutePath() + ":/workspace"));
+                "--workdir", workdir,
+                "-v", workspace.toAbsolutePath() + ":" + SessionDirs.WORKSPACE));
+        // Under their own paths too, so a path is the same inside and out.
+        for (Path dir : dirs.all()) {
+            args.add("-v");
+            args.add(dir + ":" + dir);
+        }
         if (mount != null) {
             args.add("-v");
             args.add(mount.dir().toAbsolutePath() + ":" + HostMount.MOUNT_POINT
@@ -143,8 +168,9 @@ public final class CodeExecutionService implements AutoCloseable {
                     + cli.binary() + " run failed): " + result.stderr().trim());
         }
         String containerId = result.stdout().trim();
-        log.info("Started code-exec container {} ({} / {}{})", shortId(containerId), sessionKey,
-                language.name(), mount == null ? "" : " / mount " + mount.describe());
+        log.info("Started code-exec container {} ({} / {} / workspace {}{}{})", shortId(containerId), sessionKey,
+                language.name(), workspace, dirs.additionalDirs().isEmpty() ? "" : " / dirs " + dirs.additionalDirs(),
+                mount == null ? "" : " / mount " + mount.describe());
         return new Session(containerId);
     }
 

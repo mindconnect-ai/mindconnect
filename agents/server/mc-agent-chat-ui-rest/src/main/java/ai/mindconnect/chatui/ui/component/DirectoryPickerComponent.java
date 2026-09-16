@@ -77,13 +77,13 @@ public final class DirectoryPickerComponent {
 
     /** The folders inside the listed directory, each a step down; a step up when there is one. */
     private static UiNode folders(SessionId sessionId, WorkingDirBrowser.Listing listing) {
-        var list = UiList.of(ID + "-folders", "Folders in " + name(listing.current())).icon("folder");
+        var list = UiList.of(ID + "-folders", "Folders in " + label(listing.current(), sessionId)).icon("folder");
         if (listing.parent() != null) {
             list.action(UiAction.secondary("up", "Up").icon("corner-left-up")
                     .onClick(trigger(on(ChatUiController.class).browseDirs(sessionId, listing.parent(), null))));
         }
         for (String dir : listing.subdirs()) {
-            list.item(UiList.Item.of(ID + "-f-" + itemId(dir), name(dir)).icon("folder")
+            list.item(UiList.Item.of(ID + "-f-" + itemId(dir), label(dir, sessionId)).icon("folder")
                     .onClick(trigger(on(ChatUiController.class).browseDirs(sessionId, dir, null))));
         }
         if (listing.subdirs().isEmpty()) {
@@ -94,7 +94,7 @@ public final class DirectoryPickerComponent {
         // directory shown, and the dialog steps into it.
         stack.child(UiField.text(NEW_FOLDER_FIELD, "New folder", null)
                 .asEditable()
-                .placeholder("Name of a folder to create in " + name(listing.current()))
+                .placeholder("Name of a folder to create in " + label(listing.current(), sessionId))
                 .trailing(UiAction.secondary("create", "Create").icon("folder-plus")
                         .onClick(trigger(on(ChatUiController.class).createDir(sessionId, null, null), ID))));
         if (listing.truncated()) {
@@ -114,7 +114,7 @@ public final class DirectoryPickerComponent {
      */
     private static UiNode additional(SessionId sessionId, AgentSession session, WorkingDirBrowser.Listing listing) {
         var list = UiList.of(ID + "-extra", "Additional directories").icon("folder-plus")
-                .action(UiAction.secondary("add", "Add " + name(listing.current())).icon("add")
+                .action(UiAction.secondary("add", "Add " + label(listing.current(), sessionId)).icon("add")
                         .onClick(trigger(on(ChatUiController.class).addDir(sessionId, null, null), ID)));
         for (String dir : session.additionalDirs()) {
             list.item(UiList.Item.of(ID + "-x-" + itemId(dir), dir).icon("folder")
@@ -133,6 +133,19 @@ public final class DirectoryPickerComponent {
     /** A path as a DOM id: URL-encoded, so it is unique and free of slashes and spaces. */
     private static String itemId(String dir) {
         return java.net.URLEncoder.encode(dir, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** What a chat's own directory is called wherever its name would be its session id. */
+    public static final String SESSION_DIR = "Session dir";
+
+    /**
+     * How a chat shows one of its directories: by the folder's own name, except
+     * the chat's own directory, which is named after the session and would show
+     * its id.
+     */
+    public static String label(String dir, SessionId sessionId) {
+        String name = name(dir);
+        return sessionId != null && name.equals(sessionId.value()) ? SESSION_DIR : name;
     }
 
     /** The last segment of a path — the folder's own name; the path itself at a root. */
