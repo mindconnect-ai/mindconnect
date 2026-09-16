@@ -14,7 +14,9 @@ class CodeLanguagesTest {
     void defaultsOfferPythonAndNode() {
         Map<String, CodeLanguages.CodeLanguage> languages = CodeLanguages.defaults();
 
-        assertThat(languages.get("python").image()).isEqualTo("python:3.12-slim");
+        assertThat(languages.get("python").image()).isEqualTo(CodeLanguages.PYTHON_IMAGE);
+        assertThat(languages.get("python").contents()).contains("python-pptx").contains("mc_office");
+        assertThat(languages.get("node").contents()).isNull();
         assertThat(languages.get("python").command()).containsExactly("python3", "-");
         assertThat(languages.get("node").command()).containsExactly("node", "-");
     }
@@ -25,7 +27,15 @@ class CodeLanguagesTest {
 
         assertThat(languages.get("python").image()).isEqualTo("python:3.13-slim");
         assertThat(languages.get("python").command()).containsExactly("python3", "-");
+        assertThat(languages.get("python").contents()).as("another image, contents unknown").isNull();
         assertThat(languages.get("node").image()).isEqualTo("node:22-slim");
+    }
+
+    @Test
+    void theDefaultImageNamedAgainKeepsWhatItIsKnownToCarry() {
+        var languages = CodeLanguages.parse("python=" + CodeLanguages.PYTHON_IMAGE);
+
+        assertThat(languages.get("python").contents()).isNotNull();
     }
 
     @Test

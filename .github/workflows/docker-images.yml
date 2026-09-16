@@ -67,3 +67,28 @@ jobs:
           labels: ${{ steps.meta-admin.outputs.labels }}
           cache-from: type=gha,scope=admin-ui
           cache-to: type=gha,mode=max,scope=admin-ui
+
+      # ── code_execute's python image ─────────────────────────────────────────
+      # The default image of the python language (CodeLanguages.PYTHON_IMAGE).
+      # Built for arm64 too: most people running the admin UI locally are on a
+      # Mac, and an amd64-only image would run emulated or not at all.
+      - uses: docker/setup-qemu-action@v3
+
+      - id: meta-code-exec-python
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/code-exec-python
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=long
+            type=semver,pattern={{version}}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: agents/core/mc-agent-tools-code/images/python
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta-code-exec-python.outputs.tags }}
+          labels: ${{ steps.meta-code-exec-python.outputs.labels }}
+          cache-from: type=gha,scope=code-exec-python
+          cache-to: type=gha,mode=max,scope=code-exec-python

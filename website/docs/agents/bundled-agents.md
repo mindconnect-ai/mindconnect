@@ -43,6 +43,12 @@ end.
 | **file-finder** | Locates files by name, type or location hint. | `file_list`, `glob` |
 | **document-analyst** | Answers questions over long documents (PDF, Word) using outline/grep/page-range tools. | `document_outline`, `grep_document`, `read_document` |
 
+## Office sub-agents
+
+| Agent | What it does | Key tools |
+|-------|--------------|-----------|
+| **presentation-builder** | Builds **one** PowerPoint deck from a brief — or revises one through the spec it saved beside it — in the chat's working directory, and returns only the path and slide titles. `default-chat` hands it presentations, so the drafting stays out of the chat's context. Ships with the `pptx-builder` skill. | `code_execute`, skill `pptx-builder` |
+
 ## Creative
 
 | Agent | What it does |

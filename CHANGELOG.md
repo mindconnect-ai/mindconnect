@@ -25,6 +25,24 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** **`presentation-builder`, a sub-agent for PowerPoint decks**, bundled
+  with the `pptx-builder` skill and callable from `default-chat`. The chat hands it
+  a brief — the outline and facts, or the path of a deck to revise — and gets back
+  the path and the slide titles; the planning, the spec and any failed attempts stay
+  in the sub-agent's own context. It saves the spec beside the deck as
+  `<name>.spec.json`, which is how a later brief changes the deck. New installations
+  get both; an existing one imports the agent and the skill on start, while its
+  stored `default-chat` keeps its roster until you add the agent there.
+- **agents:** **`code_execute` runs python in an image with the office libraries.**
+  The default python image is now `ghcr.io/mindconnect-ai/code-exec-python`:
+  Python 3.12 with python-pptx, python-docx, openpyxl, matplotlib and pandas, and
+  the `mc_office` package whose `pptx_builder`, `docx_builder` and `xlsx_builder`
+  build a deck, a Word document or a workbook from a small spec. The office
+  skills used to carry those generators as text the model had to copy into every
+  call — tens of kilobytes that crowded a local model's context before the first
+  slide was written. The tool tells the model what the image carries. It is
+  published for amd64 and arm64; `mindconnect.code-exec.languages=python=python:3.12-slim`
+  goes back to the plain image.
 - **agents:** **a Files dialog in the chat** — next to Working Memory, Traces and
   Todos. It lists the session's directories (the working directory, the
   additional ones and the session's own) and lets you open their folders, view a
@@ -145,6 +163,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **a loaded skill is no longer evicted from the context.** With
+  `toolResultEviction` on, a skill's text was replaced by a stub after the user's
+  next message, and the model reloaded it with `fetch_tool_result` straight away —
+  paying for the skill twice.
 - **agents:** **an attached file's tools reach the agent.** After `attachFile` (or an
   upload in the chat) the system note told the model to read the file with
   `vector_search`, but an agent whose definition did not list that tool never got

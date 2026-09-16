@@ -1,0 +1,8 @@
+# What code_execute's python image carries beyond the standard library: the
+# office formats, charts and tables. Pinned, so an image rebuilt later still
+# runs what the skills were written against.
+python-pptx==1.0.2
+python-docx==1.1.2
+openpyxl==3.1.5
+matplotlib==3.9.2
+pandas==2.2.3

@@ -120,7 +120,7 @@ class CodeExecutionServiceTest {
                 .contains("--cpus 1")
                 .contains("--label " + CodeExecutionService.LABEL + "=1")
                 .contains(":/workspace")
-                .contains("python:3.12-slim");
+                .contains(CodeLanguages.PYTHON_IMAGE);
         assertThat(dir.resolve("scratch/session-b")).isDirectory();
     }
 
@@ -173,7 +173,7 @@ class CodeExecutionServiceTest {
         String description = new CodeExecuteTool(svc, CodeLanguages.defaults(), "session-d", "none", null,
                 new SessionDirs(work, List.of())).description();
 
-        assertThat(description).contains("python (image python:3.12-slim)")
+        assertThat(description).contains("python (image " + CodeLanguages.PYTHON_IMAGE + ": the standard library plus python-pptx")
                 .contains("There is no network")
                 .contains("The current directory is the chat's working directory " + work)
                 .contains(work.resolve("report.pptx").toString())
