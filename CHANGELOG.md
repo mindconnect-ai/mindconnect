@@ -25,6 +25,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Added
 
+- **agents:** **OpenAI goes through the Responses API.** Configs with provider `OPENAI`
+  now talk to `/v1/responses` instead of `/v1/chat/completions` — the only endpoint
+  where gpt-5.6 and later take tools and reasoning together. Reasoning survives tool
+  rounds (replayed as encrypted items, nothing stored at OpenAI), and its summary
+  shows up in the chat as the thought. New `additionalParams.reasoning_summary`
+  (`auto` default, `concise`, `detailed`, `none`) — set `none` if OpenAI refuses
+  summaries to your organization. Other OpenAI-compatible providers and Azure are
+  unchanged.
 - **agents:** **`presentation-builder`, a sub-agent for PowerPoint decks**, bundled
   with the `pptx-builder` skill and callable from `default-chat`. The chat hands it
   a brief — the outline and facts, or the path of a deck to revise — and gets back

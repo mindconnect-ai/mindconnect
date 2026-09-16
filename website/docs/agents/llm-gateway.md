@@ -100,7 +100,8 @@ for: it is the case an admin can fix from the Admin UI.
 | Gateway | Providers it serves |
 |---------|---------------------|
 | `ClaudeGateway` | Anthropic (Claude) |
-| `OpenAiCompatibleGateway` | OpenAI and every OpenAI-compatible API — LM Studio, Groq, Ollama, Mistral, DeepSeek, xAI (Grok), Moonshot (Kimi), Together, OpenRouter, Perplexity, Fireworks |
+| `OpenAiResponsesGateway` | OpenAI itself, through the Responses API (`/v1/responses`) |
+| `OpenAiCompatibleGateway` | Every OpenAI-compatible API — LM Studio, Groq, Ollama, Mistral, DeepSeek, xAI (Grok), Moonshot (Kimi), Together, OpenRouter, Perplexity, Fireworks |
 | `AzureOpenAiGateway` | Azure OpenAI |
 | `GeminiGateway` | Google Gemini |
 
@@ -108,10 +109,21 @@ The `LlmProvider` enum lists all wired providers: `OPENAI`, `ANTHROPIC`,
 `AZURE_OPENAI`, `GOOGLE_GEMINI`, `GROQ`, `OLLAMA`, `MISTRAL`, `DEEPSEEK`,
 `XAI` (Grok), `MOONSHOT` (Kimi), `TOGETHER`, `OPENROUTER`, `PERPLEXITY`,
 `FIREWORKS`, `LM_STUDIO`. Each constant also carries the provider's own
-endpoint, so a config may leave `baseUrl` out. Everything but Anthropic, Azure
-OpenAI and Gemini is served by the OpenAI-compatible gateway, which the apps
+endpoint, so a config may leave `baseUrl` out. Everything but OpenAI, Anthropic,
+Azure OpenAI and Gemini is served by the OpenAI-compatible gateway, which the apps
 register as the default for the whole enum — so another compatible vendor is
 one enum constant, not new wiring.
+
+OpenAI itself goes through the Responses API rather than Chat Completions:
+from gpt-5.6 on, OpenAI refuses function tools together with reasoning on
+Chat Completions. The gateway is stateless (`store: false`) — the history
+travels in every request, so memory strategies work as with any provider — and
+asks for `reasoning.encrypted_content`: each reasoning item comes back as a
+`ThinkingBlock` of type `reasoning` and is replayed in front of the tool calls
+it led to. A config's `reasoning_summary` (`auto` by default, `concise`,
+`detailed`, `none`) picks the readable summary shown in the chat; OpenAI hands
+summaries only to verified organizations, so `none` is the setting for one it
+refuses.
 
 ### Decorator gateways
 

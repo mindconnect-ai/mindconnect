@@ -15,7 +15,7 @@ public enum LlmProvider {
     LM_STUDIO("http://localhost:1234", Set.of(LlmCapability.TOOL_CALLING), ReasoningParams.CHAT),
     OPENAI("https://api.openai.com",
             Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION, LlmCapability.DOCUMENTS),
-            ReasoningParams.CHAT_AND_TRANSCRIPTION),
+            ReasoningParams.OPENAI),
     /** No default: the endpoint is the customer's own resource, {@code https://<resource>.openai.azure.com}. */
     AZURE_OPENAI(null, Set.of(LlmCapability.TOOL_CALLING, LlmCapability.VISION), ReasoningParams.CHAT),
     GROQ("https://api.groq.com/openai", Set.of(LlmCapability.TOOL_CALLING),
@@ -199,6 +199,20 @@ public enum LlmProvider {
         /** For the providers that also transcribe: the chat knob and the speech ones. */
         static final List<AdditionalParamSpec> CHAT_AND_TRANSCRIPTION =
                 java.util.stream.Stream.concat(CHAT.stream(), SpeechParams.TRANSCRIPTION.stream()).toList();
+
+        /**
+         * OpenAI itself: the gateway speaks the Responses API there, which can
+         * also summarise the reasoning for the chat.
+         */
+        static final List<AdditionalParamSpec> OPENAI = java.util.stream.Stream.of(
+                CHAT.stream(),
+                java.util.stream.Stream.of(AdditionalParamSpec.select("reasoning_summary", "Reasoning summary",
+                        List.of("auto", "concise", "detailed", "none"),
+                        "A readable summary of what a reasoning model thought, shown in the chat. "
+                                + "OpenAI hands summaries only to verified organizations — set "
+                                + "'none' if every call is refused. Leave at 'default' for 'auto'.",
+                        LlmConfigType.CHAT)),
+                SpeechParams.TRANSCRIPTION.stream()).flatMap(s -> s).toList();
 
         private ReasoningParams() {
         }
