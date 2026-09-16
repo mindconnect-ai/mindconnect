@@ -37,6 +37,7 @@ its cross-cutting advisors, and it declares what it depends on.
 | `ToolsFeature` | `mc-agent-runtime-feature-tools` | the tool registry over the `mc-agent-tools-*` modules on the classpath, dynamic activation, the executor with every contributed `ToolAdvisor` | — |
 | `WorkflowsFeature` | `mc-agent-runtime-feature-workflows` | the workflow store the runtime and the workflow tools share — files, memory or Postgres, following the persistence — seeded from the classpath; brings `mc-agent-tools-workflow` | — |
 | `FileUploadFeature` | `mc-agent-runtime-feature-file-upload` | the file store (a directory or Postgres, following the persistence) and `attachFile` — indexing a document into the session's vector store; brings `mc-file-store` and `mc-vector-store-tools` | `ToolsFeature` |
+| `TranscriptionFeature` | `mc-agent-runtime-feature-transcription` | speech to text by LLM config name, over the OpenAI-compatible transcription endpoint | — |
 
 The core is always there: `of(persistence)` installs it, because a runtime without
 a model, a transcript or a session is not an agent runtime — which is why the

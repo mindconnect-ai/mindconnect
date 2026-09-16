@@ -39,6 +39,7 @@
         <module>builder/mc-agent-runtime-feature-workflows</module>
         <module>builder/mc-agent-runtime-feature-file-upload</module>
         <module>builder/mc-agent-runtime-feature-namespace</module>
+        <module>builder/mc-agent-runtime-feature-transcription</module>
         <module>builder/mc-agent-runtime-builder</module>
         <module>demo/mc-agent-simple-demo</module>
 

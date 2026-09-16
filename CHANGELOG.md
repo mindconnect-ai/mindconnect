@@ -36,7 +36,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   beans (installed, replacing a shipped feature of the same name) and
   `AgentRuntimeCustomizer` beans, and injects `AgentRuntime` to reach any bean or
   feature. `mc-agent-runtime-feature-namespace` is the feature behind it: a runtime
-  that works in the namespace of the call, for any host that binds a scope. Every
+  that works in the namespace of the call, for any host that binds a scope;
+  `mc-agent-runtime-feature-transcription` is speech to text as a feature of its
+  own, installed by the starter, left out by a runtime that never hears audio. Every
   domain module's repository factory can build for a namespace, and the tool
   environment falls back to the host's beans.
 - **agents:** the embedded runtime is now **a core plus installed features**, the way

@@ -147,6 +147,11 @@
             <artifactId>mc-agent-runtime-feature-namespace</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-transcription</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>org.slf4j</groupId>

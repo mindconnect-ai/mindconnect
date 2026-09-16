@@ -11,6 +11,7 @@ import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.namespace.NamespaceFeature;
 import ai.mindconnect.agent.runtime.feature.skills.SkillsFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
+import ai.mindconnect.agent.runtime.feature.transcription.TranscriptionFeature;
 import ai.mindconnect.agent.runtime.feature.workflows.WorkflowsFeature;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
@@ -132,7 +133,8 @@ public class AgentRuntimeAutoConfiguration {
         if (!disabled.isBlank()) tools.disabled(disabled.split("\\s*,\\s*"));
         builder.install(tools)
                 .install(new WorkflowsFeature())
-                .install(new FileUploadFeature());
+                .install(new FileUploadFeature())
+                .install(new TranscriptionFeature());   // the chat's voice input
         builder.property("defaultBaseDir", env.getProperty("mindconnect.tools.base-dir", System.getProperty("user.home")))
                 .property("tavilyApiKey", env.getProperty("mindconnect.tools.tavily-api-key", ""))
                 .property("codeExecRuntime", env.getProperty("mindconnect.code-exec.runtime", "auto"))

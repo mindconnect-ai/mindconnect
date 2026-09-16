@@ -45,6 +45,10 @@
             <artifactId>mc-agent-runtime-feature-namespace</artifactId>
         </dependency>
         <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-transcription</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
         </dependency>

@@ -56,6 +56,7 @@
         <module>agents/builder/mc-agent-runtime-feature-workflows</module>
         <module>agents/builder/mc-agent-runtime-feature-file-upload</module>
         <module>agents/builder/mc-agent-runtime-feature-namespace</module>
+        <module>agents/builder/mc-agent-runtime-feature-transcription</module>
         <module>agents/builder/mc-agent-runtime-builder</module>
         <module>agents/demo/mc-agent-simple-demo</module>
         <module>common/mc-pathaccessor</module>

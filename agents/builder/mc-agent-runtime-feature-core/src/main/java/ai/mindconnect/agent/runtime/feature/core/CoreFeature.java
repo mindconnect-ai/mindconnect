@@ -36,20 +36,16 @@ import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
 import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
 import ai.mindconnect.llm.adapter.openai.OpenAiEmbeddingsGateway;
-import ai.mindconnect.llm.adapter.openai.OpenAiTranscriptionGateway;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
-import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmGateway;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
 import ai.mindconnect.llm.port.out.LlmRepositoryFactory;
-import ai.mindconnect.llm.port.out.TranscriptionGateway;
 import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
-import ai.mindconnect.llm.service.RoutingLlmTranscriptionService;
 import ai.mindconnect.message.adapter.file.FileMessageRepositoryFactory;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepositoryFactory;
 import ai.mindconnect.message.adapter.pg.PgMessageRepositoryFactory;
@@ -261,10 +257,6 @@ public class CoreFeature extends ConfigurableFeature {
                 ctx.require(LlmConfigRepository.class), ctx.require(LlmGatewayRegistry.class)));
         ctx.bean(LlmEmbeddings.class, () -> new OpenAiEmbeddingsGateway(
                 ctx.require(OkHttpClient.class), ctx.objectMapper(), encryption));
-        ctx.bean(TranscriptionGateway.class, () -> new OpenAiTranscriptionGateway(
-                ctx.require(OkHttpClient.class), ctx.objectMapper(), encryption));
-        ctx.bean(LlmTranscription.class, () -> new RoutingLlmTranscriptionService(
-                ctx.require(LlmConfigRepository.class), ctx.require(TranscriptionGateway.class)));
         ctx.onStart(() -> {
             var repository = ctx.require(LlmConfigRepository.class);
             llmConfigs.forEach(repository::save);

@@ -98,7 +98,7 @@ class AgentRuntimeFeaturesTest {
             assertThat(runtime.beans().get(LlmConfigRepository.class).findByName("test-llm")).isPresent();
             assertThat(runtime.llmConfigs()).isSameAs(runtime.beans().get(LlmConfigRepository.class));
             assertThat(runtime.features().all()).extracting(RuntimeFeature::name)
-                    .containsExactly("core", "skills", "tools", "workflows", "file-upload");
+                    .containsExactly("core", "skills", "tools", "workflows", "file-upload", "transcription");
         }
     }
 
@@ -178,7 +178,7 @@ class AgentRuntimeFeaturesTest {
                 .build()) {
             var names = runtime.features().all().stream().map(RuntimeFeature::name).toList();
             assertThat(names).containsExactlyInAnyOrder(
-                    "core", "skills", "tools", "workflows", "file-upload");
+                    "core", "skills", "tools", "workflows", "file-upload", "transcription");
             assertThat(names.indexOf("tools")).isLessThan(names.indexOf("file-upload"));
         }
     }

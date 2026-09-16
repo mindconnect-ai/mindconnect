@@ -117,7 +117,7 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     embedding facade and runnable examples. The builder assembles a core plus installed
     `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); the
     shipped features live one per module in `builder/mc-agent-runtime-feature-*`
-    (core = LLM + messages + agents, always installed; skills, tools, workflows, file-upload)
+    (core = LLM + messages + agents, always installed; skills, tools, workflows, file-upload, transcription, namespace)
   - `server/` — deployable Spring Boot services
     - `mc-agent-api-rest` / `mc-agent-api-app`: REST API library / agent server (streaming via SSE)
     - `mc-agent-admin-ui-rest` / `mc-agent-admin-ui-app`: admin UI library / app (port 9090)
