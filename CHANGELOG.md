@@ -23,8 +23,6 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ## [Unreleased]
 
-## [0.8.2] - 2026-09-16
-
 ### Added
 
 - **agents:** the embedded runtime is now **a core plus installed features**, the way
@@ -50,6 +48,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
   `SkillsFeature` and `WorkflowsFeature`. The `use…()` factories still build
   the batteries-included runtime they always did, so nothing changes for a caller
   who does not install anything.
+
+## [0.8.2] - 2026-09-16
+
+### Added
+
 - **agents:** **namespaces** — a server now serves any number of them, and a
   user works in one at a time. Everything lives inside a namespace (agents,
   LLM configs, skills, sessions, files, vector stores, workflows, MCP servers,
