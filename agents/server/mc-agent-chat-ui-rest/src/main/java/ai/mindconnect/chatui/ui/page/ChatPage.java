@@ -311,12 +311,12 @@ public final class ChatPage {
         return patch(chatForm.toStreaming());
     }
 
-    public UiPatch streamStart(String userText, String thinkingId) {
+    public UiPatch streamStart(String userBubble, String thinkingId) {
         // The thinking indicator lives in the composer's streaming state
         // (see ChatFormComponent#streamingForm) — nothing extra is appended
         // to the conversation, so the composer stays pinned in place.
         return patch(
-                messages.appendUserMessage(userText),
+                messages.appendUserMessage(userBubble),
                 chatForm.toStreaming());
     }
 

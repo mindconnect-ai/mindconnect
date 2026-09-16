@@ -325,13 +325,16 @@ public final class MessageListComponent implements UiComponent {
      * milliseconds) and only matters until the next {@link #replaceAll()}
      * — which is fine because the streaming chat always replaces the
      * whole list at the end of the turn.
+     *
+     * @param body the bubble's markdown, attachments and pictures included —
+     *             see {@link MessageComponent#userBubble}
      */
-    public UiPatch.Operation appendUserMessage(String text) {
+    public UiPatch.Operation appendUserMessage(String body) {
         String tempId = "user-msg-" + System.currentTimeMillis();
         String time = DT_FMT.format(java.time.Instant.now());
         var wrapper = UiList.of("user-item-" + tempId, null);
         wrapper.item(UiList.Item.of(tempId, "You  [" + time + "]")
-                .content(UiMarkdown.of(tempId + "-md", text)
+                .content(UiMarkdown.of(tempId + "-md", body)
                         .<UiMarkdown>withCssClass("user-message")));
         return UiPatch.Operation.append(id(), wrapper);
     }

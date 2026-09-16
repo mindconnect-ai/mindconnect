@@ -1532,8 +1532,26 @@ public class ChatUiController {
         // before streaming, so the now-deleted messages disappear from the
         // DOM instead of lingering until the end-of-turn refresh.
         var session = sessionOpt.get();
-        return runTurnStream(session, agentOpt.get(), text, true,
+        return runTurnStream(session, agentOpt.get(), parts, true,
                 handler -> chatService.submitChat(session.id(), parts, handler));
+    }
+
+    /**
+     * The user bubble a turn shows the moment it is sent, as the message will
+     * be stored: the attachments added or removed since the last turn are
+     * announced with it, and a fresh image or PDF rides along as a part — the
+     * same rules the runtime applies when it writes the message, read off the
+     * same session and history, so the picture is there before the answer
+     * rather than after the turn.
+     */
+    private String userBubble(AgentSession session,
+                              java.util.List<ai.mindconnect.message.domain.ContentPart> parts) {
+        var history = sessionService.loadHistory(session.id());
+        var attached = ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice.unannounced(session, history);
+        var removed = ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice.unannouncedRemovals(session, history);
+        var shown = ai.mindconnect.agent.runtime.service.prompt.AttachmentParts.withAttachments(parts, session, attached);
+        return ai.mindconnect.chatui.ui.component.MessageComponent.userBubble(session.id(), attached, removed,
+                ai.mindconnect.message.domain.ContentPart.textOf(parts), shown);
     }
 
     /**
@@ -1549,18 +1567,19 @@ public class ChatUiController {
     private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(AgentSession session,
                                                                           AgentDefinition agent,
                                                                           String text, boolean initialRefresh) {
-        return runTurnStream(session, agent, text, initialRefresh,
+        return runTurnStream(session, agent, ai.mindconnect.message.domain.ContentPart.text(text), initialRefresh,
                 handler -> chatService.submitChat(session.id(), text, handler));
     }
 
     /**
      * The streaming core, parameterised over WHAT starts the turn: a typed
-     * message ({@code text} echoed as a user bubble) or an approval answer
-     * ({@code text == null} — the card click is the input, nothing to echo).
+     * message ({@code userParts} echoed as a user bubble) or an approval answer
+     * ({@code userParts == null} — the card click is the input, nothing to echo).
      */
     private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(AgentSession session,
                                                                           AgentDefinition agent,
-                                                                          String text, boolean initialRefresh,
+                                                                          java.util.List<ai.mindconnect.message.domain.ContentPart> userParts,
+                                                                          boolean initialRefresh,
                                                                           java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
         SessionId sessionId = session.id();
         // Channel id == the id of the message-list container the patches
@@ -1610,8 +1629,8 @@ public class ChatUiController {
 
         // 1. Append user message (a typed turn) or just swap the form to
         //    streaming (an approval resume), add thinking indicator.
-        publishPatch(bus, text != null
-                ? liveView.streamStart(text, thinkingId)
+        publishPatch(bus, userParts != null
+                ? liveView.streamStart(userBubble(session, userParts), thinkingId)
                 : liveView.streamResume());
 
         // 2. Stream tokens + per-task cards.

@@ -146,6 +146,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Changed
 
+- **agents:** **an image sent with a message shows in the chat right away.** The
+  bubble a turn shows the moment it is sent now carries the attachment line and
+  the pictures of the stored message, instead of the text alone until the turn
+  ended.
 - **agents:** **a new message ends a turn that waits for an approval.** The
   turn used to stay parked forever while the new one ran; now its waiting
   calls are closed as "Not approved: superseded by a new message" — no
