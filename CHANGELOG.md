@@ -214,6 +214,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
   agent stored for themselves — so a workflow written by one user and called by
   another's agent could read that user's API keys. It now gets the shared view, the
   namespace's and the server's values, like a config's non-secret fields.
+- **agents:** **the stores use the application's JSON settings again.** Sessions,
+  messages and the other file stores were written with a default `ObjectMapper`
+  instead of the application's — timestamps as numbers rather than ISO strings, and
+  unknown fields failing a read. `AgentRuntimeBuilder.objectMapper(...)` now reaches
+  every feature.
+- **agents:** **`mindconnect.file-store.backend` is honoured on Postgres again.** A
+  Postgres installation that kept its uploads on a volume (`filesystem`) had them put
+  into the database instead.
 - **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
   turn left its thinking card, tool cards and reply bubble on the page, and the next
   turn reused their ids — its thought and its answer streamed into the cancelled

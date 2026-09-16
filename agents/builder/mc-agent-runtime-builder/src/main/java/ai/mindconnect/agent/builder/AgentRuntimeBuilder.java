@@ -260,8 +260,11 @@ public class AgentRuntimeBuilder {
         return this;
     }
 
+    /** The mapper the runtime's stores and gateways use — handed to the features' context as well. */
     public AgentRuntimeBuilder objectMapper(ObjectMapper objectMapper) {
+        requireNotBuilt();
         this.objectMapper = objectMapper;
+        context.objectMapper(objectMapper);
         return this;
     }
 
