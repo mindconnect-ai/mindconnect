@@ -161,6 +161,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   and Sub-agents. The Upload files dialog lists only documents, the Add images
   dialog only pictures. The file count no longer disappears from the menu after a
   turn.
+- **agents:** **tool and thinking cards in the chat are compact again.** A run of
+  cards sits close together in small, muted type instead of a turn's gap and
+  body-size text per card. Collapsible summaries elsewhere in the admin UI keep
+  their size.
 - **agents:** **an image sent with a message shows in the chat right away.** The
   bubble a turn shows the moment it is sent now carries the attachment line and
   the pictures of the stored message, instead of the text alone until the turn
