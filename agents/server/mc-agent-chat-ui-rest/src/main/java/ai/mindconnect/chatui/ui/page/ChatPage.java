@@ -357,7 +357,7 @@ public final class ChatPage {
 
     /** REPLACE a task card in place — used for done / failed transitions. */
     public UiPatch streamTaskUpdate(TaskCardComponent card) {
-        return patch(messages.replaceTaskCard(card));
+        return patch(messages.replaceTaskCard(card).toArray(UiPatch.Operation[]::new));
     }
 
     /**

@@ -6,8 +6,11 @@ import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiNode;
+import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiText;
+
+import java.util.List;
 
 /**
  * One tool-call or sub-agent-call card rendered as a collapsible
@@ -103,12 +106,11 @@ public final class TaskCardComponent implements UiComponent {
     }
 
     /**
-     * Renders as a single-item {@link UiList} wrapper. The wrapper id
-     * differs from the item id so a REPLACE on the item ({@link #id()})
-     * morphs the {@code <li>} content without disturbing the surrounding
-     * list — but APPEND on the message list's id can also take this
-     * wrapper directly: the renderer's "append a list" path extracts
-     * its {@code items} into the existing {@code <ul>}.
+     * Renders as a single-item {@link UiList} wrapper, which APPEND on the
+     * message list's id takes directly: the renderer's "append a list" path
+     * extracts its {@code items} into the existing {@code <ul>}. A card
+     * already on the page is updated with {@link #updateInPlace()}, never by
+     * REPLACEing its {@code <li>} with this wrapper.
      */
     @Override
     public UiList render() {
@@ -120,9 +122,35 @@ public final class TaskCardComponent implements UiComponent {
         // the user opened back shut. `summaryId` (sub-agent cards) keeps the
         // header marker individually REPLACE-able even while collapsed.
         var item = UiList.Item.of(nodeId, "").content(body)
-                .collapsibleClient(headerLabel, summaryId);
+                .collapsibleClient(headerLabel, summaryNodeId());
         wrapper.item(item);
         return wrapper;
+    }
+
+    /**
+     * The id of the span around the summary text. Every card has one — a
+     * sub-agent card under its session-keyed {@link #summaryId}, any other
+     * under its node id — so a live update can swap the header alone.
+     */
+    public String summaryNodeId() {
+        return summaryId != null ? summaryId : nodeId + "-summary";
+    }
+
+    /**
+     * The patches that turn the card already on the page into this one: its
+     * summary text and its body, each REPLACEd on its own id.
+     *
+     * <p>Not a REPLACE of the {@code <li>}: what this component renders is a
+     * one-item wrapper list, and morphing a list item into a whole list puts a
+     * {@code <div class="sui-list">} — with the theme's frame and rounded
+     * corners — inside the conversation until the turn ends and the list is
+     * rebuilt. The {@code <details>} stays as it is, which also keeps a card
+     * the reader opened open.
+     */
+    public List<UiPatch.Operation> updateInPlace() {
+        return List.of(
+                UiPatch.Operation.replace(summaryNodeId(), UiText.of(summaryNodeId(), headerLabel)),
+                UiPatch.Operation.replace(body.getId(), body));
     }
 
     // ── Factory helpers for tool-call cards ────────────────────────────────

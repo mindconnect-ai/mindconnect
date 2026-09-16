@@ -427,12 +427,12 @@ public final class MessageListComponent implements UiComponent {
     }
 
     /**
-     * REPLACE a task card in place. Targets the card's own id (the
-     * {@code <li>}'s id), not the wrapper — that's the shape REPLACE
-     * needs to morph an existing list item.
+     * Update a task card in place: its summary and its body, each on its own
+     * id — see {@link TaskCardComponent#updateInPlace()} for why not the
+     * {@code <li>} as a whole.
      */
-    public UiPatch.Operation replaceTaskCard(TaskCardComponent card) {
-        return UiPatch.Operation.replace(card.id(), card.render());
+    public List<UiPatch.Operation> replaceTaskCard(TaskCardComponent card) {
+        return card.updateInPlace();
     }
 
     // ── Internal: welcome / empty ──────────────────────────────────────────
