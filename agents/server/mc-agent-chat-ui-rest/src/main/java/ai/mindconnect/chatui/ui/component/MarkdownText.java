@@ -27,8 +27,13 @@ public final class MarkdownText {
 
     private MarkdownText() {}
 
-    /** An opening or closing code fence: three or more backticks or tildes, at any indent. */
-    private static final Pattern FENCE = Pattern.compile("^\\s*(`{3,}|~{3,})(.*)$");
+    /**
+     * An opening code fence as marked reads one: at most three spaces of indent, then three
+     * or more backticks or tildes. A deeper indent is an indented code block to marked, not
+     * a fence — taking it for one stopped the escaping while marked rendered the lines after
+     * it as HTML.
+     */
+    private static final Pattern FENCE_OPEN = Pattern.compile("^ {0,3}(`{3,}|~{3,})(.*)$");
 
     /** An autolink the renderer turns into a link — the one {@code <} that is not a tag. */
     private static final Pattern AUTOLINK = Pattern.compile("<(?:https?://|mailto:)[^\\s<>]*>");
@@ -37,28 +42,28 @@ public final class MarkdownText {
     public static String safe(String markdown) {
         if (markdown == null || markdown.indexOf('<') < 0) return markdown;
         StringBuilder out = new StringBuilder(markdown.length() + 16);
-        String fence = null;
+        Pattern closing = null;
         int start = 0;
         while (start <= markdown.length()) {
             int end = markdown.indexOf('\n', start);
             boolean last = end < 0;
             String line = markdown.substring(start, last ? markdown.length() : end);
-            Matcher m = FENCE.matcher(line);
-            if (fence == null) {
+            // A CRLF line ends in \r, which no pattern's "." matches.
+            String bare = line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
+            if (closing == null) {
+                Matcher m = FENCE_OPEN.matcher(bare);
                 // A backtick fence's info string may not contain a backtick —
                 // "```a``` b" on one line is inline code, not a fence.
                 if (m.matches() && !(m.group(1).charAt(0) == '`' && m.group(2).indexOf('`') >= 0)) {
-                    fence = m.group(1);
+                    closing = closingFence(m.group(1));
                     out.append(line);
                 } else {
                     out.append(escapeInline(line));
                 }
             } else {
                 out.append(line);
-                if (m.matches() && m.group(2).isBlank()
-                        && m.group(1).charAt(0) == fence.charAt(0)
-                        && m.group(1).length() >= fence.length()) {
-                    fence = null;
+                if (closing.matcher(bare).matches()) {
+                    closing = null;
                 }
             }
             if (last) break;
@@ -66,6 +71,16 @@ public final class MarkdownText {
             start = end + 1;
         }
         return out.toString();
+    }
+
+    /**
+     * What closes a fence opened with {@code fence}, by marked's rule: up to three spaces, the
+     * opening run itself, any further backticks or tildes, then only spaces — so {@code ```~}
+     * closes a {@code ```} fence, which a "same character, nothing else" rule missed and kept
+     * the rest of the reply unescaped.
+     */
+    private static Pattern closingFence(String fence) {
+        return Pattern.compile("^ {0,3}" + Pattern.quote(fence) + "[~`]* *$");
     }
 
     /**
@@ -95,7 +110,12 @@ public final class MarkdownText {
         int i = 0;
         while (i < line.length()) {
             char c = line.charAt(i);
-            if (c == '`') {
+            if (c == '\\' && i + 1 < line.length() && line.charAt(i + 1) == '`') {
+                // An escaped backtick is a plain character, not the start of a code
+                // span — taking it for one left the tags "inside" it unescaped.
+                out.append(line, i, i + 2);
+                i += 2;
+            } else if (c == '`') {
                 int runEnd = i;
                 while (runEnd < line.length() && line.charAt(runEnd) == '`') runEnd++;
                 int close = closingRun(line, runEnd, runEnd - i);

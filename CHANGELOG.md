@@ -213,7 +213,9 @@ fresh empty one, so nothing has to be moved by hand at release time.
   of the conversation and the layout fell apart, and markup like `<img onerror>`
   could run script. Such text now shows as text; code blocks and inline code render
   as before, and tool output that itself contains a code fence stays inside its
-  block.
+  block. The admin UI also tells the markdown renderer itself to show raw HTML as text
+  (only its own icon markup passes), so no reply can build elements in the page
+  even where the escaping and the renderer read the markdown differently.
 - **agents:** **gpt-5.6 with tools works on `OPENAI_CHAT_COMPLETIONS`.** From gpt-5.6
   on, OpenAI refuses function tools together with reasoning on Chat Completions,
   and those models reason by default — every turn of an agent with tools ended in a

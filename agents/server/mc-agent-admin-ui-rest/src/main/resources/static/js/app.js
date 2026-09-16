@@ -7,6 +7,7 @@ import { SuiEventBus }                         from "/sui/eventbus.js";
 import { bffFetch }                            from "/sui/bff.js";
 import { install as installJsonViewer } from "/sui-ext/jsonviewer/extension.js";
 import { install as installMarkdown }   from "/sui-ext/markdown/extension.js";
+import { installMarkdownSafety }       from "/js/markdown-safety.js";
 import { install as installDiagram }    from "/sui-ext/diagram/extension.js";
 import { watchConnectionBudget }        from "/js/connection-budget.js";
 import { installAudioRecorder }         from "/js/audio-recorder.js";
@@ -21,6 +22,9 @@ await Promise.all([
     installJsonViewer(renderer),
     installMarkdown(renderer),
 ]);
+// After the extension has loaded marked, before anything renders: raw HTML in
+// markdown is shown as text (see markdown-safety.js).
+await installMarkdownSafety();
 // Teaches the renderer to draw UiDiagram nodes (the embedded workflow admin's
 // "Diagram" tab). Synchronous install — the web component registers itself.
 installDiagram(renderer);

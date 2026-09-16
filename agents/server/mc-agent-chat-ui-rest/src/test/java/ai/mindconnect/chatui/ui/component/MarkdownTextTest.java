@@ -82,4 +82,52 @@ class MarkdownTextTest {
                 .writeValueAsString(TaskCardComponent.thinkingBody("n", "maybe <section> works"));
         assertThat(json).contains("maybe &lt;section> works");
     }
+
+    // ── Where the escaper and marked used to disagree ──────────────────────
+    // Each of these let a tag through: the escaper took a stretch for code that
+    // marked renders as markdown, so nothing was escaped and the tag ran.
+
+    /** An escaped backtick is a plain character to marked, not the start of a code span. */
+    @Test
+    void anEscapedBacktickDoesNotOpenACodeSpan() {
+        assertThat(MarkdownText.safe("\\`<img src=x onerror=alert(1)>\\`"))
+                .isEqualTo("\\`&lt;img src=x onerror=alert(1)>\\`");
+    }
+
+    /** Four spaces make an indented code block, not a fence — the line after it is markdown again. */
+    @Test
+    void aFenceIndentedFourSpacesIsNoFence() {
+        assertThat(MarkdownText.safe("    ```\n<img src=x onerror=alert(1)>"))
+                .isEqualTo("    ```\n&lt;img src=x onerror=alert(1)>");
+        assertThat(MarkdownText.safe("\t```\n<img src=x onerror=alert(1)>"))
+                .endsWith("&lt;img src=x onerror=alert(1)>");
+        assertThat(MarkdownText.safe("   ```\n<b>\n   ```"))
+                .isEqualTo("   ```\n<b>\n   ```");
+    }
+
+    /** marked closes a fence with the opening run followed by more backticks or tildes; after it comes markdown. */
+    @Test
+    void aFenceClosesByMarkedsRule() {
+        assertThat(MarkdownText.safe("```\n<a>\n```~\n<img src=x onerror=alert(1)>"))
+                .isEqualTo("```\n<a>\n```~\n&lt;img src=x onerror=alert(1)>");
+        assertThat(MarkdownText.safe("````\n<a>\n```\n<b>\n````\n<c>"))
+                .isEqualTo("````\n<a>\n```\n<b>\n````\n&lt;c>");
+    }
+
+    /** A CRLF fence is still a fence: its code is left alone, and what follows it is escaped. */
+    @Test
+    void crlfLineEndingsKeepTheFence() {
+        assertThat(MarkdownText.safe("```\r\n<div>\r\n```\r\n<p>"))
+                .isEqualTo("```\r\n<div>\r\n```\r\n&lt;p>");
+    }
+
+    /** A document's name is the user's (or a tool's) text too. */
+    @Test
+    void attachmentNamesInTheBubbleAreEscaped() {
+        String bubble = MessageComponent.userBubble(ai.mindconnect.agent.SessionId.of("s"),
+                java.util.List.of(), java.util.List.of(), "see file",
+                java.util.List.of(new ai.mindconnect.message.domain.ContentPart.File(
+                        "f-1", "<img src=x onerror=alert(1)>.pdf", "application/pdf", 10)));
+        assertThat(bubble).contains("&lt;img src=x onerror=alert").doesNotContain("<img");
+    }
 }

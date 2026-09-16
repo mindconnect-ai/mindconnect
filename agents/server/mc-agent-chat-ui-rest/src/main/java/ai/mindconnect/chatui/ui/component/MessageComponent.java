@@ -80,10 +80,10 @@ public final class MessageComponent {
                     // opens the original in a new tab — the markdown renderer
                     // gives every link target="_blank".
                     String url = contentUrl(sessionId, image.fileId());
-                    out.append("\n\n[![").append(markdownSafe(image.name())).append("](")
+                    out.append("\n\n[![").append(MarkdownText.safe(markdownSafe(image.name()))).append("](")
                             .append(url).append(")](").append(url).append(")");
                 } else if (part instanceof ContentPart.File file) {
-                    out.append("\n\n").append(icon("file-text")).append(" *").append(markdownSafe(file.name())).append("*");
+                    out.append("\n\n").append(icon("file-text")).append(" *").append(MarkdownText.safe(markdownSafe(file.name()))).append("*");
                 }
             }
         }
