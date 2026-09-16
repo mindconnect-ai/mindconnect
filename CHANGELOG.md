@@ -190,6 +190,11 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
+  turn left its thinking card, tool cards and reply bubble on the page, and the next
+  turn reused their ids — its thought and its answer streamed into the cancelled
+  turn's card or bubble while its own stayed empty. Every live card now gets an id no
+  earlier turn used.
 - **agents:** **HTML in a conversation no longer breaks the chat.** An answer, a
   thought, a tool's output or a user message that contained HTML or JSX outside a
   code block was rendered as real elements — an unclosed `<div>` swallowed the rest
