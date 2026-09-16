@@ -87,9 +87,8 @@ public sealed interface StreamEvent
     /**
      * A tool call needs a human — pushed on the ROOT turn's channel so the
      * open chat stream shows the approval card immediately. The durable
-     * truth is the APPROVAL_REQUEST message (persisted FIRST, in the root
-     * conversation for bubbled sub-agent requests); this event is only the
-     * live mirror of it. {@code originSessionId}/{@code toolTaskId} are set
+     * truth is the {@code ToolApprovalStore} entry, written before this event;
+     * the event is only the live mirror of it. {@code originSessionId}/{@code toolTaskId} are set
      * for bubbled requests and route the answer back down.
      */
     record ApprovalRequested(String requestId, String callId, String toolName,

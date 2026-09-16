@@ -13,10 +13,11 @@ import ai.mindconnect.agent.runtime.feature.Features;
 import ai.mindconnect.agent.runtime.feature.RuntimeBeans;
 import ai.mindconnect.agent.runtime.feature.RuntimeView;
 import ai.mindconnect.agent.runtime.feature.fileupload.AttachSupport;
-import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
@@ -123,9 +124,55 @@ public class AgentRuntime implements RuntimeView, AutoCloseable {
     /** Sends one turn and blocks until the agent answered. */
     public String chat(SessionId sessionId, java.util.List<ai.mindconnect.message.domain.ContentPart> parts,
                        Consumer<StreamEvent> events) {
-        ChatTurnHandle handle = chatService().submitChat(sessionId, parts, events);
+        return await(chatService().submitChat(sessionId, parts, events).result());
+    }
+
+    public TurnResult send(SessionId sessionId, String message, Consumer<StreamEvent> events) {
+        return send(sessionId, ai.mindconnect.message.domain.ContentPart.text(message), events);
+    }
+
+    /**
+     * Sends one turn and blocks until the agent answered — or until a tool call waits for
+     * an approval, which comes back as {@link TurnResult#isIncomplete() INCOMPLETE} with the
+     * open questions. {@link #approve} or {@link #deny} continue the same turn:
+     *
+     * <pre>
+     * TurnResult r = runtime.send(session, "Tidy up the temp directory", events);
+     * while (r.isIncomplete()) {
+     *     ToolApproval q = r.pendingApprovals().get(0);
+     *     r = askUser(q) ? runtime.approve(session, q.callId(), ApprovalScope.ONCE, events)
+     *                    : runtime.deny(session, q.callId(), events);
+     * }
+     * </pre>
+     */
+    public TurnResult send(SessionId sessionId, java.util.List<ai.mindconnect.message.domain.ContentPart> parts,
+                           Consumer<StreamEvent> events) {
+        return await(chatService().sendChat(sessionId, parts, events).outcome());
+    }
+
+    /**
+     * Runs the call that waits on {@code callId} and blocks until the turn answers or asks again.
+     *
+     * @throws IllegalStateException when the session has no such open question (answered, or its turn is gone)
+     */
+    public TurnResult approve(SessionId sessionId, String callId, ApprovalScope scope, Consumer<StreamEvent> events) {
+        return await(chatService().approve(sessionId, callId, scope, events)
+                .orElseThrow(() -> noOpenQuestion(sessionId, callId)).outcome());
+    }
+
+    /** Refuses the call that waits on {@code callId}; the agent carries on without it. See {@link #approve}. */
+    public TurnResult deny(SessionId sessionId, String callId, Consumer<StreamEvent> events) {
+        return await(chatService().deny(sessionId, callId, events)
+                .orElseThrow(() -> noOpenQuestion(sessionId, callId)).outcome());
+    }
+
+    private static IllegalStateException noOpenQuestion(SessionId sessionId, String callId) {
+        return new IllegalStateException("No open approval for call " + callId + " in session " + sessionId.value());
+    }
+
+    private static <T> T await(java.util.concurrent.CompletableFuture<T> future) {
         try {
-            return handle.result().get();
+            return future.get();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Interrupted while waiting for the agent", e);

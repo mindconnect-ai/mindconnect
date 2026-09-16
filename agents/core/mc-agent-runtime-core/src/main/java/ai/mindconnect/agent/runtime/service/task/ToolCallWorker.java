@@ -28,7 +28,7 @@ import ai.mindconnect.llm.domain.ToolCall;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalNotifications;
-import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskQueue;

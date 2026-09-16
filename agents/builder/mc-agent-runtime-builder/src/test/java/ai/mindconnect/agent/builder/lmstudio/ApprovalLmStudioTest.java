@@ -3,10 +3,12 @@ package ai.mindconnect.agent.builder.lmstudio;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
@@ -67,14 +69,36 @@ class ApprovalLmStudioTest {
 
     private Pending askUntilParked(Chat chat, String message) {
         ChatTurnHandle handle = chat.service.submitChat(chat.session.id(), message, event -> { });
-        boolean parked = awaitTrue(
-                () -> openApproval(chat.runtime, chat.session.id()) != null, Duration.ofSeconds(60));
-        assumeTrue(parked, "model produced no gated tool call in time");
-        ToolApproval open = openApproval(chat.runtime, chat.session.id());
+        TurnResult outcome;
+        try {
+            outcome = handle.outcome().get(60, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            outcome = null;
+        }
+        assumeTrue(outcome != null && outcome.isIncomplete(), "model produced no gated tool call in time");
+        ToolApproval open = outcome.pendingApprovals().get(0);
         assertThat(open.toolName()).isEqualTo("it_echo");
         assertThat(TestTools.INVOCATIONS).as("the gated tool must not have run yet").isEmpty();
         assertThat(handle.result().isDone()).as("the turn is WAITING, not ended").isFalse();
         return new Pending(handle, open);
+    }
+
+    @Test
+    void sendEndsIncompleteAndApproveCompletesTheSameTurn() {
+        try (Chat chat = openChat()) {
+            TurnResult first = chat.runtime.send(chat.session.id(),
+                    "Call the tool it_echo with text='weiter'.", event -> { });
+            assumeTrue(first.isIncomplete(), "model produced no gated tool call");
+            assertThat(TestTools.INVOCATIONS).isEmpty();
+
+            TurnResult done = chat.runtime.approve(chat.session.id(),
+                    first.pendingApprovals().get(0).callId(), ApprovalScope.ONCE, event -> { });
+
+            assertThat(done.status()).isEqualTo(TurnStatus.COMPLETED);
+            assertThat(done.turnId()).isEqualTo(first.turnId());
+            assertThat(done.text()).isNotBlank();
+            assertThat(TestTools.INVOCATIONS).contains("it_echo:weiter");
+        }
     }
 
     @Test

@@ -16,7 +16,7 @@ import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agentrest.auth.SessionAccess;
@@ -168,6 +168,7 @@ class AgentApiControllerOwnershipTest {
                 post("/api/sessions/{id}/compress", sessionId),
                 get("/api/sessions/{id}/approvals", sessionId),
                 post("/api/sessions/{id}/approvals/{callId}", sessionId, "call-1").param("approved", "true"),
+                post("/api/sessions/{id}/approvals/{callId}/continue", sessionId, "call-1").param("approved", "true"),
                 delete("/api/sessions/{id}", sessionId));
     }
 
@@ -216,6 +217,14 @@ class AgentApiControllerOwnershipTest {
                                       ApprovalScope scope) {
             calls.add("answerApproval " + rootSessionId.value());
             return false;
+        }
+
+        @Override
+        public java.util.Optional<ai.mindconnect.agent.runtime.port.in.ChatTurnHandle> approve(
+                SessionId rootSessionId, String callId, ApprovalScope scope,
+                java.util.function.Consumer<ai.mindconnect.agent.runtime.domain.StreamEvent> events) {
+            calls.add("approve " + rootSessionId.value());
+            return java.util.Optional.empty();
         }
     }
 }

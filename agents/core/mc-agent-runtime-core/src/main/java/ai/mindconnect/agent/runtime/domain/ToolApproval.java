@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service.approval;
+package ai.mindconnect.agent.runtime.domain;
 
 import ai.mindconnect.agent.SessionId;
 import java.time.Instant;
@@ -10,8 +10,8 @@ import java.time.Instant;
  * sub-turn suspends until the human answers (or the chat is cancelled,
  * restarted with a new turn, or its session deleted).
  *
- * <p>Root-level requests never become entries: their card renders straight
- * off the origin conversation's own {@code APPROVAL_REQUEST} message.
+ * <p>Root-level requests are entries too: the gate registers every call it
+ * parks, whichever session in the chain made it.
  *
  * @param requestId       the request's id, echoed into the response message
  * @param callId          the tool call awaiting the verdict — the store key

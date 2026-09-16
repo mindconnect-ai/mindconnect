@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.protocol.runtime;
 
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.protocol.IncompleteReason;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseError;
 import ai.mindconnect.agent.protocol.ResponseStatus;
@@ -65,6 +66,7 @@ public final class ResponseAssembler {
      */
     private Usage usage = Usage.ZERO;
     private ResponseStatus status = ResponseStatus.IN_PROGRESS;
+    private IncompleteReason incompleteReason;
     private ResponseError error;
     private Instant completedAt;
 
@@ -122,11 +124,25 @@ public final class ResponseAssembler {
             case StreamEvent.AskingLlm t -> { }
             case StreamEvent.Reviewing t -> { }
             case StreamEvent.ReviewerDecision t -> { }
-            // Approval requests reach protocol clients as the persisted
-            // APPROVAL_REQUEST item once the item mapping lands (K07); the
-            // live event is a UI concern for now.
+            // The question becomes an item when the turn reports it waits
+            // (waitingForApproval) — with every question open at that moment.
             case StreamEvent.ApprovalRequested t -> { }
         }
+    }
+
+    /**
+     * The turn waits for a human: the response ends {@code INCOMPLETE} with one
+     * {@code ApprovalRequest} item per open question. The turn itself goes on
+     * once answered — as a new response.
+     */
+    public synchronized void waitingForApproval(List<ConversationItem.ApprovalRequest> requests) {
+        if (status.terminal()) return;
+        flushText();
+        requests.forEach(this::addItem);
+        status = ResponseStatus.INCOMPLETE;
+        incompleteReason = IncompleteReason.WAITING_FOR_APPROVAL;
+        completedAt = Instant.now();
+        emit(new ResponseEvent.Incomplete(responseId, ++seq, incompleteReason));
     }
 
     /** Terminal failure signalled by the turn's future rather than the stream. */
@@ -156,7 +172,7 @@ public final class ResponseAssembler {
 
     public synchronized Response snapshot() {
         return new Response(responseId, conversationId, sessionId, agentName,
-                status, null, null, null, List.copyOf(items),
+                status, incompleteReason, null, null, List.copyOf(items),
                 usage, error, Map.copyOf(metadata), createdAt, completedAt);
     }
 

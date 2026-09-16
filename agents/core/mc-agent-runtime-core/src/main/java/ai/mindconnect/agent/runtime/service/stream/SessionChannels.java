@@ -81,6 +81,19 @@ public final class SessionChannels {
                 event -> consumer.accept(event.value().event()));
     }
 
+    /**
+     * The turn-scoped view from a cursor: {@code turnId}'s events after {@code afterSeq},
+     * replayed from the buffer, then live — each with its {@code seq}. This is how a turn
+     * that waited for an approval is picked up again: the answer's handle continues where
+     * the previous one stopped, including what happened in between.
+     */
+    public Subscription subscribeTurn(SessionId sessionId, ChatTurnId turnId, long afterSeq,
+                                      Consumer<Channel.Event<StreamEvent>> consumer) {
+        return channel(sessionId).subscribe(afterSeq,
+                event -> turnId.equals(event.turnId()),
+                event -> consumer.accept(new Channel.Event<>(event.seq(), event.value().event())));
+    }
+
     /** The newest sequence the session has seen (0 when nothing happened). */
     public long lastSeq(SessionId sessionId) {
         return channel(sessionId).lastSeq();

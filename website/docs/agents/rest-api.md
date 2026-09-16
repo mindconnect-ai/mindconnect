@@ -170,6 +170,7 @@ Each event is one JSON frame with a `type`:
 | `sub_agent_started` / `sub_agent_event` / `sub_agent_done` / `sub_agent_error` | `agentName`, `taskId`, `subSessionId`; `sub_agent_event` wraps the sub-agent's own frame in `inner` |
 | `reviewing` / `reviewer_decision` / `response_revised` | the response-reviewer chain |
 | `approval_requested` | a tool is waiting for a human — see below |
+| `incomplete` | `turnId`, `pendingApprovals` — the turn now waits for every question listed; it goes on once they are answered (see [Approvals](#approvals)) |
 | `done` | the turn ended |
 | `error` | the turn failed; `text` is the message. Only on this endpoint — it is the chat stream's way of reporting a broken turn, not a runtime event |
 
@@ -252,9 +253,17 @@ and reattach with the last seen `seq` when the connection drops.
 
 ## Approvals
 
-A tool marked "needs approval" suspends its task and the turn stops, waiting
-for a human. The request arrives on the stream as `approval_requested` — but
-only in the moment it is raised, so a client that connects later has to ask:
+A tool marked "needs approval" parks its call and the turn waits for a human.
+The chat stream says so twice: `approval_requested` in the moment a question
+is raised, then an `incomplete` frame listing every question the turn waits
+on:
+
+```json
+{"type":"incomplete","turnId":"6f1c…",
+ "pendingApprovals":[{"callId":"call_1","toolName":"bash","content":"{…}", …}]}
+```
+
+The questions are also there for a client that connects later:
 
 ```bash
 curl "http://localhost:8080/api/sessions/$SESSION/approvals"
@@ -265,7 +274,7 @@ agent's own tools and the ones bubbled up from sub-agents alike. Each entry
 carries the `callId` (the identity of the question), the `toolName`, and the
 call JSON in `content`.
 
-Answering is one call:
+There are two ways to answer. The short one delivers the decision:
 
 ```bash
 curl -X POST "http://localhost:8080/api/sessions/$SESSION/approvals/$CALL_ID?approved=true&scope=once"
@@ -274,12 +283,25 @@ curl -X POST "http://localhost:8080/api/sessions/$SESSION/approvals/$CALL_ID?app
 `scope=once` allows exactly this call; `scope=session` makes it a standing
 rule for that tool in this conversation, which also releases sibling calls of
 the same tool that are already parked. 204 means the decision was delivered,
-404 means the card was stale and its task is gone.
+404 means the card was stale and its task is gone. The turn never ended, so
+the stream that was already open — the chat stream or the session stream —
+carries it on.
 
-There is no new stream to open afterwards: the turn never ended. It is
-suspended on the parked tool task and continues on its original stream the
-moment the answer arrives — which is exactly why attaching first and then
-loading the open approvals is the right order for a client.
+The other one answers and streams the turn on in the same response:
+
+```bash
+curl -N -X POST "http://localhost:8080/api/sessions/$SESSION/approvals/$CALL_ID/continue?approved=true&scope=once"
+```
+
+It picks the turn up where the stream reported the question, including
+whatever happened in between, and ends with `done` — or with another
+`incomplete` frame when the turn still waits, for instance on a second call
+made in parallel. Answer that one the same way. A client that works like
+this can close its chat stream at the first `incomplete` frame.
+
+A new message on a session whose turn waits for an approval ends that turn:
+its parked calls are closed as not approved ("superseded by a new message"),
+without another round of the model, and the new message starts a new turn.
 
 ## Working memory
 

@@ -1,9 +1,9 @@
 package ai.mindconnect.agent.runtime.port.in;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.domain.TurnStatus;
 import ai.mindconnect.message.domain.ChatTurnId;
-
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -23,15 +23,22 @@ public interface ChatTurnHandle {
 
     SessionId sessionId();
 
-    /** Current lifecycle status of the turn. */
+    /** Current lifecycle status of the turn, as this handle sees it. */
     TurnStatus status();
 
     /**
      * Future that completes with the final assistant message when the turn
      * reaches {@link TurnStatus#COMPLETED}, or completes exceptionally on
-     * failure or cancellation.
+     * failure or cancellation. A turn waiting for an approval keeps it pending.
      */
     CompletableFuture<String> result();
+
+    /**
+     * Future that completes as soon as there is something to act on: the final answer
+     * ({@link TurnStatus#COMPLETED}), or the open approval questions the turn waits on
+     * ({@link TurnStatus#INCOMPLETE}). Fails like {@link #result()}.
+     */
+    CompletableFuture<TurnResult> outcome();
 
     /**
      * Cooperatively cancels the turn. Sets the turn's cancel flag, which is

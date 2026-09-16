@@ -15,12 +15,13 @@ import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategyFactory;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalNotifications;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.service.approval.ToolApproval;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
 import ai.mindconnect.agent.runtime.service.round.ToolCalls;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
@@ -94,6 +95,17 @@ public class AgentChatService {
     private final java.util.Map<String, CompletableFuture<String>> awaitingTurns = new ConcurrentHashMap<>();
     /** Turns whose task ended but whose title task still runs, keyed by the title task's id. */
     private final java.util.Map<String, PendingTitle> awaitingTitles = new ConcurrentHashMap<>();
+
+    /**
+     * Per session, the stream position where a handle last stopped at the approval gate —
+     * where the answer's handle continues. Dropped when the turn ends.
+     */
+    private final java.util.Map<SessionId, Long> resumeCursors = new ConcurrentHashMap<>();
+
+    /** What a parked call reads when a new message ends its turn. */
+    static final String SUPERSEDED_DENIAL = "Not approved: superseded by a new message";
+    /** What any other open call of that turn reads. */
+    static final String SUPERSEDED_CANCEL = "Cancelled: superseded by a new message";
 
     private record PendingTitle(TaskRecord turn, CompletableFuture<String> outcome) {}
     private final ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions;
@@ -182,6 +194,27 @@ public class AgentChatService {
      */
     public ChatTurnHandle submitChat(SessionId sessionId, List<ContentPart> parts,
                                      Consumer<StreamEvent> eventHandler) {
+        return submit(sessionId, parts, eventHandler, false);
+    }
+
+    /**
+     * Starts a chat turn that stops at the approval gate: the handle's
+     * {@link ChatTurnHandle#outcome()} completes {@code INCOMPLETE} with the open
+     * questions as soon as a tool call waits for a human, and {@code events} hears
+     * nothing after that. {@link #approve} or {@link #deny} continue the same turn
+     * with a new handle. A turn that asks nothing completes like {@link #submitChat}.
+     */
+    public ChatTurnHandle sendChat(SessionId sessionId, String userMessage, Consumer<StreamEvent> events) {
+        return sendChat(sessionId, ContentPart.text(userMessage), events);
+    }
+
+    /** Same, for a message made of content parts. */
+    public ChatTurnHandle sendChat(SessionId sessionId, List<ContentPart> parts, Consumer<StreamEvent> events) {
+        return submit(sessionId, parts, events, true);
+    }
+
+    private ChatTurnHandle submit(SessionId sessionId, List<ContentPart> parts,
+                                  Consumer<StreamEvent> eventHandler, boolean stopAtGate) {
         AgentSession session = sessionService.findSession(sessionId);
         AgentDefinition def = effectiveDefinition(session);
         String userMessage = ContentPart.textOf(parts);
@@ -191,9 +224,10 @@ public class AgentChatService {
 
         ChatTurnId turnId = ChatTurnId.random();
 
-        // A new turn can only start when the previous one is over — any open
-        // approval cards of that turn are moot now (cancelled mid-wait).
-        approvalStore.deleteForRoot(sessionId);
+        // A new turn can only start when the previous one is over. One that
+        // still waits for an approval is ended here, its questions denied —
+        // before the new question is written, so the conversation reads in order.
+        supersedeWaitingTurn(session);
 
         // 1. The question becomes conversation truth — BEFORE the task exists.
         //    A file attached since the last turn is recorded on this message
@@ -214,7 +248,7 @@ public class AgentChatService {
 
         // 2.+3. Listen on the turn's channel, make the turn a task — the queue
         //        is the only registry of running work, nothing is tracked here.
-        return startTurn(session, turnId, 0, eventHandler);
+        return startTurn(session, turnId, 0, eventHandler, stopAtGate);
     }
 
     /**
@@ -227,17 +261,16 @@ public class AgentChatService {
      * every top-level turn passes through, whichever client submitted it.
      */
     private ChatTurnHandle startTurn(AgentSession session, ChatTurnId turnId, int run,
-                                     Consumer<StreamEvent> eventHandler) {
+                                     Consumer<StreamEvent> eventHandler, boolean stopAtGate) {
         SessionId sessionId = session.id();
-        var subscription = sessionChannels.subscribeTurn(sessionId, turnId, eventHandler);
+        // The handle replays from here, so it hears the turn from its first event on.
+        long startSeq = sessionChannels.lastSeq(sessionId);
         TaskSubmission submission = AgentTurnWorker.submission(turnId, run, sessionId, 0, null);
-        CompletableFuture<String> outcome = new CompletableFuture<>();
+        CompletableFuture<String> turn = new CompletableFuture<>();
         // Registered before the submit: a turn that ends before submit() returns still finds its future.
-        awaitingTurns.put(submission.id(), outcome);
-        outcome.orTimeout(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
-        CompletableFuture<String> future = outcome.whenComplete((response, error) -> {
-            awaitingTurns.remove(submission.id(), outcome);
-            subscription.close();
+        awaitingTurns.put(submission.id(), turn);
+        turn.whenComplete((response, error) -> {
+            resumeCursors.remove(sessionId);
             userChannels.publish(session.userId(),
                     new UserEvent.TurnFinished(sessionId, turnId, outcomeOf(error)));
         });
@@ -245,7 +278,6 @@ public class AgentChatService {
             queue.submit(submission);
         } catch (RuntimeException e) {
             awaitingTurns.remove(submission.id());
-            subscription.close();
             throw e;
         }
         userChannels.publish(session.userId(), new UserEvent.TurnStarted(sessionId, turnId));
@@ -257,7 +289,120 @@ public class AgentChatService {
         }
         // An idempotent re-submit of a task that already ended fires no listener: read it off the queue.
         queue.get(submission.id()).filter(task -> task.status().terminal()).ifPresent(this::turnEnded);
-        return new LocalChatTurnHandle(turnId, sessionId, future, () -> cancelChat(sessionId));
+        return handleFor(session, turnId, run, startSeq, eventHandler, stopAtGate);
+    }
+
+    /**
+     * One caller's view of a turn: its events after {@code afterSeq}, its final
+     * answer, and — the moment a tool call waits at the approval gate — an
+     * {@code INCOMPLETE} outcome listing the open questions.
+     *
+     * <p>Every handle of a turn shares the turn's one future; the timeout is the
+     * handle's own, so a caller that stops waiting does not end the turn for
+     * anybody else. With {@code stopAtGate} the handle's events end at the gate:
+     * the answer's handle picks them up from there (see {@link #approve}).
+     * Without it the handler hears the turn to its end, as before.
+     */
+    private ChatTurnHandle handleFor(AgentSession session, ChatTurnId turnId, int run, long afterSeq,
+                                     Consumer<StreamEvent> eventHandler, boolean stopAtGate) {
+        SessionId sessionId = session.id();
+        CompletableFuture<String> result = watchTurn(AgentTurnWorker.taskIdFor(turnId, run))
+                .copy().orTimeout(TURN_TIMEOUT.toSeconds(), java.util.concurrent.TimeUnit.SECONDS);
+        CompletableFuture<TurnResult> outcome = new CompletableFuture<>();
+        Runnable cancel = () -> cancelChat(sessionId);
+        LocalChatTurnHandle handle = new LocalChatTurnHandle(turnId, sessionId, result, outcome, cancel);
+
+        // An answer that leaves other questions open continues nothing yet.
+        List<ToolApproval> stillOpen = approvalStore.openForRoot(sessionId);
+        if (!stillOpen.isEmpty()) {
+            outcome.complete(TurnResult.incomplete(turnId, stillOpen));
+            if (stopAtGate) return handle;
+        }
+
+        Subscription subscription = sessionChannels.subscribeTurn(sessionId, turnId, afterSeq, event -> {
+            if (stopAtGate && outcome.isDone()) return;
+            eventHandler.accept(event.value());
+            if (event.value() instanceof StreamEvent.ApprovalRequested asked && !outcome.isDone()
+                    // a replayed question that was answered meanwhile asks nothing any more
+                    && approvalStore.find(sessionId, asked.callId()).isPresent()) {
+                resumeCursors.put(sessionId, event.seq());
+                outcome.complete(TurnResult.incomplete(turnId, approvalStore.openForRoot(sessionId)));
+            }
+        });
+        if (stopAtGate) {
+            outcome.whenComplete((r, error) -> subscription.close());
+        }
+        result.whenComplete((text, error) -> {
+            subscription.close();
+            if (error != null) outcome.completeExceptionally(error);
+            else outcome.complete(TurnResult.completed(turnId, text));
+        });
+        return handle;
+    }
+
+    /**
+     * The future of the turn task {@code taskId}, shared by every handle. A turn
+     * that ended before anybody watched it is read off the queue.
+     */
+    private CompletableFuture<String> watchTurn(String taskId) {
+        CompletableFuture<String> created = new CompletableFuture<>();
+        CompletableFuture<String> existing = awaitingTurns.putIfAbsent(taskId, created);
+        if (existing != null) return existing;
+        queue.get(taskId).filter(task -> task.status().terminal()).ifPresent(this::turnEnded);
+        return created;
+    }
+
+    /**
+     * Continues the turn waiting on {@code callId} with "run it". Delivers the
+     * answer like {@link #answerApproval} and hands back the turn from where the
+     * caller's last handle stopped: its events, its answer, or the next question.
+     *
+     * @return empty when this chat has no open question {@code callId} or its task is gone
+     */
+    public java.util.Optional<ChatTurnHandle> approve(SessionId rootSessionId, String callId,
+                                                      ApprovalScope scope, Consumer<StreamEvent> events) {
+        return continueAfterAnswer(rootSessionId, callId, true, scope, events);
+    }
+
+    /** Continues the turn waiting on {@code callId} with "do not run it"; see {@link #approve}. */
+    public java.util.Optional<ChatTurnHandle> deny(SessionId rootSessionId, String callId,
+                                                   Consumer<StreamEvent> events) {
+        return continueAfterAnswer(rootSessionId, callId, false, ApprovalScope.ONCE, events);
+    }
+
+    private java.util.Optional<ChatTurnHandle> continueAfterAnswer(SessionId rootSessionId, String callId,
+                                                                   boolean approved, ApprovalScope scope,
+                                                                   Consumer<StreamEvent> events) {
+        AgentSession session = sessionService.findSession(rootSessionId);
+        var history = conversationManager.loadCompleteHistory(session.conversationId());
+        ChatTurnId turnId = history.currentTurnId().orElse(null);
+        if (turnId == null) return java.util.Optional.empty();
+        // Read before answering: what the tool does next must land after the cursor.
+        long cursor = resumeCursors.getOrDefault(rootSessionId, sessionChannels.lastSeq(rootSessionId));
+        if (!answerApproval(rootSessionId, callId, approved, scope)) return java.util.Optional.empty();
+        return java.util.Optional.of(handleFor(session, turnId, history.currentRun(), cursor, events, true));
+    }
+
+    /**
+     * Ends the session's turn if it waits at the approval gate — a new message
+     * supersedes it. It goes the way of a cancel, so it takes no further round
+     * that would write into the new turn: the parked calls are closed as not
+     * approved, anything else still open as cancelled.
+     */
+    private void supersedeWaitingTurn(AgentSession session) {
+        List<ToolApproval> open = approvalStore.openForRoot(session.id());
+        if (open.isEmpty()) return;
+        java.util.Set<String> parked = new java.util.HashSet<>();
+        for (ToolApproval approval : open) parked.add(approval.callId());
+        log.info("New message on session {} supersedes the turn waiting for {} approval(s)",
+                session.id(), open.size());
+        boolean cancelled = cancelTurn(session, call -> parked.contains(call.callId())
+                ? TurnMessage.toolResult(call.callId(), call.name(), SUPERSEDED_DENIAL, true)
+                        .with("approval", "denied").with("reason", "superseded")
+                : TurnMessage.toolResult(call.callId(), call.name(), SUPERSEDED_CANCEL, true));
+        if (!cancelled) {
+            approvalStore.deleteForRoot(session.id());   // cards of a turn that is already gone
+        }
     }
 
     /** How the turn ended, read off the await's failure — or its absence. */
@@ -306,6 +451,8 @@ public class AgentChatService {
      * <p>No stream, no resume, no run: the turn never ended — it is suspended
      * on the tool task and continues on its ORIGINAL stream the moment the
      * tool finishes (or reports the denial).
+     * A caller that wants a handle on what follows answers through
+     * {@link #approve} or {@link #deny} instead.
      *
      * @return false when this chat has no open question {@code callId} or its task is
      *         gone — a stale card; the caller just refreshes, which drops it
@@ -393,7 +540,14 @@ public class AgentChatService {
     }
 
     public boolean cancelChat(SessionId sessionId) {
-        AgentSession session = sessionService.findSession(sessionId);
+        return cancelTurn(sessionService.findSession(sessionId), call -> TurnMessage.toolResult(
+                call.callId(), call.name(), "Cancelled by user before the tool finished", true));
+    }
+
+    /** Cancels the session's running turn; {@code stub} closes each call it left open. */
+    private boolean cancelTurn(AgentSession session,
+                               java.util.function.Function<ToolCalls.Call, TurnMessage> stub) {
+        SessionId sessionId = session.id();
         var history = conversationManager.loadCompleteHistory(session.conversationId());
         boolean cancelled = history.currentTurnId()
                 .map(turnId -> queue.get(AgentTurnWorker.taskIdFor(turnId, history.currentRun()))
@@ -408,7 +562,7 @@ public class AgentChatService {
             // The cascade killed the sub-turns too — their open approval
             // questions die with them, and so do their cards.
             approvalStore.deleteForRoot(sessionId);
-            appendCancelStubs(session, history);
+            appendCancelStubs(session, history, stub);
         }
         return cancelled;
     }
@@ -423,14 +577,14 @@ public class AgentChatService {
      * re-checks for an existing result right before its append.
      */
     private void appendCancelStubs(AgentSession session,
-                                   ai.mindconnect.message.domain.ConversationHistory history) {
+                                   ai.mindconnect.message.domain.ConversationHistory history,
+                                   java.util.function.Function<ToolCalls.Call, TurnMessage> stubFor) {
         var turn = history.currentTurn().orElse(null);
         if (turn == null) return;
         var open = ToolCalls
                 .of(turn.messages()).open();
         for (var call : open) {
-            TurnMessage stub = TurnMessage.toolResult(call.callId(), call.name(),
-                    "Cancelled by user before the tool finished", true);
+            TurnMessage stub = stubFor.apply(call);
             conversationManager.addMessageToConversation(
                     session.conversationId(), session.agentDefinitionId().value(), stub.senderType(),
                     stub.type(), stub.content(), turn.turnId(), history.currentRun(),
@@ -458,7 +612,15 @@ public class AgentChatService {
         // handle resolves once that one is done too, like the old executor waited for it.
         String titleId = titleTaskOf(task);
         if (titleId != null && queue.get(titleId).filter(t -> !t.status().terminal()).isPresent()) {
-            awaitingTitles.put(titleId, new PendingTitle(task, outcome));
+            PendingTitle previous = awaitingTitles.putIfAbsent(titleId, new PendingTitle(task, outcome));
+            if (previous != null) {
+                // Somebody already waits for this title: follow that wait instead of replacing it.
+                previous.outcome().whenComplete((text, error) -> {
+                    if (error != null) outcome.completeExceptionally(error);
+                    else outcome.complete(text);
+                });
+                return;
+            }
             // It may have ended between the check and the put: then nobody fires the listener for us.
             if (queue.get(titleId).filter(t -> t.status().terminal()).isPresent()
                     && awaitingTitles.remove(titleId) != null) {
