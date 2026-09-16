@@ -1,1 +1,0 @@
-{"id":"00000001-0000-0000-0000-000000000000","name":"agent-default","provider":null,"model":null,"baseUrl":null,"apiKey":null,"defaultTemperature":0.0,"maxOutputTokens":0,"additionalParams":{},"contextWindowTokens":null,"isAlias":true,"delegatesTo":"openai-default","retry":null,"rateLimit":null,"type":"CHAT","capabilities":null,"fallbackModels":[],"version":1}

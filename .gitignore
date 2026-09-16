@@ -89,3 +89,6 @@ semantic-ui/editor/mc-sui-editor/src/main/sui/
 # CI-friendly versions: flatten writes these beside each pom; the branch suffix lives per clone
 .flattened-pom.xml
 /.mvn/maven.config
+
+# preview servers of parallel clones write their data next to the checkout
+data-preview-*/
