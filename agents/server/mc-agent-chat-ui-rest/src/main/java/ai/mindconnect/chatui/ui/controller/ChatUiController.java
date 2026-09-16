@@ -1803,9 +1803,14 @@ public class ChatUiController {
                 // emitter normally; the browser sees a clean stream end.
                 String message = cause.getMessage() != null ? cause.getMessage() : cause.toString();
                 try {
-                    // A thought the failure cut short must not keep running on screen.
+                    // A thought, tool or sub-agent the failure cut short must not keep
+                    // running on screen: no result event comes for it any more.
                     synchronized (liveLock) {
                         for (LiveThinking open : thinkings.values()) closeThinking(open, liveView, bus, false);
+                        failOpenTasks(liveView, liveTasks, bus, taskToSession,
+                                cause instanceof java.util.concurrent.CancellationException
+                                        ? "Cancelled by user before the tool finished"
+                                        : "The turn failed before the tool finished: " + message);
                     }
                     publishPatch(bus, liveView.streamError(message));
                 } catch (Exception ignored) {}
@@ -2000,6 +2005,7 @@ public class ChatUiController {
         String output;
         long durationMs;
         boolean done;
+        final long startedAt = System.currentTimeMillis();
 
         LiveTask(String nodeId, String name, boolean isSubAgent,
                  java.util.Map<String, Object> input, java.util.UUID parentTaskId) {
@@ -2146,6 +2152,39 @@ public class ChatUiController {
                 : TaskCardComponent.doneTool(lt.nodeId, toolName, lt.input, resultOrError, durationMs);
         publishPatch(bus, liveView.streamTaskUpdate(card));
         if (lt.nodeId.equals(openTaskNodeId[0])) openTaskNodeId[0] = null;
+    }
+
+    /**
+     * Flips every card of the turn still showing "running" to failed, innermost
+     * first. Called when the turn itself fails or is cancelled: the tool's own
+     * result event never comes then — the cancel stub is written to the store,
+     * not to the stream — and the card would spin until the page is reloaded.
+     */
+    private void failOpenTasks(ChatPage liveView,
+                               java.util.LinkedHashMap<String, LiveTask> liveTasks,
+                               ai.mindconnect.chatui.service.StreamBus bus,
+                               java.util.Map<java.util.UUID, SessionId> taskToSession,
+                               String reason) {
+        var open = new java.util.ArrayList<>(liveTasks.entrySet());
+        java.util.Collections.reverse(open);
+        for (var e : open) {
+            LiveTask lt = e.getValue();
+            if (lt.done) continue;
+            lt.done = true;
+            long durationMs = System.currentTimeMillis() - lt.startedAt;
+            if (lt.isSubAgent) {
+                java.util.UUID taskId = java.util.UUID.fromString(e.getKey().substring("sub-".length()));
+                SessionId subSession = taskToSession.get(taskId);
+                String tid = subSession != null ? subSession.value() : taskId.toString();
+                publishPatch(bus, liveView.streamSubAgentDone(
+                        TaskCardComponent.failedSubAgentSummary(tid, lt.name),
+                        TaskCardComponent.stackId(tid),
+                        TaskCardComponent.subAgentAnswer(tid, reason)));
+            } else {
+                publishPatch(bus, liveView.streamTaskUpdate(
+                        TaskCardComponent.failedTool(lt.nodeId, lt.name, lt.input, reason, durationMs)));
+            }
+        }
     }
 
     private void startSubAgentCard(ChatPage liveView,
