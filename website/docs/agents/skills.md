@@ -35,7 +35,7 @@ the next turn, no restart:
 
 | Source | Where | Who edits it |
 |--------|-------|--------------|
-| **Managed** | stored by this installation | the **Skills** screen in the admin UI, or `/api/skills` |
+| **Managed** | stored by this installation | the **Skills** screen in the admin UI, `/api/skills`, or an import from a [registry](./registry.md) |
 | **User** | `~/.mindconnect/skills/` (see below) | the user, in their own files |
 | **Project** | `.mindconnect/skills/` in the session's working directory | whoever commits to that repository |
 
@@ -127,6 +127,14 @@ Skills shipped with the app are imported on start from
 shipped version — it is prose someone has since made their own. Deleting a
 shipped skill therefore brings it back on the next start; to be rid of one,
 switch it off.
+
+A skill can also come from a [registry](./registry.md): an entry of type
+`skill` points at a `SKILL.md` in a GitHub repository, and *Import* on the
+registry screen stores it as a managed skill. The public
+[mc-registry](https://github.com/mindconnect-ai/mc-registry) carries a few —
+writing Word and PowerPoint files through `code_execute`, reading the
+Deutsche Bahn and Swiss public-transport APIs through `bash` — as examples of
+the shape.
 
 ## Configuration
 

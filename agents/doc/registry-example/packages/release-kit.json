@@ -1,7 +1,7 @@
 {
   "name": "Release kit",
-  "description": "The changelog writer, the workflow it runs, and the model they share.",
+  "description": "The changelog writer, the workflow it runs, the model they share, and the skill it writes by.",
   "version": "1.0.0",
-  "includes": ["example-llm", "changelog-writer", "greeting"],
+  "includes": ["example-llm", "changelog-writer", "greeting", "changelog-style"],
   "items": []
 }

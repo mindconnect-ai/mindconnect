@@ -9,7 +9,7 @@ last-verified: never
 # A package installs every entity it names, once, in order
 
 **Goal:** Adding a registry, browsing it and importing a package leaves the
-agent, the workflow and the LLM config they share in the local stores — and a
+agent, the workflow, the skill and the LLM config they share in the local stores — and a
 second import changes nothing unless overwrite is asked for.
 
 ## Preconditions
@@ -23,8 +23,8 @@ second import changes nothing unless overwrite is asked for.
 ## Setup
 
 1. Make sure no agent named `changelog-writer`, no LLM config named
-   `example-default` and no workflow `greeting` exists yet — delete them if a
-   previous run left them behind.
+   `example-default`, no workflow `greeting` and no skill `changelog-style`
+   exists yet — delete them if a previous run left them behind.
 
 ## Steps
 
@@ -33,8 +33,8 @@ second import changes nothing unless overwrite is asked for.
    **Expected:** Back on the list, one row, named `<REGISTRY>`, subtitle
    `<REGISTRY>@main`.
 2. Click the row.
-   **Expected:** Four entries — an LLM config, an agent, a workflow and a
-   package — each with its kind and version in the subtitle. Nothing says
+   **Expected:** Five entries — an LLM config, an agent, a workflow, a skill
+   and a package — each with its kind and version in the subtitle. Nothing says
    "already here".
 3. Type `release` into the search field.
    **Expected:** Only **Release kit** remains. Clear it again.
@@ -42,20 +42,21 @@ second import changes nothing unless overwrite is asked for.
    **Expected:** Only `changelog-writer`. Set it back to **Everything**.
 5. Click **Release kit**, then **Import**.
    **Expected:** The entry screen comes back with a report under it:
-   `3 imported`, one line each for the LLM config, the agent and the workflow,
-   in that order — the config before the agent that requires it.
+   `4 imported`, one line each for the LLM config, the agent, the workflow and
+   the skill, in that order — the config before the agent that requires it.
 6. http://localhost:9091/admin/agents and http://localhost:9091/admin/llm-configs
    and http://localhost:9091/workflow-admin.
    **Expected:** `changelog-writer` is in the agent list with the prompt from
    the file, `example-default` is in the LLM configs with its API key showing
    the `${ANTHROPIC_API_KEY}` placeholder rather than a key, and `greeting` is
-   in the workflow list.
+   in the workflow list. http://localhost:9091/admin/skills lists
+   `changelog-style` with the instructions from the file.
 7. Open the agent `changelog-writer` and change its description to `mine`. Save.
    Back to the registry, **Release kit**, **Import** again.
-   **Expected:** `3 skipped` — every line says something of that name is already
+   **Expected:** `4 skipped` — every line says something of that name is already
    here. The agent's description is still `mine`.
 8. Same screen, **Import and overwrite**, confirm.
-   **Expected:** `3 updated`. The agent's description is back to the registry's,
+   **Expected:** `4 updated`. The agent's description is back to the registry's,
    and its id in the URL is **unchanged** from step 7 — an overwrite keeps the
    local id.
 9. Back on the entry list, one entry at a time: the rows now read
@@ -63,8 +64,8 @@ second import changes nothing unless overwrite is asked for.
 
 ## Cleanup
 
-- Delete the agent `changelog-writer`, the LLM config `example-default` and the
-  workflow `greeting`.
+- Delete the agent `changelog-writer`, the LLM config `example-default`, the
+  workflow `greeting` and the skill `changelog-style`.
 - Remove the registry from http://localhost:9091/registry.
 
 ## Notes

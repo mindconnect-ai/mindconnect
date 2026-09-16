@@ -6,12 +6,14 @@ import ai.mindconnect.agent.registry.adapter.github.GitHubRegistryClient;
 import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
 import ai.mindconnect.agent.registry.adapter.installer.AgentDefinitionInstaller;
 import ai.mindconnect.agent.registry.adapter.installer.LlmConfigInstaller;
+import ai.mindconnect.agent.registry.adapter.installer.SkillInstaller;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.port.out.RegistryClient;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.agent.registry.service.RegistryService;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,6 +96,13 @@ public class RegistryAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnBean(SkillRepository.class)
+    @ConditionalOnMissingBean
+    public SkillInstaller skillRegistryInstaller(SkillRepository repository) {
+        return new SkillInstaller(repository);
+    }
+
+    @Bean
     @ConditionalOnMissingBean
     public RegistryClient registryClient(
             @Value("${mindconnect.registry.cache-ttl:PT10M}") Duration cacheTtl,
@@ -116,7 +125,7 @@ public class RegistryAutoConfiguration {
     }
 
     /**
-     * The service over whatever installers the host assembled — the two here,
+     * The service over whatever installers the host assembled — the three here,
      * plus any another module contributed (the workflow installer lives with
      * the workflow tools). A host with no installers at all still gets the
      * service: browsing a registry is useful before anything can be installed,
