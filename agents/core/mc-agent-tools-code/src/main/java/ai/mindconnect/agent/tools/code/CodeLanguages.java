@@ -15,15 +15,31 @@ public final class CodeLanguages {
 
     /**
      * One runnable language. {@code command} must read the program from stdin
-     * (the {@code -} convention both python3 and node support).
+     * (the {@code -} convention both python3 and node support). {@code contents}
+     * says what the image carries beyond the interpreter, for the model — null
+     * when nobody knows, as for an image set in configuration.
      */
-    public record CodeLanguage(String name, String image, List<String> command) {}
+    public record CodeLanguage(String name, String image, List<String> command, String contents) {
+        public CodeLanguage(String name, String image, List<String> command) {
+            this(name, image, command, null);
+        }
+    }
+
+    /** The python image Mindconnect publishes: the office libraries and generators the skills use. */
+    public static final String PYTHON_IMAGE = "ghcr.io/mindconnect-ai/code-exec-python:latest";
+
+    /** What {@link #PYTHON_IMAGE} carries, as the tool tells the model. */
+    static final String PYTHON_IMAGE_CONTENTS = "the standard library plus python-pptx, python-docx, openpyxl, "
+            + "matplotlib (Agg backend: save charts to files) and pandas, and the mc_office package whose "
+            + "pptx_builder, docx_builder and xlsx_builder modules build a deck, a Word document or a workbook "
+            + "from a spec with build(spec, path)";
 
     private CodeLanguages() {}
 
     public static Map<String, CodeLanguage> defaults() {
         Map<String, CodeLanguage> languages = new LinkedHashMap<>();
-        languages.put("python", new CodeLanguage("python", "python:3.12-slim", List.of("python3", "-")));
+        languages.put("python", new CodeLanguage("python", PYTHON_IMAGE, List.of("python3", "-"),
+                PYTHON_IMAGE_CONTENTS));
         languages.put("node", new CodeLanguage("node", "node:22-slim", List.of("node", "-")));
         return languages;
     }
@@ -57,14 +73,16 @@ public final class CodeLanguages {
             String rest = trimmed.substring(eq + 1).trim();
             int pipe = rest.indexOf('|');
             String image = pipe < 0 ? rest : rest.substring(0, pipe).trim();
+            CodeLanguage known = languages.get(name);
             List<String> command;
             if (pipe >= 0) {
                 command = Arrays.stream(rest.substring(pipe + 1).trim().split("\\s+")).toList();
             } else {
-                CodeLanguage known = languages.get(name);
                 command = known != null ? known.command() : List.of(name, "-");
             }
-            languages.put(name, new CodeLanguage(name, image, command));
+            // Another image: what the default carried is no longer known to be there.
+            String contents = known != null && known.image().equals(image) ? known.contents() : null;
+            languages.put(name, new CodeLanguage(name, image, command, contents));
         }
         return languages;
     }

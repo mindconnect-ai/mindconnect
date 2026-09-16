@@ -70,6 +70,35 @@ class AutoCompactEvictionStubTest {
         assertThat(MessageId.of(stub.group(1).trim())).isEqualTo(result.id());
     }
 
+    @Test
+    void aLoadedSkillStaysInTheWindowWhereAnyOtherResultIsEvicted() {
+        Message skillCall = message(ParticipantType.AGENT, MessageType.TOOL_CALL,
+                "{\"toolCalls\":[{\"name\":\"skill\",\"arguments\":{\"name\":\"pptx-builder\"},\"id\":\"s1\"}]}",
+                Map.of("callIds", List.of("s1")));
+        Message skill = message(ParticipantType.AGENT, MessageType.TOOL_RESULT,
+                "{\"toolCallId\":\"s1\",\"toolName\":\"skill\",\"result\":\"SKILL-TEXT " + "y".repeat(2_000) + "\"}",
+                Map.of("callId", "s1", "toolName", "skill")).withTokenCount(500);
+        Message searchCall = message(ParticipantType.AGENT, MessageType.TOOL_CALL,
+                "{\"toolCalls\":[{\"name\":\"web_search\",\"arguments\":{},\"id\":\"w1\"}]}",
+                Map.of("callIds", List.of("w1")));
+        Message search = message(ParticipantType.AGENT, MessageType.TOOL_RESULT,
+                "{\"toolCallId\":\"w1\",\"toolName\":\"web_search\",\"result\":\"" + "x".repeat(2_000) + "\"}",
+                Map.of("callId", "w1", "toolName", "web_search")).withTokenCount(500);
+        List<Message> history = List.of(
+                message(ParticipantType.USER, MessageType.CHAT, "make me a deck", Map.of()),
+                skillCall, skill, searchCall, search,
+                message(ParticipantType.AGENT, MessageType.CHAT, "which slides?", Map.of()),
+                message(ParticipantType.USER, MessageType.CHAT, "three slides, please", Map.of()));
+
+        String rendered = strategy().buildWindow(def(), session(), AuthenticationInfo.of(userId), history).toString();
+
+        assertThat(rendered).contains("SKILL-TEXT");
+        Matcher stub = STUB_ID.matcher(rendered);
+        assertThat(stub.find()).isTrue();
+        assertThat(MessageId.of(stub.group(1).trim())).isEqualTo(search.id());
+        assertThat(stub.find()).as("only the search result is evicted").isFalse();
+    }
+
     private AutoCompactStrategy strategy() {
         TokenCounter counter = text -> text == null ? 0 : text.length() / 4;
         TokenCounters counters = new TokenCounters() {

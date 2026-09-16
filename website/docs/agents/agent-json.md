@@ -72,7 +72,7 @@ Controls how the conversation is kept within the model's context window.
 | `kind` | One of `none`, `windowed` (sliding window), `summarizing_window`, `auto_compact` (summarize when full), `full` (keep everything). |
 | `compactAtRatio` | For `auto_compact`: compact when the window reaches this fraction of the budget (e.g. `0.8`). |
 | `summaryPlacement` | Where the summary goes — `USER_MESSAGE` (auto-compact default) or `SYSTEM_PROMPT` (summarizing-window default). |
-| `toolResultEviction` | Drop bulky tool results: `afterTurns` (age) and `aboveTokens` (size). |
+| `toolResultEviction` | Drop bulky tool results: `afterTurns` (age) and `aboveTokens` (size). A loaded skill stays. |
 
 When `memoryConfig` is omitted the runtime uses the **`summarizing_window`
 default** — not `auto_compact`.

@@ -94,7 +94,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.user.id` | app-specific | The user id that owns sessions and data (the CLI ships a hard-coded default). |
 | `mindconnect.remote.url` | _(unset)_ | Points the CLI at a remote agent server instead of local mode. |
 | `mindconnect.remote.token` | _(unset)_ | Bearer token the CLI sends to a remote agent server that requires authentication; also read from `MC_REMOTE_TOKEN`. |
-| `mindconnect.code-exec.*` | — | Sandbox limits for `code_execute`: `runtime`, `network`, `languages`, `memory`, `cpus`, `timeout-seconds`, `idle-seconds`. |
+| `mindconnect.code-exec.*` | — | Sandbox limits for `code_execute`: `runtime`, `network`, `languages`, `memory`, `cpus`, `timeout-seconds`, `idle-seconds`. `languages` overrides images (`python=python:3.12-slim`); python defaults to `ghcr.io/mindconnect-ai/code-exec-python:latest` with the office libraries. |
 | `mindconnect.vector-store.*` | — | Vector-store backend: `backend`, `url`, `user`, `password`, `embedding-config` (default `embeddings`). The `memory` backend keeps its files in `<data.base-dir>/<namespace>/vector-stores`. |
 | `mindconnect.file-store.*` | — | File-store backend: `backend`. The `filesystem` backend keeps uploads in `<data.base-dir>/<namespace>/files`. |
 | `mindconnect.cors.allowed-origins` | `*` | Origins that may call the REST endpoints from a browser (`/api`, `/chat/api`, `/v1`), comma-separated. `*` lets every origin call without credentials; a list of origins may also send the session cookie. Both server apps. |

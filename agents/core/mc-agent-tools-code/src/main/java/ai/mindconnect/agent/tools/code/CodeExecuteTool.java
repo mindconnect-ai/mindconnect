@@ -66,12 +66,18 @@ public final class CodeExecuteTool implements Tool {
                 + lifecycleNote();
     }
 
-    /** The interpreters and their images — what is installed is what the image ships, nothing more. */
+    /**
+     * The interpreters and their images — what is installed is what the image
+     * ships, so the model is told what that is where it is known, and warned
+     * off packages where it is not.
+     */
     private String languagesNote() {
         String each = String.join("; ", languages.values().stream()
-                .map(l -> l.name() + " (image " + l.image() + ")").toList());
-        return "The program is passed as code and read from stdin: " + each + ". Only what the image ships "
-                + "is installed; the default slim images carry the standard library and nothing else. ";
+                .map(l -> l.name() + " (image " + l.image()
+                        + (l.contents() == null ? "" : ": " + l.contents()) + ")")
+                .toList());
+        return "The program is passed as code and read from stdin: " + each + ". Nothing else is installed; "
+                + "an image described by name only may carry just its standard library. ";
     }
 
     private String networkNote() {

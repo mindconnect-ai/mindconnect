@@ -35,7 +35,8 @@ The **whole conversation** is the unit of compaction — but there is one
 optional, finer knob: `toolResultEviction` (`afterTurns`, `aboveTokens`)
 replaces bulky older tool results with a short stub before compaction kicks in.
 It is off by default; the agent can pull an evicted result back with the
-built-in `fetch_tool_result` tool.
+built-in `fetch_tool_result` tool. A loaded skill is never evicted: it is the
+instructions for the task at hand, and the model would only reload it.
 
 The current strategy and window are visible through the `/memory` endpoint and
 in the admin UI's working-memory view.

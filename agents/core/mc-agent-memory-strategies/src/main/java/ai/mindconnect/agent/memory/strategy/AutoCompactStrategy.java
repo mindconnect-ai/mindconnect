@@ -258,7 +258,8 @@ public class AutoCompactStrategy implements MemoryStrategy {
             if (m.type() == MessageType.TOOL_RESULT
                     && m.sequenceNum() < cutoffSeq
                     && originalTokens(m) >= policy.aboveTokens()
-                    && !isAlreadyEvictionStub(m)) {
+                    && !isAlreadyEvictionStub(m)
+                    && !isSkill(m)) {
                 result.add(asEvictionStub(m));
                 evictedCount++;
             } else {
@@ -270,6 +271,17 @@ public class AutoCompactStrategy implements MemoryStrategy {
                     evictedCount, cutoffSeq);
         }
         return result;
+    }
+
+    /**
+     * A loaded skill is the instructions for the task at hand, not output the
+     * conversation has moved past: evicted after the user's next message, the
+     * model reloads it straight away with {@code fetch_tool_result}, and the
+     * skill costs its size twice.
+     */
+    private static boolean isSkill(Message m) {
+        return m.metadata() != null
+                && ai.mindconnect.agent.runtime.skill.SkillTool.NAME.equals(m.metadata().get("toolName"));
     }
 
     /** Token count of the original tool result (or compressed if already compressed). */
