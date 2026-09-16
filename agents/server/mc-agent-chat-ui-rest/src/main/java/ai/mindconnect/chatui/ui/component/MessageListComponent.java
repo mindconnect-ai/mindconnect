@@ -296,6 +296,17 @@ public final class MessageListComponent implements UiComponent {
         return UiPatch.Operation.append(id(), wrapper);
     }
 
+    /**
+     * REMOVE an answered approval card, in both shapes it can have: the
+     * wrapper the live stream appended, or the bare item of a rendered list.
+     * An id that is not on the page is skipped.
+     */
+    public static UiPatch removeApprovalCard(String callId) {
+        return UiPatch.of()
+                .patch(UiPatch.Operation.remove("approval-wrapper-approval-" + callId))
+                .patch(UiPatch.Operation.remove("approval-" + callId));
+    }
+
     // ── Patch operations ───────────────────────────────────────────────────
 
     /**

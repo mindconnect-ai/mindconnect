@@ -163,6 +163,16 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **OpenAI gpt-5.6 models work with tools again.** From gpt-5.6 on, OpenAI
+  refuses function tools together with reasoning on Chat Completions, and those
+  models reason by default — every turn of an agent with tools ended in a
+  "Streaming error" (HTTP 400). With tools the gateway now sends
+  `reasoning_effort: none` to these models; a configured effort still applies to
+  turns without tools.
+- **agents:** **an approved tool call stays in the chat.** Answering an approval
+  card rebuilt the whole message list, which wiped the card of the tool that had
+  just started running; it only came back when the turn ended. Now only the
+  approval card is removed.
 - **agents:** **a loaded skill is no longer evicted from the context.** With
   `toolResultEviction` on, a skill's text was replaced by a stub after the user's
   next message, and the model reloaded it with `fetch_tool_result` straight away —

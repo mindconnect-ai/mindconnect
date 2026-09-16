@@ -1459,8 +1459,13 @@ public class ChatUiController {
      * tool task, tool name and origin live in the ToolApprovalRepository. No new
      * stream: the turn never ended (it is suspended on the parked tool task)
      * and its original stream carries the continuation; this delivers the
-     * decision and refreshes the list so the card disappears. A STALE card
-     * (no store entry any more) delivers nothing — the refresh alone drops it.
+     * decision and removes the card. A STALE card (no store entry any more)
+     * delivers nothing — the removal alone drops it.
+     *
+     * <p>Only the card goes, never the whole list: the woken tool task streams
+     * its card into the page at once, and a list rebuilt from history — slower
+     * than that, and blind to a tool whose result is not saved yet — would
+     * land on top of it and wipe the running tool from the chat.
      */
     @PostMapping("/sessions/{sessionId}/approval")
     public ResponseEntity<UiPatch> approvalAnswered(@PathVariable("sessionId") String sessionIdValue,
@@ -1471,13 +1476,11 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        var agentOpt = java.util.Optional.of(agentResolver.resolve(sessionOpt.get()));
-        if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
         boolean delivered = chatService.answerApproval(sessionId, callId, approved,
                 ApprovalScope.fromParam(scope));
         log.info("POST /chat/api/sessions/{}/approval call={} approved={} scope={} delivered={}",
                 sessionId.value(), callId, approved, scope, delivered);
-        return ResponseEntity.ok(buildChatPage(sessionOpt.get(), agentOpt.get()).headerOnly());
+        return ResponseEntity.ok(ai.mindconnect.chatui.ui.component.MessageListComponent.removeApprovalCard(callId));
     }
 
     /**

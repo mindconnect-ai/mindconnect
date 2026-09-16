@@ -1,5 +1,8 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Known OpenAI model IDs with their API behaviour flags.
  * <p>
@@ -116,5 +119,23 @@ public enum OpenAiModels {
         String lower = modelId.toLowerCase();
         return lower.startsWith("o1") || lower.startsWith("o3") || lower.startsWith("o4") || lower.startsWith("o5")
                 || lower.startsWith("gpt-5");
+    }
+
+    private static final Pattern GPT_VERSION =
+            Pattern.compile("^gpt-(\\d+)(?:\\.(\\d+))?(?:-.*)?$");
+
+    /**
+     * Returns true for the models OpenAI refuses function tools together with
+     * reasoning on Chat Completions — gpt-5.6 and everything after it, snapshot
+     * and suffixed variants included (e.g. {@code gpt-5.6-luna}). Such a request
+     * only goes through with {@code reasoning_effort=none}.
+     */
+    public static boolean refusesToolsWithReasoningOnChat(String modelId) {
+        if (modelId == null) return false;
+        Matcher m = GPT_VERSION.matcher(modelId.toLowerCase());
+        if (!m.matches()) return false;
+        int major = Integer.parseInt(m.group(1));
+        int minor = m.group(2) == null ? 0 : Integer.parseInt(m.group(2));
+        return major > 5 || (major == 5 && minor >= 6);
     }
 }
