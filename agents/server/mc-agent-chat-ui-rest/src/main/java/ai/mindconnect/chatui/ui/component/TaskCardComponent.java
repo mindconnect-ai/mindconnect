@@ -19,7 +19,7 @@ import java.util.List;
  * <p>A card has three lifecycle states; this component is constructed
  * directly in the state it should render in (no internal mutation):
  * <ul>
- *   <li><b>running</b> — header shows {@code ⏳ name — running…}, body
+ *   <li><b>running</b> — header shows {@code ⧖ name — running…}, body
  *       shows the input arguments, card is open by default so the user
  *       can see what's executing.</li>
  *   <li><b>done</b> — header shows {@code ✓ name (duration ms)}, body
@@ -233,20 +233,23 @@ public final class TaskCardComponent implements UiComponent {
         return new TaskCardComponent(nodeId, header, thinkingBody(nodeId, text), false);
     }
 
-    // Plain words, no marker: a thought is neither a task that can fail nor
-    // one that succeeds, so the ✓/✗ vocabulary of the tool cards does not fit.
+    // The same markers as a tool's: ⧖ while the model thinks, ✓ once the
+    // thought is over — without any marker its words started a glyph further
+    // left than the tool names around it.
 
     private static String runningThinkingHeader() {
-        return "thinking…";
+        return RUNNING_MARKER + "thinking…";
     }
 
-    /** "thought for 12.3 s". */
+    /** "✓ thought for 12.3 s". */
     private static String doneThinkingHeader(long durationMs) {
-        return "thought for " + String.format(java.util.Locale.ROOT, "%.1f", durationMs / 1000.0) + " s";
+        return DONE_MARKER + "thought for "
+                + String.format(java.util.Locale.ROOT, "%.1f", durationMs / 1000.0) + " s";
     }
 
+    /** A persisted thought without a recorded duration — finished all the same. */
     private static String historicThinkingHeader() {
-        return "thinking";
+        return DONE_MARKER + "thought";
     }
 
     // ── Factory helpers for sub-agent cards (tree-bearing) ─────────────────
@@ -279,7 +282,7 @@ public final class TaskCardComponent implements UiComponent {
 
     /**
      * The running sub-agent card. Built once at SubAgentStarted. The
-     * {@code <details>} summary carries the live status marker (⏳ + agent
+     * {@code <details>} summary carries the live status marker (⧖ + agent
      * name) inside an id'd span so it can be flipped to ✓/✗ on completion
      * without touching the nested tree — and stays visible when the card is
      * collapsed. The body opens with a link to the sub-session and (once
@@ -352,7 +355,7 @@ public final class TaskCardComponent implements UiComponent {
      * it differs from the rendered answer), the nested child tree, then the
      * sub-agent's final answer as a chat bubble.
      *
-     * @param running    when true the summary shows the ⏳ marker and the card
+     * @param running    when true the summary shows the ⧖ marker and the card
      *                   starts open; the summary id lets a later done patch flip it.
      * @param inputJson  the {@code run_agent} call's pretty-printed arguments, or null.
      * @param resultText the persisted tool-result text (≈ the answer), or null while running.
@@ -384,14 +387,25 @@ public final class TaskCardComponent implements UiComponent {
 
     // ── Header / body string helpers ───────────────────────────────────────
 
-    /** "⏳ toolName — running…". */
+    /**
+     * What is still running — a tool, a reviewer, a sub-agent, a thought.
+     * ⧖, not the ⏳ emoji it replaced: the emoji drew in colour among muted
+     * headers and 1.6px wider than ✓, where ⧖ takes the text colour and sits
+     * within 1.2px of it in the chat's system font, so a run of cards lines up.
+     */
+    static final String RUNNING_MARKER = "⧖ ";
+
+    /** What finished well. */
+    static final String DONE_MARKER = "✓ ";
+
+    /** "⧖ toolName — running…". */
     public static String runningToolHeader(String toolName) {
-        return "⏳ " + toolName + " — running…";
+        return RUNNING_MARKER + toolName + " — running…";
     }
 
-    /** "⏳ reviewerName — reviewing…". */
+    /** "⧖ reviewerName — reviewing…". */
     public static String runningReviewerHeader(String reviewerName) {
-        return "⏳ " + reviewerName + " — reviewing…";
+        return RUNNING_MARKER + reviewerName + " — reviewing…";
     }
 
     /**
@@ -410,7 +424,7 @@ public final class TaskCardComponent implements UiComponent {
 
     /** "✓ toolName (123 ms)". */
     public static String doneToolHeader(String toolName, long durationMs) {
-        return "✓ " + toolName + "  (" + durationMs + " ms)";
+        return DONE_MARKER + toolName + "  (" + durationMs + " ms)";
     }
 
     /** "✗ toolName (123 ms)". */
@@ -419,7 +433,7 @@ public final class TaskCardComponent implements UiComponent {
     }
 
     public static String runningSubAgentHeader(String agentName) {
-        return "⏳ ↳ " + agentName + " — running…";
+        return RUNNING_MARKER + "↳ " + agentName + " — running…";
     }
 
     public static String doneSubAgentHeader(String agentName, long durationMs) {
