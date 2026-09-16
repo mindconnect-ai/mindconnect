@@ -39,15 +39,7 @@
         <!-- Opt-in capabilities, exactly as a client would pick them: -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-vector-store</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-vector-store-tools</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-file-store</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
