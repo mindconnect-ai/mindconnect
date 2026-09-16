@@ -132,12 +132,12 @@ final class LmStudioSupport {
 
     /**
      * The first open approval question of the session, or null. Open
-     * questions live ONLY in the ToolApprovalStore now (the gate parks the
+     * questions live ONLY in the ToolApprovalRepository now (the gate parks the
      * tool task there) — nothing about them is a conversation message.
      */
     static ToolApproval openApproval(
             AgentRuntime runtime, SessionId rootSessionId) {
-        var open = runtime.approvalStore().openForRoot(rootSessionId);
+        var open = runtime.toolApprovals().openForRoot(rootSessionId);
         return open.isEmpty() ? null : open.get(0);
     }
 

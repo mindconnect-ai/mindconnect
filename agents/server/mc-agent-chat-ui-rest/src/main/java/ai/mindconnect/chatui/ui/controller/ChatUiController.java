@@ -25,7 +25,7 @@ import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import ai.mindconnect.ui.model.UiAction;
 
@@ -67,7 +67,7 @@ public class ChatUiController {
     private final ai.mindconnect.chatui.service.SessionStreams sessionStreams;
 
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
-    private final ToolApprovalStore approvalStore;
+    private final ToolApprovalRepository approvalStore;
     /** What the embedding app adds to the chat — none in a standalone chat app. */
     private final ai.mindconnect.chatui.ui.ChatHostLinks hostLinks;
     private final ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository;
@@ -86,7 +86,7 @@ public class ChatUiController {
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                              ai.mindconnect.chatui.service.SessionStreams sessionStreams,
                              ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
-                             ToolApprovalStore approvalStore,
+                             ToolApprovalRepository approvalStore,
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.chatui.ui.ChatHostLinks> hostLinks,
                              ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
                              ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
@@ -1245,7 +1245,7 @@ public class ChatUiController {
 
     /**
      * The cards for this session's OPEN sub-agent approval questions — read
-     * from the ToolApprovalStore, the single truth for bubbled requests
+     * from the ToolApprovalRepository, the single truth for bubbled requests
      * (entry exists = card shows; answered/cancelled/deleted = entry gone).
      */
     private List<ai.mindconnect.ui.model.UiList.Item> bubbledApprovalCards(SessionId sessionId) {
@@ -1456,7 +1456,7 @@ public class ChatUiController {
 
     /**
      * The answer to ANY approval card. The callId is the whole identity —
-     * tool task, tool name and origin live in the ToolApprovalStore. No new
+     * tool task, tool name and origin live in the ToolApprovalRepository. No new
      * stream: the turn never ended (it is suspended on the parked tool task)
      * and its original stream carries the continuation; this delivers the
      * decision and refreshes the list so the card disappears. A STALE card

@@ -22,7 +22,7 @@ import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.Participant;
 import ai.mindconnect.message.port.in.ConversationManager;
 
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 import org.slf4j.Logger;
@@ -52,7 +52,7 @@ public class AgentSessionService {
     private final WorkingMemoryRepository workingMemoryRepository;
     private final ConversationSummaryRepository summaryRepository;
     private final TodoListRepository todoListRepository;
-    private final ToolApprovalStore approvalStore;
+    private final ToolApprovalRepository approvalStore;
     private final UserChannels userChannels;
     private final WorkingDirPolicy workingDirPolicy;
     /** Where a session's own directory lives — none when the runtime has no users' home. */
@@ -67,7 +67,7 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 TodoListRepository todoListRepository,
-                                ToolApprovalStore approvalStore,
+                                ToolApprovalRepository approvalStore,
                                 UserChannels userChannels) {
         this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
                 summaryRepository, todoListRepository, approvalStore, userChannels,
@@ -80,7 +80,7 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 TodoListRepository todoListRepository,
-                                ToolApprovalStore approvalStore,
+                                ToolApprovalRepository approvalStore,
                                 UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy) {
         this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
@@ -95,7 +95,7 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 TodoListRepository todoListRepository,
-                                ToolApprovalStore approvalStore,
+                                ToolApprovalRepository approvalStore,
                                 UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy,
                                 UserHome userHome) {
@@ -114,7 +114,7 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 TodoListRepository todoListRepository,
-                                ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore approvalStore,
+                                ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository approvalStore,
                                 ai.mindconnect.agent.runtime.service.stream.UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy,
                                 UserHome userHome,

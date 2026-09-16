@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
@@ -8,7 +9,7 @@ import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryTodoListReposito
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.auth.VectorStoreAccess;
@@ -66,7 +67,7 @@ class VectorStoreApiControllerOwnershipTest {
         sessionService = new AgentSessionService(definitions, sessions,
                 new InMemoryMessageStore().conversationManager(), new InMemoryWorkingMemoryRepository(),
                 new InMemoryConversationSummaryRepository(), new InMemoryTodoListRepository(),
-                new ToolApprovalStore(), new UserChannels());
+                new InMemoryToolApprovalRepository(), new UserChannels());
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         String alicesSession = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
         alicesStore = VectorStoreAccess.CHAT_STORE_PREFIX + alicesSession;

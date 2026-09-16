@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  * entirely when LM Studio is down.
  *
  * <p>Gate model: the turn never ends while a human is asked — the tool task
- * parks, the open question is a {@code ToolApprovalStore} entry, the answer
+ * parks, the open question is a {@code ToolApprovalRepository} entry, the answer
  * travels as a task notification, and the turn continues on its ORIGINAL
  * stream. No APPROVAL messages, no resumes, no runs.
  */

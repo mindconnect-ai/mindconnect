@@ -18,7 +18,7 @@ import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
@@ -51,7 +51,7 @@ public class SessionUiController {
 
     private final ai.mindconnect.agentrest.service.SessionFileService sessionFiles;
     private final ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory;
-    private final ToolApprovalStore approvalStore;
+    private final ToolApprovalRepository approvalStore;
     /**
      * The session tools (memory, traces, todos) have to resolve the
      * agent the same way the run does. A chat with an inline session agent has
@@ -70,7 +70,7 @@ public class SessionUiController {
                              ai.mindconnect.chatui.service.ActiveStreams activeStreams,
                              ai.mindconnect.agentrest.service.SessionFileService sessionFiles,
                              ai.mindconnect.adminui.ui.AdminLayoutFactory layoutFactory,
-                             ToolApprovalStore approvalStore) {
+                             ToolApprovalRepository approvalStore) {
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
         this.chatService = chatService;

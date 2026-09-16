@@ -6,7 +6,7 @@ import java.time.Instant;
 /**
  * One OPEN approval question bubbled up from a sub-agent — everything the
  * root UI needs to show the card and everything the answer needs to route
- * back down. Lives in the {@link ToolApprovalStore} from the moment the
+ * back down. Lives in the {@link ToolApprovalRepository} from the moment the
  * sub-turn suspends until the human answers (or the chat is cancelled,
  * restarted with a new turn, or its session deleted).
  *

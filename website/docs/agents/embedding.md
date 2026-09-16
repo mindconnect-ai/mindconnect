@@ -116,6 +116,11 @@ The non-blocking form is on the chat service: `chatService().sendChat(…)`
 returns a handle whose `outcome()` completes at the question, and
 `approve`/`deny` return the handle of the continuation.
 
+The open questions live in a `ToolApprovalRepository` — in memory unless a
+feature of yours registers one (`ctx.instance(ToolApprovalRepository.class, …)`).
+A question in memory does not survive a restart, while a task queue on Postgres
+keeps the parked call: such a runtime needs a repository that persists as well.
+
 ## Reaching the beans
 
 Everything a feature registers is reachable after `build()`, decorated the way

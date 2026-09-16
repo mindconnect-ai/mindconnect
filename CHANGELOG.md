@@ -128,6 +128,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
 - **agents:** `ToolApproval` moved from `ai.mindconnect.agent.runtime.service.approval`
   to `ai.mindconnect.agent.runtime.domain`, next to the new `TurnResult`. Code that
   reads open approvals needs the new import; the JSON is unchanged.
+- **agents:** **open approval questions are stored behind a port.** `ToolApprovalStore`
+  is now the interface `ToolApprovalRepository` (`ai.mindconnect.agent.runtime.port.out`)
+  with `InMemoryToolApprovalRepository` in `mc-agent-runtime` as the default; a runtime
+  feature that registers its own `ToolApprovalRepository` replaces it. The runtime
+  accessor `AgentRuntime.approvalStore()` is now `toolApprovals()`. Storage is still
+  in memory only, so an open question does not survive a restart.
 
 ## [0.8.2] - 2026-09-16
 

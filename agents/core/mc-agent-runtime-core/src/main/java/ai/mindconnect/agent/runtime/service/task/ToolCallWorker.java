@@ -18,7 +18,7 @@ import ai.mindconnect.agent.runtime.service.round.TurnMessage;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
@@ -87,7 +87,7 @@ public final class ToolCallWorker implements TaskWorker {
     private final ToolExecutor toolExecutor;
     private final SessionChannels sessionChannels;
     private final UserChannels userChannels;
-    private final ToolApprovalStore approvalStore;
+    private final ToolApprovalRepository approvalStore;
     private final SubAgentCalls subAgents;
     private final SubAgentSupport subAgentSupport;
 
@@ -99,7 +99,7 @@ public final class ToolCallWorker implements TaskWorker {
                           DynamicToolActivations dynamicToolActivations,
                           ToolExecutor toolExecutor,
                           SessionChannels sessionChannels,
-                          ToolApprovalStore approvalStore,
+                          ToolApprovalRepository approvalStore,
                           UserChannels userChannels) {
         this(conversationManager, definitionRepository, sessionService, memoryStrategyFactory, toolRegistry,
                 dynamicToolActivations, toolExecutor, sessionChannels, approvalStore, userChannels,
@@ -115,7 +115,7 @@ public final class ToolCallWorker implements TaskWorker {
                           DynamicToolActivations dynamicToolActivations,
                           ToolExecutor toolExecutor,
                           SessionChannels sessionChannels,
-                          ToolApprovalStore approvalStore,
+                          ToolApprovalRepository approvalStore,
                           UserChannels userChannels,
                           SubAgentSupport subAgentSupport) {
         this.subAgentSupport = subAgentSupport == null ? SubAgentSupport.disabled() : subAgentSupport;

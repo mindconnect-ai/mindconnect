@@ -83,7 +83,7 @@ public final class MessageListComponent implements UiComponent {
     private String sessionTitle;
     /** Whether this chat replaced its agent's system prompt with its own. */
     private boolean customPrompt;
-    /** Bubbled sub-agent approval cards (from the ToolApprovalStore), rendered after the history. */
+    /** Bubbled sub-agent approval cards (from the ToolApprovalRepository), rendered after the history. */
     private List<UiList.Item> bubbledApprovalCards = List.of();
     /** The host's overflow menu (parent session, back to agent, memory/trace
      *  dialogs), shown as a "…" button in the header. Built by ChatPage from
@@ -143,7 +143,7 @@ public final class MessageListComponent implements UiComponent {
 
     /**
      * Cards for the OPEN sub-agent approval questions of this (root) session
-     * — the controller builds them from the {@code ToolApprovalStore}, the
+     * — the controller builds them from the {@code ToolApprovalRepository}, the
      * single truth for bubbled requests (nothing about them lives in this
      * conversation's history). Returns {@code this} for fluent chaining.
      */
@@ -265,7 +265,7 @@ public final class MessageListComponent implements UiComponent {
         for (TaskCardComponent t : toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, Integer.MAX_VALUE)) {
             list.item(((UiList) t.render()).getItems().get(0));
         }
-        // Open approval questions live ONLY in the ToolApprovalStore now
+        // Open approval questions live ONLY in the ToolApprovalRepository now
         // (the gate parks the tool task and registers the card there) — the
         // controller hands them in, rendered after the history.
         bubbledApprovalCards.forEach(list::item);

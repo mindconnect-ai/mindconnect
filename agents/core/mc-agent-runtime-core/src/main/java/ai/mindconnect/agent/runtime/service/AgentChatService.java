@@ -22,7 +22,7 @@ import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalNotifications;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.domain.ToolApproval;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.round.ToolCalls;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
@@ -88,7 +88,7 @@ public class AgentChatService {
     private final SessionChannels sessionChannels;
     private final UserChannels userChannels;
     private final TaskQueue queue;
-    private final ToolApprovalStore approvalStore;
+    private final ToolApprovalRepository approvalStore;
     /** Where this runtime works: a turn's handle is completed in the turn's own scope. */
     private final ScopeSupplier scope;
     /** Turns a caller holds a handle for, by task id — completed from the queue's listener, no thread waits. */
@@ -120,7 +120,7 @@ public class AgentChatService {
                             SessionChannels sessionChannels,
                             UserChannels userChannels,
                             TaskQueue queue,
-                            ToolApprovalStore approvalStore,
+                            ToolApprovalRepository approvalStore,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions) {
         this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
                 workingMemoryRepository, promptRenderer, sessionChannels, userChannels,
@@ -137,7 +137,7 @@ public class AgentChatService {
                             SessionChannels sessionChannels,
                             UserChannels userChannels,
                             TaskQueue queue,
-                            ToolApprovalStore approvalStore,
+                            ToolApprovalRepository approvalStore,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
                             ai.mindconnect.agent.runtime.skill.SkillCatalog skills,
                             ScopeSupplier scope) {
@@ -441,7 +441,7 @@ public class AgentChatService {
      * The human's answer to an approval card — Deny, Allow once, or Allow for
      * this session. The card's identity is its chat and the {@code callId} —
      * the provider's id alone is unique only within one response; everything
-     * else comes from the {@link ToolApprovalStore} entry, the ONE truth for
+     * else comes from the {@link ToolApprovalRepository} entry, the ONE truth for
      * the open question. The decision travels as a task NOTIFICATION to the
      * parked tool task, which re-runs its gate on wake: an explicit
      * grant/denial wins (that is what makes "once" possible), a session-wide
