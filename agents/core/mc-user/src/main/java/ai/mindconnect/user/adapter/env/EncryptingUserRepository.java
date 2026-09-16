@@ -6,6 +6,7 @@ import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.port.out.UserRepository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -38,9 +39,16 @@ public class EncryptingUserRepository implements UserRepository {
         return delegate.findAll().stream().map(this::decrypted).toList();
     }
 
+    /**
+     * Encrypts the variables on the way in, and keeps any stored value that no longer
+     * decrypts: it was left out when the record was read, so without this the save
+     * after an unrelated change — a login stamp — would delete it for good.
+     */
     @Override
     public void save(User user) {
-        delegate.save(user.environment().isEmpty() ? user : user.withEnvironment(encryption.encryptValues(user.environment())));
+        Map<String, String> stored = delegate.findById(user.id()).map(User::environment).orElse(Map.of());
+        Map<String, String> environment = encryption.encryptValuesKeepingUnreadable(user.environment(), stored);
+        delegate.save(environment.isEmpty() ? user : user.withEnvironment(environment));
     }
 
     private User decrypted(User user) {

@@ -308,7 +308,7 @@ public class SessionFileService {
                 var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                         new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                                 + "' not found"));
-                var runner = new WorkflowRunService(workflowInstances, environment::asMap);
+                var runner = new WorkflowRunService(workflowInstances, environment.shared()::asMap);
                 ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
                 // The workflow's tool steps run on behalf of this chat's user and
                 // session — the calls its upload store accepts — and resolve their

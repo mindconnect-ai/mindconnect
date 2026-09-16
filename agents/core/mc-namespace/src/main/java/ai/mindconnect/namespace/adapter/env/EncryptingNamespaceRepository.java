@@ -7,6 +7,7 @@ import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -57,9 +58,16 @@ public class EncryptingNamespaceRepository implements NamespaceRepository {
         return delegate.deleteById(id);
     }
 
+    /**
+     * The variables encrypted for storage, plus any stored value that no longer decrypts:
+     * it was left out when the record was read, so a save after renaming or inviting
+     * would otherwise delete it for good.
+     */
     private NamespaceDefinition encrypted(NamespaceDefinition namespace) {
-        if (namespace.environment().isEmpty()) return namespace;
-        return namespace.withEnvironment(encryption.encryptValues(namespace.environment()));
+        Map<String, String> stored = delegate.findById(namespace.id())
+                .map(NamespaceDefinition::environment).orElse(Map.of());
+        Map<String, String> environment = encryption.encryptValuesKeepingUnreadable(namespace.environment(), stored);
+        return environment.isEmpty() ? namespace : namespace.withEnvironment(environment);
     }
 
     private NamespaceDefinition decrypted(NamespaceDefinition namespace) {
