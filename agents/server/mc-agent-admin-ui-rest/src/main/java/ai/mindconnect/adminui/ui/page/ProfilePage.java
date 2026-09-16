@@ -10,6 +10,7 @@ import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+import ai.mindconnect.ui.model.UiSection;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTable;
 import ai.mindconnect.ui.model.UiText;
@@ -49,6 +50,8 @@ public class ProfilePage extends AdminPage {
     /** The variables table — replaced in place after a variable is added or removed. */
     public static final String ENVIRONMENT_ID = "profile-environment";
     static final String ENVIRONMENT_FORM_ID = "profile-environment-form";
+    /** The namespace variables tab's content — replaced when a namespace the user created comes or goes. */
+    public static final String NAMESPACE_ENVIRONMENT_ID = "profile-namespace-variables";
 
     /** What a user of an installation without authentication has to know before trusting a token to protect anything. */
     public static final String AUTH_OFF_NOTE = "Authentication is off on this installation: the API answers every "
@@ -103,16 +106,53 @@ public class ProfilePage extends AdminPage {
                 "A program calls the REST API (/api/…, /v1/…) as you with one of your tokens, sent as the "
                 + "header \"Authorization: Bearer <token>\". A token's secret is shown once, when it is "
                 + "created. Revoke a token you no longer need — programs using it stop working at once.");
-        UiStack page = UiStack.of("profile").gap(20);
+        UiStack account = UiStack.of("profile-account").gap(20);
         if (!authEnabled) {
-            page.child(authOffNote("profile-auth-off"));
+            account.child(authOffNote("profile-auth-off"));
         }
-        page.child(details)
-                .child(namespaces(userId, namespaces, defaultNamespace, active))
-                .child(environment(user == null ? Map.of() : user.environment()))
-                .child(tokenTable(tokens))
-                .child(help);
+        account.child(details);
+        // One tab per concern: the page had grown into a scroll through five
+        // unrelated blocks. The tab ids differ from the ids of the tables inside
+        // them, because a tab id becomes its panel's DOM id and the tables are
+        // replaced in place by id.
+        UiSection page = UiSection.of("profile", null)
+                .section("profile-tab-account", "Account", account)
+                .section("profile-tab-namespaces", "Namespaces", namespaces(userId, namespaces, defaultNamespace, active))
+                .section("profile-tab-variables", "Your variables", environment(user == null ? Map.of() : user.environment()))
+                .section("profile-tab-namespace-variables", "Namespace variables",
+                        namespaceVariables(userId, namespaces, defaultNamespace))
+                .section("profile-tab-tokens", "API tokens", UiStack.of("profile-tokens").gap(12)
+                        .child(tokenTable(tokens))
+                        .child(help));
         return UiPage.of("/admin/profile", page);
+    }
+
+    /**
+     * The variables of every namespace the user created, one table each — the ones they
+     * set for everyone working there. Only a namespace's creator sets them, so a
+     * namespace they merely joined is not listed, and the open default namespace has
+     * none of its own. The tables are the namespaces screen's, so adding or removing a
+     * variable here goes through the same endpoints and lands on the same ids.
+     */
+    public static UiNode namespaceVariables(UserId me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace) {
+        UiStack stack = UiStack.of(NAMESPACE_ENVIRONMENT_ID).gap(16);
+        stack.child(UiText.of(NAMESPACE_ENVIRONMENT_ID + "-note",
+                "A ${VAR} in an LLM config takes your own variable first, then the variable of the "
+                        + "namespace you work in, then the server's environment. The variables of a namespace "
+                        + "are shared with everyone in it; only the one who created the namespace sets them."));
+        List<NamespaceDefinition> created = namespaces.stream()
+                .filter(ns -> !ns.id().equals(defaultNamespace) && ns.isCreator(me))
+                .toList();
+        if (created.isEmpty()) {
+            stack.child(UiText.of(NAMESPACE_ENVIRONMENT_ID + "-none",
+                    "You have not created a namespace, so there are no namespace variables for you to set. "
+                            + "Create one from the namespace switcher in the header."));
+            return stack;
+        }
+        for (NamespaceDefinition ns : created) {
+            stack.child(NamespacesPage.environment(ns));
+        }
+        return stack;
     }
 
     /** The user's tokens, newest first as given, with a revoke action per row. */

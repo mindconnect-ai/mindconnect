@@ -215,6 +215,54 @@ class ProfileUiControllerTest {
         assertThat(users.activeNamespace(UserId.of("bob"))).contains(Namespace.DEFAULT);
     }
 
+    /** The page had grown into one long scroll; each concern is a tab now, and a tab id never clashes with a table replaced in place. */
+    @Test
+    void theProfileIsSplitIntoTabs() throws Exception {
+        String page = json(controller.profile(user("alice")));
+
+        assertThat(page).contains("\"profile-tab-account\"", "\"profile-tab-namespaces\"", "\"profile-tab-variables\"",
+                "\"profile-tab-namespace-variables\"", "\"profile-tab-tokens\"");
+        assertThat(page).contains("\"" + ProfilePage.NAMESPACES_ID + "\"", "\"" + ProfilePage.ENVIRONMENT_ID + "\"",
+                "\"" + ProfilePage.TOKENS_ID + "\"", "\"" + ProfilePage.NAMESPACE_ENVIRONMENT_ID + "\"");
+    }
+
+    /**
+     * A namespace's variables are its creator's to set, so the tab lists the namespaces the user
+     * created — with the namespaces screen's own table and endpoints — and neither one they only
+     * joined nor the open default namespace. No value ever reaches the page.
+     */
+    @Test
+    void theNamespaceVariablesTabShowsTheNamespacesTheUserCreated() throws Exception {
+        namespaces.create("acme", "ACME Corp", UserId.of("alice"));
+        namespaces.putVariable(new Namespace("acme"), UserId.of("alice"), "OPENAI_API_KEY", "sk-acme");
+        namespaces.create("beta", "Beta Team", UserId.of("bob"));
+        namespaces.invite(new Namespace("beta"), UserId.of("bob"), UserId.of("alice"));
+
+        String page = json(controller.profile(user("alice")));
+
+        assertThat(page).contains("\"" + NamespacesPage.environmentId(new Namespace("acme")) + "\"")
+                .contains("Variables of ACME Corp")
+                .contains("OPENAI_API_KEY")
+                .contains(NamespacesPage.API + "/acme/environment")
+                .doesNotContain("Variables of Beta Team")
+                .doesNotContain(NamespacesPage.environmentId(Namespace.DEFAULT))
+                .doesNotContain("sk-acme");
+
+        assertThat(json(controller.profile(user("carol")))).contains("You have not created a namespace");
+    }
+
+    /** Deleting a namespace takes its variables off the tab too, not only its row off the table. */
+    @Test
+    void deletingANamespaceRedrawsTheVariablesTab() throws Exception {
+        namespaces.create("acme", "ACME Corp", UserId.of("alice"));
+
+        String answer = json(controller.delete(user("alice"), "acme"));
+
+        assertThat(answer).contains("\"" + ProfilePage.NAMESPACE_ENVIRONMENT_ID + "\"")
+                .doesNotContain("Variables of ACME Corp")
+                .contains("You have not created a namespace");
+    }
+
     @Test
     void aUserAddsAndRemovesTheirOwnVariables_andNeverSeesAValueAgain() throws Exception {
         assertThat(json(controller.newVariable())).contains("Add variable");
