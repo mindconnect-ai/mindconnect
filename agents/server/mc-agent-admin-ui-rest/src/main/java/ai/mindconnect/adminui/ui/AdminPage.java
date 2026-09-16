@@ -25,6 +25,9 @@ import ai.mindconnect.ui.model.UiPatch;
  */
 public abstract class AdminPage {
 
+    /** How a stored secret is shown: never — the masked form stands for "a value is set". */
+    public static final String MASKED_VALUE = "••••••••";
+
     /** Render the full page (initial GET, after navigation). */
     public abstract UiPage render();
 

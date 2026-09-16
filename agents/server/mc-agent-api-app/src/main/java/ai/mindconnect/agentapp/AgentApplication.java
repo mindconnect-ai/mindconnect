@@ -1,17 +1,6 @@
 package ai.mindconnect.agentapp;
 
-import ai.mindconnect.agent.runtime.adapter.config.DefaultAgentRuntimeConfig;
-import ai.mindconnect.agent.runtime.adapter.config.TodoToolsConfig;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
-import ai.mindconnect.llm.adapter.gemini.GeminiGateway;
-import ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway;
-import ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway;
-import ai.mindconnect.llm.domain.LlmProvider;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.llm.service.DefaultLlmGatewayRegistry;
-import ai.mindconnect.llm.service.RoutingLlmChatService;
-import ai.mindconnect.message.adapter.file.MessageRepositoryConfig;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -22,20 +11,19 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
-import org.springframework.context.annotation.Import;
 
-import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * The agent server. The agent runtime — repositories, LLM layer, tools, turn
+ * loop — comes from {@code mc-agent-starter-runtime}, built from the same
+ * features the embedded builder installs and configured from the
+ * {@code mindconnect.*} properties; what is left here is the server's own.
+ */
 @SpringBootApplication
 @ComponentScan(basePackages = {
     "ai.mindconnect.agentapp",
     "ai.mindconnect.agentrest"
-})
-@Import({
-    MessageRepositoryConfig.class,
-    DefaultAgentRuntimeConfig.class,
-    TodoToolsConfig.class
 })
 public class AgentApplication {
 
@@ -43,6 +31,7 @@ public class AgentApplication {
         SpringApplication.run(AgentApplication.class, args);
     }
 
+    /** The server's own HTTP client, for the SSE streams it consumes — no read timeout. */
     @Bean
     OkHttpClient okHttpClient() {
         return new OkHttpClient.Builder()
@@ -61,13 +50,7 @@ public class AgentApplication {
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
 
-    /**
-     * The secret key encrypts stored LLM credentials. It is required and has
-     * no default on purpose: a hard-coded fallback would mean credentials are
-     * "encrypted" with a publicly known key. Provide a strong, private value
-     * via {@code mindconnect.encryption.secret-key} (env var
-     * {@code MINDCONNECT_ENCRYPTION_SECRET_KEY}).
-     */
+    /** The key the runtime encrypts stored LLM credentials with — required on a server. */
     @Bean
     EncryptionHelper encryptionHelper(
             @Value("${mindconnect.encryption.secret-key:}") String secretKey) {
@@ -79,71 +62,5 @@ public class AgentApplication {
                 + "private 32-character value).");
         }
         return new EncryptionHelper(secretKey);
-    }
-
-    @Bean
-    OpenAiCompatibleGateway openAiCompatibleGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper,
-                                                     EncryptionHelper encryptionHelper) {
-        return new OpenAiCompatibleGateway(okHttpClient, objectMapper, encryptionHelper);
-    }
-
-    /** Embeddings over the OpenAI-compatible endpoint (LM Studio, Ollama, OpenAI). */
-    @Bean
-    ai.mindconnect.llm.port.in.LlmEmbeddings llmEmbeddings(OkHttpClient okHttpClient, ObjectMapper objectMapper,
-                                                           EncryptionHelper encryptionHelper) {
-        return new ai.mindconnect.llm.adapter.openai.OpenAiEmbeddingsGateway(okHttpClient, objectMapper, encryptionHelper);
-    }
-
-    /** Speech-to-text over the OpenAI-compatible transcription endpoint (Whisper, Groq, local servers). */
-    @Bean
-    ai.mindconnect.llm.port.out.TranscriptionGateway transcriptionGateway(
-            OkHttpClient okHttpClient, ObjectMapper objectMapper, EncryptionHelper encryptionHelper) {
-        return new ai.mindconnect.llm.adapter.openai.OpenAiTranscriptionGateway(okHttpClient, objectMapper, encryptionHelper);
-    }
-
-    /** Transcription by config name, aliases followed — the audio counterpart of the chat routing. */
-    @Bean
-    ai.mindconnect.llm.port.in.LlmTranscription llmTranscription(
-            ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
-            ai.mindconnect.llm.port.out.TranscriptionGateway transcriptionGateway) {
-        return new ai.mindconnect.llm.service.RoutingLlmTranscriptionService(llmConfigRepository, transcriptionGateway);
-    }
-
-    @Bean
-    ClaudeGateway claudeGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper,
-                                 EncryptionHelper encryptionHelper) {
-        return new ClaudeGateway(okHttpClient, objectMapper, encryptionHelper);
-    }
-
-    @Bean
-    AzureOpenAiGateway azureOpenAiGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper,
-                                           EncryptionHelper encryptionHelper) {
-        return new AzureOpenAiGateway(okHttpClient, objectMapper, encryptionHelper);
-    }
-
-    @Bean
-    GeminiGateway geminiGateway(OkHttpClient okHttpClient, ObjectMapper objectMapper,
-                                 EncryptionHelper encryptionHelper) {
-        return new GeminiGateway(okHttpClient, objectMapper, encryptionHelper);
-    }
-
-    @Bean
-    RoutingLlmChatService llmService(LlmConfigRepository llmConfigRepository,
-                                     OpenAiCompatibleGateway openAiCompatibleGateway,
-                                     ClaudeGateway claudeGateway,
-                                     AzureOpenAiGateway azureOpenAiGateway,
-                                     GeminiGateway geminiGateway) {
-        var gateways = new HashMap<LlmProvider, ai.mindconnect.llm.port.out.LlmGateway>();
-        // Every provider speaks the OpenAI API unless it has an adapter of
-        // its own — so default them all to it and override the three that
-        // differ. A provider added to the enum is then routed by itself.
-        for (LlmProvider provider : LlmProvider.values()) {
-            gateways.put(provider, openAiCompatibleGateway);
-        }
-        gateways.put(LlmProvider.ANTHROPIC,    claudeGateway);
-        gateways.put(LlmProvider.AZURE_OPENAI, azureOpenAiGateway);
-        gateways.put(LlmProvider.GOOGLE_GEMINI, geminiGateway);
-        var registry = new DefaultLlmGatewayRegistry(gateways);
-        return new RoutingLlmChatService(llmConfigRepository, registry);
     }
 }

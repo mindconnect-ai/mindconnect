@@ -75,7 +75,7 @@ class SessionFileServiceWorkingDirTest {
                 "memory", Map.of(), "embeddings", null, Map.of()));
         service = new SessionFileService(files, provider(stores), provider(null), sessions,
                 provider(null), provider(null), temp.resolve("tools").toString(), provider(home),
-                ai.mindconnect.agent.ScopeSupplier.local());
+                ai.mindconnect.agent.ScopeSupplier.local(), provider(null));
     }
 
     @Test

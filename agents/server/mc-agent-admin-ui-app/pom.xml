@@ -100,6 +100,10 @@
         <!-- persistence: one starter per backend, mindconnect.persistence picks -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-starter-file</artifactId>
         </dependency>
         <dependency>

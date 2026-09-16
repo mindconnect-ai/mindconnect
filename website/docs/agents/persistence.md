@@ -14,6 +14,17 @@ the tools or the agent definitions knows the difference.
 
 ## Ports and adapters
 
+The runtime starter (`mc-agent-starter-runtime`) builds every store of the runtime from the
+`Persistence` a persistence starter declares — the starters themselves keep only what is
+installation-wide: the users and their API tokens.
+
+Each domain module also ships a **repository factory** for its ports —
+`AgentRepositoryFactory` (agent runtime), `MessageRepositoryFactory` (messages),
+`LlmRepositoryFactory` (LLM configs) — with one implementation per backend:
+`FileAgentRepositoryFactory`, `InMemoryAgentRepositoryFactory`,
+`PgAgentRepositoryFactory`, and so on. Whoever assembles a runtime picks the
+factory once for the backend it wants; the repositories come from it.
+
 The runtime follows a hexagonal (ports-and-adapters) design. Each persisted
 concept is an interface in `port/out`, and the file-based default is the
 matching adapter in `adapter/file`:
@@ -62,8 +73,10 @@ namespace and forwards each call to the one the current `Scope` names. The
 scope is bound per request (from the `/ns/{namespace}/` prefix, the
 `X-Mindconnect-Namespace` header, or the namespace the user chose in the Admin
 UI) and per queued task; nothing above the repositories names a namespace.
-Threads that bind nothing — start-up seeding, say — work in
-`mindconnect.namespace` (default `local`), which is also the namespace every
+Start-up work — the runtime build, the tool warm-up, the seed loaders — binds
+`mindconnect.namespace` (default `local`) explicitly; a thread that binds
+nothing and touches a store fails instead of working there quietly. That is
+also the namespace every
 signed-in user may work in without an invitation.
 
 This makes the runtime zero-dependency: it boots and persists with nothing but a
@@ -76,7 +89,8 @@ Spring-free `AgentRuntimeBuilder` and in tests. Two of them are bounded so that 
 long-lived embedded runtime does not grow with every turn: the trace store keeps
 at most 50 LLM call traces per conversation (the file store's cap), and the
 builder tells its task queue to forget finished task trees at the next
-maintenance tick — `taskRetention(Duration)` keeps them longer, `null` for the
+maintenance tick — `taskRetention(Duration)` keeps them longer (it reaches the
+task-queue feature too, when that is installed), `null` for the
 life of the process. Deleting a session takes its conversation, messages and
 traces with it, in every persistence mode.
 

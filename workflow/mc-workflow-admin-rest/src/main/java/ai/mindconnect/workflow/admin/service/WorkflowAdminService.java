@@ -29,9 +29,15 @@ public class WorkflowAdminService {
     private final WorkflowRunService runService;
 
     public WorkflowAdminService(WorkflowDataRepository store, WorkflowInstanceRepository instances) {
+        this(store, instances, null);
+    }
+
+    /** @param environment what a run's {@code env} variable holds; the process environment when null */
+    public WorkflowAdminService(WorkflowDataRepository store, WorkflowInstanceRepository instances,
+                                java.util.function.Supplier<java.util.Map<String, String>> environment) {
         this.store = store;
         this.instances = instances;
-        this.runService = new WorkflowRunService(instances);
+        this.runService = new WorkflowRunService(instances, environment);
     }
 
     // ── Definitions ────────────────────────────────────────────────────────

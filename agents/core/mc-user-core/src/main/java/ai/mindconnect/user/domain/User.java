@@ -3,6 +3,7 @@ package ai.mindconnect.user.domain;
 import ai.mindconnect.agent.UserId;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -24,6 +25,9 @@ import java.util.Objects;
  *                        {@code UserService} records it with
  * @param activeNamespace the namespace the user last chose to work in — kept here so the
  *                        choice outlives a browser session and a restart; null until they chose one
+ * @param environment     the user's own variables — an API key of their own, say — which
+ *                        {@code ${VAR}} placeholders resolve from before the namespace's and the
+ *                        process's; values are stored encrypted, {@code enc:} prefixed. Never null
  */
 public record User(
         UserId id,
@@ -33,16 +37,24 @@ public record User(
         String email,
         Instant createdAt,
         Instant lastLoginAt,
-        String activeNamespace
+        String activeNamespace,
+        Map<String, String> environment
 ) {
     public User {
         Objects.requireNonNull(id, "A user needs an id");
+        environment = environment == null ? Map.of() : Map.copyOf(environment);
+    }
+
+    /** A user without variables of their own. */
+    public User(UserId id, String subject, String issuer, String displayName, String email,
+                Instant createdAt, Instant lastLoginAt, String activeNamespace) {
+        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, null);
     }
 
     /** A user who has not chosen a namespace yet. */
     public User(UserId id, String subject, String issuer, String displayName, String email,
                 Instant createdAt, Instant lastLoginAt) {
-        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, null);
+        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, null, null);
     }
 
     /** The name to show: the display name, else the id. */
@@ -52,6 +64,11 @@ public record User(
 
     /** This user with {@code activeNamespace} as the namespace they last chose to work in. */
     public User withActiveNamespace(String activeNamespace) {
-        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace);
+        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment);
+    }
+
+    /** This user with exactly {@code environment} as their variables ({@code null}: none). */
+    public User withEnvironment(Map<String, String> environment) {
+        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment);
     }
 }

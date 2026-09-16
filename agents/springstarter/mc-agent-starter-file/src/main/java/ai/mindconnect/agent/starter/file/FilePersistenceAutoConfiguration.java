@@ -1,16 +1,8 @@
 package ai.mindconnect.agent.starter.file;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespaceRouted;
-import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
+import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.filestore.FileStore;
-import ai.mindconnect.filestore.FileStoreBackend;
-import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
-import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
 import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
 import ai.mindconnect.user.adapter.file.FileUserRepository;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
@@ -23,90 +15,54 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
 
 import java.nio.file.Path;
-import java.util.Map;
 
 /**
- * File persistence — the default. Every repository port of the agent
- * runtime, the message store, the LLM gateway and the file store is served
- * by its file adapter under {@code mindconnect.data.base-dir}. Active unless
- * {@code mindconnect.persistence} says otherwise; then the matching starter
- * (Postgres, say) takes over and this one stays silent.
+ * File persistence for the agent runtime: everything under
+ * {@code mindconnect.data.base-dir} (default {@code data}), one directory
+ * per namespace. The runtime's stores are built by the runtime starter from
+ * the {@link Persistence} declared here; this starter adds what is
+ * installation-wide and not the runtime's — the users and their API tokens.
  *
- * <p>Every store is routed per namespace: the bean is a {@link NamespaceRouted}
- * proxy, the adapter behind it is built for the namespace the
- * {@link ScopeSupplier} names when a call comes in.
- *
- * <p>Auto-configured: having {@code mc-agent-starter-file} on the classpath
- * is enough. Every bean here backs off when the application defines its
- * own of the same type.
+ * <p>It declares no scope: an application works in one namespace unless it also
+ * has {@code mc-agent-starter-namespace}, which binds a scope per request and
+ * owns the {@code ThreadBoundScope} bean. A host without it — the CLI, an
+ * embedded server — gets a runtime fixed to {@code mindconnect.namespace},
+ * which is what a single-namespace application wants and what its own start-up
+ * threads can work with.
+ * The default: {@code mindconnect.persistence=file}, or nothing at all.
  */
 @AutoConfiguration
 @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
-@Import({FileRepositoriesConfig.class, FileMessageRepositoryConfig.class})
 public class FilePersistenceAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(FilePersistenceAutoConfiguration.class);
 
-    /**
-     * Where this server works: a {@link Scope} bound to the thread per
-     * request or per queued task. Until every entry point binds one, an
-     * unbound thread works in {@code mindconnect.namespace} (default
-     * {@code local}); that fallback goes once the request filter and the
-     * start-up routines bind, and an unbound thread becomes an error.
-     */
     @Bean
-    @ConditionalOnMissingBean(ScopeSupplier.class)
-    ThreadBoundScope scopeSupplier(@Value("${mindconnect.namespace:local}") String fallbackNamespace) {
-        return ThreadBoundScope.withFallback(Scope.of(new Namespace(fallbackNamespace)));
+    @ConditionalOnMissingBean(Persistence.class)
+    Persistence persistence(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return Persistence.file(Path.of(baseDir));
     }
 
-    /**
-     * Encrypted at rest when the application has an {@link EncryptionHelper};
-     * plain otherwise — which the CLI and embedders without a key accept.
-     */
-    @Bean
-    @ConditionalOnMissingBean(LlmConfigRepository.class)
-    LlmConfigRepository llmConfigRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                            ScopeSupplier scope,
-                                            ObjectProvider<EncryptionHelper> encryption) {
-        LlmConfigRepository files = NamespaceRouted.route(LlmConfigRepository.class, scope,
-                ns -> new FileLlmConfigRepository(Path.of(baseDir), ns));
-        EncryptionHelper helper = encryption.getIfAvailable();
-        if (helper == null) {
-            log.warn("No EncryptionHelper — LLM credentials are stored unencrypted under {}", baseDir);
-            return files;
-        }
-        return new EncryptingLlmConfigRepository(files, helper);
-    }
-
-    /** The installation's users, under {@code <mindconnect.data.base-dir>/system/users} — installation-wide, not per namespace. */
+    /** Installation-wide, not per namespace: a user is the same person in every namespace. */
     @Bean
     @ConditionalOnMissingBean(UserRepository.class)
-    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new FileUserRepository(Path.of(baseDir));
+    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                  ObjectProvider<EncryptionHelper> encryption) {
+        UserRepository files = new FileUserRepository(Path.of(baseDir));
+        EncryptionHelper helper = encryption.getIfAvailable();
+        // A user's own variables are secrets — enc: at rest when there is a key, like LLM credentials.
+        if (helper == null) {
+            log.warn("No EncryptionHelper — users' own variables are stored unencrypted under {}", baseDir);
+            return files;
+        }
+        return new EncryptingUserRepository(files, helper);
     }
 
-    /** Personal API tokens, stored as hashes under {@code <mindconnect.data.base-dir>/system/api-tokens} — installation-wide like their users. */
     @Bean
     @ConditionalOnMissingBean(ApiTokenRepository.class)
     ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
         return new FileApiTokenRepository(Path.of(baseDir));
-    }
-
-    /** Uploads: the {@code filesystem} backend under {@code <mindconnect.data.base-dir>/<namespace>/files} unless configured otherwise. */
-    @Bean
-    @ConditionalOnMissingBean(FileStore.class)
-    FileStore fileStore(@Value("${mindconnect.file-store.backend:filesystem}") String backend,
-                        @Value("${mindconnect.data.base-dir:data}") String baseDir,
-                        ScopeSupplier scope) {
-        FileStoreBackend files = FileStoreBackend.byType(backend)
-                .orElseThrow(() -> new IllegalStateException("No file-store backend '" + backend
-                        + "' on the classpath (available: "
-                        + FileStoreBackend.discover().stream().map(FileStoreBackend::type).toList() + ")"));
-        return NamespaceRouted.route(FileStore.class, scope,
-                ns -> files.open(Map.of("baseDir", baseDir, "namespace", ns.value())));
     }
 }

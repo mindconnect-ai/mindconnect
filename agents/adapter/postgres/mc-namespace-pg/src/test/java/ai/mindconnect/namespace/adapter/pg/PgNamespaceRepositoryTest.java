@@ -38,6 +38,16 @@ class PgNamespaceRepositoryTest {
     }
 
     @Test
+    void theNamespacesVariablesSurviveTheRoundTrip() {
+        NamespaceDefinition acme = acme(UserId.of("alice")).withEnvironment(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
+        assertThat(repo.insert(acme)).isTrue();
+
+        assertThat(repo.findById(new Namespace("acme"))).contains(acme);
+        assertThat(repo.findByMember(UserId.of("alice"))).singleElement().extracting(NamespaceDefinition::environment)
+                .isEqualTo(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
+    }
+
+    @Test
     void findByMemberAnswersTheNMSide() {
         repo.save(acme(UserId.of("alice")));
         repo.save(new NamespaceDefinition(new Namespace("beta"), null, UserId.of("alice"),

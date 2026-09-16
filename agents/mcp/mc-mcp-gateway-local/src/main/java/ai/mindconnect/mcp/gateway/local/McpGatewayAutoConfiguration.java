@@ -60,13 +60,16 @@ public class McpGatewayAutoConfiguration {
             McpSessionRegistry sessions,
             Environment environment,
             ObjectProvider<ScopeSupplier> scope,
+            // The installation's default namespace: seeds go there, whatever scope a thread binds — and at
+            // start-up the main thread binds none.
+            @Value("${mindconnect.namespace:local}") String defaultNamespace,
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
             @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime) {
         // Whether process and docker targets start is the installation's call:
         // mindconnect.mcp.allow-process / allow-docker, unset following sign-in.
         NamespacedMcpGateways gateways = new NamespacedMcpGateways(storageRoot(dataBaseDir), mcpProxy, sessions,
                 containerRuntime, McpStartPolicy.from(environment));
-        gateways.seed(scope.getIfAvailable(ScopeSupplier::local).namespace(), "classpath:initial-data/mcp-servers/*.json");
+        gateways.seed(seedNamespace(scope, defaultNamespace), "classpath:initial-data/mcp-servers/*.json");
         return gateways;
     }
 
@@ -145,5 +148,17 @@ public class McpGatewayAutoConfiguration {
     public McpRegistryAdmin mcpRegistryAdmin(NamespacedMcpGateways gateways, ObjectProvider<ScopeSupplier> scope) {
         return NamespaceRouted.route(McpRegistryAdmin.class, scope.getIfAvailable(ScopeSupplier::local),
                 ns -> gateways.forNamespace(ns).admin());
+    }
+    /**
+     * Where bundled data is seeded: the namespace a fixed scope names — a
+     * single-namespace host chose it — and otherwise the installation default,
+     * because a thread-bound scope binds nothing at start-up.
+     */
+    private static ai.mindconnect.agent.Namespace seedNamespace(
+            ObjectProvider<ScopeSupplier> scope, String defaultNamespace) {
+        ScopeSupplier supplier = scope.getIfAvailable();
+        return supplier == null || supplier instanceof ai.mindconnect.agent.ThreadBoundScope
+                ? new ai.mindconnect.agent.Namespace(defaultNamespace)
+                : supplier.namespace();
     }
 }

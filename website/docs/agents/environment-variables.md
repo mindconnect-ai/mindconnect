@@ -1,4 +1,10 @@
----
+| `mindconnect.namespace` | `local` | The default namespace: open to every signed-in user, and the one start-up work runs in — the runtime build, the tool warm-up, the seed loaders. A request or task that names none does **not** land here: with the namespace starter the scope is strict and an unbound thread that touches a store fails instead, because on a server that silence is a leak between namespaces. Bound to `MC_NAMESPACE` in the apps' yaml. |
+| `mindconnect.agent.sub-agents.max-depth` | `5` | How deep a chain of sub-agents may go before a turn is refused. Delegation itself comes from `mc-agent-runtime-feature-subagents`; without that module on the classpath an agent's roster yields no `run_agent`. |
+| `mindconnect.task-queue.retention` | — | How long finished task trees stay readable (ISO-8601, e.g. `PT1H`). Unset keeps them, which is what the Admin UI's task monitor reads. |
+| `mindconnect.task-queue.maintenance-interval` | `PT20S` | How often the queue renews leases, reclaims dead ones and applies the retention. |
+| `mindconnect.task-queue.store` | `memory` | `memory`, or `jdbc` for a store in the runtime's Postgres that several nodes share, each claiming with a lease. `jdbc` needs `mindconnect.persistence=postgres`. |
+| `mindconnect.task-queue.node-id` | host and pid | This node's name on a shared store. |
+| `mindconnect.task-queue.lease` | `PT30S` | How long a claim on a shared store holds before another node may take the task over. |---
 title: Environment variables
 sidebar_position: 10
 ---
@@ -16,6 +22,45 @@ Set them in your shell before starting the app, e.g.:
 export ANTHROPIC_API_KEY=sk-ant-...
 export TAVILY_API_KEY=tvly-...
 ```
+
+## Your own and your namespace's variables
+
+On a server several people share, a placeholder does not have to come from the
+process. A `${VAR}` in an LLM config is looked up in this order, and the first
+place that has it answers:
+
+1. **the user's own variables** — set on the profile page (avatar in the header
+   → *Your variables*), so everyone can bring their own API key;
+2. **the namespace's variables** — set by the namespace's creator on
+   *Namespaces & members*, one key for everyone working there;
+3. **the process environment** — what the server was started with.
+
+Two rules narrow that:
+
+- **Your own variables reach a config's API key, nothing else.** Its `model`,
+  `baseUrl` and `name` resolve from the namespace's variables and the process
+  alone. Otherwise anyone could point a shared config — whose key is still the
+  installation's — at an endpoint of their own.
+- **The default namespace has no variables of its own.** Nobody created it and
+  everyone works there, so it belongs to the installation: set its values in the
+  server's environment. A namespace you create carries variables for everyone in
+  it, and only its creator sets them — the same right as renaming or deleting it.
+
+The same chain feeds the workflow engine's built-in `env` variable: a workflow
+run from the admin, from a chat (as a tool) or as a vector-store ingestion reads
+`${env.OPENAI_API_KEY}` the same way.
+
+A config that says `${OPENAI_API_KEY}` therefore uses your key when you have
+one, the namespace's when it has one, and the server's otherwise; the
+`:default` of a placeholder is the last word. Values are stored encrypted with
+`MINDCONNECT_ENCRYPTION_SECRET_KEY` and are never shown again once saved — the
+tables list names only. Removing a variable lets the next place answer.
+
+The lookup is pluggable: the gateways take an `EnvVarResolver`, the servers
+wire the chain above (`UserEnvVarResolver`, `NamespaceEnvVarResolver`,
+`EnvVarResolver.system()`), a library gets the process environment unless it
+passes `AgentRuntimeBuilder.envVarResolver(…)` — a vault, say — and any Spring
+host may define an `EnvVarResolver` bean of its own.
 
 ## Core
 

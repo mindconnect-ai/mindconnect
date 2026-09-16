@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
+    <name>mc-agent-runtime-feature-file-upload</name>
+    <packaging>jar</packaging>
+    <description>Runtime feature: files attached to a chat — the file store that keeps them (a directory
+        or Postgres, following the runtime's persistence) and the attach path that indexes a document
+        into the session's vector store. Brings the file store and vector store modules with it; running
+        an ingestion workflow additionally needs the workflows feature.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-tools</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-store</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-store-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-vector-store-tools</artifactId>
+        </dependency>
+        <!-- Ingestion through a workflow: only when the workflows feature and the admin runner are present. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-tools-workflow</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-admin-rest</artifactId>
+            <version>${project.version}</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+    </dependencies>
+</project>

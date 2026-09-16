@@ -115,6 +115,54 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- The core feature every builder installs. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-core</artifactId>
+        </dependency>
+        <!-- The optional features: on the compile classpath so the builder can name them, but a client
+             gets the ones it puts on its own classpath — use…() installs whatever it finds there. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-skills</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-tools</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-workflows</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-namespace</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-transcription</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-taskqueue</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-feature-subagents</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -122,6 +170,11 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

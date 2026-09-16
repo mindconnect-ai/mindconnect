@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonAlias;
 
 import java.time.Instant;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -24,13 +25,17 @@ import java.util.Set;
  * @param createdBy   who created it; null for the installation's default namespace
  * @param createdAt   when it was created
  * @param members     who may work in it, the creator included
+ * @param environment the namespace's variables — an API key everyone working here shares, say —
+ *                    which {@code ${VAR}} placeholders resolve from after the user's own and
+ *                    before the process's; values are stored encrypted, {@code enc:} prefixed
  */
 public record NamespaceDefinition(
         Namespace id,
         String displayName,
         @JsonAlias("owner") UserId createdBy,
         Instant createdAt,
-        Set<UserId> members
+        Set<UserId> members,
+        Map<String, String> environment
 ) {
     public NamespaceDefinition {
         Objects.requireNonNull(id, "A namespace needs an id");
@@ -38,6 +43,12 @@ public record NamespaceDefinition(
         Set<UserId> all = new LinkedHashSet<>(members == null ? Set.of() : members);
         if (createdBy != null) all.add(createdBy);
         members = Set.copyOf(all);
+        environment = environment == null ? Map.of() : Map.copyOf(environment);
+    }
+
+    /** A namespace without variables of its own. */
+    public NamespaceDefinition(Namespace id, String displayName, UserId createdBy, Instant createdAt, Set<UserId> members) {
+        this(id, displayName, createdBy, createdAt, members, null);
     }
 
     /** A namespace {@code creator} just created, with the creator as its only member. */
@@ -64,7 +75,7 @@ public record NamespaceDefinition(
         if (members.contains(user)) return this;
         Set<UserId> all = new LinkedHashSet<>(members);
         all.add(user);
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, all);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, all, environment);
     }
 
     /** This namespace without {@code user}; the creator cannot be removed. */
@@ -73,10 +84,15 @@ public record NamespaceDefinition(
         if (isCreator(user)) throw new IllegalArgumentException("The creator of '" + id + "' cannot be removed");
         Set<UserId> all = new LinkedHashSet<>(members);
         all.remove(user);
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, all);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, all, environment);
     }
 
     public NamespaceDefinition withDisplayName(String displayName) {
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, members);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, members, environment);
+    }
+
+    /** This namespace with exactly {@code environment} as its variables ({@code null}: none). */
+    public NamespaceDefinition withEnvironment(Map<String, String> environment) {
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, members, environment);
     }
 }
