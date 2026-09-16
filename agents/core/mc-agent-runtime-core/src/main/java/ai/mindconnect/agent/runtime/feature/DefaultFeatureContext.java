@@ -21,7 +21,7 @@ public class DefaultFeatureContext implements FeatureContext {
     private final RuntimeView runtime;
     private final DefaultRuntimeBeans beans;
     private final Persistence persistence;
-    private final ObjectMapper objectMapper;
+    private volatile ObjectMapper objectMapper;
     private final Map<String, String> properties = new LinkedHashMap<>();
     private final List<Runnable> startHooks = new ArrayList<>();
     private final List<AutoCloseable> closeHooks = new ArrayList<>();
@@ -37,6 +37,16 @@ public class DefaultFeatureContext implements FeatureContext {
     @Override public RuntimeView runtime() { return runtime; }
     @Override public Persistence persistence() { return persistence; }
     @Override public ObjectMapper objectMapper() { return objectMapper; }
+
+    /**
+     * The mapper every feature reads and writes its stores' JSON with. A builder creates
+     * the context before its host names a mapper, so the host's choice has to reach the
+     * context here — keeping the first one left a Spring host's configured mapper out of
+     * every file store and gateway.
+     */
+    public void objectMapper(ObjectMapper objectMapper) {
+        this.objectMapper = java.util.Objects.requireNonNull(objectMapper, "objectMapper");
+    }
 
     @Override
     public Optional<String> property(String key) {

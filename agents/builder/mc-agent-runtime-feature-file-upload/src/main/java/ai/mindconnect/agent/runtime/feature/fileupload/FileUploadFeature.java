@@ -44,7 +44,11 @@ public class FileUploadFeature implements RuntimeFeature {
     public void configure(FeatureContext ctx) {
         // The factory per namespace: the persistence setting looked at once, the routing builds the rest.
         Function<Namespace, FileStoreFactory> factories = switch (ctx.persistence()) {
-            case Persistence.Postgres p -> ns -> new PgFileStoreFactory(ctx.require(ai.mindconnect.jdbc.Sql.class), ns);
+            // In the database — unless fileStoreBackend names another backend: a host may keep
+            // its records in Postgres and its files on a volume, as it always could.
+            case Persistence.Postgres p -> ctx.property("fileStoreBackend").filter(b -> !b.isBlank() && !"postgres".equals(b)).isPresent()
+                    ? ns -> spiFactory(ctx, p, ns)
+                    : ns -> new PgFileStoreFactory(ctx.require(ai.mindconnect.jdbc.Sql.class), ns);
             case Persistence.File f -> ns -> spiFactory(ctx, f, ns);
             case Persistence.InMemory m -> ns -> spiFactory(ctx, m, ns);   // the side-channel directory
         };
