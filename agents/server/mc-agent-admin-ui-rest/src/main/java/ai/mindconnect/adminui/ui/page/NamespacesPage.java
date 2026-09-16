@@ -124,7 +124,7 @@ public final class NamespacesPage {
      */
     public static UiTable environment(NamespaceDefinition ns) {
         String id = ns.id().value();
-        return environmentTable(environmentId(ns.id()), "Variables", ns.environment().keySet(),
+        return environmentTable(environmentId(ns.id()), "Variables of " + ns.label(), ns.environment().keySet(),
                 API + "/" + id + "/environment",
                 "Remove this variable? A config that refers to it falls back to the server's value, if there is one.");
     }

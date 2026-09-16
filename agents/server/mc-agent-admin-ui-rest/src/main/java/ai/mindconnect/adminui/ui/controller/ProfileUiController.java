@@ -5,6 +5,7 @@ import ai.mindconnect.adminui.ui.page.ProfilePage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.chatui.ui.controller.FormBody;
@@ -33,6 +34,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -177,9 +179,13 @@ public class ProfileUiController {
             users.selectNamespace(me, namespaces.defaultNamespace());
             return ResponseEntity.status(HttpStatus.SEE_OTHER).location(NamespaceUiController.AFTER_SWITCH).build();
         }
+        List<NamespaceDefinition> remaining = namespaces.forUser(me);
         return ResponseEntity.ok(UiPatch.of()
                 .patch(UiPatch.Operation.replace(ProfilePage.NAMESPACES_ID, ProfilePage.namespaces(me,
-                        namespaces.forUser(me), namespaces.defaultNamespace(), scope.namespace())))
+                        remaining, namespaces.defaultNamespace(), scope.namespace())))
+                // A deleted namespace takes its variables with it — the tab must not keep showing them.
+                .patch(UiPatch.Operation.replace(ProfilePage.NAMESPACE_ENVIRONMENT_ID,
+                        ProfilePage.namespaceVariables(me, remaining, namespaces.defaultNamespace())))
                 .toast(UiToast.success(message).title(title)));
     }
 
