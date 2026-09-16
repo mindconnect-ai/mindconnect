@@ -92,6 +92,21 @@ public class FileConversationRepository implements ConversationRepository {
         }
     }
 
+    @Override
+    public void deleteById(ConversationId id) {
+        if (findById(id).isEmpty()) return;   // absent, or another tenant's file of the same value
+        // The directory is the conversation's own (messages and traces are co-located in it):
+        // whatever is still in there belongs to nobody once the conversation is gone.
+        Path dir = fileFor(id).getParent();
+        try (var paths = Files.walk(dir)) {
+            for (Path path : paths.sorted(java.util.Comparator.reverseOrder()).toList()) {
+                Files.deleteIfExists(path);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not delete conversation " + id.value(), e);
+        }
+    }
+
     private Path fileFor(ConversationId id) {
         return baseDir.resolve(id.value()).resolve(FILE_NAME);
     }

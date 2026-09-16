@@ -61,4 +61,9 @@ public final class PgConversationRepository implements ConversationRepository {
         return conversations.find("WHERE namespace = ? ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
                 namespace.value(), page.size(), page.offset());
     }
+
+    @Override
+    public void deleteById(ConversationId id) {
+        conversations.delete("WHERE namespace = ? AND id = ?", namespace.value(), id.value());
+    }
 }

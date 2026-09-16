@@ -193,7 +193,8 @@ public final class LocalTaskQueue implements TaskQueue, AutoCloseable {
     @Override
     public TaskRecord await(String taskId, Duration timeout) {
         TaskRecord current = store.find(taskId)
-                .orElseThrow(() -> new TaskQueueException("Unknown task " + taskId));
+                .orElseThrow(() -> new TaskQueueException("Unknown task " + taskId
+                        + " — never submitted here, or already forgotten under the retention setting"));
         if (current.status().terminal()) return current;
         CompletableFuture<TaskRecord> future =
                 awaiters.computeIfAbsent(taskId, id -> new CompletableFuture<>());

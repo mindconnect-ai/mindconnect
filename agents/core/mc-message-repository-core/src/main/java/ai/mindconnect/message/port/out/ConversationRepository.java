@@ -16,4 +16,7 @@ public interface ConversationRepository {
 
     /** A page of one tenant's conversations. */
     List<Conversation> findAll(PageRequest page);
+
+    /** Removes the conversation record itself. Its messages are the {@link MessageRepository}'s to delete; unknown ids are a no-op. */
+    void deleteById(ConversationId id);
 }

@@ -73,4 +73,9 @@ public class FileMessageRepository implements MessageRepository {
     public void deleteBySequenceRange(ConversationId conversation, int fromSeq, int toSeq) {
         messages.deleteKeyRange(conversation, fromSeq, toSeq);
     }
+
+    @Override
+    public void deleteByConversation(ConversationId conversation) {
+        messages.deleteAll(conversation);
+    }
 }

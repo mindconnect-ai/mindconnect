@@ -77,7 +77,10 @@ public final class PgFileStore implements FileStore {
         String safeName = Path.of(name == null || name.isBlank() ? "upload.bin" : name)
                 .getFileName().toString().replaceAll("[^A-Za-z0-9._ -]", "_");
         byte[] bytes = content.readAllBytes();
-        StoredFile file = new StoredFile(id, safeName, contentType, bytes.length, Instant.now(), creator);
+        // Microseconds: what TIMESTAMPTZ keeps. A JDK clock with nanoseconds (Linux) would otherwise
+        // hand back a record that no longer equals the one read from the table.
+        Instant createdAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        StoredFile file = new StoredFile(id, safeName, contentType, bytes.length, createdAt, creator);
         sql.update("INSERT INTO mc_file (namespace, id, name, content_type, size, created_at, content, creator) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 namespace.value(), id.value(), file.name(), file.contentType(), file.size(), file.createdAt(), bytes,

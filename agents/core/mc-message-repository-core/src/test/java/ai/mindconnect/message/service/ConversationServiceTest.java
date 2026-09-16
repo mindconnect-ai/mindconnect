@@ -147,6 +147,28 @@ class ConversationServiceTest {
 
     // --- minimal in-memory test doubles ---
 
+    @Test
+    void deleteConversation_removesTheConversationAndAllItsMessages() {
+        Conversation conv = service.createConversation(ConversationId.random(), "topic",
+                ConversationType.USER_AGENT, List.of());
+        Conversation other = service.createConversation(ConversationId.random(), "other",
+                ConversationType.USER_AGENT, List.of());
+        service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "one", null);
+        service.addMessageToConversation(conv.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "two", null);
+        service.addMessageToConversation(other.id(), "user-1", ParticipantType.USER, MessageType.CHAT, "keep", null);
+
+        service.deleteConversation(conv.id());
+
+        assertThat(service.findById(conv.id())).isEmpty();
+        assertThat(messageRepo.findByConversation(conv.id(), new PageRequest(0, 10))).isEmpty();
+        assertThat(messageRepo.findByConversation(other.id(), new PageRequest(0, 10))).hasSize(1);
+    }
+
+    @Test
+    void deleteConversation_ofAnUnknownIdIsANoOp() {
+        service.deleteConversation(ConversationId.random());
+    }
+
     static class InMemoryConversationRepository implements ConversationRepository {
         final Map<ConversationId, Conversation> store = new HashMap<>();
 
@@ -161,6 +183,9 @@ class ConversationServiceTest {
             return store.values().stream()
                     .skip((long) page.page() * page.size()).limit(page.size()).toList();
         }
+
+        @Override
+        public void deleteById(ConversationId id) { store.remove(id); }
     }
 
     static class InMemoryMessageRepository implements MessageRepository {
@@ -211,6 +236,11 @@ class ConversationServiceTest {
         public void deleteBySequenceRange(ConversationId conversationId, int fromSeq, int toSeq) {
             store.removeIf(m -> m.conversationId().equals(conversationId)
                     && m.sequenceNum() >= fromSeq && m.sequenceNum() <= toSeq);
+        }
+
+        @Override
+        public void deleteByConversation(ConversationId conversationId) {
+            store.removeIf(m -> m.conversationId().equals(conversationId));
         }
     }
 }

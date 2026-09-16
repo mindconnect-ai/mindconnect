@@ -38,6 +38,31 @@ class AgentRuntimeBuilderTest {
     }
 
     @Test
+    void deletingASessionTakesItsConversationAndMessagesAlong() {
+        try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("test-llm", "some-model", "http://localhost:9"))
+                .agentDefinition(demoAgent())
+                .build()) {
+            AgentSession session = runtime.openSession("test-agent", UserId.of("user-1"));
+            var conversations = runtime.conversationManager();
+            conversations.addMessageToConversation(session.conversationId(), "user-1",
+                    ai.mindconnect.message.domain.ParticipantType.USER,
+                    ai.mindconnect.message.domain.MessageType.CHAT, "hello", null);
+            assertThat(conversations.loadCompleteHistory(session.conversationId()).messages()).hasSize(1);
+
+            runtime.sessionService().deleteSession(session.id());
+
+            assertThat(conversations.findById(session.conversationId())).isEmpty();
+            // the history is gone with it — reading it is now "not found", not an empty page
+            assertThatThrownBy(() -> conversations.loadHistory(session.conversationId(),
+                    new ai.mindconnect.common.PageRequest(0, 10)))
+                    .isInstanceOf(ai.mindconnect.common.DomainException.class);
+            assertThatThrownBy(() -> runtime.sessionService().findSession(session.id()))
+                    .isInstanceOf(Exception.class);
+        }
+    }
+
+    @Test
     void unknownAgentFailsWithAClearMessage() {
         try (AgentRuntime runtime = AgentRuntimeBuilder.useInMemoryPersistence().build()) {
             assertThatThrownBy(() -> runtime.openSession("nope", UserId.of("u")))
