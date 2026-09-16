@@ -293,6 +293,14 @@ fresh empty one, so nothing has to be moved by hand at release time.
 
 ### Fixed
 
+- **agents:** **an attached file's tools reach the agent.** After `attachFile` (or an
+  upload in the chat) the system note told the model to read the file with
+  `vector_search`, but an agent whose definition did not list that tool never got
+  it, so it could only answer that it had no way to look. A chat's attachments now
+  bring what reads them — `vector_search` for what was indexed, `view_attachment`
+  for an image or a PDF, `file_read` and `file_list` for a copy on disk — for as
+  long as the file is attached, whether or not the definition lists them. Nothing
+  else is granted this way, and what the installation disabled stays disabled.
 - **agents:** **deleting a session deletes its conversation, messages and LLM
   traces** too. It used to remove the session's memory, summaries, todos and
   directory but leave the transcript and every recorded LLM call behind,
