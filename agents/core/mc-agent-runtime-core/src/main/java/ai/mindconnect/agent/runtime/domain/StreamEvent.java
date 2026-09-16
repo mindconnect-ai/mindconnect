@@ -87,7 +87,7 @@ public sealed interface StreamEvent
     /**
      * A tool call needs a human — pushed on the ROOT turn's channel so the
      * open chat stream shows the approval card immediately. The durable
-     * truth is the {@code ToolApprovalStore} entry, written before this event;
+     * truth is the {@code ToolApprovalRepository} entry, written before this event;
      * the event is only the live mirror of it. {@code originSessionId}/{@code toolTaskId} are set
      * for bubbled requests and route the answer back down.
      */

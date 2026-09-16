@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
@@ -17,7 +18,7 @@ import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.domain.ToolApproval;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
@@ -70,7 +71,7 @@ class AgentApiControllerOwnershipTest {
         sessionService = new AgentSessionService(definitions, sessions,
                 new InMemoryMessageStore().conversationManager(), new InMemoryWorkingMemoryRepository(),
                 new InMemoryConversationSummaryRepository(), new InMemoryTodoListRepository(),
-                new ToolApprovalStore(), userChannels);
+                new InMemoryToolApprovalRepository(), userChannels);
         chat = new RecordingChatService(sessionService);
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),

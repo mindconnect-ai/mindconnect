@@ -39,7 +39,8 @@ import ai.mindconnect.agent.runtime.service.StatelessAgentSeeder;
 import ai.mindconnect.agent.runtime.service.StatelessAgentTaskRunner;
 import ai.mindconnect.agent.runtime.service.UserHome;
 import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
@@ -436,7 +437,10 @@ public class AgentRuntimeBuilder {
                 context.require(ToolResultSummarizer.class), context.require(AgentTaskRunner.class),
                 context.require(TokenCounters.class), context.require(LlmConfigRepository.class),
                 context.require(LlmMessageMapper.class)));
-        context.bean(ToolApprovalStore.class, ToolApprovalStore::new);
+        if (!beans.has(ToolApprovalRepository.class)) {
+            // Open approval questions in memory, unless a feature brings storage that outlives a restart.
+            context.bean(ToolApprovalRepository.class, InMemoryToolApprovalRepository::new);
+        }
         context.bean(UserChannels.class, UserChannels::new);
         context.bean(SessionChannels.class, SessionChannels::new);
 
@@ -470,7 +474,7 @@ public class AgentRuntimeBuilder {
                 context.require(AgentDefinitionRepository.class), context.require(AgentSessionRepository.class),
                 context.require(ConversationManager.class), context.require(WorkingMemoryRepository.class),
                 context.require(ConversationSummaryRepository.class), context.require(TodoListRepository.class),
-                context.require(ToolApprovalStore.class), context.require(UserChannels.class),
+                context.require(ToolApprovalRepository.class), context.require(UserChannels.class),
                 context.require(WorkingDirPolicy.class), context.require(UserHome.class),
                 context.require(LlmCallTraceRepository.class)));
         context.bean(AgentTurnWorker.class, () -> new AgentTurnWorker(
@@ -487,7 +491,7 @@ public class AgentRuntimeBuilder {
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
                 context.require(ToolRegistry.class), context.require(DynamicToolActivations.class),
                 context.require(ToolExecutor.class), context.require(SessionChannels.class),
-                context.require(ToolApprovalStore.class), context.require(UserChannels.class),
+                context.require(ToolApprovalRepository.class), context.require(UserChannels.class),
                 context.require(SubAgentSupport.class)));
         context.bean(SessionTitleWorker.class, () -> new SessionTitleWorker(
                 context.require(AgentSessionService.class), context.require(ConversationManager.class),
@@ -497,7 +501,7 @@ public class AgentRuntimeBuilder {
                 context.require(ConversationManager.class), context.require(MemoryStrategyFactory.class),
                 context.require(WorkingMemoryRepository.class), context.require(PromptRenderer.class),
                 context.require(SessionChannels.class), context.require(UserChannels.class),
-                context.require(TaskQueue.class), context.require(ToolApprovalStore.class),
+                context.require(TaskQueue.class), context.require(ToolApprovalRepository.class),
                 context.require(InstructionFiles.class), context.require(SkillCatalog.class),
                 context.require(ScopeSupplier.class)));
 

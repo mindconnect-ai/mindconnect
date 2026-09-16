@@ -187,7 +187,7 @@ public final class ChatPage {
 
     /**
      * The open sub-agent approval cards of this (root) session — built by
-     * the controller from the ToolApprovalStore, rendered by the message
+     * the controller from the ToolApprovalRepository, rendered by the message
      * list after the history. Returns {@code this} for fluent chaining.
      */
     public ChatPage withBubbledApprovals(List<ai.mindconnect.ui.model.UiList.Item> cards) {

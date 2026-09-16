@@ -18,7 +18,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.in.ConversationManager;
 
@@ -206,7 +206,7 @@ public class AgentRuntime implements RuntimeView, AutoCloseable {
 
     public AgentChatService chatService() { return beans.get(AgentChatService.class); }
     public AgentSessionService sessionService() { return beans.get(AgentSessionService.class); }
-    public ToolApprovalStore approvalStore() { return beans.get(ToolApprovalStore.class); }
+    public ToolApprovalRepository toolApprovals() { return beans.get(ToolApprovalRepository.class); }
     public AgentDefinitionRepository agentDefinitions() { return beans.get(AgentDefinitionRepository.class); }
     public LlmConfigRepository llmConfigs() { return beans.get(LlmConfigRepository.class); }
     public ConversationManager conversationManager() { return beans.get(ConversationManager.class); }

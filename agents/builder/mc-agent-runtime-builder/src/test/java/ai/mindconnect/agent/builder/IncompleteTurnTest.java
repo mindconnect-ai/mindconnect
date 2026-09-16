@@ -3,6 +3,7 @@ package ai.mindconnect.agent.builder;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.lmstudio.TestTools;
+import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
@@ -10,6 +11,7 @@ import ai.mindconnect.agent.runtime.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.domain.ToolApproval;
@@ -200,6 +202,45 @@ class IncompleteTurnTest {
                 .isEmpty();
         assertThatThrownBy(() -> runtime.deny(session, "no-such-call", recorder))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void aFeatureBringsItsOwnApprovalRepository() {
+        runtime.close();
+        RecordingApprovals mine = new RecordingApprovals();
+        runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("scripted", "scripted-model", "http://localhost:1"))
+                .install(new ScriptedLlmFeature())
+                .install(new RuntimeFeature() {
+                    @Override public String name() { return "approval-storage"; }
+                    @Override public void configure(FeatureContext ctx) {
+                        ctx.instance(ToolApprovalRepository.class, mine);
+                    }
+                })
+                .agentDefinition(agent("single", List.of(echo(true)), List.of()))
+                .build();
+        SessionId session = open("single");
+
+        TurnResult first = runtime.send(session, "go", recorder);
+        TurnResult done = runtime.approve(session, first.pendingApprovals().get(0).callId(),
+                ApprovalScope.ONCE, recorder);
+
+        assertThat(runtime.toolApprovals()).isSameAs(mine);
+        assertThat(mine.saved).as("the gate parked the call in the feature's repository").hasSize(1);
+        assertThat(done.status()).isEqualTo(TurnStatus.COMPLETED);
+        assertThat(mine.openForRoot(session)).as("answered, so gone").isEmpty();
+    }
+
+    /** Memory, but it remembers what the gate saved — stands in for a repository of one's own. */
+    static class RecordingApprovals extends InMemoryToolApprovalRepository {
+        final List<ToolApproval> saved = new CopyOnWriteArrayList<>();
+
+        @Override
+        public boolean saveIfAbsent(ToolApproval approval) {
+            boolean added = super.saveIfAbsent(approval);
+            if (added) saved.add(approval);
+            return added;
+        }
     }
 
     // ── fixtures ───────────────────────────────────────────────────────────

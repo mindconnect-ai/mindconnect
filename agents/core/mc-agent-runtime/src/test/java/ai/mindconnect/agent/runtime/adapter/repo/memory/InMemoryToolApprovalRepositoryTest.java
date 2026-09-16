@@ -1,6 +1,7 @@
-package ai.mindconnect.agent.runtime.service.approval;
+package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
 import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.SessionId;
 import org.junit.jupiter.api.Test;
 
@@ -8,11 +9,11 @@ import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ToolApprovalStoreTest {
+class InMemoryToolApprovalRepositoryTest {
 
     private final SessionId root = SessionId.random();
     private final SessionId origin = SessionId.random();
-    private final ToolApprovalStore store = new ToolApprovalStore();
+    private final ToolApprovalRepository store = new InMemoryToolApprovalRepository();
 
     private ToolApproval approval(String callId, Instant at) {
         return new ToolApproval("req-" + callId, callId, "web_search",

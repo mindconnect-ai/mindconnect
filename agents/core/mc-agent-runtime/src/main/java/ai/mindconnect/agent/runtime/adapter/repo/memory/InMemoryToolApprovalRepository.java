@@ -1,7 +1,9 @@
-package ai.mindconnect.agent.runtime.service.approval;
+package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
+
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -9,28 +11,12 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The registry of OPEN approval questions — ONE truth per card: an entry
- * exists exactly while a parked tool call awaits its human answer, whether
- * the root agent made the call or a sub-agent below it.
- *
- * <p>Lifecycle: the approval gate in {@code ToolCallWorker} registers when it
- * parks a call (idempotent per chat and callId — a woken-without-answer task
- * registers nothing twice), the root chat renders its cards from
- * {@link #openForRoot}, the answer {@link #delete}s. Cleanup beyond the happy
- * path: cancel of the root chat, a new message that supersedes the waiting
- * turn, and session deletion.
- *
- * <p>Keyed by the chat that shows the card <em>and</em> the call id. The call
- * id comes from the model provider and is unique only within one response, so
- * it never addresses a question on its own: an answer names the root session
- * it was given in, and a call id from another chat finds nothing.
- *
- * <p>In-memory: entries point at live task ids. With a persistent task store
- * a parked task outlives a restart while its entry does not — the question is
- * then unanswerable until the store persists too (concept 33, step 4).
- * Thread-safe.
+ * {@link ToolApprovalRepository} in memory — the default. Nothing survives a
+ * restart: with a persistent task store a parked task outlives its entry and
+ * cannot be answered any more, so such an installation needs a repository that
+ * persists as well.
  */
-public final class ToolApprovalStore {
+public class InMemoryToolApprovalRepository implements ToolApprovalRepository {
 
     private record Key(SessionId rootSessionId, String callId) { }
 
@@ -43,16 +29,19 @@ public final class ToolApprovalStore {
      * @return true when the entry is NEW (the caller pushes the live card
      *         only then — the UI already shows it otherwise)
      */
+    @Override
     public boolean saveIfAbsent(ToolApproval approval) {
         return open.putIfAbsent(keyOf(approval), approval) == null;
     }
 
     /** The open question {@code callId} shown in {@code rootSessionId}'s chat. */
+    @Override
     public Optional<ToolApproval> find(SessionId rootSessionId, String callId) {
         return Optional.ofNullable(open.get(new Key(rootSessionId, callId)));
     }
 
     /** The cards to show in {@code rootSessionId}'s chat, oldest first. */
+    @Override
     public List<ToolApproval> openForRoot(SessionId rootSessionId) {
         return open.values().stream()
                 .filter(a -> rootSessionId.equals(a.rootSessionId()))
@@ -61,16 +50,19 @@ public final class ToolApprovalStore {
     }
 
     /** The question is answered (or dead) — the card disappears everywhere. */
+    @Override
     public void delete(SessionId rootSessionId, String callId) {
         open.remove(new Key(rootSessionId, callId));
     }
 
     /** Every open question of one chat — cancel and new-turn cleanup. */
+    @Override
     public void deleteForRoot(SessionId rootSessionId) {
         open.values().removeIf(a -> rootSessionId.equals(a.rootSessionId()));
     }
 
     /** Session deleted: drop entries it anchors on either end. */
+    @Override
     public void deleteForSession(SessionId sessionId) {
         open.values().removeIf(a -> sessionId.equals(a.rootSessionId())
                 || sessionId.equals(a.originSessionId()));

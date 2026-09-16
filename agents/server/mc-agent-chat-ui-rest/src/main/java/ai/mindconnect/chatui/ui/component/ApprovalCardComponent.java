@@ -16,7 +16,7 @@ import ai.mindconnect.agent.SessionId;
  *
  * <p>One shape for every open question — a root tool call or a sub-agent's —
  * because the answer is a plain dispatch identified by the call id alone and
- * the {@code ToolApprovalStore} knows the rest.
+ * the {@code ToolApprovalRepository} knows the rest.
  *
  * <p>Static by nature: a card is built from a request, not from a session's
  * state, and both the historic render and the live stream need the same one.
@@ -51,7 +51,7 @@ public final class ApprovalCardComponent {
     /**
      * The approval card — ONE shape for every open question (root tool or
      * sub-agent alike): the answer is a plain dispatch identified by callId
-     * alone, the ToolApprovalStore knows the rest. The turn never ended, so
+     * alone, the ToolApprovalRepository knows the rest. The turn never ended, so
      * there is no stream to start — the ORIGINAL stream carries the
      * continuation once the parked tool task is woken.
      */

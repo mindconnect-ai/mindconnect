@@ -30,7 +30,7 @@ import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.UserHome;
 import ai.mindconnect.agent.runtime.service.WorkingDirBrowser;
 import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
-import ai.mindconnect.agent.runtime.service.approval.ToolApprovalStore;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
@@ -222,7 +222,7 @@ public class AgentRuntimeAutoConfiguration {
     @Bean WorkingDirPolicy workingDirPolicy(AgentRuntime r) { return r.beans().get(WorkingDirPolicy.class); }
     @Bean UserHome userHome(AgentRuntime r) { return r.beans().get(UserHome.class); }
     @Bean InstructionFiles instructionFiles(AgentRuntime r) { return r.beans().get(InstructionFiles.class); }
-    @Bean ToolApprovalStore toolApprovalStore(AgentRuntime r) { return r.beans().get(ToolApprovalStore.class); }
+    @Bean ToolApprovalRepository toolApprovalRepository(AgentRuntime r) { return r.beans().get(ToolApprovalRepository.class); }
     @Bean UserChannels userChannels(AgentRuntime r) { return r.beans().get(UserChannels.class); }
     @Bean SessionChannels sessionChannels(AgentRuntime r) { return r.beans().get(SessionChannels.class); }
     @Bean TodoListService todoListService(AgentRuntime r) { return r.beans().get(TodoListService.class); }
