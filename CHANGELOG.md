@@ -203,6 +203,12 @@ fresh empty one, so nothing has to be moved by hand at release time.
   card rebuilt the whole message list, which wiped the card of the tool that had
   just started running; it only came back when the turn ended. Now only the
   approval card is removed.
+- **agents:** **a finished response is reported as finished.** A turn's events
+  reach their listener on a thread of their own, so the turn could end before its
+  final event had been handed over. A caller reading the result at that moment —
+  a synchronous `POST` to the responses API, an approval answer — now and then got
+  the response back still `in_progress`. The turn's outcome now waits until its
+  final event has reached the listener.
 - **agents:** **a loaded skill is no longer evicted from the context.** With
   `toolResultEviction` on, a skill's text was replaced by a stub after the user's
   next message, and the model reloaded it with `fetch_tool_result` straight away —

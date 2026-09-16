@@ -79,6 +79,9 @@ public class AgentChatService {
     /** Upper bound on one turn, sub-agents included — a safety net, not a target: a turn parked at a gate nobody answers. */
     private static final java.time.Duration TURN_TIMEOUT = java.time.Duration.ofHours(3);
 
+    /** How long a finished turn's outcome waits for its Done to reach the handler. */
+    private static final java.time.Duration DONE_HANDOVER_GRACE = java.time.Duration.ofSeconds(5);
+
     private final AgentSessionService sessionService;
     private final AgentDefinitionRepository definitionRepository;
     private final ConversationManager conversationManager;
@@ -319,9 +322,14 @@ public class AgentChatService {
             if (stopAtGate) return handle;
         }
 
+        // Set once the handler has been given the turn's Done — see the completion below.
+        CompletableFuture<Void> doneHandedOver = new CompletableFuture<>();
         Subscription subscription = sessionChannels.subscribeTurn(sessionId, turnId, afterSeq, event -> {
             if (stopAtGate && outcome.isDone()) return;
             eventHandler.accept(event.value());
+            if (event.value() instanceof StreamEvent.Done) {
+                doneHandedOver.complete(null);
+            }
             if (event.value() instanceof StreamEvent.ApprovalRequested asked && !outcome.isDone()
                     // a replayed question that was answered meanwhile asks nothing any more
                     && approvalStore.find(sessionId, asked.callId()).isPresent()) {
@@ -334,8 +342,18 @@ public class AgentChatService {
         }
         result.whenComplete((text, error) -> {
             subscription.close();
-            if (error != null) outcome.completeExceptionally(error);
-            else outcome.complete(TurnResult.completed(turnId, text));
+            if (error != null) {
+                outcome.completeExceptionally(error);
+                return;
+            }
+            // The events travel on the subscription's own drain thread, and closing lets it
+            // hand over what is queued afterwards: the task can be done before its Done has
+            // reached the handler. Completing now would give whoever reads the result on
+            // completion a turn still in progress. A Done that no longer comes — replayed
+            // from a buffer that dropped it — does not hold the outcome up for long.
+            doneHandedOver.completeOnTimeout(null, DONE_HANDOVER_GRACE.toMillis(),
+                            java.util.concurrent.TimeUnit.MILLISECONDS)
+                    .whenComplete((ignored, e) -> outcome.complete(TurnResult.completed(turnId, text)));
         });
         return handle;
     }
