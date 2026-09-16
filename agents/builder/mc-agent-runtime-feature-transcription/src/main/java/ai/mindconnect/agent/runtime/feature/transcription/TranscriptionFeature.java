@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.feature.transcription;
 
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.openai.OpenAiTranscriptionGateway;
 import ai.mindconnect.llm.port.in.LlmTranscription;
@@ -27,7 +28,8 @@ public class TranscriptionFeature implements RuntimeFeature {
     @Override
     public void configure(FeatureContext ctx) {
         ctx.bean(TranscriptionGateway.class, () -> new OpenAiTranscriptionGateway(
-                ctx.require(OkHttpClient.class), ctx.objectMapper(), ctx.require(EncryptionHelper.class)));
+                ctx.require(OkHttpClient.class), ctx.objectMapper(), ctx.require(EncryptionHelper.class),
+                ctx.require(EnvVarResolver.class)));
         ctx.bean(LlmTranscription.class, () -> new RoutingLlmTranscriptionService(
                 ctx.require(LlmConfigRepository.class), ctx.require(TranscriptionGateway.class)));
     }

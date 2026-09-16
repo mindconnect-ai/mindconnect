@@ -55,6 +55,7 @@ public class VectorStoreService {
     private final Path uploadBase;
     /** Where a call works — every store call names the namespace. */
     private final ScopeSupplier scope;
+    private final ai.mindconnect.common.env.EnvVarResolver environment;
 
     public VectorStoreService(ObjectProvider<VectorStores> storesProvider,
                               ObjectProvider<FileStore> fileStoreProvider,
@@ -62,9 +63,11 @@ public class VectorStoreService {
                               ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}")
                               String toolsBaseDir,
-                              ScopeSupplier scope) {
+                              ScopeSupplier scope,
+                              ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
         this.storesProvider = storesProvider;
         this.scope = scope;
+        this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStoreProvider = fileStoreProvider;
         this.workflowsProvider = workflowsProvider;
         this.workflowInstancesProvider = workflowInstancesProvider;
@@ -161,7 +164,7 @@ public class VectorStoreService {
         if (workflowName != null && !workflowName.isBlank()) {
             var workflow = workflows().findById(workflowName).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + workflowName + "' not found"));
-            var report = new WorkflowRunService(workflowInstances())
+            var report = new WorkflowRunService(workflowInstances(), environment::asMap)
                     .run(workflow, Map.of("file", uploadBase.relativize(target).toString(),
                             "store", storeName));
             return safeName + ": " + summarize(report);

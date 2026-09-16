@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.LlmHttpErrors;
 import ai.mindconnect.llm.adapter.TraceRedaction;
@@ -44,12 +45,15 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
     protected final OkHttpClient httpClient;
     protected final ObjectMapper objectMapper;
     protected final EncryptionHelper encryption;
+    protected final EnvVarResolver env;
     private final ObjectWriter prettyWriter;
 
-    AbstractOpenAiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
+    AbstractOpenAiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
+                          EnvVarResolver env) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.encryption = encryption;
+        this.env = env;
         this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
     }
 
@@ -69,7 +73,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                               Consumer<LlmStreamChunk> handler,
                               Cancellation cancellation,
                               LlmCallListener listener) {
-        config = config.resolved(encryption);
+        config = config.resolved(env, encryption);
         int msgCount = request.messages() == null ? 0 : request.messages().size();
         int toolCount = request.tools() == null ? 0 : request.tools().size();
         log.debug("LLM stream → model={} messages={} tools={}", config.model(), msgCount, toolCount);

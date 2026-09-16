@@ -72,6 +72,9 @@ public final class NamespacesPage {
                     .column(UiTable.Column.text("user", "Members"));
             table.row(Map.of("id", "everyone", "user", "Every signed-in user — the default namespace is open to all."));
             card.child(table);
+            card.child(UiText.of("namespace-" + id + "-environment-note",
+                    "The default namespace has no variables of its own: a ${VAR} here takes your own value, "
+                            + "else the server's environment. A namespace you create can carry variables for everyone in it."));
             return card;
         }
         UiTable table = UiTable.of("namespace-" + id + "-members", title).icon("layers")
@@ -104,8 +107,72 @@ public final class NamespacesPage {
         card.child(table);
         if (ns.isCreator(me)) {
             card.child(inviteForm(ns));
+            card.child(environment(ns));
         }
         return card;
+    }
+
+    /** The id of the variables table of {@code ns} — replaced in place after a variable is added or removed. */
+    public static String environmentId(Namespace ns) {
+        return "namespace-" + ns.value() + "-environment";
+    }
+
+    /**
+     * The variables of {@code ns}, for its creator: what {@code ${VAR}} placeholders in the
+     * namespace's LLM configs resolve to for everyone working here, unless a user set their
+     * own. Names only — a value is a secret and is never shown again.
+     */
+    public static UiTable environment(NamespaceDefinition ns) {
+        String id = ns.id().value();
+        return environmentTable(environmentId(ns.id()), "Variables", ns.environment().keySet(),
+                API + "/" + id + "/environment",
+                "Remove this variable? A config that refers to it falls back to the server's value, if there is one.");
+    }
+
+    /**
+     * A table of variables by name — one per owner: a user's own on the profile page, a
+     * namespace's here. Values are never shown; {@code apiBase} takes {@code /new} (the add
+     * dialog) and {@code /{name}} (a DELETE), {@code confirm} is asked before a removal.
+     */
+    public static UiTable environmentTable(String tableId, String title, java.util.Collection<String> names,
+                                           String apiBase, String confirm) {
+        UiTable table = UiTable.of(tableId, title).icon("key-round")
+                .column(UiTable.Column.text("name", "Name"))
+                .column(UiTable.Column.text("value", "Value"))
+                .action(UiAction.secondary(tableId + "-add", "Add variable…").icon("add")
+                        .dispatch("GET", apiBase + "/new"))
+                .rowAction(UiAction.danger("remove", "Remove").icon("delete")
+                        .confirm(confirm)
+                        .dispatch("DELETE", apiBase + "/{id}"));
+        for (String name : names) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", name);
+            row.put("name", name);
+            row.put("value", ai.mindconnect.adminui.ui.AdminPage.MASKED_VALUE);
+            table.row(row);
+        }
+        return table;
+    }
+
+    /**
+     * The form that adds (or replaces) one variable; {@code error} keeps it open with the
+     * reason. {@code target} is where the form posts, {@code close} what the cancel action calls.
+     */
+    public static UiForm environmentForm(String formId, String error, String target, String close) {
+        UiForm form = UiForm.of(formId, null)
+                .field(UiField.text("name", "Name", null).asEditable().asRequired()
+                        .placeholder("e.g. OPENAI_API_KEY")
+                        .hint("As a config refers to it: ${OPENAI_API_KEY}. Letters, digits and '_'."))
+                .field(UiField.password("value", "Value", null).asEditable().asRequired()
+                        .hint("Stored encrypted and never shown again; adding a name that exists replaces its value."))
+                .action(UiAction.primary(formId + "-save", "Save").icon("key-round")
+                        .dispatch("POST", target, formId))
+                .action(UiAction.secondary(formId + "-cancel", "Cancel")
+                        .dispatch("POST", close));
+        if (error != null) {
+            form.error(error);
+        }
+        return form;
     }
 
     private static UiForm inviteForm(NamespaceDefinition ns) {

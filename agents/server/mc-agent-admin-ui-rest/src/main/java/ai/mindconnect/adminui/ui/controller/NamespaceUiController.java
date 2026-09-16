@@ -11,6 +11,7 @@ import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.ui.model.UiDialog;
+import ai.mindconnect.ui.model.UiForm;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
@@ -48,6 +49,8 @@ import java.util.Map;
 public class NamespaceUiController {
 
     static final String CREATE_DIALOG_ID = "namespace-create-dialog";
+    static final String ENVIRONMENT_DIALOG_ID = "namespace-environment-dialog";
+    static final String ENVIRONMENT_FORM_ID = "namespace-environment-form";
     /** Where a switch lands: the agents of the namespace just entered. */
     static final URI AFTER_SWITCH = URI.create("/admin/api/agents");
 
@@ -112,7 +115,69 @@ public class NamespaceUiController {
 
     @PostMapping("/dialog/close")
     public UiPatch closeDialog() {
-        return UiPatch.of().patch(UiPatch.Operation.remove(CREATE_DIALOG_ID));
+        return UiPatch.of()
+                .patch(UiPatch.Operation.remove(CREATE_DIALOG_ID))
+                .patch(UiPatch.Operation.remove(ENVIRONMENT_DIALOG_ID));
+    }
+
+    /** Opens the "Add variable" dialog for {@code id}; only its creator sets variables, anyone else is told so. */
+    @GetMapping("/{id}/environment/new")
+    public UiPatch newVariable(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id) {
+        UserId me = userId(user);
+        Namespace namespace = new Namespace(id);
+        return namespaces.find(namespace)
+                .filter(ns -> ns.isCreator(me))
+                .map(ns -> dialog(ENVIRONMENT_DIALOG_ID, "Add variable to " + ns.label(), environmentForm(id, null)))
+                .orElseGet(() -> UiPatch.of().toast(UiToast.error("Only the creator of '" + id + "' sets its variables.")
+                        .title("Not yours to configure")));
+    }
+
+    /**
+     * Adds the variable — or replaces the value of one with that name — closes the dialog
+     * and re-renders the namespace's variables table. A refused name keeps the dialog open
+     * with the reason.
+     */
+    @PostMapping("/{id}/environment")
+    public UiPatch addVariable(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
+                               @RequestBody Map<String, Object> raw) {
+        UserId me = userId(user);
+        Namespace namespace = new Namespace(id);
+        FormBody body = new FormBody(raw);
+        String name = body.str("name") == null ? null : body.str("name").strip();
+        NamespaceDefinition updated;
+        try {
+            updated = namespaces.putVariable(namespace, me, name, body.str("value"));
+        } catch (IllegalArgumentException e) {
+            return dialog(ENVIRONMENT_DIALOG_ID, "Add variable to " + id, environmentForm(id, e.getMessage()));
+        }
+        return UiPatch.of()
+                .patch(UiPatch.Operation.remove(ENVIRONMENT_DIALOG_ID))
+                .patch(UiPatch.Operation.replace(NamespacesPage.environmentId(namespace), NamespacesPage.environment(updated)))
+                .toast(UiToast.success("Configs in '" + id + "' referring to ${" + name + "} now use this value.").title("Variable saved"));
+    }
+
+    @DeleteMapping("/{id}/environment/{name}")
+    public UiPatch removeVariable(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
+                                  @PathVariable("name") String name) {
+        UserId me = userId(user);
+        Namespace namespace = new Namespace(id);
+        NamespaceDefinition updated;
+        try {
+            updated = namespaces.removeVariable(namespace, me, name).orElse(null);
+        } catch (IllegalArgumentException e) {
+            return UiPatch.of().toast(UiToast.error(e.getMessage()).title("Not removed"));
+        }
+        if (updated == null) {
+            return UiPatch.of().toast(UiToast.error("'" + id + "' has no variable called " + name + ".").title("Nothing removed"));
+        }
+        return UiPatch.of()
+                .patch(UiPatch.Operation.replace(NamespacesPage.environmentId(namespace), NamespacesPage.environment(updated)))
+                .toast(UiToast.success("Configs in '" + id + "' referring to ${" + name + "} fall back to the server's value.").title("Variable removed"));
+    }
+
+    private static UiForm environmentForm(String id, String error) {
+        return NamespacesPage.environmentForm(ENVIRONMENT_FORM_ID, error,
+                NamespacesPage.API + "/" + id + "/environment", NamespacesPage.API + "/dialog/close");
     }
 
     @PostMapping("/{id}/members")

@@ -134,8 +134,12 @@ workflow declares its expected parameters via `WorkflowData.params` (a
 `Schema`; use `declareParams("name", …)` for the simple name-list form).
 
 The executor also injects a built-in variable **`env`** into the root scope of
-every run — a map of the process environment variables merged with the system
-properties — so steps can read `${env.HOME}` and friends.
+every run — by default a map of the process environment variables merged with
+the system properties — so steps can read `${env.HOME}` and friends. A host
+that keeps variables elsewhere hands in its own supplier with
+`service.withEnvironment(() -> map)`; the mindconnect agent server does that, so
+`${env.OPENAI_API_KEY}` in a workflow means the calling user's key there, then
+the namespace's, then the server's.
 
 ```java
 service.executeWorkflow(wf, Map.of("name", "Ada", "limit", 10));

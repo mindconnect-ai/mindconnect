@@ -4,6 +4,7 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 import ai.mindconnect.llm.port.out.TranscriptionGateway;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -56,12 +57,20 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final EncryptionHelper encryption;
+    private final EnvVarResolver env;
 
-    public OpenAiTranscriptionGateway(OkHttpClient httpClient, ObjectMapper objectMapper,
-                                      EncryptionHelper encryption) {
+    /** Placeholders resolve from the process environment alone — the library and desktop case. */
+    public OpenAiTranscriptionGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
+        this(httpClient, objectMapper, encryption, EnvVarResolver.system());
+    }
+
+    /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
+    public OpenAiTranscriptionGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
+                                      EnvVarResolver env) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.encryption = encryption;
+        this.env = env;
     }
 
     @Override
@@ -80,7 +89,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     @Override
     public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
                                           Consumer<String> onDelta) {
-        LlmConfig cfg = config.resolved(encryption);
+        LlmConfig cfg = config.resolved(env, encryption);
         String responseFormat = param(cfg, "response_format", "json");
         String stream = param(cfg, "stream", "auto");
         boolean askForStream = onDelta != null

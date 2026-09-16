@@ -1,7 +1,8 @@
 package ai.mindconnect.llm;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,39 @@ class LlmConfigResolvedTest {
     private static LlmConfig config(String model, String baseUrl, String apiKey) {
         return new LlmConfig(LlmConfigId.random(), "test", LlmProvider.OPENAI,
                 model, baseUrl, apiKey, 0.7, 4096, Map.of(), null, false, null, null, null, null, null);
+    }
+
+    @Test
+    void resolvedAgainstAChainTakesTheFirstSourceThatKnowsTheName() {
+        var chain = EnvVarResolver.chain(
+                EnvVarResolver.of(Map.of("OPENAI_API_KEY", "sk-alice")),
+                EnvVarResolver.of(Map.of("OPENAI_API_KEY", "sk-server", "LLM_MODEL", "gpt-4o")));
+        var cfg = config("${LLM_MODEL}", "https://api.openai.com", "${OPENAI_API_KEY}");
+
+        var r = cfg.resolved(chain, EncryptionHelper.noEncryption());
+
+        assertThat(r.apiKey()).isEqualTo("sk-alice");
+        assertThat(r.model()).isEqualTo("gpt-4o");
+    }
+
+    /** A user brings their own key, never their own endpoint for a config whose key may be the installation's. */
+    @Test
+    void personalVariablesReachTheApiKeyOnly() {
+        EnvVarResolver personal = new EnvVarResolver() {
+            final Map<String, String> vars = Map.of("OPENAI_API_KEY", "sk-alice", "OPENAI_BASE_URL", "https://alice.example", "LLM_MODEL", "alices-model");
+            @Override public java.util.Optional<String> get(String name) { return java.util.Optional.ofNullable(vars.get(name)); }
+            @Override public Map<String, String> asMap() { return vars; }
+            @Override public boolean personal() { return true; }
+        };
+        var chain = EnvVarResolver.chain(personal,
+                EnvVarResolver.of(Map.of("OPENAI_BASE_URL", "https://api.openai.com", "LLM_MODEL", "gpt-4o")));
+        var cfg = config("${LLM_MODEL}", "${OPENAI_BASE_URL}", "${OPENAI_API_KEY}");
+
+        var r = cfg.resolved(chain, EncryptionHelper.noEncryption());
+
+        assertThat(r.apiKey()).isEqualTo("sk-alice");
+        assertThat(r.baseUrl()).isEqualTo("https://api.openai.com");
+        assertThat(r.model()).isEqualTo("gpt-4o");
     }
 
     // --- resolved() — env-var expansion only ---

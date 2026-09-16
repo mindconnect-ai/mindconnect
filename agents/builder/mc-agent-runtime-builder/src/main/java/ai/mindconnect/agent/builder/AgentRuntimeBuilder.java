@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.builder;
 
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.memory.strategy.DefaultMemoryStrategyFactory;
@@ -122,6 +123,7 @@ public class AgentRuntimeBuilder {
     private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private String namespaceName = Namespace.DEFAULT.value();
     private String toolResultSummarizer = "rule";
+    private EnvVarResolver envVarResolver = EnvVarResolver.system();
     /** null → the default mapper, reading media parts from the runtime's file store. */
     private LlmMessageMapper llmMessageMapper;
     private java.time.Duration taskRetention = java.time.Duration.ZERO;
@@ -274,6 +276,17 @@ public class AgentRuntimeBuilder {
         return configure(CoreFeature.class, core -> core.encryptionKey(secretKey));
     }
 
+    /**
+     * Where {@code ${VAR}} placeholders in LLM configs get their values — the
+     * process environment unless the host has sources of its own (a per-user
+     * store, a vault). Chain them with {@link EnvVarResolver#chain}. Every
+     * feature can ask for it: {@code ctx.require(EnvVarResolver.class)}.
+     */
+    public AgentRuntimeBuilder envVarResolver(EnvVarResolver envVarResolver) {
+        this.envVarResolver = java.util.Objects.requireNonNull(envVarResolver, "envVarResolver");
+        return this;
+    }
+
     /** {@code rule} (default) or {@code llm}: how oversized tool results are shortened. */
     public AgentRuntimeBuilder toolResultSummarizer(String type) {
         this.toolResultSummarizer = type;
@@ -378,6 +391,7 @@ public class AgentRuntimeBuilder {
         // scope per call (the namespace feature) replaces both beans.
         context.bean(NamespaceRouting.class, () -> NamespaceRouting.fixed(context.require(Namespace.class)));
         context.bean(ObjectMapper.class, () -> objectMapper);
+        context.bean(EnvVarResolver.class, () -> envVarResolver);
         if (persistence instanceof Persistence.Postgres postgres) {
             // One Sql for every Postgres store, around this builder's mapper, so
             // the documents in the database are the JSON the file store writes.
