@@ -100,7 +100,7 @@ public class WorkflowRegistryInstaller implements RegistryInstaller {
                 case LLM_CONFIG -> name.equals(node.path("llmConfigName").asText(null));
                 case WORKFLOW -> stepClass.endsWith(".CallWorkflowData")
                         && name.equals(node.path("workflow").asText(null));
-                case PACKAGE -> false;
+                case SKILL, PACKAGE -> false;
             };
             if (hit) {
                 return true;
