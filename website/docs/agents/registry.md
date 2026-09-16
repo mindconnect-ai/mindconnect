@@ -76,6 +76,9 @@ agents/
   research-lead.json
 workflows/
   summarize.json
+skills/
+  weekly-report/
+    SKILL.md                ← a skill: front matter + instructions
 packages/
   research-kit.json         ← a package manifest
 ```
@@ -122,11 +125,16 @@ packages/
 | Field | Meaning |
 |-------|---------|
 | `id` | the entry's address inside this registry — what `requires` and packages refer to |
-| `type` | `llm-config`, `agent`, `workflow` or `package` |
+| `type` | `llm-config`, `agent`, `workflow`, `skill` or `package` |
 | `name` | the name the entity is installed under; the screen warns when it is taken |
 | `path` | where the entity's file sits in the repository |
 | `version`, `author`, `homepage`, `tags`, `description` | for the person deciding |
 | `requires` | ids of entries installed **first**, in order |
+
+An entry whose `type` this installation does not know — written for a newer
+Mindconnect — is left out and counted, and the screen says how many; the rest
+of the index reads as usual. A registry can therefore gain a kind of entry
+without breaking the installations that have not caught up.
 
 Unknown fields are ignored, so an index written against a later schema still
 reads.
@@ -143,6 +151,17 @@ writes. Two fields are taken away on the way in:
   `${ANTHROPIC_API_KEY}`, which resolves against *this* installation's
   environment at call time. A key that is not a placeholder is somebody else's
   credential — it is dropped, and the import report says so.
+
+A **skill** is the one entry that is not JSON: its file is a `SKILL.md` —
+front matter with `name`, `description` and `tools`, then the instructions —
+the same file the [Skills](./skills.md) screen offers for download, so a skill
+travels between a repository's `.mindconnect/skills/`, a registry and an
+installation unchanged. Imported, it is stored as a managed skill; the name
+comes from the front matter, or from the entry when the file names none. Only
+the file is fetched: a skill that keeps scripts or templates beside its
+`SKILL.md` in the repository has to carry them in its own text to be usable
+from a registry. Re-importing keeps the local id and the enabled flag — a
+skill an operator switched off stays off when a newer text arrives.
 
 ### Packages
 
@@ -226,6 +245,9 @@ everything imported is here afterwards:
 - **A workflow** is executable — its steps call tools, agents and scripts.
 - **An LLM config** names a provider and a base URL: the address this
   installation would send prompts to.
+- **A skill** is instructions an agent loads on demand — steps to follow,
+  commands to run. Imported, every agent whose skills mode is ALL is offered
+  it; an agent naming its skills has to name it.
 
 The import screen says this above the buttons, once, before the click.
 
@@ -234,7 +256,7 @@ The import screen says this above the buttons, once, before the click.
 | Module | Purpose |
 |--------|---------|
 | `mc-agent-registry-core` | What a registry is: domain, the three ports, the import service that walks packages and dependencies |
-| `mc-agent-registry` | The GitHub client, the file-backed store of registries, the installers for LLM configs and agents |
+| `mc-agent-registry` | The GitHub client, the file-backed store of registries, the installers for LLM configs, agents and skills |
 | `mc-agent-registry-admin-ui-rest` | The `/registry` screen |
 
 Installers are contributed by the module that owns the entity, so an installation

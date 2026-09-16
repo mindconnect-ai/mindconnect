@@ -15,7 +15,7 @@
     <name>mc-agent-starter-file</name>
     <packaging>jar</packaging>
     <description>Spring Boot starter: file persistence for the agent runtime — the Persistence the runtime starter
-        builds every store from, the request scope, and the installation-wide users and API tokens on files.</description>
+        builds every store from, and the installation-wide users and API tokens on files.</description>
 
     <dependencies>
         <dependency>

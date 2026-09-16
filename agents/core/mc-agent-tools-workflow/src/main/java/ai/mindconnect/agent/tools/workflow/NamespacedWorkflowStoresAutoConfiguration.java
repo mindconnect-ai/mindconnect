@@ -4,11 +4,13 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -90,6 +92,19 @@ public class NamespacedWorkflowStoresAutoConfiguration {
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(name = "ai.mindconnect.workflow.admin.run.RunThreadContext")
     static class AdminRuns {
+
+        /**
+         * The admin's runs resolve {@code ${env.X}} through the host's {@link EnvVarResolver} — on a
+         * server the user's, the namespace's and the process's variables — like the LLM gateways do.
+         */
+        @Bean
+        @ConditionalOnMissingBean
+        ai.mindconnect.workflow.admin.service.WorkflowAdminService workflowAdminService(
+                WorkflowDataRepository store, WorkflowInstanceRepository instances,
+                ObjectProvider<EnvVarResolver> environment) {
+            EnvVarResolver vars = environment.getIfAvailable(EnvVarResolver::system);
+            return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances, vars::asMap);
+        }
 
         /** A streamed run works in the namespace of the request that started it. */
         @Bean

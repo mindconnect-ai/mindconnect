@@ -4,6 +4,16 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.namespace.adapter.env.EncryptingNamespaceRepository;
+import ai.mindconnect.namespace.adapter.env.NamespaceEnvVarResolver;
+import ai.mindconnect.user.adapter.env.UserEnvVarResolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import ai.mindconnect.user.port.out.UserRepository;
+import java.util.ArrayList;
+import java.util.List;
 import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.namespace.adapter.file.FileNamespacePurge;
 import ai.mindconnect.namespace.adapter.file.FileNamespaceRepository;
@@ -45,6 +55,8 @@ import java.nio.file.Path;
                 "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig"})
 public class NamespaceAutoConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(NamespaceAutoConfiguration.class);
+
     /**
      * Where this server works: a {@link Scope} bound per request by the
      * {@link ScopeBindingFilter} and per queued task by the runtime's task
@@ -70,8 +82,19 @@ public class NamespaceAutoConfiguration {
     @ConditionalOnMissingBean(NamespaceRepository.class)
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     NamespaceRepository fileNamespaceRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
-                                                ObjectMapper objectMapper) {
-        return new FileNamespaceRepository(Path.of(baseDir), objectMapper);
+                                                ObjectMapper objectMapper,
+                                                ObjectProvider<EncryptionHelper> encryption) {
+        return encrypting(new FileNamespaceRepository(Path.of(baseDir), objectMapper), encryption);
+    }
+
+    /** A namespace's variables are secrets — {@code enc:} at rest when the application has a key, like LLM credentials. */
+    static NamespaceRepository encrypting(NamespaceRepository repository, ObjectProvider<EncryptionHelper> encryption) {
+        EncryptionHelper helper = encryption.getIfAvailable();
+        if (helper == null) {
+            log.warn("No EncryptionHelper — a namespace's variables are stored unencrypted");
+            return repository;
+        }
+        return new EncryptingNamespaceRepository(repository, helper);
     }
 
     /** Deleting a namespace removes {@code <mindconnect.data.base-dir>/<namespace>} — everything of it. */
@@ -88,8 +111,10 @@ public class NamespaceAutoConfiguration {
         /** One row per namespace in {@code mc_namespace}, on the persistence starter's {@code Sql}. */
         @Bean
         @ConditionalOnMissingBean(NamespaceRepository.class)
-        NamespaceRepository pgNamespaceRepository(ai.mindconnect.jdbc.Sql mindconnectSql) {
-            return new ai.mindconnect.namespace.adapter.pg.PgNamespaceRepository(mindconnectSql).initSchema();
+        NamespaceRepository pgNamespaceRepository(ai.mindconnect.jdbc.Sql mindconnectSql,
+                                                  ObjectProvider<EncryptionHelper> encryption) {
+            return encrypting(new ai.mindconnect.namespace.adapter.pg.PgNamespaceRepository(mindconnectSql).initSchema(),
+                    encryption);
         }
 
         /** Deleting a namespace removes its rows from every namespaced table and drops its pgvector tables. */
@@ -107,6 +132,24 @@ public class NamespaceAutoConfiguration {
                                       ObjectProvider<NamespacePurge> purges) {
         return new NamespaceService(namespaces, new Namespace(defaultNamespace), java.time.Clock.systemUTC(),
                 purges.orderedStream().toList());
+    }
+
+    /**
+     * Where {@code ${VAR}} placeholders — an LLM config's API key, say — get their
+     * values on this server: what the user behind the work stored for themselves,
+     * else what the namespace they work in stores, else the process environment.
+     * A host that resolves differently defines its own {@link EnvVarResolver}.
+     */
+    @Bean
+    @ConditionalOnMissingBean(EnvVarResolver.class)
+    EnvVarResolver envVarResolver(ScopeSupplier scope, NamespaceRepository namespaces,
+                                  ObjectProvider<UserRepository> users) {
+        List<EnvVarResolver> sources = new ArrayList<>();
+        UserRepository userRepository = users.getIfAvailable();
+        if (userRepository != null) sources.add(new UserEnvVarResolver(userRepository, scope));
+        sources.add(new NamespaceEnvVarResolver(namespaces, scope));
+        sources.add(EnvVarResolver.system());
+        return EnvVarResolver.chain(sources);
     }
 
     /** Before Spring Security ({@code -100}): matchers must see the path without the prefix. */

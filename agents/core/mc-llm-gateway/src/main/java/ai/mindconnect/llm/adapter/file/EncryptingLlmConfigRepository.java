@@ -2,7 +2,7 @@ package ai.mindconnect.llm.adapter.file;
 
 import ai.mindconnect.llm.domain.LlmConfigId;
 
-import ai.mindconnect.common.util.EnvVarResolver;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;

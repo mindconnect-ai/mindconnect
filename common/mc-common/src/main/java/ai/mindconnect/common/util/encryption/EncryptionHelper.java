@@ -1,6 +1,10 @@
 package ai.mindconnect.common.util.encryption;
 
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.SecretKeySpec;
@@ -8,6 +12,7 @@ import java.util.Base64;
 
 @RequiredArgsConstructor
 public class EncryptionHelper {
+    private static final Logger log = LoggerFactory.getLogger(EncryptionHelper.class);
     public static final String PLAIN = "plain:";
     public static final String ENC = "enc:";
 
@@ -52,6 +57,40 @@ public class EncryptionHelper {
         } catch (Exception e) {
             throw new RuntimeException("Error decrypting password", e);
         }
+    }
+
+    /** {@link #encrypt} with the {@code enc:} tag {@link #resolve} expects. */
+    public String encryptTagged(String plain) {
+        try {
+            return ENC + encrypt(plain);
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to encrypt a value", e);
+        }
+    }
+
+    /** Every value {@link #encryptTagged encrypted}; the map's order is kept. */
+    public Map<String, String> encryptValues(Map<String, String> plain) {
+        Map<String, String> encrypted = new LinkedHashMap<>();
+        plain.forEach((name, value) -> encrypted.put(name, encryptTagged(value)));
+        return encrypted;
+    }
+
+    /**
+     * Every value {@link #resolve resolved} to plaintext. A value that no longer
+     * decrypts — the key was rotated — is left out with a warning naming
+     * {@code owner} and the entry, rather than failing everything else the
+     * owner stored.
+     */
+    public Map<String, String> decryptValues(Map<String, String> stored, String owner) {
+        Map<String, String> plain = new LinkedHashMap<>();
+        stored.forEach((name, value) -> {
+            try {
+                plain.put(name, resolve(value));
+            } catch (RuntimeException e) {
+                log.warn("Cannot decrypt variable '{}' of {} — skipping it (was the encryption key rotated?)", name, owner);
+            }
+        });
+        return plain;
     }
 
     public String encrypt(String input) throws Exception {

@@ -60,18 +60,25 @@ public class AgentDefinitionInstaller implements RegistryInstaller {
         return name != null && repository.findByName(name).isPresent();
     }
 
-    /** Agents running on that LLM config, or calling or reviewing with that agent. */
+    /**
+     * Agents running on that LLM config, calling or reviewing with that agent,
+     * or naming that skill. An agent whose skills mode is ALL is not listed:
+     * it loads whatever is here and misses nothing by name.
+     */
     @Override
     public List<String> referencesTo(RegistryItemType type, String name) {
-        if (name == null || (type != RegistryItemType.LLM_CONFIG && type != RegistryItemType.AGENT)) {
+        if (name == null) {
             return List.of();
         }
         return repository.findAll().stream()
-                .filter(agent -> type == RegistryItemType.LLM_CONFIG
-                        ? name.equals(agent.llmConfigName())
-                        : !name.equals(agent.name())
-                                && (contains(agent.callableAgents(), name)
-                                        || contains(agent.responseReviewers(), name)))
+                .filter(agent -> switch (type) {
+                    case LLM_CONFIG -> name.equals(agent.llmConfigName());
+                    case AGENT -> !name.equals(agent.name())
+                            && (contains(agent.callableAgents(), name)
+                                    || contains(agent.responseReviewers(), name));
+                    case SKILL -> contains(agent.skillsOrDefault().names(), name);
+                    default -> false;
+                })
                 .map(AgentDefinition::name)
                 .toList();
     }

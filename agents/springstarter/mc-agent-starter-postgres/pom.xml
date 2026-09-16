@@ -15,7 +15,7 @@
     <name>mc-agent-starter-postgres</name>
     <packaging>jar</packaging>
     <description>Spring Boot starter: Postgres persistence for the agent runtime — the pooled data source, the
-        Persistence the runtime starter builds every store from, the request scope, and the installation-wide
+        Persistence the runtime starter builds every store from, and the installation-wide
         users and API tokens as tables. mindconnect.persistence=postgres switches it on.</description>
 
     <dependencies>
@@ -30,6 +30,10 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user</artifactId>
         </dependency>
         <!-- The namespace starter's Postgres stores are conditional on this module's classes. -->
         <dependency>

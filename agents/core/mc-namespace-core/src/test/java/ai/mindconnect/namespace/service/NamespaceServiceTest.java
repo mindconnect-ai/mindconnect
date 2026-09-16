@@ -50,6 +50,32 @@ class NamespaceServiceTest {
             new NamespaceService(repository, Namespace.DEFAULT, Clock.fixed(NOW, ZoneOffset.UTC));
 
     @Test
+    void onlyTheCreatorSetsTheVariables_andNotOnTheDefaultNamespace() {
+        service.create("acme", null, DAVID);
+        service.invite(new Namespace("acme"), DAVID, ALICE);
+
+        NamespaceDefinition updated = service.setEnvironment(new Namespace("acme"), DAVID, Map.of("OPENAI_API_KEY", "sk-acme"));
+
+        assertThat(updated.environment()).containsEntry("OPENAI_API_KEY", "sk-acme");
+        assertThat(repository.findById(new Namespace("acme"))).get().extracting(NamespaceDefinition::environment)
+                .isEqualTo(Map.of("OPENAI_API_KEY", "sk-acme"));
+        assertThatThrownBy(() -> service.setEnvironment(new Namespace("acme"), ALICE, Map.of("X", "y")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("Only the creator");
+        assertThatThrownBy(() -> service.setEnvironment(new Namespace("acme"), DAVID, Map.of("bad name", "y")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("bad name");
+        assertThatThrownBy(() -> service.setEnvironment(Namespace.DEFAULT, DAVID, Map.of("X", "y")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("default namespace");
+
+        assertThat(service.putVariable(new Namespace("acme"), DAVID, "TAVILY_API_KEY", "tvly").environment())
+                .containsKeys("OPENAI_API_KEY", "TAVILY_API_KEY");
+        assertThat(service.removeVariable(new Namespace("acme"), DAVID, "OPENAI_API_KEY")).get()
+                .extracting(NamespaceDefinition::environment).isEqualTo(Map.of("TAVILY_API_KEY", "tvly"));
+        assertThat(service.removeVariable(new Namespace("acme"), DAVID, "NOPE")).isEmpty();
+        assertThatThrownBy(() -> service.removeVariable(new Namespace("acme"), ALICE, "NOPE"))
+                .as("the right to remove is checked before the name").hasMessageContaining("Only the creator");
+    }
+
+    @Test
     void theDefaultNamespaceIsOpenToEveryoneAndGetsARecordOnFirstUse() {
         assertThat(service.canAccess(ALICE, Namespace.DEFAULT)).isTrue();
         assertThat(service.forUser(ALICE)).extracting(NamespaceDefinition::id).containsExactly(Namespace.DEFAULT);

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -21,14 +22,19 @@ import java.util.Optional;
  *                      unknown fields are ignored throughout
  * @param name          what the registry calls itself
  * @param description   what it is for
- * @param entries       everything on offer
+ * @param entries       everything on offer that this version can read
+ * @param unknownEntries how many entries the index lists of a type this
+ *                      version does not know — written for a newer
+ *                      Mindconnect, left out of {@link #entries}, so a
+ *                      screen can say they are there
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record RegistryIndex(
         int schemaVersion,
         String name,
         String description,
-        List<RegistryEntry> entries
+        List<RegistryEntry> entries,
+        int unknownEntries
 ) {
 
     /** The index format this code was written against. */
@@ -37,6 +43,12 @@ public record RegistryIndex(
     public RegistryIndex {
         entries = entries == null ? List.of() : List.copyOf(entries);
         if (schemaVersion <= 0) schemaVersion = SCHEMA_VERSION;
+        if (unknownEntries < 0) unknownEntries = 0;
+    }
+
+    /** An index of which every entry could be read. */
+    public RegistryIndex(int schemaVersion, String name, String description, List<RegistryEntry> entries) {
+        this(schemaVersion, name, description, entries, 0);
     }
 
     public static RegistryIndex empty() {
@@ -57,12 +69,21 @@ public record RegistryIndex(
                 .toList();
     }
 
+    /**
+     * Jackson. An entry of a type this version does not know arrives as
+     * {@code null} (see {@link RegistryEntry}); it is left out and counted.
+     */
     @JsonCreator
     static RegistryIndex fromJson(
             @JsonProperty("schemaVersion") int schemaVersion,
             @JsonProperty("name")          String name,
             @JsonProperty("description")   String description,
             @JsonProperty("entries")       List<RegistryEntry> entries) {
-        return new RegistryIndex(schemaVersion, name, description, entries);
+        if (entries == null) {
+            return new RegistryIndex(schemaVersion, name, description, List.of());
+        }
+        List<RegistryEntry> readable = entries.stream().filter(Objects::nonNull).toList();
+        return new RegistryIndex(schemaVersion, name, description, readable,
+                entries.size() - readable.size());
     }
 }

@@ -79,8 +79,17 @@ public class PostgresPersistenceConfig {
 
     @Bean
     /** Installation-wide, not per namespace: a user is the same person in every namespace. */
-    ai.mindconnect.user.port.out.UserRepository userRepository(Sql mindconnectSql) {
-        return new ai.mindconnect.user.adapter.pg.PgUserRepository(mindconnectSql).initSchema();
+    ai.mindconnect.user.port.out.UserRepository userRepository(
+            Sql mindconnectSql,
+            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption) {
+        var rows = new ai.mindconnect.user.adapter.pg.PgUserRepository(mindconnectSql).initSchema();
+        var helper = encryption.getIfAvailable();
+        // A user's own variables are secrets — enc: at rest when there is a key, like LLM credentials.
+        if (helper == null) {
+            log.warn("No EncryptionHelper — users' own variables are stored unencrypted");
+            return rows;
+        }
+        return new ai.mindconnect.user.adapter.env.EncryptingUserRepository(rows, helper);
     }
 
     @Bean

@@ -15,6 +15,7 @@ import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import ai.mindconnect.user.domain.ApiTokenId;
 import ai.mindconnect.user.service.ApiTokenService;
+import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.service.UserService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -48,6 +49,7 @@ public class ProfileUiController {
     static final String CREATE_DIALOG_ID = "api-token-create-dialog";
     static final String SECRET_DIALOG_ID = "api-token-secret-dialog";
     static final String INVITE_DIALOG_ID = "namespace-invite-dialog";
+    static final String ENVIRONMENT_DIALOG_ID = "profile-environment-dialog";
 
     private static final Duration DEFAULT_LIFETIME = Duration.ofDays(90);
 
@@ -184,6 +186,49 @@ public class ProfileUiController {
     @PostMapping("/namespaces/dialog/close")
     public UiPatch closeInviteDialog() {
         return UiPatch.of().patch(UiPatch.Operation.remove(INVITE_DIALOG_ID));
+    }
+
+    /** Opens the "Add variable" dialog. */
+    @GetMapping("/environment/new")
+    public UiPatch newVariable() {
+        return dialog(ENVIRONMENT_DIALOG_ID, "Add variable", ProfilePage.environmentForm(null));
+    }
+
+    /**
+     * Adds the variable — or replaces the value of one with that name — closes the
+     * dialog and re-renders the table. A refused name keeps the dialog open with the reason.
+     */
+    @PostMapping("/environment")
+    public UiPatch addVariable(@AuthenticationPrincipal OidcUser user, @RequestBody Map<String, Object> raw) {
+        UserId id = userId(user);
+        FormBody body = new FormBody(raw);
+        String name = body.str("name") == null ? null : body.str("name").strip();
+        User updated;
+        try {
+            updated = users.putVariable(id, name, body.str("value"));
+        } catch (IllegalArgumentException e) {
+            return dialog(ENVIRONMENT_DIALOG_ID, "Add variable", ProfilePage.environmentForm(e.getMessage()));
+        }
+        return UiPatch.of()
+                .patch(UiPatch.Operation.remove(ENVIRONMENT_DIALOG_ID))
+                .patch(UiPatch.Operation.replace(ProfilePage.ENVIRONMENT_ID, ProfilePage.environment(updated.environment())))
+                .toast(UiToast.success("Configs referring to ${" + name + "} now use your value.").title("Variable saved"));
+    }
+
+    @DeleteMapping("/environment/{name}")
+    public UiPatch removeVariable(@AuthenticationPrincipal OidcUser user, @PathVariable("name") String name) {
+        UserId id = userId(user);
+        boolean removed = users.removeVariable(id, name);
+        return UiPatch.of()
+                .patch(UiPatch.Operation.replace(ProfilePage.ENVIRONMENT_ID, ProfilePage.environment(users.environment(id))))
+                .toast(removed
+                        ? UiToast.success("Configs referring to ${" + name + "} fall back to the namespace's or the server's value.").title("Variable removed")
+                        : UiToast.error("You have no variable called " + name + ".").title("Nothing removed"));
+    }
+
+    @PostMapping("/environment/dialog/close")
+    public UiPatch closeVariableDialog() {
+        return UiPatch.of().patch(UiPatch.Operation.remove(ENVIRONMENT_DIALOG_ID));
     }
 
     /** Opens the "New token" dialog. */

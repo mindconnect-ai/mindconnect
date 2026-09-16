@@ -75,7 +75,6 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user</artifactId>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

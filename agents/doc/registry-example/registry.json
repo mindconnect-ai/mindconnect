@@ -34,10 +34,20 @@
       "author": "mindconnect"
     },
     {
+      "id": "changelog-style",
+      "type": "skill",
+      "name": "changelog-style",
+      "description": "How a changelog entry is written — loaded by an agent on demand",
+      "version": "1.0.0",
+      "path": "skills/changelog-style/SKILL.md",
+      "tags": ["writing", "release"],
+      "author": "mindconnect"
+    },
+    {
       "id": "release-kit",
       "type": "package",
       "name": "Release kit",
-      "description": "The changelog writer, the workflow it runs, and the model they share",
+      "description": "The changelog writer, the workflow it runs, the model they share, and the skill it writes by",
       "version": "1.0.0",
       "path": "packages/release-kit.json",
       "author": "mindconnect"

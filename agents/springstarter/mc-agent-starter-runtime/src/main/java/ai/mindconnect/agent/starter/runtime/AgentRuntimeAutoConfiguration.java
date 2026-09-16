@@ -57,6 +57,7 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import ai.mindconnect.common.env.EnvVarResolver;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -111,6 +112,7 @@ public class AgentRuntimeAutoConfiguration {
                               Environment env,
                               ApplicationContext context,
                               ObjectProvider<ThreadBoundScope> boundScope,
+                              ObjectProvider<EnvVarResolver> envVarResolver,
                               ObjectProvider<RuntimeFeature> features,
                               ObjectProvider<AgentRuntimeCustomizer> customizers) {
         String namespace = env.getProperty("mindconnect.namespace", "local");
@@ -120,6 +122,9 @@ public class AgentRuntimeAutoConfiguration {
                 .toolResultSummarizer(env.getProperty("mindconnect.agent.tool-result.summarizer", "rule"))
                 // A tool from an optional module asks for the host's beans when no feature registered the type.
                 .beanFallback(type -> Optional.ofNullable(context.getBeanProvider(type).getIfUnique()));
+        // Where ${VAR} placeholders resolve: the namespace starter's chain — the user's own
+        // variables, then the namespace's, then the process — or the process alone without it.
+        builder.envVarResolver(envVarResolver.getIfAvailable(EnvVarResolver::system));
 
         CoreFeature core = builder.feature(CoreFeature.class)
                 .encryptionKey(blankToNull(env.getProperty("mindconnect.encryption.secret-key")))

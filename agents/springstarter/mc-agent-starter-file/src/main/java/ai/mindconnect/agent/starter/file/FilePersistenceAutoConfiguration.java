@@ -1,10 +1,15 @@
 package ai.mindconnect.agent.starter.file;
 
 import ai.mindconnect.agent.runtime.feature.Persistence;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
 import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
 import ai.mindconnect.user.adapter.file.FileUserRepository;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
 import ai.mindconnect.user.port.out.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -32,6 +37,8 @@ import java.nio.file.Path;
 @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
 public class FilePersistenceAutoConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(FilePersistenceAutoConfiguration.class);
+
     @Bean
     @ConditionalOnMissingBean(Persistence.class)
     Persistence persistence(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
@@ -41,8 +48,16 @@ public class FilePersistenceAutoConfiguration {
     /** Installation-wide, not per namespace: a user is the same person in every namespace. */
     @Bean
     @ConditionalOnMissingBean(UserRepository.class)
-    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new FileUserRepository(Path.of(baseDir));
+    UserRepository userRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                  ObjectProvider<EncryptionHelper> encryption) {
+        UserRepository files = new FileUserRepository(Path.of(baseDir));
+        EncryptionHelper helper = encryption.getIfAvailable();
+        // A user's own variables are secrets — enc: at rest when there is a key, like LLM credentials.
+        if (helper == null) {
+            log.warn("No EncryptionHelper — users' own variables are stored unencrypted under {}", baseDir);
+            return files;
+        }
+        return new EncryptingUserRepository(files, helper);
     }
 
     @Bean

@@ -87,11 +87,17 @@ public record RegistryEntry(
         return value != null && value.toLowerCase(Locale.ROOT).contains(lowerCaseNeedle);
     }
 
-    /** Jackson: {@code requires} also accepts a single string, which is what people write. */
+    /**
+     * Jackson: {@code requires} also accepts a single string, which is what
+     * people write. An entry whose {@code type} this version does not know
+     * reads as {@code null} rather than failing the whole index — a registry
+     * that gained a kind of entry in a newer Mindconnect is still a registry
+     * to an older one, minus those entries; {@link RegistryIndex} counts them.
+     */
     @JsonCreator
     static RegistryEntry fromJson(
             @JsonProperty("id")          String id,
-            @JsonProperty("type")        RegistryItemType type,
+            @JsonProperty("type")        String typeText,
             @JsonProperty("name")        String name,
             @JsonProperty("description") String description,
             @JsonProperty("version")     String version,
@@ -100,6 +106,10 @@ public record RegistryEntry(
             @JsonProperty("author")      String author,
             @JsonProperty("homepage")    String homepage,
             @JsonProperty("requires")    List<String> requires) {
+        RegistryItemType type = RegistryItemType.fromWireOrNull(typeText);
+        if (type == null && typeText != null && !typeText.isBlank()) {
+            return null;
+        }
         return new RegistryEntry(id, type, name, description, version, path, tags, author,
                 homepage, requires);
     }

@@ -2,12 +2,16 @@ package ai.mindconnect.user.service;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.port.out.UserRepository;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -25,6 +29,8 @@ public class UserService {
 
     private final UserRepository users;
     private final Clock clock;
+    /** Every change of a record is read-modify-write of the whole document: one at a time per user, in this process. */
+    private final Map<UserId, Object> locks = new ConcurrentHashMap<>();
 
     public UserService(UserRepository users) {
         this(users, Clock.systemUTC());
@@ -44,6 +50,12 @@ public class UserService {
      */
     public User recordLogin(UserId id, String subject, String issuer, String displayName, String email) {
         Objects.requireNonNull(id, "id");
+        synchronized (lockFor(id)) {
+            return recordLoginLocked(id, subject, issuer, displayName, email);
+        }
+    }
+
+    private User recordLoginLocked(UserId id, String subject, String issuer, String displayName, String email) {
         Instant now = clock.instant();
         User existing = users.findById(id).orElse(null);
         if (existing == null) {
@@ -58,7 +70,8 @@ public class UserService {
                 orElse(email, existing.email()),
                 existing.createdAt(),
                 existing.lastLoginAt(),
-                existing.activeNamespace());
+                existing.activeNamespace(),
+                existing.environment());
         boolean changed = !merged.equals(existing);
         boolean stale = existing.lastLoginAt() == null
                 || Duration.between(existing.lastLoginAt(), now).compareTo(LOGIN_RESOLUTION) >= 0;
@@ -66,7 +79,8 @@ public class UserService {
             return existing;
         }
         User updated = new User(id, merged.subject(), merged.issuer(), merged.displayName(), merged.email(),
-                merged.createdAt() != null ? merged.createdAt() : now, now, merged.activeNamespace());
+                merged.createdAt() != null ? merged.createdAt() : now, now, merged.activeNamespace(),
+                merged.environment());
         users.save(updated);
         return updated;
     }
@@ -82,14 +96,16 @@ public class UserService {
     public void selectNamespace(UserId id, Namespace namespace) {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(namespace, "namespace");
-        User existing = users.findById(id).orElse(null);
-        if (existing == null) {
-            Instant now = clock.instant();
-            users.save(new User(id, null, null, null, null, now, now, namespace.value()));
-            return;
-        }
-        if (!namespace.value().equals(existing.activeNamespace())) {
-            users.save(existing.withActiveNamespace(namespace.value()));
+        synchronized (lockFor(id)) {
+            User existing = users.findById(id).orElse(null);
+            if (existing == null) {
+                Instant now = clock.instant();
+                users.save(new User(id, null, null, null, null, now, now, namespace.value()));
+                return;
+            }
+            if (!namespace.value().equals(existing.activeNamespace())) {
+                users.save(existing.withActiveNamespace(namespace.value()));
+            }
         }
     }
 
@@ -98,6 +114,61 @@ public class UserService {
         return users.findById(id).map(User::activeNamespace)
                 .filter(value -> value != null && !value.isBlank())
                 .map(Namespace::new);
+    }
+
+    /**
+     * Replaces the variables {@code id} keeps for themselves with exactly
+     * {@code environment} — every name with a value. A user the installation
+     * has not seen sign in yet gets a record for it. Values go to the
+     * repository in plain; an encrypting repository decorator makes them
+     * {@code enc:} at rest.
+     */
+    public User setEnvironment(UserId id, Map<String, String> environment) {
+        Objects.requireNonNull(id, "id");
+        EnvVarResolver.requireValid(environment);
+        synchronized (lockFor(id)) {
+            return saveEnvironment(id, environment);
+        }
+    }
+
+    /** Adds the variable {@code name} to {@code id}'s own, or replaces its value; the merge happens under the user's lock. */
+    public User putVariable(UserId id, String name, String value) {
+        Objects.requireNonNull(id, "id");
+        EnvVarResolver.requireValid(name, value);
+        synchronized (lockFor(id)) {
+            Map<String, String> merged = new LinkedHashMap<>(environment(id));
+            merged.put(name, value);
+            return saveEnvironment(id, merged);
+        }
+    }
+
+    /** Removes the variable {@code name} from {@code id}'s own; false when they had none of that name. */
+    public boolean removeVariable(UserId id, String name) {
+        Objects.requireNonNull(id, "id");
+        synchronized (lockFor(id)) {
+            Map<String, String> merged = new LinkedHashMap<>(environment(id));
+            if (merged.remove(name) == null) return false;
+            saveEnvironment(id, merged);
+            return true;
+        }
+    }
+
+    private User saveEnvironment(UserId id, Map<String, String> environment) {
+        User existing = users.findById(id).orElse(null);
+        User updated = existing == null
+                ? new User(id, null, null, null, null, clock.instant(), clock.instant(), null, environment)
+                : existing.withEnvironment(environment);
+        users.save(updated);
+        return updated;
+    }
+
+    /** The variables {@code id} keeps for themselves, as stored — empty for a user the installation does not know. */
+    public Map<String, String> environment(UserId id) {
+        return users.findById(id).map(User::environment).orElse(Map.of());
+    }
+
+    private Object lockFor(UserId id) {
+        return locks.computeIfAbsent(id, k -> new Object());
     }
 
     private static String orElse(String value, String fallback) {

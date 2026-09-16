@@ -8,7 +8,8 @@ registry.json                     the index — everything on offer
 llm-configs/example-default.json  an LLM config, keyed from ${ANTHROPIC_API_KEY}
 agents/changelog-writer.json      an agent, requiring the config above
 workflows/greeting.json           a workflow, exactly as the store writes it
-packages/release-kit.json         a package: all three, installed together
+skills/changelog-style/SKILL.md   a skill: front matter, then instructions
+packages/release-kit.json         a package: all four, installed together
 ```
 
 ## Trying it
@@ -17,9 +18,9 @@ packages/release-kit.json         a package: all three, installed together
 2. In the admin UI, open **Registry → Add registry** and type `owner/repo`.
 3. Open it, and import `Release kit`.
 
-Three entities arrive: the LLM config first (the agent requires it), then the
-agent and the workflow. Nothing runs; the changelog writer is in your agent list
-and the workflow in the workflow admin.
+Four entities arrive: the LLM config first (the agent requires it), then the
+agent, the workflow and the skill. Nothing runs; the changelog writer is in your
+agent list, the workflow in the workflow admin, the skill on the Skills screen.
 
 The format is documented at
 [website/docs/agents/registry.md](../../../website/docs/agents/registry.md).

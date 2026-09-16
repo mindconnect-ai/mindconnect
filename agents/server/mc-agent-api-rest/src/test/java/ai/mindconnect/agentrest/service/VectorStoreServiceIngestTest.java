@@ -37,7 +37,8 @@ class VectorStoreServiceIngestTest {
         VectorStoreService service = new VectorStoreService(beans.getBeanProvider(VectorStores.class),
                 beans.getBeanProvider(FileStore.class), beans.getBeanProvider(WorkflowDataRepository.class),
                 beans.getBeanProvider(WorkflowInstanceRepository.class), dir.resolve("tools").toString(),
-                ai.mindconnect.agent.ScopeSupplier.local());
+                ai.mindconnect.agent.ScopeSupplier.local(),
+                beans.getBeanProvider(ai.mindconnect.common.env.EnvVarResolver.class));
 
         assertThatThrownBy(() -> service.ingestStoredFile("handbook", alices.id().value(), UserId.of("bob")))
                 .isInstanceOf(IllegalArgumentException.class)
