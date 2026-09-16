@@ -59,6 +59,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ai.mindconnect.common.env.EnvVarResolver;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.AnnotatedBeanDefinition;
+import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.ApplicationContext;
@@ -69,6 +71,8 @@ import org.springframework.core.env.Environment;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -121,7 +125,7 @@ public class AgentRuntimeAutoConfiguration {
                 .namespace(namespace)
                 .toolResultSummarizer(env.getProperty("mindconnect.agent.tool-result.summarizer", "rule"))
                 // A tool from an optional module asks for the host's beans when no feature registered the type.
-                .beanFallback(type -> Optional.ofNullable(context.getBeanProvider(type).getIfUnique()));
+                .beanFallback(type -> hostBean(context, type));
         // Where ${VAR} placeholders resolve: the namespace starter's chain — the user's own
         // variables, then the namespace's, then the process — or the process alone without it.
         builder.envVarResolver(envVarResolver.getIfAvailable(EnvVarResolver::system));
@@ -200,6 +204,42 @@ public class AgentRuntimeAutoConfiguration {
 
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    /**
+     * A bean of the host for a type no feature registered — never one of the
+     * exports below. Those hand the runtime's own beans to the application,
+     * so resolving one while the runtime is still being built asks Spring for
+     * the runtime again: a cycle that stops the application from starting. It
+     * happened for {@code ToolRepository}, which the tools feature registers
+     * on files only, as soon as a server ran on Postgres.
+     */
+    static <T> Optional<T> hostBean(ApplicationContext context, Class<T> type) {
+        if (!(context.getAutowireCapableBeanFactory()
+                instanceof ConfigurableListableBeanFactory factory)) {
+            return Optional.ofNullable(context.getBeanProvider(type).getIfUnique());
+        }
+        List<String> hosts = Arrays.stream(factory.getBeanNamesForType(type, true, false))
+                .filter(name -> !exportedHere(factory, name))
+                .toList();
+        if (hosts.size() > 1) {
+            // Several: the primary one, as getIfUnique would pick.
+            hosts = hosts.stream()
+                    .filter(name -> factory.containsBeanDefinition(name) && factory.getBeanDefinition(name).isPrimary())
+                    .toList();
+        }
+        return hosts.size() == 1 ? Optional.of(factory.getBean(hosts.get(0), type)) : Optional.empty();
+    }
+
+    /** Whether {@code name} is one of this configuration's exports of the runtime's beans. */
+    private static boolean exportedHere(
+            ConfigurableListableBeanFactory factory, String name) {
+        if (!factory.containsBeanDefinition(name)) return false;
+        return factory.getBeanDefinition(name)
+                instanceof AnnotatedBeanDefinition annotated
+                && annotated.getFactoryMethodMetadata() != null
+                && AgentRuntimeAutoConfiguration.class.getName()
+                        .equals(annotated.getFactoryMethodMetadata().getDeclaringClassName());
     }
 
     // ── the runtime's beans, for the application's own beans to inject ─────
