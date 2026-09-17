@@ -94,8 +94,17 @@ public final class ChatPage {
                 .withParentSession(session.parentSessionId());
         this.chatForm = new ChatFormComponent(session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
-                .withAgentCounts(agent)
+                .withAgentCounts(agent, List.of())
                 .withWorkingDir(session.workingDir());
+    }
+
+    /**
+     * The tools the registry can hand out here, so the "+" menu's Tools badge
+     * counts what the Tools picker counts — a binding without a row is not in it.
+     */
+    public ChatPage withOfferedTools(java.util.Collection<String> offeredTools) {
+        this.chatForm.withAgentCounts(agent, offeredTools);
+        return this;
     }
 
     /** Whether the composer offers the choice of the chat's directories. */

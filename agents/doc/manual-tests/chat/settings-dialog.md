@@ -28,8 +28,10 @@ dialog itself; it shows up two clicks away, in the "+" menu's Tools picker.
 ## Steps
 
 1. Open a new chat, then **+** → **Tools** and write down the header count
-   (`Tools · N on, M available`). Close the dialog.
-   **Expected:** N is the number the "+" menu's **Tools** entry badges.
+   (`Tools · N on, M by search, K available`). Close the dialog.
+   **Expected:** N is the number the "+" menu's **Tools** entry badges. Tools
+   set to Search and bindings the registry cannot resolve on this host have no
+   place in either number.
 
 2. Click the **model button** in the composer (it names the chat's model,
    e.g. `agent-default`).
@@ -57,9 +59,9 @@ dialog itself; it shows up two clicks away, in the "+" menu's Tools picker.
 5. Reopen the dialog, set **Agent** to `— no agent: the model and prompt
    below —`, and press **Apply**.
    **Expected:** The chat detaches. **+** → **Tools**: the header count is
-   STILL N — including any tool the registry cannot resolve on this host (with
-   no Gmail credentials, `default-chat`'s three `gmail_*` tools are among
-   them, so N does not drop by three). **+** → **Sub-agents**: the same roster
+   STILL N, and so is the **Tools** badge. (With no Gmail credentials,
+   `default-chat`'s three deferred `gmail_*` tools cannot be resolved: they
+   have no row and are counted in neither number, before or after.) **+** → **Sub-agents**: the same roster
    as before, with the line about it being the agent's roster.
 
 6. Reopen the dialog. Edit the **System prompt** again and press **Apply**,

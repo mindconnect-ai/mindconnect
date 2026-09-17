@@ -99,9 +99,15 @@ public final class ChatFormComponent implements UiComponent {
      * Puts the tool and sub-agent counts on the "+" menu's entries, so what
      * the chat can reach for is readable from the composer rather than from a
      * dialog two clicks in. {@code agent} is the chat's effective agent.
+     *
+     * <p>The tool count is the Tools picker's "on" count, not every binding
+     * the agent carries — see {@link ChatToolsPickerComponent#onCount}.
+     *
+     * @param offeredTools every tool name the registry can hand out here
      */
-    public ChatFormComponent withAgentCounts(AgentDefinition agent) {
-        this.toolCount = agent == null || agent.tools() == null ? 0 : agent.tools().size();
+    public ChatFormComponent withAgentCounts(AgentDefinition agent,
+                                             java.util.Collection<String> offeredTools) {
+        this.toolCount = ChatToolsPickerComponent.onCount(agent, offeredTools);
         this.subAgentCount = agent == null ? 0 : agent.effectiveCallableAgents().size();
         return this;
     }

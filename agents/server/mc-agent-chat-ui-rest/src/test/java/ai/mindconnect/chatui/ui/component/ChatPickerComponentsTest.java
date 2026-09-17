@@ -99,6 +99,35 @@ class ChatPickerComponentsTest {
                 .contains("\"collapseOpen\":false");
     }
 
+    /**
+     * The "+" menu's Tools badge is the picker's "on" count. A deferred tool
+     * is not up front, and a binding the registry cannot resolve on this host
+     * (Gmail without credentials) has no row: counting every binding badged
+     * 19 over a picker that said 12 on.
+     */
+    @Test
+    void theToolsBadgeCountsWhatThePickerCountsOn() throws Exception {
+        var agent = AgentDefinition.create("default-chat", "Chats", "You chat.", null, "agent-default")
+                .withTools(List.of(tool("read_file", false), tool("bash", false),
+                        tool("web_search", true),
+                        tool("gmail_send", false), tool("gmail_read", true)));
+        Map<String, List<String>> byGroup =
+                Map.of("files", List.of("read_file", "bash"), "web", List.of("web_search"));
+
+        String picker = json(ChatToolsPickerComponent.node(SESSION, byGroup,
+                ChatToolsPickerComponent.states(agent), Map.of()));
+        String composer = json(new ChatFormComponent(SESSION, agent.id())
+                .withAgentCounts(agent, ChatToolsPickerComponent.offered(byGroup)).render());
+
+        assertThat(picker).contains("Tools · 2 on, 1 by search, 3 available");
+        assertThat(composer).contains("\"badge\":\"2\"").doesNotContain("\"badge\":\"5\"");
+    }
+
+    private static ai.mindconnect.agent.tool.AgentTool tool(String name, boolean deferred) {
+        return new ai.mindconnect.agent.tool.AgentTool.Json(null, name, null, Map.of(),
+                true, deferred, false, null).toTool();
+    }
+
     /** Where a tool comes from is worth a line when the registry knows it. */
     @Test
     void aToolNamesItsSource() throws Exception {

@@ -1,6 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiList;
@@ -10,8 +11,10 @@ import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTrigger;
 
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -63,13 +66,11 @@ public final class ChatToolsPickerComponent {
                               Map<String, ToolState> states, Map<String, String> subgroups) {
         var body = UiStack.of(BODY_ID).gap(12);
 
-        // Counted over the rows the picker shows: a binding the registry
-        // cannot resolve here (Gmail without credentials) stays on the chat
-        // but has no row, and a count nobody can find the rows for is noise.
-        var shown = new TreeSet<String>();
-        byGroup.values().forEach(shown::addAll);
-        long on = shown.stream().filter(n -> states.get(n) == ToolState.ON).count();
-        long searchable = shown.stream().filter(n -> states.get(n) == ToolState.SEARCH).count();
+        // Counted over the rows the picker shows — see onCount, which the
+        // "+" menu's badge goes through too.
+        var shown = offered(byGroup);
+        long on = count(shown, states, ToolState.ON);
+        long searchable = count(shown, states, ToolState.SEARCH);
         var groups = UiList.of("chat-tools-groups",
                 "Tools · " + on + " on, " + searchable + " by search, " + shown.size() + " available")
                 .icon("wrench");
@@ -106,6 +107,43 @@ public final class ChatToolsPickerComponent {
                     .withCssClass("chat-picker-hint"));
         }
         return body;
+    }
+
+    /** Where each tool the agent binds stands: on, or left for tool search. */
+    public static Map<String, ToolState> states(AgentDefinition agent) {
+        var states = new LinkedHashMap<String, ToolState>();
+        if (agent == null || agent.tools() == null) return states;
+        agent.tools().forEach(t ->
+                states.putIfAbsent(t.name(), t.deferred() ? ToolState.SEARCH : ToolState.ON));
+        return states;
+    }
+
+    /** Every tool name the picker has a row for, out of the registry's groups. */
+    public static Set<String> offered(Map<String, ? extends Collection<String>> byGroup) {
+        var names = new TreeSet<String>();
+        if (byGroup != null) byGroup.values().forEach(names::addAll);
+        return names;
+    }
+
+    /**
+     * How many tools the chat offers up front: the picker's "on" count, and
+     * the badge on the "+" menu's Tools entry — both go through here, so the
+     * two cannot say different things.
+     *
+     * <p>Counted over the rows the picker shows: a binding the registry
+     * cannot resolve here (Gmail without credentials) stays on the chat but
+     * has no row and never reaches the model, and a count nobody can find
+     * the rows for is noise. A deferred tool is not up front either.
+     *
+     * @param offered every tool name the registry can hand out
+     */
+    public static int onCount(AgentDefinition agent, Collection<String> offered) {
+        return (int) count(offered, states(agent), ToolState.ON);
+    }
+
+    private static long count(Collection<String> offered, Map<String, ToolState> states, ToolState state) {
+        return offered == null ? 0
+                : offered.stream().distinct().filter(n -> states.get(n) == state).count();
     }
 
     /** One tool: what it is called, where it comes from, and the switch. */

@@ -411,7 +411,7 @@ public class ChatUiController {
                         session.id(), agent.id(), streaming)
                 .withModelLabel(agent.llmConfigName())
                 .withAttachments(sessionFiles.attachments(session.id()))
-                .withAgentCounts(agent)
+                .withAgentCounts(agent, offeredToolNames())
                 .withWorkingDir(session.workingDir())
                 .withDirChoice(sessionService.workingDirChoice());
         return UiPatch.Operation.replace(form.id(), form.render());
@@ -844,11 +844,13 @@ public class ChatUiController {
             String subgroup = toolRegistry.subgroupOf(name);
             if (subgroup != null && !subgroup.isBlank()) subgroups.put(name, subgroup);
         }));
-        var states = new java.util.HashMap<String, ToolState>();
-        selection(effective).forEach((name, deferred) ->
-                states.put(name, deferred ? ToolState.SEARCH : ToolState.ON));
-        return ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.node(
-                session.id(), byGroup, states, subgroups);
+        return ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.node(session.id(), byGroup,
+                ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.states(effective), subgroups);
+    }
+
+    /** Every tool the picker has a row for — what the composer's tool badge counts over. */
+    private java.util.Set<String> offeredToolNames() {
+        return ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent.offered(offeredToolsByGroup());
     }
 
     /**
@@ -1195,7 +1197,8 @@ public class ChatUiController {
                 (toolCallId, running, in, out) ->
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
-                .withHostLinks(hostLinks);
+                .withHostLinks(hostLinks)
+                .withOfferedTools(offeredToolNames());
         page.withAttachments(sessionFiles.attachments(session.id()));
         page.withDirChoice(sessionService.workingDirChoice());
         // Every render hands the SPA this session's stream — whether or not
