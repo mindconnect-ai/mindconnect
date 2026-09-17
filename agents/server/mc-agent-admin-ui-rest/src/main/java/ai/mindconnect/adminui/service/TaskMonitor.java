@@ -15,6 +15,7 @@ import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.Subscription;
+import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.taskqueue.TaskListener;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
@@ -134,29 +135,39 @@ public class TaskMonitor implements TaskListener {
     /** Where lookups run: a task's session lives in the task's namespace, and the board shows every namespace. */
     private final ScopeSupplier scope;
 
+    /**
+     * Which namespaces still exist. A finished task outlives the namespace it ran in, and looking
+     * its session up there would open that namespace's stores again — with file persistence, its
+     * directory.
+     */
+    private final NamespaceService namespaces;
+
     /** A host without namespaces — lookups run wherever the repositories are bound. */
     public TaskMonitor(LocalTaskQueue queue,
                        AgentSessionRepository sessions,
                        AgentDefinitionRepository definitions) {
-        this(queue, sessions, definitions, (ScopeSupplier) null);
+        this(queue, sessions, definitions, (ScopeSupplier) null, (NamespaceService) null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
     public TaskMonitor(LocalTaskQueue queue,
                        AgentSessionRepository sessions,
                        AgentDefinitionRepository definitions,
-                       org.springframework.beans.factory.ObjectProvider<ScopeSupplier> scope) {
-        this(queue, sessions, definitions, scope.getIfAvailable());
+                       org.springframework.beans.factory.ObjectProvider<ScopeSupplier> scope,
+                       org.springframework.beans.factory.ObjectProvider<NamespaceService> namespaces) {
+        this(queue, sessions, definitions, scope.getIfAvailable(), namespaces.getIfAvailable());
     }
 
     TaskMonitor(LocalTaskQueue queue,
                 AgentSessionRepository sessions,
                 AgentDefinitionRepository definitions,
-                ScopeSupplier scope) {
+                ScopeSupplier scope,
+                NamespaceService namespaces) {
         this.queue = queue;
         this.sessions = sessions;
         this.definitions = definitions;
         this.scope = scope;
+        this.namespaces = namespaces;
         queue.addListener(this);
     }
 
@@ -228,6 +239,7 @@ public class TaskMonitor implements TaskListener {
     public Snapshot snapshot() {
         Map<SessionId, Optional<AgentSession>> sessionCache = new HashMap<>();
         Map<AgentId, Optional<AgentDefinition>> definitionCache = new HashMap<>();
+        Map<ai.mindconnect.agent.Namespace, Boolean> existing = new HashMap<>();
 
         List<TaskRecord> active = new ArrayList<>();
         active.addAll(queue.byStatus(TaskStatus.RUNNING, QUERY_LIMIT));
@@ -243,24 +255,27 @@ public class TaskMonitor implements TaskListener {
         if (finished.size() > RECENT_LIMIT) finished = finished.subList(0, RECENT_LIMIT);
 
         return new Snapshot(
-                active.stream().map(t -> view(t, sessionCache, definitionCache)).toList(),
-                finished.stream().map(t -> view(t, sessionCache, definitionCache)).toList(),
+                active.stream().map(t -> view(t, sessionCache, definitionCache, existing)).toList(),
+                finished.stream().map(t -> view(t, sessionCache, definitionCache, existing)).toList(),
                 Instant.now());
     }
 
     private TaskView view(TaskRecord task,
                           Map<SessionId, Optional<AgentSession>> sessionCache,
-                          Map<AgentId, Optional<AgentDefinition>> definitionCache) {
+                          Map<AgentId, Optional<AgentDefinition>> definitionCache,
+                          Map<ai.mindconnect.agent.Namespace, Boolean> existing) {
         SessionId sessionId = sessionIdOf(task);
         // The session and the agent live in the task's namespace: look them up there, whatever
         // namespace the monitor's own thread is in. The caches stay correct because a session
         // id is a UUID — the same id in two namespaces is not a case worth a compound key.
+        // A task of a namespace deleted since shows without them: no owner, agent or title.
         Optional<AgentSession> session = sessionId == null
                 ? Optional.empty()
-                : sessionCache.computeIfAbsent(sessionId, id -> inScopeOf(task, () -> findSession(id)));
+                : sessionCache.computeIfAbsent(sessionId, id -> inScopeOf(task, existing, () -> findSession(id)));
         Optional<AgentDefinition> agent = session
                 .map(AgentSession::agentDefinitionId)
-                .flatMap(id -> definitionCache.computeIfAbsent(id, aid -> inScopeOf(task, () -> findDefinition(aid))));
+                .flatMap(id -> definitionCache.computeIfAbsent(id,
+                        aid -> inScopeOf(task, existing, () -> findDefinition(aid))));
 
         String agentName = agent.map(AgentDefinition::name).orElse(null);
         String label;
@@ -292,12 +307,29 @@ public class TaskMonitor implements TaskListener {
         return out.toString();
     }
 
-    /** Runs {@code body} bound to the namespace the task was submitted in, when there is one to bind. */
-    private <T> T inScopeOf(TaskRecord task, java.util.function.Supplier<T> body) {
+    /**
+     * Runs {@code body} bound to the namespace the task was submitted in, when there is one to bind —
+     * and finds nothing, without touching that namespace's stores, when it no longer exists.
+     */
+    private <T> Optional<T> inScopeOf(TaskRecord task, Map<ai.mindconnect.agent.Namespace, Boolean> existing,
+                                      java.util.function.Supplier<Optional<T>> body) {
         if (scope instanceof ThreadBoundScope bound) {
-            return ScopeTaskAdvisor.scopeIfAny(task).map(s -> bound.runIn(s, body)).orElseGet(body);
+            Optional<ai.mindconnect.agent.Scope> stamped = ScopeTaskAdvisor.scopeIfAny(task);
+            if (stamped.isEmpty()) return body.get();
+            if (!existing.computeIfAbsent(stamped.get().namespace(), this::exists)) return Optional.empty();
+            return bound.runIn(stamped.get(), body);
         }
         return body.get();
+    }
+
+    /** Whether {@code namespace} is still there; without a namespace service every one is. */
+    private boolean exists(ai.mindconnect.agent.Namespace namespace) {
+        if (namespaces == null) return true;
+        try {
+            return namespaces.find(namespace).isPresent();
+        } catch (RuntimeException e) {
+            return false;                            // unknown is not a reason to open its stores
+        }
     }
 
     private Optional<AgentSession> findSession(SessionId id) {
@@ -347,7 +379,7 @@ public class TaskMonitor implements TaskListener {
         Optional<TaskRecord> record = queue.get(taskId);
         if (record.isEmpty()) return CancelResult.UNKNOWN;
         if (record.get().status().terminal()) return CancelResult.ALREADY_FINISHED;
-        TaskView view = view(record.get(), new HashMap<>(), new HashMap<>());
+        TaskView view = view(record.get(), new HashMap<>(), new HashMap<>(), new HashMap<>());
         if (view.owner() == null || !view.owner().equals(userId)) return CancelResult.NOT_OWNER;
         return queue.cancel(taskId) ? CancelResult.CANCELLED : CancelResult.ALREADY_FINISHED;
     }

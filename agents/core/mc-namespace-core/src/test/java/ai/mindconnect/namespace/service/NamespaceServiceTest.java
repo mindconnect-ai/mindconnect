@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -190,6 +192,103 @@ class NamespaceServiceTest {
         assertThatThrownBy(() -> failing.delete(new Namespace("acme"), DAVID))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("disk gone");
         assertThat(repository.findById(new Namespace("acme"))).isPresent();
+    }
+
+    /** A repository whose save of a record holding {@code RACE} stops until released — a write caught between read and save. */
+    static final class HeldSaveRepository implements NamespaceRepository {
+        final Map<Namespace, NamespaceDefinition> byId = new java.util.concurrent.ConcurrentHashMap<>();
+        final CountDownLatch saving = new CountDownLatch(1);
+        final CountDownLatch release = new CountDownLatch(1);
+
+        @Override public Optional<NamespaceDefinition> findById(Namespace id) { return Optional.ofNullable(byId.get(id)); }
+
+        @Override public List<NamespaceDefinition> findAll() { return List.copyOf(byId.values()); }
+
+        @Override public List<NamespaceDefinition> findByMember(UserId user) {
+            return findAll().stream().filter(n -> n.isMember(user)).toList();
+        }
+
+        @Override public void save(NamespaceDefinition namespace) {
+            if (namespace.environment().containsKey("RACE")) {
+                saving.countDown();
+                awaitQuietly(release);
+            }
+            byId.put(namespace.id(), namespace);
+        }
+
+        @Override public boolean insert(NamespaceDefinition namespace) { return byId.putIfAbsent(namespace.id(), namespace) == null; }
+
+        @Override public boolean deleteById(Namespace id) { return byId.remove(id) != null; }
+    }
+
+    @Test
+    void aDeleteWhileAVariableIsBeingSavedDoesNotBringTheNamespaceBack() throws Exception {
+        HeldSaveRepository held = new HeldSaveRepository();
+        NamespaceService racing = new NamespaceService(held, Namespace.DEFAULT, Clock.fixed(NOW, ZoneOffset.UTC),
+                List.of(ns -> { }));
+        Namespace acme = racing.create("acme", null, DAVID).id();
+
+        AtomicReference<Throwable> writeFailure = new AtomicReference<>();
+        AtomicReference<Throwable> deleteFailure = new AtomicReference<>();
+        Thread writer = start(() -> racing.putVariable(acme, DAVID, "RACE", "1"), writeFailure);
+        held.saving.await();                                     // read the record, now saving it back
+        Thread deleter = start(() -> racing.delete(acme, DAVID), deleteFailure);
+        awaitBlockedOrDone(deleter);                             // waiting for the write, or — unguarded — finished
+        held.release.countDown();
+        writer.join();
+        deleter.join();
+
+        assertThat(writeFailure.get()).isNull();
+        assertThat(deleteFailure.get()).isNull();
+        assertThat(held.findById(acme)).as("the deleted namespace stays deleted").isEmpty();
+    }
+
+    @Test
+    void aWriteThatWaitedForTheDeleteFindsNoNamespaceAndWritesNothing() throws Exception {
+        CountDownLatch purging = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        NamespaceService deleting = new NamespaceService(repository, Namespace.DEFAULT, Clock.fixed(NOW, ZoneOffset.UTC),
+                List.of(ns -> { purging.countDown(); awaitQuietly(release); }));
+        Namespace acme = deleting.create("acme", null, DAVID).id();
+
+        AtomicReference<Throwable> deleteFailure = new AtomicReference<>();
+        AtomicReference<Throwable> writeFailure = new AtomicReference<>();
+        Thread deleter = start(() -> deleting.delete(acme, DAVID), deleteFailure);
+        purging.await();                                         // the delete is under way
+        Thread writer = start(() -> deleting.putVariable(acme, DAVID, "LATE", "1"), writeFailure);
+        awaitBlockedOrDone(writer);
+        release.countDown();
+        deleter.join();
+        writer.join();
+
+        assertThat(deleteFailure.get()).isNull();
+        assertThat(writeFailure.get()).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("No namespace 'acme'");
+        assertThat(repository.findById(acme)).isEmpty();
+    }
+
+    private static Thread start(Runnable body, AtomicReference<Throwable> failure) {
+        return Thread.ofPlatform().start(() -> {
+            try {
+                body.run();
+            } catch (Throwable t) {
+                failure.set(t);
+            }
+        });
+    }
+
+    /** Spins until {@code thread} waits for a monitor or has finished — no sleeping, no timing guess. */
+    private static void awaitBlockedOrDone(Thread thread) {
+        while (thread.getState() != Thread.State.BLOCKED && thread.getState() != Thread.State.TERMINATED) {
+            Thread.onSpinWait();
+        }
+    }
+
+    private static void awaitQuietly(CountDownLatch latch) {
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     @Test

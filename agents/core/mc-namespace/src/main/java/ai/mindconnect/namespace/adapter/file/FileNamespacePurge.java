@@ -2,6 +2,7 @@ package ai.mindconnect.namespace.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespacePurge;
+import ai.mindconnect.filerepo.FileRepo;
 import ai.mindconnect.namespace.service.NamespaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,8 @@ import java.util.stream.Stream;
  * Removes a namespace's directory: with file persistence everything of a
  * namespace lives under {@code <base>/<namespace>/} — agents, sessions,
  * conversations, workflows, MCP registrations, vector-store settings, user
- * homes — so deleting that one tree is the whole purge.
+ * homes — so deleting that one tree is the whole purge. The partition is
+ * closed in this process first, releasing its lock.
  *
  * <p>Refuses anything that is not a plain namespace id, and the
  * installation's own {@code system} directory, whatever it is asked.
@@ -43,6 +45,9 @@ public class FileNamespacePurge implements NamespacePurge {
         if (!dir.startsWith(baseDir) || dir.equals(baseDir)) {
             throw new IllegalArgumentException("Refusing to delete '" + dir + "'");
         }
+        // Close the partition first: its lock goes with the directory, and the namespace, created
+        // again under this id, must open fresh and take a lock of its own.
+        FileRepo.close(baseDir, id);
         if (!Files.exists(dir)) return;
         try (Stream<Path> walk = Files.walk(dir)) {
             walk.sorted(Comparator.reverseOrder()).forEach(path -> {

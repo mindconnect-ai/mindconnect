@@ -1,6 +1,7 @@
 package ai.mindconnect.namespace.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.filerepo.FileRepo;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -27,6 +28,18 @@ class FileNamespacePurgeTest {
         assertThat(dir.resolve("acme")).doesNotExist();
         assertThat(dir.resolve("local/sessions")).exists();
         assertThat(dir.resolve("system/users")).exists();
+    }
+
+    @Test
+    void aNamespaceCreatedAgainUnderThePurgedIdOpensFreshWithALockOfItsOwn() {
+        FileRepo before = FileRepo.open(dir, "acme");
+        assertThat(before.resolve(".mc-partition.lock")).exists();
+
+        new FileNamespacePurge(dir).purge(new Namespace("acme"));
+        FileRepo after = FileRepo.open(dir, "acme");
+
+        assertThat(after).as("not the old instance, whose lock guarded a deleted file").isNotSameAs(before);
+        assertThat(dir.resolve("acme/.mc-partition.lock")).exists();
     }
 
     @Test

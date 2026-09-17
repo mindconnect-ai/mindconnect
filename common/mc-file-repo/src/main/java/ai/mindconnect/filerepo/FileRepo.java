@@ -41,6 +41,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>The operating system releases the lock when the process ends, a crash
  * included. Do not open {@value #LOCK_FILE} anywhere else: on POSIX systems
  * closing any channel to the file releases the process's lock on it.
+ *
+ * <p>An instance lives until {@link #close} — which whoever deletes a
+ * partition's directory calls first, so that the partition, created again,
+ * opens as a fresh instance with a lock file of its own instead of the old
+ * one guarding a file that is gone.
  */
 public class FileRepo {
 
@@ -57,8 +62,11 @@ public class FileRepo {
 
     private final Path root;
 
-    @SuppressWarnings({"unused", "FieldCanBeLocal"}) // held for the lifetime of the JVM
+    /** Held until {@link #close}, normally for the lifetime of the JVM. */
     private final FileLock processLock;
+
+    /** Set by {@link #close}: the partition's directory is about to go, nothing may be written there. */
+    private volatile boolean closed;
 
     /**
      * The indexes of the {@link RecordLog} directories, shared by every log on this
@@ -98,6 +106,35 @@ public class FileRepo {
         return OPEN.computeIfAbsent(real, FileRepo::new);
     }
 
+    /**
+     * Closes the partition {@code partition} of {@code base}, if this JVM has it
+     * open: releases its lock and forgets the instance, so the next {@link #open}
+     * builds a new one. Call it before deleting the partition's directory. Whoever
+     * still holds the old instance can no longer resolve paths with it.
+     *
+     * @return whether an open instance was closed
+     */
+    public static boolean close(Path base, String partition) {
+        requireDirectoryName(partition);
+        Path dir = base.resolve(partition);
+        Path key;
+        try {
+            key = dir.toRealPath();
+        } catch (IOException e) {
+            key = dir.toAbsolutePath().normalize();   // already gone: an instance could only be keyed like this
+        }
+        FileRepo repo = OPEN.remove(key);
+        if (repo == null) return false;
+        repo.closed = true;
+        try {
+            repo.processLock.release();
+        } catch (IOException e) {
+            log.warn("Could not release the lock of partition {}: {}", repo.root, e.getMessage());
+        }
+        closeQuietly(repo.processLock.channel());
+        return true;
+    }
+
     /** The real path of the partition directory. */
     public Path root() {
         return root;
@@ -109,6 +146,9 @@ public class FileRepo {
      * keys come from ids, and ids come from requests.
      */
     public Path resolve(String relative) {
+        if (closed) {
+            throw new FileRepoException("Partition " + root + " was closed — its directory is being deleted");
+        }
         Path file = root.resolve(relative).normalize();
         if (!file.startsWith(root)) {
             throw new IllegalArgumentException("Path leads out of the partition " + root + ": " + relative);

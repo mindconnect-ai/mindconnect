@@ -11,9 +11,18 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.NamespaceRouted;
+import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
+import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
+import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.TaskSubmission;
@@ -21,7 +30,9 @@ import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -139,6 +150,49 @@ class TaskMonitorTest {
 
         assertThat(snapshots.get(0).active()).extracting(TaskView::id).containsExactly(id);
         subscription.close();
+    }
+
+    @Test
+    void aTaskOfADeletedNamespaceShowsWithoutOpeningThatNamespacesStoresAgain(@TempDir Path data) throws Exception {
+        var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
+                .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
+                .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        var scope = ThreadBoundScope.strict();
+        var sessions = NamespaceRouted.route(AgentSessionRepository.class, scope,
+                ns -> new FileAgentSessionRepository(data, mapper, ns));
+        var definitions = new InMemoryAgentDefinitionRepository();
+        definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
+                "assistants", "bot", "prompt", null, "cfg", 5, null,
+                AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
+        var namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
+        Namespace acme = namespaces.create("acme", null, UserId.of("alice")).id();
+        scope.runIn(Scope.of(acme), () -> sessions.create(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"),
+                ConversationId.random(), "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
+                null, null, null, null, null, null, null)));
+        release.countDown();                                     // the stand-in worker finishes at once
+        String live = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
+                AgentTurnWorker.SESSION_ID, ALICE_SESSION.value(), AgentTurnWorker.DEPTH, 0,
+                ScopeTaskAdvisor.NAMESPACE, "acme")));
+        String orphan = queue.submit(TaskSubmission.of(AgentTurnWorker.TYPE, Map.of(
+                AgentTurnWorker.SESSION_ID, SessionId.random().value(), AgentTurnWorker.DEPTH, 0,
+                ScopeTaskAdvisor.NAMESPACE, "gone")));
+        queue.await(live, Duration.ofSeconds(5));
+        queue.await(orphan, Duration.ofSeconds(5));
+
+        TaskMonitor board = new TaskMonitor(queue, sessions, definitions, scope, namespaces);
+        try {
+            Snapshot snapshot = board.snapshot();
+
+            assertThat(data.resolve("gone")).as("no directory for a namespace that is not there").doesNotExist();
+            TaskView orphanView = snapshot.recent().stream().filter(v -> v.id().equals(orphan)).findFirst().orElseThrow();
+            assertThat(orphanView.label()).isEqualTo("Agent turn");
+            assertThat(orphanView.owner()).isNull();
+            TaskView liveView = snapshot.recent().stream().filter(v -> v.id().equals(live)).findFirst().orElseThrow();
+            assertThat(liveView.label()).isEqualTo("Scout");
+            assertThat(liveView.owner()).isEqualTo("alice");
+        } finally {
+            board.shutdown();
+        }
     }
 
     @Test
