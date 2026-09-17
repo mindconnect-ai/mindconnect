@@ -386,7 +386,8 @@ public class NamespaceService {
     /**
      * Deletes {@code id} with everything in it. Only its creator may — an admin
      * they promoted shapes the namespace but does not throw it away; the default
-     * namespace cannot be deleted at all.
+     * namespace cannot be deleted at all, since it is where the installation
+     * itself works.
      *
      * @throws IllegalArgumentException when the namespace does not exist, is the default one,
      *                                  or {@code actor} did not create it
@@ -396,6 +397,10 @@ public class NamespaceService {
         // Under the namespace's lock like every other write: a variable or member change that
         // read the record before would otherwise save it back after the record was dropped,
         // and the namespace would return. A write waiting here reads again and finds nothing.
+        if (defaultNamespace.equals(id)) {
+            throw new IllegalArgumentException("The default namespace '" + id + "' belongs to the installation"
+                    + " and cannot be deleted");
+        }
         synchronized (lockFor(id)) {
             NamespaceDefinition ns = memberOnly(id, actor, "delete");
             if (!ns.isCreator(actor(actor))) {
@@ -480,9 +485,9 @@ public class NamespaceService {
      * environment.
      */
     private NamespaceDefinition variablesOf(Namespace id, UserId actor) {
-        if (defaultNamespace.equals(id)) {
+        if (defaultNamespace.equals(id) && defaultIsOpen()) {
             throw new IllegalArgumentException("The default namespace '" + id + "' has no variables of its own"
-                    + " — it belongs to the installation, so set them in the server's environment");
+                    + " — everyone works there, so set them in the server's environment");
         }
         return adminOnly(id, actor, "set the variables of");
     }
@@ -506,10 +511,10 @@ public class NamespaceService {
 
     private NamespaceDefinition memberOnly(Namespace id, UserId actor, String verb) {
         Objects.requireNonNull(actor, "actor");
-        if (defaultNamespace.equals(id)) {
+        if (defaultNamespace.equals(id) && defaultIsOpen()) {
             throw new IllegalArgumentException("The default namespace '" + id + "' is open to everyone; there is nothing to " + verb);
         }
-        NamespaceDefinition ns = namespaces.findById(id)
+        NamespaceDefinition ns = find(id)
                 .orElseThrow(() -> new IllegalArgumentException("No namespace '" + id + "'"));
         if (!ns.isMember(actor(actor))) {
             throw new IllegalArgumentException("'" + actor.value() + "' is not a member of '" + id + "'");

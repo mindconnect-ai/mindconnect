@@ -36,7 +36,7 @@ final class ToolSchemaTable {
             names.forEach(name -> required.add(String.valueOf(name)));
         }
 
-        UiTable table = UiTable.of(id, title)
+        UiTable table = UiTable.of(id, title).stackOnMobile(true)
                 .column(UiTable.Column.text("param", "Parameter"))
                 .column(UiTable.Column.text("type", "Type"))
                 .column(UiTable.Column.text("required", "Required"))

@@ -87,7 +87,7 @@ public class VectorStoreUiController {
 
     /** The overview as tabs; {@code tab} picks which one opens (after an action, the one it happened in). */
     private UiPage list(String tab) {
-        UiTable templates = UiTable.of("vs-templates", null)
+        UiTable templates = UiTable.of("vs-templates", null).stackOnMobile(true)
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("backend", "Backend"))
                 .column(UiTable.Column.text("embedding", "Embedding Config"))
@@ -108,7 +108,7 @@ public class VectorStoreUiController {
                     "description", t.metadata().getOrDefault("description", "")));
         }
 
-        UiTable instances = UiTable.of("vs-instances", null)
+        UiTable instances = UiTable.of("vs-instances", null).stackOnMobile(true)
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("template", "Template"))
                 .column(UiTable.Column.text("backend", "Backend"))
@@ -150,7 +150,7 @@ public class VectorStoreUiController {
 
         // The file store (Files API): raw uploads addressed by id, independent
         // of any store — attach them to a chat via POST /api/sessions/{id}/files.
-        UiTable files = UiTable.of("vs-files-all", null)
+        UiTable files = UiTable.of("vs-files-all", null).stackOnMobile(true)
                 .column(UiTable.Column.text("fid", "Id"))
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("type", "Type"))
@@ -541,7 +541,7 @@ public class VectorStoreUiController {
                     .uploadTo(BASE + "/stores/" + name + "/upload"));
         }
 
-        UiTable files = UiTable.of("vs-files", "Files")
+        UiTable files = UiTable.of("vs-files", "Files").stackOnMobile(true)
                 .column(UiTable.Column.text("file", "File"))
                 .column(UiTable.Column.text("chunks", "Chunks"))
                 .rowAction(UiAction.danger("delete-file", "Delete").icon("delete")
@@ -630,7 +630,7 @@ public class VectorStoreUiController {
         Set<String> metaKeys = new java.util.TreeSet<>();
         hits.forEach(h -> metaKeys.addAll(h.metadata().keySet()));
 
-        UiTable table = UiTable.of("vs-search-result", "Results (" + hits.size() + ")")
+        UiTable table = UiTable.of("vs-search-result", "Results (" + hits.size() + ")").stackOnMobile(true)
                 .column(UiTable.Column.text("rank", "#"))
                 .column(UiTable.Column.text("score", "Score"))
                 .column(UiTable.Column.text("chunk", "Chunk"));

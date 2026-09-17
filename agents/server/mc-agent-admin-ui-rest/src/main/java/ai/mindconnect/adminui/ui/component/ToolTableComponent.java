@@ -45,7 +45,7 @@ public final class ToolTableComponent implements UiComponent {
 
     @Override
     public UiTable render() {
-        var table = UiTable.of(id(), "Tools")
+        var table = UiTable.of(id(), "Tools").stackOnMobile(true)
                 .action(UiAction.primary("add-tool", "Add Tool").icon("add")
                         .onClick(trigger(on(AgentUiController.class).newToolForm(agent.id().value()))))
                 .column(UiTable.Column.text("name", "Name"))

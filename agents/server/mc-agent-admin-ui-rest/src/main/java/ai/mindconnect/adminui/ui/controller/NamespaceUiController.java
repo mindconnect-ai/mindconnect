@@ -283,7 +283,7 @@ public class NamespaceUiController {
 
     private UiPage page(UserId me) {
         return new NamespacesPage(namespaces.actor(me), scope.namespace(), namespaces.defaultNamespace(),
-                namespaces.forUser(me), users.findAll()).render();
+                namespaces.defaultIsOpen(), namespaces.forUser(me), users.findAll()).render();
     }
 
 

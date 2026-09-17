@@ -99,7 +99,7 @@ public final class MigrationListComponent implements UiComponent {
      * row id, which is the (URL-encoded) field name.
      */
     private static UiTable diffTable(PendingMigration p) {
-        var table = UiTable.of("migration-diff-" + p.id(), null)
+        var table = UiTable.of("migration-diff-" + p.id(), null).stackOnMobile(true)
                 .column(UiColumn.text("field", "Field"))
                 .column(UiColumn.text("before", "Before (stored)"))
                 .column(UiColumn.text("after", "After (bundled)"))

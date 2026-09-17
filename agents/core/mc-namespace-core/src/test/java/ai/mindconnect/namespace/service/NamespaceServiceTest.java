@@ -254,7 +254,9 @@ class NamespaceServiceTest {
         withPurges.invite(ACME, DAVID, ALICES, NamespaceRole.USER);
 
         assertThatThrownBy(() -> withPurges.delete(ACME, ALICE)).hasMessageContaining("Only the creator");
-        assertThatThrownBy(() -> withPurges.delete(Namespace.DEFAULT, DAVID)).hasMessageContaining("open to everyone");
+        assertThatThrownBy(() -> withPurges.delete(Namespace.DEFAULT, DAVID))
+                .as("the installation works there; it is nobody's to throw away")
+                .hasMessageContaining("cannot be deleted");
         assertThat(repository.findById(new Namespace("acme"))).isPresent();
 
         withPurges.delete(new Namespace("acme"), DAVID);

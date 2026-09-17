@@ -38,12 +38,24 @@ public final class NamespacesPage {
     private final List<NamespaceDefinition> namespaces;
     private final List<User> users;
     private final Namespace defaultNamespace;
+    /**
+     * Whether the default namespace takes every signed-in user. It does until
+     * somebody is named to shape it ({@code mindconnect.namespace-admins}); from
+     * then on it is a namespace like any other and is shown as one.
+     */
+    private final boolean defaultOpen;
 
     public NamespacesPage(Actor me, Namespace active, Namespace defaultNamespace,
+                          List<NamespaceDefinition> namespaces, List<User> users) {
+        this(me, active, defaultNamespace, true, namespaces, users);
+    }
+
+    public NamespacesPage(Actor me, Namespace active, Namespace defaultNamespace, boolean defaultOpen,
                           List<NamespaceDefinition> namespaces, List<User> users) {
         this.me = me;
         this.active = active;
         this.defaultNamespace = defaultNamespace;
+        this.defaultOpen = defaultOpen;
         this.namespaces = namespaces;
         this.users = users;
     }
@@ -65,12 +77,12 @@ public final class NamespacesPage {
 
     private UiNode namespaceCard(NamespaceDefinition ns) {
         String id = ns.id().value();
-        boolean isDefault = ns.id().equals(defaultNamespace);
+        boolean isDefault = ns.id().equals(defaultNamespace) && defaultOpen;
         String title = ns.label() + (ns.label().equals(id) ? "" : " (" + id + ")")
                 + (ns.id().equals(active) ? " — current" : "");
         UiStack card = UiStack.of("namespace-" + id).gap(8);
         if (isDefault) {
-            UiTable table = UiTable.of("namespace-" + id + "-members", title).icon("layers")
+            UiTable table = UiTable.of("namespace-" + id + "-members", title).stackOnMobile(true).icon("layers")
                     .column(UiTable.Column.text("user", "Members"));
             table.row(Map.of("id", "everyone", "user", "Every signed-in user — the default namespace is open to all."));
             card.child(table);
@@ -80,7 +92,7 @@ public final class NamespacesPage {
             return card;
         }
         boolean iAmAdmin = ns.isAdmin(me);
-        UiTable table = UiTable.of("namespace-" + id + "-members", title).icon("layers")
+        UiTable table = UiTable.of("namespace-" + id + "-members", title).stackOnMobile(true).icon("layers")
                 .column(UiTable.Column.text("user", "Member"))
                 .column(UiTable.Column.text("role", "Role"));
         if (iAmAdmin) {
@@ -150,7 +162,7 @@ public final class NamespacesPage {
      */
     public static UiTable environmentTable(String tableId, String title, java.util.Collection<String> names,
                                            String apiBase, String confirm) {
-        UiTable table = UiTable.of(tableId, title).icon("key-round")
+        UiTable table = UiTable.of(tableId, title).stackOnMobile(true).icon("key-round")
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("value", "Value"))
                 .action(UiAction.secondary(tableId + "-add", "Add variable…").icon("add")

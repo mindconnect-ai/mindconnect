@@ -60,7 +60,7 @@ public final class SessionTableComponent implements UiComponent {
         List<AgentSession> sessions = sessionRepository
                 .findByAgent(agent.id(), UserId.of(userId));
 
-        var table = UiTable.of(id(), "Sessions")
+        var table = UiTable.of(id(), "Sessions").stackOnMobile(true)
                 .action(UiAction.primary("new-session", "New Session").icon("add")
                         .onClick(trigger(on(ChatUiController.class).startSession(agent.id().value(), null))))
                 .column(UiTable.Column.text("title", "Title").asSortable())

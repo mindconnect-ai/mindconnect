@@ -90,7 +90,8 @@ public class ProfileUiController {
                 user == null ? null : user.getFullName(),
                 user == null ? null : user.getEmail(),
                 tokens.list(id), authEnabled,
-                namespaces.forUser(id), namespaces.defaultNamespace(), scope.namespace()).render();
+                namespaces.forUser(id), namespaces.defaultNamespace(), namespaces.defaultIsOpen(),
+                scope.namespace()).render();
     }
 
     /**
@@ -102,7 +103,7 @@ public class ProfileUiController {
     public UiPatch inviteDialog(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id) {
         UserId me = userId(user);
         Namespace namespace = new Namespace(id);
-        if (namespace.equals(namespaces.defaultNamespace())) {
+        if (namespace.equals(namespaces.defaultNamespace()) && namespaces.defaultIsOpen()) {
             return UiPatch.of().toast(UiToast.info("The default namespace is open to every signed-in user.")
                     .title("Nobody to invite"));
         }

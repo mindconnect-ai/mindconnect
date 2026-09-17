@@ -73,6 +73,30 @@ body {
     #admin-layout-content:not(:has(> #chat-app-shell, > .app-fill-frame)) {
         padding: 16px;
     }
+
+    /* ── Lists on a phone: a row becomes a column ──────────────────────────
+       A list row is a row — text on the left, buttons on the right, and the
+       buttons never shrink (.sui-list-item-actions is flex: 0 0 auto). On a
+       phone that is the wrong shape: the name is squeezed into two or three
+       characters per line beside a wall of buttons, or the row scrolls
+       sideways. Everything it holds gets the full width instead, stacked in
+       the order it is read: what it is, what it says, what you can do with it.
+
+       Every list of the admin UI at once, rather than the agents alone: they
+       are all the same shape, and the next screen someone adds should not have
+       to remember this. The chat is not one of them — a conversation is a list
+       whose rows are messages, and chat-ui.css lays those out itself. */
+    #admin-layout-content .sui-list:not(.chat-container) .sui-list-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--sui-space-sm, 8px);
+    }
+
+    /* Buttons keep their size and wrap to a second line rather than being
+       pushed off the edge. */
+    #admin-layout-content .sui-list:not(.chat-container) .sui-list-item > .sui-list-item-actions {
+        flex-wrap: wrap;
+    }
 }
 
 /* Containers are outlined, not filled: only the header carries the surface
@@ -531,6 +555,26 @@ body {
     margin-right: 16px;
     min-width: 8rem;
     text-align: center;
+}
+
+/* On a phone the row is a column (see the media query near the top), so the
+   header stacks too and the badge gives up the column it was aligned in:
+   there is nothing to align to when every row is a block of its own. These
+   rules sit here rather than up there because they have to outrank the two
+   above, which a later rule of the same weight does. */
+@media (max-width: 768px) {
+    .agent-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .agent-head .agent-llm-badge {
+        margin-left: 0;
+        margin-right: 0;
+        min-width: 0;
+        text-align: left;
+    }
 }
 
 /* LLM-config tag at the right of the name row. Soft green pill — sits apart

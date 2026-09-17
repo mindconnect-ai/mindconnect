@@ -109,7 +109,7 @@ public final class TraceTableComponent implements UiComponent {
         var open = trigger(on(SessionUiController.class)
                 .getTrace(sessionId.value(), ROW_ID.toString()));
 
-        var table = UiTable.of(id(), null)
+        var table = UiTable.of(id(), null).stackOnMobile(true)
                 .headerExtra(searchForm())
                 .column(UiColumn.number("n", "#").asSortable()
                         .withCellTemplate(UiLink.of("trace-open", "#", "{n}").onClick(open)))

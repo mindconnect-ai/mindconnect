@@ -75,6 +75,8 @@ public class ProfilePage extends AdminPage {
     private final boolean authEnabled;
     private final List<NamespaceDefinition> namespaces;
     private final Namespace defaultNamespace;
+    /** Whether the default namespace still takes every signed-in user; see {@code NamespacesPage}. */
+    private final boolean defaultOpen;
     private final Namespace active;
 
     /**
@@ -90,6 +92,13 @@ public class ProfilePage extends AdminPage {
     public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
                        boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
                        Namespace active) {
+        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace, true, active);
+    }
+
+    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
+                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+                       boolean defaultOpen, Namespace active) {
+        this.defaultOpen = defaultOpen;
         this.userId = userId;
         this.me = me;
         this.user = user;
@@ -123,10 +132,11 @@ public class ProfilePage extends AdminPage {
         // replaced in place by id.
         UiSection page = UiSection.of("profile", null)
                 .section("profile-tab-account", "Account", account)
-                .section("profile-tab-namespaces", "Namespaces", namespaces(me, namespaces, defaultNamespace, active))
+                .section("profile-tab-namespaces", "Namespaces",
+                        namespaces(me, namespaces, defaultNamespace, defaultOpen, active))
                 .section("profile-tab-variables", "Your variables", environment(user == null ? Map.of() : user.environment()))
                 .section("profile-tab-namespace-variables", "Namespace variables",
-                        namespaceVariables(me, namespaces, defaultNamespace))
+                        namespaceVariables(me, namespaces, defaultOpen ? defaultNamespace : null))
                 .section("profile-tab-tokens", "API tokens", UiStack.of("profile-tokens").gap(12)
                         .child(tokenTable(tokens))
                         .child(help));
@@ -163,7 +173,7 @@ public class ProfilePage extends AdminPage {
 
     /** The user's tokens, newest first as given, with a revoke action per row. */
     public static UiTable tokenTable(List<ApiToken> tokens) {
-        UiTable table = UiTable.of(TOKENS_ID, "API tokens").icon("key-round")
+        UiTable table = UiTable.of(TOKENS_ID, "API tokens").stackOnMobile(true).icon("key-round")
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("hint", "Token"))
                 .column(UiTable.Column.text("created", "Created"))
@@ -187,15 +197,29 @@ public class ProfilePage extends AdminPage {
         return table;
     }
 
-    /**
-     * The user's namespaces: where they may work, with a way to switch there and, on
-     * every row, the invite, leave and delete actions — the controller answers each
-     * with the dialog or the deed where the user may, and with the reason where not. The open default
-     * namespace is listed like the others; nobody is invited into it.
-     */
     public static UiNode namespaces(Actor me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
                                     Namespace active) {
-        UiTable table = UiTable.of(NAMESPACES_ID, "Namespaces").icon("layers")
+        return namespaces(me, namespaces, defaultNamespace, true, active);
+    }
+
+    /**
+     * The user's namespaces: where they may work, with a way to switch there and,
+     * on every row, leave and delete — the controller answers each with the deed
+     * where the user may and with the reason where not.
+     *
+     * <p><strong>Inviting is offered only to somebody who shapes one of them.</strong>
+     * A row action is on every row or on none, so a user of every namespace they
+     * are in gets no invite button at all rather than one that always answers
+     * "only an admin may".
+     *
+     * <p>The default namespace is listed like the others; while nobody has been
+     * named to shape it, it is the one everybody is in and nobody is invited to.
+     */
+    public static UiNode namespaces(Actor me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+                                    boolean defaultOpen, Namespace active) {
+        boolean shapesOne = namespaces.stream()
+                .anyMatch(ns -> ns.isAdmin(me) && !(ns.id().equals(defaultNamespace) && defaultOpen));
+        UiTable table = UiTable.of(NAMESPACES_ID, "Namespaces").stackOnMobile(true).icon("layers")
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("namespace", "Id"))
                 .column(UiTable.Column.text("role", "Your role"))
@@ -203,8 +227,6 @@ public class ProfilePage extends AdminPage {
                 .column(UiTable.Column.text("created", "Created"))
                 .rowAction(UiAction.secondary("switch", "Switch to").icon("arrow-right")
                         .dispatch("POST", NamespacesPage.API + "/switch/{id}"))
-                .rowAction(UiAction.secondary("invite", "Invite…").icon("user-plus")
-                        .dispatch("GET", API + "/namespaces/{id}/invite"))
                 .rowAction(UiAction.secondary("leave", "Leave").icon("log-out")
                         .confirm("Leave this namespace? You will need a new invitation to come back.")
                         .dispatch("POST", API + "/namespaces/{id}/leave"))
@@ -212,8 +234,12 @@ public class ProfilePage extends AdminPage {
                         .confirm("Delete this namespace with everything in it — agents, sessions, files, workflows, "
                                 + "vector stores, MCP servers? This cannot be undone.")
                         .dispatch("DELETE", API + "/namespaces/{id}"));
+        if (shapesOne) {
+            table.rowAction(UiAction.secondary("invite", "Invite…").icon("user-plus")
+                    .dispatch("GET", API + "/namespaces/{id}/invite"));
+        }
         for (NamespaceDefinition ns : namespaces) {
-            boolean isDefault = ns.id().equals(defaultNamespace);
+            boolean isDefault = ns.id().equals(defaultNamespace) && defaultOpen;
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", ns.id().value());
             row.put("name", ns.label() + (ns.id().equals(active) ? " (current)" : ""));
