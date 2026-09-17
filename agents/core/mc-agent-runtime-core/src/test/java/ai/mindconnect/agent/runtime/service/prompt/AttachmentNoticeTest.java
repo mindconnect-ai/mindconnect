@@ -130,6 +130,30 @@ class AttachmentNoticeTest {
     }
 
     @Test
+    void aFileOnDiskIsAnnouncedByItsPathAsInTheSystemPrompt() {
+        // The notice and the "Attached files" section read the same record:
+        // a file with a path is opened by that path, never "not on the filesystem".
+        AttachedFile soup = new AttachedFile("f-1", "soup.md", "text/markdown", 10)
+                .withPath("/home/u/sessions/s1/uploads/soup.md");
+        Message announcing = user("What goes in the soup?", attached("soup.md"));
+        String text = AttachmentNotice.forModel(announcing, session(List.of(soup)));
+        assertThat(text)
+                .startsWith("[System note — attached to this chat: soup.md (Markdown) — on disk at "
+                        + "`/home/u/sessions/s1/uploads/soup.md`")
+                .contains("by its path with the file and document tools")
+                .doesNotContain("not on the filesystem").doesNotContain("vector_search")
+                .endsWith("]\n\nWhat goes in the soup?");
+        assertThat(SystemPromptRenderer.attachedFilesSection(session(List.of(soup))))
+                .contains("- soup.md (Markdown) — on disk at `/home/u/sessions/s1/uploads/soup.md`");
+
+        // One on disk, one only in the store: each gets its own way in.
+        AgentSession mixed = session(List.of(soup, new AttachedFile("f-2", "b.pdf", "application/pdf", 10)));
+        assertThat(AttachmentNotice.forModel(user("?", attached("soup.md", "b.pdf")), mixed))
+                .contains("soup.md (Markdown) — on disk at `/home/u/sessions/s1/uploads/soup.md`, b.pdf (PDF).")
+                .contains("a file without a path is not on the filesystem — read its content with vector_search");
+    }
+
+    @Test
     void theSystemPromptSectionListsKindsAndForbidsThePathTools() {
         String section = SystemPromptRenderer.attachedFilesSection(session("notes.md", "deck.pptx"));
         assertThat(section).contains("- notes.md (Markdown)")

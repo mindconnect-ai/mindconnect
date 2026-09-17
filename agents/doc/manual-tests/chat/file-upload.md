@@ -48,9 +48,11 @@ it via `vector_search`.
    itself is what you typed).
 4. Check the session's Memory view (session → Memory).
    **Expected:** The user message is shown with a
-   `[System note — attached to this chat: soup.md (Markdown) …]` ahead of
-   the question — that is what the model received — and the system prompt
-   carries an "Attached files" section listing `soup.md (Markdown)`.
+   `[System note — attached to this chat: soup.md (Markdown) — on disk at …]`
+   ahead of the question — that is what the model received — and the system
+   prompt carries an "Attached files" section listing `soup.md (Markdown)` at
+   the same path. The note says to open the file by that path; it does not
+   claim the file is not on the filesystem.
 5. Ask a second question about the file.
    **Expected:** The answer is right again; the new user bubble has NO 📎
    line — a file is announced once, later turns rely on the system-prompt
