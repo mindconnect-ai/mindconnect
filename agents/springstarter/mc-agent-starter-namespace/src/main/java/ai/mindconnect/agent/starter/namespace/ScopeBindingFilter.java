@@ -54,15 +54,23 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
     private final NamespaceService namespaces;
     /** Where a user's last choice is kept; null when the host has no user records. */
     private final UserService users;
+    /** Which host stands for which namespace; never null, empty for an installation without brands. */
+    private final HostNamespaces hosts;
 
     public ScopeBindingFilter(ScopeSupplier scope, NamespaceService namespaces) {
         this(scope, namespaces, null);
     }
 
     public ScopeBindingFilter(ScopeSupplier scope, NamespaceService namespaces, UserService users) {
+        this(scope, namespaces, users, HostNamespaces.none());
+    }
+
+    public ScopeBindingFilter(ScopeSupplier scope, NamespaceService namespaces, UserService users,
+                              HostNamespaces hosts) {
         this.scope = Objects.requireNonNull(scope, "scope");
         this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
         this.users = users;
+        this.hosts = hosts == null ? HostNamespaces.none() : hosts;
     }
 
     /** The REST API and the Responses API, in front of which no session and no remembered choice count. */
@@ -105,8 +113,27 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
             return;
         }
         Namespace namespace;
+        Namespace host = hosts.namespaceOf(request.getServerName()).orElse(null);
         if (user == null) {
-            namespace = namespaces.defaultNamespace();
+            namespace = host != null ? host : namespaces.defaultNamespace();
+        } else if (host != null) {
+            // This address stands for a namespace, so it is the one — a header
+            // or an earlier choice does not move the work somewhere else while
+            // the page still wears this brand's name.
+            if (named.isPresent() && !named.get().equals(host)) {
+                log.debug("{} asked for namespace '{}' under a host that serves '{}'",
+                        user.value(), named.get().value(), host.value());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "This address serves namespace '" + host.value() + "'");
+                return;
+            }
+            namespace = host;
+            if (!namespaces.canAccess(user, namespace)) {
+                log.debug("{} may not work in namespace '{}'", user.value(), namespace.value());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "You are not a member of namespace '" + namespace.value() + "'");
+                return;
+            }
         } else if (named.isPresent()) {
             namespace = named.get();
             if (!namespaces.canAccess(user, namespace)) {
