@@ -95,16 +95,34 @@ public final class LocalMcpRegistryAdmin implements McpRegistryAdmin {
      * for this screen — "header 'Authorization' cannot be resolved: …" names
      * the field as well as the variable — so one of those wins over the
      * library exception underneath it.
+     *
+     * <p>Some roots say nothing at all: an unknown host ends in an
+     * {@code UnresolvedAddressException} without a message, and its bare class
+     * name told nobody which url failed, and neither did the SDK's "Client failed
+     * to initialize" around it. Then the outermost layer that says something —
+     * the proxy's "MCP initialize failed for endpoint …", which carries the
+     * layers below in its text — speaks, with the root's name after it.
      */
-    private static String rootMessage(Throwable e) {
-        if (e instanceof McpGatewayException && e.getMessage() != null && !e.getMessage().isBlank()) {
+    static String rootMessage(Throwable e) {
+        if (e instanceof McpGatewayException && hasMessage(e)) {
             return e.getMessage();
         }
-        Throwable current = e;
-        while (current.getCause() != null && current.getCause() != current) {
-            current = current.getCause();
+        Throwable root = e;
+        Throwable spoken = hasMessage(e) ? e : null;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+            if (spoken == null && hasMessage(root)) spoken = root;
         }
-        String message = current.getMessage();
-        return message == null || message.isBlank() ? current.toString() : message;
+        if (hasMessage(root)) return root.getMessage();
+        if (spoken == null) return root.toString();
+        String name = root.getClass().getSimpleName();
+        return spoken.getMessage().contains(name) ? spoken.getMessage() : spoken.getMessage() + " (" + name + ")";
+    }
+
+    /** A message of its own — not the one {@code new Exception(cause)} copies from its cause. */
+    private static boolean hasMessage(Throwable e) {
+        String message = e.getMessage();
+        return message != null && !message.isBlank()
+                && (e.getCause() == null || !message.equals(e.getCause().toString()));
     }
 }
