@@ -1,0 +1,66 @@
+/*
+ * ERNI AI — the branding stylesheet of this example instance.
+ *
+ * Linked last of all by the shell (mindconnect.branding.stylesheets), so it
+ * only has to set framework tokens: every control takes its colour from
+ * those, the way the shipped themes do. It writes them on :root, which is
+ * where sui.css puts its own, so it is written for
+ * mindconnect.branding.theme: default — pick a theme in the header and that
+ * theme's class wins on specificity, as it should.
+ *
+ * The palette is ERNI's: Firefly navy as the band and the accent, Cape Cod
+ * as the working grey, white paper underneath.
+ */
+
+:root {
+    --erni-firefly:   #0a192c;
+    --erni-navy-soft: #16304f;
+    --erni-cape-cod:  #505454;
+
+    /* Paper and ink. */
+    --sui-color-bg:            #f7f8f9;
+    --sui-color-surface:       #ffffff;
+    --sui-color-surface-alt:   #eef1f3;
+    --sui-color-text:          #1b2229;
+    --sui-color-text-strong:   var(--erni-firefly);
+    --sui-color-text-body:     #33393f;
+    --sui-color-text-muted:    var(--erni-cape-cod);
+    --sui-color-text-subtle:   #8b9196;
+    --sui-color-border:        #dfe3e6;
+    --sui-color-border-soft:   #eceff1;
+    --sui-color-border-strong: #c3c9ce;
+
+    /* One accent, and everything tinted follows it. */
+    --sui-color-primary:       var(--erni-firefly);
+    --sui-color-primary-hover: var(--erni-navy-soft);
+    --sui-color-primary-soft:  #e7ecf2;
+    --sui-color-on-primary:    #ffffff;
+
+    --sui-color-action:        var(--erni-firefly);
+    --sui-color-action-hover:  var(--erni-navy-soft);
+    --sui-color-on-action:     #ffffff;
+
+    --sui-focus-ring: 0 0 0 3px rgba(10, 25, 44, .18);
+
+    /* The band: the brand navy, with the wordmark painted white on it — which
+       is what the framework's default logo filter already does. */
+    --sui-header-bg:           var(--erni-firefly);
+    --sui-header-fg:           #d7dde4;
+    --sui-header-brand-fg:     #ffffff;
+    --sui-header-nav-fg:       #9fabb8;
+    --sui-header-nav-fg-hover: #ffffff;
+    --sui-header-nav-bg-hover: var(--erni-navy-soft);
+    --sui-header-radius:       0;
+
+    color-scheme: light;
+}
+
+/* The login card wears the mark too: it is the first page anyone sees, and
+   the shell's header is not on it. */
+#brand-title::before {
+    content: "";
+    display: block;
+    height: 40px;
+    margin: 0 auto 16px;
+    background: url("/branding/logo.svg") center / contain no-repeat;
+}
