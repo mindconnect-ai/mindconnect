@@ -238,4 +238,73 @@ class ScopeBindingFilterTest {
         assertThat(seen.get()).isNotNull()
                 .satisfies(scope -> assertThat(scope.namespace()).isEqualTo(Namespace.DEFAULT));
     }
+
+    /** A host that stands for the namespace "erni", as the Admin UI's branding answers it. */
+    private static final HostNamespaces ERNI_HOST =
+            host -> "erni.example.com".equals(host) ? java.util.Optional.of(new Namespace("erni")) : java.util.Optional.empty();
+
+    private MockHttpServletRequest under(String host, String path) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+        request.setServerName(host);
+        return request;
+    }
+
+    @Test
+    void aHostThatStandsForANamespaceIsThatNamespace_whateverTheUserChoseBefore() throws Exception {
+        namespaces.create("erni", "ERNI AI", UserId.of("david"));
+        ScopeBindingFilter byHost = new ScopeBindingFilter(bound, namespaces, null, ERNI_HOST);
+        signIn("david");
+        MockHttpServletRequest request = under("erni.example.com", "/chat");
+        NamespaceSelection.select(request, Namespace.DEFAULT);
+
+        byHost.doFilter(request, new MockHttpServletResponse(), chain);
+
+        assertThat(seen.get()).isNotNull()
+                .satisfies(scope -> assertThat(scope.namespace()).isEqualTo(new Namespace("erni")));
+    }
+
+    @Test
+    void underThatHostSomebodyWhoIsNotInItDoesNotGetIn_evenWithANamespaceOfTheirOwn() throws Exception {
+        namespaces.create("erni", "ERNI AI", UserId.of("david"));
+        namespaces.create("alice", "Alice", UserId.of("alice"));
+        ScopeBindingFilter byHost = new ScopeBindingFilter(bound, namespaces, null, ERNI_HOST);
+        signIn("alice");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        byHost.doFilter(under("erni.example.com", "/chat"), response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getErrorMessage()).contains("not a member of namespace 'erni'");
+        assertThat(seen.get()).isNull();
+    }
+
+    @Test
+    void aHeaderDoesNotMoveTheWorkAwayFromTheHostThatNamesIt() throws Exception {
+        namespaces.create("erni", "ERNI AI", UserId.of("david"));
+        namespaces.create("david", "David", UserId.of("david"));
+        ScopeBindingFilter byHost = new ScopeBindingFilter(bound, namespaces, null, ERNI_HOST);
+        signIn("david");
+        MockHttpServletRequest request = under("erni.example.com", "/api/agents");
+        request.addHeader(ScopeBindingFilter.HEADER, "david");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        byHost.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).isEqualTo(403);
+        assertThat(response.getErrorMessage()).contains("This address serves namespace 'erni'");
+    }
+
+    @Test
+    void aHostThatBindsNothingLeavesTheChoiceWhereItWas() throws Exception {
+        namespaces.create("david", "David", UserId.of("david"));
+        ScopeBindingFilter byHost = new ScopeBindingFilter(bound, namespaces, null, ERNI_HOST);
+        signIn("david");
+        MockHttpServletRequest request = under("app.example.com", "/chat");
+        NamespaceSelection.select(request, new Namespace("david"));
+
+        byHost.doFilter(request, new MockHttpServletResponse(), chain);
+
+        assertThat(seen.get()).isNotNull()
+                .satisfies(scope -> assertThat(scope.namespace()).isEqualTo(new Namespace("david")));
+    }
 }

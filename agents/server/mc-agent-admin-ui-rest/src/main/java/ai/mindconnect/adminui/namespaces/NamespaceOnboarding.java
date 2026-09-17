@@ -79,6 +79,14 @@ public class NamespaceOnboarding {
         Objects.requireNonNull(user, "user");
         Namespace brand = brandNamespace(host);
         List<NamespaceDefinition> mine = namespaces.forUser(user);
+        if (brand != null && !namespaces.canAccess(user, brand)) {
+            // This address is that namespace. Being in another one is no reason
+            // to be let in here — the page would wear this brand's name and show
+            // what is not its.
+            log.info("{} is not in namespace '{}', which is what '{}' serves",
+                    user.value(), brand.value(), host);
+            return Outcome.NO_NAMESPACE;
+        }
         if (mine.isEmpty()) {
             log.info("{} is in no namespace — nobody has invited them", user.value());
             return Outcome.NO_NAMESPACE;

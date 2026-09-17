@@ -7,6 +7,7 @@ import ai.mindconnect.adminui.service.UserStream;
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.starter.namespace.HostNamespaces;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.registry.service.RegistryService;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -61,6 +62,8 @@ public class AdminLayoutFactory {
      * on the host in the address bar, and one process can serve two brands.
      */
     private final BrandingProperties branding;
+    /** Which host stands for which namespace; absent on a host that does not bind any. */
+    private final ObjectProvider<HostNamespaces> hostNamespaces;
 
     @Autowired
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
@@ -70,8 +73,10 @@ public class AdminLayoutFactory {
                               ObjectProvider<RegistryService> registryService,
                               ObjectProvider<NamespaceService> namespaceService,
                               ObjectProvider<ScopeSupplier> scope,
-                              BrandingProperties branding) {
+                              BrandingProperties branding,
+                              ObjectProvider<HostNamespaces> hostNamespaces) {
         this.branding = branding;
+        this.hostNamespaces = hostNamespaces;
         this.authEnabled = authEnabled;
         this.buildInfo = buildInfo;
         this.taskMonitor = taskMonitor.orElse(null);
@@ -88,7 +93,7 @@ public class AdminLayoutFactory {
                               ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
                               ObjectProvider<RegistryService> registryService) {
         this(authEnabled, buildInfo, taskMonitor, mcpRegistryAdmin, registryService, none(), none(),
-                new BrandingProperties());
+                new BrandingProperties(), none());
     }
 
     /**
@@ -131,10 +136,22 @@ public class AdminLayoutFactory {
         if (user == null) return Optional.empty();
         Namespace active = current.namespace();
         List<NamespaceDefinition> mine = namespaces.forUser(user);
+        // A host that stands for a namespace offers no others: the address bar
+        // decides where the work happens, so a menu of alternatives would be a
+        // list of things this page refuses.
+        if (hostNamespace().filter(active::equals).isPresent()) {
+            mine = mine.stream().filter(ns -> ns.id().equals(active)).toList();
+        }
         String activeLabel = mine.stream().filter(ns -> ns.id().equals(active)).map(NamespaceDefinition::label)
                 .findFirst().orElse(active.value());
         return Optional.of(new AdminLayout.NamespaceSwitch(active.value(), activeLabel,
                 mine.stream().map(ns -> new AdminLayout.NamespaceSwitch.Entry(ns.id().value(), ns.label())).toList()));
+    }
+
+    /** The namespace the host of this request stands for, if it stands for one. */
+    private Optional<Namespace> hostNamespace() {
+        HostNamespaces byHost = hostNamespaces.getIfAvailable();
+        return byHost == null ? Optional.empty() : byHost.namespaceOf(currentHost());
     }
 
     /** The brand for the host this request came in on; the top-level settings when it matches none. */

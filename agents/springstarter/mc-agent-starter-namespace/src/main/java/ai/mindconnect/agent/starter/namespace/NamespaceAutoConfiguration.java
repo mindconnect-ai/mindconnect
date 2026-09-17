@@ -190,13 +190,19 @@ public class NamespaceAutoConfiguration {
         return registration;
     }
 
-    /** Right after Spring Security: the authentication is known, the scope can be bound. */
+    /**
+     * Right after Spring Security: the authentication is known, the scope can be
+     * bound. A {@link HostNamespaces} bean — the Admin UI contributes one from
+     * its branding — makes the address bar decide where the work happens.
+     */
     @Bean
     @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     FilterRegistrationBean<ScopeBindingFilter> scopeBindingFilter(ScopeSupplier scope, NamespaceService namespaces,
-                                                                  ObjectProvider<UserService> users) {
-        FilterRegistrationBean<ScopeBindingFilter> registration =
-                new FilterRegistrationBean<>(new ScopeBindingFilter(scope, namespaces, users.getIfAvailable()));
+                                                                  ObjectProvider<UserService> users,
+                                                                  ObjectProvider<HostNamespaces> hosts) {
+        FilterRegistrationBean<ScopeBindingFilter> registration = new FilterRegistrationBean<>(
+                new ScopeBindingFilter(scope, namespaces, users.getIfAvailable(),
+                        hosts.getIfAvailable(HostNamespaces::none)));
         registration.setOrder(SecurityProperties.DEFAULT_FILTER_ORDER + 10);
         registration.setName("scopeBindingFilter");
         return registration;

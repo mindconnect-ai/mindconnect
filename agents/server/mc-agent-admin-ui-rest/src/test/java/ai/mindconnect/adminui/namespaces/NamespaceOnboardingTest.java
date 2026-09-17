@@ -196,4 +196,16 @@ class NamespaceOnboardingTest {
         assertThat(namespaces.role(renamed, ERNI)).contains(NamespaceRole.ADMIN);
         assertThat(Optional.of(namespaces.actor(renamed).email())).contains(DAVID);
     }
+
+    @Test
+    void underABrandsHostSomebodyWhoIsNotInItIsTurnedAway_evenWithANamespaceOfTheirOwn() {
+        UserId david = signIn("david", "david@erni.example");
+        onboarding.onboard(david, HOST);                      // creates erni, and david's own
+        UserId chief = signIn("chief", "chief@erni.example"); // an admin of the default namespace
+        onboarding.onboard(chief, "app.example.com");         // and so has one of their own
+
+        assertThat(onboarding.onboard(chief, HOST))
+                .as("this address is that namespace, and chief is not in it")
+                .isEqualTo(NamespaceOnboarding.Outcome.NO_NAMESPACE);
+    }
 }
