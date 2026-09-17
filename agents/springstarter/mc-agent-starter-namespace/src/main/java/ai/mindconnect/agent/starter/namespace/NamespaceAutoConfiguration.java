@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.namespace;
 
+import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.Scope;
@@ -19,6 +20,8 @@ import ai.mindconnect.namespace.adapter.file.FileNamespacePurge;
 import ai.mindconnect.namespace.adapter.file.FileNamespaceRepository;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.port.out.UserEmails;
+import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.ObjectProvider;
@@ -124,14 +127,39 @@ public class NamespaceAutoConfiguration {
         }
     }
 
-    /** The default namespace — open to everyone — is {@code mindconnect.namespace}, like the fallback above. */
+    /**
+     * The default namespace is {@code mindconnect.namespace}, like the fallback
+     * above. Who shapes it is {@code mindconnect.namespace-admins} — and naming
+     * anybody there closes it: an installation that lists its people has said
+     * that being signed in is not the same as being let in. Unset it stays open
+     * to every signed-in user, which is what a single-user installation, the dev
+     * mode and the tests work with.
+     */
     @Bean
     @ConditionalOnMissingBean
     NamespaceService namespaceService(NamespaceRepository namespaces,
                                       @Value("${mindconnect.namespace:local}") String defaultNamespace,
-                                      ObjectProvider<NamespacePurge> purges) {
+                                      ObjectProvider<NamespacePurge> purges,
+                                      UserEmails emails,
+                                      @Value("${mindconnect.email-domain:}") String emailDomain,
+                                      @Value("${mindconnect.namespace-admins:}") List<String> defaultAdmins) {
         return new NamespaceService(namespaces, new Namespace(defaultNamespace), java.time.Clock.systemUTC(),
-                purges.orderedStream().toList());
+                purges.orderedStream().toList(), emails, emailDomain,
+                defaultAdmins.stream().map(entry -> Email.qualified(entry, emailDomain)).toList());
+    }
+
+    /**
+     * Namespaces list people by e-mail; a request carries a user id. The
+     * addresses come from the user store; without one — a library host, a test
+     * — nobody has a stored address and the service falls back to the id at
+     * {@code mindconnect.email-domain}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    UserEmails userEmails(ObjectProvider<UserService> users) {
+        UserService userService = users.getIfAvailable();
+        if (userService == null) return UserEmails.none();
+        return id -> userService.find(id).map(User::email).flatMap(ai.mindconnect.agent.Email::parse);
     }
 
     /**

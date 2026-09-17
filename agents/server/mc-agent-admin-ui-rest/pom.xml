@@ -45,6 +45,14 @@
             <artifactId>mc-file-store</artifactId>
         </dependency>
         <!-- The profile page: the signed-in user and their personal API tokens -->
+        <!-- Who a request runs as, however it authenticated: session, JWT or API
+             token (SecurityCurrentUserResolver). Came in transitively before the
+             namespace roles started asking; named here because they depend on it. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-security</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user-core</artifactId>

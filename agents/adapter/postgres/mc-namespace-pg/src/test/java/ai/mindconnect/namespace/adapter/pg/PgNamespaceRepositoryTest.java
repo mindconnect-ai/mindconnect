@@ -1,8 +1,10 @@
 package ai.mindconnect.namespace.adapter.pg;
 
+import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,39 +25,46 @@ class PgNamespaceRepositoryTest {
         repo = new PgNamespaceRepository(sql).initSchema();
     }
 
-    private static NamespaceDefinition acme(UserId... members) {
-        return new NamespaceDefinition(new Namespace("acme"), "ACME", UserId.of("david"),
-                Instant.parse("2026-09-15T12:00:00Z"), Set.of(members));
+    private static final Email DAVID = Email.of("david@local");
+    private static final Email ALICE = Email.of("alice@local");
+
+    private static NamespaceDefinition acme(Email... users) {
+        return new NamespaceDefinition(new Namespace("acme"), "ACME", DAVID,
+                Instant.parse("2026-09-15T12:00:00Z"), Set.of(), Set.of(users));
+    }
+
+    private static Actor who(String name) {
+        return Actor.of(UserId.of(name), Email.of(name + "@local"));
     }
 
     @Test
     void aNamespaceSurvivesTheRoundTripAndASaveReplacesIt() {
         repo.save(acme());
-        repo.save(acme(UserId.of("alice")));
+        repo.save(acme(ALICE));
 
-        assertThat(repo.findById(new Namespace("acme"))).contains(acme(UserId.of("alice")));
+        assertThat(repo.findById(new Namespace("acme"))).contains(acme(ALICE));
         assertThat(repo.findAll()).hasSize(1);
     }
 
     @Test
     void theNamespacesVariablesSurviveTheRoundTrip() {
-        NamespaceDefinition acme = acme(UserId.of("alice")).withEnvironment(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
+        NamespaceDefinition acme = acme(ALICE).withEnvironment(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
         assertThat(repo.insert(acme)).isTrue();
 
         assertThat(repo.findById(new Namespace("acme"))).contains(acme);
-        assertThat(repo.findByMember(UserId.of("alice"))).singleElement().extracting(NamespaceDefinition::environment)
+        assertThat(repo.findFor(who("alice"))).singleElement().extracting(NamespaceDefinition::environment)
                 .isEqualTo(java.util.Map.of("OPENAI_API_KEY", "enc:abc"));
     }
 
     @Test
-    void findByMemberAnswersTheNMSide() {
-        repo.save(acme(UserId.of("alice")));
-        repo.save(new NamespaceDefinition(new Namespace("beta"), null, UserId.of("alice"),
-                Instant.parse("2026-09-15T12:00:00Z"), Set.of()));
+    void findForAnswersTheNMSide() {
+        repo.save(acme(ALICE));
+        repo.save(new NamespaceDefinition(new Namespace("beta"), null, ALICE,
+                Instant.parse("2026-09-15T12:00:00Z"), Set.of(), Set.of()));
 
-        assertThat(repo.findByMember(UserId.of("alice"))).extracting(NamespaceDefinition::id)
+        assertThat(repo.findFor(who("alice"))).extracting(NamespaceDefinition::id)
                 .containsExactly(new Namespace("acme"), new Namespace("beta"));
-        assertThat(repo.findByMember(UserId.of("david"))).extracting(NamespaceDefinition::id)
+        assertThat(repo.findFor(who("david"))).extracting(NamespaceDefinition::id)
                 .containsExactly(new Namespace("acme"));
     }
 

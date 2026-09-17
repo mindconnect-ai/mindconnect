@@ -1,8 +1,10 @@
 package ai.mindconnect.adminui.ui.page;
 
+import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.UserId;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -19,9 +21,9 @@ import java.util.Map;
 
 /**
  * The namespaces the signed-in user may work in — the open default one and
- * every one they created or were invited into — each with its members, a form
- * for the creator to invite another user by name, and the way to create a new,
- * empty namespace. Data
+ * every one they created or were invited into — each with its people and what
+ * they may do there, a form for an admin to invite somebody by e-mail address,
+ * and the way to create a new, empty namespace. Data
  * for a new namespace comes from the Registry, or from the user's own
  * hands; nothing is copied.
  */
@@ -31,13 +33,13 @@ public final class NamespacesPage {
     public static final String NAVIGATE = "/admin/namespaces";
     public static final String CREATE_FORM_ID = "namespace-create-form";
 
-    private final UserId me;
+    private final Actor me;
     private final Namespace active;
     private final List<NamespaceDefinition> namespaces;
     private final List<User> users;
     private final Namespace defaultNamespace;
 
-    public NamespacesPage(UserId me, Namespace active, Namespace defaultNamespace,
+    public NamespacesPage(Actor me, Namespace active, Namespace defaultNamespace,
                           List<NamespaceDefinition> namespaces, List<User> users) {
         this.me = me;
         this.active = active;
@@ -77,12 +79,25 @@ public final class NamespacesPage {
                             + "else the server's environment. A namespace you create can carry variables for everyone in it."));
             return card;
         }
+        boolean iAmAdmin = ns.isAdmin(me);
         UiTable table = UiTable.of("namespace-" + id + "-members", title).icon("layers")
                 .column(UiTable.Column.text("user", "Member"))
-                .column(UiTable.Column.text("role", "Role"))
-                .rowAction(UiAction.danger("remove", "Remove").icon("delete")
-                        .confirm("Remove this member from the namespace? Their sessions there stay.")
-                        .dispatch("DELETE", API + "/" + id + "/members/{id}"));
+                .column(UiTable.Column.text("role", "Role"));
+        if (iAmAdmin) {
+            // The server decides again on every one of these; the buttons are only
+            // here because an admin is the one who would use them.
+            table.rowAction(UiAction.secondary("promote", "Make admin").icon("shield")
+                            .confirm("Let this person shape the namespace — agents, LLM configs, workflows, "
+                                    + "variables, and who else is in it?")
+                            .dispatch("POST", API + "/" + id + "/members/{id}/promote"))
+                    .rowAction(UiAction.secondary("demote", "Make user").icon("user")
+                            .confirm("Take the namespace's content out of this person's hands? "
+                                    + "They keep the chat and may run its workflows.")
+                            .dispatch("POST", API + "/" + id + "/members/{id}/demote"))
+                    .rowAction(UiAction.danger("remove", "Remove").icon("delete")
+                            .confirm("Remove this member from the namespace? Their sessions there stay.")
+                            .dispatch("DELETE", API + "/" + id + "/members/{id}"));
+        }
         if (!ns.id().equals(active)) {
             table.action(UiAction.secondary("switch-" + id, "Switch to").icon("arrow-right")
                     .dispatch("POST", API + "/switch/" + id));
@@ -97,15 +112,14 @@ public final class NamespacesPage {
                     .confirm("Leave '" + ns.label() + "'? You will need a new invitation to come back.")
                     .dispatch("POST", API + "/" + id + "/leave"));
         }
-        for (UserId member : ns.members()) {
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", member.value());
-            row.put("user", label(member));
-            row.put("role", ns.isCreator(member) ? "creator" : "member");
-            table.row(row);
+        for (Email admin : ns.admins()) {
+            table.row(memberRow(admin, admin.equals(ns.createdBy()) ? "creator" : "admin"));
+        }
+        for (Email member : ns.users()) {
+            table.row(memberRow(member, "user"));
         }
         card.child(table);
-        if (ns.isCreator(me)) {
+        if (iAmAdmin) {
             card.child(inviteForm(ns));
             card.child(environment(ns));
         }
@@ -181,15 +195,21 @@ public final class NamespacesPage {
     }
 
     /**
-     * The form that invites a user into {@code id} by their user name; {@code error} keeps it
-     * open with the reason. {@code target} is where the form posts.
+     * The form that invites somebody into {@code id} by e-mail address and role;
+     * {@code error} keeps it open with the reason. {@code target} is where the form posts.
      */
     public static UiForm inviteForm(String formId, String title, String id, String error, String target) {
         UiForm form = UiForm.of(formId, title)
-                .field(UiField.text("user", "Invite", null).asEditable().asRequired()
-                        .placeholder("user name, as they sign in")
-                        .hint("The user name at the identity provider. The person has to have signed in here once; "
-                                + "members see everything in the namespace."))
+                .field(UiField.text("email", "Invite", null).asEditable().asRequired()
+                        .placeholder("e-mail address, as their account carries it")
+                        .hint("The address they sign in with. They do not have to have signed in yet — "
+                                + "the membership is waiting when they do."))
+                .field(UiField.select("role", "May", NamespaceRole.USER.name(), List.of(
+                                UiField.Option.of(NamespaceRole.USER.name(), "Use it — chat, and run its workflows"),
+                                UiField.Option.of(NamespaceRole.ADMIN.name(), "Shape it — everything, except deleting it")))
+                        .asEditable()
+                        .hint("A user sees the chat and the workflows and nothing else; an admin also creates and "
+                                + "changes agents, LLM configs, workflows and the namespace's variables."))
                 .action(UiAction.primary(formId + "-send", "Invite").icon("user-plus")
                         .dispatch("POST", target, formId));
         if (error != null) {
@@ -198,14 +218,30 @@ public final class NamespacesPage {
         return form;
     }
 
-    private String label(UserId id) {
+    private Map<String, Object> memberRow(Email entry, String role) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("id", entry.value());
+        row.put("user", label(entry));
+        row.put("role", role);
+        return row;
+    }
+
+    /**
+     * How one listed entry reads: the name of the account behind it when somebody
+     * has signed in under it, the bare entry when nobody has yet — an address may
+     * be listed before its first sign-in, and saying so is more useful than
+     * hiding it.
+     */
+    private String label(Email entry) {
+        String address = entry.value();
+        if (me.matches(entry)) return address + " (you)";
         for (User user : users) {
-            if (user.id().equals(id)) {
+            if (address.equalsIgnoreCase(user.email())) {
                 String name = user.label();
-                return name.equals(id.value()) ? name : name + " (" + id.value() + ")";
+                return name.equalsIgnoreCase(address) ? address : name + " (" + address + ")";
             }
         }
-        return id.equals(me) ? id.value() + " (you)" : id.value();
+        return address + " — not signed in yet";
     }
 
     /** The "New namespace" dialog body; {@code error} keeps the form open with the reason. */

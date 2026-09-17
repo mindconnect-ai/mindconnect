@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.branding;
 
+import ai.mindconnect.agent.Email;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
@@ -118,7 +119,9 @@ public class BrandingProperties extends BrandingVariant {
      * over the top-level settings over what the app ships.
      */
     public Branding resolve(String host) {
-        BrandingVariant variant = variantFor(host);
+        Map.Entry<String, BrandingVariant> match = entryFor(host);
+        String key = match == null ? null : match.getKey();
+        BrandingVariant variant = match == null ? null : match.getValue();
         String title = firstSet(variant == null ? null : variant.getTitle(), getTitle(), DEFAULT_TITLE);
         String documentTitle = firstSet(variant == null ? null : variant.getDocumentTitle(),
                 getDocumentTitle(), title);
@@ -130,14 +133,41 @@ public class BrandingProperties extends BrandingVariant {
         return new Branding(title, documentTitle,
                 asset(logo), firstSet(variant == null ? null : variant.getLogoHref(), getLogoHref(), DEFAULT_LOGO_HREF),
                 asset(favicon), firstSet(variant == null ? null : variant.getTheme(), getTheme(), DEFAULT_THEME),
-                stylesheets(variant), pickerDisabled(variant), pickerThemes(variant));
+                stylesheets(variant), pickerDisabled(variant), pickerThemes(variant),
+                namespaceId(key, variant), namespaceAdmins(variant));
     }
 
     /** The first entry whose pattern matches, or null for the top-level branding. */
     BrandingVariant variantFor(String host) {
+        Map.Entry<String, BrandingVariant> match = entryFor(host);
+        return match == null ? null : match.getValue();
+    }
+
+    private Map.Entry<String, BrandingVariant> entryFor(String host) {
         String name = normalizeHost(host);
         if (name == null) return null;
-        return variants.values().stream().filter(v -> v.matchesHost(name)).findFirst().orElse(null);
+        return variants.entrySet().stream()
+                .filter(entry -> entry.getValue().matchesHost(name))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * The namespace of the matching brand: what its block names, else the entry's
+     * own name — a brand called {@code acme} works in the namespace {@code acme}
+     * unless it says otherwise. Null when the brand brings no namespace, and the
+     * top level brings none either: a namespace is a brand's, not an
+     * installation-wide fallback.
+     */
+    private static String namespaceId(String key, BrandingVariant variant) {
+        BrandingNamespace block = variant == null ? null : variant.getNamespace();
+        if (block == null) return null;
+        String id = block.getId();
+        return isSet(id) ? id.trim() : key;
+    }
+
+    private static List<Email> namespaceAdmins(BrandingVariant variant) {
+        BrandingNamespace block = variant == null ? null : variant.getNamespace();
+        return block == null ? List.of() : block.addresses();
     }
 
     private List<String> stylesheets(BrandingVariant variant) {

@@ -1,6 +1,8 @@
 package ai.mindconnect.adminui;
 
 import ai.mindconnect.agent.security.ApiAuthentication;
+import ai.mindconnect.adminui.namespaces.NamespaceOnboarding;
+import ai.mindconnect.adminui.namespaces.NamespaceOnboardingFilter;
 import ai.mindconnect.agent.security.UserRecorder;
 import ai.mindconnect.agent.security.UserRecordingFilter;
 import jakarta.servlet.FilterChain;
@@ -105,7 +107,8 @@ public class SecurityConfig {
     SecurityFilterChain securedFilterChain(
             HttpSecurity http,
             ClientRegistrationRepository clientRegistrations,
-            UserRecorder userRecorder) throws Exception {
+            UserRecorder userRecorder,
+            NamespaceOnboarding onboarding) throws Exception {
 
         // Only remember browser navigations (Accept: text/html) as the
         // post-login return target. Without this, an XHR call that 401s —
@@ -134,7 +137,10 @@ public class SecurityConfig {
                                  // Public keys of the on-behalf tokens for the virtual
                                  // environment server (mc-agent-tools-virtual-env).
                                  "/.well-known/mc-virtual-env/jwks.json",
-                                 "/error").permitAll()
+                                 "/error",
+                                 // Signed in, but in no namespace: the page that says so
+                                 // (NamespaceOnboardingFilter sends browsers there).
+                                 NamespaceOnboardingFilter.NO_ACCESS).permitAll()
                 .anyRequest().authenticated()
             )
             .requestCache(rc -> rc.requestCache(htmlOnlyRequestCache))
@@ -171,7 +177,11 @@ public class SecurityConfig {
                 .authenticationEntryPoint(htmlOrApiEntryPoint())
             )
             // The user record follows who signs in (profile page, API tokens).
-            .addFilterBefore(new UserRecordingFilter(userRecorder), AuthorizationFilter.class);
+            .addFilterBefore(new UserRecordingFilter(userRecorder), AuthorizationFilter.class)
+            // Right after it, because it needs that record: the brand's namespace
+            // is created, whoever is listed gets one of their own, and somebody
+            // the installation lists nowhere is turned away (/no-access).
+            .addFilterAfter(new NamespaceOnboardingFilter(onboarding), UserRecordingFilter.class);
 
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
@@ -184,7 +194,8 @@ public class SecurityConfig {
     SecurityFilterChain openFilterChain(
             HttpSecurity http,
             @Value("${mindconnect.auth.dev-user:mc_user}") String devUser,
-            UserRecorder userRecorder) throws Exception {
+            UserRecorder userRecorder,
+            NamespaceOnboarding onboarding) throws Exception {
         OncePerRequestFilter devUserFilter = devUserFilter(devUser);
         http
             .cors(Customizer.withDefaults())
@@ -195,7 +206,11 @@ public class SecurityConfig {
             // Inject a fixed dev user so behaviour matches the secured chain.
             .addFilterBefore(devUserFilter, AuthorizationFilter.class)
             // The dev user has a user record too — the profile page needs one.
-            .addFilterBefore(new UserRecordingFilter(userRecorder), AuthorizationFilter.class);
+            .addFilterBefore(new UserRecordingFilter(userRecorder), AuthorizationFilter.class)
+            // And the same onboarding as with authentication on: with an open
+            // default namespace it finds the dev user somewhere to work, so this
+            // mode behaves as it always did.
+            .addFilterAfter(new NamespaceOnboardingFilter(onboarding), UserRecordingFilter.class);
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
         http.headers(headers -> headers.frameOptions(f -> f.sameOrigin()));

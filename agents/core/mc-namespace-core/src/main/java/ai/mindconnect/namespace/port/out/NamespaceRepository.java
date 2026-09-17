@@ -1,7 +1,7 @@
 package ai.mindconnect.namespace.port.out;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.UserId;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 
 import java.util.List;
@@ -19,8 +19,13 @@ public interface NamespaceRepository {
     /** Every namespace, ordered by id. */
     List<NamespaceDefinition> findAll();
 
-    /** The namespaces {@code user} is a member of, ordered by id. */
-    List<NamespaceDefinition> findByMember(UserId user);
+    /**
+     * The namespaces {@code who} is listed in, in either role, ordered by id.
+     * Matching is the record's business ({@code NamespaceDefinition.isMember}):
+     * an entry is an e-mail, or a user id in the records written before that
+     * was the rule.
+     */
+    List<NamespaceDefinition> findFor(Actor who);
 
     /** Creates or replaces. */
     void save(NamespaceDefinition namespace);

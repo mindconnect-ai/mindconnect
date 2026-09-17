@@ -118,6 +118,16 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
         } else {
             namespace = isApi(request) ? namespaces.defaultNamespace()
                     : chosen(request, user).orElseGet(namespaces::defaultNamespace);
+            // The fallback is the default namespace, and an installation that
+            // named its admins closed that one too. Falling into it unchecked
+            // would let somebody the installation lists nowhere work there —
+            // through the API, which sees no onboarding and no error page.
+            if (!namespaces.canAccess(user, namespace)) {
+                log.debug("{} is in no namespace", user.value());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "Your account is not in any namespace of this installation");
+                return;
+            }
         }
         response.setHeader(HEADER, namespace.value());
         try {

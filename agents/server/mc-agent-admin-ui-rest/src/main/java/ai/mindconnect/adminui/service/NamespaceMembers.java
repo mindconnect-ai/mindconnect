@@ -1,29 +1,32 @@
 package ai.mindconnect.adminui.service;
 
+import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.service.UserService;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 
 /**
- * Membership as the screens change it: inviting a user by their user name,
- * removing one, leaving, deleting the namespace. On top of what the
- * {@link NamespaceService} decides, this keeps the users' remembered choice
- * honest — someone who loses a namespace must not keep it as the one they
- * work in, or their live streams would go on showing it.
+ * Membership as the screens change it: inviting somebody by e-mail address in a
+ * role, promoting, demoting, removing, leaving, deleting the namespace. On top
+ * of what the {@link NamespaceService} decides, this keeps the users'
+ * remembered choice honest — someone who loses a namespace must not keep it as
+ * the one they work in, or their live streams would go on showing it.
  *
- * <p>The user name is the id every session and token already carries,
- * {@code preferred_username} at the identity provider. It has to belong to
- * a user this installation has seen: a typo, or someone who never signed in,
- * is refused rather than recorded as a member nobody can become. The
- * caller's right to invite is checked before the name is looked up, so the
- * endpoint tells nobody who is a user here.
+ * <p><strong>An address, not an account.</strong> A namespace lists e-mail
+ * addresses, so somebody can be invited before they have ever signed in: the
+ * first sign-in under that address finds the membership already there. That is
+ * also why nothing here refuses an unknown address — there is nothing to look
+ * up, and nothing to tell the caller about who else exists on this
+ * installation.
  */
 @Service
 public class NamespaceMembers {
@@ -37,64 +40,87 @@ public class NamespaceMembers {
     }
 
     /**
-     * Adds the user named {@code username} to {@code namespace}, as {@code inviter}.
+     * Puts {@code email} into {@code namespace} in {@code role}, as {@code inviter}.
      *
-     * @return the invited user
-     * @throws IllegalArgumentException when {@code inviter} did not create the namespace, the
+     * @return the address as it was listed
+     * @throws IllegalArgumentException when {@code inviter} does not shape the namespace, the
      *                                  namespace is missing or the open default one, or the
-     *                                  name is blank, unknown or already a member's
+     *                                  address is blank, malformed or already listed
      */
-    public User invite(Namespace namespace, UserId inviter, String username) {
-        NamespaceDefinition ns = createdBy(namespace, inviter, "invites into");
-        String name = username == null ? "" : username.strip();
-        if (name.isEmpty()) {
-            throw new IllegalArgumentException("Enter the user name of the person to invite");
+    public Email invite(Namespace namespace, UserId inviter, String email, NamespaceRole role) {
+        NamespaceDefinition ns = namespaces.find(namespace)
+                .orElseThrow(() -> new IllegalArgumentException("No namespace '" + namespace.value() + "'"));
+        Email address = address(email);
+        if (ns.admins().contains(address) || ns.users().contains(address)) {
+            throw new IllegalArgumentException("'" + address + "' is already in '" + namespace.value() + "'");
         }
-        User invitee = users.find(UserId.of(name)).orElseThrow(() -> new IllegalArgumentException(
-                "No user '" + name + "' on this installation. A user appears after their first sign-in."));
-        if (ns.isMember(invitee.id())) {
-            throw new IllegalArgumentException("'" + name + "' is already a member of '" + namespace.value() + "'");
-        }
-        namespaces.invite(namespace, inviter, invitee.id());
-        return invitee;
+        namespaces.invite(namespace, inviter, address, role);
+        return address;
     }
 
-    /** {@code actor} removes {@code member}; the member's remembered choice moves on if it was this namespace. */
-    public void remove(Namespace namespace, UserId actor, UserId member) {
-        namespaces.removeMember(namespace, actor, member);
-        forget(namespace, Set.of(member));
+    /** {@code actor} makes {@code entry} an admin of the namespace. */
+    public void promote(Namespace namespace, UserId actor, String entry) {
+        namespaces.promote(namespace, actor, address(entry));
+    }
+
+    /** {@code actor} makes {@code entry} a user again; the creator stays an admin. */
+    public void demote(Namespace namespace, UserId actor, String entry) {
+        namespaces.demote(namespace, actor, address(entry));
+    }
+
+    /** {@code actor} removes {@code entry}; that person's remembered choice moves on if it was this namespace. */
+    public void remove(Namespace namespace, UserId actor, String entry) {
+        Email address = address(entry);
+        namespaces.removeMember(namespace, actor, address);
+        forget(namespace, Set.of(address));
     }
 
     /** {@code actor} leaves; the creator cannot, only delete. */
     public void leave(Namespace namespace, UserId actor) {
         namespaces.leave(namespace, actor);
-        forget(namespace, Set.of(actor));
+        forget(namespace, Set.of(namespaces.actor(actor).email()));
     }
 
     /** Deletes the namespace with everything in it; every member's remembered choice moves on. */
     public void delete(Namespace namespace, UserId actor) {
-        Set<UserId> members = namespaces.find(namespace).map(NamespaceDefinition::members).orElse(Set.of());
+        Set<Email> listed = namespaces.find(namespace).map(NamespaceMembers::everyone).orElse(Set.of());
         namespaces.delete(namespace, actor);
-        forget(namespace, members);
+        forget(namespace, listed);
     }
 
-    private NamespaceDefinition createdBy(Namespace namespace, UserId actor, String verb) {
-        if (namespace.equals(namespaces.defaultNamespace())) {
-            throw new IllegalArgumentException("The default namespace is open to everyone; nobody " + verb + " it");
+    /**
+     * What the form typed, as an address: a bare name gets the installation's
+     * domain ({@code mindconnect.email-domain}), so that a company where every
+     * account is {@code <name>@company.example} can be invited by name.
+     */
+    private Email address(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Enter the e-mail address of the person to invite");
         }
-        NamespaceDefinition ns = namespaces.find(namespace)
-                .orElseThrow(() -> new IllegalArgumentException("No namespace '" + namespace.value() + "'"));
-        if (!ns.isCreator(actor)) {
-            throw new IllegalArgumentException("Only the creator of '" + namespace.value() + "' " + verb + " it");
-        }
-        return ns;
+        return namespaces.address(email);
     }
 
-    /** A user whose remembered namespace is {@code gone} goes back to the default one. */
-    private void forget(Namespace gone, Set<UserId> affected) {
-        for (UserId user : affected) {
-            if (users.activeNamespace(user).filter(gone::equals).isPresent()) {
-                users.selectNamespace(user, namespaces.defaultNamespace());
+    private static Set<Email> everyone(NamespaceDefinition ns) {
+        Set<Email> all = new LinkedHashSet<>(ns.admins());
+        all.addAll(ns.users());
+        return all;
+    }
+
+    /**
+     * Whoever is listed under {@code entries} and remembers {@code gone} as the
+     * namespace they work in goes back to the default one. An address nobody has
+     * signed in under yet has nothing to forget.
+     *
+     * <p>An account is matched through the same {@code actor} the namespace
+     * service asks — so an account without a stored address, listed under its id
+     * at the installation's domain, is found as well.
+     */
+    private void forget(Namespace gone, Set<Email> entries) {
+        if (entries.isEmpty()) return;
+        for (User user : users.all()) {
+            if (!entries.contains(namespaces.actor(user.id()).email())) continue;
+            if (users.activeNamespace(user.id()).filter(gone::equals).isPresent()) {
+                users.selectNamespace(user.id(), namespaces.defaultNamespace());
             }
         }
     }

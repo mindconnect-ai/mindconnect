@@ -238,4 +238,59 @@ class BrandingPropertiesTest {
         own.getStylePicker().setDisabled(false);
         assertThat(properties.resolve("app.mindconnect.ai").pickerDisabled()).isFalse();
     }
+
+    @Test
+    void a_brand_may_name_the_namespace_its_hosts_work_in() {
+        BrandingProperties properties = new BrandingProperties();
+        BrandingVariant acme = new BrandingVariant();
+        acme.setUrlPattern("acme.example.com");
+        acme.setTitle("ACME AI");
+        BrandingNamespace namespace = new BrandingNamespace();
+        namespace.setAdmins(java.util.List.of("chief@acme.example", "david@acme.example"));
+        acme.setNamespace(namespace);
+        properties.setSwitch(new java.util.LinkedHashMap<>(java.util.Map.of("acme", acme)));
+
+        Branding branded = properties.resolve("acme.example.com");
+
+        assertThat(branded.namespace()).as("the entry's own name is the id").isEqualTo("acme");
+        assertThat(branded.namespaceAdmins()).containsExactly(
+                ai.mindconnect.agent.Email.of("chief@acme.example"),
+                ai.mindconnect.agent.Email.of("david@acme.example"));
+        assertThat(branded.hasNamespace()).isTrue();
+    }
+
+    @Test
+    void creator_is_the_short_form_of_one_admin_and_comes_first() {
+        BrandingNamespace namespace = new BrandingNamespace();
+        namespace.setCreator("David@Acme.example");
+        namespace.setAdmins(java.util.List.of("chief@acme.example", " ", "david@acme.example"));
+
+        assertThat(namespace.addresses()).containsExactly(
+                ai.mindconnect.agent.Email.of("david@acme.example"),
+                ai.mindconnect.agent.Email.of("chief@acme.example"));
+    }
+
+    @Test
+    void a_brand_without_a_namespace_block_has_none_and_inherits_none() {
+        BrandingProperties properties = new BrandingProperties();
+        BrandingVariant plain = new BrandingVariant();
+        plain.setUrlPattern("plain.example.com");
+        BrandingVariant acme = new BrandingVariant();
+        acme.setUrlPattern("acme.example.com");
+        BrandingNamespace namespace = new BrandingNamespace();
+        namespace.setId("acme-ai");
+        namespace.setCreator("david@acme.example");
+        acme.setNamespace(namespace);
+        java.util.LinkedHashMap<String, BrandingVariant> variants = new java.util.LinkedHashMap<>();
+        variants.put("acme", acme);
+        variants.put("plain", plain);
+        properties.setSwitch(variants);
+
+        assertThat(properties.resolve("acme.example.com").namespace())
+                .as("an explicit id wins over the entry's name").isEqualTo("acme-ai");
+        assertThat(properties.resolve("plain.example.com").namespace()).isNull();
+        assertThat(properties.resolve("plain.example.com").hasNamespace()).isFalse();
+        assertThat(properties.resolve("nothing.example.com").namespace()).isNull();
+        assertThat(properties.resolve(null).namespaceAdmins()).isEmpty();
+    }
 }

@@ -1,9 +1,9 @@
 package ai.mindconnect.namespace.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -49,8 +49,8 @@ public class FileNamespaceRepository implements NamespaceRepository {
     }
 
     @Override
-    public List<NamespaceDefinition> findByMember(UserId user) {
-        return findAll().stream().filter(ns -> ns.isMember(user)).toList();
+    public List<NamespaceDefinition> findFor(Actor who) {
+        return findAll().stream().filter(ns -> ns.isMember(who)).toList();
     }
 
     @Override

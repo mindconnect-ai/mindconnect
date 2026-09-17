@@ -7,6 +7,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.starter.namespace.NamespaceSelection;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.user.adapter.memory.InMemoryUserRepository;
 import ai.mindconnect.user.service.UserService;
@@ -73,7 +74,7 @@ class NamespaceUiControllerTest {
 
         assertThat(created.getStatusCode().value()).isEqualTo(303);
         assertThat(namespaces.find(ACME)).get().satisfies(ns -> {
-            assertThat(ns.createdBy()).isEqualTo(UserId.of("alice"));
+            assertThat(ns.createdBy()).isEqualTo(ai.mindconnect.agent.Email.of("alice@local"));
             assertThat(ns.label()).isEqualTo("ACME");
         });
         assertThat(NamespaceSelection.selected(request)).contains(ACME);
@@ -86,13 +87,13 @@ class NamespaceUiControllerTest {
     }
 
     @Test
-    void onlyTheCreatorRemovesOthers_andAMemberRemovesThemselves() throws Exception {
+    void onlyAnAdminRemovesOthers_andAMemberRemovesThemselves() throws Exception {
         namespaces.create("acme", null, UserId.of("alice"));
-        namespaces.invite(ACME, UserId.of("alice"), UserId.of("bob"));
-        namespaces.invite(ACME, UserId.of("alice"), UserId.of("carol"));
+        namespaces.invite(ACME, UserId.of("alice"), namespaces.address("bob"), NamespaceRole.USER);
+        namespaces.invite(ACME, UserId.of("alice"), namespaces.address("carol"), NamespaceRole.USER);
         users.selectNamespace(UserId.of("carol"), ACME);
 
-        assertThat(json(controller.remove(user("bob"), "acme", "carol"))).contains("Not removed").contains("Only the creator");
+        assertThat(json(controller.remove(user("bob"), "acme", "carol"))).contains("Not removed").contains("Only an admin");
         assertThat(namespaces.canAccess(UserId.of("carol"), ACME)).isTrue();
 
         assertThat(json(controller.remove(user("alice"), "acme", "carol"))).contains("Removed");
@@ -108,7 +109,7 @@ class NamespaceUiControllerTest {
     @Test
     void thePageListsTheUsersNamespacesWithTheCreatorsActionsOnly() throws Exception {
         namespaces.create("acme", "ACME", UserId.of("alice"));
-        namespaces.invite(ACME, UserId.of("alice"), UserId.of("bob"));
+        namespaces.invite(ACME, UserId.of("alice"), namespaces.address("bob"), NamespaceRole.USER);
         namespaces.create("beta", null, UserId.of("carol"));
 
         String alices = json(controller.page(user("alice")));
@@ -122,9 +123,9 @@ class NamespaceUiControllerTest {
     @Test
     void onlyTheCreatorSetsANamespacesVariables_andAValueIsNeverShown() throws Exception {
         namespaces.create("acme", null, UserId.of("alice"));
-        namespaces.invite(ACME, UserId.of("alice"), UserId.of("bob"));
+        namespaces.invite(ACME, UserId.of("alice"), namespaces.address("bob"), NamespaceRole.USER);
 
-        assertThat(json(controller.newVariable(user("bob"), "acme"))).contains("Only the creator");
+        assertThat(json(controller.newVariable(user("bob"), "acme"))).contains("Only an admin");
         assertThat(json(controller.newVariable(user("alice"), "acme"))).contains("Add variable to");
 
         String added = json(controller.addVariable(user("alice"), "acme", Map.of("name", "OPENAI_API_KEY", "value", "sk-acme")));
@@ -132,7 +133,7 @@ class NamespaceUiControllerTest {
         assertThat(added).contains("OPENAI_API_KEY").contains("Variable saved").doesNotContain("sk-acme");
         assertThat(namespaces.find(ACME)).get().extracting(NamespaceDefinition::environment)
                 .isEqualTo(Map.of("OPENAI_API_KEY", "sk-acme"));
-        assertThat(json(controller.addVariable(user("bob"), "acme", Map.of("name", "X", "value", "y")))).contains("Only the creator");
+        assertThat(json(controller.addVariable(user("bob"), "acme", Map.of("name", "X", "value", "y")))).contains("Only an admin");
         assertThat(json(controller.page(user("alice")))).contains("OPENAI_API_KEY").doesNotContain("sk-acme");
 
         assertThat(json(controller.removeVariable(user("alice"), "acme", "OPENAI_API_KEY"))).contains("Variable removed");
