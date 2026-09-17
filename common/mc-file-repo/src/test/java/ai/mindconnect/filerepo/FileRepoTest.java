@@ -97,6 +97,26 @@ class FileRepoTest {
         assertThat(data.resolve(FileRepo.LOCK_FILE)).as("the data directory itself is never locked").doesNotExist();
     }
 
+    @Test
+    void aClosedPartitionDeletedAndCreatedAgainOpensFreshAndLocked() throws Exception {
+        Path data = dir.resolve("data");
+        FileRepo old = FileRepo.open(data, "ns");
+
+        assertThat(FileRepo.close(data, "ns")).isTrue();
+        assertThat(FileRepo.close(data, "ns")).as("closing twice is nothing to do").isFalse();
+        assertThatThrownBy(() -> old.resolve("sessions/s1/session.json")).isInstanceOf(FileRepoException.class);
+        try (var walk = Files.walk(old.root())) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+        }
+
+        FileRepo fresh = FileRepo.open(data, "ns");
+
+        assertThat(fresh).isNotSameAs(old);
+        assertThat(fresh.resolve(FileRepo.LOCK_FILE)).exists();
+        ChildRun run = openInChildProcess(data, "ns");
+        assertThat(run.exitCode()).as(run.output()).isEqualTo(3);
+    }
+
     private record ChildRun(int exitCode, String output) { }
 
     private static ChildRun openInChildProcess(Path base, String partition) throws Exception {

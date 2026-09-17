@@ -186,17 +186,25 @@ public class NamespaceService {
      * @throws IllegalStateException    when a store could not purge its data — the record stays, try again
      */
     public void delete(Namespace id, UserId actor) {
-        NamespaceDefinition ns = memberOnly(id, actor, "delete");
-        if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator deletes '" + id + "'");
-        for (NamespacePurge purge : purges) {
-            try {
-                purge.purge(id);
-            } catch (RuntimeException e) {
-                throw new IllegalStateException("Could not remove the data of '" + id + "': " + e.getMessage(), e);
+        // Under the namespace's lock like every other write: a variable or member change that
+        // read the record before would otherwise save it back after the record was dropped,
+        // and the namespace would return. A write waiting here reads again and finds nothing.
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = memberOnly(id, actor, "delete");
+            if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator deletes '" + id + "'");
+            for (NamespacePurge purge : purges) {
+                try {
+                    purge.purge(id);
+                } catch (RuntimeException e) {
+                    // A purge may have closed what the routed adapters hold; the retry and the
+                    // namespace, still there, get fresh ones.
+                    NamespaceRouted.evictEverywhere(id);
+                    throw new IllegalStateException("Could not remove the data of '" + id + "': " + e.getMessage(), e);
+                }
             }
+            namespaces.deleteById(id);
+            NamespaceRouted.evictEverywhere(id);
         }
-        namespaces.deleteById(id);
-        NamespaceRouted.evictEverywhere(id);
     }
 
     public NamespaceDefinition rename(Namespace id, UserId actor, String displayName) {
@@ -276,7 +284,10 @@ public class NamespaceService {
         return ns;
     }
 
-    /** Membership and name changes are read-modify-write on one record: one at a time per namespace, in this process. */
+    /**
+     * Membership, name and variable changes are read-modify-write on one record, and deleting drops it:
+     * one at a time per namespace, in this process.
+     */
     private Object lockFor(Namespace id) {
         return locks.computeIfAbsent(id, n -> new Object());
     }
