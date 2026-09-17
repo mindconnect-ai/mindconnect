@@ -53,6 +53,14 @@ public interface WorkspaceFiles {
     void write(Path file, byte[] content) throws IOException;
 
     /**
+     * Deletes a file, a link (never what it points to) or a directory with everything
+     * in it. A workspace that cannot delete says so with {@link UnsupportedOperationException}.
+     */
+    default void delete(Path path) throws IOException {
+        throw new UnsupportedOperationException("This workspace cannot delete files");
+    }
+
+    /**
      * The file as a path on this machine, for libraries that only read from a
      * {@link Path} (document parsers). Local workspaces hand out the file itself;
      * remote ones a temporary copy that closing deletes.
