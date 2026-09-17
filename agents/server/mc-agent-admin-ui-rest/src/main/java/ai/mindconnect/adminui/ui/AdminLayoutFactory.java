@@ -135,13 +135,10 @@ public class AdminLayoutFactory {
         UserId user = currentUserId().orElse(null);
         if (user == null) return Optional.empty();
         Namespace active = current.namespace();
-        List<NamespaceDefinition> mine = namespaces.forUser(user);
-        // A host that stands for a namespace offers no others: the address bar
-        // decides where the work happens, so a menu of alternatives would be a
-        // list of things this page refuses.
-        if (hostNamespace().filter(active::equals).isPresent()) {
-            mine = mine.stream().filter(ns -> ns.id().equals(active)).toList();
-        }
+        // What this address serves: the namespaces of its brand — the brand's
+        // own and the ones its people made. A menu of alternatives the page
+        // would refuse is worse than no menu.
+        List<NamespaceDefinition> mine = namespaces.forUser(user, hostNamespace().orElse(null));
         String activeLabel = mine.stream().filter(ns -> ns.id().equals(active)).map(NamespaceDefinition::label)
                 .findFirst().orElse(active.value());
         return Optional.of(new AdminLayout.NamespaceSwitch(active.value(), activeLabel,

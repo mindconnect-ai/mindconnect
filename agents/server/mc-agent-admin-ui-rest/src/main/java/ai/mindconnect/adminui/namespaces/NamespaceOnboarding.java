@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.namespaces;
 import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.starter.namespace.HostNamespaces;
 import ai.mindconnect.adminui.branding.Branding;
 import ai.mindconnect.adminui.branding.BrandingProperties;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
@@ -64,11 +65,20 @@ public class NamespaceOnboarding {
     private final NamespaceService namespaces;
     private final UserService users;
     private final BrandingProperties branding;
+    private final HostNamespaces hosts;
 
+    /** Without a {@link HostNamespaces} no address binds anything — a host that embeds the UI plainly. */
     public NamespaceOnboarding(NamespaceService namespaces, UserService users, BrandingProperties branding) {
+        this(namespaces, users, branding, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public NamespaceOnboarding(NamespaceService namespaces, UserService users, BrandingProperties branding,
+                               HostNamespaces hosts) {
         this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
         this.users = Objects.requireNonNull(users, "users");
         this.branding = Objects.requireNonNull(branding, "branding");
+        this.hosts = hosts == null ? HostNamespaces.none() : hosts;
     }
 
     /**
@@ -94,8 +104,13 @@ public class NamespaceOnboarding {
         // The open default namespace is not a membership: it is what a
         // single-user installation works in, and nobody put anybody there.
         boolean listed = mine.stream().anyMatch(ns -> !isOpenDefault(ns));
-        if (listed) personalNamespace(user);
-        land(user, brand, mine);
+        if (listed) personalNamespace(user, brand);
+        List<NamespaceDefinition> here = namespaces.forUser(user, brand);
+        if (here.isEmpty()) {
+            log.info("{} has no namespace that is reachable under '{}'", user.value(), host);
+            return Outcome.NO_NAMESPACE;
+        }
+        land(user, brand, here);
         return Outcome.ALLOWED;
     }
 
@@ -110,7 +125,11 @@ public class NamespaceOnboarding {
     private Namespace brandNamespace(String host) {
         Branding brand = branding.resolve(host);
         if (!brand.hasNamespace()) return null;
-        NamespaceService.Created created = namespaces.ensure(brand.namespace(), brand.title(), brand.namespaceAdmins());
+        Namespace id = new Namespace(brand.namespace());
+        // A brand's namespace belongs to itself: everything else of this brand
+        // carries the same id, and that is what makes them one family.
+        NamespaceService.Created created =
+                namespaces.ensure(brand.namespace(), brand.title(), brand.namespaceAdmins(), id);
         if (created.fresh()) {
             log.info("Namespace '{}' created for the brand on host '{}', admins {}",
                     created.namespace().id().value(), host, brand.namespaceAdmins());
@@ -124,36 +143,46 @@ public class NamespaceOnboarding {
      * a brand, by another installation-wide namespace — is left alone rather
      * than fought over; then they simply have no personal one.
      */
-    private void personalNamespace(UserId user) {
-        String id = personalId(user);
+    private void personalNamespace(UserId user, Namespace brand) {
+        String id = personalId(user, brand);
         if (id == null) return;
         Email mine = namespaces.actor(user).email();
         NamespaceService.Created personal = namespaces.ensure(id, users.find(user)
-                .map(stored -> stored.label()).orElse(user.value()), List.of(mine));
+                .map(stored -> stored.label()).orElse(user.value()), List.of(mine), brand);
         if (personal.fresh()) {
-            log.info("Namespace '{}' created for {}", id, user.value());
+            log.info("Namespace '{}' created for {} under brand {}", id, user.value(),
+                    brand == null ? "-" : brand.value());
         }
     }
 
     /**
-     * Where they start: the brand's namespace, when they are in it and have not
-     * chosen one yet. A choice they made before stays theirs — this is a first
-     * landing point, not a redirection on every sign-in.
+     * Where they start. The brand's namespace when this address names one, and
+     * otherwise their remembered choice — unless that one belongs to another
+     * address, in which case it is no use here and the first namespace this
+     * address does serve takes over. A usable choice they made before stays
+     * theirs: this is a landing point, not a redirection on every sign-in.
      */
-    private void land(UserId user, Namespace brand, List<NamespaceDefinition> mine) {
-        if (brand == null) return;
-        if (users.activeNamespace(user).isPresent()) return;
-        if (mine.stream().noneMatch(ns -> ns.id().equals(brand))) return;
-        users.selectNamespace(user, brand);
+    private void land(UserId user, Namespace brand, List<NamespaceDefinition> here) {
+        Namespace remembered = users.activeNamespace(user).orElse(null);
+        if (remembered != null && here.stream().anyMatch(ns -> ns.id().equals(remembered))) return;
+        Namespace landing = brand != null ? brand : here.get(0).id();
+        if (remembered == null || !landing.equals(remembered)) {
+            users.selectNamespace(user, landing);
+        }
     }
 
     /**
      * A user id as a namespace id: lower-case, anything else an underscore, and
      * nothing that a namespace may not be called. Null when what is left could
      * not be one.
+     *
+     * <p>Under a brand the brand's id goes in front, because the same person
+     * working under two brands has a namespace of their own in each — and each
+     * of them is only ever offered under its own brand's addresses.
      */
-    static String personalId(UserId user) {
-        String raw = user.value().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
+    static String personalId(UserId user, Namespace brand) {
+        String name = brand == null ? user.value() : brand.value() + "_" + user.value();
+        String raw = name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "_");
         while (raw.startsWith("_") || raw.startsWith("-")) {
             raw = raw.substring(1);
         }

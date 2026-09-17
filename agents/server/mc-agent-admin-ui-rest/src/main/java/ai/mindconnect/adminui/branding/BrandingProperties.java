@@ -158,6 +158,20 @@ public class BrandingProperties extends BrandingVariant {
      * top level brings none either: a namespace is a brand's, not an
      * installation-wide fallback.
      */
+    /**
+     * The namespace of one {@code switch} entry, by its own name in the map —
+     * what {@link #resolve} would answer for a host this entry claims. Empty
+     * when the entry brings no namespace.
+     */
+    public java.util.Optional<String> namespaceOf(BrandingVariant variant) {
+        for (Map.Entry<String, BrandingVariant> entry : variants.entrySet()) {
+            if (entry.getValue() == variant) {
+                return java.util.Optional.ofNullable(namespaceId(entry.getKey(), variant));
+            }
+        }
+        return java.util.Optional.ofNullable(namespaceId(null, variant));
+    }
+
     private static String namespaceId(String key, BrandingVariant variant) {
         BrandingNamespace block = variant == null ? null : variant.getNamespace();
         if (block == null) return null;

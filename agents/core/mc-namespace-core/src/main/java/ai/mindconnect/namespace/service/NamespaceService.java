@@ -193,6 +193,16 @@ public class NamespaceService {
         return out;
     }
 
+    /**
+     * The namespaces {@code user} may work in <em>under {@code brand}</em>: the
+     * ones that belong to it. A brand's namespace carries its own id, and so
+     * does what somebody created while working under it; {@code null} is the
+     * installation itself, where the namespaces of no brand live.
+     */
+    public List<NamespaceDefinition> forUser(UserId user, Namespace brand) {
+        return forUser(user).stream().filter(ns -> ns.belongsTo(brand)).toList();
+    }
+
     /** Whether {@code user} may work in {@code id}: the default namespace, or one that lists them. */
     public boolean canAccess(UserId user, Namespace id) {
         return role(user, id).isPresent();
@@ -220,8 +230,13 @@ public class NamespaceService {
      * @throws IllegalArgumentException when the id is malformed or taken
      */
     public NamespaceDefinition create(String id, String displayName, UserId creator) {
+        return create(id, displayName, creator, null);
+    }
+
+    /** The same, belonging to {@code brand} — what somebody working under a brand creates is the brand's. */
+    public NamespaceDefinition create(String id, String displayName, UserId creator, Namespace brand) {
         Objects.requireNonNull(creator, "creator");
-        return insert(id, displayName, List.of(actor(creator).email()));
+        return insert(id, displayName, List.of(actor(creator).email()), brand);
     }
 
     /**
@@ -232,13 +247,18 @@ public class NamespaceService {
      * @throws IllegalArgumentException when the id is malformed or taken, or no admin is given
      */
     public NamespaceDefinition create(String id, String displayName, List<Email> admins) {
+        return create(id, displayName, admins, null);
+    }
+
+    /** The same, belonging to {@code brand} — a brand's own namespace carries its own id. */
+    public NamespaceDefinition create(String id, String displayName, List<Email> admins, Namespace brand) {
         if (admins == null || admins.isEmpty()) {
             throw new IllegalArgumentException("A namespace needs at least one admin");
         }
-        return insert(id, displayName, admins);
+        return insert(id, displayName, admins, brand);
     }
 
-    private NamespaceDefinition insert(String id, String displayName, List<Email> admins) {
+    private NamespaceDefinition insert(String id, String displayName, List<Email> admins, Namespace brand) {
         String value = id == null ? "" : id.strip();
         if (!ID.matcher(value).matches()) {
             throw new IllegalArgumentException("A namespace id is 1–64 lower-case letters, digits, '-' or '_', got '" + id + "'");
@@ -251,7 +271,7 @@ public class NamespaceService {
             throw new IllegalArgumentException("Namespace '" + value + "' already exists");
         }
         String label = displayName == null || displayName.isBlank() ? null : displayName.strip();
-        NamespaceDefinition created = NamespaceDefinition.create(namespace, label, admins, Instant.now(clock));
+        NamespaceDefinition created = NamespaceDefinition.create(namespace, label, admins, Instant.now(clock), brand);
         if (created.admins().isEmpty()) {
             throw new IllegalArgumentException("A namespace needs at least one admin");
         }
@@ -272,11 +292,16 @@ public class NamespaceService {
      * @return the namespace, and whether this call is what created it
      */
     public Created ensure(String id, String displayName, List<Email> admins) {
+        return ensure(id, displayName, admins, null);
+    }
+
+    /** The same, with the brand the new namespace would belong to. */
+    public Created ensure(String id, String displayName, List<Email> admins, Namespace brand) {
         Namespace namespace = new Namespace(id == null ? "" : id.strip());
         Optional<NamespaceDefinition> existing = find(namespace);
         if (existing.isPresent()) return new Created(existing.get(), false);
         try {
-            return new Created(create(id, displayName, admins), true);
+            return new Created(create(id, displayName, admins, brand), true);
         } catch (IllegalArgumentException e) {
             // Somebody else inserted it between the two calls — two requests of
             // the same brand arriving together. Theirs is as good as ours.

@@ -45,7 +45,11 @@ class NamespaceOnboardingTest {
             id -> users.find(id).map(User::email).flatMap(Email::parse),
             "erni.example", List.of(Email.of("chief@erni.example")));
 
-    private final NamespaceOnboarding onboarding = new NamespaceOnboarding(namespaces, users, branding());
+    /** What the Admin UI answers on this installation: the brand erni owns the namespace erni. */
+    private final ai.mindconnect.agent.starter.namespace.HostNamespaces hosts =
+            new ai.mindconnect.adminui.namespaces.BrandHostNamespaces(branding());
+
+    private final NamespaceOnboarding onboarding = new NamespaceOnboarding(namespaces, users, branding(), hosts);
 
     private static BrandingProperties branding() {
         BrandingProperties properties = new BrandingProperties();
@@ -83,17 +87,18 @@ class NamespaceOnboardingTest {
     }
 
     @Test
-    void theFirstSignInUnderTheBrandLandsInItsNamespace_aLaterChoiceStays() {
+    void underTheBrandsAddressItsNamespaceIsWhereTheyWork_whateverTheyChoseElsewhere() {
         UserId david = signIn("david", "david@erni.example");
 
         onboarding.onboard(david, HOST);
 
         assertThat(users.activeNamespace(david)).contains(ERNI);
 
+        // He went to another address and worked in his own namespace; coming
+        // back here puts him back into this address's namespace.
         users.selectNamespace(david, new Namespace("david"));
         onboarding.onboard(david, HOST);
-        assertThat(users.activeNamespace(david)).as("nobody is moved on a later sign-in")
-                .contains(new Namespace("david"));
+        assertThat(users.activeNamespace(david)).contains(ERNI);
     }
 
     @Test
@@ -102,12 +107,13 @@ class NamespaceOnboardingTest {
 
         onboarding.onboard(david, HOST);
 
-        assertThat(store.findById(new Namespace("david"))).get().satisfies(ns -> {
+        assertThat(store.findById(new Namespace("erni_david"))).get().satisfies(ns -> {
             assertThat(ns.admins()).as("their own to shape").containsExactly(DAVID);
             assertThat(ns.label()).isEqualTo("david");
+            assertThat(ns.brand()).as("and it belongs to the brand they made it under").isEqualTo(ERNI);
         });
         assertThat(namespaces.forUser(david)).extracting(NamespaceDefinition::id)
-                .containsExactlyInAnyOrder(ERNI, new Namespace("david"));
+                .containsExactlyInAnyOrder(ERNI, new Namespace("erni_david"));
     }
 
     @Test
@@ -135,7 +141,8 @@ class NamespaceOnboardingTest {
 
         assertThat(namespaces.role(guest, ERNI)).contains(NamespaceRole.USER);
         assertThat(users.activeNamespace(guest)).contains(ERNI);
-        assertThat(store.findById(new Namespace("guest"))).as("and a place of their own").isPresent();
+        assertThat(store.findById(new Namespace("erni_guest"))).as("and a place of their own, in this brand")
+                .isPresent();
     }
 
     @Test
@@ -161,8 +168,9 @@ class NamespaceOnboardingTest {
                 .as("the default namespace lists them, so they may work").isEqualTo(NamespaceOnboarding.Outcome.ALLOWED);
 
         assertThat(store.findById(ERNI)).isEmpty();
-        assertThat(users.activeNamespace(chief)).as("no brand, nowhere to land").isEmpty();
-        assertThat(store.findById(new Namespace("chief"))).as("but a place of their own").isPresent();
+        assertThat(users.activeNamespace(chief)).as("the namespace this address serves")
+                .contains(Namespace.DEFAULT);
+        assertThat(store.findById(new Namespace("chief"))).as("and a place of their own").isPresent();
     }
 
     @Test
@@ -179,11 +187,13 @@ class NamespaceOnboardingTest {
 
     @Test
     void aUserIdThatCouldNotBeANamespaceIdSimplyHasNoPersonalNamespace() {
-        assertThat(NamespaceOnboarding.personalId(UserId.of("David.Beisert@erni.example")))
+        assertThat(NamespaceOnboarding.personalId(UserId.of("David.Beisert@erni.example"), null))
                 .isEqualTo("david.beisert_erni.example".replace(".", "_"));
-        assertThat(NamespaceOnboarding.personalId(UserId.of("system"))).isNull();
-        assertThat(NamespaceOnboarding.personalId(UserId.of("__"))).isNull();
-        assertThat(NamespaceOnboarding.personalId(UserId.of("-alice"))).isEqualTo("alice");
+        assertThat(NamespaceOnboarding.personalId(UserId.of("alice"), ERNI))
+                .as("one of their own per brand, and each only offered there").isEqualTo("erni_alice");
+        assertThat(NamespaceOnboarding.personalId(UserId.of("system"), null)).isNull();
+        assertThat(NamespaceOnboarding.personalId(UserId.of("__"), null)).isNull();
+        assertThat(NamespaceOnboarding.personalId(UserId.of("-alice"), null)).isEqualTo("alice");
     }
 
     @Test
@@ -207,5 +217,45 @@ class NamespaceOnboardingTest {
         assertThat(onboarding.onboard(chief, HOST))
                 .as("this address is that namespace, and chief is not in it")
                 .isEqualTo(NamespaceOnboarding.Outcome.NO_NAMESPACE);
+    }
+
+    @Test
+    void awayFromItsAddressABrandsNamespaceIsNotWhereSomebodyLands() {
+        UserId david = signIn("david", "david@erni.example");
+        onboarding.onboard(david, HOST);                       // lands in erni, and gets his own
+
+        assertThat(users.activeNamespace(david)).contains(ERNI);
+        assertThat(onboarding.onboard(david, "app.example.com"))
+                .as("his own namespace is served here, so he may work").isEqualTo(NamespaceOnboarding.Outcome.ALLOWED);
+        assertThat(users.activeNamespace(david))
+                .as("but not in ERNI's, which belongs to its own address")
+                .contains(new Namespace("david"));
+    }
+
+    @Test
+    void aGuestOfTheBrandWorksInTheirOwnNamespaceElsewhere_neverInTheBrandsOne() {
+        UserId david = signIn("david", "david@erni.example");
+        onboarding.onboard(david, HOST);
+        namespaces.invite(ERNI, david, Email.of("guest@example.com"), NamespaceRole.USER);
+        UserId guest = signIn("guest", "guest@example.com");
+        onboarding.onboard(guest, HOST);
+
+        assertThat(users.activeNamespace(guest)).contains(ERNI);
+
+        assertThat(onboarding.onboard(guest, "app.example.com"))
+                .as("their own namespace is served here").isEqualTo(NamespaceOnboarding.Outcome.ALLOWED);
+        assertThat(users.activeNamespace(guest))
+                .as("ERNI's is not — it belongs to its own address").contains(new Namespace("guest"));
+    }
+
+    @Test
+    void withoutAnyNamespaceServedHereTheyAreTurnedAway() {
+        // Nobody listed anywhere, so not even a namespace of their own: there
+        // is nothing for them at any address.
+        UserId stranger = signIn("stranger", "stranger@example.com");
+
+        assertThat(onboarding.onboard(stranger, "app.example.com"))
+                .isEqualTo(NamespaceOnboarding.Outcome.NO_NAMESPACE);
+        assertThat(store.findById(new Namespace("stranger"))).isEmpty();
     }
 }

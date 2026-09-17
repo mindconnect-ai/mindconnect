@@ -112,30 +112,23 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
             response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
             return;
         }
+        // The brand this address belongs to, if it belongs to one. Everything
+        // reachable here belongs to it as well: its own namespace, and the
+        // namespaces the people working under it created.
+        Namespace brand = hosts.namespaceOf(request.getServerName()).orElse(null);
+        Namespace fallback = brand != null ? brand : namespaces.defaultNamespace();
         Namespace namespace;
-        Namespace host = hosts.namespaceOf(request.getServerName()).orElse(null);
         if (user == null) {
-            namespace = host != null ? host : namespaces.defaultNamespace();
-        } else if (host != null) {
-            // This address stands for a namespace, so it is the one — a header
-            // or an earlier choice does not move the work somewhere else while
-            // the page still wears this brand's name.
-            if (named.isPresent() && !named.get().equals(host)) {
-                log.debug("{} asked for namespace '{}' under a host that serves '{}'",
-                        user.value(), named.get().value(), host.value());
-                response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                        "This address serves namespace '" + host.value() + "'");
-                return;
-            }
-            namespace = host;
-            if (!namespaces.canAccess(user, namespace)) {
-                log.debug("{} may not work in namespace '{}'", user.value(), namespace.value());
-                response.sendError(HttpServletResponse.SC_FORBIDDEN,
-                        "You are not a member of namespace '" + namespace.value() + "'");
-                return;
-            }
+            namespace = fallback;
         } else if (named.isPresent()) {
             namespace = named.get();
+            if (!servedHere(namespace, brand)) {
+                log.debug("{} asked for namespace '{}', which this address does not serve",
+                        user.value(), namespace.value());
+                response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                        "This address does not serve namespace '" + namespace.value() + "'");
+                return;
+            }
             if (!namespaces.canAccess(user, namespace)) {
                 log.debug("{} may not work in namespace '{}'", user.value(), namespace.value());
                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
@@ -143,14 +136,14 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
                 return;
             }
         } else {
-            namespace = isApi(request) ? namespaces.defaultNamespace()
-                    : chosen(request, user).orElseGet(namespaces::defaultNamespace);
-            // The fallback is the default namespace, and an installation that
-            // named its admins closed that one too. Falling into it unchecked
-            // would let somebody the installation lists nowhere work there —
-            // through the API, which sees no onboarding and no error page.
+            namespace = isApi(request) ? fallback : chosen(request, user, brand).orElse(fallback);
+            // An installation that named the admins of its default namespace
+            // closed that one too, and a brand's namespace was never open.
+            // Falling into either unchecked would let somebody this
+            // installation lists nowhere work there — through the API, which
+            // sees no onboarding and no error page.
             if (!namespaces.canAccess(user, namespace)) {
-                log.debug("{} is in no namespace", user.value());
+                log.debug("{} is in no namespace this address serves", user.value());
                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
                         "Your account is not in any namespace of this installation");
                 return;
@@ -175,19 +168,46 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
      * session too when there is one, so the record is read once per session,
      * not once per request. A choice they may no longer use is dropped.
      */
-    private Optional<Namespace> chosen(HttpServletRequest request, UserId user) {
+    private Optional<Namespace> chosen(HttpServletRequest request, UserId user, Namespace brand) {
         Optional<Namespace> selected = NamespaceSelection.selected(request);
         if (selected.isPresent()) {
-            if (namespaces.canAccess(user, selected.get())) return selected;
+            if (reachableHere(user, selected.get(), brand)) return selected;
             NamespaceSelection.clear(request);
         }
         if (users == null) return Optional.empty();
         Optional<Namespace> remembered = users.activeNamespace(user);
-        if (remembered.isPresent() && namespaces.canAccess(user, remembered.get())) {
+        if (remembered.isPresent() && reachableHere(user, remembered.get(), brand)) {
             NamespaceSelection.rememberIfSession(request, remembered.get());
             return remembered;
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether {@code user} may work in {@code namespace} <em>here</em>: it has
+     * to belong to this address's brand, so a choice made under another brand's
+     * address does not carry over to this one.
+     */
+    private boolean reachableHere(UserId user, Namespace namespace, Namespace brand) {
+        return servedHere(namespace, brand) && namespaces.canAccess(user, namespace);
+    }
+
+    /**
+     * Whether this address serves {@code namespace} at all.
+     *
+     * <p>Three answers, in this order. The namespace this address <em>is</em>
+     * is always served here, whatever its record says — a record written before
+     * brands existed must not leave a brand's own namespace unreachable at its
+     * own address. A namespace some other address stands for is never served
+     * here. Everything else is served where its brand is, and a namespace of no
+     * brand where there is no brand.
+     */
+    private boolean servedHere(Namespace namespace, Namespace brand) {
+        if (namespace.equals(brand)) return true;
+        if (hosts.bound().contains(namespace)) return false;
+        return namespaces.find(namespace)
+                .map(definition -> definition.belongsTo(brand))
+                .orElseGet(() -> brand == null);
     }
 
     /** The namespace the request itself names: the path prefix, else the header. */

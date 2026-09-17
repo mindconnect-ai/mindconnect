@@ -45,6 +45,11 @@ import java.util.Set;
  * @param environment the namespace's variables — an API key everyone working here shares, say —
  *                    which {@code ${VAR}} placeholders resolve from after the user's own and
  *                    before the process's; values are stored encrypted, {@code enc:} prefixed
+ * @param brand       the brand this namespace belongs to, as that brand's own namespace id:
+ *                    a brand's namespace carries its own id, a namespace created by somebody
+ *                    working under that brand carries it too, and null means it belongs to no
+ *                    brand. It is what decides where a namespace is offered at all — under the
+ *                    addresses of its brand, and nowhere else
  */
 public record NamespaceDefinition(
         Namespace id,
@@ -53,7 +58,8 @@ public record NamespaceDefinition(
         Instant createdAt,
         Set<Email> admins,
         Set<Email> users,
-        Map<String, String> environment
+        Map<String, String> environment,
+        Namespace brand
 ) {
     public NamespaceDefinition {
         Objects.requireNonNull(id, "A namespace needs an id");
@@ -83,21 +89,34 @@ public record NamespaceDefinition(
             @JsonProperty("admins") Set<Email> admins,
             @JsonProperty("users") Set<Email> users,
             @JsonProperty("members") Set<Email> legacyMembers,
-            @JsonProperty("environment") Map<String, String> environment) {
+            @JsonProperty("environment") Map<String, String> environment,
+            @JsonProperty("brand") Namespace brand) {
         Set<Email> workers = entries(users);
         workers.addAll(entries(legacyMembers));
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, workers, environment);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, workers, environment, brand);
+    }
+
+    /** A namespace of no brand — the installation's own, and every one written before brands existed. */
+    public NamespaceDefinition(Namespace id, String displayName, Email createdBy, Instant createdAt,
+                               Set<Email> admins, Set<Email> users, Map<String, String> environment) {
+        this(id, displayName, createdBy, createdAt, admins, users, environment, null);
     }
 
     /** A namespace without variables of its own. */
     public NamespaceDefinition(Namespace id, String displayName, Email createdBy, Instant createdAt,
                                Set<Email> admins, Set<Email> users) {
-        this(id, displayName, createdBy, createdAt, admins, users, null);
+        this(id, displayName, createdBy, createdAt, admins, users, null, null);
     }
 
     /** A namespace {@code creator} just created, with them as its only admin and nobody else in it. */
     public static NamespaceDefinition create(Namespace id, String displayName, Email creator, Instant now) {
         return new NamespaceDefinition(id, displayName, creator, now, Set.of(), Set.of());
+    }
+
+    /** The same, belonging to {@code brand} — created by somebody working under that brand. */
+    public static NamespaceDefinition create(Namespace id, String displayName, Email creator, Instant now,
+                                             Namespace brand) {
+        return new NamespaceDefinition(id, displayName, creator, now, Set.of(), Set.of(), null, brand);
     }
 
     /**
@@ -107,9 +126,21 @@ public record NamespaceDefinition(
      * that is why this takes a list and not a set.
      */
     public static NamespaceDefinition create(Namespace id, String displayName, List<Email> admins, Instant now) {
+        return create(id, displayName, admins, now, null);
+    }
+
+    /** The same, belonging to {@code brand} — a brand's own namespace carries its own id here. */
+    public static NamespaceDefinition create(Namespace id, String displayName, List<Email> admins, Instant now,
+                                             Namespace brand) {
         List<Email> shapers = admins == null ? List.of() : admins.stream().filter(Objects::nonNull).toList();
         Email creator = shapers.stream().findFirst().orElse(null);
-        return new NamespaceDefinition(id, displayName, creator, now, new LinkedHashSet<>(shapers), Set.of());
+        return new NamespaceDefinition(id, displayName, creator, now, new LinkedHashSet<>(shapers), Set.of(),
+                null, brand);
+    }
+
+    /** Whether this namespace belongs to {@code brand} — null being "no brand", which is a brand of its own kind. */
+    public boolean belongsTo(Namespace brand) {
+        return Objects.equals(this.brand, brand);
     }
 
     /** The name to show: the display name, else the id. */
@@ -158,7 +189,7 @@ public record NamespaceDefinition(
         shapers.add(value);
         Set<Email> workers = entries(users);
         workers.remove(value);
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, shapers, workers, environment);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, shapers, workers, environment, brand);
     }
 
     /**
@@ -171,7 +202,7 @@ public record NamespaceDefinition(
         if (admins.contains(value) || users.contains(value)) return this;
         Set<Email> workers = entries(users);
         workers.add(value);
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, workers, environment);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, workers, environment, brand);
     }
 
     /** This namespace with {@code entry} in the given role. */
@@ -190,7 +221,7 @@ public record NamespaceDefinition(
         shapers.remove(value);
         Set<Email> workers = entries(users);
         workers.add(value);
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, shapers, workers, environment);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, shapers, workers, environment, brand);
     }
 
     /** This namespace without {@code entry} in either list; the creator cannot be removed. */
@@ -204,16 +235,16 @@ public record NamespaceDefinition(
         shapers.remove(value);
         Set<Email> workers = entries(users);
         workers.remove(value);
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, shapers, workers, environment);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, shapers, workers, environment, brand);
     }
 
     public NamespaceDefinition withDisplayName(String displayName) {
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, users, environment);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, users, environment, brand);
     }
 
     /** This namespace with exactly {@code environment} as its variables ({@code null}: none). */
     public NamespaceDefinition withEnvironment(Map<String, String> environment) {
-        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, users, environment);
+        return new NamespaceDefinition(id, displayName, createdBy, createdAt, admins, users, environment, brand);
     }
 
     private static boolean matches(Set<Email> list, Actor who) {
