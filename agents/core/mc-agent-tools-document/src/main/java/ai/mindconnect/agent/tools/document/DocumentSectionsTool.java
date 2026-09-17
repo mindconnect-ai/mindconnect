@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.document;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.DocumentModel;
 import ai.mindconnect.agent.tools.document.DocumentReader;
@@ -26,6 +27,7 @@ public final class DocumentSectionsTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
     private final DocumentReader reader;
 
     public DocumentSectionsTool(Path baseDir, DocumentReader reader) {
@@ -34,7 +36,13 @@ public final class DocumentSectionsTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public DocumentSectionsTool(FileRoots roots, DocumentReader reader) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots), reader);
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public DocumentSectionsTool(WorkspaceFiles files, DocumentReader reader) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
         this.reader = reader;
     }
@@ -87,12 +95,12 @@ public final class DocumentSectionsTool implements Tool {
         if (target == null) {
             return roots.outsideError(relative);
         }
-        if (!Files.exists(target)) {
+        if (!files.exists(target)) {
             return "Error: file does not exist: " + relative;
         }
 
         try {
-            DocumentModel model = reader.load(baseDir, target);
+            DocumentModel model = reader.load(files, baseDir, target);
             ObjectNode root = MAPPER.createObjectNode();
             root.put("path", model.relativePath());
             root.put("sectionCount", model.sections().size());

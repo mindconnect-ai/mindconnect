@@ -11,6 +11,6 @@ public final class FileWriteToolFactory extends FileRootedToolFactory {
     @Override public String group() { return "files"; }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new FileWriteTool(BaseDirs.roots(scope, agentTool, defaultBaseDir));
+        return new FileWriteTool(files(agentTool, scope));
     }
 }

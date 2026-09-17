@@ -8,6 +8,6 @@ public final class GrepToolFactory extends FileRootedToolFactory {
     @Override public String name() { return "grep"; }
     @Override public String group() { return "files"; }
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new GrepTool(BaseDirs.roots(scope, agentTool, defaultBaseDir));
+        return new GrepTool(files(agentTool, scope));
     }
 }

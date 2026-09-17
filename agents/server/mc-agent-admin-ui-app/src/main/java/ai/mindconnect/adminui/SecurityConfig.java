@@ -127,6 +127,9 @@ public class SecurityConfig {
                                  // unauthenticated so users can start (or
                                  // restart after a failure) the OAuth flow.
                                  "/login", "/login.html",
+                                 // Public keys of the on-behalf tokens for the virtual
+                                 // environment server (mc-agent-tools-virtual-env).
+                                 "/.well-known/mc-virtual-env/jwks.json",
                                  "/error").permitAll()
                 .anyRequest().authenticated()
             )

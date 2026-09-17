@@ -11,7 +11,7 @@ public final class ReadDocumentSectionToolFactory extends DocBaseDirs.FileRooted
     @Override public String group() { return "documents"; }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new ReadDocumentSectionTool(DocBaseDirs.roots(scope, agentTool, defaultBaseDir),
+        return new ReadDocumentSectionTool(files(agentTool, scope),
                 SharedDocumentReader.INSTANCE);
     }
 }

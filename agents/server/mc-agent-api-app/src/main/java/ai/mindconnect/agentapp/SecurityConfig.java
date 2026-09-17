@@ -41,7 +41,9 @@ public class SecurityConfig {
         api.apply(http
             .cors(Customizer.withDefaults())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error").permitAll()
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/error",
+                        // public keys of the on-behalf tokens for the virtual environment server
+                        "/.well-known/mc-virtual-env/jwks.json").permitAll()
                 .anyRequest().authenticated()));
         return http.build();
     }

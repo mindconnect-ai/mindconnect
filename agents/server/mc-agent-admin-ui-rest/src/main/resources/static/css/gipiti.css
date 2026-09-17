@@ -195,6 +195,20 @@
     border: none;
 }
 
+/* ...but only while it sits beside the content. Once it floats as a drawer (an overlay
+   menu, or a responsive one below 768px) the framework gives it a ground of its own, and
+   the transparency above, three classes against its two, would take that away again: the
+   page showed straight through the nav labels. Restated at four classes so the drawer
+   keeps the surface the framework meant it to have. */
+:root.sui-theme-gipiti .sui-shell-body > .sui-menu--overlay.sui-menu--overlay {
+    background: var(--sui-color-surface);
+}
+@media (max-width: 768px) {
+    :root.sui-theme-gipiti .sui-shell-body > .sui-menu--responsive.sui-menu--responsive {
+        background: var(--sui-color-surface);
+    }
+}
+
 :root.sui-theme-gipiti .sui-menu-link {
     border-radius: var(--sui-radius-sm);
     font-size: 14px;

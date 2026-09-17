@@ -11,6 +11,6 @@ public final class DocumentWriteToolFactory extends DocBaseDirs.FileRooted {
     @Override public String group() { return "documents"; }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new DocumentWriteTool(DocBaseDirs.roots(scope, agentTool, defaultBaseDir));
+        return new DocumentWriteTool(files(agentTool, scope));
     }
 }

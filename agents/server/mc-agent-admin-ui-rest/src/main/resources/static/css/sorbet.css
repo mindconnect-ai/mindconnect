@@ -187,6 +187,22 @@
     box-shadow: none;   /* the card rule above names .sui-menu too */
 }
 
+/* ...but only while it sits beside the content. Once it floats as a drawer (an overlay
+   menu, or a responsive one below 768px) the framework gives it a ground and an elevation
+   of its own, and the rule above, three classes against its two, would take both away
+   again: the page showed straight through the nav labels. Restated at four classes so the
+   drawer looks like the panel the framework meant it to be. */
+:root.sui-theme-sorbet .sui-shell-body > .sui-menu--overlay.sui-menu--overlay {
+    background: var(--sui-color-surface);
+    box-shadow: var(--sui-shadow-pop);
+}
+@media (max-width: 768px) {
+    :root.sui-theme-sorbet .sui-shell-body > .sui-menu--responsive.sui-menu--responsive {
+        background: var(--sui-color-surface);
+        box-shadow: var(--sui-shadow-pop);
+    }
+}
+
 :root.sui-theme-sorbet .sui-menu-link {
     border-radius: 12px;
 }

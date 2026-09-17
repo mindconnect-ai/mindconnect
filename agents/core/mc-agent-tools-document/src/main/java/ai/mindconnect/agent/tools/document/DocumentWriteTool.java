@@ -1,12 +1,14 @@
 package ai.mindconnect.agent.tools.document;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
 
-import java.io.OutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -24,6 +26,7 @@ public final class DocumentWriteTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
 
     public DocumentWriteTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -31,7 +34,13 @@ public final class DocumentWriteTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public DocumentWriteTool(FileRoots roots) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots));
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public DocumentWriteTool(WorkspaceFiles files) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
     }
 
@@ -81,7 +90,7 @@ public final class DocumentWriteTool implements Tool {
         }
         String templateRel = arguments.get("template") instanceof String t && !t.isBlank() ? t : null;
         try {
-            XWPFDocument document = openDocument(roots, templateRel);
+            XWPFDocument document = openDocument(files, roots, templateRel);
             boolean styled = templateRel != null;
             int written = 0;
             for (Object raw : sections) {
@@ -93,10 +102,9 @@ public final class DocumentWriteTool implements Tool {
                 writeContent(document, content);
                 written++;
             }
-            Files.createDirectories(target.getParent());
-            try (OutputStream out = Files.newOutputStream(target)) {
-                document.write(out);
-            }
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            document.write(out);
+            files.write(target, out.toByteArray());
             document.close();
             return "Wrote " + written + " section(s) to " + relative + ".";
         } catch (Exception e) {
@@ -105,15 +113,15 @@ public final class DocumentWriteTool implements Tool {
     }
 
     /** Fresh document, or the template with its body cleared (styles survive). */
-    private static XWPFDocument openDocument(FileRoots roots, String templateRel) throws Exception {
+    private static XWPFDocument openDocument(WorkspaceFiles files, FileRoots roots, String templateRel) throws Exception {
         if (templateRel == null) {
             return new XWPFDocument();
         }
         Path template = roots.resolve(templateRel).orElse(null);
-        if (template == null || !Files.isRegularFile(template)) {
+        if (template == null || !files.isRegularFile(template)) {
             throw new IllegalArgumentException("template not found: " + templateRel);
         }
-        XWPFDocument document = new XWPFDocument(Files.newInputStream(template));
+        XWPFDocument document = new XWPFDocument(new ByteArrayInputStream(files.readAllBytes(template)));
         for (int i = document.getBodyElements().size() - 1; i >= 0; i--) {
             document.removeBodyElement(i);
         }

@@ -91,8 +91,12 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-llm-gateway-core` / `mc-llm-gateway`: LLM abstraction ports / provider adapters + routing
     - `mc-message-repository-core` / `mc-message-repository`: conversation & message storage
     - `mc-agent-protocol` (+ `-openai`, `-mc-runtime`): protocol vocabulary and backend adapters
-    - `mc-agent-tool-spi`: what a tool is — `Tool`, `ToolFactory`, `MultiToolProvider`, registry
+    - `mc-agent-tool-spi`: what a tool is — `Tool`, `ToolFactory`, `MultiToolProvider`, registry;
+      `WorkspaceFiles` / `WorkspaceProvider`: where file tools read and write and where `bash` runs
     - `mc-agent-tools*`: built-in tool providers (filesystem/bash, code, document, web, web-browser, workflow)
+    - `mc-agent-tools-virtual-env`: binds those tools to a virtual environment server over its REST API
+      (workspace per chat, commands in its container, calls signed per user) when
+      `mindconnect.virtual-env.client.url` is set; the server itself is not part of this repo
     - `mc-agent-registry-core` / `mc-agent-registry`: importing from a registry — a GitHub
       project with an index of LLM configs, agents, workflows and packages — ports + import
       service / GitHub client, file-backed source store, installers. An installer is
@@ -211,6 +215,7 @@ mvn -f agents/server/mc-agent-api-app/pom.xml spring-boot:run
 
 # Agent CLI (local mode by default; remote via mindconnect.remote.url)
 mvn -f agents/client/mc-agent-cli/pom.xml spring-boot:run
+
 ```
 
 ## Key Technologies

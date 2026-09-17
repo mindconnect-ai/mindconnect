@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.tools.builtin;
 
+import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -51,7 +53,7 @@ class FileWalksTest {
         Path latin = Files.write(tmp.resolve("latin.txt"), LATIN_1_LINE.getBytes(StandardCharsets.ISO_8859_1));
         Path utf8 = Files.write(tmp.resolve("utf8.txt"), LATIN_1_LINE.getBytes(StandardCharsets.UTF_8));
 
-        assertThat(FileWalks.readText(latin)).isEqualTo(new FileWalks.Decoded(LATIN_1_LINE, StandardCharsets.ISO_8859_1));
-        assertThat(FileWalks.readText(utf8)).isEqualTo(new FileWalks.Decoded(LATIN_1_LINE, StandardCharsets.UTF_8));
+        assertThat(FileWalks.readText(WorkspaceFiles.local(FileRoots.of(tmp)), latin)).isEqualTo(new FileWalks.Decoded(LATIN_1_LINE, StandardCharsets.ISO_8859_1));
+        assertThat(FileWalks.readText(WorkspaceFiles.local(FileRoots.of(tmp)), utf8)).isEqualTo(new FileWalks.Decoded(LATIN_1_LINE, StandardCharsets.UTF_8));
     }
 }

@@ -1,19 +1,21 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class FileListTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
 
     public FileListTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -21,7 +23,13 @@ public class FileListTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public FileListTool(FileRoots roots) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots));
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public FileListTool(WorkspaceFiles files) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
     }
 
@@ -61,20 +69,17 @@ public class FileListTool implements Tool {
         if (target == null) {
             return roots.outsideError(raw);
         }
-        if (!Files.exists(target)) {
+        if (!files.exists(target)) {
             return "Error: path does not exist: " + relative;
         }
-        if (!Files.isDirectory(target)) {
+        if (!files.isDirectory(target)) {
             return "Error: path is not a directory: " + relative;
         }
 
-        try (Stream<Path> entries = Files.list(target)) {
-            String listing = entries
-                    .sorted()
-                    .map(p -> {
-                        String name = p.getFileName().toString();
-                        return Files.isDirectory(p) ? name + "/" : name;
-                    })
+        try {
+            String listing = files.list(target).stream()
+                    .sorted(Comparator.comparing(WorkspaceEntry::path))
+                    .map(entry -> entry.directory() ? entry.name() + "/" : entry.name())
                     .collect(Collectors.joining("\n"));
             String header = "Directory: " + target.toAbsolutePath();
             return listing.isEmpty() ? header + "\n(empty directory)" : header + "\n" + listing;

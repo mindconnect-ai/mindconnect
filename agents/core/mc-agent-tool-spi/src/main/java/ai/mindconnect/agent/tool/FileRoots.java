@@ -17,10 +17,20 @@ import java.util.Optional;
  * all. {@code ~} and {@code $HOME} at the start of a path stand for the
  * user's home; an absolute path is taken as written, so a path into an
  * additional directory needs no relativising against the base.
+ *
+ * <p>{@code alias} is another name for the base, or {@code null}: an absolute
+ * path under it is read as the same path under the base. A workspace that
+ * lives elsewhere uses it, so the session directory the prompt names on this
+ * machine still reaches the files that are now under {@code /workspace}.
  */
-public record FileRoots(Path base, List<Path> extra) {
+public record FileRoots(Path base, List<Path> extra, Path alias) {
+
+    public FileRoots(Path base, List<Path> extra) {
+        this(base, extra, null);
+    }
 
     public FileRoots {
+        alias = alias == null ? null : alias.toAbsolutePath().normalize();
         Path root = base.toAbsolutePath().normalize();
         base = root;
         extra = extra == null ? List.of() : extra.stream()
@@ -29,6 +39,11 @@ public record FileRoots(Path base, List<Path> extra) {
                 .filter(p -> !p.equals(root))
                 .distinct()
                 .toList();
+    }
+
+    /** These roots, with {@code other} as a second name for the base. */
+    public FileRoots withAlias(Path other) {
+        return new FileRoots(base, extra, other);
     }
 
     /** The base alone. */
@@ -60,6 +75,9 @@ public record FileRoots(Path base, List<Path> extra) {
         try {
             Path asPath = Path.of(s);
             target = (asPath.isAbsolute() ? asPath : base.resolve(asPath)).normalize();
+            if (alias != null && asPath.isAbsolute() && target.startsWith(alias) && !target.startsWith(base)) {
+                target = base.resolve(alias.relativize(target)).normalize();
+            }
         } catch (InvalidPathException e) {
             return Optional.empty();
         }

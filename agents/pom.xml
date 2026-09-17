@@ -74,6 +74,7 @@
         <module>core/mc-agent-runtime</module>
         <module>core/mc-agent-tools</module>
         <module>core/mc-agent-tools-code</module>
+        <module>core/mc-agent-tools-virtual-env</module>
         <module>core/mc-agent-tools-document</module>
         <module>core/mc-agent-tools-web</module>
         <module>core/mc-agent-tools-web-browser</module>

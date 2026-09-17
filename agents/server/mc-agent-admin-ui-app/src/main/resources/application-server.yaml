@@ -7,10 +7,23 @@
 # and every chat keeps its files in a directory of its own under its user's home
 # (mindconnect.users.home, by default <data.base-dir>/<namespace>/home/{user}).
 mindconnect:
+  virtual-env:
+    client:
+      # A virtual environment server (reached over its REST API): the file tools, bash and
+      # code_execute then work in each chat's workspace and container there.
+      url: ${MC_VIRTUAL_ENV_URL:}
+      default-template: ${MC_VIRTUAL_ENV_TEMPLATE:python}
+      # Sign a short-lived token per call for the calling user under this issuer name; the
+      # server trusts that issuer and reads the key from
+      # /.well-known/mc-virtual-env/jwks.json here. Empty: MC_VIRTUAL_ENV_TOKEN, or no token.
+      issuer: ${MC_VIRTUAL_ENV_ISSUER:}
+      token: ${MC_VIRTUAL_ENV_TOKEN:}
   tools:
     # Not offered at all, whatever an agent names or an admin switches on.
     # bash runs as this process — with its environment, its API keys, the whole
     # file system — and nothing confines it to a chat's directory.
+    # With a virtual environment server (MC_VIRTUAL_ENV_URL above) bash runs in the
+    # chat's own container instead: set MC_TOOLS_DISABLED= (empty) to offer it.
     disabled: ${MC_TOOLS_DISABLED:bash,process_kill,process_list}
     # Empty: every user's root is their own home, so nobody leaves their tree.
     working-dir-root: ${MC_WORKING_DIR_ROOT:}

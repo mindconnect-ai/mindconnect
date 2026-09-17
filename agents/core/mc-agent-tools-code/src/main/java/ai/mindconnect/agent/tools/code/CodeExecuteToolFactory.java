@@ -5,6 +5,8 @@ import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
+import ai.mindconnect.agent.tool.workspace.CommandRunner;
+import ai.mindconnect.agent.tool.workspace.WorkspaceProvider;
 import ai.mindconnect.agent.tools.code.CodeLanguages.CodeLanguage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Wires {@code code_execute} into the runtime. The tool is only offered when a
@@ -43,6 +46,9 @@ public final class CodeExecuteToolFactory implements ToolFactory {
     private String defaultNetwork = "none";
     /** Host directory offered to every binding that does not name its own; null = none. */
     private String defaultMountDir;
+    /** Where commands run when a workspace provider is bound; the containers of this module are then unused. */
+    private Optional<WorkspaceProvider> workspaces = Optional.empty();
+    private Duration timeout = Duration.ofSeconds(60);
 
     @Override
     public String name() {
@@ -56,6 +62,12 @@ public final class CodeExecuteToolFactory implements ToolFactory {
 
     @Override
     public void bind(ToolEnvironment env) {
+        this.workspaces = env.get(WorkspaceProvider.class);
+        this.timeout = Duration.ofSeconds(longValue(env, "codeExecTimeoutSeconds", 60));
+        if (workspaces.isPresent()) {
+            log.info("code_execute runs in the bound workspace provider's environments");
+            return;
+        }
         String runtime = env.getString("codeExecRuntime").orElse("auto");
         ContainerCli cli = ContainerCli.detect(runtime).orElse(null);
         if (cli == null) {
@@ -85,7 +97,7 @@ public final class CodeExecuteToolFactory implements ToolFactory {
 
     @Override
     public boolean isAvailable() {
-        return service != null;
+        return service != null || workspaces.isPresent();
     }
 
     @Override
@@ -116,6 +128,15 @@ public final class CodeExecuteToolFactory implements ToolFactory {
 
     @Override
     public Tool create(AgentTool agentTool, ToolCallScope scope) {
+        if (workspaces.isPresent()) {
+            Optional<CommandRunner> runner = workspaces.get().commands(scope, agentTool);
+            if (runner.isPresent()) {
+                return new RemoteCodeExecuteTool(runner.get(), timeout);
+            }
+        }
+        if (service == null) {
+            throw new IllegalStateException("code_execute has no container runtime and no workspace provider for this call");
+        }
         // Per-agent opt-in to network access via the agent-tool override
         // {"network": "bridge"} — the runtime default stays authoritative
         // for everything unlisted or invalid.
