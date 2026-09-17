@@ -149,9 +149,18 @@ specificity over a `:root` rule, so a branding stylesheet written as above
 wants `theme: default` underneath it. The theme picker in the header still
 overrides the setting per browser.
 
-A worked example lives in
-[`agents/server/mc-agent-admin-ui-app/branding/erni`](https://github.com/mindconnect-ai/mindconnect/tree/main/agents/server/mc-agent-admin-ui-app/branding/erni):
-a profile (`--spring.profiles.active=erni`), a palette and a logo directory.
+A palette that several installations share is better off as a **theme** than
+as a branding stylesheet: a theme is a class on `<html>`, so it can restyle
+components (the nav rail's active row, the tabs, the toasts) and not just set
+tokens, and it shows up in the header's theme picker. A theme is one file in
+`static/css/` in `mc-agent-admin-ui-rest`, linked in `index.html` and listed
+in `js/theme-switch.js` — the shipped ones are the worked examples. A branding
+stylesheet is then left with what a theme cannot reach: the login page, which
+has no app shell and therefore no theme class.
+
+A whole branded instance is usually a Spring profile: put the settings above
+into `application-<name>.yaml`, point `assets-dir` at a directory beside the
+app, and start it with `--spring.profiles.active=<name>`.
 
 ## The main sections
 
