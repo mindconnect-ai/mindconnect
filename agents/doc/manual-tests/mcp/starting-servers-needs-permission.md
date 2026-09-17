@@ -3,7 +3,7 @@ id: mcp-starting-servers-needs-permission
 area: mcp
 requires: [server-9090, server-restartable]
 duration: ~10 min
-last-verified: 2026-09-11 (working tree on e0d19d7, branch fix/mcp-review-1-4, port 9097, probes sent to /mcp-gateway/api/probe instead of through the form)
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # Process and docker targets start only where the installation allows them

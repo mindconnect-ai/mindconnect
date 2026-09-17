@@ -3,7 +3,7 @@ id: chat-plus-menu
 area: chat
 requires: [server-9090]
 duration: ~6 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # The composer's "+": files, images, tools and sub-agents
@@ -64,8 +64,9 @@ change the chat while staying open, and what the menu says about the chat
    **Expected:** A dialog titled **Sub-agents** with one row per agent — not
    the chat's own agent, not `title-generator` or the summarizers — each with
    its icon, its description, a **Test** button and **Off | On**. The ones the
-   chat's agent brought are **On** (for `default-chat`: `url-reader` and
-   `explorer`); the header reads `Sub-agents · n of m on`.
+   chat's agent brought are **On** (for `default-chat`: `url-reader`,
+   `explorer` and `presentation-builder`); the header reads
+   `Sub-agents · n of m on`.
 
 7. Switch an agent the chat's agent did not have to **On**, and one it had
    to **Off**.
@@ -77,8 +78,12 @@ change the chat while staying open, and what the menu says about the chat
 8. One agent **On**, the rest **Off**. Close the dialog and ask the chat
    "Which agents can you call?".
    **Expected:** The chat calls `list_agents` and names only the agent that
-   is on. Switch every agent **Off** and ask again: the chat has no
-   `list_agents` or `run_agent` to call and says it cannot delegate.
+   is on. Switch every agent **Off** and ask: `Please call the list_agents
+   tool right now (not from memory) and tell me exactly what it returns. If
+   you do not have that tool, say "NO LIST_AGENTS TOOL".` The chat has no
+   `list_agents` or `run_agent` to call and says so. (Asked plainly again,
+   a model may answer from the previous turn's list — that is the history,
+   not the tool.)
 
 8a. **+** → **Sub-agents** → **Test** on any agent.
    **Expected:** A dialog titled **Test <agent>** with a message field,
@@ -89,10 +94,12 @@ change the chat while staying open, and what the menu says about the chat
    history on the left gained no entry. **Back** returns to the Sub-agents
    picker.
 
-9. Type half a sentence into the composer, then start a turn and — while it
-   is still streaming — open **+** → **Tools** and toggle any tool.
-   **Expected:** The composer keeps its **Stop** button; it does not turn
-   back into a Send button mid-turn.
+9. Start a long turn (`Write a 1500-word story about a lighthouse, no
+   tools.`) and look at the composer while it streams.
+   **Expected:** The composer is replaced by `AI is thinking` and a **Stop**
+   button — no textarea and no **+**, so no tool can be toggled mid-turn and
+   the Stop button cannot be swapped for Send. After the turn the composer
+   with its **+** is back.
 
 ## Cleanup
 

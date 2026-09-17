@@ -3,7 +3,7 @@ id: mcp-register-stdio-server
 area: mcp
 requires: [server-9090, npx, lm-studio-tool-model]
 duration: ~8 min
-last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # Register a stdio MCP server and let an agent call it
@@ -43,7 +43,8 @@ actually calls it.
    **Expected:** All five fields hold what was typed; **Enabled** is on.
 3. Click **Test connection**.
    **Expected:** Within ~30 s a result appears **below the form**, listing the
-   server's tools (`read_text_file`, `list_directory`, … — 10 or more).
+   server's tools under the prefix (`mfs_read_text_file`,
+   `mfs_list_directory`, … — 10 or more).
    Everything typed in step 2 is **still in the form**. The page did not
    navigate away.
 4. Click **Save**.
@@ -57,14 +58,16 @@ actually calls it.
    parameters table — not an empty row.
    Alternatively: `curl -s localhost:9090/admin/api/tools | grep -c mfs_`
 6. Create an agent at http://localhost:9090/admin/agents (**New agent**), name
-   `MCP Manual`, and add the tools `mfs_list_directory` and
-   `mfs_read_text_file`. Save.
-   **Expected:** Both appear in the tool dropdown under `Mcp · mfs_…` and the
-   saved agent lists them.
+   `MCP Manual`, **Save**. On the agent's page open **Tools (0)** →
+   **Add Tool** and add `mfs_list_directory`, then again for
+   `mfs_read_text_file`.
+   **Expected:** Both appear in the tool dropdown as `Mcp · mfs_…` and the
+   agent's **Tools (2)** tab lists them.
 7. Open a chat with `MCP Manual` and send:
    `Liste /tmp/mcp-manual auf und lies die Datei note.txt vor.`
-   **Expected:** The agent calls `mfs_list_directory` and then
-   `mfs_read_text_file`, and its answer contains **4711**.
+   **Expected:** The agent calls `mfs_list_directory` and
+   `mfs_read_text_file` (one after the other or in one parallel round), and its
+   answer contains **4711**.
 
 ## Cleanup
 

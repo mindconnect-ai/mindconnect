@@ -3,7 +3,7 @@ id: coding-project-instructions
 area: coding
 requires: [server-9090, tool-model]
 duration: ~6 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Standing instructions: AGENTS.md in the working directory reaches the prompt
@@ -27,7 +27,7 @@ user's own file comes first.
    lines may be skipped).
 2. Note whether the user file exists — never change it:
    `test -f ~/.mindconnect/AGENTS.md && echo present || echo absent`
-3. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
+3. Open http://localhost:9090/chat, **New chat**, the composer's model button (it names the model, e.g. `agent-default`) →
    **Agent** `coding-assistant` → **Apply**. Do NOT choose a folder yet.
    Note the session id from the URL.
 4. In a terminal, a shortcut for the prompt checks below (authentication

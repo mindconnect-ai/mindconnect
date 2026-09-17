@@ -3,7 +3,7 @@ id: mcp-variables-are-refused
 area: mcp
 requires: [server-9090, server-restartable]
 duration: ~5 min
-last-verified: never
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # A variable in a registration is refused; the process environment is never read

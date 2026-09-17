@@ -26,7 +26,7 @@ its timeout is killed with everything it started.
 
 1. Copy the fixture as in `coding/read-edit-verify.md` Setup 1 (the `git`
    lines may be skipped).
-2. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
+2. Open http://localhost:9090/chat, **New chat**, the composer's model button (it names the model, e.g. `agent-default`) →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL — `<session dir>` below is
    `<data.base-dir>/local/home/mc_user/sessions/<session-id>`.
@@ -43,7 +43,10 @@ its timeout is killed with everything it started.
    `Started in background: pid <n>`, has a line
    `Log: <session dir>/logs/bash-<digits>.log`, a line
    `Status: still running after …`, and a log excerpt containing
-   `port 8765`. The answer says the server is up and names the pid.
+   `port 8765` (in the JVM's locale — a German one prints `Port 8765`). The
+   answer says the server is up and names the pid. A model that first tries
+   `jwebserver … & echo $!` gets the `&` refusal and retries with
+   `background=true`; that is the guard working.
 3. Verify from a terminal:
    ```bash
    curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:8765/AGENTS.md

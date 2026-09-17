@@ -3,7 +3,7 @@ id: llm-configs-speech-to-text
 area: llm-configs
 requires: [server-9090, openai-key]
 duration: ~4 min
-last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # A speech-to-text config transcribes a recording

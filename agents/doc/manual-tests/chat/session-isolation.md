@@ -3,7 +3,7 @@ id: chat-session-isolation
 area: chat
 requires: [server-9098]
 duration: ~3 min
-last-verified: 2026-09-11 (curl, dev-user mode, branch fix/session-ownership)
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Session isolation: another user's session id opens nothing
@@ -21,16 +21,26 @@ user, and works for the owner. No LLM is needed: only the answer codes count.
 
 ## Setup
 
-Create one session for `alice` and one for `bob` through the REST API, which
-takes the user from the request body (it is a backend-client API):
+`POST /api/sessions` gives the session to the authenticated caller and
+ignores a `userId` in the body, so with the server running as `bob` only
+bob's session can be made over REST. Alice's session has to exist already:
+start the same data directory once with `--mindconnect.auth.dev-user=alice`
+and create it there, or — with file persistence — write one next to bob's
+(the server reads it from disk; give it a fresh id and no conversation, so
+deleting it cannot take bob's conversation along):
 
 ```bash
 B=http://localhost:9098
 AG=$(curl -s $B/api/agents | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["id"])')
-A=$(curl -s -X POST $B/api/sessions -H 'Content-Type: application/json' -d "{\"agentId\":\"$AG\",\"userId\":\"alice\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
-BOB=$(curl -s -X POST $B/api/sessions -H 'Content-Type: application/json' -d "{\"agentId\":\"$AG\",\"userId\":\"bob\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+BOB=$(curl -s -X POST $B/api/sessions -H 'Content-Type: application/json' -d "{\"agentId\":\"$AG\"}" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+# file persistence: <data.base-dir>/local/sessions/<id>/session.json
+DATA=<data.base-dir>/local/sessions
+A=aaaaaaaa-0000-4000-8000-00000000a11c
+mkdir -p $DATA/$A && jq --arg id $A '.id=$id | .userId="alice" | .conversationId=null | .attachedFiles=[]' $DATA/$BOB/session.json > $DATA/$A/session.json
 c() { printf '%-16s %s\n' "$1" "$(curl -s -o /dev/null -m 5 -w '%{http_code}' "${@:2}")"; }
 ```
+
+Remove `$DATA/$A` by hand afterwards.
 
 ## Steps
 

@@ -3,7 +3,7 @@ id: skills-load-and-precedence
 area: skills
 requires: [server-9090, tool-model]
 duration: ~10 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Skills: created, listed in the prompt, loaded on demand, project wins
@@ -44,7 +44,8 @@ an agent with skills off sees neither.
    MD
    ```
 3. http://localhost:9090/admin/agents → `coding-assistant` → **Edit** →
-   **Enable Skills** on, **Skills** empty (= all) → **Save**.
+   **Skills** `All skills` → **Save** (the seeded agent already has it; the
+   select offers `None`, `All skills`, `Specific skills`).
 
 ## Steps
 
@@ -71,13 +72,14 @@ an agent with skills off sees neither.
    the **same** chat: `Greet Bob by name.`
    **Expected:** `Salutations, Bob, from the project, edited.` — skills are
    read fresh, no restart.
-6. Admin UI → `coding-assistant` → **Edit** → **Enable Skills** off → **Save**.
+6. Admin UI → `coding-assistant` → **Edit** → **Skills** `None` → **Save**.
    **New chat** with the agent, send: `Greet Alice by name.`
    **Expected:** No `skill` tool card, and the answer is an ordinary greeting.
    The memory view of that session has no `## Skills` section.
-7. Admin UI → `coding-assistant` → **Edit** → **Enable Skills** on, and in
-   **Skills** select only a skill that is *not* `manual-test-greeting` (create
-   a second one if the list has no other) → **Save**. **New chat**, send:
+7. Admin UI → `coding-assistant` → **Edit** → **Skills** `Specific skills`,
+   and under **Skills to load** tick only a skill that is *not*
+   `manual-test-greeting` (e.g. the seeded `pptx-builder`; create a second one
+   if the list has no other) → **Save**. **New chat**, send:
    `Greet Alice by name.`
    **Expected:** The prompt's `## Skills` section does not list
    `manual-test-greeting`; if the model calls `skill` with that name anyway the
@@ -88,8 +90,8 @@ an agent with skills off sees neither.
 - http://localhost:9090/admin/skills → delete `manual-test-greeting` (and the
   second skill from step 7, if created).
 - `rm -rf ~/mc-manual-tests/skills-project`
-- `coding-assistant` → **Edit** → **Enable Skills** off, **Skills** empty →
-  **Save**.
+- `coding-assistant` → **Edit** → **Skills** `All skills` (the seeded
+  value) → **Save**.
 
 ## Notes
 

@@ -59,3 +59,10 @@ input, and nothing is sent until the person who spoke presses Send.
   the config to create — that is the error path working, not a FAIL.
 - Recording holds the microphone until the second click. If a step fails
   mid-recording, reload the page to release it.
+- Without a microphone (a scripted run): a spoken WAV
+  (`say -v Anna -o speech.wav --data-format=LEI16@48000 "…"`) fed to Chrome
+  with `--use-fake-ui-for-media-stream --use-fake-device-for-media-stream
+  --use-file-for-fake-audio-capture=<abs path>` stands in for one. Chrome's
+  sandbox cannot read the file on macOS (the log says so, and the fake device
+  records silence, which Whisper transcribes as `you`); that throwaway test
+  browser needs `--no-sandbox`.

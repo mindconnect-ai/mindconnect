@@ -3,7 +3,7 @@ id: approval-allow-once
 area: approval
 requires: [server-9090, lm-studio-tool-model]
 duration: ~3 min
-last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Allow once: the tool runs, the next call asks again

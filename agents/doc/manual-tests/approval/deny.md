@@ -3,7 +3,7 @@ id: approval-deny
 area: approval
 requires: [server-9090, lm-studio-tool-model]
 duration: ~3 min
-last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Deny: a denied tool never runs, the model still answers
@@ -34,9 +34,12 @@ assistant answer.
 
 1. Open a new session with that agent and send:
    `Suche im Web nach dem Wetter in Hamburg.`
-   **Expected:** An **Approval required** card appears showing `web_search`
-   and the concrete arguments; three buttons (Deny / Allow once / Allow for
-   this session); NO search runs, NO final answer yet.
+   **Expected:** An approval card appears reading
+   `The agent wants to run web_search.`, with the concrete arguments folded
+   behind a **show** row (expand it to check them); three buttons (Deny /
+   Allow once / Allow for this session); NO search runs, NO final answer yet.
+   (The card's DOM title is `Approval required  [<time>]` — what a scripted
+   browser can wait for — but it is not drawn.)
 2. Click **Deny**.
    **Expected:** The card disappears immediately; the agent produces an
    answer that acknowledges it could not search.

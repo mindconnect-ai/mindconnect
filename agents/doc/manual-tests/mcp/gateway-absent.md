@@ -3,7 +3,7 @@ id: mcp-gateway-absent
 area: mcp
 requires: [server-restartable]
 duration: ~5 min
-last-verified: never
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # With MCP switched off, the app has no MCP anything
@@ -29,8 +29,9 @@ nobody serves, and agents that use no MCP tools keep working.
    `./agents/server/mc-agent-admin-ui-app/start.sh -Dspring-boot.run.arguments="--mindconnect.mcp.enabled=false"`
    **Expected:** The application starts. No error about missing MCP beans.
 2. Open http://localhost:9090/admin/agents and look at the sidebar.
-   **Expected:** **No** entry **MCP Servers**. Chat, Agents, Tools, LLM
-   Configs, Workflows, Vector Stores, Migrations, API are all still there.
+   **Expected:** **No** entry **MCP Servers**. Chat, Agents, Tools, Skills,
+   LLM Configs, Workflows, Vector Stores, the **Install** group (Registry,
+   Migrations) and API are all still there.
 3. Open http://localhost:9090/admin/tools.
    **Expected:** The catalog renders with the built-in tools. **No**
    **Register MCP Server** button in its header — there is no gateway to

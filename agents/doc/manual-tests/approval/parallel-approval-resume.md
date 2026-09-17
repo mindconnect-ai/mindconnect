@@ -3,7 +3,7 @@ id: approval-parallel-resume
 area: approval
 requires: [server-9090, lm-studio-parallel-toolcall-model]
 duration: ~5 min
-last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Answering a card while another tool still runs: no second execution
@@ -24,7 +24,10 @@ one result.
 ## Setup
 
 1. Test agent with TWO tools: one slow (e.g. a long-running search / code
-   execution) WITHOUT approval, and one WITH **Needs approval**.
+   execution) WITHOUT approval, and one WITH **Needs approval**. A setup that
+   works: a new agent with `bash` (no approval) and `get_current_datetime`
+   (**Needs approval**), and the message
+   `Call BOTH tools in ONE single response, in parallel: (1) bash with command "sleep 45; echo SLOW-DONE" and (2) get_current_datetime with no arguments. Then tell me both outputs.`
 
 ## Steps
 
@@ -40,7 +43,8 @@ one result.
 4. Check the message log.
    **Expected:** Exactly ONE `TOOL_RESULT` per callId (no duplicates); all
    messages carry `run=0` — no `_r1` resume execution was started. Server log
-   shows `… is alive — notified, no resume`.
+   shows `Approval answer for call <callId> (granted, scope ONCE) delivered to task task_tool_<turnId>_<callId>`,
+   and only ONE `POST /chat/api/sessions/<id>/chat/stream` for the session.
 
 ## Cleanup
 

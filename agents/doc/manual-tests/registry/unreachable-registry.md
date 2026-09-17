@@ -3,7 +3,7 @@ id: registry-unreachable
 area: registry
 requires: [server-9090]
 duration: ~4 min
-last-verified: never
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # A registry that cannot be read says why, and costs nothing else
