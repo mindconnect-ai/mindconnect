@@ -1,11 +1,11 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,6 +27,7 @@ public class FileEditTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
 
     public FileEditTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -34,7 +35,13 @@ public class FileEditTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public FileEditTool(FileRoots roots) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots));
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public FileEditTool(WorkspaceFiles files) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
     }
 
@@ -106,19 +113,19 @@ public class FileEditTool implements Tool {
         if (target == null) {
             return roots.outsideError(raw);
         }
-        if (!Files.exists(target)) {
+        if (!files.exists(target)) {
             return "Error: file does not exist: " + relative + " — use file_write to create a file.";
         }
-        if (Files.isDirectory(target)) {
+        if (files.isDirectory(target)) {
             return "Error: path is a directory: " + relative;
         }
-        if (FileWalks.isBinary(target)) {
+        if (FileWalks.isBinary(files, target)) {
             return "Error: " + relative + " is a binary file.";
         }
         String content;
         Charset charset;
         try {
-            FileWalks.Decoded decoded = FileWalks.readText(target);
+            FileWalks.Decoded decoded = FileWalks.readText(files, target);
             content = decoded.text();
             charset = decoded.charset();
         } catch (IOException e) {
@@ -163,7 +170,7 @@ public class FileEditTool implements Tool {
         }
         try {
             // Written back in the encoding it was read in: a Latin-1 file stays Latin-1.
-            Files.writeString(target, changed, charset);
+            files.write(target, changed.getBytes(charset));
         } catch (IOException e) {
             return "Error writing file: " + e.getMessage();
         }

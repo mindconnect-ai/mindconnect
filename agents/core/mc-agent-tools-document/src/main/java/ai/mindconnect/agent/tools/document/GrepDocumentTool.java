@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.document;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tools.document.DocumentModel;
 import ai.mindconnect.agent.tools.document.DocumentReader;
@@ -34,6 +35,7 @@ public class GrepDocumentTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
     private final DocumentReader reader;
 
     public GrepDocumentTool(Path baseDir, DocumentReader reader) {
@@ -42,7 +44,13 @@ public class GrepDocumentTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public GrepDocumentTool(FileRoots roots, DocumentReader reader) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots), reader);
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public GrepDocumentTool(WorkspaceFiles files, DocumentReader reader) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
         this.reader = reader;
     }
@@ -101,8 +109,8 @@ public class GrepDocumentTool implements Tool {
 
         Path target = roots.resolve(relative).orElse(null);
         if (target == null) return roots.outsideError(relative);
-        if (!Files.exists(target)) return "Error: file does not exist: " + relative;
-        if (!Files.isRegularFile(target)) return "Error: not a regular file: " + relative;
+        if (!files.exists(target)) return "Error: file does not exist: " + relative;
+        if (!files.isRegularFile(target)) return "Error: not a regular file: " + relative;
 
         Pattern compiled;
         try {
@@ -113,7 +121,7 @@ public class GrepDocumentTool implements Tool {
 
         DocumentModel model;
         try {
-            model = reader.load(baseDir, target);
+            model = reader.load(files, baseDir, target);
         } catch (IOException | RuntimeException e) {
             log.warn("grep_document: failed to parse {}: {}", relative, e.getMessage());
             return "Error parsing document: " + e.getMessage();

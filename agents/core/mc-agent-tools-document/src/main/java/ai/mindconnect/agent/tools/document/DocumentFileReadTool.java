@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.document;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.nio.file.Files;
@@ -16,6 +17,7 @@ public class DocumentFileReadTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
 
     public DocumentFileReadTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -23,7 +25,13 @@ public class DocumentFileReadTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public DocumentFileReadTool(FileRoots roots) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots));
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public DocumentFileReadTool(WorkspaceFiles files) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
     }
 
@@ -65,14 +73,16 @@ public class DocumentFileReadTool implements Tool {
         if (target == null) {
             return roots.outsideError(relative);
         }
-        if (!Files.exists(target)) {
+        if (!files.exists(target)) {
             return "Error: file does not exist: " + relative;
         }
-        if (Files.isDirectory(target)) {
+        if (files.isDirectory(target)) {
             return "Error: path is a directory, use file_list instead";
         }
         try {
-            return DocumentParser.parseFile(target);
+            try (WorkspaceFiles.LocalFile local = files.localFile(target)) {
+                return DocumentParser.parseFile(local.path());
+            }
         } catch (Exception e) {
             return "Error reading file: " + e.getMessage();
         }

@@ -1,6 +1,11 @@
 package ai.mindconnect.agent.runtime.service;
 
+import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
@@ -10,6 +15,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -29,15 +36,33 @@ public class SessionDirectories {
     public static final int MAX_ENTRIES = 1000;
 
     private final List<Path> roots;
+    /** Roots that live elsewhere — a virtual environment's workspace — by the name they are shown under. */
+    private final Map<String, WorkspaceFiles> workspaces;
+
+    /** Names in a workspace root that are the environment's own, not the session's files. */
+    private static final Set<String> WORKSPACE_INTERNALS = Set.of(".home", ".mc");
 
     /** @param roots the session's directories, in the order they are shown; ones that do not exist are left out */
     public SessionDirectories(List<Path> roots) {
+        this(roots, Map.of());
+    }
+
+    /**
+     * @param workspaces workspaces that live elsewhere, shown first under their key (e.g. {@code /workspace});
+     *                   read through {@link WorkspaceFiles}, which does its own confinement
+     */
+    public SessionDirectories(List<Path> roots, Map<String, WorkspaceFiles> workspaces) {
         List<Path> existing = new ArrayList<>();
+        workspaces.keySet().stream().sorted().map(Path::of).forEach(existing::add);
         for (Path root : roots) {
             if (root != null && Files.isDirectory(root) && !existing.contains(root)) existing.add(root);
         }
         this.roots = List.copyOf(existing);
+        this.workspaces = Map.copyOf(workspaces);
     }
+
+    /** A file's name, size and bytes, for viewing or downloading. */
+    public record Content(String name, long size, InputStream stream) {}
 
     /** One entry of a directory. {@code path} is relative to the root, with forward slashes. */
     public record Entry(String name, String path, boolean directory, long size, Instant modified) {}
@@ -54,6 +79,9 @@ public class SessionDirectories {
      * Empty when the root is not one of the session's or the path leaves it or is no directory.
      */
     public Optional<Listing> list(String root, String path) {
+        if (root != null && workspaces.containsKey(root)) {
+            return listWorkspace(root, path);
+        }
         return resolve(root, path).filter(Files::isDirectory).flatMap(dir -> {
             Path base = rootOf(root).orElseThrow();
             Path realRoot;
@@ -85,6 +113,57 @@ public class SessionDirectories {
     /** The regular file at {@code path} under {@code root}, when it is one and stays inside. */
     public Optional<Path> file(String root, String path) {
         return resolve(root, path).filter(Files::isRegularFile);
+    }
+
+    /** The file at {@code path} under {@code root} to read, local or in a workspace elsewhere. */
+    public Optional<Content> open(String root, String path) throws IOException {
+        WorkspaceFiles remote = root == null ? null : workspaces.get(root);
+        if (remote != null) {
+            Optional<Path> target = workspacePath(remote, path);
+            if (target.isEmpty() || !remote.isRegularFile(target.get())) return Optional.empty();
+            byte[] bytes = remote.readAllBytes(target.get());
+            return Optional.of(new Content(target.get().getFileName().toString(), bytes.length,
+                    new ByteArrayInputStream(bytes)));
+        }
+        Optional<Path> file = file(root, path);
+        if (file.isEmpty()) return Optional.empty();
+        return Optional.of(new Content(file.get().getFileName().toString(), Files.size(file.get()),
+                Files.newInputStream(file.get())));
+    }
+
+    private Optional<Listing> listWorkspace(String root, String path) {
+        WorkspaceFiles remote = workspaces.get(root);
+        Optional<Path> dir = workspacePath(remote, path);
+        if (dir.isEmpty() || !remote.isDirectory(dir.get())) return Optional.empty();
+        Path base = remote.roots().base();
+        String dirPath = base.relativize(dir.get()).toString().replace('\\', '/');
+        List<Entry> entries = new ArrayList<>();
+        boolean truncated = false;
+        try {
+            for (WorkspaceEntry child : remote.list(dir.get())) {
+                boolean internal = dirPath.isEmpty() && WORKSPACE_INTERNALS.contains(child.name());
+                if (internal || !(child.directory() || child.regularFile())) continue;   // links are not followed
+                if (entries.size() == MAX_ENTRIES) {
+                    truncated = true;
+                    break;
+                }
+                String childPath = dirPath.isEmpty() ? child.name() : dirPath + "/" + child.name();
+                entries.add(new Entry(child.name(), childPath, child.directory(), child.directory() ? 0 : child.size(),
+                        Instant.ofEpochMilli(child.lastModifiedMillis())));
+            }
+        } catch (IOException e) {
+            return Optional.of(new Listing(Path.of(root), dirPath, List.of(), false));
+        }
+        entries.sort(Comparator.comparing((Entry e) -> !e.directory())
+                .thenComparing(e -> e.name().toLowerCase()));
+        return Optional.of(new Listing(Path.of(root), dirPath, List.copyOf(entries), truncated));
+    }
+
+    /** {@code path} in a workspace, when its roots accept it. */
+    private static Optional<Path> workspacePath(WorkspaceFiles remote, String path) {
+        String rel = path == null ? "" : path.replace('\\', '/');
+        while (rel.startsWith("/")) rel = rel.substring(1);
+        return remote.roots().resolve(rel.isEmpty() ? "." : rel);
     }
 
     /**

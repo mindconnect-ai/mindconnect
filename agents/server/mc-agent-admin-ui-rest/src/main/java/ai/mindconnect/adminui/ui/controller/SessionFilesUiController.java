@@ -2,12 +2,18 @@ package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.page.SessionFilesPage;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.agent.tool.workspace.WorkspaceProvider;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.SessionDirectories;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -20,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -62,12 +68,21 @@ public class SessionFilesUiController {
     private final AgentSessionService sessionService;
     private final AgentSessionRepository sessions;
     private final CurrentUsers currentUsers;
+    /** Where the tools keep a session's files when not on this machine — a virtual environment server. */
+    private final ObjectProvider<WorkspaceProvider> workspaces;
 
     public SessionFilesUiController(AgentSessionService sessionService, AgentSessionRepository sessions,
                                     CurrentUsers currentUsers) {
+        this(sessionService, sessions, currentUsers, null);
+    }
+
+    @Autowired
+    public SessionFilesUiController(AgentSessionService sessionService, AgentSessionRepository sessions,
+                                    CurrentUsers currentUsers, ObjectProvider<WorkspaceProvider> workspaces) {
         this.sessionService = sessionService;
         this.sessions = sessions;
         this.currentUsers = currentUsers;
+        this.workspaces = workspaces;
     }
 
     /** The dialog: the session's directories as a tree. */
@@ -101,14 +116,15 @@ public class SessionFilesUiController {
                                                        @RequestParam("path") String path,
                                                        @RequestParam(value = "download", defaultValue = "false") boolean download)
             throws IOException {
-        Optional<Path> file = directoriesOfOwned(SessionId.of(sessionIdValue)).flatMap(d -> d.file(root, path));
+        Optional<SessionDirectories> directories = directoriesOfOwned(SessionId.of(sessionIdValue));
+        Optional<SessionDirectories.Content> file = directories.isEmpty() ? Optional.empty()
+                : directories.get().open(root, path);
         if (file.isEmpty()) return ResponseEntity.notFound().build();
-        Path found = file.get();
-        String name = found.getFileName().toString();
+        String name = file.get().name();
         String viewAs = download ? null : VIEWABLE.get(extension(name));
 
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentLength(Files.size(found));
+        headers.setContentLength(file.get().size());
         headers.set("X-Content-Type-Options", "nosniff");
         if (viewAs == null) {
             headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
@@ -117,7 +133,7 @@ public class SessionFilesUiController {
             headers.setContentType(MediaType.parseMediaType(viewAs));
             headers.setContentDisposition(ContentDisposition.inline().filename(name).build());
         }
-        return ResponseEntity.ok().headers(headers).body(new InputStreamResource(Files.newInputStream(found)));
+        return ResponseEntity.ok().headers(headers).body(new InputStreamResource(file.get().stream()));
     }
 
     /** The session's directories, when the session exists and is the caller's. */
@@ -126,7 +142,19 @@ public class SessionFilesUiController {
         if (caller == null) return Optional.empty();
         return sessions.findById(sessionId)
                 .filter(session -> caller.equals(session.userId()))
-                .map(session -> sessionService.directories(sessionId));
+                .map(session -> {
+                    WorkspaceProvider provider = workspaces == null ? null : workspaces.getIfAvailable();
+                    if (provider == null) return sessionService.directories(sessionId);
+                    // With an environment server the session's files are its workspace there: bash and
+                    // code_execute write into it, and the uploads are copied into it (files() does that
+                    // now). It is the only directory shown, under the path the tools and the container use.
+                    ToolCallScope scope = new ToolCallScope(session.userId(), session.id(), session.agentDefinitionId(),
+                            session.parentSessionId() == null ? session.id() : session.parentSessionId(),
+                            session.workingDir(), session.additionalDirs());
+                    var files = provider.files(scope, AgentTool.of("file_read"),
+                            FileRoots.of(Path.of(session.hasWorkingDir() ? session.workingDir() : ".")));
+                    return new SessionDirectories(List.of(), Map.of(files.roots().base().toString(), files));
+                });
     }
 
     private static String extension(String name) {

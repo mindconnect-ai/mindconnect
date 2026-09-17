@@ -1,13 +1,12 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
 import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import java.nio.file.Path;
 import java.util.Set;
 
@@ -31,7 +30,7 @@ final class FileWalks {
     );
 
     /** How much of a file's head decides whether it is binary. */
-    private static final int SNIFF_BYTES = 8_192;
+    static final int SNIFF_BYTES = 8_192;
 
     /** Above this share of control characters in the head a file without NUL bytes still counts as binary. */
     private static final double MAX_CONTROL_SHARE = 0.10;
@@ -43,10 +42,9 @@ final class FileWalks {
      * those. Text in a legacy encoding — ISO-8859-1, Windows-1252 — is text:
      * the bytes that are no UTF-8 say nothing about binary.
      */
-    static boolean isBinary(Path file) {
-        try (InputStream in = Files.newInputStream(file)) {
-            byte[] head = in.readNBytes(SNIFF_BYTES);
-            return isBinary(head);
+    static boolean isBinary(WorkspaceFiles files, Path file) {
+        try {
+            return isBinary(files.readHead(file, SNIFF_BYTES));
         } catch (IOException e) {
             return false;
         }
@@ -72,8 +70,12 @@ final class FileWalks {
      * which decodes every byte, so a Latin-1 or Windows-1252 file reads with
      * its umlauts instead of failing.
      */
-    static Decoded readText(Path file) throws IOException {
-        byte[] bytes = Files.readAllBytes(file);
+    static Decoded readText(WorkspaceFiles files, Path file) throws IOException {
+        return decode(files.readAllBytes(file));
+    }
+
+    /** UTF-8 when the bytes are UTF-8, ISO-8859-1 otherwise. */
+    static Decoded decode(byte[] bytes) {
         try {
             String text = StandardCharsets.UTF_8.newDecoder()
                     .onMalformedInput(CodingErrorAction.REPORT)

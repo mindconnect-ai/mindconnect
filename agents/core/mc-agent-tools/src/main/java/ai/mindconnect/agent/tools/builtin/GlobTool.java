@@ -1,17 +1,18 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
+import ai.mindconnect.agent.tool.workspace.WorkspaceWalker;
 import ai.mindconnect.agent.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -57,6 +58,7 @@ public class GlobTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
 
     public GlobTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -64,7 +66,13 @@ public class GlobTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public GlobTool(FileRoots roots) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots));
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public GlobTool(WorkspaceFiles files) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
     }
 
@@ -154,11 +162,11 @@ public class GlobTool implements Tool {
         if (searchRoot == null) {
             return roots.outsideError(rawPath);
         }
-        if (!Files.exists(searchRoot)) {
+        if (!files.exists(searchRoot)) {
             return "Error: path does not exist: " + relativeRoot
                     + suggestionsFor(searchRoot);
         }
-        if (!Files.isDirectory(searchRoot)) {
+        if (!files.isDirectory(searchRoot)) {
             return "Error: path is not a directory: " + relativeRoot;
         }
 
@@ -185,39 +193,36 @@ public class GlobTool implements Tool {
         boolean[] timedOut = {false};
         boolean[] interrupted = {false};
         try {
-            Files.walkFileTree(searchRoot, new FileVisitor<>() {
+            // Excluded directories are pruned by the walk itself, on whichever side the files are.
+            files.walk(searchRoot, EXCLUDED_DIRS, new WorkspaceWalker() {
                 @Override
-                public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                public Step directory(WorkspaceEntry directory) {
+                    Path dir = directory.path();
                     // Cooperative cancel: the ToolLoopRunner interrupts our
-                    // worker thread when the user hits Stop. java.nio.file
-                    // walks don't notice interrupts on their own, so we check
-                    // the flag at every directory boundary.
+                    // worker thread when the user hits Stop. The walk does not
+                    // notice interrupts on its own, so we check the flag at
+                    // every directory boundary.
                     if (Thread.currentThread().isInterrupted()) {
                         interrupted[0] = true;
-                        return FileVisitResult.TERMINATE;
+                        return Step.TERMINATE;
                     }
                     if (System.currentTimeMillis() >= deadline) {
                         timedOut[0] = true;
-                        return FileVisitResult.TERMINATE;
-                    }
-                    String name = dir.getFileName() != null ? dir.getFileName().toString() : "";
-                    if (!dir.equals(searchRoot) && EXCLUDED_DIRS.contains(name)) {
-                        log.debug("glob: skipping excluded dir {}", roots.display(dir));
-                        return FileVisitResult.SKIP_SUBTREE;
+                        return Step.TERMINATE;
                     }
                     // Log entries at the first level under the search root so the
                     // user can see roughly where the walk is.
                     if (dir.getParent() != null && dir.getParent().equals(searchRoot)) {
-                        log.info("glob:   scanning {}/", name);
+                        log.info("glob:   scanning {}/", directory.name());
                     }
-                    return FileVisitResult.CONTINUE;
+                    return Step.CONTINUE;
                 }
                 @Override
-                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                public Step file(WorkspaceEntry entry) {
                     entries[0]++;
-                    Path rel = searchRoot.relativize(file);
+                    Path rel = searchRoot.relativize(entry.path());
                     if (matcher.matches(rel)) {
-                        matches.add(new Match(file, attrs.lastModifiedTime().toMillis()));
+                        matches.add(new Match(entry.path(), entry.lastModifiedMillis()));
                     }
                     // Heartbeat — at least every PROGRESS_INTERVAL_ENTRIES files
                     // and every PROGRESS_INTERVAL_MS ms, whichever fires first.
@@ -227,12 +232,12 @@ public class GlobTool implements Tool {
                     if (entries[0] % PROGRESS_INTERVAL_ENTRIES == 0) {
                         if (Thread.currentThread().isInterrupted()) {
                             interrupted[0] = true;
-                            return FileVisitResult.TERMINATE;
+                            return Step.TERMINATE;
                         }
                         long now = System.currentTimeMillis();
                         if (now >= deadline) {
                             timedOut[0] = true;
-                            return FileVisitResult.TERMINATE;
+                            return Step.TERMINATE;
                         }
                         if (now - lastHeartbeat[0] >= PROGRESS_INTERVAL_MS) {
                             log.info("glob:   …{} entries scanned, {} matches so far ({} ms)",
@@ -240,16 +245,7 @@ public class GlobTool implements Tool {
                             lastHeartbeat[0] = now;
                         }
                     }
-                    return FileVisitResult.CONTINUE;
-                }
-                @Override
-                public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                    log.debug("glob: skipping {}: {}", file, exc.getMessage());
-                    return FileVisitResult.CONTINUE;
-                }
-                @Override
-                public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
-                    return FileVisitResult.CONTINUE;
+                    return Step.CONTINUE;
                 }
             });
         } catch (IOException e) {
@@ -319,21 +315,21 @@ public class GlobTool implements Tool {
     private String suggestionsFor(Path missing) {
         Path parent = missing.getParent();
         // Walk up until we find a parent that exists and is inside baseDir.
-        while (parent != null && roots.contains(parent) && !Files.isDirectory(parent)) {
+        while (parent != null && roots.contains(parent) && !files.isDirectory(parent)) {
             parent = parent.getParent();
         }
-        if (parent == null || !roots.contains(parent) || !Files.isDirectory(parent)) {
+        if (parent == null || !roots.contains(parent) || !files.isDirectory(parent)) {
             return "";
         }
         String missingName = missing.getFileName() != null ? missing.getFileName().toString() : "";
         if (missingName.isEmpty()) return "";
 
         List<String> children = new ArrayList<>();
-        try (var stream = Files.list(parent)) {
-            stream.filter(Files::isDirectory)
-                    .forEach(p -> {
-                        String name = p.getFileName().toString();
-                        if (!EXCLUDED_DIRS.contains(name)) children.add(name);
+        try {
+            files.list(parent).stream()
+                    .filter(WorkspaceEntry::directory)
+                    .forEach(entry -> {
+                        if (!EXCLUDED_DIRS.contains(entry.name())) children.add(entry.name());
                     });
         } catch (IOException e) {
             return "";

@@ -109,4 +109,25 @@ class SessionDirectoriesTest {
         assertThat(listing.entries()).hasSize(SessionDirectories.MAX_ENTRIES);
         assertThat(listing.truncated()).isTrue();
     }
+
+    @Test
+    void a_workspace_elsewhere_is_listed_first_without_its_internals_and_opens_through_its_port() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home"));
+        Files.createDirectories(remote.resolve("deck"));
+        Files.writeString(remote.resolve("deck/sales.pptx"), "pptx-bytes");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionDirectories dirs = new SessionDirectories(List.of(work), java.util.Map.of("/workspace", workspace));
+
+        assertThat(dirs.roots()).containsExactly(Path.of("/workspace"), work);
+        assertThat(dirs.list("/workspace", "").orElseThrow().entries())
+                .extracting(SessionDirectories.Entry::name).containsExactly("deck");
+        assertThat(dirs.list("/workspace", "deck").orElseThrow().entries())
+                .extracting(SessionDirectories.Entry::path).containsExactly("deck/sales.pptx");
+        var content = dirs.open("/workspace", "deck/sales.pptx").orElseThrow();
+        assertThat(content.size()).isEqualTo(10);
+        assertThat(new String(content.stream().readAllBytes())).isEqualTo("pptx-bytes");
+        assertThat(dirs.open("/workspace", "../../etc/passwd")).isEmpty();
+    }
 }

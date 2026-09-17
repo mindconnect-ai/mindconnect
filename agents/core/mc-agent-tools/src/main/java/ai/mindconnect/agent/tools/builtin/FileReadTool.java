@@ -1,11 +1,11 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -28,6 +28,7 @@ public class FileReadTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
 
     public FileReadTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -35,7 +36,13 @@ public class FileReadTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public FileReadTool(FileRoots roots) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots));
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public FileReadTool(WorkspaceFiles files) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
     }
 
@@ -89,29 +96,26 @@ public class FileReadTool implements Tool {
         if (target == null) {
             return roots.outsideError(raw);
         }
-        if (!Files.exists(target)) {
+        if (!files.exists(target)) {
             return "Error: file does not exist: " + relative;
         }
-        if (Files.isDirectory(target)) {
+        if (files.isDirectory(target)) {
             return "Error: path is a directory, use file_list instead";
         }
         int offset = Math.max(1, intArg(arguments.get("offset"), 1));
         int limit = intArg(arguments.get("limit"), DEFAULT_LIMIT);
         if (limit <= 0) limit = DEFAULT_LIMIT;
 
-        if (FileWalks.isBinary(target)) {
+        if (FileWalks.isBinary(files, target)) {
             return "Error: " + relative + " is a binary file. For a PDF, Word or other document use "
                     + "document_file_read or read_document; an image goes to the model as an attachment.";
         }
         List<String> lines;
         try {
-            lines = Files.readAllLines(target, StandardCharsets.UTF_8);
+            // UTF-8 when the bytes are UTF-8, ISO-8859-1 otherwise: a legacy file reads with its umlauts.
+            lines = FileWalks.readText(files, target).text().lines().toList();
         } catch (IOException e) {
-            try {
-                lines = Files.readAllLines(target, StandardCharsets.ISO_8859_1);
-            } catch (IOException e2) {
-                return "Error reading file: " + e2.getMessage();
-            }
+            return "Error reading file: " + e.getMessage();
         }
         return render(relative, lines, offset, limit);
     }

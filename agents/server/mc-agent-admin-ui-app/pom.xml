@@ -46,6 +46,12 @@
             <artifactId>mc-agent-tools-code</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- File tools, bash and code_execute in a virtual environment server; active with mindconnect.virtual-env.client.url -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-tools-virtual-env</artifactId>
+            <scope>runtime</scope>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tools-web</artifactId>

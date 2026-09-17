@@ -11,6 +11,6 @@ public final class GlobToolFactory extends FileRootedToolFactory {
     @Override public String group() { return "files"; }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new GlobTool(BaseDirs.roots(scope, agentTool, defaultBaseDir));
+        return new GlobTool(files(agentTool, scope));
     }
 }

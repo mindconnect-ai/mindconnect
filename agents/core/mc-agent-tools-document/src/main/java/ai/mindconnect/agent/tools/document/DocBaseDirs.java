@@ -3,6 +3,8 @@ package ai.mindconnect.agent.tools.document;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
+import ai.mindconnect.agent.tool.workspace.WorkspaceProvider;
 
 /**
  * Base-dir lookup for document tools. Mirrors the equivalent helper in the
@@ -41,8 +43,17 @@ final class DocBaseDirs {
 
     static abstract class FileRooted implements ToolFactory {
         protected String defaultBaseDir;
+        /** Where the files live when not on this machine; empty for the local roots. */
+        protected java.util.Optional<WorkspaceProvider> workspaces = java.util.Optional.empty();
+
         @Override public void bind(ToolEnvironment env) {
             this.defaultBaseDir = env.getString(DEFAULT_BASE_DIR_KEY).orElse(null);
+            this.workspaces = env.get(WorkspaceProvider.class);
+        }
+
+        /** The provider's workspace when one is bound, the session's roots here otherwise. */
+        protected WorkspaceFiles files(AgentTool agentTool, ai.mindconnect.agent.tool.ToolCallScope scope) {
+            return WorkspaceProvider.localOrProvided(workspaces, scope, agentTool, roots(scope, agentTool, defaultBaseDir));
         }
 
         @Override public java.util.Map<String, Object> overridesSchema() {

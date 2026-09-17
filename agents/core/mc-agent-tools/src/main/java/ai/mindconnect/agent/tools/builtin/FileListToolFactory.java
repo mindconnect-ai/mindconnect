@@ -11,6 +11,6 @@ public final class FileListToolFactory extends FileRootedToolFactory {
     @Override public String group() { return "files"; }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new FileListTool(BaseDirs.roots(scope, agentTool, defaultBaseDir));
+        return new FileListTool(files(agentTool, scope));
     }
 }

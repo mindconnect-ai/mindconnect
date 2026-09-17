@@ -129,6 +129,7 @@
         <module>agents/core/mc-agent-runtime</module>
         <module>agents/core/mc-agent-tools</module>
         <module>agents/core/mc-agent-tools-code</module>
+        <module>agents/core/mc-agent-tools-virtual-env</module>
         <module>agents/core/mc-agent-tools-document</module>
         <module>agents/core/mc-agent-tools-web</module>
         <module>agents/core/mc-agent-tools-web-browser</module>

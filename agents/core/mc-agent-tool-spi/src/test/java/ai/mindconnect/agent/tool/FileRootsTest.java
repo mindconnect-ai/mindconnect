@@ -74,4 +74,15 @@ class FileRootsTest {
         assertThat(roots.resolve("$HOME/notes.md")).contains(Path.of(home, "notes.md"));
         assertThat(roots.resolve("~")).contains(Path.of(home));
     }
+
+    @Test
+    void an_alias_is_a_second_name_for_the_base() {
+        FileRoots roots = FileRoots.of(Path.of("/workspace")).withAlias(Path.of("/app/data/home/david/sessions/s1"));
+
+        assertThat(roots.resolve("/app/data/home/david/sessions/s1/uploads/data.csv"))
+                .contains(Path.of("/workspace/uploads/data.csv"));
+        assertThat(roots.resolve("/app/data/home/david/sessions/s1")).contains(Path.of("/workspace"));
+        assertThat(roots.resolve("/app/data/home/david/sessions/s1/../s2/secret")).isEmpty();
+        assertThat(roots.resolve("/workspace/deck.pptx")).contains(Path.of("/workspace/deck.pptx"));
+    }
 }

@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.tools.document;
 
+import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -46,12 +49,17 @@ public class DocumentReader {
     private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
     public DocumentModel load(Path baseDir, Path absoluteFile) throws IOException {
-        if (!Files.isRegularFile(absoluteFile)) {
-            throw new IOException("not a file: " + absoluteFile);
-        }
-        long mtime = Files.getLastModifiedTime(absoluteFile).toMillis();
-        long size = Files.size(absoluteFile);
-        String key = absoluteFile + "|" + mtime + "|" + size;
+        return load(WorkspaceFiles.local(FileRoots.of(baseDir)), baseDir, absoluteFile);
+    }
+
+    /**
+     * The document at {@code file} in {@code files}. A workspace elsewhere hands the
+     * parser a temporary local copy; the cache key stays the workspace path.
+     */
+    public DocumentModel load(WorkspaceFiles files, Path baseDir, Path file) throws IOException {
+        WorkspaceEntry entry = files.stat(file).filter(WorkspaceEntry::regularFile)
+                .orElseThrow(() -> new IOException("not a file: " + file));
+        String key = files.identity() + "|" + file + "|" + entry.lastModifiedMillis() + "|" + entry.size();
 
         CacheEntry hit = cache.get(key);
         if (hit != null) {
@@ -59,15 +67,18 @@ public class DocumentReader {
             return hit.model;
         }
 
-        DocumentModel model = parse(baseDir, absoluteFile);
+        DocumentModel model;
+        try (WorkspaceFiles.LocalFile local = files.localFile(file)) {
+            model = parse(baseDir.relativize(file).toString().replace('\\', '/'), file, local.path());
+        }
         cache.put(key, new CacheEntry(model, System.currentTimeMillis()));
         evictIfFull();
         return model;
     }
 
-    private DocumentModel parse(Path baseDir, Path file) throws IOException {
-        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        String rel = baseDir.relativize(file).toString().replace('\\', '/');
+    /** {@code logical} names the document and decides the format; {@code file} is where its bytes are. */
+    private DocumentModel parse(String rel, Path logical, Path file) throws IOException {
+        String name = logical.getFileName().toString().toLowerCase(Locale.ROOT);
         if (name.endsWith(".pdf")) {
             return parsePdf(rel, file);
         } else if (name.endsWith(".docx")) {

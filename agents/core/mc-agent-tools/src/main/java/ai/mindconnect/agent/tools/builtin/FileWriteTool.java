@@ -1,10 +1,11 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 
 import java.io.IOException;
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.Map;
 
@@ -12,6 +13,7 @@ public class FileWriteTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
 
     public FileWriteTool(Path baseDir) {
         this(FileRoots.of(baseDir));
@@ -19,7 +21,13 @@ public class FileWriteTool implements Tool {
 
     /** Rooted at the session's directories — the base for relative paths, the rest by absolute path. */
     public FileWriteTool(FileRoots roots) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots));
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public FileWriteTool(WorkspaceFiles files) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
     }
 
@@ -72,8 +80,7 @@ public class FileWriteTool implements Tool {
         }
 
         try {
-            Files.createDirectories(target.getParent());
-            Files.writeString(target, content);
+            files.write(target, content.getBytes(StandardCharsets.UTF_8));
             return "Written " + content.length() + " chars to " + target.toAbsolutePath();
         } catch (IOException e) {
             return "Error writing file: " + e.getMessage();

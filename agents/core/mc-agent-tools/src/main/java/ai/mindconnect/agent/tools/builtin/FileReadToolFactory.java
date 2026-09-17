@@ -11,6 +11,6 @@ public final class FileReadToolFactory extends FileRootedToolFactory {
     @Override public String group() { return "files"; }
 
     @Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new FileReadTool(BaseDirs.roots(scope, agentTool, defaultBaseDir));
+        return new FileReadTool(files(agentTool, scope));
     }
 }

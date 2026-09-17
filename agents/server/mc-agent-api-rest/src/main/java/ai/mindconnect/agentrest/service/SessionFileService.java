@@ -312,12 +312,15 @@ public class SessionFileService {
                 ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
                 // The workflow's tool steps run on behalf of this chat's user and
                 // session — the calls its upload store accepts — and resolve their
-                // paths in the session's own directories.
+                // paths in the session's own directory, the file as uploads/<name>. That
+                // is the same file here and in a workspace on an environment server,
+                // where the tools read the uploads copied to /workspace/uploads.
                 if (copy.isPresent()) {
-                    ToolCallScope scope = ToolCallScope.ofSession(
-                            session.userId(), sessionId, copy.get().getParent().toString());
+                    Path sessionDir = copy.get().getParent().getParent();
+                    String file = sessionDir.relativize(copy.get()).toString().replace('\\', '/');
+                    ToolCallScope scope = ToolCallScope.ofSession(session.userId(), sessionId, sessionDir.toString());
                     report = scope.runWith(() -> runner.runWithAttributes(workflow,
-                            Map.of("file", stored.name(), "store", storeName),
+                            Map.of("file", file, "store", storeName),
                             Map.of(ToolCallScope.class.getName(), scope)));
                 } else {
                     Path dir = spoolBase.resolve("vector-store-uploads").resolve(storeName);

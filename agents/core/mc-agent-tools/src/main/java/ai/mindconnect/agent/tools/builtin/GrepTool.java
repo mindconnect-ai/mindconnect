@@ -1,18 +1,19 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
+import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
+import ai.mindconnect.agent.tool.workspace.WorkspaceWalker;
 import ai.mindconnect.agent.tool.Tool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +43,7 @@ public class GrepTool implements Tool {
 
     private final Path baseDir;
     private final FileRoots roots;
+    private final WorkspaceFiles files;
     private final long timeoutMs;
 
     public GrepTool(Path baseDir) {
@@ -55,7 +57,17 @@ public class GrepTool implements Tool {
 
     /** With a time budget of its own — for tests that should not wait a minute. */
     GrepTool(FileRoots roots, long timeoutMs) {
-        this.roots = roots;
+        this(WorkspaceFiles.local(roots), timeoutMs);
+    }
+
+    /** Working on {@code files}: this machine's, or a workspace that lives elsewhere. */
+    public GrepTool(WorkspaceFiles files) {
+        this(files, TIMEOUT_MS);
+    }
+
+    GrepTool(WorkspaceFiles files, long timeoutMs) {
+        this.files = files;
+        this.roots = files.roots();
         this.baseDir = roots.base();
         this.timeoutMs = timeoutMs;
     }
@@ -120,7 +132,7 @@ public class GrepTool implements Tool {
         if (start == null) {
             return roots.outsideError(rawPath);
         }
-        if (!Files.exists(start)) {
+        if (!files.exists(start)) {
             return "Error: path does not exist: " + relative;
         }
         PathMatcher nameFilter = null;
@@ -136,61 +148,64 @@ public class GrepTool implements Tool {
             }
         }
 
-        List<Path> files = new ArrayList<>();
+        // Entries, not paths: the walk already knows each file's time, so sorting costs no second look.
+        List<WorkspaceEntry> candidates = new ArrayList<>();
         long deadline = System.currentTimeMillis() + timeoutMs;
         boolean[] timedOut = {false};
-        if (Files.isDirectory(start)) {
+        if (files.isDirectory(start)) {
             PathMatcher filter = nameFilter;
             try {
-                Files.walkFileTree(start, new SimpleFileVisitor<>() {
+                files.walk(start, FileWalks.EXCLUDED_DIRS, new WorkspaceWalker() {
                     @Override
-                    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                    public Step directory(WorkspaceEntry dir) {
                         if (Thread.currentThread().isInterrupted() || System.currentTimeMillis() > deadline) {
                             timedOut[0] = true;
-                            return FileVisitResult.TERMINATE;
+                            return Step.TERMINATE;
                         }
-                        String name = dir.getFileName() == null ? "" : dir.getFileName().toString();
-                        return !dir.equals(start) && FileWalks.EXCLUDED_DIRS.contains(name)
-                                ? FileVisitResult.SKIP_SUBTREE : FileVisitResult.CONTINUE;
+                        return Step.CONTINUE;
                     }
 
                     @Override
-                    public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
-                        if (attrs.isRegularFile() && attrs.size() <= MAX_FILE_BYTES
-                                && (filter == null || filter.matches(start.relativize(file)))) {
-                            files.add(file);
+                    public Step file(WorkspaceEntry file) {
+                        if (file.regularFile() && file.size() <= MAX_FILE_BYTES
+                                && (filter == null || filter.matches(start.relativize(file.path())))) {
+                            candidates.add(file);
                         }
-                        return FileVisitResult.CONTINUE;
-                    }
-
-                    @Override
-                    public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                        return FileVisitResult.CONTINUE;
+                        return Step.CONTINUE;
                     }
                 });
             } catch (IOException e) {
                 return "Error walking directory: " + e.getMessage();
             }
         } else {
-            files.add(start);
+            try {
+                files.stat(start).ifPresent(candidates::add);
+            } catch (IOException e) {
+                return "Error reading file: " + e.getMessage();
+            }
         }
         // Newest first, like glob: the file being worked on is what the caller means.
-        files.sort((x, y) -> Long.compare(mtime(y), mtime(x)));
+        candidates.sort((x, y) -> Long.compare(y.lastModifiedMillis(), x.lastModifiedMillis()));
 
         StringBuilder out = new StringBuilder();
         int matches = 0;
         int filesWithMatches = 0;
         boolean capped = false;
         outer:
-        for (Path file : files) {
+        for (WorkspaceEntry candidate : candidates) {
+            Path file = candidate.path();
             if (System.currentTimeMillis() > deadline || Thread.currentThread().isInterrupted()) {
                 timedOut[0] = true;
                 break;
             }
-            if (FileWalks.isBinary(file)) continue;
             List<String> lines;
             try {
-                lines = FileWalks.readText(file).text().lines().toList();
+                // One read per file: the head decides binary, the rest is the text.
+                byte[] bytes = files.readAllBytes(file);
+                if (FileWalks.isBinary(Arrays.copyOf(bytes, Math.min(bytes.length, FileWalks.SNIFF_BYTES)))) {
+                    continue;
+                }
+                lines = FileWalks.decode(bytes).text().lines().toList();
             } catch (IOException e) {
                 continue; // unreadable, not ours
             }
@@ -307,14 +322,6 @@ public class GrepTool implements Tool {
 
     private static String cut(String line) {
         return line.length() > MAX_LINE_CHARS ? line.substring(0, MAX_LINE_CHARS) + " …" : line;
-    }
-
-    private static long mtime(Path p) {
-        try {
-            return Files.getLastModifiedTime(p).toMillis();
-        } catch (IOException e) {
-            return 0L;
-        }
     }
 
     private static boolean bool(Object raw) {
