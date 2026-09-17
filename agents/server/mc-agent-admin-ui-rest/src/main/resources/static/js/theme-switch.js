@@ -43,9 +43,17 @@
             // this page; it just will not be remembered.
         }
         if (stored && THEMES.some((t) => t.id === stored)) return stored;
-        // Keep this in step with the inline script in index.html, which
-        // applies the default before this file has loaded — the two
-        // disagreeing means the picker ticks a theme the page is not wearing.
+        // Nothing remembered: the page wears this installation's default, put
+        // on <html data-default-theme> when the shell is served
+        // (mindconnect.branding.theme) and applied by the inline script in
+        // index.html before this file loads. Reading the same attribute is
+        // what keeps the tick on the theme the page is actually wearing —
+        // a constant here would tick Amethyst on an installation that opens
+        // in its own look. An id this picker does not know (a theme a host
+        // app added) ticks nothing, which is better than ticking the wrong
+        // one.
+        var configured = document.documentElement.dataset.defaultTheme;
+        if (configured) return configured;
         return "amethyst";
     }
 
