@@ -52,13 +52,16 @@ public class ChatFilesUiController {
     private final SessionOwnership ownership;
     /** Whether a turn is live right now — the composer is redrawn in that state. */
     private final ai.mindconnect.chatui.service.ActiveStreams activeStreams;
+    /** What the Tools picker offers — the redrawn composer's tool badge counts over it. */
+    private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  AgentSessionRepository sessions,
                                  AgentSessionService sessionService,
                                  AgentDefinitionRepository agents,
                                  SessionOwnership ownership,
-                                 ai.mindconnect.chatui.service.ActiveStreams activeStreams) {
+                                 ai.mindconnect.chatui.service.ActiveStreams activeStreams,
+                                 ai.mindconnect.agent.tool.ToolRegistry toolRegistry) {
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
         this.sessions = sessions;
@@ -66,6 +69,7 @@ public class ChatFilesUiController {
         this.agentResolver = new SessionAgentResolver(agents);
         this.ownership = ownership;
         this.activeStreams = activeStreams;
+        this.toolRegistry = toolRegistry;
     }
 
     /**
@@ -187,7 +191,8 @@ public class ChatFilesUiController {
                         sessionId, agent == null ? null : agent.id(), streaming)
                 .withModelLabel(agent == null ? null : agent.llmConfigName())
                 .withAttachments(sessionFiles.attachments(sessionId))
-                .withAgentCounts(agent)
+                .withAgentCounts(agent, ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent
+                        .offered(toolRegistry.toolNamesByGroup()))
                 .withWorkingDir(session == null ? null : session.workingDir())
                 .withDirChoice(sessionService.workingDirChoice());
         return UiPatch.Operation.replace(form.id(), form.render());
