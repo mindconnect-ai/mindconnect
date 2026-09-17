@@ -1,0 +1,19 @@
+# ── ERNI AI ──────────────────────────────────────────────────────────────────
+# A worked example of mindconnect.branding: the same app under a different
+# name, mark and palette, with nothing built in. Run it with
+# --spring.profiles.active=erni (or -Dspring-boot.run.profiles=erni).
+#
+# Everything it shows comes from ./branding/erni next to this app — see that
+# directory's README, including the note that the logos in it are placeholders
+# rather than the official assets.
+mindconnect:
+  branding:
+    title: ERNI AI
+    logo: /branding/logo.svg
+    favicon: /branding/favicon.svg
+    # The branding sheet writes framework tokens on :root, so it wants the
+    # framework's bare look underneath rather than one of the shipped themes.
+    theme: default
+    stylesheets:
+      - /branding/erni.css
+    assets-dir: ${MC_BRANDING_ASSETS_DIR:./branding/erni}

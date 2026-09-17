@@ -127,6 +127,10 @@ public class SecurityConfig {
                                  // unauthenticated so users can start (or
                                  // restart after a failure) the OAuth flow.
                                  "/login", "/login.html",
+                                 // Branding assets (mindconnect.branding.assets-dir):
+                                 // the login page wears the installation's logo
+                                 // and stylesheet, and it is shown to nobody.
+                                 "/branding/**",
                                  // Public keys of the on-behalf tokens for the virtual
                                  // environment server (mc-agent-tools-virtual-env).
                                  "/.well-known/mc-virtual-env/jwks.json",

@@ -100,6 +100,59 @@ Run it once per podman machine — or any time login starts failing with a
 "Jwt expired" error after your Mac has been asleep.
 :::
 
+## Branding the app
+
+The Admin UI can carry your own name and look instead of Mindconnect's — set
+`mindconnect.branding.*` and nothing has to be rebuilt:
+
+```yaml
+mindconnect:
+  branding:
+    title: ACME Assistants          # heading in the header, and the login page
+    document-title: ACME Admin      # the browser tab; unset it follows title
+    logo: /branding/acme.svg        # the mark beside the heading; "" for none
+    logo-href: /admin/agents        # where a click on the brand leads
+    favicon: /branding/favicon.png  # the tab icon; unset it follows the logo
+    theme: default                  # the look it opens in (see below)
+    stylesheets:                    # linked last, so their rules win
+      - /branding/acme.css
+    assets-dir: /etc/acme/branding  # served at /branding/**
+```
+
+Every setting is optional; unset, the app looks exactly as it ships.
+
+**Where the assets come from.** An asset URL is used verbatim, so all three
+forms work: a path into the app's own resources (`/img/logo.svg`), a path into
+`assets-dir` (`/branding/acme.svg`), and an absolute URL on a CDN. `assets-dir`
+is the one that keeps branding a deployment concern: point it at a directory
+next to the running app, drop a logo and a stylesheet in, and the files are
+served at `/branding/**` — no rebuild, no custom image. They are reachable
+without a login, because the login page wears them.
+
+**The stylesheet** is linked after every shipped one, so it only has to set the
+framework's tokens — `--sui-color-primary`, `--sui-header-bg`, … — and every
+control follows, the same way the bundled themes work. The login page takes the
+same tokens, so it is branded along with the rest.
+
+```css
+:root {
+    --sui-color-primary: #0a192c;
+    --sui-color-action:  #0a192c;
+    --sui-header-bg:     #0a192c;
+}
+```
+
+**`theme`** picks which shipped look the shell opens in (`amethyst` — the
+default —, `clody`, `gipiti`, `sorbet`, `compact`, `dark`, or `default` for the
+framework's bare one). A theme is a class on `<html>` and therefore wins on
+specificity over a `:root` rule, so a branding stylesheet written as above
+wants `theme: default` underneath it. The theme picker in the header still
+overrides the setting per browser.
+
+A worked example lives in
+[`agents/server/mc-agent-admin-ui-app/branding/erni`](https://github.com/mindconnect-ai/mindconnect/tree/main/agents/server/mc-agent-admin-ui-app/branding/erni):
+a profile (`--spring.profiles.active=erni`), a palette and a logo directory.
+
 ## The main sections
 
 The navigation has eight top-level entries:
