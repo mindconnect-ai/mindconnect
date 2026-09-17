@@ -32,22 +32,28 @@
          * no stylesheet and the app renders as the framework default.
          */
         (function () {
+            var root = document.documentElement;
+            // A host whose picker is off does not let the look be chosen at
+            // all — not through the menu, not through ?theme=, and not
+            // through what this browser remembers from before it was turned
+            // off. See mindconnect.branding.style-picker.
+            var fixed = root.dataset.themePicker === "off";
             var url = new URL(window.location.href);
-            var wanted = url.searchParams.get("theme");
+            var wanted = fixed ? null : url.searchParams.get("theme");
             if (wanted) {
                 try { localStorage.setItem("sui-theme", wanted); } catch (e) { /* private mode */ }
             }
             var active = wanted;
-            if (!active) {
+            if (!active && !fixed) {
                 try { active = localStorage.getItem("sui-theme"); } catch (e) { active = null; }
             }
             // The installation's default look: mindconnect.branding.theme is
             // written into data-default-theme when the shell is served (see
             // BrandingShellController), so a branded install opens in its own
             // theme while the picker still wins per browser.
-            if (active === null) active = document.documentElement.dataset.defaultTheme || "amethyst";
+            if (!active) active = root.dataset.defaultTheme || "amethyst";
             if (/^[a-z][a-z0-9-]*$/.test(active) && active !== "default") {
-                document.documentElement.classList.add("sui-theme-" + active);
+                root.classList.add("sui-theme-" + active);
             }
         })();
     </script>

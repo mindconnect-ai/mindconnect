@@ -31,6 +31,28 @@
         { id: "default",  label: "Default",  hint: "The framework's own" },
     ];
 
+    /**
+     * What this host may pick from, put on <html data-theme-picker> when the
+     * shell is served (mindconnect.branding.style-picker): "off" for no picker
+     * at all, a space-separated list of ids to narrow it, absent or empty for
+     * every theme below. A branded installation that does not want its look
+     * swapped says "off"; one that ships two looks names them.
+     *
+     * Ids the app does not have are dropped rather than offered, and a list
+     * that leaves fewer than two is no choice at all, so the control stays
+     * away — an empty menu is worse than no menu.
+     */
+    function offered() {
+        const configured = document.documentElement.dataset.themePicker;
+        if (configured === "off") return [];
+        if (!configured) return THEMES;
+        const wanted = configured.trim().split(/\s+/);
+        const themes = wanted
+            .map((id) => THEMES.find((t) => t.id === id))
+            .filter((t) => t !== undefined);
+        return themes.length > 1 ? themes : [];
+    }
+
     const PALETTE_ICON =
         '<svg class="sui-icon" aria-hidden="true">' +
         '<use href="/sui/icons.svg#palette"></use></svg>';
@@ -71,7 +93,7 @@
         }
     }
 
-    function build() {
+    function build(offer) {
         const active = current();
         const el = document.createElement("details");
         el.className = "sui-menu-button sui-menu-button--icon sui-menu-button--align-end sui-theme-switch";
@@ -81,7 +103,7 @@
             ' aria-expanded="false" aria-label="Theme">' +
             '<span class="sui-menu-button-glyph">' + PALETTE_ICON + "</span></summary>" +
             '<div class="sui-menu-button-popover" role="menu">' +
-            THEMES.map((t) =>
+            offer.map((t) =>
                 '<button type="button" class="sui-menu-button-item" role="menuitemradio"' +
                 ' aria-checked="' + (t.id === active) + '" data-theme="' + t.id + '">' +
                 '<span class="sui-menu-button-item-label">' + t.label + "</span>" +
@@ -104,9 +126,11 @@
 
     /** Puts the control in the header, ahead of the user widget. */
     function inject() {
+        const offer = offered();
+        if (offer.length === 0) return;
         const right = document.querySelector(".sui-header .sui-header-right");
         if (!right || right.querySelector(".sui-theme-switch")) return;
-        right.insertBefore(build(), right.firstChild);
+        right.insertBefore(build(offer), right.firstChild);
     }
 
     // The header is re-rendered by navigations and by patches that redraw the

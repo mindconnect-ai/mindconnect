@@ -142,6 +142,18 @@ same tokens, so it is branded along with the rest.
 }
 ```
 
+**The theme picker** in the header offers every shipped theme unless
+`style-picker` says otherwise — `disabled: true` takes it away entirely (and
+then the look is genuinely fixed: neither the menu, nor `?theme=`, nor what
+the browser remembers can change it), `themes:` narrows it to a list:
+
+```yaml
+mindconnect:
+  branding:
+    style-picker:
+      themes: amethyst, default
+```
+
 **`theme`** picks which shipped look the shell opens in (`amethyst` — the
 default —, `clody`, `gipiti`, `sorbet`, `erni`, `compact`, `dark`, or `default`
 for the framework's bare one). A theme is a class on `<html>` and therefore wins on
@@ -178,6 +190,54 @@ the branding stylesheet in `branding/erni/` carries the login page, and the
 logo and favicon are files in that directory rather than resources in a jar —
 replace them and the next page load wears them. The marks committed there are
 drawn for the example and are **not** the official assets.
+
+## One process, several brands
+
+A profile decides the brand when the process starts, which means one process
+per brand. `switch` decides it per request instead, from the host in the
+address bar — the same deployment behind two names wears two brands:
+
+```yaml
+mindconnect:
+  branding:
+    # what every other host gets
+    title: Mindconnect Agent Runtime
+    assets-dir: /etc/mindconnect/branding
+    switch:
+      acme:
+        url-pattern: "*.acme.*"
+        title: ACME AI
+        logo: acme.svg              # a bare name: a file in assets-dir
+        stylesheet: acme-sui.css    # "stylesheets:" for more than one
+        style-picker:
+          disabled: true            # this brand's look is not up for discussion
+      mindconnect:
+        url-pattern: app.mindconnect.ai
+        logo: mindconnect-logo.svg
+        style-picker:
+          themes: amethyst, default
+```
+
+Each entry takes the same keys as the block above it, plus the `url-pattern`
+that claims a host. What to know:
+
+- **The pattern is a glob over the host name** — no port, no path, case
+  ignored. `*` stands for any run of characters, dots included, so
+  `*.acme.*` covers `agents.acme.com` and `ai.acme.co.uk` alike.
+- **The first matching entry wins**, in the order they are declared. Write the
+  specific pattern above the wildcard.
+- **What an entry leaves unset comes from the top level**, and what the top
+  level leaves unset is what the app ships. An entry says only what makes it
+  different.
+- **No match is not an error.** A host nobody claims — `localhost`, a health
+  check, an internal name — gets the top-level branding.
+- **A bare file name is a file in `assets-dir`**, which is what keeps a
+  `switch` block from repeating `/branding/` on every line. A path
+  (`/img/logo.svg`) or an absolute URL is used as written.
+
+Since the assets of every brand are served from the same `/branding/**`, give
+them distinct names (`acme.svg`, `mindconnect-logo.svg`) rather than a
+directory each.
 
 ## The main sections
 

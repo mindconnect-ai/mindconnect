@@ -95,9 +95,35 @@ mindconnect:
     # stylesheets:
     #   - /branding/acme.css
     #   - https://cdn.example.com/acme.css
+    # What the header's theme picker offers. Unset, it offers every theme the
+    # app ships. A branded installation that does not want its look swapped
+    # turns it off; one that ships two looks names them.
+    # style-picker:
+    #   disabled: true
+    #   themes: amethyst, default
     # A directory on disk served at /branding/** — brand a deployed app by
     # dropping files next to it, no rebuild.
     assets-dir: ${MC_BRANDING_ASSETS_DIR:}
+    # One process, several brands: the look follows the host in the address
+    # bar instead of the profile the process was started with. Each entry
+    # takes the same keys as the block above plus a url-pattern; the first
+    # one whose pattern matches wins, and what it leaves unset falls back to
+    # the settings above. A bare file name is a file in assets-dir.
+    # Write the more specific pattern first.
+    # switch:
+    #   erni:
+    #     url-pattern: "*.erni.*"
+    #     title: ERNI AI
+    #     logo: erni.svg
+    #     stylesheet: erni-sui.css
+    #     style-picker:
+    #       disabled: true
+    #   mindconnect:
+    #     url-pattern: app.mindconnect.ai
+    #     title: Mindconnect Agent Runtime
+    #     logo: mindconnect-logo.svg
+    #     style-picker:
+    #       themes: amethyst, default
   encryption:
     # Required — encrypts stored LLM credentials. No default on purpose.
     # Set MINDCONNECT_ENCRYPTION_SECRET_KEY to a strong, private 32-char value.
