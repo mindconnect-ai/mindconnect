@@ -93,9 +93,8 @@ public final class SystemPromptRenderer {
                 + "The user attached these files to this conversation:\n");
         boolean anyOnDisk = false;
         for (var file : searchable) {
-            out.append("- ").append(file.name()).append(" (").append(AttachmentNotice.kind(file.name())).append(")");
+            out.append("- ").append(AttachmentNotice.listing(file));
             if (file.hasPath()) {
-                out.append(" — on disk at `").append(file.path()).append('`');
                 String inWorkingDir = relativeToWorkingDir(session, file.path());
                 if (inWorkingDir != null) {
                     out.append(", i.e. `").append(inWorkingDir).append("` from the working directory");

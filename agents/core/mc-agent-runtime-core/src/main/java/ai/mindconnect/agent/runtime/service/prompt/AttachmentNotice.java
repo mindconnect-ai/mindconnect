@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.service.prompt;
 
 import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.ParticipantType;
 
@@ -94,23 +95,44 @@ public final class AttachmentNotice {
     /**
      * The line that goes ahead of the user's text for newly attached files —
      * what was attached, what kind of file it is, and the one instruction
-     * that matters: the content is reached through {@code vector_search},
-     * never through a path. Marked as a system note so the model does not
-     * take it for something the user said. Callers leave images out (see
-     * {@link #forModel}): an image is not indexed, it travels with the
-     * message as an image part (or as that part's placeholder), which speaks
-     * for itself.
+     * that matters: a file with a path is opened by that path, a file
+     * without one is reached only through {@code vector_search}. It names
+     * each file as the system prompt's "Attached files" section does
+     * ({@link #listing}), so the two never tell the model opposite things.
+     * Marked as a system note so the model does not take it for something
+     * the user said. Callers leave images out (see {@link #forModel}): an
+     * image is not indexed, it travels with the message as an image part
+     * (or as that part's placeholder), which speaks for itself.
      */
-    public static String notice(List<String> files) {
+    public static String notice(List<AttachedFile> files) {
         if (files.isEmpty()) return "";
         StringBuilder out = new StringBuilder("[System note — attached to this chat: ");
         for (int i = 0; i < files.size(); i++) {
             if (i > 0) out.append(", ");
-            out.append(files.get(i)).append(" (").append(kind(files.get(i))).append(')');
+            out.append(listing(files.get(i)));
         }
-        return out.append(" — indexed for search. Read their content with vector_search; ")
-                .append("they are not on the filesystem, so file and document tools cannot open them.]")
-                .toString();
+        boolean anyOnDisk = files.stream().anyMatch(AttachedFile::hasPath);
+        boolean anyWithoutPath = files.stream().anyMatch(f -> !f.hasPath());
+        if (!anyOnDisk) {
+            out.append(" — indexed for search. Read their content with vector_search; ")
+                    .append("they are not on the filesystem, so file and document tools cannot open them.");
+        } else if (!anyWithoutPath) {
+            out.append(". Open a file on disk by its path with the file and document tools.");
+        } else {
+            out.append(". Open a file on disk by its path with the file and document tools; ")
+                    .append("a file without a path is not on the filesystem — read its content with vector_search.");
+        }
+        return out.append(']').toString();
+    }
+
+    /**
+     * How an attached file is named to the model, in the user's turn and in
+     * the system prompt alike: its name, its kind, and where it is on disk
+     * when it has a copy there.
+     */
+    static String listing(AttachedFile file) {
+        String out = file.name() + " (" + kind(file.name()) + ")";
+        return file.hasPath() ? out + " — on disk at `" + file.path() + "`" : out;
     }
 
     /** The line for files removed from the chat: their content is gone, and gone means gone. */
@@ -131,9 +153,10 @@ public final class AttachmentNotice {
         Set<String> live = session == null ? Set.of() : new LinkedHashSet<>(session.attachedFileNames());
         // Images are announced in the metadata (the chat's chip shows them)
         // but not in the notice — they are not indexed, the part speaks.
-        List<String> attached = announcedBy(message).stream()
+        List<AttachedFile> attached = announcedBy(message).stream()
                 .filter(live::contains)
                 .filter(name -> !isImage(session, name))
+                .map(name -> session.attachedFile(name).orElseGet(() -> AttachedFile.named(name)))
                 .toList();
         List<String> removed = detachedBy(message).stream().filter(f -> !live.contains(f)).toList();
         StringBuilder out = new StringBuilder();

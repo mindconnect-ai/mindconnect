@@ -133,9 +133,10 @@ places:
 - **In the user's next message.** That message records the newly attached
   files in its metadata; when the request is built, the model reads a short
   system note ahead of the user's text — the file names, their kind, and
-  that `vector_search` is the way to their content because they are not on
-  the filesystem. The stored text stays what the user typed; the chat shows
-  a 📎 line above it.
+  how to reach them: a file stored on disk by its path, with the file and
+  document tools; a file without a path through `vector_search`, because it
+  is not on the filesystem. The stored text stays what the user typed; the
+  chat shows a 📎 line above it.
 - **In the system prompt.** An "Attached files" section lists every file
   currently attached, rendered fresh each round.
 
