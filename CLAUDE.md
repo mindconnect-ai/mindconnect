@@ -239,13 +239,20 @@ mvn -f agents/client/mc-agent-cli/pom.xml spring-boot:run
   people who might read it. Conversation with the maintainer can be in German,
   but nothing that lands in the repository or on GitHub.
 - Git commits: do **not** add a `Co-Authored-By` trailer.
-- **Before committing a user-facing change, add a line to `CHANGELOG.md`**
-  under `## [Unreleased]`. User-facing means someone using the libraries or
-  running the apps would want to know: a new endpoint, a changed behaviour, a
-  fixed bug whose symptom they may have been living with. Refactorings, tests,
-  docs and build plumbing do not need one — write the entry for a reader
-  deciding whether to upgrade, not for the commit log, which the releases page
-  already has. A PR that touches shipped Java without touching the changelog
-  fails the `changelog` check; label it `no-changelog` when that is the right
-  answer. The release workflow renames `[Unreleased]` to the version being cut
-  and opens a fresh one, so nothing is moved by hand.
+- **Before committing a user-facing change, add a changelog fragment**: a file
+  `changelog.d/<section>/<branch-slug>.md` (section folder `added`, `changed`,
+  `deprecated`, `removed`, `fixed` or `security`, e.g.
+  `changelog.d/fixed/cancel-tool-cards.md`) holding the bullet —
+  `- **agents:** **what is different, in one bold sentence.** explanation…`.
+  Never write into `CHANGELOG.md` itself: every PR appending at the same spot
+  put every other open PR in conflict. User-facing means someone using the
+  libraries or running the apps would want to know: a new endpoint, a changed
+  behaviour, a fixed bug whose symptom they may have been living with.
+  Refactorings, tests, docs and build plumbing do not need one — write the
+  entry for a reader deciding whether to upgrade, not for the commit log, which
+  the releases page already has. A PR that touches shipped Java without adding
+  a fragment fails the `changelog` check; label it `no-changelog` when that is
+  the right answer. The release workflow assembles the fragments into
+  `CHANGELOG.md` under the version being cut and deletes them
+  (`.github/scripts/changelog-release.sh preview` shows what it would write);
+  see `changelog.d/README.md`.
