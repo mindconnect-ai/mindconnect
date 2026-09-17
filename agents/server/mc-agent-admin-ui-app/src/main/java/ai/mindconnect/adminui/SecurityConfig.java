@@ -7,6 +7,7 @@ import ai.mindconnect.agent.security.UserRecorder;
 import ai.mindconnect.agent.security.UserRecordingFilter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -181,7 +182,7 @@ public class SecurityConfig {
             // Right after it, because it needs that record: the brand's namespace
             // is created, whoever is listed gets one of their own, and somebody
             // the installation lists nowhere is turned away (/no-access).
-            .addFilterAfter(new NamespaceOnboardingFilter(onboarding), UserRecordingFilter.class);
+            .addFilterAfter(new NamespaceOnboardingFilter(onboarding, true), UserRecordingFilter.class);
 
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
@@ -210,7 +211,7 @@ public class SecurityConfig {
             // And the same onboarding as with authentication on: with an open
             // default namespace it finds the dev user somewhere to work, so this
             // mode behaves as it always did.
-            .addFilterAfter(new NamespaceOnboardingFilter(onboarding), UserRecordingFilter.class);
+            .addFilterAfter(new NamespaceOnboardingFilter(onboarding, true), UserRecordingFilter.class);
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
         http.headers(headers -> headers.frameOptions(f -> f.sameOrigin()));
@@ -309,9 +310,55 @@ public class SecurityConfig {
      * URL, which would 302 to Keycloak, which would 302 back, … The
      * landing page forces the loop to terminate at the first hop and
      * requires a deliberate user click to retry.
+     *
+     * <p>One request skips it: the one coming back from the sign-out of
+     * somebody who was just turned away for having no namespace here
+     * ({@code NamespaceOnboardingFilter}). They have already decided to
+     * come back as somebody else, and a page asking them to click "sign
+     * in" first is one click of nothing. The cookie that says so is
+     * cleared as it is read, so this stays a single hop and the loop the
+     * landing page breaks stays broken.
      */
+    /** An HTML request carrying the note that its user just signed out to come back as somebody else. */
+    private RequestMatcher reloginMatcher() {
+        RequestMatcher html = htmlAcceptMatcher();
+        return request -> html.matches(request) && reloginCookie(request) != null;
+    }
+
+    /**
+     * Straight to the provider, clearing the note first — the sign-out that
+     * set it has ended the session there, so this is where the login form
+     * actually appears.
+     */
+    private static org.springframework.security.web.AuthenticationEntryPoint reloginEntryPoint() {
+        LoginUrlAuthenticationEntryPoint provider =
+                new LoginUrlAuthenticationEntryPoint("/oauth2/authorization/keycloak");
+        return (request, response, exception) -> {
+            Cookie note = reloginCookie(request);
+            if (note != null) {
+                Cookie cleared = new Cookie(NamespaceOnboardingFilter.RELOGIN_COOKIE, "");
+                cleared.setPath("/");
+                cleared.setMaxAge(0);
+                cleared.setHttpOnly(true);
+                cleared.setSecure(request.isSecure());
+                response.addCookie(cleared);
+            }
+            provider.commence(request, response, exception);
+        };
+    }
+
+    private static Cookie reloginCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return null;
+        for (Cookie cookie : cookies) {
+            if (NamespaceOnboardingFilter.RELOGIN_COOKIE.equals(cookie.getName())) return cookie;
+        }
+        return null;
+    }
+
     private DelegatingAuthenticationEntryPoint htmlOrApiEntryPoint() {
         var entryPoints = new LinkedHashMap<RequestMatcher, org.springframework.security.web.AuthenticationEntryPoint>();
+        entryPoints.put(reloginMatcher(), reloginEntryPoint());
         entryPoints.put(htmlAcceptMatcher(), new LoginUrlAuthenticationEntryPoint("/login"));
 
         var entryPoint = new DelegatingAuthenticationEntryPoint(entryPoints);

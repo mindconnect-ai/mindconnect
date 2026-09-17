@@ -4,6 +4,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.security.SecurityCurrentUserResolver;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -27,10 +28,23 @@ import java.util.Objects;
  * lists somebody under comes from their user record — and before the scope is
  * bound, which reads the namespace they last chose.
  *
- * <p>Somebody in no namespace is sent to {@link #NO_ACCESS}, once, for a
- * browser navigation; anything else — the SPA's own calls, the API — gets 403.
- * Signing out has to keep working, so it is left open along with what the
- * error page itself needs.
+ * <p>A browser that is turned away is <strong>signed out and sent back to the
+ * identity provider's login</strong>: being refused is almost always the wrong
+ * account for this address — the personal one instead of the work one — and
+ * what helps is the chance to come back as somebody else, not a page to read.
+ * The sign-out is what makes that offer real: without it the provider would
+ * hand the same account straight back.
+ *
+ * <p>The way there is a cookie rather than a redirect of its own, because the
+ * sign-out ends at a fixed address the provider has registered. It lives for
+ * two minutes, is cleared the moment it is used, and only makes that one
+ * request skip the login landing page — the page stays where it is, and so
+ * does the loop it breaks (see {@code SecurityConfig}).
+ *
+ * <p>Without a provider to send anybody to — authentication off — the
+ * {@link #NO_ACCESS} page is shown instead. Anything that is not a browser
+ * navigation gets 403 either way. Signing out has to keep working, so it is
+ * left open along with what the error page itself needs.
  */
 public class NamespaceOnboardingFilter extends OncePerRequestFilter {
 
@@ -39,6 +53,16 @@ public class NamespaceOnboardingFilter extends OncePerRequestFilter {
 
     /** Set on the session once onboarding has run, so it runs once per sign-in. */
     static final String DONE = "mindconnect.namespace.onboarded";
+
+    /**
+     * Says "the next unauthenticated page request comes from somebody who was
+     * just turned away, send them to the provider rather than to the landing
+     * page". Read and cleared by the entry point in {@code SecurityConfig}.
+     */
+    public static final String RELOGIN_COOKIE = "mc-relogin";
+
+    /** Where a browser is sent to end its session before signing in again. */
+    static final String SIGN_OUT = "/admin/logout";
 
     /**
      * Paths that must work without a namespace: the error page and what it is
@@ -50,9 +74,16 @@ public class NamespaceOnboardingFilter extends OncePerRequestFilter {
             "/.well-known/");
 
     private final NamespaceOnboarding onboarding;
+    /** Whether there is an identity provider to send a turned-away browser back to. */
+    private final boolean authEnabled;
 
     public NamespaceOnboardingFilter(NamespaceOnboarding onboarding) {
+        this(onboarding, true);
+    }
+
+    public NamespaceOnboardingFilter(NamespaceOnboarding onboarding, boolean authEnabled) {
         this.onboarding = Objects.requireNonNull(onboarding, "onboarding");
+        this.authEnabled = authEnabled;
     }
 
     @Override
@@ -70,7 +101,7 @@ public class NamespaceOnboardingFilter extends OncePerRequestFilter {
         }
         NamespaceOnboarding.Outcome outcome = onboarding.onboard(user, request.getServerName());
         if (outcome == NamespaceOnboarding.Outcome.NO_NAMESPACE) {
-            turnAway(request, response);
+            turnAway(request, response, authEnabled);
             return;
         }
         HttpSession created = request.getSession(false);
@@ -100,13 +131,34 @@ public class NamespaceOnboardingFilter extends OncePerRequestFilter {
         return false;
     }
 
-    /** A browser is shown the page; everything else is told 403 and nothing more. */
-    private static void turnAway(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    /**
+     * A browser is signed out and sent back to the provider's login; without a
+     * provider it is shown the page. Everything else is told 403 and nothing
+     * more.
+     */
+    private static void turnAway(HttpServletRequest request, HttpServletResponse response, boolean authEnabled)
+            throws IOException {
         String accept = request.getHeader("Accept");
-        if (accept != null && accept.contains("text/html")) {
+        if (accept == null || !accept.contains("text/html")) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "No namespace");
+            return;
+        }
+        if (!authEnabled) {
             response.sendRedirect(request.getContextPath() + NO_ACCESS);
             return;
         }
-        response.sendError(HttpServletResponse.SC_FORBIDDEN, "No namespace");
+        response.addCookie(relogin(request));
+        response.sendRedirect(request.getContextPath() + SIGN_OUT);
+    }
+
+    /** The note to the entry point, good for two minutes and for one request. */
+    private static Cookie relogin(HttpServletRequest request) {
+        Cookie cookie = new Cookie(RELOGIN_COOKIE, "1");
+        cookie.setPath(request.getContextPath().isEmpty() ? "/" : request.getContextPath());
+        cookie.setHttpOnly(true);
+        cookie.setSecure(request.isSecure());
+        cookie.setMaxAge(120);
+        cookie.setAttribute("SameSite", "Lax");
+        return cookie;
     }
 }
