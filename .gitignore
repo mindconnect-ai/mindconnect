@@ -45,6 +45,11 @@ dist/
 .DS_Store
 **/.DS_Store
 
+# The deployment lives in mindconnect-ai/mc-infra, not here. Keeping the
+# directory ignored means a working copy of it next to the source (handy while
+# changing both) cannot be committed back by accident.
+deploy/
+
 # Local configuration (secrets, environment overrides)
 **/application-local.properties
 **/.env
