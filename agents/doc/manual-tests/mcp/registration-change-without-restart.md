@@ -3,7 +3,7 @@ id: mcp-registration-change-without-restart
 area: mcp
 requires: [server-9090, npx]
 duration: ~5 min
-last-verified: never
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # A changed registration takes effect without a restart

@@ -3,7 +3,7 @@ id: memory-auto-compact-eviction
 area: memory
 requires: [server-9090, lm-studio-tool-model]
 duration: ~8 min
-last-verified: 2026-09-11 (working tree on e462251, branch feature/mcp-support, runs/2026-09-11-mcp-support — OpenAI via agent-default)
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Auto-compact tool-result eviction: old results become fetchable stubs
@@ -41,13 +41,17 @@ window (store untouched), and the agent can reload them via
 2. Turn 2: any plain question.
    **Expected:** Normal answer.
 3. Open the **Working Memory** view.
-   **Expected:** Turn 1's tool result appears as an eviction stub:
-   `[Tool result evicted (~N tokens). Call the fetch_tool_result tool with
-   this id …]` — while the stored message still holds the full content.
+   **Expected:** Turn 1's tool result's entry reads
+   `#N · AGENT · TOOL_RESULT · <few> tok · (compressed)` with the stub
+   `[Tool result evicted from context — id=<message id>, originally ~N tokens. Call the `fetch_tool_result` tool with this id to reload the full content.]`
+   — while the stored message still holds the full content
+   (`GET /api/sessions/<id>/memory`: `content` is the whole result, the stub
+   is in `compressedContent`).
 4. Turn 3: ask something that NEEDS the old result's details, e.g.
    `Was stand nochmal genau im Suchergebnis von vorhin? Nutze fetch_tool_result.`
    **Expected:** The agent calls `fetch_tool_result` with the stub's id and
-   answers with details from the ORIGINAL result.
+   answers with details from the ORIGINAL result. (On `default-chat` the tool
+   is deferred, so a `tool_search` call for it may come first.)
 
 ## Cleanup
 

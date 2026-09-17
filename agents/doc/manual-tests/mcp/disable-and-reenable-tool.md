@@ -3,7 +3,7 @@ id: mcp-disable-and-reenable-tool
 area: mcp
 requires: [server-9090]
 duration: ~4 min
-last-verified: never
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # Switching a tool off is not a one-way door
@@ -32,14 +32,17 @@ catalog, so it can be switched back on from the UI.
    → `1`
 4. Open the row → **Settings**.
    **Expected:** The dialog opens, and **Available to agents** is **off**.
-5. Open any agent that binds `glob` (or create one) and start a session; ask it
-   to use the tool.
+5. Open any agent that binds `glob` (e.g. `file-finder`) and start a session;
+   ask it to use the tool. A new binding cannot be made now: while `glob` is
+   off, **Add Tool** does not offer it — bind it before step 2 if no agent has
+   it.
    **Expected:** The agent does not offer or call `glob`. It answers without
    it and does not error out — a disabled tool is a missing capability, not a
    failure.
 6. Back in **Settings**, switch **Available to agents** on → **Save** → reload
    the catalog.
-   **Expected:** The `(off)` marker is gone; the row is a normal row again;
+   **Expected:** Message "Saved — nothing deviates from the defaults any
+   more." The `(off)` marker is gone; the row is a normal row again;
    the agent from step 5 can use the tool again in a **new** session.
 
 ## Cleanup

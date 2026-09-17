@@ -42,11 +42,14 @@ it via `vector_search`.
    state), and the menu's **Upload files** entry carries the badge `1`.
 3. Ask: `Was ist die Geheimzutat der Testsuppe? Nutze deine angehängten
    Dateien.`
-   **Expected:** A `vector_search` task card runs; the answer names
-   **Paprika**. After the turn the user bubble shows a `📎 soup.md` line
+   **Expected:** A `file_read` card on `uploads/soup.md` runs (the upload
+   lies in the chat's own directory and the prompt names its path; a
+   `vector_search` card is equally right, and is what a re-attached file in
+   step 7 tends to get); the answer names **Paprika**. After the turn the user bubble shows a `📎 soup.md` line
    above the question (rendered from the message's metadata; the text
    itself is what you typed).
-4. Check the session's Memory view (session → Memory).
+4. Check the session's Memory view (the conversation's **…** → **Working
+   Memory**).
    **Expected:** The user message is shown with a
    `[System note — attached to this chat: soup.md (Markdown) — on disk at …]`
    ahead of the question — that is what the model received — and the system

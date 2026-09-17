@@ -3,7 +3,7 @@ id: coding-session-directory-uploads
 area: coding
 requires: [server-9090, tool-model, embedding-model]
 duration: ~6 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # A chat's own directory: uploads land on disk and stay reachable
@@ -30,7 +30,7 @@ can open it, and stays reachable after the chat moves to a project.
    lines may be skipped).
 2. Create the upload:
    `printf 'Die Geheimzutat der Testsuppe ist Paprika.\n%.0s' 1 2 3 > /tmp/soup.md`
-3. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
+3. Open http://localhost:9090/chat, **New chat**, the composer's model button (it names the model, e.g. `agent-default`) →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL.
 
@@ -40,18 +40,21 @@ can open it, and stays reachable after the chat moves to a project.
    http://localhost:9090/admin/sessions/<session-id>/memory — or, with
    authentication off (the app's default),
    `curl -s http://localhost:9090/api/sessions/<session-id>/memory | jq -r .systemPrompt`.
-   **Expected:** The button reads the session id. The system prompt's
+   **Expected:** The button reads **Session dir**. The system prompt's
    `## Working directory` section says
    `You are working in \`<…>/home/mc_user/sessions/<session-id>\``, and
    `ls -d <that path>` shows the directory exists.
-2. In the chat, click **Attach files** and attach `/tmp/soup.md`.
+2. In the chat, click **+** → **Upload files** → **Attach…** and attach
+   `/tmp/soup.md`.
    **Expected:** A success toast ending `attached — the agent can now search
-   it.`; the chip `soup.md` above the input;
+   it.`; the **Attached files** dialog lists `soup.md`, and the menu's
+   **Upload files** entry badges `1`;
    `ls <session dir>/uploads/` lists `soup.md`.
 3. Reload the Memory page (or repeat the curl of step 1).
    **Expected:** An `## Attached files` section with the line
-   `- soup.md (Markdown) — on disk at \`<session dir>/uploads/soup.md\`` and
-   the sentence `A file with a path is also a file on disk`.
+   `- soup.md (Markdown) — on disk at \`<session dir>/uploads/soup.md\`, i.e.
+   \`uploads/soup.md\` from the working directory` and the sentence
+   `A file with a path is a file on disk`.
 4. Send: `Open the attached soup.md with file_read and quote its first line.`
    **Expected:** A `file_read` card on `<session dir>/uploads/soup.md`; the
    quote is `Die Geheimzutat der Testsuppe ist Paprika.`
@@ -65,7 +68,7 @@ can open it, and stays reachable after the chat moves to a project.
    **Expected:** The `file_read` succeeds with the same quote — the own
    directory stayed reachable after the move; no "outside the session's
    directories" error.
-7. Remove the chip (×).
+7. **+** → **Upload files** → **Remove** next to `soup.md`, confirm.
    **Expected:** The removal toast; `ls <session dir>/uploads/` no longer
    lists `soup.md`; on the Memory page the `## Attached files` section is
    gone.

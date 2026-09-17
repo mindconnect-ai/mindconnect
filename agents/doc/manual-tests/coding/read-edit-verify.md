@@ -3,7 +3,7 @@ id: coding-read-edit-verify
 area: coding
 requires: [server-9090, tool-model, jdk-21]
 duration: ~6 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Fix a bug: read first, edit exactly, prove it with the checks
@@ -38,10 +38,11 @@ through an approved `bash`, and leaves exactly the intended change on disk.
    ```
    The last command prints `FAIL subtract(7, 3): expected 4, got 10` and
    `1 CHECK(S) FAILED`.
-2. Open http://localhost:9090/chat, click **New chat**, then **Model & tools**
-   in the composer; under **Agent** pick `coding-assistant` and click
+2. Open http://localhost:9090/chat, click **New chat**, then the composer's model button
+   (it names the model, e.g. `agent-default`); in the **Agent, model & prompt**
+   dialog under **Agent** pick `coding-assistant` and click
    **Apply**.
-3. Click the composer's folder button, type the absolute path of
+3. Click the composer's folder button (it reads **Session dir**), type the absolute path of
    `~/mc-manual-tests/calc-project` into the path field, click **Open**, then
    **Use this folder**. The folder button now reads **calc-project**.
    Note the session id from the URL (`/chat/sessions/<session-id>`).

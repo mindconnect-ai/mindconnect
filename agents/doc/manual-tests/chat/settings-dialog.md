@@ -46,8 +46,8 @@ dialog itself; it shows up two clicks away, in the "+" menu's Tools picker.
 
 3. Append a sentence to the **System prompt** and press **Apply**.
    **Expected:** The dialog closes and the chat is redrawn. Reopen it: the
-   sentence is still there. **+** → **Tools**: the header count is still N
-   from step 1.
+   sentence is still there. **+** → **Tools**: the header counts are still
+   N and S from step 1.
 
 4. Send `Which model are you and what is your first instruction?` and read the
    answer, then open the chat's Memory view (**…** → Memory) if the host
@@ -58,11 +58,13 @@ dialog itself; it shows up two clicks away, in the "+" menu's Tools picker.
 
 5. Reopen the dialog, set **Agent** to `— no agent: the model and prompt
    below —`, and press **Apply**.
-   **Expected:** The chat detaches. **+** → **Tools**: the header count is
-   STILL N, and so is the **Tools** badge. (With no Gmail credentials,
-   `default-chat`'s three deferred `gmail_*` tools cannot be resolved: they
-   have no row and are counted in neither number, before or after.) **+** → **Sub-agents**: the same roster
-   as before, with the line about it being the agent's roster.
+   **Expected:** The chat detaches (the header badge no longer names
+   `default-chat`). **+** → **Tools**: the header count is STILL N, and so is
+   the **Tools** badge. (With no Gmail credentials, `default-chat`'s three
+   deferred `gmail_*` tools cannot be resolved: they have no row and are
+   counted in neither number, before or after.) **+** → **Sub-agents**: the same agents are **On** as
+   before (`default-chat` itself now appears as an Off row), with the hint
+   "Each sub-agent runs in its own session and reports back to this chat."
 
 6. Reopen the dialog. Edit the **System prompt** again and press **Apply**,
    then reopen it once more.

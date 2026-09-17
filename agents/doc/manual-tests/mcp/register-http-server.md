@@ -37,7 +37,8 @@ pasted token off the wire holds: `http://` is allowed for localhost only.
    **Expected:** The form accepts the values.
 2. Click **Test connection**.
    **Expected:** Result below the form within ~2 s, listing the server's tools
-   (`echo`, `add`, `printEnv`, … — 10 or more), with a duration in ms. The
+   under the prefix (`mev_echo`, `mev_get-sum`, `mev_get-env`, … — 10 or
+   more), with a duration in ms. The
    form still holds everything typed.
 3. Click **Save**, then open http://localhost:9090/admin/tools and search `mev`.
    **Expected:** Section **Manual Test Everything** under group **Mcp**, with

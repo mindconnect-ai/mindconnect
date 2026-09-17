@@ -3,7 +3,7 @@ id: chat-landing-and-new-chats
 area: chat
 requires: [server-9090]
 duration: ~4 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Coming back to the chat lands where you were; chats started elsewhere are marked new
@@ -35,8 +35,9 @@ is opened.
 2. Keep the chat list open. From a terminal, start a chat elsewhere:
    ```bash
    curl -s -X POST http://localhost:9090/api/sessions -H 'content-type: application/json' \
-        -d "{\"agentId\":\"$AID\",\"userId\":\"mc_user\"}" | jq -r .id
+        -d "{\"agentId\":\"$AID\"}" | jq -r .id
    ```
+   (The session belongs to the caller — with authentication off, `mc_user`.)
    Note the printed id as `<elsewhere>`.
    **Expected:** Without a reload, a row `New chat` appears at the top of the
    list with the badge **new** in the success colour. The page stays on
@@ -50,8 +51,10 @@ is opened.
 5. Click **Agents**, then **Chat**.
    **Expected:** The URL is `/chat/sessions/<elsewhere>` — the chat last on
    screen.
-6. Delete `<elsewhere>` (its row's **…** → **Delete**, confirm).
+6. Delete `<elsewhere>` (its row's **…** → **Delete**, confirm the browser's
+   `Delete this chat and its whole conversation?` prompt).
    **Expected:** The most recently started remaining chat opens; no error.
+   (Deleting the last remaining chat opens a fresh one.)
 
 ## Cleanup
 

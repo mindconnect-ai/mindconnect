@@ -3,7 +3,7 @@ id: mcp-catalog-takeover
 area: mcp
 requires: [server-9090, internet, mcp-catalog-enabled]
 duration: ~4 min
-last-verified: never
+last-verified: 2026-09-17 (commit a561e9ca, runs/2026-09-16-full-suite)
 ---
 
 # Find a server in the Docker catalog and take it over into the form
@@ -36,7 +36,9 @@ name prefix that does not stutter.
    **Expected:** The registration form opens, prefilled:
    - **Target (JSON)** carries `"type": "docker"` and the entry's image
    - the required secret `GITHUB_PERSONAL_ACCESS_TOKEN` appears in the target's
-     `env` with an **empty** value — the requirement is shown, not hidden
+     `env` as the placeholder `"${GITHUB_PERSONAL_ACCESS_TOKEN}"` — the
+     requirement is shown, not hidden; the placeholder is refused at start
+     until it is replaced by the value (see `mcp/variables-are-refused.md`)
    - **Tool name prefix** is filled in and does **not** stutter
    - a note names the catalog entry this came from
 5. Do **not** save. Click **All MCP servers**.

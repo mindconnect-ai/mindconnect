@@ -3,7 +3,7 @@ id: approval-allow-for-session
 area: approval
 requires: [server-9090, lm-studio-tool-model]
 duration: ~4 min
-last-verified: 2026-09-11 (working tree on a2c12b5, branch chore/typed-ids, runs/2026-09-11-typed-ids — OpenAI via agent-default)
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Allow for this session: no further asking, other sessions still ask

@@ -3,7 +3,7 @@ id: coding-working-dir-chooser
 area: coding
 requires: [server-9090, tool-model]
 duration: ~6 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Choose where a chat works: the folder button and its chooser
@@ -29,18 +29,18 @@ chat's working directory and additional directories, and the choice reaches
 1. Copy the fixture as in `coding/read-edit-verify.md` Setup 1 (the `git`
    lines may be skipped).
 2. `rm -rf ~/mc-manual-tests/calc-project/scratch`
-3. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
+3. Open http://localhost:9090/chat, **New chat**, the composer's model button (it names the model, e.g. `agent-default`) →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL (`/chat/sessions/<session-id>`).
 
 ## Steps
 
 1. Look at the composer.
-   **Expected:** The folder button reads the session id — the chat works in
+   **Expected:** The folder button reads **Session dir** — the chat works in
    its own directory `<data.base-dir>/local/home/mc_user/sessions/<session-id>`.
 2. Click the folder button.
    **Expected:** A **Working directory** dialog: the path field holds the
-   chat's own directory, a **Folders in …** list below it, an
+   chat's own directory, a **Folders in Session dir** list below it, an
    **Additional directories** section that says `None yet.`, and the buttons
    **Use this folder** and **Cancel**.
 3. Type `~/mc-manual-tests` into the path field and click **Open**.
@@ -72,8 +72,8 @@ chat's working directory and additional directories, and the choice reaches
    project keeps it reachable.
 9. Type `/tmp` into the field and click **Open**.
    **Expected:** An error toast titled **Not applied** containing
-   `The working directory must lie under`; the field and the list stay as
-   they were.
+   `The working directory must lie under`; the dialog does not move — the
+   list still shows the folders it showed (the field keeps the typed `/tmp`).
 10. Open `~/mc-manual-tests/calc-project/src`, click **Add src**.
     **Expected:** A toast titled **Additional directories** reading
     `Added <home>/mc-manual-tests/calc-project/src`; `src` is listed under
@@ -93,7 +93,7 @@ chat's working directory and additional directories, and the choice reaches
     the chat's own directory — and no line for `src`.
 14. Reload the chat page (F5).
     **Expected:** The folder button still reads **calc-project**.
-15. If a second llm-config exists: **Model & tools** → pick another
+15. If a second llm-config exists: the composer's model button (it names the model, e.g. `agent-default`) → pick another
     **Model** → **Apply**, then open the folder button. (With only one
     llm-config: SKIPPED for this step.)
     **Expected:** The button still reads **calc-project** and the own

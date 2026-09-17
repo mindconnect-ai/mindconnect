@@ -3,7 +3,7 @@ id: coding-project-agents
 area: coding
 requires: [server-9090, tool-model, jdk-21]
 duration: ~8 min
-last-verified: never
+last-verified: 2026-09-16 (commit f86ac52e, runs/2026-09-16-full-suite)
 ---
 
 # Project agents: found in .mindconnect/agents, narrowed tools, project wins
@@ -26,7 +26,7 @@ project agent wins over a registered agent of the same name.
 1. Copy the fixture as in `coding/read-edit-verify.md` Setup 1. It brings
    `checker`, `explorer` and `reader` in
    `~/mc-manual-tests/calc-project/.mindconnect/agents/`.
-2. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
+2. Open http://localhost:9090/chat, **New chat**, the composer's model button (it names the model, e.g. `agent-default`) →
    **Agent** `coding-assistant` → **Apply**; folder button → absolute path
    of `~/mc-manual-tests/calc-project` → **Open** → **Use this folder**.
    Note the session id from the URL.
@@ -45,7 +45,8 @@ project agent wins over a registered agent of the same name.
    **Expected:** The `run_agent` tool description ends with
    `Available to you: checker, explorer, reader.`
 3. Send: `Ask the reader agent what subtract in Calculator.java does.`
-   **Expected:** A `run_agent` card for `reader`; its answer says that
+   **Expected:** A sub-agent card (`↳ reader — running…`, then
+   `✓ ↳ sub-agent`); the reader's answer (stored as the `run_agent` result) says that
    subtract adds its operands and ends with the line `-- reader`.
 4. Send: `Ask the reader agent to create a file NOTES.md containing "hello".
    Only ask the reader; do not write anything yourself.`
