@@ -22,7 +22,7 @@ public class BrandingVariant {
 
     /**
      * The host this variant is for, as a glob: {@code app.mindconnect.ai},
-     * {@code *.erni.*}, {@code erni.*}. Matched against the request's host
+     * {@code *.acme.*}, {@code acme.*}. Matched against the request's host
      * name — no port, no path — ignoring case. Only meaningful inside
      * {@code switch}; the top-level branding is what applies when no entry
      * matches.
@@ -136,8 +136,8 @@ public class BrandingVariant {
 
     /**
      * The glob as a regex: {@code *} stands for any run of characters, dots
-     * and all, so {@code *.erni.*} covers {@code agents.erni.com} as well as
-     * {@code ai.erni.co.uk}. Everything else is literal.
+     * and all, so {@code *.acme.*} covers {@code agents.acme.com} as well as
+     * {@code ai.acme.co.uk}. Everything else is literal.
      */
     private static Pattern hostPattern(String glob) {
         StringBuilder regex = new StringBuilder();

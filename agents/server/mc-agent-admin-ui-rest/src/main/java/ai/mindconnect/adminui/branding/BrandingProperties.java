@@ -39,11 +39,11 @@ import java.util.Map;
  * mindconnect:
  *   branding:
  *     switch:
- *       erni:
- *         url-pattern: "*.erni.*"
- *         title: ERNI AI
- *         logo: erni.svg
- *         stylesheet: erni-sui.css
+ *       acme:
+ *         url-pattern: "*.acme.*"
+ *         title: ACME AI
+ *         logo: acme.svg
+ *         stylesheet: acme-sui.css
  *         style-picker:
  *           disabled: true
  *       mindconnect:
@@ -62,7 +62,7 @@ import java.util.Map;
  *
  * <p>An asset URL is used as it is written, so all of these work: a path into
  * the app's own resources ({@code /img/logo.svg}), an absolute URL on a CDN,
- * and a bare file name ({@code erni.svg}), which is taken to be a file in
+ * and a bare file name ({@code acme.svg}), which is taken to be a file in
  * {@link #getAssetsDir() assets-dir} and served at {@code /branding/**}.
  */
 @Component
