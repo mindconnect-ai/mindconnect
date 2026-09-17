@@ -207,13 +207,14 @@ class TaskMonitorTest {
         assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
         ai.mindconnect.agent.Namespace ns = new ai.mindconnect.agent.Namespace("acme");
 
-        // A task between QUEUED and RUNNING is in neither list for an instant: wait until all three run.
-        Snapshot full = monitor.snapshot();
-        for (int i = 0; i < 100 && full.active().size() < 3; i++) {
+        // A task between QUEUED and RUNNING is in neither list for an instant — the monitor reads
+        // one status after the other. Every worker blocks until released, so wait until all three
+        // RUN: from then on no task changes its status while the test counts.
+        for (int i = 0; i < 250 && queue.byStatus(TaskStatus.RUNNING, 10).size() < 3; i++) {
             Thread.sleep(20);
-            full = monitor.snapshot();
         }
-        Snapshot board = full.in(ns);
+        assertThat(queue.byStatus(TaskStatus.RUNNING, 10)).as("all three tasks run").hasSize(3);
+        Snapshot board = monitor.snapshot().in(ns);
 
         assertThat(board.active()).extracting(TaskView::id).containsExactlyInAnyOrder(acme, unstamped);
         assertThat(monitor.snapshot().active()).extracting(TaskView::id).contains(other);
