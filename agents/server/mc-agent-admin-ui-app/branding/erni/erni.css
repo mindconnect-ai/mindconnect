@@ -42,15 +42,20 @@
 
     --sui-focus-ring: 0 0 0 3px rgba(10, 25, 44, .18);
 
-    /* The band: the brand navy, with the wordmark painted white on it — which
-       is what the framework's default logo filter already does. */
-    --sui-header-bg:           var(--erni-firefly);
-    --sui-header-fg:           #d7dde4;
-    --sui-header-brand-fg:     #ffffff;
-    --sui-header-nav-fg:       #9fabb8;
-    --sui-header-nav-fg-hover: #ffffff;
-    --sui-header-nav-bg-hover: var(--erni-navy-soft);
+    /* A light band, because the logo is two-tone. The framework paints a
+       header logo white by default (it assumes a dark band and a single-colour
+       mark); a shield plus a wordmark would come out as one white blob, so the
+       filter goes off and the band goes light — which is how the mark is used
+       everywhere else. */
+    --sui-header-bg:           #ffffff;
+    --sui-header-fg:           #33393f;
+    --sui-header-brand-fg:     var(--erni-firefly);
+    --sui-header-nav-fg:       var(--erni-cape-cod);
+    --sui-header-nav-fg-hover: var(--erni-firefly);
+    --sui-header-nav-bg-hover: #eef1f3;
     --sui-header-radius:       0;
+    --sui-header-shadow:       0 1px 0 #dfe3e6;
+    --sui-header-logo-filter:  none;
 
     color-scheme: light;
 }

@@ -1,17 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  PLACEHOLDER — not the official ERNI asset.
+  APPROXIMATION, not the official ERNI asset.
 
-  A stand-in wordmark so this branding example runs out of the box. Replace
-  this file with the official logo from the ERNI brand portal; nothing else
-  has to change, the file name is what application-erni.yaml points at.
+  Redrawn from the logo to get the shape and the palette right: the navy
+  shield with the swash "e", and the grey serif wordmark. The letterforms are
+  system serifs, not ERNI's typeface, so treat this as a stand-in.
 
-  The header renders it at 36px height and, on a dark band, paints it white
-  (see the sui-header-logo-filter token), so the colour below only shows
-  where a sheet turns that filter off.
+  Replace this file with the official SVG from the ERNI brand portal. Nothing
+  else changes: application-erni.yaml points at the file name, and the page
+  picks it up on the next load, without a rebuild or a restart.
 -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 134 56" width="134" height="56"
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 862 211" width="862" height="211"
      role="img" aria-label="ERNI">
-  <text x="0" y="42" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif"
-        font-size="44" font-weight="700" letter-spacing="2" fill="#0A192C">ERNI</text>
+  <!-- Shield: flat top, straight flanks, rounded bottom point. -->
+  <path fill="#1b3a6b"
+        d="M4 4 h196 v104 c0 52 -40 84 -98 103 C44 192 4 160 4 108 Z"/>
+  <!-- The swash "e". A white glyph over the shield leaves its bowl navy,
+       which is how the mark reads. -->
+  <text x="42" y="158" font-family="Georgia, 'Times New Roman', serif"
+        font-style="italic" font-size="170" font-weight="400" fill="#ffffff">e</text>
+  <!-- The dot at the foot of the shield. -->
+  <circle cx="42" cy="152" r="9" fill="#ffffff"/>
+  <!-- Wordmark. -->
+  <text x="248" y="176" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif"
+        font-size="190" font-weight="400" letter-spacing="6" fill="#5a6265">ERNI</text>
 </svg>

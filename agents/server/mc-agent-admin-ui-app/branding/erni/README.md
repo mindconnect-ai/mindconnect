@@ -21,8 +21,9 @@ The profile (`src/main/resources/application-erni.yaml`) points
 
 ## The logos are placeholders
 
-`logo.svg` and `favicon.svg` are stand-ins drawn for this example — **not**
-the official ERNI assets, and not usable as them. Drop the real files in
+`logo.svg` and `favicon.svg` are drawn for this example — the shape and the
+palette follow the real mark, the letterforms are system serifs. They are
+**not** the official ERNI assets and are not usable as them. Drop the real files in
 under the same names and the instance picks them up on the next page load;
 no rebuild, no restart.
 
