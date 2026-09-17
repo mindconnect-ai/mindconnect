@@ -71,13 +71,17 @@ The admin UI needs `MINDCONNECT_ENCRYPTION_SECRET_KEY` (16, 24 or 32 chars).
 - Parent POMs own dependency versions and plugin config. Do not declare a
   version in a module POM when the parent can.
 - Do **not** add a `Co-Authored-By` trailer to commits.
-- **A user-facing change needs a line in `CHANGELOG.md`** under
-  `## [Unreleased]`, in the section that fits: a new endpoint, a changed
-  behaviour, a fixed bug someone may have been living with. Refactorings,
-  tests, docs and build plumbing do not. Write it for a reader deciding
-  whether to upgrade. A PR touching shipped Java without touching the
-  changelog fails the `changelog` check; label it `no-changelog` when that is
-  the right answer.
+- **A user-facing change needs a changelog fragment**, not an edit of
+  `CHANGELOG.md`: a file `changelog.d/<section>/<branch-slug>.md` (section
+  `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`) holding
+  the bullet, e.g. `changelog.d/fixed/cancel-tool-cards.md` with
+  `- **agents:** **what is different.** explanation…`. User-facing: a new
+  endpoint, a changed behaviour, a fixed bug someone may have been living
+  with. Refactorings, tests, docs and build plumbing do not. Write it for a
+  reader deciding whether to upgrade. A PR touching shipped Java without a
+  fragment fails the `changelog` check; label it `no-changelog` when that is
+  the right answer. The release assembles the fragments; see
+  `changelog.d/README.md`.
 - Manual regression tests live in `agents/doc/manual-tests/`; update a
   `last-verified` stamp only on a pass.
 - Keep `website/docs/` in step with behaviour you change.

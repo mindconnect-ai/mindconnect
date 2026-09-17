@@ -47,20 +47,46 @@ jobs:
             echo "No shipped code changed — no entry needed."
             exit 0
           fi
+          # An entry is a file added or edited in a section folder of
+          # changelog.d/ — deleting one does not count, and neither does the
+          # README. A folder name outside the list is not an entry either: the
+          # release script would refuse it, so it must not pass here.
+          #
           # A here-string, not `echo | grep -q`: grep -q stops reading at the
           # first match, and with pipefail the echo still writing into the
           # closed pipe fails the test. CHANGELOG.md sorts near the top, so a
           # large PR that updated it was reported as not having done so.
+          WRITTEN=$(git diff --name-only --diff-filter=ACMR "$BASE" "$HEAD")
+          if grep -qE '^changelog\.d/(added|changed|deprecated|removed|fixed|security)/[^/]+\.md$' <<< "$WRITTEN"; then
+            echo "A changelog fragment was added."
+            exit 0
+          fi
+          # Still accepted while PRs opened before changelog.d/ are merged: the
+          # release script picks up entries under [Unreleased] as well.
           if grep -qx 'CHANGELOG.md' <<< "$CHANGED"; then
             echo "CHANGELOG.md was updated."
             exit 0
           fi
 
-          echo "::error::This PR changes shipped code but not CHANGELOG.md."
-          echo "Add a line under '## [Unreleased]' saying what is different for"
-          echo "someone using the libraries or running the apps — or label the PR"
-          echo "'no-changelog' if there is genuinely nothing to tell them."
+          echo "::error::This PR changes shipped code but adds no changelog entry."
+          echo "Add a file changelog.d/<section>/<branch-slug>.md, e.g."
+          echo "changelog.d/fixed/cancel-tool-cards.md, holding the bullet that says"
+          echo "what is different for someone using the libraries or running the"
+          echo "apps (see changelog.d/README.md) — or label the PR 'no-changelog'"
+          echo "if there is genuinely nothing to tell them."
           echo
           echo "Changed:"
           echo "$USER_FACING" | sed 's/^/  /'
           exit 1
+
+  # A fragment in the wrong folder or without a leading bullet would stop the
+  # release that tries to assemble it. Better to hear it now, from the same
+  # script the release runs — and for labelled PRs too, which skip the job above.
+  fragments:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Are the changelog fragments well-formed?
+        run: .github/scripts/changelog-release.sh preview > /dev/null

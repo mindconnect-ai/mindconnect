@@ -16,6 +16,8 @@
       (`mvn -f <area>/pom.xml clean install`).
 - [ ] I added/updated tests where it makes sense.
 - [ ] I updated docs/README if behaviour changed.
+- [ ] A user-facing change has a file in `changelog.d/<section>/`
+      ([how](/changelog.d/README.md)) — or the PR is labelled `no-changelog`.
 - [ ] I have read and accept the [CLA](/CLA.md) and
       [Contributing guide](/CONTRIBUTING.md).
 
