@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  APPROXIMATION, not the official ERNI asset.
+
+  Redrawn from the logo to get the shape and the palette right: the navy
+  shield with the swash "e", and the grey serif wordmark. The letterforms are
+  system serifs, not ERNI's typeface, so treat this as a stand-in.
+
+  Replace this file with the official SVG from the ERNI brand portal. Nothing
+  else changes: application-erni.yaml points at the file name, and the page
+  picks it up on the next load, without a rebuild or a restart.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 862 211" width="862" height="211"
+     role="img" aria-label="ERNI">
+  <!-- Shield: flat top, straight flanks, rounded bottom point. -->
+  <path fill="#1b3a6b"
+        d="M4 4 h196 v104 c0 52 -40 84 -98 103 C44 192 4 160 4 108 Z"/>
+  <!-- The swash "e". A white glyph over the shield leaves its bowl navy,
+       which is how the mark reads. -->
+  <text x="42" y="158" font-family="Georgia, 'Times New Roman', serif"
+        font-style="italic" font-size="170" font-weight="400" fill="#ffffff">e</text>
+  <!-- The dot at the foot of the shield. -->
+  <circle cx="42" cy="152" r="9" fill="#ffffff"/>
+  <!-- Wordmark. -->
+  <text x="248" y="176" font-family="Georgia, 'Times New Roman', 'Liberation Serif', serif"
+        font-size="190" font-weight="400" letter-spacing="6" fill="#5a6265">ERNI</text>
+</svg>

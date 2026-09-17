@@ -1,0 +1,42 @@
+/*
+ * ERNI AI — what the theme cannot reach.
+ *
+ * The palette of this instance is a theme now (mindconnect.branding.theme:
+ * erni, shipped as static/css/erni.css), and a theme is a class on <html> in
+ * the SPA shell. The login page has no shell and no class: it is a standalone
+ * HTML file, so its colours come from framework tokens on :root with the
+ * shipped values as fallbacks. This sheet fills those in, and puts the mark
+ * above the heading.
+ *
+ * It is linked on every page, but on the app the theme's class-scoped rules
+ * outrank it — which is the right way round: the theme is the look, this is
+ * the one page the theme cannot get to.
+ */
+
+:root {
+    /* The same values the theme uses; see static/css/erni.css for what each
+       one does there. */
+    --sui-color-bg:            #ffffff;
+    --sui-color-surface:       #ffffff;
+    --sui-color-text:          #1b2430;
+    --sui-color-text-strong:   #0a192c;
+    --sui-color-text-muted:    #6b7580;
+
+    --sui-color-action:        #1b3a6b;
+    --sui-color-action-hover:  #12294e;
+    --sui-color-on-action:     #ffffff;
+
+    --sui-color-danger:        #b4231b;
+    --sui-color-danger-bg:     #fbeae8;
+    --sui-color-danger-border: #f0c4bf;
+}
+
+/* The mark above the heading: the login page is the first thing an
+   installation shows, and it is the one page without a header to carry it. */
+#brand-title::before {
+    content: "";
+    display: block;
+    height: 44px;
+    margin: 0 auto 18px;
+    background: url("/branding/logo.svg") center / contain no-repeat;
+}

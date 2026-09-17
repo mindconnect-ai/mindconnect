@@ -87,8 +87,8 @@ mindconnect:
     # The browser tab's icon; unset it follows the logo.
     # favicon: /branding/favicon.png
     # The look the shell opens in: amethyst (default), clody, gipiti, sorbet,
-    # compact, dark, or "default" for the framework's bare one. The theme
-    # picker in the header still overrides it per browser.
+    # erni, compact, dark, or "default" for the framework's bare one. The
+    # theme picker in the header still overrides it per browser.
     # theme: amethyst
     # Stylesheets linked after every shipped one, so their rules win. Either
     # bundled with the app, dropped into assets-dir, or on a server elsewhere.

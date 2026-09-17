@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  APPROXIMATION, not the official ERNI asset — see logo.svg.
+
+  The shield alone: a tab is 16px, where the wordmark beside it would be
+  illegible. Replace it with the official icon under this name.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"
+     role="img" aria-label="ERNI">
+  <path fill="#1b3a6b" d="M2 2 h60 v32 c0 16 -12 26 -30 32 C14 60 2 50 2 34 Z"/>
+  <text x="14" y="46" font-family="Georgia, 'Times New Roman', serif"
+        font-style="italic" font-size="52" fill="#ffffff">e</text>
+</svg>

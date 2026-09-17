@@ -1,0 +1,386 @@
+/*
+ * ERNI — navy on white, cyan as the pointer.
+ *
+ * A corporate light theme, taken from how the brand presents itself: a white
+ * band with the mark at the left, navigation in navy, one bright cyan marking
+ * where you are, and a navy pill as the one solid action on the screen.
+ *
+ * Same mechanism as Clody and Gipiti: an overlay on sui.css scoped to
+ * :root.sui-theme-erni, setting framework variables and turning off specific
+ * pieces of the default sheet. It names no admin-app class — app.css speaks
+ * in tokens.
+ *
+ * The three ideas:
+ *
+ *   1. Navy is the brand, cyan is the pointer. Two blues with different
+ *      jobs: the navy carries weight — solid buttons, headings, the active
+ *      row's text — and the cyan never fills anything, it only marks. A rule
+ *      under the current tab, the bar beside the current nav row, the
+ *      underline on a hover. Colour that points is worth more than colour
+ *      that decorates, and two blues stay one family.
+ *
+ *   2. One plane, hairlines. White paper throughout, including the header
+ *      band; what separates is a single border, never a shadow and never a
+ *      second grey. An engineering console reads better flat than layered.
+ *
+ *   3. Square, with pills for the actions alone. The radius scale is small
+ *      and calm; the primary button is a full pill, the way the brand's own
+ *      call to action is. The shape marks what is clickable, so nothing else
+ *      needs to borrow it.
+ *
+ * The typeface is the humanist sans the system already has. The brand's own
+ * face is a webfont; an installation that has it licensed adds one @font-face
+ * and sets --sui-font-family in its branding stylesheet, which is linked
+ * after this file (see mindconnect.branding.stylesheets).
+ */
+
+
+/* ══ Tokens ══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-erni {
+    /* Paper and ink. The greys are barely cool — enough to belong to the
+       navy, not enough to read as blue. */
+    --sui-color-bg:            #ffffff;
+    --sui-color-surface:       #ffffff;
+    --sui-color-surface-alt:   #f2f5f8;
+    --sui-color-text:          #1b2430;
+    --sui-color-text-strong:   #0a192c;
+    --sui-color-text-body:     #3a434c;
+    --sui-color-text-muted:    #6b7580;
+    --sui-color-text-subtle:   #9aa3ac;
+    --sui-color-border:        #dde3e9;
+    --sui-color-border-soft:   #eef2f6;
+    --sui-color-border-strong: #c2cad3;
+
+    /* The brand navy. Everything tinted follows these three. */
+    --sui-color-primary:       #1b3a6b;
+    --sui-color-primary-hover: #12294e;
+    --sui-color-primary-soft:  #e8eef6;
+    --sui-color-on-primary:    #ffffff;
+
+    --sui-color-action:        #1b3a6b;
+    --sui-color-action-hover:  #12294e;
+    --sui-color-on-action:     #ffffff;
+
+    /* The pointer. The bright value is for rules and bars — shapes, where
+       contrast against white does not have to carry text; the deep one is
+       what is used wherever the cyan has to be read. */
+    --erni-cyan:        #2fa9cc;
+    --erni-cyan-strong: #17788f;
+
+    /* Colour that means something. Kept away from both blues: a failed run
+       must never be mistaken for the accent. */
+    --sui-color-danger:          #b4231b;
+    --sui-color-danger-bg:       #fbeae8;
+    --sui-color-danger-bg-hover: #f7d8d5;
+    --sui-color-danger-border:   #f0c4bf;
+    --sui-color-success:         #1a7a4f;
+    --sui-color-success-bg:      #e8f4ed;
+    --sui-color-success-border:  #c2e0d0;
+    --sui-color-warning:         #9a6410;
+    --sui-color-warning-bg:      #fbf1dd;
+
+    --sui-color-required:      #b4231b;
+    --sui-color-empty:         #9aa3ac;
+
+    --sui-color-code-bg:       #0a192c;
+    --sui-color-code-fg:       #dde3e9;
+    --sui-color-blockquote-border: #c2cad3;
+
+    /* Square and calm. The pill is not on the scale: it belongs to the
+       controls, which opt into it below. */
+    --sui-radius-sm:   4px;
+    --sui-radius-md:   6px;
+    --sui-radius-lg:   10px;
+    --sui-radius-pill: 999px;
+
+    /* Humanist sans, and the framework's own 15px like every theme here: a
+       theme decides how the app looks, not how big its text is. */
+    --sui-font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont,
+                       "Noto Sans", Roboto, Helvetica, Arial, sans-serif;
+    --sui-font-mono:   ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sui-font-size:   15px;
+
+    /* Flat: one plane means the borders do the separating, and a shadow
+       would be a second mechanism doing the same job. What genuinely floats
+       keeps one. */
+    --sui-shadow-pop:     0 1px 4px rgba(10, 25, 44, .06), 0 8px 24px rgba(10, 25, 44, .10);
+    --sui-shadow-popover: 0 1px 4px rgba(10, 25, 44, .08), 0 14px 34px rgba(10, 25, 44, .14);
+    --sui-focus-ring:     0 0 0 3px rgba(47, 169, 204, .28);
+
+    /* A white band with the mark on it, separated by the rule below. The
+       logo filter goes off: a brand mark is two-tone and pre-coloured, and
+       the framework's default would paint it into one white silhouette. */
+    --sui-header-bg:           #ffffff;
+    --sui-header-fg:           #3a434c;
+    --sui-header-brand-fg:     #0a192c;
+    --sui-header-nav-fg:       #1b3a6b;
+    --sui-header-nav-fg-hover: #0a192c;
+    --sui-header-nav-bg-hover: #f2f5f8;
+    --sui-header-radius:       0;
+    --sui-header-shadow:       none;
+    --sui-header-logo-filter:  none;
+
+    color-scheme: light;
+}
+
+
+/* ══ Base ════════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-erni body {
+    line-height: 1.6;
+}
+
+/* Headings are navy and tight. The brand's wordmark is a serif, but its
+   pages are not: the serif is the mark's business, and a console is read,
+   not admired. */
+:root.sui-theme-erni :is(h1, h2, h3, h4) {
+    color: var(--sui-color-text-strong);
+    letter-spacing: -.01em;
+    font-weight: 600;
+}
+
+
+/* ══ Header ══════════════════════════════════════════════════════════════
+   One hairline under a white band, and the brand sitting on it at the size
+   the mark was drawn for. */
+
+:root.sui-theme-erni .sui-header {
+    border-bottom: 1px solid var(--sui-color-border);
+}
+
+:root.sui-theme-erni .sui-header-brand {
+    font-weight: 600;
+    letter-spacing: -.01em;
+}
+
+:root.sui-theme-erni .sui-header-user .sui-avatar,
+:root.sui-theme-erni .sui-header-avatar {
+    background: var(--sui-color-primary);
+    color: var(--sui-color-on-primary);
+}
+
+
+/* ══ Navigation ══════════════════════════════════════════════════════════
+   Navy labels on white, and the current row marked twice: a soft navy fill
+   for weight, a cyan bar at its edge for the eye. The bar is the theme's
+   signature — colour that points rather than fills. */
+
+:root.sui-theme-erni .sui-menu {
+    background: var(--sui-color-surface);
+    border-right: 1px solid var(--sui-color-border);
+}
+
+/* As a drawer the framework gives the menu its own ground; three classes
+   against its two would take that away, so the surface is restated here. */
+:root.sui-theme-erni .sui-shell-body > .sui-menu--overlay.sui-menu--overlay {
+    background: var(--sui-color-surface);
+}
+@media (max-width: 768px) {
+    :root.sui-theme-erni .sui-shell-body > .sui-menu--responsive.sui-menu--responsive {
+        background: var(--sui-color-surface);
+    }
+}
+
+:root.sui-theme-erni .sui-menu-link {
+    border-radius: var(--sui-radius-sm);
+    color: var(--sui-color-text-body);
+    font-size: 14px;
+    /* Room for the bar below, so the label does not shift when it appears. */
+    border-left: 3px solid transparent;
+}
+
+:root.sui-theme-erni .sui-menu-link:hover {
+    background: var(--sui-color-surface-alt);
+    color: var(--sui-color-text-strong);
+}
+
+:root.sui-theme-erni .sui-menu-item.is-active > .sui-menu-link,
+:root.sui-theme-erni .sui-menu-item.is-active > .sui-menu-group > .sui-menu-link {
+    background: var(--sui-color-primary-soft);
+    border-left-color: var(--erni-cyan);
+    color: var(--sui-color-primary);
+    font-weight: 600;
+}
+
+:root.sui-theme-erni .sui-menu-item.is-active > .sui-menu-link .sui-icon {
+    color: var(--sui-color-primary);
+}
+
+
+/* ══ Lists & tables ══════════════════════════════════════════════════════ */
+
+:root.sui-theme-erni :is(.sui-list-header, .sui-table-header) {
+    border-bottom: 1px solid var(--sui-color-border);
+}
+
+:root.sui-theme-erni :is(.sui-list-header, .sui-table-header) h2 {
+    font-size: 15px;
+    letter-spacing: -.01em;
+}
+
+/* A row's name is navy and plain until you point at it, and then the cyan
+   underlines it. */
+:root.sui-theme-erni .sui-list:not(.chat-container) .sui-list-item-label,
+:root.sui-theme-erni .sui-table td .sui-link {
+    color: var(--sui-color-text-strong);
+    font-weight: 500;
+    text-decoration: none;
+}
+
+:root.sui-theme-erni .sui-list:not(.chat-container) .sui-list-item-label:hover,
+:root.sui-theme-erni .sui-table td .sui-link:hover {
+    color: var(--sui-color-primary);
+    text-decoration: underline;
+    text-decoration-color: var(--erni-cyan);
+    text-decoration-thickness: 2px;
+    text-underline-offset: 3px;
+}
+
+:root.sui-theme-erni .sui-list:not(.chat-container) .sui-list-item {
+    border-bottom: 1px solid var(--sui-color-border-soft);
+}
+
+:root.sui-theme-erni .sui-list:not(.chat-container) .sui-list-item:hover,
+:root.sui-theme-erni .sui-table tbody tr:hover {
+    background: var(--sui-color-surface-alt);
+}
+
+:root.sui-theme-erni .sui-table .column-header-background,
+:root.sui-theme-erni .sui-table th {
+    background: var(--sui-color-surface);
+    color: var(--sui-color-text-muted);
+    font-weight: 600;
+    letter-spacing: .02em;
+}
+
+/* The conversation is the chat module's business — the same exclusion the
+   other themes make, and for the same reason: a theme selector carries the
+   :root class and would outrank the module's own rules. */
+:root.sui-theme-erni .sui-list.chat-container > .sui-list-header {
+    border-bottom: none;
+}
+
+
+/* ══ Forms ═══════════════════════════════════════════════════════════════ */
+
+:root.sui-theme-erni .sui-field label {
+    color: var(--sui-color-text-body);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+:root.sui-theme-erni :is(.sui-field input, .sui-field textarea, .sui-field select) {
+    border-color: var(--sui-color-border-strong);
+    border-radius: var(--sui-radius-sm);
+    background-color: var(--sui-color-surface);
+}
+
+/* Focus is where the bright cyan earns its place: the ring is a shape, so it
+   does not have to carry text. */
+:root.sui-theme-erni :is(.sui-field input, .sui-field textarea, .sui-field select):focus {
+    border-color: var(--erni-cyan);
+}
+
+
+/* ══ Buttons ═════════════════════════════════════════════════════════════
+   The solid action is a navy pill, the way the brand's own call to action
+   is. Secondary keeps the square outline: one pill on a screen reads as
+   "the" button, two read as decoration. */
+
+:root.sui-theme-erni .sui-btn--primary {
+    border-radius: var(--sui-radius-pill);
+    font-weight: 600;
+    padding-inline: 20px;
+}
+
+:root.sui-theme-erni :is(.sui-btn, .sui-icon-btn) {
+    font-weight: 500;
+}
+
+:root.sui-theme-erni .sui-btn--secondary {
+    border: 1px solid var(--sui-color-border-strong);
+    background: var(--sui-color-surface);
+    color: var(--sui-color-primary);
+}
+
+:root.sui-theme-erni .sui-btn--secondary:hover:not(:disabled) {
+    background: var(--sui-color-primary-soft);
+    border-color: var(--sui-color-primary);
+}
+
+:root.sui-theme-erni .sui-link {
+    color: var(--sui-color-primary);
+    text-decoration-color: var(--erni-cyan);
+    text-underline-offset: 2px;
+}
+
+:root.sui-theme-erni .sui-link:hover {
+    color: var(--erni-cyan-strong);
+}
+
+
+/* ══ Tabs ════════════════════════════════════════════════════════════════
+   The current tab is navy text over a cyan rule — the same two-blue split as
+   the nav rail, in the one other place the app says "you are here". */
+
+:root.sui-theme-erni .sui-tabs {
+    border-bottom-color: var(--sui-color-border);
+}
+
+:root.sui-theme-erni .sui-tab {
+    color: var(--sui-color-text-muted);
+    font-weight: 500;
+}
+
+:root.sui-theme-erni .sui-tab:hover {
+    color: var(--sui-color-text-strong);
+}
+
+:root.sui-theme-erni .sui-tab.active {
+    color: var(--sui-color-primary);
+    font-weight: 600;
+    border-bottom-color: var(--erni-cyan);
+}
+
+
+/* ══ Things that float ═══════════════════════════════════════════════════ */
+
+:root.sui-theme-erni .sui-dialog {
+    border-radius: var(--sui-radius-lg);
+}
+
+:root.sui-theme-erni .sui-dialog-backdrop {
+    background: rgba(10, 25, 44, .38);
+}
+
+:root.sui-theme-erni .sui-dialog-header {
+    border-bottom-color: var(--sui-color-border);
+}
+
+/* Toasts: the level in the rail and the text, on a light card — the palette
+   is quiet enough that a wash of colour would shout. */
+:root.sui-theme-erni .sui-toast--info    { --sui-toast-bg: var(--sui-color-primary-soft); --sui-toast-ring: #c6d6ea; --sui-toast-fg: var(--sui-color-primary); }
+:root.sui-theme-erni .sui-toast--success { --sui-toast-bg: var(--sui-color-success-bg);   --sui-toast-ring: var(--sui-color-success-border); --sui-toast-fg: var(--sui-color-success); }
+:root.sui-theme-erni .sui-toast--warn    { --sui-toast-bg: var(--sui-color-warning-bg);   --sui-toast-ring: #ecd7ae; --sui-toast-fg: var(--sui-color-warning); }
+:root.sui-theme-erni .sui-toast--error   { --sui-toast-bg: var(--sui-color-danger-bg);    --sui-toast-ring: var(--sui-color-danger-border); --sui-toast-fg: var(--sui-color-danger); }
+
+
+/* ══ The chat ════════════════════════════════════════════════════════════
+   The one variable the chat module asks a theme for. On white paper the
+   user's bubble is the soft navy: it belongs to the person speaking, and the
+   navy is who this installation is. */
+
+:root.sui-theme-erni #chat-app-shell {
+    --chat-user-bubble: var(--sui-color-primary-soft);
+}
+
+:root.sui-theme-erni .chat-conversation .sui-scrollpane > .sui-list > .sui-list-header {
+    background: var(--sui-color-surface);
+}
+
+/* The composer is a field, so it takes the theme's input corner, not the
+   action's pill. */
+:root.sui-theme-erni .chat-form.sui-form {
+    border-radius: var(--sui-radius-sm);
+}

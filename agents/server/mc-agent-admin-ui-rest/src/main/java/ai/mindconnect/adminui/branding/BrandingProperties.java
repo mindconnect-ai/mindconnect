@@ -104,7 +104,7 @@ public class BrandingProperties {
     /**
      * The theme the shell starts in — one of the looks the SPA ships
      * ({@code amethyst}, {@code clody}, {@code gipiti}, {@code sorbet},
-     * {@code compact}, {@code dark}), or {@code default} for the framework's
+     * {@code erni}, {@code compact}, {@code dark}), or {@code default} for the framework's
      * bare one. A name nobody ships matches no stylesheet and renders as that
      * bare default. It is only the starting point: the theme picker in the
      * header still overrides it per browser.

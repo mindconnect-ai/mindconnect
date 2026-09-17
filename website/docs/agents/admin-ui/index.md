@@ -143,8 +143,8 @@ same tokens, so it is branded along with the rest.
 ```
 
 **`theme`** picks which shipped look the shell opens in (`amethyst` — the
-default —, `clody`, `gipiti`, `sorbet`, `compact`, `dark`, or `default` for the
-framework's bare one). A theme is a class on `<html>` and therefore wins on
+default —, `clody`, `gipiti`, `sorbet`, `erni`, `compact`, `dark`, or `default`
+for the framework's bare one). A theme is a class on `<html>` and therefore wins on
 specificity over a `:root` rule, so a branding stylesheet written as above
 wants `theme: default` underneath it. The theme picker in the header still
 overrides the setting per browser.
@@ -161,6 +161,23 @@ has no app shell and therefore no theme class.
 A whole branded instance is usually a Spring profile: put the settings above
 into `application-<name>.yaml`, point `assets-dir` at a directory beside the
 app, and start it with `--spring.profiles.active=<name>`.
+
+### The ERNI instance
+
+`application-erni.yaml` is such a profile, and `erni` such a theme — navy on
+white with a cyan pointer, the palette of the brand it is named after:
+
+```bash
+MINDCONNECT_ENCRYPTION_SECRET_KEY="change-me-to-a-32-char-secret!!!" \
+mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run \
+  -Dspring-boot.run.profiles=erni
+```
+
+It shows the whole mechanism in one place: the theme carries the app's look,
+the branding stylesheet in `branding/erni/` carries the login page, and the
+logo and favicon are files in that directory rather than resources in a jar —
+replace them and the next page load wears them. The marks committed there are
+drawn for the example and are **not** the official assets.
 
 ## The main sections
 
