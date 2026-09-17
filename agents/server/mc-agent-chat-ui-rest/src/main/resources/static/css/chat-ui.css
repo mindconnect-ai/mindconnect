@@ -412,13 +412,13 @@
     border-radius: 0;
 }
 
-/* Two planes, and this is what tells them apart. The history sits on the
-   tinted surface (above), the conversation on the plain one — white against
-   a wash, on every theme, because both tokens exist everywhere. Tinting only
-   the sidebar was not enough: on the default palette `surface-alt` and `bg`
-   are three values apart and the seam simply did not read. */
+/* The conversation sits on the page ground like every other screen: no
+   surface of its own, its edges are hairlines (the list header's, the
+   composer's). It used to be the plain surface against a tinted wash, which
+   next to the outlined admin pages read as one more filled slab. The history
+   drawer keeps its surface — it slides over the text. */
 #chat-app-shell > .sui-shell-body > .sui-shell-content {
-    background: var(--sui-color-surface);
+    background: var(--sui-color-bg);
     border: none;
     box-shadow: none;
     border-radius: 0;
@@ -449,7 +449,7 @@
    around the prose that had no reason to be different. */
 .chat-conversation .sui-list.chat-container,
 .chat-conversation .sui-list.chat-container:hover {
-    background: var(--sui-color-surface);
+    background: transparent;
     box-shadow: none;
     border: none;
     border-radius: 0;
@@ -463,7 +463,9 @@
    was the second bar on the page and had to keep out of the way of the
    first. It is the only one now, so it stops apologising for itself. */
 .chat-conversation .sui-scrollpane > .sui-list > .sui-list-header {
-    background: var(--sui-color-surface);
+    /* Opaque, because it is sticky and the messages scroll under it. */
+    background: var(--sui-color-bg);
+    border-bottom: 1px solid var(--sui-color-border);
 }
 
 /* Legible, not decorative: the readout takes the body ink — muted grey at
@@ -732,7 +734,7 @@
 }
 
 .chat-form.sui-form {
-    background: var(--sui-color-surface);
+    background: var(--sui-color-bg);
     border: 1px solid var(--sui-color-border);
     /* The same corner every other input in the app has. It was 20px, which
        is a pill's radius on a box the height of a paragraph — it read as a
@@ -784,6 +786,13 @@
     resize: none;
 }
 
+/* A theme's field rule carries the :root class and would paint the textarea
+   its input fill — invisible while the composer shared that fill, a box in a
+   box now that the composer sits on the page ground. */
+#chat-app-shell .chat-form .sui-field textarea {
+    background: transparent;
+}
+
 .chat-form .sui-field textarea:focus {
     border: none;
     box-shadow: none;
@@ -818,7 +827,7 @@
 /* The streaming state is the same surface, so the composer does not jump
    when the turn starts. */
 .chat-form--streaming {
-    background: var(--sui-color-surface);
+    background: var(--sui-color-bg);
     border: 1px solid var(--sui-color-border);
     border-radius: var(--sui-radius-md, 8px);
     padding: 14px 14px 14px 20px;

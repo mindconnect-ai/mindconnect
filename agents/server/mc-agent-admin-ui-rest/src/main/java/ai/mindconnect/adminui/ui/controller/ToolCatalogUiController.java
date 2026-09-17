@@ -95,7 +95,7 @@ public class ToolCatalogUiController {
         if (mcpRegistryAdmin.getIfAvailable() == null) {
             return List.of();
         }
-        return List.of(UiAction.secondary("register-mcp", "Register MCP Server").icon("plug")
+        return List.of(UiAction.primary("register-mcp", "Register MCP Server").icon("plug")
                 .dispatch("GET", "/mcp-gateway/api/new"));
     }
 
