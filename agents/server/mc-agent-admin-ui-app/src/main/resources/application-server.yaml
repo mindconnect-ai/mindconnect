@@ -11,7 +11,7 @@ mindconnect:
     # Not offered at all, whatever an agent names or an admin switches on.
     # bash runs as this process — with its environment, its API keys, the whole
     # file system — and nothing confines it to a chat's directory.
-    disabled: ${MC_TOOLS_DISABLED:bash,process_kill}
+    disabled: ${MC_TOOLS_DISABLED:bash,process_kill,process_list}
     # Empty: every user's root is their own home, so nobody leaves their tree.
     working-dir-root: ${MC_WORKING_DIR_ROOT:}
     # Where the file tools look when they run outside any chat (the admin's tool

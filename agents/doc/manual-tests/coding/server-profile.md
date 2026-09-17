@@ -8,10 +8,11 @@ last-verified: never
 
 # The server profile: no shell, no directory choice, uploads still work
 
-**Goal:** With the `server` profile active, `bash` and `process_kill` exist
-nowhere — not in the tool catalog, not for an agent that names them — no
-user can point a chat at a directory, every chat works in its own directory
-where attached files still land, and deleting a chat removes that directory.
+**Goal:** With the `server` profile active, `bash`, `process_kill` and
+`process_list` exist nowhere — not in the tool catalog, not for an agent that
+names them — no user can point a chat at a directory, every chat works in its
+own directory where attached files still land, and deleting a chat removes
+that directory.
 
 ## Preconditions
 
@@ -19,7 +20,7 @@ where attached files still land, and deleting a chat removes that directory.
   profiles, e.g. `SPRING_PROFILES_ACTIVE=server` (next to any profile it
   already runs with); `MC_TOOLS_DISABLED` is unset (otherwise: SKIPPED)
 - The startup log has the line
-  `Tools switched off by configuration: [bash, process_kill]`
+  `Tools switched off by configuration: [bash, process_kill, process_list]`
 - `agent-default` points at a tool-capable model, and the `embeddings`
   llm-config reaches an embeddings model (see `chat/file-upload.md`;
   otherwise: SKIPPED)
@@ -35,9 +36,9 @@ where attached files still land, and deleting a chat removes that directory.
 ## Steps
 
 1. Open http://localhost:9090/admin/tools.
-   **Expected:** Neither `bash` nor `process_kill` is listed; `file_read`,
-   `grep` and the other file tools are. The shell's group is gone if nothing
-   else was in it.
+   **Expected:** None of `bash`, `process_kill` and `process_list` is
+   listed; `file_read`, `grep` and the other file tools are. The shell's
+   group is gone if nothing else was in it.
 2. Open http://localhost:9090/chat, **New chat**, **Model & tools** →
    **Agent** `coding-assistant` → **Apply**. Note the session id from the
    URL.

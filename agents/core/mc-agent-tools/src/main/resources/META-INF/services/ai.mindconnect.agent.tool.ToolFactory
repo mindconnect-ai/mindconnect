@@ -1,6 +1,7 @@
 ai.mindconnect.agent.tools.builtin.CurrentDateTimeToolFactory
 ai.mindconnect.agent.tools.builtin.BashToolFactory
 ai.mindconnect.agent.tools.builtin.ProcessKillToolFactory
+ai.mindconnect.agent.tools.builtin.ProcessListToolFactory
 ai.mindconnect.agent.tools.builtin.FileListToolFactory
 ai.mindconnect.agent.tools.builtin.FileReadToolFactory
 ai.mindconnect.agent.tools.builtin.FileWriteToolFactory

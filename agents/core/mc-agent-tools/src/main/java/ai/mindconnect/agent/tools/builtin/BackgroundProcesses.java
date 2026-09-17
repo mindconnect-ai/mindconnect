@@ -16,8 +16,9 @@ import java.util.stream.Stream;
 /**
  * The processes {@code bash} left running in the background, per session:
  * a dev server, a watcher, a long build. Each writes to a log file the
- * model reads; {@code process_kill} ends one, and every one still alive
- * when the JVM stops is killed with it — nothing outlives the runtime.
+ * model reads; {@code process_list} shows them, {@code process_kill} ends
+ * one, and every one still alive when the JVM stops is killed with it —
+ * nothing outlives the runtime.
  *
  * <p>Killing means the whole tree: {@code bash -c "npm run dev"} is a
  * shell, npm and node hang under it, and ending the shell alone leaves the

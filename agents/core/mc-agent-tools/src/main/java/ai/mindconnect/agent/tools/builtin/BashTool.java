@@ -40,9 +40,9 @@ import java.util.stream.Stream;
  * <p>A command that is not meant to return — a dev server, a watcher —
  * runs with {@code background}: it is started, its output goes to a log
  * file, and the call returns at once with the pid and the log's path. The
- * model reads the log like any file and ends the process with
- * {@code process_kill}; whatever is still running when the runtime stops
- * is killed with it.
+ * model reads the log like any file, sees what runs with
+ * {@code process_list} and ends the process with {@code process_kill};
+ * whatever is still running when the runtime stops is killed with it.
  */
 public class BashTool implements Tool {
 
@@ -100,9 +100,10 @@ public class BashTool implements Tool {
                 + "shell: cd and variables do not carry over. Default timeout " + DEFAULT_TIMEOUT_SECONDS
                 + "s, raise `timeout` (up to " + MAX_TIMEOUT_SECONDS + ") for a build or test run. A command "
                 + "that does not return on its own — a dev server, a watcher — must run with "
-                + "`background`: the call returns at once with the pid and a log file to read; end it "
-                + "with process_kill. Never detach a command yourself with `&`, `nohup` or `setsid`: the "
-                + "process would run on out of reach, so such a command is refused." + extra;
+                + "`background`: the call returns at once with the pid and a log file to read; "
+                + "process_list shows what runs, process_kill ends it. Never detach a command yourself "
+                + "with `&`, `nohup` or `setsid`: the process would run on out of reach, so such a "
+                + "command is refused." + extra;
     }
 
     @Override
