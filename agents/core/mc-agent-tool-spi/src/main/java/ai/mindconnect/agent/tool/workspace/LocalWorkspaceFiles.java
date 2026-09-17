@@ -105,6 +105,29 @@ public class LocalWorkspaceFiles implements WorkspaceFiles {
     }
 
     @Override
+    public void delete(Path path) throws IOException {
+        if (!Files.isDirectory(path, LinkOption.NOFOLLOW_LINKS)) {
+            if (!Files.deleteIfExists(path)) throw new NoSuchFileException(path.toString());
+            return;
+        }
+        // A walk does not follow links: a link inside is removed, what it points to stays.
+        Files.walkFileTree(path, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                Files.delete(file);
+                return FileVisitResult.CONTINUE;
+            }
+
+            @Override
+            public FileVisitResult postVisitDirectory(Path dir, IOException failure) throws IOException {
+                if (failure != null) throw failure;
+                Files.delete(dir);
+                return FileVisitResult.CONTINUE;
+            }
+        });
+    }
+
+    @Override
     public LocalFile localFile(Path file) {
         return new LocalFile() {
             @Override

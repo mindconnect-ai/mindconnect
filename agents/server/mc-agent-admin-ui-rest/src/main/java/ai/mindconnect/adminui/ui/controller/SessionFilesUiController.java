@@ -10,20 +10,27 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.SessionDirectories;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
+import ai.mindconnect.chatui.ui.component.DirectoryPickerComponent;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
+import ai.mindconnect.ui.model.UiToast;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -33,8 +40,8 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * The session's Files dialog: browse the session's directories and view or
- * download what is in them — what the agent wrote with {@code bash} or
+ * The session's Files dialog: browse the session's directories and view,
+ * download, edit or delete what is in them — what the agent wrote with {@code bash} or
  * {@code code_execute}, which reaches the user no other way.
  *
  * <p>Only the session's owner gets anything; any other session is not found.
@@ -53,6 +60,7 @@ public class SessionFilesUiController {
     private static final Map<String, String> VIEWABLE = Map.ofEntries(
             Map.entry("png", "image/png"), Map.entry("jpg", "image/jpeg"), Map.entry("jpeg", "image/jpeg"),
             Map.entry("gif", "image/gif"), Map.entry("webp", "image/webp"),
+            Map.entry("bmp", "image/bmp"), Map.entry("ico", "image/x-icon"),
             Map.entry("pdf", "application/pdf"),
             Map.entry("json", "application/json"),
             Map.entry("csv", "text/csv;charset=UTF-8"), Map.entry("tsv", "text/tab-separated-values;charset=UTF-8"),
@@ -134,6 +142,91 @@ public class SessionFilesUiController {
             headers.setContentDisposition(ContentDisposition.inline().filename(name).build());
         }
         return ResponseEntity.ok().headers(headers).body(new InputStreamResource(file.get().stream()));
+    }
+
+    /** A file in the viewer, in the tree's place: its text to edit, a frame, or a note to download it. */
+    @GetMapping("/view")
+    public ResponseEntity<UiPatch> view(@PathVariable("sessionId") String sessionIdValue,
+                                        @RequestParam("root") String root,
+                                        @RequestParam("path") String path) throws IOException {
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        Optional<SessionDirectories.Preview> preview = directories.isEmpty() ? Optional.empty()
+                : directories.get().preview(root, path);
+        if (preview.isEmpty()) {
+            return ResponseEntity.ok(SessionFilesPage.closed().toast(UiToast.error("The file is gone.")));
+        }
+        return ResponseEntity.ok(new SessionFilesPage(sessionId, directories.get()).opened(root, preview.get()));
+    }
+
+    /** The editor's text written back to its file; the file must still be there. */
+    @PostMapping("/save")
+    public ResponseEntity<UiPatch> save(@PathVariable("sessionId") String sessionIdValue,
+                                        @RequestParam("root") String root,
+                                        @RequestParam("path") String path,
+                                        @RequestBody Map<String, Object> raw) throws IOException {
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        if (directories.isEmpty()) return ResponseEntity.notFound().build();
+        Object content = raw.get("content");
+        Optional<SessionDirectories.Entry> saved;
+        try {
+            saved = directories.get().write(root, path, content == null ? "" : String.valueOf(content));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(UiPatch.of().toast(UiToast.error("Not saved: the text is larger than "
+                    + SessionFilesPage.humanSize(SessionDirectories.MAX_EDIT_BYTES) + ".")));
+        }
+        if (saved.isEmpty()) {
+            return ResponseEntity.ok(UiPatch.of().toast(UiToast.error("Not saved: the file is gone.")));
+        }
+        return ResponseEntity.ok(new SessionFilesPage(sessionId, directories.get()).saved(root, saved.get()));
+    }
+
+    /** A file, or a folder with everything in it, deleted; a directory of the session itself never is. */
+    @PostMapping("/delete")
+    public ResponseEntity<UiPatch> delete(@PathVariable("sessionId") String sessionIdValue,
+                                          @RequestParam("root") String root,
+                                          @RequestParam("path") String path) throws IOException {
+        Optional<SessionDirectories> directories = directoriesOfOwned(SessionId.of(sessionIdValue));
+        if (directories.isEmpty()) return ResponseEntity.notFound().build();
+        if (!directories.get().delete(root, path)) {
+            return ResponseEntity.ok(UiPatch.of().toast(UiToast.error("Nothing to delete there.")));
+        }
+        return ResponseEntity.ok(SessionFilesPage.deleted(root, path));
+    }
+
+    /**
+     * A folder and everything below it as a zip download, written straight to the
+     * response on the request's own thread. A folder past the archive limits is refused
+     * before anything is written.
+     */
+    @GetMapping("/zip")
+    public void zip(@PathVariable("sessionId") String sessionIdValue,
+                    @RequestParam("root") String root,
+                    @RequestParam(value = "path", defaultValue = "") String path,
+                    HttpServletResponse response) throws IOException {
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        // A directory is named the way the dialog shows it: the chat's own is not its session id.
+        String name = path.isBlank() ? DirectoryPickerComponent.label(root, sessionId) : null;
+        Optional<SessionDirectories.Archive> archive = directories.isEmpty() ? Optional.empty()
+                : directories.get().archive(root, path, name);
+        if (archive.isEmpty()) {
+            response.sendError(HttpStatus.NOT_FOUND.value());
+            return;
+        }
+        if (archive.get().tooLarge()) {
+            response.sendError(HttpStatus.PAYLOAD_TOO_LARGE.value(), "The folder is too large to download as a zip "
+                    + "(at most " + SessionDirectories.MAX_ARCHIVE_FILES + " files and "
+                    + SessionFilesPage.humanSize(SessionDirectories.MAX_ARCHIVE_BYTES) + ").");
+            return;
+        }
+        response.setContentType("application/zip");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.attachment().filename(archive.get().name()).build().toString());
+        archive.get().writeTo(response.getOutputStream());
+        response.flushBuffer();
     }
 
     /** The session's directories, when the session exists and is the caller's. */

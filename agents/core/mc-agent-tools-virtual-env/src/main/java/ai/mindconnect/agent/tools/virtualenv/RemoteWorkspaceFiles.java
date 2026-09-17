@@ -110,6 +110,18 @@ public class RemoteWorkspaceFiles implements WorkspaceFiles {
     }
 
     @Override
+    public void delete(Path path) throws IOException {
+        try {
+            client.delete(key, relative(path));
+        } catch (VirtualEnvClientException e) {
+            if (e.status() == 404) {
+                throw new NoSuchFileException(path.toString());
+            }
+            throw e;
+        }
+    }
+
+    @Override
     public LocalFile localFile(Path file) throws IOException {
         String name = file.getFileName() == null ? "file" : file.getFileName().toString();
         int dot = name.lastIndexOf('.');
