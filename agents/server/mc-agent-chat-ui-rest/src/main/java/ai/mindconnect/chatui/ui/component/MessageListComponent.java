@@ -244,12 +244,14 @@ public final class MessageListComponent implements UiComponent {
         int prevAgentSeq = -1;
         for (Message m : chatMessages) {
             boolean isUser = m.senderType() == ParticipantType.USER;
+            // Before a user message too: a turn that was cancelled or failed has
+            // tool calls but no answer, and its cards belong above the next question.
+            List<TaskCardComponent> tasks = toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, m.sequenceNum());
+            for (TaskCardComponent t : tasks) {
+                // Reuse the wrapper render to get the same <li> shape.
+                list.item(((UiList) t.render()).getItems().get(0));
+            }
             if (!isUser) {
-                List<TaskCardComponent> tasks = toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, m.sequenceNum());
-                for (TaskCardComponent t : tasks) {
-                    // Reuse the wrapper render to get the same <li> shape.
-                    list.item(((UiList) t.render()).getItems().get(0));
-                }
                 // The thought that led to this answer sits right above it,
                 // after the tools — where it was while the turn streamed.
                 Thoughts.of(m).ifPresent(thought ->

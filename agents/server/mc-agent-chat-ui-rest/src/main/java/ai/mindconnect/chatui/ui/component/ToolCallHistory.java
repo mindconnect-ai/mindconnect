@@ -92,7 +92,10 @@ public final class ToolCallHistory {
                 long   duration = m.durationMs() != null ? m.durationMs() : 0L;
 
                 boolean isSubAgent = "run_agent".equals(toolName) || "run_agents".equals(toolName);
-                boolean failed     = result != null && result.startsWith("Error:");
+                // The flag is what the runtime records (a cancel stub, a denied
+                // approval); the prefix is how older results said so.
+                boolean failed     = (m.metadata() != null && "true".equals(String.valueOf(m.metadata().get("failed"))))
+                        || (result != null && result.startsWith("Error:"));
                 String key = callId.isEmpty() ? ("task-hist-" + m.id().value()) : callId;
 
                 // Sub-agent call WITH a persisted result → done. Prefer the
