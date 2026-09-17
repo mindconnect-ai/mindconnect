@@ -130,4 +130,93 @@ class SessionDirectoriesTest {
         assertThat(new String(content.stream().readAllBytes())).isEqualTo("pptx-bytes");
         assertThat(dirs.open("/workspace", "../../etc/passwd")).isEmpty();
     }
+
+    @Test
+    void aFolderZipsWithEverythingBelowIt_insideAFolderOfItsName() throws Exception {
+        Files.writeString(work.resolve("out/charts/bar.png"), "png");
+
+        var archive = dirs.archive(root, "out").orElseThrow();
+
+        assertThat(archive.name()).isEqualTo("out.zip");
+        assertThat(archive.tooLarge()).isFalse();
+        assertThat(archive.files()).isEqualTo(2);
+        assertThat(unzip(archive)).containsExactly(
+                java.util.Map.entry("out/", ""),
+                java.util.Map.entry("out/charts/", ""),
+                java.util.Map.entry("out/charts/bar.png", "png"),
+                java.util.Map.entry("out/data.csv", "a,b\n1,2\n"));
+    }
+
+    @Test
+    void aRootZipsUnderTheNameItIsShownBy() throws Exception {
+        var archive = dirs.archive(root, "", "Session dir").orElseThrow();
+
+        assertThat(archive.name()).isEqualTo("Session dir.zip");
+        assertThat(unzip(archive).keySet()).containsExactly(
+                "Session dir/", "Session dir/out/", "Session dir/out/charts/", "Session dir/out/data.csv",
+                "Session dir/report.md");
+    }
+
+    @Test
+    void aZipHoldsNothingTheListingWouldNotShow() throws Exception {
+        Files.createSymbolicLink(work.resolve("escape.txt"), outside.resolve("secret.txt"));
+        Files.createSymbolicLink(work.resolve("escape-dir"), outside);
+        Files.createSymbolicLink(work.resolve("out/loop"), work);
+
+        var entries = unzip(dirs.archive(root, "").orElseThrow());
+
+        assertThat(entries.keySet()).noneMatch(name -> name.contains("escape") || name.contains("loop"));
+        assertThat(entries.values()).doesNotContain("not yours");
+        assertThat(dirs.archive(root, "..")).isEmpty();
+        assertThat(dirs.archive(root, "report.md")).as("a file is no folder").isEmpty();
+        assertThat(dirs.archive(outside.toString(), "")).isEmpty();
+    }
+
+    @Test
+    void aFolderWithTooManyFilesIsTooLargeToZip() throws Exception {
+        Path big = Files.createDirectories(work.resolve("big"));
+        for (int i = 0; i <= SessionDirectories.MAX_ARCHIVE_FILES; i++) {
+            Files.createFile(big.resolve("f" + i));
+        }
+
+        var archive = dirs.archive(root, "big").orElseThrow();
+
+        assertThat(archive.tooLarge()).isTrue();
+        assertThat(archive.files()).isEqualTo(SessionDirectories.MAX_ARCHIVE_FILES);
+    }
+
+    @Test
+    void a_workspace_elsewhere_zips_without_its_internals() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home"));
+        Files.writeString(remote.resolve(".home/.bashrc"), "internal");
+        Files.createDirectories(remote.resolve("deck"));
+        Files.writeString(remote.resolve("deck/sales.pptx"), "pptx-bytes");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionDirectories dirs = new SessionDirectories(List.of(), java.util.Map.of("/workspace", workspace));
+
+        var whole = dirs.archive("/workspace", "").orElseThrow();
+        assertThat(whole.name()).isEqualTo("workspace.zip");
+        assertThat(unzip(whole)).containsExactly(
+                java.util.Map.entry("workspace/", ""),
+                java.util.Map.entry("workspace/deck/", ""),
+                java.util.Map.entry("workspace/deck/sales.pptx", "pptx-bytes"));
+        assertThat(unzip(dirs.archive("/workspace", "deck").orElseThrow()).keySet())
+                .containsExactly("deck/", "deck/sales.pptx");
+        assertThat(dirs.archive("/workspace", "../..")).isEmpty();
+    }
+
+    /** The zip's entries in order, each with its content as text. */
+    private static java.util.Map<String, String> unzip(SessionDirectories.Archive archive) throws Exception {
+        var bytes = new java.io.ByteArrayOutputStream();
+        archive.writeTo(bytes);
+        var entries = new java.util.LinkedHashMap<String, String>();
+        try (var zip = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(bytes.toByteArray()))) {
+            for (var entry = zip.getNextEntry(); entry != null; entry = zip.getNextEntry()) {
+                entries.put(entry.getName(), new String(zip.readAllBytes()));
+            }
+        }
+        return entries;
+    }
 }

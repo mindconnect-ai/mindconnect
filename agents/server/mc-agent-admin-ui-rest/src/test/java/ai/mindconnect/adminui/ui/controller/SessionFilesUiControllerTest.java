@@ -14,13 +14,16 @@ import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mock.web.MockHttpServletResponse;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.zip.ZipInputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -105,6 +108,36 @@ class SessionFilesUiControllerTest {
                 .isEqualTo(404);
         assertThat(controller.content(session.id().value(), tmp.toRealPath().toString(), "secret.txt", true)
                 .getStatusCode().value()).isEqualTo(404);
+    }
+
+    @Test
+    void theOwnerDownloadsAFolderAsAZip() throws Exception {
+        actAs("alice");
+        var response = new MockHttpServletResponse();
+
+        controller.zip(session.id().value(), root, "out", response);
+
+        assertThat(response.getStatus()).isEqualTo(200);
+        assertThat(response.getContentType()).isEqualTo("application/zip");
+        assertThat(response.getHeader("Content-Disposition")).startsWith("attachment").contains("out.zip");
+        try (var zip = new ZipInputStream(new ByteArrayInputStream(response.getContentAsByteArray()))) {
+            assertThat(zip.getNextEntry().getName()).isEqualTo("out/");
+            assertThat(zip.getNextEntry().getName()).isEqualTo("out/result.csv");
+            assertThat(new String(zip.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("total\n60\n");
+        }
+    }
+
+    @Test
+    void nobodyElseZipsAFolder_andNothingOutsideIsZipped() throws Exception {
+        actAs("bob");
+        var asBob = new MockHttpServletResponse();
+        controller.zip(session.id().value(), root, "out", asBob);
+        assertThat(asBob.getStatus()).isEqualTo(404);
+
+        actAs("alice");
+        var outside = new MockHttpServletResponse();
+        controller.zip(session.id().value(), root, "..", outside);
+        assertThat(outside.getStatus()).isEqualTo(404);
     }
 
     private void actAs(String user) {
