@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui;
 
+import ai.mindconnect.adminui.branding.Branding;
 import ai.mindconnect.adminui.branding.BrandingProperties;
 import ai.mindconnect.adminui.service.TaskMonitor;
 import ai.mindconnect.adminui.service.UserStream;
@@ -18,6 +19,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -52,8 +55,12 @@ public class AdminLayoutFactory {
     private final ObjectProvider<NamespaceService> namespaceService;
     /** Where the request works — bound by the scope filter; the switcher marks it as active. */
     private final ObjectProvider<ScopeSupplier> scope;
-    /** What this installation calls itself; never null — unset properties are the shipped defaults. */
-    private final AdminLayout.Brand brand;
+    /**
+     * What this installation calls itself. Read per request rather than held
+     * as a value: with {@code mindconnect.branding.switch} the answer depends
+     * on the host in the address bar, and one process can serve two brands.
+     */
+    private final BrandingProperties branding;
 
     @Autowired
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
@@ -64,7 +71,7 @@ public class AdminLayoutFactory {
                               ObjectProvider<NamespaceService> namespaceService,
                               ObjectProvider<ScopeSupplier> scope,
                               BrandingProperties branding) {
-        this.brand = new AdminLayout.Brand(branding.getTitle(), branding.getLogo(), branding.getLogoHref());
+        this.branding = branding;
         this.authEnabled = authEnabled;
         this.buildInfo = buildInfo;
         this.taskMonitor = taskMonitor.orElse(null);
@@ -96,7 +103,7 @@ public class AdminLayoutFactory {
                         "Live updates", "/admin/agents"),
                 mcpRegistryAdmin.getIfAvailable() != null,
                 registryService.getIfAvailable() != null);
-        layout.brand(brand);
+        layout.brand(currentBrand());
         namespaceSwitch().ifPresent(layout::namespaces);
         return layout;
     }
@@ -114,6 +121,18 @@ public class AdminLayoutFactory {
                 .findFirst().orElse(active.value());
         return Optional.of(new AdminLayout.NamespaceSwitch(active.value(), activeLabel,
                 mine.stream().map(ns -> new AdminLayout.NamespaceSwitch.Entry(ns.id().value(), ns.label())).toList()));
+    }
+
+    /** The brand for the host this request came in on; the top-level settings when it matches none. */
+    private AdminLayout.Brand currentBrand() {
+        Branding resolved = branding.resolve(currentHost());
+        return new AdminLayout.Brand(resolved.title(), resolved.logo(), resolved.logoHref());
+    }
+
+    /** The host in the address bar, or null off a request thread — a scheduled render, a test. */
+    private static String currentHost() {
+        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes servlet
+                ? servlet.getRequest().getServerName() : null;
     }
 
     /** The namespace the request works in; null (everything) for a host without namespaces. */

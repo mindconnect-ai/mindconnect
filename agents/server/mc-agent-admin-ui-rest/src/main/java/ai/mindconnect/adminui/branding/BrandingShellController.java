@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.branding;
 
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
@@ -24,6 +25,10 @@ import java.nio.charset.StandardCharsets;
  * to know that these two files are no longer served straight off the
  * classpath.
  *
+ * <p>The branding is resolved per request from the host in the address bar
+ * (see {@code mindconnect.branding.switch}), which is why the shell cannot be
+ * rendered once at startup: two hosts served by this process get two shells.
+ *
  * <p>The file is read per request rather than cached: it is a few kilobytes,
  * asked for once per full page load (the SPA navigates without it), and
  * keeping it uncached means an edited shell shows up on reload the way it did
@@ -43,25 +48,27 @@ public class BrandingShellController {
     /** The SPA shell. */
     @GetMapping(value = "/index.html", produces = HTML)
     @ResponseBody
-    public ResponseEntity<String> index() {
-        return shell("static/index.html", branding.getDocumentTitle());
+    public ResponseEntity<String> index(HttpServletRequest request) {
+        Branding resolved = branding.resolve(request.getServerName());
+        return shell("static/index.html", resolved, resolved.documentTitle());
     }
 
     /** The login landing page — branded too: it is the first page an installation shows. */
     @GetMapping(value = "/login.html", produces = HTML)
     @ResponseBody
-    public ResponseEntity<String> login() {
-        return shell("static/login.html", "Sign in \u2014 " + branding.getTitle());
+    public ResponseEntity<String> login(HttpServletRequest request) {
+        Branding resolved = branding.resolve(request.getServerName());
+        return shell("static/login.html", resolved, "Sign in \u2014 " + resolved.title());
     }
 
-    private ResponseEntity<String> shell(String classpathLocation, String documentTitle) {
+    private ResponseEntity<String> shell(String classpathLocation, Branding resolved, String documentTitle) {
         Resource resource = new ClassPathResource(classpathLocation);
         if (!resource.exists()) {
             return ResponseEntity.notFound().build();
         }
         try (var in = resource.getInputStream()) {
             String html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-            return ResponseEntity.ok(BrandingHtml.apply(html, branding, documentTitle));
+            return ResponseEntity.ok(BrandingHtml.apply(html, resolved, documentTitle));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot read the UI shell " + classpathLocation, e);
         }
