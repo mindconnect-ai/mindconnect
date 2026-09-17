@@ -191,6 +191,17 @@ logo and favicon are files in that directory rather than resources in a jar —
 replace them and the next page load wears them. The marks committed there are
 drawn for the example and are **not** the official assets.
 
+The profile is written as a `switch`, so the same process also answers as
+Mindconnect under `app.mindconnect.ai`. Its ERNI entry claims every other host
+by default, which is what makes a local run show the brand without touching
+`/etc/hosts`; a deployment narrows it to the names it serves:
+
+```bash
+MC_ERNI_HOST='*.erni.*' MC_MINDCONNECT_HOST=app.mindconnect.ai \
+mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run \
+  -Dspring-boot.run.profiles=erni
+```
+
 ## One process, several brands
 
 A profile decides the brand when the process starts, which means one process

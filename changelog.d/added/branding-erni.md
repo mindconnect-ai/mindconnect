@@ -4,4 +4,6 @@
   in the header's theme picker, or open in it with
   `mindconnect.branding.theme: erni`. The `erni` Spring profile
   (`--spring.profiles.active=erni`) starts the Admin UI fully branded: name,
-  logo, favicon, theme and a login page to match.
+  logo, favicon, theme and a login page to match — written as a
+  `mindconnect.branding.switch`, so the same process still answers as
+  Mindconnect under its own host.

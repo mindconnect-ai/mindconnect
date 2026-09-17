@@ -1,7 +1,8 @@
 # ── ERNI AI ──────────────────────────────────────────────────────────────────
-# A worked example of mindconnect.branding: the same app under a different
-# name, mark and palette, with nothing built in. Run it with
-# --spring.profiles.active=erni (or -Dspring-boot.run.profiles=erni).
+# A worked example of mindconnect.branding, and of the switch in particular:
+# the same process answers as ERNI or as Mindconnect depending on the host it
+# was asked under. Run it with --spring.profiles.active=erni (or
+# -Dspring-boot.run.profiles=erni).
 #
 # The assets come from ./branding/erni next to this app; the palette is the
 # "erni" theme in mc-agent-admin-ui-rest. See that directory's README,
@@ -13,13 +14,35 @@
 # named brand does not.
 mindconnect:
   branding:
-    title: ERNI AI
-    logo: /branding/logo.svg
-    favicon: /branding/favicon.svg
-    # The palette is a theme now (static/css/erni.css in mc-agent-admin-ui-rest),
-    # so the branding sheet below is left with what a theme cannot reach: the
-    # login page, which carries no app shell and therefore no theme class.
-    theme: erni
-    stylesheets:
-      - /branding/erni.css
+    # Reached only when a host matches neither entry below, which with the
+    # default patterns cannot happen — narrow MC_ERNI_HOST and it can.
+    title: Mindconnect Agent Runtime
     assets-dir: ${MC_BRANDING_ASSETS_DIR:./branding/erni}
+
+    switch:
+      # The specific pattern first: entries are tried in declaration order, and
+      # the catch-all below would otherwise claim this name too.
+      mindconnect:
+        url-pattern: ${MC_MINDCONNECT_HOST:app.mindconnect.ai}
+        title: Mindconnect Agent Runtime
+        logo: /img/logo.svg            # a path: the app's own resources
+        style-picker:
+          themes: amethyst, default
+
+      # Everything else. The default pattern claims every host so that a local
+      # run shows the brand without an entry in /etc/hosts; a deployment
+      # narrows it to the names it serves:
+      #   MC_ERNI_HOST='*.erni.*'
+      erni:
+        url-pattern: ${MC_ERNI_HOST:*}
+        title: ERNI AI
+        # Bare names: files in assets-dir, served at /branding/**. Replace one
+        # and the next page load wears it — no rebuild, no restart.
+        logo: logo.svg
+        favicon: favicon.svg
+        stylesheet: erni.css
+        theme: erni
+        # This brand's look is not up for discussion: no picker, and the theme
+        # cannot be overridden through ?theme= or what a browser remembers.
+        style-picker:
+          disabled: true
