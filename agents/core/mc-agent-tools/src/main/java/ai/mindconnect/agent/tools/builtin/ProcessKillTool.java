@@ -10,8 +10,9 @@ import java.util.stream.Collectors;
 /**
  * Ends a process {@code bash} started in the background — the whole tree,
  * so a dev server's port is free again. Only this session's processes:
- * one started elsewhere is not the model's to kill. Without a pid it
- * lists what the session has running.
+ * one started elsewhere is not the model's to kill. Listing is
+ * {@code process_list}; without a pid this tool still lists too, so
+ * existing agents and habits keep working.
  */
 public class ProcessKillTool implements Tool {
 
@@ -29,8 +30,8 @@ public class ProcessKillTool implements Tool {
     @Override
     public String description() {
         return "Ends a process that bash started with background=true, with everything it spawned — "
-                + "a dev server, a watcher — by the pid bash reported. Without a pid, lists this "
-                + "session's background processes.";
+                + "a dev server, a watcher. `pid` is the process to end, as bash or process_list reported "
+                + "it. To see what is running, call process_list instead.";
     }
 
     @Override
@@ -39,7 +40,7 @@ public class ProcessKillTool implements Tool {
                 "type", "object",
                 "properties", Map.of(
                         "pid", Map.of("type", "integer",
-                                "description", "The pid bash reported when it started the process. Omit to list.")
+                                "description", "The pid of the background process to end, as bash or process_list reported it.")
                 ),
                 "required", new String[]{}
         );
@@ -50,8 +51,8 @@ public class ProcessKillTool implements Tool {
         Object raw = arguments.get("pid");
         List<BackgroundProcesses.Entry> running = BackgroundProcesses.list(sessionId);
         if (raw == null || raw.toString().isBlank()) {
-            return running.isEmpty() ? "No background processes in this session."
-                    : running.stream().map(BackgroundProcesses.Entry::describe).collect(Collectors.joining("\n"));
+            // Kept for agents and models that still call it this way; process_list is the tool for it.
+            return ProcessListTool.listing(sessionId);
         }
         long pid;
         try {

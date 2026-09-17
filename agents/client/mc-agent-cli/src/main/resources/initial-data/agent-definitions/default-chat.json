@@ -215,11 +215,22 @@
       "id": "00000003-0000-0000-0000-000000000073",
       "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
       "name": "process_kill",
-      "description": "Ends a process bash started with background=true, with everything it spawned; without a pid lists them.",
+      "description": "Ends a process bash started with background=true, with everything it spawned, by pid.",
       "overrides": {},
       "enabled": true,
       "deferred": false,
       "needsApproval": true,
+      "maxResultChars": null
+    },
+    {
+      "id": "00000003-0000-0000-0000-000000000075",
+      "agentDefinitionId": "00000002-0000-0000-0000-000000000012",
+      "name": "process_list",
+      "description": "Lists the processes bash started with background=true in this session.",
+      "overrides": {},
+      "enabled": true,
+      "deferred": false,
+      "needsApproval": false,
       "maxResultChars": null
     }
   ],

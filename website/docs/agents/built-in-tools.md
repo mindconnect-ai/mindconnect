@@ -26,7 +26,8 @@ Always available; no API keys required.
 | `get_current_datetime` | Returns the current date and time in ISO-8601 with timezone. | — |
 | `list_agents` | Lists the agents this one may call, with their names and descriptions. Added by the runtime with `run_agent`. | — |
 | `bash` | Runs a bash command in the session's working directory; output drained as it comes, capped at 30,000 characters; `timeout` per call (default 120 s, max 600); a timed-out or cancelled command is killed with everything it spawned. `background` starts a server or watcher detached, watches it for three seconds and returns its pid, whether it is still running or already exited with which code, the log so far, and the log file (`logs/` in the session's directory). | Working dir |
-| `process_kill` | Ends a background process of this session by pid, with everything it spawned; without a pid lists them. Whatever still runs when the runtime stops is killed with it. | — |
+| `process_list` | Lists the background processes of this session: pid, running or exited, command and log file. Read-only. | — |
+| `process_kill` | Ends a background process of this session by pid, with everything it spawned (without a pid it still lists them, as `process_list` does). Whatever still runs when the runtime stops is killed with it. | — |
 | `file_read` | Reads a text file with numbered lines, `cat -n` style; `offset` and `limit` page through a long one (2,000 lines or 20,000 characters per call); refuses binary files. | Working dir |
 | `file_edit` | Replaces one exact passage (`old_string` → `new_string`, unique unless `replace_all`) and returns a unified diff. Indentation the model got wrong is forgiven when the passage is otherwise unique, the file's own kept; a passage that is not there is answered with the closest one, numbered. | Working dir |
 | `file_write` | Writes a whole file, creating parent directories as needed. | Working dir |

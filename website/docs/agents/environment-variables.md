@@ -87,7 +87,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.users.home` | `<data.base-dir>/<namespace>/home/{user}` | Each user's directory on the server — a path with `{user}` in it. `{user}` is the user id when it consists of letters, digits, `.`, `-` and `_` and does not start with a dot; any other id is reduced to those characters and gets `+` and a short hash of the id appended (`alice@example.com` → `alice_example.com+…`), so no two users share a directory. A session opened without a working directory works in its own directory under there (`sessions/<id>`), its uploads are put in `sessions/<id>/uploads` for the file tools, and it is the default root a working directory must lie under. Blank turns it off. |
 | `mindconnect.tools.base-dir` | user home | Base directory for `bash` and the file tools when a session has no working directory at all — sessions written before 0.5.2, a runtime without a users' home, tools run outside a session — security-relevant. |
 | `mindconnect.tools.working-dir-root` | `users.home` | The root a session's working directory (`workingDir` on `POST /api/sessions`, the chat's directory chooser, `/cd` in the CLI) must lie under, and the tree the chat's directory picker shows. With `{user}` in it — `/srv/mindconnect/users/{user}` — every user gets a root of their own, created on first use, and sees nobody else's. The CLI sets `/`; the Admin UI app sets the user's home, or `MC_WORKING_DIR_ROOT` when given. |
-| `mindconnect.tools.disabled` | — | Tools this installation does not offer at all, comma-separated (`bash,process_kill`). They leave every catalog and never resolve — an agent definition that names one goes without it, and the Admin UI's tool settings cannot switch it back on. `MC_TOOLS_DISABLED` in the `server` profile. |
+| `mindconnect.tools.disabled` | — | Tools this installation does not offer at all, comma-separated (`bash,process_kill,process_list`). They leave every catalog and never resolve — an agent definition that names one goes without it, and the Admin UI's tool settings cannot switch it back on. `MC_TOOLS_DISABLED` in the `server` profile. |
 | `mindconnect.working-dirs.choice` | `true` | Whether a user may choose a chat's directories. `false`: no folder button in the chat, `workingDir`/`additionalDirs` on `POST /api/sessions`, `PUT /api/sessions/{id}/working-dir` and `GET /api/directories` are refused (`/cd` and `/add-dir` in the CLI too), and every chat works in its own directory under `users.home`. |
 | `mindconnect.agent.instructions.user-dir` | `~/.mindconnect` | Where a user's standing instructions live (`AGENTS.md`, `PROMPT.md` or `CLAUDE.md`), read into every session's system prompt beside the project's own file. The default suits a desktop: one person, one home. A server runs as one service account, so put `{user}` in the value and each user gets a directory of their own. `off` drops the user scope. |
 | `mindconnect.agent.skills.user-dir` | `~/.mindconnect/skills` | Where a user's own [skills](./skills.md) live — `SKILL.md` files they can load in every project, beside the ones this installation stores and the ones a project keeps in `.mindconnect/skills/`. Same shape as the line above: the default suits a desktop, a server puts `{user}` in the value, `off` drops the user scope. `MC_SKILLS_USER_DIR` in the `server` profile. |
@@ -106,9 +106,10 @@ The apps' defaults are for one person on their own machine. On a server several
 users share, start them with the `server` profile (`--spring.profiles.active=server`,
 plus `keycloak` for login). It sets:
 
-- `mindconnect.tools.disabled: bash,process_kill` — `bash` runs as the server's
-  account, with its environment and the whole file system, and nothing confines it to
-  a chat's directory. The file and document tools stay: they are confined to the
+- `mindconnect.tools.disabled: bash,process_kill,process_list` — `bash` runs as the
+  server's account, with its environment and the whole file system, and nothing
+  confines it to a chat's directory; without it there are no background processes to
+  list or end. The file and document tools stay: they are confined to the
   chat's directories.
 - `mindconnect.working-dirs.choice: false` — nobody points a chat at a directory or
   browses the server; each chat works in its own directory under `users.home`, where

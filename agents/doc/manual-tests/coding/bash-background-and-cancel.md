@@ -9,9 +9,9 @@ last-verified: never
 # bash: a server in the background, and nothing survives a stop or a timeout
 
 **Goal:** `bash` starts a long-running process detached with a pid and a log
-in the session's directory, `process_kill` lists and ends it with its whole
-tree, and a foreground command that is stopped or runs past its timeout is
-killed with everything it started.
+in the session's directory, `process_list` lists it, `process_kill` ends it
+with its whole tree, and a foreground command that is stopped or runs past
+its timeout is killed with everything it started.
 
 ## Preconditions
 
@@ -51,8 +51,9 @@ killed with everything it started.
    ```
    **Expected:** `200`; the log file named in step 2 is listed.
 4. Send: `List this session's background processes.`
-   **Expected:** A `process_kill` card called without a pid; its result has a
-   line `pid <n> (running): jwebserver …`.
+   **Expected:** A `process_list` card; its result has a line
+   `pid <n> (running): jwebserver …`. No `bash` card running `ps`, and no
+   `process_kill` card.
 5. Send: `Stop the file server.`
    **Expected:** A `process_kill` card with pid `<n>`; its result starts
    `Killed pid <n>`. From a terminal, the `curl` of step 3 prints `000` and

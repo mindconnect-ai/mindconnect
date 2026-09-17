@@ -279,6 +279,7 @@ class BashToolOutputTest {
         Path own = Files.createDirectories(tmp.resolve("home/u/sessions/" + session));
         BashTool bash = new BashTool(ai.mindconnect.agent.tool.FileRoots.of(own), session);
         ProcessKillTool kill = new ProcessKillTool(session);
+        ProcessListTool list = new ProcessListTool(session);
 
         String out = bash.execute(Map.of("command", "echo up; sleep 60", "background", true));
         assertThat(out).startsWith("Started in background: pid ").contains("Log: " + own.resolve("logs"))
@@ -287,12 +288,12 @@ class BashToolOutputTest {
         Path logFile = Path.of(out.substring(out.indexOf("Log: ") + 5, out.indexOf('\n', out.indexOf("Log: "))));
         assertThat(Files.readString(logFile)).isEqualTo("$ echo up; sleep 60\nup\n");
 
-        assertThat(kill.execute(Map.of())).contains("pid " + pid + " (running): echo up; sleep 60");
+        assertThat(list.execute(Map.of())).contains("pid " + pid + " (running): echo up; sleep 60");
         assertThat(kill.execute(Map.of("pid", pid))).startsWith("Killed pid " + pid);
         Thread.sleep(300);
         assertThat(ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)).isFalse();
         assertThat(kill.execute(Map.of("pid", pid))).startsWith("Error: pid " + pid + " is not a background process");
-        assertThat(kill.execute(Map.of())).isEqualTo("No background processes in this session.");
+        assertThat(list.execute(Map.of())).isEqualTo("No background processes in this session.");
     }
 
     @Test
