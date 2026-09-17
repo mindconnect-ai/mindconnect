@@ -140,6 +140,60 @@ class SessionFilesUiControllerTest {
         assertThat(outside.getStatus()).isEqualTo(404);
     }
 
+    @Test
+    void theOwnerOpensAFile_textInAnEditor_anImageAsAPicture_anOfficeFileOnlyToDownload() throws Exception {
+        Files.write(Path.of(root, "out/chart.png"), new byte[]{(byte) 0x89, 'P', 'N', 'G', 0});
+        Files.writeString(Path.of(root, "out/deck.pptx"), "PK looks like text");
+        actAs("alice");
+
+        String office = json(controller.view(session.id().value(), root, "out/deck.pptx").getBody());
+        assertThat(office).doesNotContain("\"files-editor\"").contains("Download it to open it");
+
+        String text = json(controller.view(session.id().value(), root, "out/result.csv").getBody());
+        assertThat(text).contains("\"files-editor\"").contains("total\\n60\\n").contains("\"files-viewer\"");
+
+        String image = json(controller.view(session.id().value(), root, "out/chart.png").getBody());
+        assertThat(image).contains("\"files-viewer-image\"").contains("/content?root=").doesNotContain("\"files-editor\"");
+
+        String gone = json(controller.view(session.id().value(), root, "../secret.txt").getBody());
+        assertThat(gone).contains("The file is gone.");
+    }
+
+    @Test
+    void theOwnerSavesAFile_andDeletesFilesAndFolders() throws Exception {
+        actAs("alice");
+
+        var saved = controller.save(session.id().value(), root, "out/result.csv", java.util.Map.of("content", "total\n70\n"));
+        assertThat(json(saved.getBody())).contains("Saved result.csv");
+        assertThat(Path.of(root, "out/result.csv")).hasContent("total\n70\n");
+
+        var deleted = controller.delete(session.id().value(), root, "page.html");
+        assertThat(json(deleted.getBody())).contains("Deleted page.html");
+        assertThat(Path.of(root, "page.html")).doesNotExist();
+
+        controller.delete(session.id().value(), root, "out");
+        assertThat(Path.of(root, "out")).doesNotExist();
+
+        assertThat(json(controller.delete(session.id().value(), root, "").getBody())).contains("Nothing to delete");
+        assertThat(Path.of(root)).exists();
+    }
+
+    @Test
+    void nobodyElseOpensSavesOrDeletes() throws Exception {
+        actAs("bob");
+
+        assertThat(json(controller.view(session.id().value(), root, "out/result.csv").getBody()))
+                .doesNotContain("total");
+        assertThat(controller.save(session.id().value(), root, "out/result.csv", java.util.Map.of("content", "x"))
+                .getStatusCode().value()).isEqualTo(404);
+        assertThat(controller.delete(session.id().value(), root, "out").getStatusCode().value()).isEqualTo(404);
+        assertThat(Path.of(root, "out/result.csv")).hasContent("total\n60\n");
+    }
+
+    private static String json(Object body) throws Exception {
+        return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(body);
+    }
+
     private void actAs(String user) {
         caller.set(UserId.of(user));
     }

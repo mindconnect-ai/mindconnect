@@ -94,6 +94,11 @@ public class VirtualEnvClient {
         send(key, "PUT", workspace(key, "content", path), content, "application/octet-stream");
     }
 
+    /** Deletes a file or a directory with everything in it. */
+    public void delete(WorkspaceKey key, String path) throws IOException {
+        send(key, "DELETE", workspace(key, "files", path), null, null);
+    }
+
     // ---- environments ---------------------------------------------------------------------------
 
     public Environment acquire(WorkspaceKey key) throws IOException {

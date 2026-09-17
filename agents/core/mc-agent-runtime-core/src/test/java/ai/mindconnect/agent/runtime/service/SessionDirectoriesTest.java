@@ -207,6 +207,104 @@ class SessionDirectoriesTest {
         assertThat(dirs.archive("/workspace", "../..")).isEmpty();
     }
 
+    @Test
+    void textPreviewsAsText_binaryAndLargeFilesDoNot() throws Exception {
+        Files.write(work.resolve("out/chart.png"), new byte[]{(byte) 0x89, 'P', 'N', 'G', 0, 1});
+        Files.write(work.resolve("out/big.txt"), new byte[SessionDirectories.MAX_EDIT_BYTES + 1]);
+        Files.write(work.resolve("out/latin1.txt"), new byte[]{'M', (byte) 0xFC, 'l', 'l'});
+
+        var report = dirs.preview(root, "report.md").orElseThrow();
+        assertThat(report.editable()).isTrue();
+        assertThat(report.text()).isEqualTo("# Report");
+        assertThat(report.entry().path()).isEqualTo("report.md");
+        assertThat(report.entry().size()).isEqualTo(8);
+
+        assertThat(dirs.preview(root, "out/chart.png").orElseThrow().editable()).isFalse();
+        assertThat(dirs.preview(root, "out/big.txt").orElseThrow().editable()).isFalse();
+        assertThat(dirs.preview(root, "out/latin1.txt").orElseThrow().editable()).isFalse();
+        assertThat(dirs.preview(root, "out")).as("a folder is no file").isEmpty();
+        assertThat(dirs.preview(root, "../outside/secret.txt")).isEmpty();
+    }
+
+    @Test
+    void aFileIsSavedAsText_butNoneIsCreatedAndNothingOutsideIsWritten() throws Exception {
+        var saved = dirs.write(root, "out/data.csv", "a,b\n3,4\n").orElseThrow();
+
+        assertThat(Files.readString(work.resolve("out/data.csv"))).isEqualTo("a,b\n3,4\n");
+        assertThat(saved.size()).isEqualTo(8);
+        assertThat(dirs.write(root, "out/new.txt", "x")).isEmpty();
+        assertThat(work.resolve("out/new.txt")).doesNotExist();
+        assertThat(dirs.write(root, "../outside/secret.txt", "mine")).isEmpty();
+        Files.createSymbolicLink(work.resolve("escape.txt"), outside.resolve("secret.txt"));
+        assertThat(dirs.write(root, "escape.txt", "mine")).isEmpty();
+        assertThat(Files.readString(outside.resolve("secret.txt"))).isEqualTo("not yours");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+                        dirs.write(root, "report.md", "x".repeat(SessionDirectories.MAX_EDIT_BYTES + 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void aFileOrAFolderWithEverythingInItIsDeleted_butNeitherARootNorAnythingOutside() throws Exception {
+        assertThat(dirs.delete(root, "report.md")).isTrue();
+        assertThat(work.resolve("report.md")).doesNotExist();
+
+        assertThat(dirs.delete(root, "out")).isTrue();
+        assertThat(work.resolve("out")).doesNotExist();
+
+        assertThat(dirs.delete(root, "")).isFalse();
+        assertThat(dirs.delete(root, ".")).isFalse();
+        assertThat(dirs.delete(root, "..")).isFalse();
+        assertThat(dirs.delete(root, "../outside/secret.txt")).isFalse();
+        assertThat(dirs.delete(root, "gone.txt")).isFalse();
+        assertThat(dirs.delete(outside.toString(), "secret.txt")).isFalse();
+        assertThat(work).exists();
+        assertThat(outside.resolve("secret.txt")).exists();
+    }
+
+    @Test
+    void deletingALinkRemovesTheLink_notWhatItPointsTo() throws Exception {
+        Files.createSymbolicLink(work.resolve("escape-dir"), outside);
+        Files.createDirectories(work.resolve("keep"));
+        Files.createSymbolicLink(work.resolve("keep/outside-link"), outside);
+        Files.createSymbolicLink(work.resolve("inside.md"), work.resolve("report.md"));
+
+        assertThat(dirs.delete(root, "escape-dir/secret.txt")).as("nothing through a link out").isFalse();
+        assertThat(dirs.delete(root, "escape-dir")).isTrue();
+        assertThat(dirs.delete(root, "keep")).isTrue();
+        assertThat(dirs.delete(root, "inside.md")).isTrue();
+
+        assertThat(work.resolve("escape-dir")).doesNotExist();
+        assertThat(work.resolve("keep")).doesNotExist();
+        assertThat(outside.resolve("secret.txt")).hasContent("not yours");
+        assertThat(work.resolve("report.md")).exists();
+        assertThat(dirs.delete(root, "escape-dir/secret.txt")).as("gone with its parent").isFalse();
+    }
+
+    @Test
+    void a_workspace_elsewhere_previews_saves_and_deletes_but_keeps_its_internals() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home"));
+        Files.writeString(remote.resolve(".home/.bashrc"), "internal");
+        Files.createDirectories(remote.resolve("deck"));
+        Files.writeString(remote.resolve("deck/notes.md"), "draft");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionDirectories dirs = new SessionDirectories(List.of(), java.util.Map.of("/workspace", workspace));
+
+        assertThat(dirs.preview("/workspace", "deck/notes.md").orElseThrow().text()).isEqualTo("draft");
+        assertThat(dirs.write("/workspace", "deck/notes.md", "final")).isPresent();
+        assertThat(remote.resolve("deck/notes.md")).hasContent("final");
+
+        assertThat(dirs.preview("/workspace", ".home/.bashrc")).isEmpty();
+        assertThat(dirs.write("/workspace", ".home/.bashrc", "x")).isEmpty();
+        assertThat(dirs.delete("/workspace", ".home")).isFalse();
+        assertThat(dirs.delete("/workspace", "")).isFalse();
+        assertThat(remote.resolve(".home/.bashrc")).hasContent("internal");
+
+        assertThat(dirs.delete("/workspace", "deck")).isTrue();
+        assertThat(remote.resolve("deck")).doesNotExist();
+    }
+
     /** The zip's entries in order, each with its content as text. */
     private static java.util.Map<String, String> unzip(SessionDirectories.Archive archive) throws Exception {
         var bytes = new java.io.ByteArrayOutputStream();
