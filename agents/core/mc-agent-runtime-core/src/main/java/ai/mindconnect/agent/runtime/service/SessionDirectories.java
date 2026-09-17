@@ -6,6 +6,7 @@ import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.LinkOption;
@@ -19,6 +20,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Optional;
 import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * What a user may look at of a session's directories: the working directory,
@@ -34,6 +37,11 @@ public class SessionDirectories {
 
     /** A listing stops here; a directory with more entries says it was cut. */
     public static final int MAX_ENTRIES = 1000;
+
+    /** A folder with more files than this is not packed as a zip. */
+    public static final int MAX_ARCHIVE_FILES = 10_000;
+    /** A folder whose files add up to more than this is not packed as a zip. */
+    public static final long MAX_ARCHIVE_BYTES = 1L << 30;
 
     private final List<Path> roots;
     /** Roots that live elsewhere — a virtual environment's workspace — by the name they are shown under. */
@@ -129,6 +137,172 @@ public class SessionDirectories {
         if (file.isEmpty()) return Optional.empty();
         return Optional.of(new Content(file.get().getFileName().toString(), Files.size(file.get()),
                 Files.newInputStream(file.get())));
+    }
+
+    /** Opens one member's bytes when the archive is written. */
+    @FunctionalInterface
+    public interface Source {
+        InputStream open() throws IOException;
+    }
+
+    /** One entry of an archive: {@code path} inside the zip, with forward slashes; a folder has no source and ends in {@code /}. */
+    public record Member(String path, long size, Source source) {
+        public boolean directory() {
+            return source == null;
+        }
+    }
+
+    /**
+     * A folder packed as a zip, planned but not yet written: its file name, what goes in
+     * and how much. {@code tooLarge} says the folder passed {@link #MAX_ARCHIVE_FILES} or
+     * {@link #MAX_ARCHIVE_BYTES}; the members then stop there and it should not be handed out.
+     */
+    public record Archive(String name, List<Member> members, int files, long bytes, boolean tooLarge) {
+
+        /** Writes the zip; the stream is finished, not closed. */
+        public void writeTo(OutputStream out) throws IOException {
+            ZipOutputStream zip = new ZipOutputStream(out);
+            for (Member member : members) {
+                zip.putNextEntry(new ZipEntry(member.path()));
+                if (!member.directory()) {
+                    try (InputStream in = member.source().open()) {
+                        in.transferTo(zip);
+                    }
+                }
+                zip.closeEntry();
+            }
+            zip.finish();
+            zip.flush();
+        }
+    }
+
+    /** {@link #archive(String, String, String)} named after the folder itself. */
+    public Optional<Archive> archive(String root, String path) {
+        return archive(root, path, null);
+    }
+
+    /**
+     * The folder at {@code path} under {@code root} (empty for the root itself) as a zip,
+     * with everything inside one top-level folder. Only what the folder's listing would
+     * show goes in: a link out of the root is left out, and a linked folder is not
+     * descended into, so a link cannot loop. Empty when the folder is not one of the
+     * session's or leaves it.
+     *
+     * @param name what the zip and its top-level folder are called; the folder's own name when null
+     */
+    public Optional<Archive> archive(String root, String path, String name) {
+        WorkspaceFiles remote = root == null ? null : workspaces.get(root);
+        if (remote != null) {
+            Optional<Path> dir = workspacePath(remote, path);
+            if (dir.isEmpty() || !remote.isDirectory(dir.get())) return Optional.empty();
+            boolean atRoot = dir.get().equals(remote.roots().base());
+            var packer = new Packer(archiveName(name, root, atRoot ? Path.of(root) : dir.get()));
+            try {
+                packRemote(remote, dir.get(), packer.top, atRoot, packer);
+            } catch (IOException e) {
+                return Optional.empty();
+            }
+            return Optional.of(packer.archive());
+        }
+        return resolve(root, path).filter(Files::isDirectory).flatMap(dir -> {
+            Path realRoot;
+            try {
+                realRoot = rootOf(root).orElseThrow().toRealPath();
+            } catch (IOException e) {
+                return Optional.empty();
+            }
+            var packer = new Packer(archiveName(name, root, dir.equals(realRoot) ? Path.of(root) : dir));
+            try {
+                packLocal(realRoot, dir, packer.top, packer);
+            } catch (IOException e) {
+                return Optional.empty();
+            }
+            return Optional.of(packer.archive());
+        });
+    }
+
+    private static void packLocal(Path realRoot, Path dir, String prefix, Packer packer) throws IOException {
+        packer.folder(prefix);
+        List<Path> children;
+        try (Stream<Path> listed = Files.list(dir)) {
+            children = listed.sorted().toList();
+        }
+        for (Path child : children) {
+            if (packer.tooLarge) return;
+            Path real;
+            try {
+                real = child.toRealPath();
+            } catch (IOException e) {
+                continue;   // a dangling link, or one we may not read
+            }
+            if (!real.startsWith(realRoot)) continue;
+            String name = prefix + child.getFileName();
+            if (Files.isDirectory(real)) {
+                if (!Files.isSymbolicLink(child)) packLocal(realRoot, real, name + "/", packer);
+            } else if (Files.isRegularFile(real)) {
+                packer.file(name, Files.size(real), () -> Files.newInputStream(real));
+            }
+        }
+    }
+
+    private static void packRemote(WorkspaceFiles remote, Path dir, String prefix, boolean atRoot, Packer packer)
+            throws IOException {
+        packer.folder(prefix);
+        List<WorkspaceEntry> children = remote.list(dir).stream()
+                .sorted(Comparator.comparing(WorkspaceEntry::name)).toList();
+        for (WorkspaceEntry child : children) {
+            if (packer.tooLarge) return;
+            if (atRoot && WORKSPACE_INTERNALS.contains(child.name())) continue;
+            String name = prefix + child.name();
+            if (child.directory()) {
+                packRemote(remote, child.path(), name + "/", false, packer);
+            } else if (child.regularFile()) {
+                Path file = child.path();
+                packer.file(name, child.size(), () -> new ByteArrayInputStream(remote.readAllBytes(file)));
+            }
+        }
+    }
+
+    /** A name fit for a file: the one given, else the folder's own. */
+    private static String archiveName(String name, String root, Path dir) {
+        String folder = name;
+        if (folder == null || folder.isBlank()) {
+            Path last = dir.getFileName();
+            folder = last == null ? root : last.toString();
+        }
+        String safe = folder.replaceAll("[\\\\/:*?\"<>|]", "_").strip();
+        return safe.isEmpty() || safe.equals(".") || safe.equals("..") ? "files" : safe;
+    }
+
+    /** Collects an archive's members until a limit is reached. */
+    private static class Packer {
+        final String top;
+        final List<Member> members = new ArrayList<>();
+        int files;
+        long bytes;
+        boolean tooLarge;
+
+        Packer(String name) {
+            this.top = name + "/";
+        }
+
+        void folder(String path) {
+            if (!tooLarge) members.add(new Member(path, 0, null));
+        }
+
+        void file(String path, long size, Source source) {
+            if (files + 1 > MAX_ARCHIVE_FILES || bytes + size > MAX_ARCHIVE_BYTES) {
+                tooLarge = true;
+                return;
+            }
+            files++;
+            bytes += size;
+            members.add(new Member(path, size, source));
+        }
+
+        Archive archive() {
+            return new Archive(top.substring(0, top.length() - 1) + ".zip", List.copyOf(members), files, bytes, tooLarge);
+        }
     }
 
     private Optional<Listing> listWorkspace(String root, String path) {

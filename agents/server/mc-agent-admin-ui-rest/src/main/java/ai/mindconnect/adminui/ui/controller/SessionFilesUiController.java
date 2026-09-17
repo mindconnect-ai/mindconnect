@@ -10,6 +10,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.service.SessionDirectories;
 import ai.mindconnect.agentrest.auth.CurrentUsers;
+import ai.mindconnect.chatui.ui.component.DirectoryPickerComponent;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import org.springframework.beans.factory.ObjectProvider;
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,6 +26,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -134,6 +138,40 @@ public class SessionFilesUiController {
             headers.setContentDisposition(ContentDisposition.inline().filename(name).build());
         }
         return ResponseEntity.ok().headers(headers).body(new InputStreamResource(file.get().stream()));
+    }
+
+    /**
+     * A folder and everything below it as a zip download, written straight to the
+     * response on the request's own thread. A folder past the archive limits is refused
+     * before anything is written.
+     */
+    @GetMapping("/zip")
+    public void zip(@PathVariable("sessionId") String sessionIdValue,
+                    @RequestParam("root") String root,
+                    @RequestParam(value = "path", defaultValue = "") String path,
+                    HttpServletResponse response) throws IOException {
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        Optional<SessionDirectories> directories = directoriesOfOwned(sessionId);
+        // A directory is named the way the dialog shows it: the chat's own is not its session id.
+        String name = path.isBlank() ? DirectoryPickerComponent.label(root, sessionId) : null;
+        Optional<SessionDirectories.Archive> archive = directories.isEmpty() ? Optional.empty()
+                : directories.get().archive(root, path, name);
+        if (archive.isEmpty()) {
+            response.sendError(HttpStatus.NOT_FOUND.value());
+            return;
+        }
+        if (archive.get().tooLarge()) {
+            response.sendError(HttpStatus.PAYLOAD_TOO_LARGE.value(), "The folder is too large to download as a zip "
+                    + "(at most " + SessionDirectories.MAX_ARCHIVE_FILES + " files and "
+                    + SessionFilesPage.humanSize(SessionDirectories.MAX_ARCHIVE_BYTES) + ").");
+            return;
+        }
+        response.setContentType("application/zip");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        response.setHeader(HttpHeaders.CONTENT_DISPOSITION,
+                ContentDisposition.attachment().filename(archive.get().name()).build().toString());
+        archive.get().writeTo(response.getOutputStream());
+        response.flushBuffer();
     }
 
     /** The session's directories, when the session exists and is the caller's. */
