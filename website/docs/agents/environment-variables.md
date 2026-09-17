@@ -99,6 +99,7 @@ as an env var in `SCREAMING_SNAKE` form (e.g. `MINDCONNECT_DATA_BASE_DIR`).
 | `mindconnect.file-store.*` | — | File-store backend: `backend`. The `filesystem` backend keeps uploads in `<data.base-dir>/<namespace>/files`. |
 | `mindconnect.cors.allowed-origins` | `*` | Origins that may call the REST endpoints from a browser (`/api`, `/chat/api`, `/v1`), comma-separated. `*` lets every origin call without credentials; a list of origins may also send the session cookie. Both server apps. |
 | `mindconnect.agent.trace.max-per-session` | `50` | LLM call-trace retention per session. |
+| `mindconnect.branding.*` | — | What the Admin UI calls itself: `title`, `document-title`, `logo`, `logo-href`, `favicon`, `theme`, `stylesheets`, `assets-dir` — see [Branding](./admin-ui/index.md#branding-the-app). `MC_BRANDING_TITLE`, `MC_BRANDING_LOGO` and `MC_BRANDING_ASSETS_DIR` in the Admin UI's yaml. |
 
 ## Running on a server
 

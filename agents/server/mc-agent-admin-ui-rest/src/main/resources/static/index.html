@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-default-theme="amethyst">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent Admin</title>
+    <title>Mindconnect Agent Runtime</title>
     <link rel="stylesheet" href="/sui/sui.css">
     <link rel="stylesheet" href="/css/app.css">
     <!-- Themes. Each is an overlay scoped to its own class on <html>, so an
@@ -40,7 +40,11 @@
             if (!active) {
                 try { active = localStorage.getItem("sui-theme"); } catch (e) { active = null; }
             }
-            if (active === null) active = "amethyst";     // the default look
+            // The installation's default look: mindconnect.branding.theme is
+            // written into data-default-theme when the shell is served (see
+            // BrandingShellController), so a branded install opens in its own
+            // theme while the picker still wins per browser.
+            if (active === null) active = document.documentElement.dataset.defaultTheme || "amethyst";
             if (/^[a-z][a-z0-9-]*$/.test(active) && active !== "default") {
                 document.documentElement.classList.add("sui-theme-" + active);
             }

@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui;
 
+import ai.mindconnect.adminui.branding.BrandingProperties;
 import ai.mindconnect.adminui.service.TaskMonitor;
 import ai.mindconnect.adminui.service.UserStream;
 import ai.mindconnect.adminui.ui.component.TaskMonitorComponent;
@@ -51,6 +52,8 @@ public class AdminLayoutFactory {
     private final ObjectProvider<NamespaceService> namespaceService;
     /** Where the request works — bound by the scope filter; the switcher marks it as active. */
     private final ObjectProvider<ScopeSupplier> scope;
+    /** What this installation calls itself; never null — unset properties are the shipped defaults. */
+    private final AdminLayout.Brand brand;
 
     @Autowired
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
@@ -59,7 +62,9 @@ public class AdminLayoutFactory {
                               ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
                               ObjectProvider<RegistryService> registryService,
                               ObjectProvider<NamespaceService> namespaceService,
-                              ObjectProvider<ScopeSupplier> scope) {
+                              ObjectProvider<ScopeSupplier> scope,
+                              BrandingProperties branding) {
+        this.brand = new AdminLayout.Brand(branding.getTitle(), branding.getLogo(), branding.getLogoHref());
         this.authEnabled = authEnabled;
         this.buildInfo = buildInfo;
         this.taskMonitor = taskMonitor.orElse(null);
@@ -69,13 +74,14 @@ public class AdminLayoutFactory {
         this.scope = scope;
     }
 
-    /** A host without namespaces: no switcher in the header. */
+    /** A host without namespaces and without branding: no switcher, the shipped name in the header. */
     public AdminLayoutFactory(boolean authEnabled,
                               BuildInfo buildInfo,
                               Optional<TaskMonitor> taskMonitor,
                               ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
                               ObjectProvider<RegistryService> registryService) {
-        this(authEnabled, buildInfo, taskMonitor, mcpRegistryAdmin, registryService, none(), none());
+        this(authEnabled, buildInfo, taskMonitor, mcpRegistryAdmin, registryService, none(), none(),
+                new BrandingProperties());
     }
 
     /**
@@ -90,6 +96,7 @@ public class AdminLayoutFactory {
                         "Live updates", "/admin/agents"),
                 mcpRegistryAdmin.getIfAvailable() != null,
                 registryService.getIfAvailable() != null);
+        layout.brand(brand);
         namespaceSwitch().ifPresent(layout::namespaces);
         return layout;
     }

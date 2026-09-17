@@ -70,6 +70,34 @@ mindconnect:
     # somebody opened a screen. Registering by hand works without it.
     catalog:
       enabled: ${MC_MCP_CATALOG_ENABLED:false}
+  # How this installation names and dresses itself. Every value is optional;
+  # unset, the app looks exactly as it ships. Asset URLs are used verbatim, so
+  # a path into the app's own static resources (/img/logo.svg), one into
+  # assets-dir below (/branding/logo.svg) and an absolute URL all work.
+  branding:
+    # The heading in the header, the login page's title, and the browser tab
+    # unless document-title says otherwise.
+    title: ${MC_BRANDING_TITLE:Mindconnect Agent Runtime}
+    # document-title: ACME Assistants
+    # The mark beside the heading. Empty means none — a header with the
+    # wordmark alone.
+    logo: ${MC_BRANDING_LOGO:/img/logo.svg}
+    # Where a click on the brand leads.
+    # logo-href: /admin/agents
+    # The browser tab's icon; unset it follows the logo.
+    # favicon: /branding/favicon.png
+    # The look the shell opens in: amethyst (default), clody, gipiti, sorbet,
+    # compact, dark, or "default" for the framework's bare one. The theme
+    # picker in the header still overrides it per browser.
+    # theme: amethyst
+    # Stylesheets linked after every shipped one, so their rules win. Either
+    # bundled with the app, dropped into assets-dir, or on a server elsewhere.
+    # stylesheets:
+    #   - /branding/acme.css
+    #   - https://cdn.example.com/acme.css
+    # A directory on disk served at /branding/** — brand a deployed app by
+    # dropping files next to it, no rebuild.
+    assets-dir: ${MC_BRANDING_ASSETS_DIR:}
   encryption:
     # Required — encrypts stored LLM credentials. No default on purpose.
     # Set MINDCONNECT_ENCRYPTION_SECRET_KEY to a strong, private 32-char value.

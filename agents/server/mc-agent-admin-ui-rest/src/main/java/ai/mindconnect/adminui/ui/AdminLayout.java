@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui;
 
+import ai.mindconnect.adminui.branding.BrandingProperties;
 import ai.mindconnect.ui.model.UiAppShell;
 import ai.mindconnect.ui.model.UiHeader;
 import ai.mindconnect.ui.model.UiLink;
@@ -38,6 +39,20 @@ public final class AdminLayout {
     private final boolean registry;
     /** The namespaces the user may work in and the one they are in; null when the host has no namespaces. */
     private NamespaceSwitch namespaces;
+    /** What the header calls this installation; the shipped one until {@link #brand} says otherwise. */
+    private Brand brand = Brand.DEFAULT;
+
+    /**
+     * The installation's name and mark in the header: the heading, the logo
+     * beside it (null for none) and where a click on either leads. Comes from
+     * {@code mindconnect.branding} — see
+     * {@link ai.mindconnect.adminui.branding.BrandingProperties}.
+     */
+    public record Brand(String title, String logo, String href) {
+        /** What the header showed before any of this was configurable. */
+        public static final Brand DEFAULT = new Brand(BrandingProperties.DEFAULT_TITLE,
+                BrandingProperties.DEFAULT_LOGO, BrandingProperties.DEFAULT_LOGO_HREF);
+    }
 
     /**
      * What the header's namespace switcher shows: the active namespace and
@@ -100,6 +115,12 @@ public final class AdminLayout {
         this.registry = registry;
     }
 
+    /** Names the installation in the header — heading, logo and where the brand leads. */
+    public AdminLayout brand(Brand brand) {
+        this.brand = brand == null ? Brand.DEFAULT : brand;
+        return this;
+    }
+
     /** Adds the namespace switcher to the header; without it the shell shows no namespace at all. */
     public AdminLayout namespaces(NamespaceSwitch namespaces) {
         this.namespaces = namespaces;
@@ -139,9 +160,12 @@ public final class AdminLayout {
     }
 
     private UiHeader buildHeader() {
-        var header = UiHeader.of("Mindconnect Agent Runtime")
-                .brandHref("/admin/agents")
-                .brandLogo("/img/logo.svg");
+        var header = UiHeader.of(brand.title()).brandHref(brand.href());
+        // No logo is a valid answer: an installation whose mark is the word
+        // itself wants the heading alone, not the shipped one as a fallback.
+        if (brand.logo() != null) {
+            header.brandLogo(brand.logo());
+        }
 
         // Logout leaves the SPA (Spring Security + Keycloak RP-initiated
         // logout), so it's a plain link, not a semantic-ui action. Shown only
