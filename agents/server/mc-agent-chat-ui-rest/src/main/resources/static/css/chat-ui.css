@@ -985,8 +985,10 @@
 /* ── Dictation ────────────────────────────────────────────────────────────
    While the microphone is open the composer's mic button says so in colour —
    an icon-only button has no label to change — and the textarea's placeholder
-   counts the seconds. Both end when the transcript patches the field back. */
-.chat-record-btn.is-recording,
+   counts the seconds. Both end when the transcript patches the field back.
+   The mic is matched by its action id: the framework renders an action's
+   cssClass nowhere, so the chat-record-btn class never reaches the button. */
+.chat-form .sui-icon-btn[data-action="record"].is-recording,
 .sui-btn.is-recording {
     color: var(--sui-color-danger, #d33);
     border-color: var(--sui-color-danger, #d33);
@@ -999,7 +1001,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .chat-record-btn.is-recording,
+    .chat-form .sui-icon-btn[data-action="record"].is-recording,
     .sui-btn.is-recording { animation: none; }
 }
 

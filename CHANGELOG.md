@@ -293,6 +293,10 @@ fresh empty one, so nothing has to be moved by hand at release time.
   for an image or a PDF, `file_read` and `file_list` for a copy on disk — for as
   long as the file is attached, whether or not the definition lists them. Nothing
   else is granted this way, and what the installation disabled stays disabled.
+- **agents:** **the chat's microphone button turns red while it records.** The style
+  aimed at a class the framework never renders on an icon button, so the button kept
+  its idle colour and only the placeholder showed the recording, hidden as soon as
+  the field had text. The rule now matches the composer's mic by its action.
 
 ### Changed
 
