@@ -43,19 +43,96 @@ body {
     flex: 1 1 auto;
 }
 
-/* Content is anchored to the sidebar, not centred in the leftover space —
-   a centred card reads as a floating island on a wide monitor, while the
-   right-hand whitespace reads as intentional breathing room. Two caps:
-   tables and lists may run wide, forms and detail cards stay at a
-   readable line length. (No auto margin here: the content area is a flex
-   column now, and an auto cross-axis margin eats the stretch — every card
-   collapsed to the width of its own content.) */
-.sui-shell-content > * {
-    max-width: 1400px;
+/* ── Page column ────────────────────────────────────────────────────────── */
+
+/* Content sits in one centred column next to the sidebar, the way GitHub
+   lays out its repository pages. It used to be anchored to the sidebar with
+   a 1400px cap, which on a wide monitor left a strip of bare ground on the
+   right that read as a layout bug rather than as breathing room.
+
+   The column is made with a start margin instead of `margin-inline: auto`:
+   the content pane is a flex column, and an auto cross-axis margin eats the
+   stretch (every card collapsed to the width of its own content). A
+   percentage margin resolves against the pane's width, so every direct child
+   starts at the same left edge — a 900px form lines up with a 1280px list
+   instead of being centred on its own.
+
+   The chat and the API explorer fill the pane edge to edge and stay out. */
+#admin-layout-content:not(:has(> #chat-app-shell, > .app-fill-frame)) {
+    padding: 24px 32px 32px;
 }
-.sui-shell-content .sui-form:not(.chat-form),
-.sui-shell-content .sui-detail {
+#admin-layout-content > :not(#chat-app-shell, .app-fill-frame) {
+    max-width: 1280px;
+    margin-inline-start: max(0px, (100% - 1280px) / 2);
+}
+#admin-layout-content .sui-form:not(.chat-form),
+#admin-layout-content .sui-detail {
     max-width: 900px;
+}
+@media (max-width: 768px) {
+    #admin-layout-content:not(:has(> #chat-app-shell, > .app-fill-frame)) {
+        padding: 16px;
+    }
+}
+
+/* Containers are outlined, not filled: only the header carries the surface
+   colour, the rows sit on the page ground. A filled body turned every page
+   into one large slab; an outline with a filled title bar is lighter and is
+   what GitHub does. This deliberately outranks the themes (an id against
+   their class chains) — the flat container is the app's layout, the themes
+   still decide the colours it is drawn in.
+
+   Only the outermost container is framed: a list nested in a list (the
+   agent groups) or sitting in a tab panel stays frameless, and the chat
+   draws its lists itself. */
+#admin-layout-content :is(.sui-list:not(.chat-container), .sui-table, .sui-tree, .sui-detail):not(.sui-panels *, #chat-app-shell *, :is(.sui-list, .sui-table, .sui-tree, .sui-detail) *) {
+    background: transparent;
+    border: 1px solid var(--sui-color-border);
+    border-radius: var(--sui-radius-sm);
+    box-shadow: none;
+}
+#admin-layout-content :is(.sui-list:not(.chat-container), .sui-table):not(.sui-panels *, #chat-app-shell *, :is(.sui-list, .sui-table, .sui-tree, .sui-detail) *) > :is(.sui-list-header, .sui-table-header) {
+    background: var(--sui-color-surface);
+    border-bottom: 1px solid var(--sui-color-border);
+    /* The container has no overflow clip — a row's action menu has to be
+       able to open past its edge — so the fill rounds its own top corners. */
+    border-radius: calc(var(--sui-radius-sm) - 1px) calc(var(--sui-radius-sm) - 1px) 0 0;
+}
+/* The nested ones say so outright, or a theme's hairline frames them anyway. */
+#admin-layout-content :is(.sui-list, .sui-table, .sui-tree, .sui-detail) :is(.sui-list:not(.chat-container), .sui-table, .sui-tree, .sui-detail) {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Tables are the exception: a grid of columns without an edge frays out
+   into the panel around it, so a table keeps its outline wherever it sits —
+   in a list row (the tool catalog) or in a tab panel (vector stores). The
+   framework's own `overflow: hidden` clips the header row to the corner. */
+#admin-layout-content .sui-table:not(#chat-app-shell *) {
+    border: 1px solid var(--sui-color-border);
+    border-radius: var(--sui-radius-sm);
+}
+
+/* Tabbed sections, same idea: the framework draws the panel as a filled card
+   the active tab opens into. The panel keeps its outline and loses the fill,
+   and the active tab takes the page ground so it still opens seamlessly. */
+#admin-layout-content .sui-tabs + .sui-panels > .sui-panel:not(#chat-app-shell *) {
+    background: transparent;
+}
+#admin-layout-content .sui-tab.active:not(#chat-app-shell *) {
+    background: var(--sui-color-bg);
+    border-bottom-color: var(--sui-color-bg);
+}
+
+/* A hairline between sidebar and content, while the menu sits beside it.
+   As a drawer (overlay, or responsive below 768px) it has a ground of its
+   own and needs no edge. */
+@media (min-width: 769px) {
+    #admin-layout > .sui-shell-body > .sui-menu:not(.sui-menu--overlay) {
+        border-right: 1px solid var(--sui-color-border-soft);
+    }
 }
 
 
