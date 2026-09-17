@@ -5,6 +5,7 @@ import ai.mindconnect.adminui.ui.page.NamespacesPage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.agent.starter.namespace.NamespaceSelection;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.chatui.ui.controller.FormBody;
@@ -36,7 +37,7 @@ import java.util.Map;
 
 /**
  * The namespaces screen and the header switcher's endpoints: switch, create,
- * invite (by user name), remove. Everything acts as the signed-in user — what they may
+ * invite (by e-mail address, in a role), promote, demote, remove. Everything acts as the signed-in user — what they may
  * switch to, invite into or change is the {@link NamespaceService}'s answer,
  * not a permission of the screen.
  *
@@ -120,15 +121,15 @@ public class NamespaceUiController {
                 .patch(UiPatch.Operation.remove(ENVIRONMENT_DIALOG_ID));
     }
 
-    /** Opens the "Add variable" dialog for {@code id}; only its creator sets variables, anyone else is told so. */
+    /** Opens the "Add variable" dialog for {@code id}; its admins set variables, anyone else is told so. */
     @GetMapping("/{id}/environment/new")
     public UiPatch newVariable(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id) {
         UserId me = userId(user);
         Namespace namespace = new Namespace(id);
         return namespaces.find(namespace)
-                .filter(ns -> ns.isCreator(me))
+                .filter(ns -> ns.isAdmin(namespaces.actor(me)))
                 .map(ns -> dialog(ENVIRONMENT_DIALOG_ID, "Add variable to " + ns.label(), environmentForm(id, null)))
-                .orElseGet(() -> UiPatch.of().toast(UiToast.error("Only the creator of '" + id + "' sets its variables.")
+                .orElseGet(() -> UiPatch.of().toast(UiToast.error("Only an admin of '" + id + "' sets its variables.")
                         .title("Not yours to configure")));
     }
 
@@ -184,25 +185,56 @@ public class NamespaceUiController {
     public UiPage invite(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
                          @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
-        String invitee;
+        FormBody body = new FormBody(raw);
+        ai.mindconnect.agent.Email invitee;
+        NamespaceRole role;
         try {
-            invitee = members.invite(new Namespace(id), me, new FormBody(raw).str("user")).label();
+            role = NamespaceRole.of(body.str("role"));
+            invitee = members.invite(new Namespace(id), me, body.str("email"), role);
         } catch (IllegalArgumentException e) {
             return page(me).toast(UiToast.error(e.getMessage()).title("Not invited"));
         }
-        return page(me).toast(UiToast.success(invitee + " may now work in '" + id + "'.").title("Invited"));
+        String may = role == NamespaceRole.ADMIN ? "may now shape" : "may now work in";
+        return page(me).toast(UiToast.success(invitee + " " + may + " '" + id + "'.").title("Invited"));
     }
 
-    @DeleteMapping("/{id}/members/{user}")
+    @DeleteMapping("/{id}/members/{member}")
     public UiPage remove(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
-                         @PathVariable("user") String member) {
+                         @PathVariable("member") String member) {
         UserId me = userId(user);
         try {
-            members.remove(new Namespace(id), me, UserId.of(member));
+            members.remove(new Namespace(id), me, member);
         } catch (IllegalArgumentException e) {
             return page(me).toast(UiToast.error(e.getMessage()).title("Not removed"));
         }
-        return page(me).toast(UiToast.success(member + " is no longer a member of '" + id + "'.").title("Removed"));
+        return page(me).toast(UiToast.success(member + " is no longer in '" + id + "'.").title("Removed"));
+    }
+
+    /** Makes {@code member} an admin of {@code id} — they shape it from now on, except deleting it. */
+    @PostMapping("/{id}/members/{member}/promote")
+    public UiPage promote(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
+                          @PathVariable("member") String member) {
+        UserId me = userId(user);
+        try {
+            members.promote(new Namespace(id), me, member);
+        } catch (IllegalArgumentException e) {
+            return page(me).toast(UiToast.error(e.getMessage()).title("Not promoted"));
+        }
+        return page(me).toast(UiToast.success(member + " shapes '" + id + "' now.").title("Admin"));
+    }
+
+    /** Makes {@code member} a user of {@code id} again; the creator stays an admin. */
+    @PostMapping("/{id}/members/{member}/demote")
+    public UiPage demote(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
+                         @PathVariable("member") String member) {
+        UserId me = userId(user);
+        try {
+            members.demote(new Namespace(id), me, member);
+        } catch (IllegalArgumentException e) {
+            return page(me).toast(UiToast.error(e.getMessage()).title("Not demoted"));
+        }
+        return page(me).toast(UiToast.success(member + " uses '" + id + "' now — chat and running workflows.")
+                .title("User"));
     }
 
     /** The caller leaves {@code id}; leaving the current namespace lands in the default one. */
@@ -250,9 +282,10 @@ public class NamespaceUiController {
     }
 
     private UiPage page(UserId me) {
-        return new NamespacesPage(me, scope.namespace(), namespaces.defaultNamespace(),
+        return new NamespacesPage(namespaces.actor(me), scope.namespace(), namespaces.defaultNamespace(),
                 namespaces.forUser(me), users.findAll()).render();
     }
+
 
     private static UserId userId(OidcUser user) {
         return UserId.of(SessionOwnership.userIdOf(user));

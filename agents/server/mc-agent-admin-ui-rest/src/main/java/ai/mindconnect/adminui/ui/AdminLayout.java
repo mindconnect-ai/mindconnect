@@ -37,6 +37,14 @@ public final class AdminLayout {
     private final boolean mcpGateway;
     /** Whether this host can browse registries — same idea as {@link #mcpGateway}. */
     private final boolean registry;
+
+    /**
+     * Whether the navigation is the chat and nothing else: what somebody sees
+     * who is a user of the namespace they are in rather than one of its admins
+     * (see {@code NamespaceRole}). Set per render, because it follows the
+     * namespace they are working in right now, not the account.
+     */
+    private boolean chatOnly;
     /** The namespaces the user may work in and the one they are in; null when the host has no namespaces. */
     private NamespaceSwitch namespaces;
     /** What the header calls this installation; the shipped one until {@link #brand} says otherwise. */
@@ -217,10 +225,24 @@ public final class AdminLayout {
         return header;
     }
 
+    /** Renders the chat alone — for a user of this namespace, who shapes nothing in it. */
+    public AdminLayout chatOnly(boolean chatOnly) {
+        this.chatOnly = chatOnly;
+        return this;
+    }
+
     private UiMenu buildMenu(String navigate) {
         UiMenu menu = UiMenu.of("app-menu", null);
         menu.mode(UiMenu.Mode.RESPONSIVE);
         menu.item(navItem("nav-chat", "Chat", "/chat", "chat", navigate));
+        if (chatOnly) {
+            // A user of this namespace, not one of its admins: the chat is what
+            // they came for, and an entry they may not open is worse than none.
+            // The server refuses those routes as well — this is the friendly
+            // half of that, not the guard (see NamespaceAccessInterceptor).
+            version(menu);
+            return menu;
+        }
         menu.item(navItem("nav-agents", "Agents", "/admin/agents", "bot", navigate));
         menu.item(navItem("nav-tools", "Tools", "/admin/tools", "tools", navigate));
         menu.item(navItem("nav-skills", "Skills", "/admin/skills", "graduation-cap", navigate));
@@ -232,15 +254,22 @@ public final class AdminLayout {
         menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
         menu.item(installGroup(navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));
-        // The build's version as the last entry, pushed to the bottom by the
-        // stylesheet: small and muted, an info icon in the collapsed rail. A
-        // click opens the About dialog with build time, commit, branch and
-        // the changelog section of this build.
+        version(menu);
+        return menu;
+    }
+
+    /**
+     * The build's version as the last entry, pushed to the bottom by the
+     * stylesheet: small and muted, an info icon in the collapsed rail. A click
+     * opens the About dialog with build time, commit, branch and the changelog
+     * section of this build. Everybody sees it — which build is running is not
+     * an administrator's secret.
+     */
+    private void version(UiMenu menu) {
         if (versionLabel != null) {
             menu.item(UiMenuItem.of("nav-version", versionLabel).icon("info")
                     .onClick(UiTrigger.api("GET", "/admin/api/about")));
         }
-        return menu;
     }
 
     /**

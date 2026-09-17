@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Objects;
@@ -87,6 +88,11 @@ public class UserService {
 
     public Optional<User> find(UserId id) {
         return users.findById(id);
+    }
+
+    /** Every user this installation has seen — for a screen that lists them, and for finding one by address. */
+    public List<User> all() {
+        return users.findAll();
     }
 
     /**

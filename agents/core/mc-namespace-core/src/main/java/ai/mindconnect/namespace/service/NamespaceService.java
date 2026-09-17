@@ -1,18 +1,22 @@
 package ai.mindconnect.namespace.service;
 
+import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
+import ai.mindconnect.namespace.port.out.UserEmails;
 
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -20,21 +24,27 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * What the installation does with namespaces: creates them, invites users
- * into them, and answers which namespaces a user may work in.
+ * What the installation does with namespaces: creates them, invites people
+ * into them in a role, and answers who may work where and as what.
  *
  * <p>The <em>default</em> namespace ({@code local} unless configured) is
- * special in one way: it is open to every signed-in user, so an
- * installation that never creates another namespace behaves exactly as it
- * did before namespaces existed. It gets a record on first use, owned by
- * nobody.
+ * special in one way: it is open to every signed-in user, who is an admin
+ * there, so an installation that never creates another namespace behaves
+ * exactly as it did before namespaces existed. It gets a record on first use,
+ * owned by nobody.
  *
  * <p>A namespace id is what the stores partition by — a directory name, a
  * column value, part of a URL — so it is kept simple: lower-case letters,
  * digits, {@code -} and {@code _}, at most 64 characters, and not a name the
  * installation uses for itself ({@code system} is where users, tokens and the
- * namespaces live). Only the creator invites, removes members, renames and
- * deletes; any member may leave.
+ * namespaces live).
+ *
+ * <p>Who may do what follows {@link NamespaceRole}: admins invite, promote,
+ * rename, set the variables and shape what the namespace holds; users work in
+ * it. Deleting stays with the creator alone. Everything here takes a
+ * {@link UserId}, because that is what a request carries, and turns it into an
+ * {@link Actor} with the e-mail from {@link UserEmails} — the namespaces
+ * themselves list people by {@link Email}.
  *
  * <p>Deleting a namespace runs every {@link NamespacePurge} the service was
  * given — the stores remove what they hold for it — then drops the record and
@@ -52,6 +62,9 @@ public class NamespaceService {
     private final Namespace defaultNamespace;
     private final Clock clock;
     private final List<NamespacePurge> purges;
+    private final UserEmails emails;
+    private final String emailDomain;
+    private final List<Email> defaultAdmins;
     private final java.util.concurrent.ConcurrentHashMap<Namespace, Object> locks = new java.util.concurrent.ConcurrentHashMap<>();
 
     public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace) {
@@ -65,10 +78,57 @@ public class NamespaceService {
     /** @param purges what each store does with a deleted namespace's data; may be empty */
     public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace, Clock clock,
                             List<NamespacePurge> purges) {
+        this(namespaces, defaultNamespace, clock, purges, UserEmails.none(), DEFAULT_EMAIL_DOMAIN);
+    }
+
+    public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace, Clock clock,
+                            List<NamespacePurge> purges, UserEmails emails, String emailDomain) {
+        this(namespaces, defaultNamespace, clock, purges, emails, emailDomain, List.of());
+    }
+
+    /**
+     * @param emails      how a user id becomes the address namespaces list people under
+     * @param emailDomain what a bare name becomes an address with — the domain of the
+     *                    installation, used for an account whose provider gives no
+     *                    address at all and for an invitation written as a name
+     */
+    public NamespaceService(NamespaceRepository namespaces, Namespace defaultNamespace, Clock clock,
+                            List<NamespacePurge> purges, UserEmails emails, String emailDomain,
+                            List<Email> defaultAdmins) {
         this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
         this.defaultNamespace = Objects.requireNonNull(defaultNamespace, "defaultNamespace");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.purges = List.copyOf(Objects.requireNonNull(purges, "purges"));
+        this.emails = Objects.requireNonNull(emails, "emails");
+        String domain = emailDomain == null || emailDomain.isBlank() ? DEFAULT_EMAIL_DOMAIN : emailDomain.strip();
+        this.emailDomain = domain.startsWith("@") ? domain.substring(1) : domain;
+        this.defaultAdmins = defaultAdmins == null ? List.of()
+                : defaultAdmins.stream().filter(Objects::nonNull).toList();
+    }
+
+    /**
+     * Who shapes the default namespace. **Empty means it is open to every
+     * signed-in user, who is an admin there** — that is what a single-user
+     * installation, the dev mode and every test rely on. Naming anybody closes
+     * it: from then on the default namespace is a namespace like any other, and
+     * somebody the installation has not listed is in nothing (see
+     * {@link #role}).
+     */
+    public List<Email> defaultAdmins() {
+        return defaultAdmins;
+    }
+
+    /** Whether the default namespace takes every signed-in user, because nobody was named. */
+    public boolean defaultIsOpen() {
+        return defaultAdmins.isEmpty();
+    }
+
+    /** The domain a bare name gets when the installation configures none. */
+    public static final String DEFAULT_EMAIL_DOMAIN = "local";
+
+    /** What a bare name becomes an address with here. */
+    public String emailDomain() {
+        return emailDomain;
     }
 
     /** The namespace every user may work in without being invited. */
@@ -76,10 +136,14 @@ public class NamespaceService {
         return defaultNamespace;
     }
 
-    /** The default namespace's record, created on first use. */
+    /**
+     * The default namespace's record, created on first use — with the admins the
+     * installation named, if it named any.
+     */
     public NamespaceDefinition defaultDefinition() {
         return namespaces.findById(defaultNamespace).orElseGet(() -> {
-            NamespaceDefinition created = new NamespaceDefinition(defaultNamespace, null, null, Instant.now(clock), null);
+            NamespaceDefinition created = NamespaceDefinition.create(
+                    defaultNamespace, null, defaultAdmins, Instant.now(clock));
             namespaces.save(created);
             return created;
         });
@@ -96,29 +160,85 @@ public class NamespaceService {
         return namespaces.findAll();
     }
 
-    /** The namespaces {@code user} may work in: the default one first, then the memberships. */
+    /**
+     * Who {@code user} is to a namespace: their id, and the address they are listed
+     * under. An account whose provider gives no address — a single-user
+     * installation with authentication off, for instance — is listed under its id
+     * at the installation's domain, so that it can be in a namespace at all.
+     */
+    public Actor actor(UserId user) {
+        Objects.requireNonNull(user, "user");
+        Email address = emails.emailOf(user)
+                .orElseGet(() -> Email.qualified(user.value(), emailDomain));
+        return Actor.of(user, address);
+    }
+
+    /** {@code raw} as an address here: a bare name gets the installation's domain. */
+    public Email address(String raw) {
+        return Email.qualified(raw, emailDomain);
+    }
+
+    /**
+     * The namespaces {@code user} may work in: the default one first when it is
+     * open or lists them, then the rest of their memberships. Empty means this
+     * installation has not given them anywhere to work — nobody is put anywhere
+     * by signing in.
+     */
     public List<NamespaceDefinition> forUser(UserId user) {
         List<NamespaceDefinition> out = new ArrayList<>();
-        out.add(defaultDefinition());
-        for (NamespaceDefinition ns : namespaces.findByMember(user)) {
+        if (canAccess(user, defaultNamespace)) out.add(defaultDefinition());
+        for (NamespaceDefinition ns : namespaces.findFor(actor(user))) {
             if (!ns.id().equals(defaultNamespace)) out.add(ns);
         }
         return out;
     }
 
-    /** Whether {@code user} may work in {@code id}: the default namespace, or one they are a member of. */
+    /** Whether {@code user} may work in {@code id}: the default namespace, or one that lists them. */
     public boolean canAccess(UserId user, Namespace id) {
-        if (defaultNamespace.equals(id)) return true;
-        return namespaces.findById(id).map(ns -> ns.isMember(user)).orElse(false);
+        return role(user, id).isPresent();
     }
 
     /**
-     * Creates an empty namespace, with {@code creator} as its first member.
+     * What {@code user} may do in {@code id}, or empty when they are not in it.
+     * The default namespace makes every signed-in user an admin: it is the
+     * installation's own, and it is where a single-user install works.
+     */
+    public Optional<NamespaceRole> role(UserId user, Namespace id) {
+        if (defaultNamespace.equals(id) && defaultIsOpen()) return Optional.of(NamespaceRole.ADMIN);
+        Actor who = actor(user);
+        return find(id).flatMap(ns -> ns.role(who));
+    }
+
+    /** Whether {@code user} shapes {@code id} — creates and changes what it holds, and who is in it. */
+    public boolean isAdmin(UserId user, Namespace id) {
+        return role(user, id).filter(NamespaceRole.ADMIN::equals).isPresent();
+    }
+
+    /**
+     * Creates an empty namespace, with {@code creator} as its only admin.
      *
      * @throws IllegalArgumentException when the id is malformed or taken
      */
     public NamespaceDefinition create(String id, String displayName, UserId creator) {
         Objects.requireNonNull(creator, "creator");
+        return insert(id, displayName, List.of(actor(creator).email()));
+    }
+
+    /**
+     * Creates an empty namespace whose admins are given rather than derived from
+     * whoever is signing in — a brand's namespace from configuration, say. The
+     * first of them is its creator, the one who may delete it.
+     *
+     * @throws IllegalArgumentException when the id is malformed or taken, or no admin is given
+     */
+    public NamespaceDefinition create(String id, String displayName, List<Email> admins) {
+        if (admins == null || admins.isEmpty()) {
+            throw new IllegalArgumentException("A namespace needs at least one admin");
+        }
+        return insert(id, displayName, admins);
+    }
+
+    private NamespaceDefinition insert(String id, String displayName, List<Email> admins) {
         String value = id == null ? "" : id.strip();
         if (!ID.matcher(value).matches()) {
             throw new IllegalArgumentException("A namespace id is 1–64 lower-case letters, digits, '-' or '_', got '" + id + "'");
@@ -131,7 +251,10 @@ public class NamespaceService {
             throw new IllegalArgumentException("Namespace '" + value + "' already exists");
         }
         String label = displayName == null || displayName.isBlank() ? null : displayName.strip();
-        NamespaceDefinition created = NamespaceDefinition.create(namespace, label, creator, Instant.now(clock));
+        NamespaceDefinition created = NamespaceDefinition.create(namespace, label, admins, Instant.now(clock));
+        if (created.admins().isEmpty()) {
+            throw new IllegalArgumentException("A namespace needs at least one admin");
+        }
         if (!namespaces.insert(created)) {
             throw new IllegalArgumentException("Namespace '" + value + "' already exists");
         }
@@ -139,34 +262,85 @@ public class NamespaceService {
     }
 
     /**
-     * Adds {@code invitee} to {@code id}. Only the creator invites.
+     * The namespace {@code id}, created with {@code admins} when it does not
+     * exist yet — what an installation's own namespaces are brought into being
+     * with: a brand's from configuration, somebody's personal one on their first
+     * request. Idempotent, and it never changes a namespace that is already
+     * there: who is in it afterwards is the business of its admins, not of a
+     * configuration file that somebody edited later.
+     *
+     * @return the namespace, and whether this call is what created it
+     */
+    public Created ensure(String id, String displayName, List<Email> admins) {
+        Namespace namespace = new Namespace(id == null ? "" : id.strip());
+        Optional<NamespaceDefinition> existing = find(namespace);
+        if (existing.isPresent()) return new Created(existing.get(), false);
+        try {
+            return new Created(create(id, displayName, admins), true);
+        } catch (IllegalArgumentException e) {
+            // Somebody else inserted it between the two calls — two requests of
+            // the same brand arriving together. Theirs is as good as ours.
+            return new Created(find(namespace).orElseThrow(() -> e), false);
+        }
+    }
+
+    /** A namespace and whether the call that asked for it is what brought it into being. */
+    public record Created(NamespaceDefinition namespace, boolean fresh) {
+    }
+
+    /**
+     * Puts {@code entry} — an e-mail address, of somebody who need not have signed
+     * in yet — into {@code id} in {@code role}. Admins invite.
      *
      * @throws IllegalArgumentException when the namespace does not exist, is the open default one,
-     *                                  or {@code inviter} did not create it
+     *                                  or {@code inviter} does not shape it
      */
-    public NamespaceDefinition invite(Namespace id, UserId inviter, UserId invitee) {
-        Objects.requireNonNull(invitee, "invitee");
+    public NamespaceDefinition invite(Namespace id, UserId inviter, Email entry, NamespaceRole role) {
+        Objects.requireNonNull(entry, "entry");
+        Objects.requireNonNull(role, "role");
         synchronized (lockFor(id)) {
-            NamespaceDefinition ns = memberOnly(id, inviter, "invite into");
-            if (!ns.isCreator(inviter)) throw new IllegalArgumentException("Only the creator of '" + id + "' invites");
-            NamespaceDefinition updated = ns.withMember(invitee);
+            NamespaceDefinition ns = adminOnly(id, inviter, "invite into");
+            NamespaceDefinition updated = ns.with(entry, role);
+            if (updated != ns) namespaces.save(updated);
+            return updated;
+        }
+    }
+
+    /** Makes {@code entry} an admin of {@code id}. Admins promote. */
+    public NamespaceDefinition promote(Namespace id, UserId actor, Email entry) {
+        Objects.requireNonNull(entry, "entry");
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = adminOnly(id, actor, "promote in");
+            NamespaceDefinition updated = ns.withAdmin(entry);
+            if (updated != ns) namespaces.save(updated);
+            return updated;
+        }
+    }
+
+    /** Makes {@code entry} a user of {@code id} again; the creator stays an admin. */
+    public NamespaceDefinition demote(Namespace id, UserId actor, Email entry) {
+        Objects.requireNonNull(entry, "entry");
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = adminOnly(id, actor, "demote in");
+            NamespaceDefinition updated = ns.demote(entry);
             if (updated != ns) namespaces.save(updated);
             return updated;
         }
     }
 
     /**
-     * Removes {@code member} from {@code id}. The creator may remove anyone but themselves;
-     * any member may remove themselves.
+     * Removes {@code entry} from {@code id}. An admin removes anyone, a user
+     * themselves; the creator cannot be removed at all.
      */
-    public NamespaceDefinition removeMember(Namespace id, UserId actor, UserId member) {
-        Objects.requireNonNull(member, "member");
+    public NamespaceDefinition removeMember(Namespace id, UserId actor, Email entry) {
+        Objects.requireNonNull(entry, "entry");
         synchronized (lockFor(id)) {
             NamespaceDefinition ns = memberOnly(id, actor, "change");
-            if (!ns.isCreator(actor) && !actor.equals(member)) {
-                throw new IllegalArgumentException("Only the creator of '" + id + "' removes other members");
+            Actor who = actor(actor);
+            if (!ns.isAdmin(who) && !who.matches(entry)) {
+                throw new IllegalArgumentException("Only an admin of '" + id.value() + "' removes other members");
             }
-            NamespaceDefinition updated = ns.withoutMember(member);
+            NamespaceDefinition updated = ns.without(entry);
             if (updated != ns) namespaces.save(updated);
             return updated;
         }
@@ -174,12 +348,20 @@ public class NamespaceService {
 
     /** {@code actor} leaves {@code id}; the creator cannot leave, only delete. */
     public NamespaceDefinition leave(Namespace id, UserId actor) {
-        return removeMember(id, actor, actor);
+        synchronized (lockFor(id)) {
+            NamespaceDefinition ns = memberOnly(id, actor, "leave");
+            Email mine = ns.entryOf(actor(actor)).orElseThrow(
+                    () -> new IllegalArgumentException("'" + actor.value() + "' is not a member of '" + id + "'"));
+            NamespaceDefinition updated = ns.without(mine);
+            if (updated != ns) namespaces.save(updated);
+            return updated;
+        }
     }
 
     /**
-     * Deletes {@code id} with everything in it. Only the creator may; the default
-     * namespace cannot be deleted.
+     * Deletes {@code id} with everything in it. Only its creator may — an admin
+     * they promoted shapes the namespace but does not throw it away; the default
+     * namespace cannot be deleted at all.
      *
      * @throws IllegalArgumentException when the namespace does not exist, is the default one,
      *                                  or {@code actor} did not create it
@@ -191,7 +373,9 @@ public class NamespaceService {
         // and the namespace would return. A write waiting here reads again and finds nothing.
         synchronized (lockFor(id)) {
             NamespaceDefinition ns = memberOnly(id, actor, "delete");
-            if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator deletes '" + id + "'");
+            if (!ns.isCreator(actor(actor))) {
+                throw new IllegalArgumentException("Only the creator deletes '" + id.value() + "'");
+            }
             for (NamespacePurge purge : purges) {
                 try {
                     purge.purge(id);
@@ -209,8 +393,7 @@ public class NamespaceService {
 
     public NamespaceDefinition rename(Namespace id, UserId actor, String displayName) {
         synchronized (lockFor(id)) {
-            NamespaceDefinition ns = memberOnly(id, actor, "rename");
-            if (!ns.isCreator(actor)) throw new IllegalArgumentException("Only the creator renames '" + id + "'");
+            NamespaceDefinition ns = adminOnly(id, actor, "rename");
             NamespaceDefinition updated = ns.withDisplayName(displayName == null || displayName.isBlank() ? null : displayName.strip());
             namespaces.save(updated);
             return updated;
@@ -220,24 +403,25 @@ public class NamespaceService {
     /**
      * Replaces the variables of {@code id} with exactly {@code environment} —
      * every name with a value; the caller has already merged an edit into the
-     * full set. Only the creator sets them: they are the namespace's shared
-     * secrets. Values go to the repository as given; an encrypting repository
-     * decorator makes them {@code enc:} at rest.
+     * full set. Admins set them: they are the namespace's shared secrets, and
+     * whoever shapes the namespace works with them anyway. Values go to the
+     * repository as given; an encrypting repository decorator makes them
+     * {@code enc:} at rest.
      */
     public NamespaceDefinition setEnvironment(Namespace id, UserId actor, Map<String, String> environment) {
         EnvVarResolver.requireValid(environment);
         synchronized (lockFor(id)) {
-            NamespaceDefinition updated = creatorOnly(id, actor).withEnvironment(environment);
+            NamespaceDefinition updated = variablesOf(id, actor).withEnvironment(environment);
             namespaces.save(updated);
             return updated;
         }
     }
 
-    /** Adds the variable {@code name}, or replaces its value; creator only, merged under the namespace's lock. */
+    /** Adds the variable {@code name}, or replaces its value; admins only, merged under the namespace's lock. */
     public NamespaceDefinition putVariable(Namespace id, UserId actor, String name, String value) {
         EnvVarResolver.requireValid(name, value);
         synchronized (lockFor(id)) {
-            NamespaceDefinition ns = creatorOnly(id, actor);
+            NamespaceDefinition ns = variablesOf(id, actor);
             Map<String, String> merged = new LinkedHashMap<>(ns.environment());
             merged.put(name, value);
             NamespaceDefinition updated = ns.withEnvironment(merged);
@@ -247,7 +431,7 @@ public class NamespaceService {
     }
 
     /**
-     * Removes the variable {@code name}. Creator only, and the right to remove is
+     * Removes the variable {@code name}. Admins only, and the right to remove is
      * checked before the name is looked at, so nobody learns which variables a
      * namespace holds by asking to remove them.
      *
@@ -255,7 +439,7 @@ public class NamespaceService {
      */
     public Optional<NamespaceDefinition> removeVariable(Namespace id, UserId actor, String name) {
         synchronized (lockFor(id)) {
-            NamespaceDefinition ns = creatorOnly(id, actor);
+            NamespaceDefinition ns = variablesOf(id, actor);
             Map<String, String> merged = new LinkedHashMap<>(ns.environment());
             if (merged.remove(name) == null) return Optional.empty();
             NamespaceDefinition updated = ns.withEnvironment(merged);
@@ -265,23 +449,17 @@ public class NamespaceService {
     }
 
     /**
-     * The namespace, when {@code actor} created it — the variables of a namespace are
-     * its creator's to set, like renaming and deleting it. The default namespace is
-     * refused: nobody created it and everyone works there, so it has no variables of
-     * its own and a {@code ${VAR}} there means the server's environment.
+     * The namespace, when {@code actor} may set its variables. The default
+     * namespace is refused: nobody created it and everyone works there, so it has
+     * no variables of its own and a {@code ${VAR}} there means the server's
+     * environment.
      */
-    private NamespaceDefinition creatorOnly(Namespace id, UserId actor) {
-        Objects.requireNonNull(actor, "actor");
+    private NamespaceDefinition variablesOf(Namespace id, UserId actor) {
         if (defaultNamespace.equals(id)) {
             throw new IllegalArgumentException("The default namespace '" + id + "' has no variables of its own"
                     + " — it belongs to the installation, so set them in the server's environment");
         }
-        NamespaceDefinition ns = namespaces.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("No namespace '" + id + "'"));
-        if (!ns.isCreator(actor)) {
-            throw new IllegalArgumentException("Only the creator sets the variables of '" + id + "'");
-        }
-        return ns;
+        return adminOnly(id, actor, "set the variables of");
     }
 
     /**
@@ -292,6 +470,15 @@ public class NamespaceService {
         return locks.computeIfAbsent(id, n -> new Object());
     }
 
+    /** The namespace, when {@code actor} shapes it. */
+    private NamespaceDefinition adminOnly(Namespace id, UserId actor, String verb) {
+        NamespaceDefinition ns = memberOnly(id, actor, verb);
+        if (!ns.isAdmin(actor(actor))) {
+            throw new IllegalArgumentException("Only an admin of '" + id.value() + "' may " + verb + " it");
+        }
+        return ns;
+    }
+
     private NamespaceDefinition memberOnly(Namespace id, UserId actor, String verb) {
         Objects.requireNonNull(actor, "actor");
         if (defaultNamespace.equals(id)) {
@@ -299,7 +486,7 @@ public class NamespaceService {
         }
         NamespaceDefinition ns = namespaces.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("No namespace '" + id + "'"));
-        if (!ns.isMember(actor)) {
+        if (!ns.isMember(actor(actor))) {
             throw new IllegalArgumentException("'" + actor.value() + "' is not a member of '" + id + "'");
         }
         return ns;

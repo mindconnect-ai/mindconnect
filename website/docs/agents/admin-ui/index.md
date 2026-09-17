@@ -222,6 +222,79 @@ Since the assets of every brand are served from the same `/branding/**`, give
 them distinct names (`acme.svg`, `mindconnect-logo.svg`) rather than a
 directory each.
 
+## Who may work where
+
+A namespace holds everything — agents, LLM configs, workflows, skills,
+sessions, files, vector stores — and it says who may do what in it, in two
+lists of **e-mail addresses**:
+
+| | Admin | User |
+|---|---|---|
+| Chat | yes | yes |
+| Agents, LLM configs, workflows, skills, MCP servers, vector stores | yes | no |
+| The namespace's variables | yes | no |
+| Invite, promote, demote, remove | yes | no |
+| Rename | yes | no |
+| Delete the namespace | its creator only | no |
+| Leave | yes | yes |
+
+The creator is one of the admins and the one entry that cannot be taken out of
+that list — a namespace without an admin would be nobody's to clean up. They
+are also the only one who may delete it: an admin they promoted shapes the
+namespace, but does not throw away everyone's work.
+
+**People are listed by address, not by account.** An address exists before an
+account does, so somebody can be invited before they have ever signed in — the
+membership is waiting at their first sign-in, with nothing to send and nothing
+pending. A name without an `@` gets `mindconnect.email-domain` appended, so an
+installation whose accounts are all `<name>@company.example` invites by name; a
+guest is invited with their own address.
+
+### Being signed in is not being let in
+
+`mindconnect.namespace-admins` names who shapes the default namespace
+(`mindconnect.namespace`, `local` unless configured), and **naming anybody
+closes it**:
+
+```yaml
+mindconnect:
+  namespace: local
+  namespace-admins: chief@company.example, david@company.example
+  email-domain: company.example
+```
+
+From then on an account this installation lists nowhere is shown a page saying
+so, with the way to sign out — not an empty app — and the API answers `403`
+rather than falling back into the default namespace. Nobody is put into a
+namespace by arriving under a host: an admin has to invite them.
+
+Left unset, the default namespace stays open to every signed-in user, who is an
+admin there. That is what a single-user installation and the dev mode run on,
+and it is why nothing changes for them.
+
+### A namespace per brand
+
+A `switch` entry may name the namespace its hosts work in:
+
+```yaml
+    switch:
+      acme:
+        url-pattern: "*.acme.*"
+        title: ACME AI
+        namespace:
+          admins: [chief@acme.example, david@acme.example]
+```
+
+The namespace's id is the entry's own name (`acme`) unless `id:` says
+otherwise, its display name is the brand's `title`, and the first admin is its
+creator. `creator: <address>` is the short form of a single admin.
+
+It is created the first time somebody arrives under one of that brand's hosts,
+and **never changed from configuration afterwards** — who is in a namespace is
+its admins' business, not that of a file edited later. Somebody listed in it
+lands there on their first sign-in; somebody listed anywhere also gets an empty
+namespace of their own, with them as its admin.
+
 ## The main sections
 
 The navigation has eight top-level entries:

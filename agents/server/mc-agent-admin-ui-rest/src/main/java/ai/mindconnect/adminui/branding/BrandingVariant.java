@@ -38,6 +38,20 @@ public class BrandingVariant {
     private List<String> stylesheets = new ArrayList<>();
     private StylePicker stylePicker = new StylePicker();
 
+    /**
+     * The namespace this brand works in, and who shapes it; null for a brand
+     * that has none. Never inherited — see {@link BrandingNamespace}.
+     */
+    private BrandingNamespace namespace;
+
+    public BrandingNamespace getNamespace() {
+        return namespace;
+    }
+
+    public void setNamespace(BrandingNamespace namespace) {
+        this.namespace = namespace;
+    }
+
     public String getUrlPattern() {
         return urlPattern;
     }

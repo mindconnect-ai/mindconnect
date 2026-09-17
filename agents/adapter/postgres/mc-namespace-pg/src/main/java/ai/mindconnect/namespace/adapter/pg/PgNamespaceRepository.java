@@ -1,9 +1,9 @@
 package ai.mindconnect.namespace.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 
@@ -49,9 +49,9 @@ public class PgNamespaceRepository implements NamespaceRepository {
     }
 
     @Override
-    public List<NamespaceDefinition> findByMember(UserId user) {
-        // Members live in the document; namespaces are few, so filtering here beats a JSONB query nobody else needs.
-        return findAll().stream().filter(ns -> ns.isMember(user)).toList();
+    public List<NamespaceDefinition> findFor(Actor who) {
+        // The lists live in the document; namespaces are few, so filtering here beats a JSONB query nobody else needs.
+        return findAll().stream().filter(ns -> ns.isMember(who)).toList();
     }
 
     @Override

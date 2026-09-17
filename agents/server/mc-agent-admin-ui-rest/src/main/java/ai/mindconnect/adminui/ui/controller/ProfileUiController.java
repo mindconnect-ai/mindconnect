@@ -6,6 +6,7 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.chatui.ui.controller.FormBody;
@@ -85,7 +86,7 @@ public class ProfileUiController {
     @GetMapping
     public UiPage profile(@AuthenticationPrincipal OidcUser user) {
         UserId id = userId(user);
-        return new ProfilePage(id, users.find(id).orElse(null),
+        return new ProfilePage(id, namespaces.actor(id), users.find(id).orElse(null),
                 user == null ? null : user.getFullName(),
                 user == null ? null : user.getEmail(),
                 tokens.list(id), authEnabled,
@@ -106,36 +107,41 @@ public class ProfileUiController {
                     .title("Nobody to invite"));
         }
         return namespaces.find(namespace)
-                .filter(ns -> ns.isCreator(me))
+                .filter(ns -> ns.isAdmin(namespaces.actor(me)))
                 .map(ns -> dialog(INVITE_DIALOG_ID, "Invite into " + ns.label(), ProfilePage.inviteForm(ns, null)))
-                .orElseGet(() -> UiPatch.of().toast(UiToast.error("Only the creator of '" + id + "' invites.")
+                .orElseGet(() -> UiPatch.of().toast(UiToast.error("Only an admin of '" + id + "' invites.")
                         .title("Not yours to invite into")));
     }
 
     /**
-     * Invites the user named in the dialog, closes it and re-renders the namespaces
-     * table. A name nobody signed in with keeps the dialog open and says why.
+     * Invites the address named in the dialog in the role it asked for, closes it and
+     * re-renders the namespaces table. A malformed address, or one already listed,
+     * keeps the dialog open and says why.
      */
     @PostMapping("/namespaces/{id}/members")
     public UiPatch invite(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
                           @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
         Namespace namespace = new Namespace(id);
-        String invitee;
+        FormBody body = new FormBody(raw);
+        ai.mindconnect.agent.Email invitee;
+        NamespaceRole role;
         try {
-            invitee = members.invite(namespace, me, new FormBody(raw).str("user")).label();
+            role = NamespaceRole.of(body.str("role"));
+            invitee = members.invite(namespace, me, body.str("email"), role);
         } catch (IllegalArgumentException e) {
             return namespaces.find(namespace)
-                    .filter(ns -> ns.isCreator(me))
+                    .filter(ns -> ns.isAdmin(namespaces.actor(me)))
                     .map(ns -> dialog(INVITE_DIALOG_ID, "Invite into " + ns.label(), ProfilePage.inviteForm(ns, e.getMessage())))
                     .orElseGet(() -> UiPatch.of().patch(UiPatch.Operation.remove(INVITE_DIALOG_ID))
                             .toast(UiToast.error(e.getMessage()).title("Not invited")));
         }
         return UiPatch.of()
                 .patch(UiPatch.Operation.remove(INVITE_DIALOG_ID))
-                .patch(UiPatch.Operation.replace(ProfilePage.NAMESPACES_ID, ProfilePage.namespaces(me,
+                .patch(UiPatch.Operation.replace(ProfilePage.NAMESPACES_ID, ProfilePage.namespaces(namespaces.actor(me),
                         namespaces.forUser(me), namespaces.defaultNamespace(), scope.namespace())))
-                .toast(UiToast.success(invitee + " may now work in '" + id + "'.").title("Invited"));
+                .toast(UiToast.success(invitee + (role == NamespaceRole.ADMIN ? " may now shape '" : " may now work in '")
+                        + id + "'.").title("Invited"));
     }
 
     /**
@@ -181,11 +187,11 @@ public class ProfileUiController {
         }
         List<NamespaceDefinition> remaining = namespaces.forUser(me);
         return ResponseEntity.ok(UiPatch.of()
-                .patch(UiPatch.Operation.replace(ProfilePage.NAMESPACES_ID, ProfilePage.namespaces(me,
+                .patch(UiPatch.Operation.replace(ProfilePage.NAMESPACES_ID, ProfilePage.namespaces(namespaces.actor(me),
                         remaining, namespaces.defaultNamespace(), scope.namespace())))
                 // A deleted namespace takes its variables with it — the tab must not keep showing them.
                 .patch(UiPatch.Operation.replace(ProfilePage.NAMESPACE_ENVIRONMENT_ID,
-                        ProfilePage.namespaceVariables(me, remaining, namespaces.defaultNamespace())))
+                        ProfilePage.namespaceVariables(namespaces.actor(me), remaining, namespaces.defaultNamespace())))
                 .toast(UiToast.success(message).title(title)));
     }
 

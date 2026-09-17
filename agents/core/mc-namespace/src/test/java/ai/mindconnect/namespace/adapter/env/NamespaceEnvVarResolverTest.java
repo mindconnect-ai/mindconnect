@@ -1,10 +1,12 @@
 package ai.mindconnect.namespace.adapter.env;
 
+import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 import org.junit.jupiter.api.Test;
@@ -25,8 +27,8 @@ class NamespaceEnvVarResolverTest {
     private final NamespaceRepository namespaces = new EncryptingNamespaceRepository(store, ENCRYPTION);
 
     private static NamespaceDefinition acme(Map<String, String> environment) {
-        return new NamespaceDefinition(ACME, "ACME", UserId.of("david"), Instant.parse("2026-09-15T12:00:00Z"),
-                Set.of(UserId.of("alice")), environment);
+        return new NamespaceDefinition(ACME, "ACME", Email.of("david@local"), Instant.parse("2026-09-15T12:00:00Z"),
+                Set.of(), Set.of(Email.of("alice@local")), environment);
     }
 
     @Test
@@ -36,7 +38,7 @@ class NamespaceEnvVarResolverTest {
         assertThat(store.findById(ACME).orElseThrow().environment().get("OPENAI_API_KEY"))
                 .startsWith(EncryptionHelper.ENC).doesNotContain("sk-acme");
         assertThat(namespaces.findById(ACME)).get().extracting(NamespaceDefinition::environment).isEqualTo(Map.of("OPENAI_API_KEY", "sk-acme"));
-        assertThat(namespaces.findByMember(UserId.of("alice"))).singleElement().extracting(NamespaceDefinition::environment)
+        assertThat(namespaces.findFor(Actor.of(UserId.of("alice"), Email.of("alice@local")))).singleElement().extracting(NamespaceDefinition::environment)
                 .isEqualTo(Map.of("OPENAI_API_KEY", "sk-acme"));
         assertThat(namespaces.findAll()).singleElement().extracting(NamespaceDefinition::environment).isEqualTo(Map.of("OPENAI_API_KEY", "sk-acme"));
 

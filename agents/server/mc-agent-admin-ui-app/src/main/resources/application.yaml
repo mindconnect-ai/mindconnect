@@ -34,6 +34,20 @@ mindconnect:
   # The namespace this process runs in: file data under data.base-dir/<namespace>,
   # a namespace key column in Postgres. One process serves one namespace.
   namespace: ${MC_NAMESPACE:local}
+  # The domain a name without an "@" becomes an address with. Namespaces list
+  # their admins and users by e-mail — an address exists before an account does,
+  # so somebody can be invited before their first sign-in — and in a company
+  # where every account is <name>@company.example this is what makes inviting
+  # by name work. It is also the address an account gets whose identity provider
+  # hands over none: <user id>@<this domain>.
+  email-domain: ${MC_EMAIL_DOMAIN:local}
+  # Who shapes the default namespace above — a comma-separated list of e-mail
+  # addresses (a bare name gets email-domain). Naming anybody CLOSES it: from
+  # then on being signed in is not the same as being let in, and somebody the
+  # installation lists nowhere sees /no-access instead of the app. Unset, the
+  # default namespace stays open to every signed-in user, which is what a
+  # single-user installation and the dev mode work with.
+  namespace-admins: ${MC_NAMESPACE_ADMINS:}
   postgres:
     url: ${MC_POSTGRES_URL:jdbc:postgresql://localhost:5432/mindconnect}
     username: ${MC_POSTGRES_USER:}
@@ -118,6 +132,13 @@ mindconnect:
     #     stylesheet: erni-sui.css
     #     style-picker:
     #       disabled: true
+    #     # The namespace this brand's hosts work in, and who shapes it. The
+    #     # id is this entry's own name unless "id:" says otherwise, the
+    #     # display name is the title above, and the first admin is its
+    #     # creator — the one who may delete it. Never inherited: a namespace
+    #     # belongs to a brand. "creator: <address>" is the short form of one.
+    #     namespace:
+    #       admins: [chief@erni.example, david@erni.example]
     #   mindconnect:
     #     url-pattern: app.mindconnect.ai
     #     title: Mindconnect Agent Runtime

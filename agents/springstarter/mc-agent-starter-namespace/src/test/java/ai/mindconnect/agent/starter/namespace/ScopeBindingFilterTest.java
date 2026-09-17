@@ -208,4 +208,34 @@ class ScopeBindingFilterTest {
 
         assertThat(seen.get().namespace()).isEqualTo(Namespace.DEFAULT);
     }
+
+    @Test
+    void anInstallationThatClosedItsDefaultNamespaceRefusesSomebodyItListsNowhere() throws Exception {
+        NamespaceService closed = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT,
+                java.time.Clock.systemUTC(), List.of(), id -> java.util.Optional.empty(), "local",
+                List.of(ai.mindconnect.agent.Email.of("chief@example.com")));
+        ScopeBindingFilter guarded = new ScopeBindingFilter(bound, closed);
+        signIn("stranger");
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/agents");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        guarded.doFilter(request, response, chain);
+
+        assertThat(response.getStatus()).as("no namespace, no work — not even through the API").isEqualTo(403);
+        assertThat(seen.get()).isNull();
+    }
+
+    @Test
+    void whoeverIsListedInTheClosedDefaultNamespaceWorksThereAsBefore() throws Exception {
+        NamespaceService closed = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT,
+                java.time.Clock.systemUTC(), List.of(), id -> java.util.Optional.empty(), "example.com",
+                List.of(ai.mindconnect.agent.Email.of("chief@example.com")));
+        ScopeBindingFilter guarded = new ScopeBindingFilter(bound, closed);
+        signIn("chief");
+
+        guarded.doFilter(new MockHttpServletRequest("GET", "/api/agents"), new MockHttpServletResponse(), chain);
+
+        assertThat(seen.get()).isNotNull()
+                .satisfies(scope -> assertThat(scope.namespace()).isEqualTo(Namespace.DEFAULT));
+    }
 }

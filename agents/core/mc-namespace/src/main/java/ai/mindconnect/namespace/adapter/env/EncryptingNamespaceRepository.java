@@ -1,8 +1,8 @@
 package ai.mindconnect.namespace.adapter.env;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 
@@ -39,8 +39,8 @@ public class EncryptingNamespaceRepository implements NamespaceRepository {
     }
 
     @Override
-    public List<NamespaceDefinition> findByMember(UserId user) {
-        return delegate.findByMember(user).stream().map(this::decrypted).toList();
+    public List<NamespaceDefinition> findFor(Actor who) {
+        return delegate.findFor(who).stream().map(this::decrypted).toList();
     }
 
     @Override

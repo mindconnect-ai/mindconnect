@@ -104,8 +104,22 @@ public class AdminLayoutFactory {
                 mcpRegistryAdmin.getIfAvailable() != null,
                 registryService.getIfAvailable() != null);
         layout.brand(currentBrand());
+        layout.chatOnly(!shapesCurrentNamespace());
         namespaceSwitch().ifPresent(layout::namespaces);
         return layout;
+    }
+
+    /**
+     * Whether the signed-in user is an admin of the namespace this request works
+     * in. Without a namespace service — a host that embeds the UI without
+     * namespaces — everybody shapes what they see, which is how it was before
+     * roles existed.
+     */
+    private boolean shapesCurrentNamespace() {
+        NamespaceService namespaces = namespaceService.getIfAvailable();
+        ScopeSupplier current = scope.getIfAvailable();
+        if (namespaces == null || current == null) return true;
+        return currentUserId().map(user -> namespaces.isAdmin(user, current.namespace())).orElse(true);
     }
 
     /** The switcher's content: the namespaces the current user may work in, and the one the request is in. */

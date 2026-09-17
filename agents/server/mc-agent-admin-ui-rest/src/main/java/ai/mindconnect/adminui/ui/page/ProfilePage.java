@@ -3,7 +3,9 @@ package ai.mindconnect.adminui.ui.page;
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;
 import ai.mindconnect.ui.model.UiField;
@@ -65,6 +67,7 @@ public class ProfilePage extends AdminPage {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'").withZone(ZoneOffset.UTC);
 
     private final UserId userId;
+    private final Actor me;
     private final User user;
     private final String displayName;
     private final String email;
@@ -75,6 +78,8 @@ public class ProfilePage extends AdminPage {
     private final Namespace active;
 
     /**
+     * @param me          who the signed-in user is to a namespace — id and the address they are
+     *                    listed under, which the namespace service answers
      * @param user        the stored user record; null before it was first recorded
      * @param displayName the name the login carries; null to fall back to the record
      * @param email       the e-mail the login carries; null to fall back to the record
@@ -82,10 +87,11 @@ public class ProfilePage extends AdminPage {
      * @param namespaces  the namespaces the user may work in, the default one first
      * @param active      the namespace the user is in right now
      */
-    public ProfilePage(UserId userId, User user, String displayName, String email, List<ApiToken> tokens,
+    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
                        boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
                        Namespace active) {
         this.userId = userId;
+        this.me = me;
         this.user = user;
         this.displayName = displayName;
         this.email = email;
@@ -117,10 +123,10 @@ public class ProfilePage extends AdminPage {
         // replaced in place by id.
         UiSection page = UiSection.of("profile", null)
                 .section("profile-tab-account", "Account", account)
-                .section("profile-tab-namespaces", "Namespaces", namespaces(userId, namespaces, defaultNamespace, active))
+                .section("profile-tab-namespaces", "Namespaces", namespaces(me, namespaces, defaultNamespace, active))
                 .section("profile-tab-variables", "Your variables", environment(user == null ? Map.of() : user.environment()))
                 .section("profile-tab-namespace-variables", "Namespace variables",
-                        namespaceVariables(userId, namespaces, defaultNamespace))
+                        namespaceVariables(me, namespaces, defaultNamespace))
                 .section("profile-tab-tokens", "API tokens", UiStack.of("profile-tokens").gap(12)
                         .child(tokenTable(tokens))
                         .child(help));
@@ -128,24 +134,24 @@ public class ProfilePage extends AdminPage {
     }
 
     /**
-     * The variables of every namespace the user created, one table each — the ones they
-     * set for everyone working there. Only a namespace's creator sets them, so a
-     * namespace they merely joined is not listed, and the open default namespace has
-     * none of its own. The tables are the namespaces screen's, so adding or removing a
+     * The variables of every namespace the user shapes, one table each — the ones
+     * they set for everyone working there. Only a namespace's admins set them, so a
+     * namespace they are merely a user of is not listed, and the open default
+     * namespace has none of its own. The tables are the namespaces screen's, so adding or removing a
      * variable here goes through the same endpoints and lands on the same ids.
      */
-    public static UiNode namespaceVariables(UserId me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace) {
+    public static UiNode namespaceVariables(Actor me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace) {
         UiStack stack = UiStack.of(NAMESPACE_ENVIRONMENT_ID).gap(16);
         stack.child(UiText.of(NAMESPACE_ENVIRONMENT_ID + "-note",
                 "A ${VAR} in an LLM config takes your own variable first, then the variable of the "
                         + "namespace you work in, then the server's environment. The variables of a namespace "
-                        + "are shared with everyone in it; only the one who created the namespace sets them."));
+                        + "are shared with everyone in it; its admins set them."));
         List<NamespaceDefinition> created = namespaces.stream()
-                .filter(ns -> !ns.id().equals(defaultNamespace) && ns.isCreator(me))
+                .filter(ns -> !ns.id().equals(defaultNamespace) && ns.isAdmin(me))
                 .toList();
         if (created.isEmpty()) {
             stack.child(UiText.of(NAMESPACE_ENVIRONMENT_ID + "-none",
-                    "You have not created a namespace, so there are no namespace variables for you to set. "
+                    "You are not an admin of any namespace, so there are no namespace variables for you to set. "
                             + "Create one from the namespace switcher in the header."));
             return stack;
         }
@@ -187,7 +193,7 @@ public class ProfilePage extends AdminPage {
      * with the dialog or the deed where the user may, and with the reason where not. The open default
      * namespace is listed like the others; nobody is invited into it.
      */
-    public static UiNode namespaces(UserId me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+    public static UiNode namespaces(Actor me, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
                                     Namespace active) {
         UiTable table = UiTable.of(NAMESPACES_ID, "Namespaces").icon("layers")
                 .column(UiTable.Column.text("name", "Name"))
@@ -212,12 +218,19 @@ public class ProfilePage extends AdminPage {
             row.put("id", ns.id().value());
             row.put("name", ns.label() + (ns.id().equals(active) ? " (current)" : ""));
             row.put("namespace", ns.id().value());
-            row.put("role", isDefault ? "everyone" : ns.isCreator(me) ? "creator" : "member");
-            row.put("members", isDefault ? "every signed-in user" : String.valueOf(ns.members().size()));
+            row.put("role", isDefault ? "everyone" : role(ns, me));
+            row.put("members", isDefault ? "every signed-in user"
+                    : String.valueOf(ns.admins().size() + ns.users().size()));
             row.put("created", time(ns.createdAt()));
             table.row(row);
         }
         return table;
+    }
+
+    /** What the signed-in user is in {@code ns}: its creator, an admin they promoted, or a user. */
+    private static String role(NamespaceDefinition ns, Actor me) {
+        if (ns.isCreator(me)) return "creator";
+        return ns.role(me).map(r -> r == NamespaceRole.ADMIN ? "admin" : "user").orElse("—");
     }
 
     /**
