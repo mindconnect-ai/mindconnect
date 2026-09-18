@@ -182,7 +182,7 @@ public class SecurityConfig {
             // Right after it, because it needs that record: the brand's namespace
             // is created, whoever is listed gets one of their own, and somebody
             // the installation lists nowhere is turned away (/no-access).
-            .addFilterAfter(new NamespaceOnboardingFilter(onboarding, true), UserRecordingFilter.class);
+            .addFilterAfter(new NamespaceOnboardingFilter(onboarding), UserRecordingFilter.class);
 
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
@@ -211,7 +211,7 @@ public class SecurityConfig {
             // And the same onboarding as with authentication on: with an open
             // default namespace it finds the dev user somewhere to work, so this
             // mode behaves as it always did.
-            .addFilterAfter(new NamespaceOnboardingFilter(onboarding, true), UserRecordingFilter.class);
+            .addFilterAfter(new NamespaceOnboardingFilter(onboarding), UserRecordingFilter.class);
         // Same-origin framing only: the admin shell embeds its own pages
         // (Swagger UI in the API section); foreign sites still can't frame us.
         http.headers(headers -> headers.frameOptions(f -> f.sameOrigin()));
@@ -312,12 +312,12 @@ public class SecurityConfig {
      * requires a deliberate user click to retry.
      *
      * <p>One request skips it: the one coming back from the sign-out of
-     * somebody who was just turned away for having no namespace here
-     * ({@code NamespaceOnboardingFilter}). They have already decided to
-     * come back as somebody else, and a page asking them to click "sign
-     * in" first is one click of nothing. The cookie that says so is
-     * cleared as it is read, so this stays a single hop and the loop the
-     * landing page breaks stays broken.
+     * somebody who was turned away for having no namespace here and chose
+     * to come back as somebody else ({@code NoAccessController}). They
+     * have already made that decision on a page that said so, and another
+     * page asking them to click "sign in" is one click of nothing. The
+     * cookie that says so is cleared as it is read, so this stays a single
+     * hop and the loop the landing page breaks stays broken.
      */
     /** An HTML request carrying the note that its user just signed out to come back as somebody else. */
     private RequestMatcher reloginMatcher() {

@@ -110,35 +110,16 @@ class NamespaceOnboardingFilterTest {
     }
 
     @Test
-    void aBrowserWithoutANamespaceIsSignedOutAndSentBackToTheProvider() throws Exception {
+    void aBrowserWithoutANamespaceIsSentToThePageThatSaysSo() throws Exception {
         signedIn("stranger", "stranger@example.com");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
 
         filter.doFilter(get("/", new MockHttpSession()), response, chain);
 
-        assertThat(response.getRedirectedUrl()).as("the sign-out is what makes coming back as somebody else real")
-                .isEqualTo(NamespaceOnboardingFilter.SIGN_OUT);
-        assertThat(response.getCookie(NamespaceOnboardingFilter.RELOGIN_COOKIE)).isNotNull()
-                .satisfies(note -> {
-                    assertThat(note.getValue()).isEqualTo("1");
-                    assertThat(note.getMaxAge()).as("good for one attempt, not forever").isEqualTo(120);
-                    assertThat(note.isHttpOnly()).isTrue();
-                });
+        assertThat(response.getRedirectedUrl()).as("told first, signed out only if they ask")
+                .isEqualTo(NamespaceOnboardingFilter.NO_ACCESS);
         assertThat(chain.getRequest()).as("and goes no further").isNull();
-    }
-
-    @Test
-    void withNoProviderToComeBackFromTheyGetThePageInstead() throws Exception {
-        NamespaceOnboardingFilter noAuth = new NamespaceOnboardingFilter(
-                new NamespaceOnboarding(namespaces, users, branding()), false);
-        signedIn("stranger", "stranger@example.com");
-        MockHttpServletResponse response = new MockHttpServletResponse();
-
-        noAuth.doFilter(get("/", new MockHttpSession()), response, new MockFilterChain());
-
-        assertThat(response.getRedirectedUrl()).isEqualTo(NamespaceOnboardingFilter.NO_ACCESS);
-        assertThat(response.getCookie(NamespaceOnboardingFilter.RELOGIN_COOKIE)).isNull();
     }
 
     @Test
