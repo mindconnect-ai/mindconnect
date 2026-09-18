@@ -61,6 +61,16 @@ public class BrandingShellController {
         return shell("static/login.html", resolved, "Sign in \u2014 " + resolved.title());
     }
 
+    /**
+     * The same shell for a page somebody else serves — the "you are in no
+     * namespace" page, which needs its own status code and a cookie, and comes
+     * through {@code NoAccessController} rather than through a mapping here.
+     */
+    public String render(String classpathLocation, Branding resolved, String documentTitle) {
+        ResponseEntity<String> answer = shell(classpathLocation, resolved, documentTitle);
+        return answer.getBody();
+    }
+
     private ResponseEntity<String> shell(String classpathLocation, Branding resolved, String documentTitle) {
         Resource resource = new ClassPathResource(classpathLocation);
         if (!resource.exists()) {

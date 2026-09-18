@@ -348,4 +348,28 @@ class ScopeBindingFilterTest {
         assertThat(response.getStatus()).isEqualTo(403);
         assertThat(response.getErrorMessage()).contains("does not serve namespace 'erni'");
     }
+
+    @Test
+    void thePageThatSaysWhyTheyCannotGetInAnswersAnyway() throws Exception {
+        NamespaceService closed = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT,
+                java.time.Clock.systemUTC(), List.of(), id -> java.util.Optional.empty(), "local",
+                List.of(ai.mindconnect.agent.Email.of("chief@example.com")));
+        ScopeBindingFilter guarded = new ScopeBindingFilter(bound, closed);
+        signIn("stranger");
+
+        // The point of this test: it did not. The filter refused the error page
+        // itself, so somebody with no namespace was shown a blank 403 instead of
+        // the page explaining it — the one thing they needed to read.
+        for (String path : List.of("/no-access", "/admin/logout", "/login", "/css/app.css", "/branding/erni.css")) {
+            MockFilterChain fresh = freshChain();
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            guarded.doFilter(new MockHttpServletRequest("GET", path), response, fresh);
+            assertThat(response.getStatus()).as(path).isEqualTo(200);
+            assertThat(fresh.getRequest()).as(path).isNotNull();
+        }
+
+        MockHttpServletResponse denied = new MockHttpServletResponse();
+        guarded.doFilter(new MockHttpServletRequest("GET", "/admin/agents"), denied, freshChain());
+        assertThat(denied.getStatus()).as("the app itself is still refused").isEqualTo(403);
+    }
 }

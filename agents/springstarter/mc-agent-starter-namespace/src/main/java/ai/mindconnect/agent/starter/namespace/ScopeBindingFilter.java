@@ -77,9 +77,35 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
     public static final java.util.List<String> API_PREFIXES = java.util.List.of("/api/", "/v1/");
 
     /**
+     * What has to work for somebody who is in no namespace here: the page that
+     * tells them so, the way out, the way back in, and what those pages are made
+     * of. None of it touches a namespace's data, so it runs in the default one
+     * like any request without a user — refusing it would answer the question
+     * "why can I not get in" with a blank error page, which is how this list
+     * came to exist.
+     */
+    static final java.util.List<String> WITHOUT_A_NAMESPACE = java.util.List.of(
+            "/no-access", "/admin/logout", "/logout", "/login", "/login.html", "/error",
+            "/favicon.ico", "/css/", "/js/", "/sui/", "/sui-ext/", "/img/", "/branding/",
+            "/webjars/", "/.well-known/");
+
+    /**
      * A program's call, not a browser's: it works in the namespace it names, else in
      * the default one — never in the one the same user last chose in the Admin UI.
      */
+    /** Whether this is one of the requests that must answer even to somebody in no namespace. */
+    static boolean worksWithoutANamespace(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        String context = request.getContextPath();
+        if (context != null && !context.isEmpty() && path.startsWith(context)) {
+            path = path.substring(context.length());
+        }
+        for (String open : WITHOUT_A_NAMESPACE) {
+            if (path.equals(open) || path.startsWith(open.endsWith("/") ? open : open + "/")) return true;
+        }
+        return false;
+    }
+
     static boolean isApi(HttpServletRequest request) {
         String path = request.getRequestURI();
         String context = request.getContextPath();
@@ -142,7 +168,7 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
             // Falling into either unchecked would let somebody this
             // installation lists nowhere work there — through the API, which
             // sees no onboarding and no error page.
-            if (!namespaces.canAccess(user, namespace)) {
+            if (!namespaces.canAccess(user, namespace) && !worksWithoutANamespace(request)) {
                 log.debug("{} is in no namespace this address serves", user.value());
                 response.sendError(HttpServletResponse.SC_FORBIDDEN,
                         "Your account is not in any namespace of this installation");
