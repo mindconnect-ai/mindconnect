@@ -319,6 +319,37 @@ class RegistryServiceTest {
                 .hasMessageContaining("not a package");
     }
 
+    @Test
+    void several_entries_import_in_one_walk_so_what_they_share_is_installed_once() {
+        entry("default-llm", RegistryItemType.LLM_CONFIG);
+        entry("one", RegistryItemType.AGENT, "default-llm");
+        entry("two", RegistryItemType.AGENT, "default-llm");
+
+        ImportReport report = service.importEntries(SOURCE.id(), List.of("one", "two"),
+                ImportMode.SKIP_EXISTING);
+
+        assertThat(configs.installed).containsExactly("default-llm");
+        assertThat(report.items()).extracting(ImportedItem::entryId)
+                .containsExactly("default-llm", "one", "two");
+        // No single entry was the ask.
+        assertThat(report.entryId()).isNull();
+        assertThat(report.summary()).isEqualTo("3 imported");
+    }
+
+    @Test
+    void an_id_the_index_lost_fails_only_itself_when_several_are_imported() {
+        entry("one", RegistryItemType.AGENT);
+
+        ImportReport report = service.importEntries(SOURCE.id(), List.of("gone", "one"),
+                ImportMode.SKIP_EXISTING);
+
+        assertThat(agents.installed).containsExactly("one");
+        assertThat(report.summary()).isEqualTo("1 imported, 1 failed");
+        assertThat(report.items()).filteredOn(item -> item.status() == ImportStatus.FAILED)
+                .singleElement()
+                .satisfies(item -> assertThat(item.entryId()).isEqualTo("gone"));
+    }
+
     // ---------------------------------------------------------------- helpers
 
     private ImportReport importEntry(String entryId) {

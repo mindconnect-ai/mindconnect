@@ -15,7 +15,8 @@ import java.util.List;
  *
  * @param sourceId the registry this came from
  * @param entryId  the entry that was asked for — a package's own id, when a
- *                 package was imported
+ *                 package was imported, and {@code null} when several entries
+ *                 were imported in one go and no single one was the ask
  * @param items    what happened, in install order
  */
 public record ImportReport(

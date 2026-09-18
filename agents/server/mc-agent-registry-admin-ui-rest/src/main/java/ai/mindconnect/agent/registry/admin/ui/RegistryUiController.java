@@ -107,8 +107,7 @@ public class RegistryUiController {
 
     @PostMapping("/api/{id}/search")
     public UiPage search(@PathVariable String id, @RequestBody Map<String, Object> body) {
-        Object query = body.get("q");
-        return browse(id, query == null ? null : query.toString(), typeOf(body.get("type")));
+        return browse(id, text(body.get("q")), typeOf(body.get("type")));
     }
 
     @PostMapping("/api/{id}/refresh")
@@ -117,7 +116,92 @@ public class RegistryUiController {
         return browse(id, null, null);
     }
 
+    /**
+     * Imports an entry straight from the catalog and answers with the catalog
+     * again — the report above the list, the row now marked as here.
+     *
+     * <p>The body is the browse screen's search form, so the list that comes
+     * back is the one the button was pressed in and not the unfiltered top of
+     * the registry. A package imported from here brings everything it lists
+     * that is new; leaving members out is what its Contents tab is for.
+     */
+    @PostMapping("/api/{id}/install/{entryId}")
+    public UiPage install(@PathVariable String id, @PathVariable String entryId,
+                          @RequestParam(defaultValue = "SKIP_EXISTING") String mode,
+                          @RequestBody(required = false) Map<String, Object> body) {
+        Optional<RegistrySource> found = source(id);
+        if (found.isEmpty()) {
+            return list();
+        }
+        String query = body == null ? null : text(body.get("q"));
+        RegistryItemType type = typeOf(body == null ? null : body.get("type"));
+        try {
+            Optional<RegistryEntry> entry = registry.index(found.get().id()).find(entryId);
+            ImportReport report = registry.importEntry(found.get().id(), entryId, modeOf(mode), Set.of());
+            return browse(id, query, type, new RegistryOutcome(
+                    entry.map(RegistryEntry::name).orElse(entryId),
+                    entry.map(RegistryEntry::type).orElse(null), report, null));
+        } catch (RuntimeException e) {
+            log.warn("Importing '{}' from registry '{}' failed: {}", entryId, id, e.getMessage());
+            return browse(id, query, type, new RegistryOutcome(entryId, null, null, message(e)));
+        }
+    }
+
+    /**
+     * Imports everything of one kind the catalog is showing that is not here
+     * yet — the rubric's own button — and answers with the catalog again.
+     *
+     * <p>The set is recomputed here from the search the body carries, not taken
+     * from the page: what the button counted is what the screen showed when it
+     * was drawn, and the store may have moved since. Recomputing means the
+     * import does what the label promises at the moment it is pressed.
+     */
+    @PostMapping("/api/{id}/install-group/{kind}")
+    public UiPage installGroup(@PathVariable String id, @PathVariable String kind,
+                               @RequestBody(required = false) Map<String, Object> body) {
+        Optional<RegistrySource> found = source(id);
+        if (found.isEmpty()) {
+            return list();
+        }
+        String query = body == null ? null : text(body.get("q"));
+        RegistryItemType type = typeOf(body == null ? null : body.get("type"));
+        RegistryItemType group = typeOf(kind);
+        if (group == null) {
+            return browse(id, query, type);
+        }
+        String what = RegistryBrowseView.groupTitle(group);
+        try {
+            List<String> missing = missingOf(found.get(), group, query, type);
+            ImportReport report = registry.importEntries(found.get().id(), missing,
+                    ImportMode.SKIP_EXISTING);
+            return browse(id, query, type, new RegistryOutcome(what, group, report, null));
+        } catch (RuntimeException e) {
+            log.warn("Importing the {} of registry '{}' failed: {}", what, id, e.getMessage());
+            return browse(id, query, type, new RegistryOutcome(what, group, null, message(e)));
+        }
+    }
+
+    /**
+     * The entries of one kind that the catalog is showing and this installation
+     * could install but has not — the rubric's button, in ids.
+     */
+    private List<String> missingOf(RegistrySource source, RegistryItemType group,
+                                   String query, RegistryItemType filter) {
+        return registry.index(source.id()).search(query, filter).stream()
+                .filter(entry -> entry.type() == group)
+                .filter(entry -> {
+                    RegistryService.EntryStatus entryStatus = registry.status(entry);
+                    return entryStatus.installable() && !entryStatus.present();
+                })
+                .map(RegistryEntry::id)
+                .toList();
+    }
+
     private UiPage browse(String id, String query, RegistryItemType type) {
+        return browse(id, query, type, null);
+    }
+
+    private UiPage browse(String id, String query, RegistryItemType type, RegistryOutcome outcome) {
         Optional<RegistrySource> found = source(id);
         if (found.isEmpty()) {
             return list();
@@ -133,7 +217,8 @@ public class RegistryUiController {
         }
         List<RegistryEntry> entries = index.search(query, type);
         return UiPage.of(RegistryListView.BASE + "/" + id,
-                new RegistryBrowseView(source, index, entries, query, type, registry::status).render());
+                new RegistryBrowseView(source, index, entries, query, type, registry::status,
+                        outcome).render());
     }
 
     // --------------------------------------------------------------- one entry
@@ -244,6 +329,11 @@ public class RegistryUiController {
         } catch (IllegalArgumentException notAnId) {
             return Optional.empty();
         }
+    }
+
+    /** A form value as text, or null when it was not sent at all. */
+    private static String text(Object value) {
+        return value == null ? null : value.toString();
     }
 
     private static RegistryItemType typeOf(Object value) {

@@ -49,7 +49,7 @@ agents name it and leaves it out of the removal unless it is ticked.
    row `changelog-style`, subtitle
    `Skill · 1.0.0 · by mindconnect · How a changelog entry is written — loaded by an agent on demand`,
    and an **Import** action. Set the kind filter to **Skill**: only
-   `changelog-style` remains. Set it back to **Everything**.
+   `changelog-style` remains. Leave the filter on **Skill**.
 
 2. Click `changelog-style`.
    **Expected:** the entry page shows **Kind** `Skill`, **Version** `1.0.0`,
@@ -58,9 +58,13 @@ agents name it and leaves it out of the removal unless it is ticked.
    `A skill from a registry is its SKILL.md alone: files beside it in the repository are not brought along.`
    Buttons: **Import**, **Import and overwrite**, **Back to <name>**.
 
-3. **Import** → confirm (`Import 'changelog-style' from <REGISTRY>@main?`).
-   **Expected:** the report under the page reads `✓ 1 imported` and
-   `Skill 'changelog-style' — imported`.
+3. **Back to <name>**, then **Import** in the `changelog-style` row — no
+   dialog, the import runs from the list.
+   **Expected:** the registry list comes back with the kind filter still on
+   **Skill** and a report above it: `✓ changelog-style — 1 imported` and
+   `Skill 'changelog-style' — imported`. The row now carries the **Already
+   here** badge and its action reads **Overwrite**. Set the filter back to
+   **Everything**.
 
 4. http://localhost:9090/admin/skills → click `changelog-style`.
    **Expected:** the list row shows the description; the detail page has
@@ -78,7 +82,7 @@ agents name it and leaves it out of the removal unless it is ticked.
    http://localhost:9090/admin/skills the row reads `changelog-style (off)`.
    Return to the registry entry page of `changelog-style`.
    **Expected:** the first button now reads **Import, keep mine**, and the
-   entry's row on the registry list says `· already here` with an
+   entry's row on the registry list carries the **Already here** badge with an
    **Overwrite** action.
 
 6. **Import and overwrite** → confirm.

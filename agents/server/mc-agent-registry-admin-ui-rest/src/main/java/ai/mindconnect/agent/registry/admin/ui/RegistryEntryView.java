@@ -1,7 +1,6 @@
 package ai.mindconnect.agent.registry.admin.ui;
 
 import ai.mindconnect.agent.registry.domain.ImportReport;
-import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryIndex;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
@@ -105,7 +104,7 @@ final class RegistryEntryView {
             stack.child(detail);
         }
         if (error != null) {
-            stack.child(note("registry-entry-error", "✗ " + error));
+            stack.child(RegistryNotes.note("registry-entry-error", "✗ " + error));
         }
         if (report != null) {
             stack.child(reportNode());
@@ -146,8 +145,8 @@ final class RegistryEntryView {
         }
         // A package is a handful of entries and this tab exists to show them,
         // so the rubrics start open.
-        RegistryBrowseView.addGrouped(list, "registry-package-group-", contents.members(), true,
-                member -> member(base, member));
+        RegistryBrowseView.addGrouped(list, "registry-package-group-", contents.members(),
+                kind -> true, member -> member(base, member), (kind, group) -> List.of());
         for (String missing : contents.unresolved()) {
             list.item(UiList.Item.of("unresolved-" + missing, missing)
                     .icon("warning")
@@ -326,21 +325,10 @@ final class RegistryEntryView {
                     + "run by importing it, but everything in it is here afterwards.";
         };
         String origin = source.repositoryUrl() != null ? source.repositoryUrl() : source.coordinates();
-        return note("registry-entry-warning", text + "\nFrom " + origin + ".");
+        return RegistryNotes.note("registry-entry-warning", text + "\nFrom " + origin + ".");
     }
 
     private UiNode reportNode() {
-        StringBuilder text = new StringBuilder(report.ok() ? "✓ " : "⚠ ")
-                .append(report.summary());
-        for (ImportedItem item : report.items()) {
-            text.append('\n').append(item);
-        }
-        return note("registry-entry-report", text.toString());
-    }
-
-    private static UiNode note(String id, String text) {
-        return UiStack.of(id)
-                .<UiStack>withCssClass("llm-test-result")
-                .child(UiText.of(id + "-text", text).<UiText>withCssClass("llm-test-body"));
+        return RegistryNotes.report("registry-entry-report", null, report);
     }
 }
