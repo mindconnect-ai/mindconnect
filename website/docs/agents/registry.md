@@ -31,9 +31,27 @@ pushed last.
 
 Open a registry to see what it offers — filed under *Agents*, *LLM configs*,
 *Workflows* and *Packages* — search or filter by kind, and import an entry. Each
-row says what this installation would do with it — *already here*, or a kind this
-installation cannot install at all — before you press anything; its button reads
-**Import** for something new and **Overwrite** for something already here.
+row carries the button that installs it: **Import** for something new,
+**Overwrite** — with a confirmation — for something already here, and no button
+at all for a kind this installation has no installer for. A badge beside the
+name says which of the three it is.
+
+The import runs from the row and lands back on the same list: the report above
+it, line by line, the row's badge flipped to *Already here*, and the search and
+the kind filter as they were. Opening an entry is for reading it first — its
+warning, its description, a package's contents — not a station every import has
+to pass through. A package's row always reads **Import**: whether a package as
+such is here is not something an installation knows, only whether its members
+are, so overwriting one is done from its page.
+
+Each rubric carries **Import missing (n)** beside its heading — everything of
+that kind the list is showing that this installation could install and has not.
+It asks first, because it is the one button whose reach is wider than the row
+it sits on, and it imports in one walk: an LLM config three of the agents point
+at is fetched once and the report says so once. The set is recomputed when the
+button is pressed, not taken from what the page counted. *Packages* has no such
+button — a package is already a bulk import, and "what is missing" is not a
+question an installation can answer about one.
 
 A package opens on two tabs: its details, and *Contents* — everything importing
 it would install, the entries its members require included, each marked *New*

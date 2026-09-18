@@ -643,6 +643,36 @@ body {
 #agent-list .sui-activity-body .sui-list-header,
 .registry-catalog .sui-activity-body .sui-list-header { display: none; }
 
+/* A catalog row's title: the kind's icon, the name, and — once it is here —
+   the badge that says so. The row's own Import button installs from the list,
+   so the state has to be readable without opening anything. Same green pill as
+   the agent list's LLM badge, pushed to the right of the name. */
+.registry-entry-head { align-items: center; }
+.registry-entry-badge {
+    display: inline-block;
+    margin-left: auto;
+    margin-right: 16px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: var(--sui-text-xs, 12px);
+    font-weight: 500;
+    line-height: 1.6;
+    white-space: nowrap;
+    background: var(--sui-color-success-bg, #dcfce7);
+    color: var(--sui-color-success, #15803d);
+    border: 1px solid var(--sui-color-success-border, #86efac);
+}
+/* A kind this installation has no installer for: no button either, so the
+   badge is the whole answer and stays quiet. */
+.registry-entry-badge--unavailable {
+    background: transparent;
+    color: var(--sui-color-text-subtle);
+    border-color: var(--sui-color-border, #d4d4d8);
+}
+@media (max-width: 768px) {
+    .registry-entry-badge { margin-left: 0; margin-right: 0; }
+}
+
 /* A package's Contents tab: what importing each entry would do here. An entry
    that is already here is the one to look at twice — Import and overwrite
    replaces it — so it takes the warning ink; a new one stays quiet. */

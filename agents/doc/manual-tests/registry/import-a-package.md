@@ -42,18 +42,20 @@ second import changes nothing unless overwrite is asked for.
    **Expected:** Five entries — an LLM config, an agent, a workflow, a skill
    and a package — in collapsed sections per kind (**Agents (1)**, **LLM
    configs (1)**, **Workflows (1)**, **Skills (1)**, **Packages (1)**), each
-   with its kind and version in the subtitle and an **Import** button. Nothing
-   says "already here".
+   with its kind and version in the subtitle and an **Import** button that
+   installs from the list. No row carries an **Already here** badge.
 3. Type `kit` into the search field.
    **Expected:** Only **Release kit** remains. Clear it again. (The search
    also matches tags: `release` would keep `changelog-writer` and
    `changelog-style` too, which carry the tag `release`.)
 4. Set the kind filter to **Agent**.
    **Expected:** Only `changelog-writer`. Set it back to **Everything**.
-5. Click **Release kit**, then **Import**, and confirm the browser dialog.
-   **Expected:** The entry screen comes back with a report under it:
-   `4 imported`, one line each for the LLM config, the agent, the workflow and
-   the skill, in that order — the config before the agent that requires it.
+5. Open **Packages (1)** and press **Import** in the **Release kit** row.
+   **Expected:** No dialog. The registry list comes back — same screen, same
+   filters — with a report above it: `✓ Release kit — 4 imported`, one line
+   each for the LLM config, the agent, the workflow and the skill, in that
+   order — the config before the agent that requires it. The rows of those
+   four now carry the **Already here** badge.
 6. http://localhost:9090/admin/agents and http://localhost:9090/admin/llm-configs
    and http://localhost:9090/workflow-admin.
    **Expected:** `changelog-writer` is in the agent list with the prompt from
@@ -64,15 +66,33 @@ second import changes nothing unless overwrite is asked for.
    in the workflow list. http://localhost:9090/admin/skills lists
    `changelog-style` with the instructions from the file.
 7. Open the agent `changelog-writer` and change its description to `mine`. Save.
-   Back to the registry, **Release kit**, **Import** again.
-   **Expected:** `4 skipped` — every line says something of that name is already
-   here. The agent's description is still `mine`.
-8. Same screen, **Import and overwrite**, confirm.
+   Back to the registry list, **Import** in the **Release kit** row again.
+   **Expected:** `✓ Release kit — 4 skipped` — every line says something of that
+   name is already here. The agent's description is still `mine`.
+8. Click **Release kit** to open it, then **Import and overwrite**, confirm.
    **Expected:** `4 updated`. The agent's description is back to the registry's,
    and its id in the URL is **unchanged** from step 7 — an overwrite keeps the
-   local id.
-9. Back on the entry list, one entry at a time: the rows now read
-   "already here".
+   local id. (A package's row on the list only ever offers **Import**: whether
+   a package as such is here is not something this installation knows, only
+   whether its members are.)
+9. **Back to <name>**, then **Overwrite** in the `changelog-writer` row, confirm
+   the dialog.
+   **Expected:** the list comes back with `✓ changelog-writer — 1 updated`, and
+   the rows of the agent, the workflow, the skill and the LLM config all carry
+   the **Already here** badge.
+10. Look at the rubric headings.
+    **Expected:** none of **Agents**, **LLM configs**, **Workflows** or
+    **Skills** carries an **Import missing (n)** button any more — everything
+    the registry offers is here. **Packages** never carries one.
+11. Delete the skill `changelog-style` on http://localhost:9090/admin/skills and
+    come back to the registry list (**Refresh** is not needed — the badge reads
+    the local store, not the index).
+    **Expected:** the **Skills** rubric heading carries **Import missing (1)**.
+    Press it and confirm `Import the 1 entry of Skills in <REGISTRY>@main that
+    are not here yet?`.
+    **Expected:** the list comes back with `✓ Skills — 1 imported`, the Skills
+    rubric open, `changelog-style` back with its **Already here** badge, and the
+    button gone.
 
 ## Cleanup
 

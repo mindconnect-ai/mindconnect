@@ -330,6 +330,60 @@ public class RegistryService {
         return report;
     }
 
+    /**
+     * Imports several entries in one walk — what a rubric's "import what is
+     * missing" button asks for.
+     *
+     * <p>One walk, not one per entry: the visited set spans the whole set, so
+     * the LLM config three of the agents require is installed once and the
+     * report says so once. Order is the order given, dependencies before the
+     * entry that needs them, as everywhere else.
+     *
+     * <p>An id that names nothing is a {@code FAILED} line and the rest goes
+     * on, because a stale index entry is no reason to leave the other nine
+     * uninstalled.
+     *
+     * @throws RegistryException when there is no such source or the index
+     *         cannot be read — nothing was installed then
+     */
+    public ImportReport importEntries(RegistrySourceId sourceId, List<String> entryIds, ImportMode mode) {
+        RegistrySource source = requireSource(sourceId);
+        RegistryIndex index = client.fetchIndex(source);
+        ImportMode effectiveMode = mode == null ? ImportMode.SKIP_EXISTING : mode;
+
+        List<ImportedItem> items = new ArrayList<>();
+        Set<String> visited = new LinkedHashSet<>();
+        Visitor visitor = new Visitor() {
+            @Override
+            public void entity(RegistryEntry member) {
+                items.add(installOne(source, member, effectiveMode));
+            }
+
+            @Override
+            public void excluded(RegistryEntry member) {
+                items.add(ImportedItem.skipped(member, member.name(), "left out of this import"));
+            }
+
+            @Override
+            public void report(ImportedItem item) {
+                items.add(item);
+            }
+        };
+        for (String entryId : entryIds == null ? List.<String>of() : entryIds) {
+            Optional<RegistryEntry> entry = index.find(entryId);
+            if (entry.isEmpty()) {
+                items.add(ImportedItem.unresolved(entryId,
+                        "not in this registry's index — the list it was chosen from is out of date"));
+                continue;
+            }
+            walk(source, index, entry.get(), Set.of(), visited, 0, visitor);
+        }
+        ImportReport report = new ImportReport(sourceId.value(), null, items);
+        log.info("Imported {} entries from {}: {}",
+                entryIds == null ? 0 : entryIds.size(), source.coordinates(), report.summary());
+        return report;
+    }
+
     // --------------------------------------------------------------- removing
 
     /**

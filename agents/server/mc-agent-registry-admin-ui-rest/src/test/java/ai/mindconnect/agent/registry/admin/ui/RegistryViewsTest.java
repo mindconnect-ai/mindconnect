@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.registry.admin.ui;
 
+import ai.mindconnect.agent.registry.domain.ImportReport;
+import ai.mindconnect.agent.registry.domain.ImportedItem;
 import ai.mindconnect.agent.registry.domain.RegistryEntry;
 import ai.mindconnect.agent.registry.domain.RegistryIndex;
 import ai.mindconnect.agent.registry.domain.RegistryItemType;
@@ -25,6 +27,7 @@ class RegistryViewsTest {
 
     private static final RegistrySource SOURCE = RegistrySource.of("acme/registry");
     private static final RegistryService.EntryStatus NEW = new RegistryService.EntryStatus(true, false);
+    private static final RegistryService.EntryStatus HERE = new RegistryService.EntryStatus(true, true);
 
     private static final RegistryEntry WORKFLOW = entry("greeting", RegistryItemType.WORKFLOW);
     private static final RegistryEntry AGENT = entry("researcher", RegistryItemType.AGENT);
@@ -79,8 +82,8 @@ class RegistryViewsTest {
         JsonNode tree = new ObjectMapper().valueToTree(page);
 
         assertThat(tree.toString()).contains("\"Already here\"").contains("\"New\"");
-        assertThat(checkbox(tree, "include-default-llm").path("value").asBoolean()).isTrue();
-        assertThat(checkbox(tree, "include-researcher").path("value").asBoolean()).isFalse();
+        assertThat(node(tree, "include-default-llm").path("value").asBoolean()).isTrue();
+        assertThat(node(tree, "include-researcher").path("value").asBoolean()).isFalse();
         // Import, overwrite and remove all send the Contents tab along.
         assertThat(tree.toString()).contains("/remove/kit")
                 .contains("\"payload\":\"" + RegistryEntryView.SELECTION_ID + "\"");
@@ -99,10 +102,10 @@ class RegistryViewsTest {
                 e -> here, contents, null, Set.of(), null, null).render());
 
         assertThat(fresh.toString()).contains("Used by Agent 'default-chat', Agent 'planner'");
-        assertThat(checkbox(fresh, "include-default-llm").path("value").asBoolean()).isFalse();
-        assertThat(checkbox(fresh, "include-researcher").path("value").asBoolean()).isTrue();
+        assertThat(node(fresh, "include-default-llm").path("value").asBoolean()).isFalse();
+        assertThat(node(fresh, "include-researcher").path("value").asBoolean()).isTrue();
         // Once a choice came back from the page, it is the choice.
-        assertThat(checkbox(chosen, "include-default-llm").path("value").asBoolean()).isTrue();
+        assertThat(node(chosen, "include-default-llm").path("value").asBoolean()).isTrue();
     }
 
     @Test
@@ -145,21 +148,134 @@ class RegistryViewsTest {
 
     @Test
     void a_registry_row_offers_import_for_what_is_new_and_overwrite_for_what_is_here() throws Exception {
-        RegistryService.EntryStatus here = new RegistryService.EntryStatus(true, true);
-
         String json = json(new RegistryBrowseView(SOURCE, INDEX, List.of(AGENT, CONFIG), null, null,
-                e -> e == AGENT ? here : NEW).render());
+                e -> e == AGENT ? HERE : NEW).render());
 
         assertThat(json).contains("\"overwrite-researcher\"").contains("\"Overwrite\"")
                 .contains("\"import-default-llm\"").doesNotContain("Re-import");
     }
 
-    /** The field node with that id, wherever it sits in the tree. */
-    private static JsonNode checkbox(JsonNode tree, String id) {
+    @Test
+    void a_row_button_imports_from_the_list_and_sends_the_search_along() throws Exception {
+        String base = "/registry/api/" + SOURCE.id().value();
+
+        String json = json(new RegistryBrowseView(SOURCE, INDEX, List.of(AGENT, CONFIG), "res",
+                RegistryItemType.AGENT, e -> e == AGENT ? HERE : NEW).render());
+
+        // The import runs from the row, not after a detour via the entry page.
+        assertThat(json).contains(base + "/install/default-llm?mode=SKIP_EXISTING")
+                .contains(base + "/install/researcher?mode=OVERWRITE")
+                .contains("\"payload\":\"registry-browse-search\"");
+        // Overwriting asks first; adding what is new does not.
+        assertThat(json).contains("Replace what is here with 'researcher'");
+        // The row itself still opens the entry.
+        assertThat(json).contains(base + "/entry/researcher");
+    }
+
+    @Test
+    void a_row_wears_its_state_as_a_badge_beside_the_name() throws Exception {
+        RegistryService.EntryStatus foreign = new RegistryService.EntryStatus(false, false);
+
+        String json = json(new RegistryBrowseView(SOURCE, INDEX, List.of(AGENT, CONFIG, WORKFLOW), null, null,
+                e -> e == AGENT ? HERE : e == WORKFLOW ? foreign : NEW).render());
+
+        assertThat(json).contains("\"Already here\"").contains("registry-entry-badge--present")
+                .contains("\"Not installable here\"").contains("registry-entry-badge--unavailable");
+        // A kind with no installer has no button to press.
+        assertThat(json).doesNotContain("/install/greeting");
+    }
+
+    @Test
+    void what_the_import_did_stands_above_the_list_it_came_back_to() throws Exception {
+        ImportReport report = new ImportReport(SOURCE.id().value(), "kit", List.of(
+                ImportedItem.imported(AGENT, "researcher"),
+                ImportedItem.failed(CONFIG, "does not parse")));
+
+        String json = json(new RegistryBrowseView(SOURCE, INDEX, INDEX.entries(), null, null,
+                e -> NEW, outcome(report)).render());
+
+        assertThat(json).containsSubsequence("registry-browse-report", "registry-entries");
+        assertThat(json).contains("⚠ kit — 1 imported, 1 failed")
+                .contains("LLM config 'default-llm' — failed (does not parse)");
+    }
+
+    @Test
+    void an_import_opens_the_rubrics_it_touched_and_leaves_the_rest_folded() throws Exception {
+        ImportReport report = new ImportReport(SOURCE.id().value(), "greeting",
+                List.of(ImportedItem.imported(WORKFLOW, "greeting")));
+
+        JsonNode plain = new ObjectMapper().valueToTree(new RegistryBrowseView(SOURCE, INDEX,
+                INDEX.entries(), null, null, e -> NEW).render());
+        JsonNode after = new ObjectMapper().valueToTree(new RegistryBrowseView(SOURCE, INDEX,
+                INDEX.entries(), null, null, e -> NEW, outcome(report)).render());
+
+        assertThat(node(plain, "registry-group-workflow").path("collapseOpen").asBoolean()).isFalse();
+        assertThat(node(after, "registry-group-workflow").path("collapseOpen").asBoolean()).isTrue();
+        // The registry around it stays the map it was.
+        assertThat(node(after, "registry-group-agent").path("collapseOpen").asBoolean()).isFalse();
+    }
+
+    @Test
+    void an_import_that_could_not_run_says_so_above_the_list() throws Exception {
+        String json = json(new RegistryBrowseView(SOURCE, INDEX, INDEX.entries(), null, null,
+                e -> NEW, new RegistryOutcome("kit", null, null, "404 Not Found")).render());
+
+        assertThat(json).containsSubsequence("✗ 404 Not Found", "registry-entries");
+    }
+
+    @Test
+    void a_rubric_offers_to_import_what_is_missing_in_it_and_says_how_many() throws Exception {
+        // One agent here, one not; every LLM config here.
+        String json = json(new RegistryBrowseView(SOURCE, INDEX, INDEX.entries(), null, null,
+                e -> e == AGENT || e.type() == RegistryItemType.LLM_CONFIG ? HERE : NEW).render());
+
+        assertThat(json).contains("\"Import missing (1)\"")
+                .contains("/install-group/agent")
+                .contains("Import the 1 entry of Agents in acme/registry@main that are not here yet?");
+        // A rubric with nothing missing keeps quiet, and so does Packages —
+        // whether a package is here is not a thing an installation knows.
+        assertThat(json).doesNotContain("/install-group/llm-config")
+                .doesNotContain("/install-group/package");
+    }
+
+    @Test
+    void the_rubric_button_counts_only_what_this_installation_could_install() throws Exception {
+        RegistryService.EntryStatus foreign = new RegistryService.EntryStatus(false, false);
+
+        String json = json(new RegistryBrowseView(SOURCE, INDEX, INDEX.entries(), null, null,
+                e -> e == AGENT ? foreign : NEW).render());
+
+        // The rubric holds two agents; one of them this installation has no
+        // installer for, so the button offers the one it can actually install.
+        assertThat(json).contains("Agents  (2)")
+                .contains("\"import-missing-agent\"").contains("\"Import missing (1)\"");
+    }
+
+    @Test
+    void importing_a_whole_rubric_is_filed_under_its_title() throws Exception {
+        ImportReport report = new ImportReport(SOURCE.id().value(), null, List.of(
+                ImportedItem.imported(AGENT, "researcher"),
+                ImportedItem.imported(OTHER_AGENT, "writer")));
+
+        JsonNode tree = new ObjectMapper().valueToTree(new RegistryBrowseView(SOURCE, INDEX,
+                INDEX.entries(), null, null, e -> NEW,
+                new RegistryOutcome("Agents", RegistryItemType.AGENT, report, null)).render());
+
+        assertThat(tree.toString()).contains("✓ Agents — 2 imported");
+        assertThat(node(tree, "registry-group-agent").path("collapseOpen").asBoolean()).isTrue();
+    }
+
+    /** An import of one entry, as the controller files it. */
+    private static RegistryOutcome outcome(ImportReport report) {
+        return new RegistryOutcome("kit", RegistryItemType.PACKAGE, report, null);
+    }
+
+    /** The one node with that id, wherever it sits in the tree. */
+    private static JsonNode node(JsonNode tree, String id) {
         List<JsonNode> found = tree.findParents("id").stream()
                 .filter(n -> id.equals(n.path("id").asText()))
                 .toList();
-        assertThat(found).as("field " + id).hasSize(1);
+        assertThat(found).as("node " + id).hasSize(1);
         return found.get(0);
     }
 
