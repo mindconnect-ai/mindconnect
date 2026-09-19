@@ -27,8 +27,9 @@ the JSON is the identity.
 
 ## When and how it's loaded
 
-On startup an `InitialDataLoader` scans `classpath:initial-data/` and applies
-each file:
+On startup an `InitialDataLoader` scans `initial-data/` in **every jar on the
+classpath** — the app's own and any module added to it — and applies each
+file:
 
 | Situation | What happens |
 |-----------|--------------|

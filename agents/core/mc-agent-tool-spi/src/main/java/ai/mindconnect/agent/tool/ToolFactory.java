@@ -91,6 +91,13 @@ public interface ToolFactory {
      */
     default ConnectionSpec connectionSpec() { return null; }
 
+    /**
+     * A way to try a connection of {@link #connectionSpec()} out from the
+     * Connections page, without a tool call. Empty means the page offers no
+     * test button for this provider. Default: empty.
+     */
+    default java.util.Optional<ConnectionTester> connectionTester() { return java.util.Optional.empty(); }
+
 
     /** Build a tool for the given configuration and call scope. */
     Tool create(AgentTool agentTool, ToolCallScope scope);
