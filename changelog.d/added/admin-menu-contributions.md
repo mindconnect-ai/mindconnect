@@ -3,8 +3,10 @@
   the menu was a fixed list, so the page was reachable by URL only. It now
   registers an `AdminMenuContribution` bean and says which entries to show,
   for an admin of the namespace and for a plain user of it separately, so a
-  contribution never offers a viewer a route the server would refuse. The
-  entries follow the shipped sections, before the Install group.
+  contribution never offers a viewer a route the server would refuse. An entry
+  is a link or a group of links, like Install; groups with one id from several
+  modules become one. The entries follow the shipped sections, before the
+  Install group.
 - **agents:** **a module on the classpath ships its own agents, skills and workflows.** The
   seeds were read from the app's own jar only: `initial-data/` in a second jar
   was never scanned, so a module that brings an agent had to install it by
