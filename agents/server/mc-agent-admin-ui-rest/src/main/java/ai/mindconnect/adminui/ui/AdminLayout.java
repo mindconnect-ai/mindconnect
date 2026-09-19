@@ -51,6 +51,8 @@ public final class AdminLayout {
     private NamespaceSwitch namespaces;
     /** What the header calls this installation; the shipped one until {@link #brand} says otherwise. */
     private Brand brand = Brand.DEFAULT;
+    /** Entries modules add to the sidebar, already filtered for this viewer; see {@link AdminMenuContribution}. */
+    private List<AdminMenuContribution.Entry> contributed = List.of();
 
     /**
      * The installation's name and mark in the header: the heading, the logo
@@ -250,6 +252,17 @@ public final class AdminLayout {
         return this;
     }
 
+    /**
+     * The entries modules add to the sidebar, in order. Already the ones for
+     * this viewer: the caller asked each {@link AdminMenuContribution} with
+     * whether the viewer is an admin, so a chat-only viewer gets exactly what
+     * a contribution said is open to them.
+     */
+    public AdminLayout contributions(List<AdminMenuContribution.Entry> entries) {
+        this.contributed = entries == null ? List.of() : List.copyOf(entries);
+        return this;
+    }
+
     private UiMenu buildMenu(String navigate) {
         UiMenu menu = UiMenu.of("app-menu", null);
         menu.mode(UiMenu.Mode.RESPONSIVE);
@@ -259,6 +272,7 @@ public final class AdminLayout {
             // they came for, and an entry they may not open is worse than none.
             // The server refuses those routes as well — this is the friendly
             // half of that, not the guard (see NamespaceAccessInterceptor).
+            contributed(menu, navigate);
             version(menu);
             return menu;
         }
@@ -271,10 +285,18 @@ public final class AdminLayout {
             menu.item(navItem("nav-mcp", "MCP Servers", "/mcp-gateway", "plug", navigate));
         }
         menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
+        contributed(menu, navigate);
         menu.item(installGroup(navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));
         version(menu);
         return menu;
+    }
+
+    /** The entries modules contributed, after the shipped sections and before the Install group. */
+    private void contributed(UiMenu menu, String navigate) {
+        for (AdminMenuContribution.Entry entry : contributed) {
+            menu.item(navItem(entry.id(), entry.label(), entry.href(), entry.icon(), navigate));
+        }
     }
 
     /**

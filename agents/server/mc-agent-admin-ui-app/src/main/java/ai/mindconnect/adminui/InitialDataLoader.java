@@ -24,7 +24,10 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * Loads initial data from {@code classpath:initial-data/} on startup.
+ * Loads initial data from {@code initial-data/} on startup — from every jar
+ * on the classpath, not only the app's own: a module that ships agents or
+ * skills of its own puts them under the same paths in its jar and they are
+ * seeded, and later migrated, like the bundled ones.
  * <p>
  * <ul>
  *   <li>{@code initial-data/llm-configs/*.json} — imported if no config with the same name exists;
@@ -96,7 +99,7 @@ public class InitialDataLoader implements ApplicationRunner {
     // ── LLM configs ───────────────────────────────────────────────────────────
 
     private void loadLlmConfigs(ConfirmOverwrite confirm) {
-        for (Resource resource : scan("classpath:initial-data/llm-configs/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/llm-configs/*.json")) {
             try {
                 LlmConfig incoming = read(resource, LlmConfig.class);
                 llmConfigRepository.findByName(incoming.name()).ifPresentOrElse(existing -> {
@@ -122,7 +125,7 @@ public class InitialDataLoader implements ApplicationRunner {
     // ── Agent definitions ─────────────────────────────────────────────────────
 
     private void loadAgentDefinitions(ConfirmOverwrite confirm) {
-        for (Resource resource : scan("classpath:initial-data/agent-definitions/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/agent-definitions/*.json")) {
             try {
                 AgentDefinition incoming = read(resource, AgentDefinition.class);
                 agentDefinitionRepository.findByName(incoming.name()).ifPresentOrElse(existing -> {
@@ -154,7 +157,7 @@ public class InitialDataLoader implements ApplicationRunner {
      * the shipped wording has no claim on it.
      */
     private void loadSkills() {
-        for (Resource resource : scan("classpath:initial-data/skills/*.md")) {
+        for (Resource resource : scan("classpath*:initial-data/skills/*.md")) {
             String fileName = resource.getFilename() == null ? "skill" : resource.getFilename();
             String fallback = fileName.endsWith(".md")
                     ? fileName.substring(0, fileName.length() - 3) : fileName;

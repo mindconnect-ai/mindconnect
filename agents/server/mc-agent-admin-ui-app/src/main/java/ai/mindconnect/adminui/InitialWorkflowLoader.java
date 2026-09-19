@@ -27,7 +27,7 @@ import java.io.InputStream;
 @Component
 public class InitialWorkflowLoader implements ApplicationRunner {
 
-    private static final String LOCATION = "classpath:initial-data/workflows/*.json";
+    private static final String LOCATION = "classpath*:initial-data/workflows/*.json";
 
     private final WorkflowDataRepository workflows;
     private final JacksonWorkflowSerializer serializer =
