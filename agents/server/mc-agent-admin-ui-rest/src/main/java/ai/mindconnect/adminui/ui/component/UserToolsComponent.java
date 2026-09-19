@@ -139,7 +139,7 @@ public final class UserToolsComponent {
     public static UiForm form(String toolName, Optional<ConnectionSpec> spec, List<Connection> connections,
                               UserTool editing, String error) {
         boolean editingExisting = editing != null;
-        String target = editingExisting ? API + "/" + editing.id().value() : API + "/" + toolName;
+        String target = editingExisting ? API + "/" + editing.id().value() : API + "/add/" + toolName;
 
         UiForm form = UiForm.of(FORM_ID, null)
                 .field(UiField.text("alias", "Name in your chats",
