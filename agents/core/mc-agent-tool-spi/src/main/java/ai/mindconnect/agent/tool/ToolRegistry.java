@@ -63,6 +63,16 @@ public interface ToolRegistry {
     default String subgroupOf(String toolName) { return null; }
 
     /**
+     * Every user variable the tool sources behind this registry declare
+     * ({@code ToolFactory.userVariables()} / {@code MultiToolProvider.userVariables()}),
+     * each stamped with the source that declared it. Names are unique: two
+     * sources asking for {@code MC_EMAIL_HOST} mean the same variable, and the
+     * first declaration wins. Default: empty, for registries that enumerate
+     * nothing.
+     */
+    default List<ToolVariable> declaredVariables() { return List.of(); }
+
+    /**
      * Lets go of whatever the tools hold for one session — a pooled connection,
      * a started container. Called by whoever ends the session; today that is
      * the tool test bench, whose sessions last one call. Idempotent, and safe

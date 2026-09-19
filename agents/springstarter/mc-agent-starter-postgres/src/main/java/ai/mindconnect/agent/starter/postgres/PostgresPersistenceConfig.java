@@ -96,4 +96,10 @@ public class PostgresPersistenceConfig {
     ai.mindconnect.user.port.out.ApiTokenRepository apiTokenRepository(Sql mindconnectSql) {
         return new ai.mindconnect.user.adapter.pg.PgApiTokenRepository(mindconnectSql).initSchema();
     }
+
+    /** Installation-wide like the users they are addressed to, and not encrypted: a notice is not a secret. */
+    @Bean
+    ai.mindconnect.user.port.out.NotificationRepository notificationRepository(Sql mindconnectSql) {
+        return new ai.mindconnect.user.adapter.pg.PgNotificationRepository(mindconnectSql).initSchema();
+    }
 }

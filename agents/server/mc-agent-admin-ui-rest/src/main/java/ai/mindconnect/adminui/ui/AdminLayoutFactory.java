@@ -13,7 +13,10 @@ import ai.mindconnect.agent.registry.service.RegistryService;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.adminui.ui.component.NotificationsComponent;
+import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
+import ai.mindconnect.user.service.NotificationService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -64,6 +67,8 @@ public class AdminLayoutFactory {
     private final BrandingProperties branding;
     /** Which host stands for which namespace; absent on a host that does not bind any. */
     private final ObjectProvider<HostNamespaces> hostNamespaces;
+    /** Present when this host keeps notifications — then the header carries the bell. */
+    private final ObjectProvider<NotificationService> notifications;
 
     @Autowired
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
@@ -74,7 +79,9 @@ public class AdminLayoutFactory {
                               ObjectProvider<NamespaceService> namespaceService,
                               ObjectProvider<ScopeSupplier> scope,
                               BrandingProperties branding,
-                              ObjectProvider<HostNamespaces> hostNamespaces) {
+                              ObjectProvider<HostNamespaces> hostNamespaces,
+                              ObjectProvider<NotificationService> notifications) {
+        this.notifications = notifications;
         this.branding = branding;
         this.hostNamespaces = hostNamespaces;
         this.authEnabled = authEnabled;
@@ -93,7 +100,7 @@ public class AdminLayoutFactory {
                               ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
                               ObjectProvider<RegistryService> registryService) {
         this(authEnabled, buildInfo, taskMonitor, mcpRegistryAdmin, registryService, none(), none(),
-                new BrandingProperties(), none());
+                new BrandingProperties(), none(), none());
     }
 
     /**
@@ -110,8 +117,21 @@ public class AdminLayoutFactory {
                 registryService.getIfAvailable() != null);
         layout.brand(currentBrand());
         layout.chatOnly(!shapesCurrentNamespace());
+        notificationBell().ifPresent(layout::notifications);
         namespaceSwitch().ifPresent(layout::namespaces);
         return layout;
+    }
+
+    /**
+     * The bell as it stands for the signed-in user: absent on a host that
+     * keeps no notifications, and absent off a request that carries a user —
+     * a scheduled render has nobody to have notices.
+     */
+    private Optional<UiNode> notificationBell() {
+        NotificationService service = notifications.getIfAvailable();
+        if (service == null) return Optional.empty();
+        return currentUserId().map(user ->
+                NotificationsComponent.badge(service.unreadCount(user), service.hasActionRequired(user)));
     }
 
     /**

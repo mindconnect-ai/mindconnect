@@ -262,6 +262,35 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
     }
 
     @Override
+    public List<ToolVariable> declaredVariables() {
+        // Name wins once: two sources asking for MC_EMAIL_HOST mean the same
+        // variable, and a second, differently worded declaration of it would
+        // put two rows in front of the user for one value. Factories first,
+        // for the same reason they win on tool names.
+        Map<String, ToolVariable> byName = new LinkedHashMap<>();
+        for (ToolFactory factory : factoriesByName.values()) {
+            collect(byName, factory.userVariables(), factory.name());
+        }
+        for (MultiToolProvider provider : ready()) {
+            collect(byName, provider.userVariables(), groupOrDefault(provider.group()));
+        }
+        return List.copyOf(byName.values());
+    }
+
+    /** Stamps each declaration with the source it came from and keeps the first of a name. */
+    private static void collect(Map<String, ToolVariable> byName, List<ToolVariable> declared, String source) {
+        if (declared == null) return;
+        for (ToolVariable variable : declared) {
+            if (variable == null) continue;
+            ToolVariable previous = byName.putIfAbsent(variable.name(), variable.declaredBy(source));
+            if (previous != null && !source.equals(previous.declaredBy())) {
+                log.debug("Variable '{}' is declared by '{}' and by '{}' — keeping the first",
+                        variable.name(), previous.declaredBy(), source);
+            }
+        }
+    }
+
+    @Override
     public Map<String, Set<String>> toolNamesByGroup() {
         // Sorted groups, sorted names — a stable view for catalogs and pickers.
         Map<String, Set<String>> byGroup = new java.util.TreeMap<>();

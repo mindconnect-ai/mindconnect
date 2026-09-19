@@ -98,6 +98,17 @@ public final class OverlayToolRegistry implements ToolRegistry {
         return byGroup;
     }
 
+    /**
+     * Untouched: an operator's tool settings say what a tool is called and
+     * described as, never what it needs to run. A tool switched off here is
+     * switched off for this namespace, not uninstalled, and its variables stay
+     * listed.
+     */
+    @Override
+    public java.util.List<ToolVariable> declaredVariables() {
+        return delegate.declaredVariables();
+    }
+
     @Override
     public Map<String, Object> overridesSchema(String toolName) {
         return delegate.overridesSchema(toolName);

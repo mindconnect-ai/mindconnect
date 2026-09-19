@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.ui.page;
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.ToolVariable;
 import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.domain.NamespaceRole;
@@ -52,6 +53,8 @@ public class ProfilePage extends AdminPage {
     /** The variables table — replaced in place after a variable is added or removed. */
     public static final String ENVIRONMENT_ID = "profile-environment";
     static final String ENVIRONMENT_FORM_ID = "profile-environment-form";
+    /** The table of what the installed tools ask for — replaced beside the user's own after every change. */
+    public static final String TOOL_VARIABLES_ID = "profile-tool-variables";
     /** The namespace variables tab's content — replaced when a namespace the user created comes or goes. */
     public static final String NAMESPACE_ENVIRONMENT_ID = "profile-namespace-variables";
 
@@ -78,6 +81,8 @@ public class ProfilePage extends AdminPage {
     /** Whether the default namespace still takes every signed-in user; see {@code NamespacesPage}. */
     private final boolean defaultOpen;
     private final Namespace active;
+    /** What the installed tools declare they need from this user; empty on a host that has no tools. */
+    private final List<ToolVariableRow> toolVariables;
 
     /**
      * @param me          who the signed-in user is to a namespace — id and the address they are
@@ -98,6 +103,15 @@ public class ProfilePage extends AdminPage {
     public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
                        boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
                        boolean defaultOpen, Namespace active) {
+        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace,
+                defaultOpen, active, List.of());
+    }
+
+    /** The page with what the installed tools ask of this user beside their own variables. */
+    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
+                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+                       boolean defaultOpen, Namespace active, List<ToolVariableRow> toolVariables) {
+        this.toolVariables = toolVariables == null ? List.of() : List.copyOf(toolVariables);
         this.defaultOpen = defaultOpen;
         this.userId = userId;
         this.me = me;
@@ -134,7 +148,10 @@ public class ProfilePage extends AdminPage {
                 .section("profile-tab-account", "Account", account)
                 .section("profile-tab-namespaces", "Namespaces",
                         namespaces(me, namespaces, defaultNamespace, defaultOpen, active))
-                .section("profile-tab-variables", "Your variables", environment(user == null ? Map.of() : user.environment()))
+                .section("profile-tab-variables", "Your variables",
+                        UiStack.of("profile-variables").gap(20)
+                                .child(environment(user == null ? Map.of() : user.environment()))
+                                .child(toolVariables(toolVariables)))
                 .section("profile-tab-namespace-variables", "Namespace variables",
                         namespaceVariables(me, namespaces, defaultOpen ? defaultNamespace : null))
                 .section("profile-tab-tokens", "API tokens", UiStack.of("profile-tokens").gap(12)
@@ -271,6 +288,105 @@ public class ProfilePage extends AdminPage {
     }
 
     /** The body of the "Add variable" dialog; {@code error} keeps it open with the reason. */
+    /**
+     * One declared variable as this user stands to it: what the tools call it,
+     * and whether anybody has a value for it.
+     *
+     * @param variable     the declaration, as the tool source wrote it
+     * @param setByUser    true when the user has a variable of that name of their own
+     * @param fromElsewhere true when the namespace or the server answers it — then
+     *                      there is nothing for the user to do, and saying so is the
+     *                      difference between "not set" and "not yours to set"
+     */
+    public record ToolVariableRow(ToolVariable variable, boolean setByUser, boolean fromElsewhere) {
+
+        /** Set by the user, or by somebody on their behalf. */
+        public boolean satisfied() {
+            return setByUser || fromElsewhere;
+        }
+    }
+
+    /**
+     * What the installed tools ask for. It is the answer to a question nobody
+     * can answer alone: a user cannot know that the mail tools look up
+     * {@code MC_EMAIL_HOST}, and a list of names with an empty column beside
+     * them is exactly that knowledge.
+     *
+     * <p>A variable with a sensible default is already in the table above by
+     * the time this is rendered — it was written on sign-in. What is left here
+     * is what nobody could have guessed: an address, an account, a password.
+     */
+    public static UiNode toolVariables(List<ToolVariableRow> rows) {
+        UiStack stack = UiStack.of(TOOL_VARIABLES_ID).gap(12);
+        if (rows.isEmpty()) {
+            stack.child(UiText.of(TOOL_VARIABLES_ID + "-none",
+                    "No installed tool asks for a variable of yours."));
+            return stack;
+        }
+        stack.child(UiText.of(TOOL_VARIABLES_ID + "-note",
+                "The tools this installation offers look up these variables when they run for you. "
+                        + "A missing one is only missing for you — the tool itself is installed and "
+                        + "works for everyone who has filled it in."));
+        UiTable table = UiTable.of(TOOL_VARIABLES_ID + "-table", "What the tools need").stackOnMobile(true)
+                .icon("settings")
+                .column(UiTable.Column.text("name", "Name"))
+                .column(UiTable.Column.text("what", "What it is"))
+                .column(UiTable.Column.text("tool", "Used by"))
+                .column(UiTable.Column.text("status", "Status"))
+                .rowAction(UiAction.secondary("set", "Set").icon("edit")
+                        .dispatch("GET", API + "/environment/new/{id}"));
+        for (ToolVariableRow row : rows) {
+            ToolVariable variable = row.variable();
+            Map<String, Object> cells = new LinkedHashMap<>();
+            cells.put("id", variable.name());
+            cells.put("name", variable.name());
+            cells.put("what", variable.title());
+            cells.put("tool", orDash(variable.declaredBy()));
+            cells.put("status", status(row));
+            table.row(cells);
+        }
+        stack.child(table);
+        return stack;
+    }
+
+    private static String status(ToolVariableRow row) {
+        if (row.setByUser()) return "set by you";
+        if (row.fromElsewhere()) return "from the namespace or the server";
+        return row.variable().required() ? "required — not set" : "optional — not set";
+    }
+
+    /**
+     * The add-a-variable form with a declared variable already named, so the
+     * user only has to bring the value. The name stays editable: a form that
+     * cannot be corrected is worse than one that can be got wrong.
+     */
+    public static UiForm environmentForm(ToolVariable variable, String error) {
+        UiForm form = UiForm.of(ENVIRONMENT_FORM_ID, null)
+                .field(UiField.text("name", "Name", variable.name()).asEditable().asRequired()
+                        .hint("As a tool refers to it: ${" + variable.name() + "}."))
+                .field(value(variable))
+                .action(UiAction.primary(ENVIRONMENT_FORM_ID + "-save", "Save").icon("key-round")
+                        .dispatch("POST", API + "/environment", ENVIRONMENT_FORM_ID))
+                .action(UiAction.secondary(ENVIRONMENT_FORM_ID + "-cancel", "Cancel")
+                        .dispatch("POST", API + "/environment/dialog/close"));
+        if (error != null) {
+            form.error(error);
+        }
+        return form;
+    }
+
+    /** A secret is masked and never shown again; a host or a port is plain text, because a typo has to be visible. */
+    private static UiField value(ToolVariable variable) {
+        String hint = variable.description() != null && !variable.description().isBlank()
+                ? variable.description()
+                : "The value the " + orDash(variable.declaredBy()) + " tools use for " + variable.title() + ".";
+        UiField field = variable.secret()
+                ? UiField.password("value", variable.title(), null)
+                : UiField.text("value", variable.title(), variable.defaultValue());
+        return field.asEditable().asRequired()
+                .hint(variable.secret() ? hint + " Stored encrypted and never shown again." : hint);
+    }
+
     public static UiForm environmentForm(String error) {
         return NamespacesPage.environmentForm(ENVIRONMENT_FORM_ID, error, API + "/environment",
                 API + "/environment/dialog/close");

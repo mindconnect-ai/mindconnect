@@ -4,8 +4,10 @@ import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
 import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
+import ai.mindconnect.user.adapter.file.FileNotificationRepository;
 import ai.mindconnect.user.adapter.file.FileUserRepository;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
+import ai.mindconnect.user.port.out.NotificationRepository;
 import ai.mindconnect.user.port.out.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -64,5 +66,12 @@ public class FilePersistenceAutoConfiguration {
     @ConditionalOnMissingBean(ApiTokenRepository.class)
     ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
         return new FileApiTokenRepository(Path.of(baseDir));
+    }
+
+    /** Installation-wide like the users they are addressed to, and not encrypted: a notice is not a secret. */
+    @Bean
+    @ConditionalOnMissingBean(NotificationRepository.class)
+    NotificationRepository notificationRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new FileNotificationRepository(Path.of(baseDir));
     }
 }

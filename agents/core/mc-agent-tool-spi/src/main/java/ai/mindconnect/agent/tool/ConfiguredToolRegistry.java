@@ -86,6 +86,20 @@ public final class ConfiguredToolRegistry implements ToolRegistry {
         return byGroup;
     }
 
+    /**
+     * The declarations of the sources still on offer. A {@code ToolFactory}
+     * this installation switched off takes its variables with it — there is
+     * nothing left to fill them in for. A provider declares under its group,
+     * which is no tool name, so switching off one tool of a bundle leaves the
+     * bundle's credentials alone: the rest of it still needs them.
+     */
+    @Override
+    public java.util.List<ToolVariable> declaredVariables() {
+        return delegate.declaredVariables().stream()
+                .filter(variable -> !disabled.contains(variable.declaredBy()))
+                .toList();
+    }
+
     @Override
     public Map<String, Object> overridesSchema(String toolName) {
         return disabled.contains(toolName) ? Map.of() : delegate.overridesSchema(toolName);

@@ -171,6 +171,67 @@ A factory should request **only** what it uses — there is no shared
 god-context. If a required value is missing, return `false` from
 `isAvailable()` and the tool is quietly left out instead of crashing the agent.
 
+## Asking the user for something: `userVariables()`
+
+Some tools cannot be configured once for everybody. An API key an installation
+buys is one value in the server's environment; a *mailbox* is one per person,
+and nobody but its owner can supply it.
+
+A tool source therefore **declares** what it needs from a user, and the
+installation does the asking:
+
+```java
+@Override
+public List<ToolVariable> userVariables() {
+    return List.of(
+        ToolVariable.required("MC_EMAIL_HOST", "Mail server", "Your IMAP server, e.g. imap.gmail.com."),
+        ToolVariable.secret("MC_EMAIL_PASSWORD", "Mailbox password", "An app-specific one where your provider offers it."),
+        ToolVariable.withDefault("MC_EMAIL_PORT", "Mail port", "993 for IMAP over TLS.", "993"),
+        ToolVariable.optional("MC_SMTP_HOST", "SMTP server", "Leave empty and the mailbox is read-only."));
+}
+```
+
+What each kind means:
+
+| Factory | Required | Secret | Has a default |
+|---------|----------|--------|---------------|
+| `required(…)` | yes | no | no |
+| `secret(…)` | yes | yes | no |
+| `optionalSecret(…)` | no | yes | no |
+| `withDefault(…, value)` | no | no | yes |
+| `optional(…)` | no | no | no |
+
+What the installation does with it, on a user's first request after signing in:
+
+- a variable with a **default** that neither the user, their namespace nor the
+  process has is **written for them**, so the common case needs no typing;
+- every declared variable is listed on their profile under *Your variables*,
+  with a **Set** action that opens the form already named;
+- every **required** one that nobody has a value for raises a
+  [notification](./admin-ui/index.md#notifications) pointing at that page.
+
+Two rules worth knowing:
+
+- **Declaring is not reading.** At call time the value still comes from the
+  `EnvVarResolver` chain like any other `${VAR}` — the user's own first, then
+  the namespace's, then the process's. Ask for it *per call*, never at `bind`
+  time: a resolver answers for whoever the current call runs for, so a value
+  captured in a field would be the first caller's.
+
+  ```java
+  MailAccount account = MailAccount.from(env.require(EnvVarResolver.class));   // per call
+  ```
+
+- **Nothing is ever created empty.** A blank user variable would *answer* the
+  lookup and cut off the namespace and the server behind it, so a value that
+  cannot be guessed is asked for rather than invented.
+
+`isAvailable()` is the wrong place for "has this user configured it?": it is
+decided once, at bind time, for the whole installation, and the first user to
+sign in would decide it for everybody. Register the tool either way and return
+an error result that says which variable is missing and where to put it — the
+user reads it in the chat and can act on it.
+
 ## Scope-aware tools
 
 `create(AgentTool, ToolCallScope)` runs once per tool resolution, so a tool can
@@ -253,7 +314,9 @@ missing) makes the entire bundle disappear.
    `MultiToolProvider` instead.)
 3. Add `META-INF/services/ai.mindconnect.agent.tool.ToolFactory` (or
    `…tool.MultiToolProvider`) with the class name.
-4. Put the module on the agent runtime's classpath.
+4. Needs something only the user can supply? Declare it with
+   [`userVariables()`](#asking-the-user-for-something-uservariables).
+5. Put the module on the agent runtime's classpath.
 
 The new tool now appears in the **[Tools](./admin-ui/tools.md)** catalogue and can be
 assigned to any agent.
