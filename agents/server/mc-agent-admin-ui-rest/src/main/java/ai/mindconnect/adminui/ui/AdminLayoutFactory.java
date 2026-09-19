@@ -69,6 +69,8 @@ public class AdminLayoutFactory {
     private final ObjectProvider<HostNamespaces> hostNamespaces;
     /** Present when this host keeps notifications — then the header carries the bell. */
     private final ObjectProvider<NotificationService> notifications;
+    /** The sidebar entries modules bring along; see {@link AdminMenuContribution}. */
+    private final ObjectProvider<AdminMenuContribution> contributions;
 
     @Autowired
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
@@ -80,7 +82,9 @@ public class AdminLayoutFactory {
                               ObjectProvider<ScopeSupplier> scope,
                               BrandingProperties branding,
                               ObjectProvider<HostNamespaces> hostNamespaces,
-                              ObjectProvider<NotificationService> notifications) {
+                              ObjectProvider<NotificationService> notifications,
+                              ObjectProvider<AdminMenuContribution> contributions) {
+        this.contributions = contributions;
         this.notifications = notifications;
         this.branding = branding;
         this.hostNamespaces = hostNamespaces;
@@ -100,7 +104,7 @@ public class AdminLayoutFactory {
                               ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
                               ObjectProvider<RegistryService> registryService) {
         this(authEnabled, buildInfo, taskMonitor, mcpRegistryAdmin, registryService, none(), none(),
-                new BrandingProperties(), none(), none());
+                new BrandingProperties(), none(), none(), none());
     }
 
     /**
@@ -116,7 +120,11 @@ public class AdminLayoutFactory {
                 mcpRegistryAdmin.getIfAvailable() != null,
                 registryService.getIfAvailable() != null);
         layout.brand(currentBrand());
-        layout.chatOnly(!shapesCurrentNamespace());
+        boolean admin = shapesCurrentNamespace();
+        layout.chatOnly(!admin);
+        layout.contributions(contributions.orderedStream()
+                .flatMap(contribution -> contribution.entries(admin).stream())
+                .toList());
         notificationBell().ifPresent(layout::notifications);
         namespaceSwitch().ifPresent(layout::namespaces);
         return layout;
@@ -211,6 +219,8 @@ public class AdminLayoutFactory {
     private static <T> ObjectProvider<T> none() {
         return new ObjectProvider<>() {
             @Override public T getIfAvailable() { return null; }
+            @Override public java.util.stream.Stream<T> stream() { return java.util.stream.Stream.empty(); }
+            @Override public java.util.stream.Stream<T> orderedStream() { return java.util.stream.Stream.empty(); }
         };
     }
 }

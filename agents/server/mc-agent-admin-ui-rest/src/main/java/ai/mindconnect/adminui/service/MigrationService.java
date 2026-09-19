@@ -27,7 +27,8 @@ import java.util.Set;
 
 /**
  * Computes and applies "migrations" — pending imports of bundled initial data
- * (classpath {@code initial-data/**}) against what is currently stored.
+ * ({@code initial-data/**} in every jar on the classpath) against what is
+ * currently stored.
  *
  * <p>Where {@code ai.mindconnect.adminui.InitialDataLoader} silently imports new
  * records at startup and skips differing ones, this service surfaces every
@@ -136,7 +137,7 @@ public class MigrationService {
 
     private List<PendingMigration> pendingLlmConfigs() {
         List<PendingMigration> result = new ArrayList<>();
-        for (Resource resource : scan("classpath:initial-data/llm-configs/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/llm-configs/*.json")) {
             readEach(resource, LlmConfig.class, objectMapper).ifPresent(incoming -> {
                 Optional<LlmConfig> existing = llmConfigRepository.findByName(incoming.name());
                 LlmConfig compared = existing.map(stored -> withStoredKeyIfSame(stored, incoming)).orElse(incoming);
@@ -149,7 +150,7 @@ public class MigrationService {
 
     private List<PendingMigration> pendingAgents() {
         List<PendingMigration> result = new ArrayList<>();
-        for (Resource resource : scan("classpath:initial-data/agent-definitions/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/agent-definitions/*.json")) {
             readEach(resource, AgentDefinition.class, objectMapper).ifPresent(incoming -> {
                 Optional<AgentDefinition> existing =
                         agentDefinitionRepository.findByName(incoming.name());
@@ -167,7 +168,7 @@ public class MigrationService {
      */
     private List<PendingMigration> pendingWorkflows() {
         List<PendingMigration> result = new ArrayList<>();
-        for (Resource resource : scan("classpath:initial-data/workflows/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/workflows/*.json")) {
             String id = fileId(resource);
             if (id == null) continue;
             readEach(resource, WorkflowData.class, WORKFLOW_MAPPER).ifPresent(incoming -> {
@@ -308,7 +309,7 @@ public class MigrationService {
     // ── Read: bundled records ───────────────────────────────────────────────────
 
     private Optional<LlmConfig> bundledLlmConfig(String name) {
-        for (Resource resource : scan("classpath:initial-data/llm-configs/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/llm-configs/*.json")) {
             Optional<LlmConfig> incoming = readEach(resource, LlmConfig.class, objectMapper)
                     .filter(c -> c.name().equals(name));
             if (incoming.isPresent()) return incoming;
@@ -317,7 +318,7 @@ public class MigrationService {
     }
 
     private Optional<AgentDefinition> bundledAgent(String name) {
-        for (Resource resource : scan("classpath:initial-data/agent-definitions/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/agent-definitions/*.json")) {
             Optional<AgentDefinition> incoming = readEach(resource, AgentDefinition.class, objectMapper)
                     .filter(a -> a.name().equals(name));
             if (incoming.isPresent()) return incoming;
@@ -326,7 +327,7 @@ public class MigrationService {
     }
 
     private Optional<WorkflowData> bundledWorkflow(String id) {
-        for (Resource resource : scan("classpath:initial-data/workflows/*.json")) {
+        for (Resource resource : scan("classpath*:initial-data/workflows/*.json")) {
             if (!id.equals(fileId(resource))) continue;
             return readEach(resource, WorkflowData.class, WORKFLOW_MAPPER);
         }
