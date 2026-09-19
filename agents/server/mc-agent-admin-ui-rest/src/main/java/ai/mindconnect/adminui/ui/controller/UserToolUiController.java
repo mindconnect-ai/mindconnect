@@ -75,8 +75,14 @@ public class UserToolUiController {
                 userTools.connectionSpecOf(toolName), userTools.connectionsFor(me, toolName), null, null));
     }
 
-    /** Adds it to the user's account. */
-    @PostMapping("/{toolName}")
+    /**
+     * Adds it to the user's account.
+     *
+     * <p>Under {@code /add/...}, not {@code /{toolName}}: a tool name and a
+     * user-tool id are both one path segment, and Spring cannot tell
+     * {@code POST /{toolName}} from {@code POST /{id}} — every add was a 500.
+     */
+    @PostMapping("/add/{toolName}")
     public UiPatch add(@AuthenticationPrincipal OidcUser user, @PathVariable("toolName") String toolName,
                        @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
