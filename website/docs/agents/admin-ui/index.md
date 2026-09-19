@@ -354,6 +354,87 @@ A click on the badge opens the task queue, the admin UI's Task Manager:
 
 The dialog updates itself over the same stream while it is open.
 
+## My tools
+
+An agent brings the tools whoever built it chose. The **My tools** tab on your
+profile is where you add your own — they are offered in every chat of yours, on
+top of what the agent brings, and only in your chats.
+
+Adding one is two steps: which tool, then how. The second step is where the
+interesting part is:
+
+- **Name in your chats.** Leave it empty and you are changing the agent's own
+  entry for that tool. Give it a name — `email_arbeit` — and you get a *second*
+  entry instead. Add the same tool twice with two names and you have one per
+  account.
+- **Account.** For a tool that runs on something you
+  [connected](#connections), pick which one. *Whichever is my default* follows
+  the mark on the Connections tab, so moving the default moves this tool with
+  it; picking one fixes it, and the model cannot change it.
+- **What to tell the model.** "Reads my work mailbox" is what lets it pick the
+  right one of the two without being told every time.
+- **Ask me before every call.** Only ever *adds* a question. It cannot take
+  away one the agent already asks for — an approval is tightened by any layer
+  and relaxed by none.
+
+Switching one off takes it out of your chats without forgetting how it was set
+up. Removing it forgets.
+
+**Sub-agents do not get them.** When an agent hands work to a sub-agent, that
+sub-agent keeps the tools its own definition gives it — somebody chose that
+list for a narrow job, and a research helper that silently gained the ability
+to send mail would be a surprise nobody asked for. Your *connections* are a
+different matter: a sub-agent whose own definition has a mail tool runs it on
+your mailbox, because the call still runs as you. It uses your default account,
+so if you keep two and mean the other one, do that part in the chat itself.
+
+One thing you cannot do: switch on a tool the installation switched off. The
+registry refuses it whoever asks.
+
+## Connections
+
+Some tools run on an account that is yours and nobody else's — a mailbox, a
+calendar. The **Connections** tab on your profile is where you attach them.
+
+One card per thing the installed tools ask for, with one or two ways to
+attach an account.
+
+**Connect** sends you to the provider's own sign-in page — Google, Microsoft —
+and brings you back with the account attached. Nothing is typed here and no
+password is stored: what comes back is a token, kept encrypted, renewed by
+itself while you use it. If the provider ever refuses to renew it, the
+connection says `expired` with the reason and *Connect* again is all it takes.
+
+*Add manually* opens a form —
+host, account, password, whatever that provider needs — and what you save is
+yours alone: a password is stored encrypted and never shown to anyone,
+including you. Everything else stays readable, so a typo in a hostname can be
+corrected without typing the password again.
+
+**You may attach several.** Two mailboxes, "Privat" and "Arbeit", are a normal
+thing to have. One of them is the *default*: it is what a tool uses when a
+chat does not say otherwise, and you can move that mark at any time. As soon
+as you have two, the model is offered the choice — it sees exactly your names
+and cannot invent a third — so "look in my work mail" does what it says.
+
+Renaming is safe. Tools refer to a connection by a short, fixed form of the
+name it had when you attached it; the label above it is yours to change.
+
+Removing one takes the tools that used it out of service until you attach
+another; the next connection of that provider takes over as default.
+
+:::note For operators
+A *Connect* button only appears where this installation has the provider's app
+registration. The redirect it comes back to is
+`https://<your host>/admin/oauth/callback`, and that exact address has to be
+registered with the app — providers do not accept wildcards, so one entry per
+installation.
+:::
+
+An installed tool that asks for an account you have not attached raises a
+[notification](#notifications) on your next sign-in — that is the only nudge
+you get, and it clears itself the moment you attach one.
+
 ## Notifications
 
 Beside the task badge — which says what the *server* is doing — the header

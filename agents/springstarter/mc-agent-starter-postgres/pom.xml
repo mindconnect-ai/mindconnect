@@ -33,6 +33,10 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-credentials-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-user</artifactId>
         </dependency>
         <!-- The namespace starter's Postgres stores are conditional on this module's classes. -->

@@ -78,6 +78,27 @@ public interface ToolFactory {
      */
     default java.util.List<ToolVariable> userVariables() { return java.util.List.of(); }
 
+    /**
+     * The account this tool runs on, when it runs on one — a mailbox, a
+     * calendar. Declared like {@link #userVariables()} and for the same
+     * reason: this says <em>that</em> one is needed and how a user comes by
+     * it; <em>whose</em> is answered per call, from the connections of
+     * whoever the call runs for.
+     *
+     * <p>A tool that declares one should implement {@link ConnectedTool}:
+     * the registry then hands it the resolved account and answers a call
+     * that has none without entering the tool. Default: no account needed.
+     */
+    default ConnectionSpec connectionSpec() { return null; }
+
+    /**
+     * A way to try a connection of {@link #connectionSpec()} out from the
+     * Connections page, without a tool call. Empty means the page offers no
+     * test button for this provider. Default: empty.
+     */
+    default java.util.Optional<ConnectionTester> connectionTester() { return java.util.Optional.empty(); }
+
+
     /** Build a tool for the given configuration and call scope. */
     Tool create(AgentTool agentTool, ToolCallScope scope);
 }

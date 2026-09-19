@@ -70,16 +70,20 @@ public final class ParamFormFields {
     public static UiField field(String name, Schema prop, boolean required, String value, String browseUrl) {
         String label = label(name, prop);
         String text = value != null ? value : defaultText(prop);
-        UiField field = switch (prop.getType()) {
+        UiField field = switch (fieldKind(prop)) {
             case ENUM -> UiField.select(name, label, text, options(prop));
             case BOOLEAN -> UiField.bool(name, label, Boolean.parseBoolean(text));
             case INTEGER, NUMBER -> UiField.number(name, label,
                     value != null ? value : prop.getDefaultValue());
             case ARRAY, OBJECT -> UiField.textarea(name, label + " (JSON)", value)
                     .hint("A " + prop.getType().name().toLowerCase() + " — enter it as JSON.");
-            default -> prop.getFormat() == Schema.Format.MULTILINE
-                    ? UiField.textarea(name, label, text)
-                    : UiField.text(name, label, text);
+            // A secret is masked and never shown back: the schema says so with
+            // PASSWORD, and a plain text box here would put it on the screen.
+            // Never prefilled either — the value the form gets back is what the
+            // user typed now, and an empty field means "leave it as it was".
+            case PASSWORD -> UiField.password(name, label, null);
+            case MULTILINE -> UiField.textarea(name, label, text);
+            default -> UiField.text(name, label, text);
         };
         field.asEditable();
         if (required) {
@@ -93,6 +97,23 @@ public final class ParamFormFields {
                     .dispatch("GET", browseUrl));
         }
         return field;
+    }
+
+    /**
+     * What kind of input a property wants: its type, except that a string
+     * with a {@link Schema.Format} of its own is that format. Keeping the two
+     * apart in one switch is what let a PASSWORD render as a plain box.
+     */
+    private enum FieldKind { ENUM, BOOLEAN, INTEGER, NUMBER, ARRAY, OBJECT, PASSWORD, MULTILINE, TEXT }
+
+    private static FieldKind fieldKind(Schema prop) {
+        Schema.Type type = prop.getType();
+        if (type != null && type != Schema.Type.STRING) {
+            return FieldKind.valueOf(type.name());
+        }
+        if (prop.getFormat() == Schema.Format.PASSWORD) return FieldKind.PASSWORD;
+        if (prop.getFormat() == Schema.Format.MULTILINE) return FieldKind.MULTILINE;
+        return FieldKind.TEXT;
     }
 
     private static String label(String name, Schema prop) {

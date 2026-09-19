@@ -232,6 +232,109 @@ sign in would decide it for everybody. Register the tool either way and return
 an error result that says which variable is missing and where to put it — the
 user reads it in the chat and can act on it.
 
+## Running on the user's own account: `connectionSpec()`
+
+A variable is right when an operator could set the value once for everybody.
+A **mailbox** is not: it is one account per person, and a person may have two.
+That is what a *connection* is.
+
+Declare what has to be connected, and how a user comes by it:
+
+```java
+@Override
+public ConnectionSpec connectionSpec() {
+    return ConnectionSpec.form("email", "Mailbox", Schema.object()
+            .prop("host",     Schema.string().description("Your IMAP server, e.g. imap.gmail.com"))
+            .prop("port",     Schema.integer().defaultValue(993))
+            .prop("user",     Schema.string())
+            .prop("password", Schema.string().format(Schema.Format.PASSWORD))
+            .require("host", "user", "password"))
+        .description("The mailbox the email tools read.")
+        .allowingSeveral();
+}
+```
+
+That declaration is the whole user interface. The **Connections** tab on the
+profile renders the card and the form from it, the sign-in check turns it into
+a notification, and `Format.PASSWORD` decides what is encrypted at rest and
+never shown again. A tool ships no screen and needs no dependency on the Admin
+UI — which is what lets a tool module live in another repository.
+
+For a service with a real sign-in, declare that way too — both can sit on one
+card, "Connect with Google" beside "Add manually":
+
+```java
+ConnectionSpec.form("microsoft", "Microsoft", schema())
+        .acquire(Acquisition.OAuth.of("ms-graph", "Mail.Read", "Calendars.ReadWrite", "offline_access"));
+```
+
+`"ms-graph"` names an **app registration** the installation holds, not the
+connection: the operator registers it once, every user signs in to their own
+account through it, and the token is renewed on its way to a tool. Ask for
+`offline_access` (or its equivalent) or there will be no refresh token and the
+connection dies at the first expiry.
+
+`provider` (`"email"`) is **not** the tool group. Three bundles — mail,
+calendar, files — can share one `"microsoft"` connection, and keeping the two
+apart is what makes that possible.
+
+### Getting the connection: `ConnectedTool`
+
+The tool is *handed* the account rather than looking it up:
+
+```java
+public final class ListMessagesTool implements ConnectedTool {
+
+    @Override
+    public String execute(Map<String, Object> arguments, BoundConnections connections) {
+        ToolConnection account = connections.one();
+        String host = account.value("host");          // settings and secrets alike
+        String password = account.value("password");
+        ...
+    }
+}
+```
+
+A decorator around the tool does four things, once, so no tool repeats them:
+
+1. puts an `account` parameter into the schema — an **enum of exactly this
+   user's connections** — or leaves it out when there is nothing to choose;
+2. takes that parameter back out of the arguments;
+3. resolves it: the named connection, else the user's default;
+4. answers a call that has no usable account **without entering the tool**,
+   with the sentence that says where to attach one.
+
+A tool with two ends declares two parameters and reads them by name:
+
+```java
+ConnectionSpec.form("calendar", "Calendar", schema)
+        .params(ConnectionParam.of("from", "calendar"), ConnectionParam.of("to", "calendar"));
+// connections.get("from"), connections.get("to")
+```
+
+### Several accounts, and how an agent pins one
+
+A user with two mailboxes sees `account: "privat" | "arbeit"` and says which
+one they mean. An agent can settle it instead, with the mechanism that already
+exists for carrying one tool twice:
+
+```json
+"tools": [
+  { "name": "email_work_list_messages",
+    "overrides": { "tool": "email_list_messages", "params": { "account": "arbeit" } } }
+]
+```
+
+`AliasTool` gives it its own name, `PinnedParamsTool` fixes the account and
+takes it out of the schema. Note that a connection key is **personal**: pin one
+only in an agent that belongs to one person, never in a definition several
+people share.
+
+That is also exactly what a user does for themselves on the
+[My tools](./admin-ui/index.md#my-tools) tab — `UserToolRoster` derives the same
+two overrides from *their* connections, and the runtime applies them to the
+agent they are chatting with. A tool does nothing to support it.
+
 ## Scope-aware tools
 
 `create(AgentTool, ToolCallScope)` runs once per tool resolution, so a tool can
@@ -314,8 +417,9 @@ missing) makes the entire bundle disappear.
    `MultiToolProvider` instead.)
 3. Add `META-INF/services/ai.mindconnect.agent.tool.ToolFactory` (or
    `…tool.MultiToolProvider`) with the class name.
-4. Needs something only the user can supply? Declare it with
-   [`userVariables()`](#asking-the-user-for-something-uservariables).
+4. Needs something only the user can supply? Declare it — a value with
+   [`userVariables()`](#asking-the-user-for-something-uservariables), a whole
+   account with [`connectionSpec()`](#running-on-the-users-own-account-connectionspec).
 5. Put the module on the agent runtime's classpath.
 
 The new tool now appears in the **[Tools](./admin-ui/tools.md)** catalogue and can be

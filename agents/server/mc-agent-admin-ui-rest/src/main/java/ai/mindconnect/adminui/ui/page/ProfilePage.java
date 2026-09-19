@@ -1,6 +1,8 @@
 package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
+import ai.mindconnect.adminui.ui.component.ConnectionsComponent;
+import ai.mindconnect.adminui.ui.component.UserToolsComponent;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolVariable;
@@ -83,6 +85,15 @@ public class ProfilePage extends AdminPage {
     private final Namespace active;
     /** What the installed tools declare they need from this user; empty on a host that has no tools. */
     private final List<ToolVariableRow> toolVariables;
+    /** What the installed tools ask this user to connect, with what they have attached. */
+    private final List<ConnectionsComponent.Card> connections;
+    /** False on a host that keeps no connections at all — then the tab says so. */
+    private final boolean connectionStore;
+    /** What this user keeps in their own tool account, and what they could add. */
+    private final List<UserToolsComponent.Row> userTools;
+    private final Map<String, java.util.Set<String>> toolCatalogue;
+    /** False on a host that keeps no per-user tools — then the tab says so. */
+    private final boolean userToolStore;
 
     /**
      * @param me          who the signed-in user is to a namespace — id and the address they are
@@ -111,6 +122,31 @@ public class ProfilePage extends AdminPage {
     public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
                        boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
                        boolean defaultOpen, Namespace active, List<ToolVariableRow> toolVariables) {
+        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace,
+                defaultOpen, active, toolVariables, List.of(), false);
+    }
+
+    /** The page with the accounts this user has attached. */
+    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
+                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+                       boolean defaultOpen, Namespace active, List<ToolVariableRow> toolVariables,
+                       List<ConnectionsComponent.Card> connections, boolean connectionStore) {
+        this(userId, me, user, displayName, email, tokens, authEnabled, namespaces, defaultNamespace,
+                defaultOpen, active, toolVariables, connections, connectionStore, List.of(), Map.of(), false);
+    }
+
+    /** The page with what this user keeps in their own tool account. */
+    public ProfilePage(UserId userId, Actor me, User user, String displayName, String email, List<ApiToken> tokens,
+                       boolean authEnabled, List<NamespaceDefinition> namespaces, Namespace defaultNamespace,
+                       boolean defaultOpen, Namespace active, List<ToolVariableRow> toolVariables,
+                       List<ConnectionsComponent.Card> connections, boolean connectionStore,
+                       List<UserToolsComponent.Row> userTools,
+                       Map<String, java.util.Set<String>> toolCatalogue, boolean userToolStore) {
+        this.userTools = userTools == null ? List.of() : List.copyOf(userTools);
+        this.toolCatalogue = toolCatalogue == null ? Map.of() : Map.copyOf(toolCatalogue);
+        this.userToolStore = userToolStore;
+        this.connections = connections == null ? List.of() : List.copyOf(connections);
+        this.connectionStore = connectionStore;
         this.toolVariables = toolVariables == null ? List.of() : List.copyOf(toolVariables);
         this.defaultOpen = defaultOpen;
         this.userId = userId;
@@ -148,6 +184,10 @@ public class ProfilePage extends AdminPage {
                 .section("profile-tab-account", "Account", account)
                 .section("profile-tab-namespaces", "Namespaces",
                         namespaces(me, namespaces, defaultNamespace, defaultOpen, active))
+                .section("profile-tab-my-tools", "My tools",
+                        UserToolsComponent.render(userTools, toolCatalogue, userToolStore))
+                .section("profile-tab-connections", "Connections",
+                        ConnectionsComponent.render(connections, connectionStore))
                 .section("profile-tab-variables", "Your variables",
                         UiStack.of("profile-variables").gap(20)
                                 .child(environment(user == null ? Map.of() : user.environment()))

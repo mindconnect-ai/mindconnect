@@ -68,7 +68,7 @@ public final class SessionTools implements ToolDefinitionProvider {
      * reports the unknown tool exactly as before.
      */
     public List<Tool> liveTool(String toolName) {
-        List<AgentTool> refs = dynamicToolActivations.effectiveRefs(def, session.id()).stream()
+        List<AgentTool> refs = effectiveRefs().stream()
                 .filter(ref -> toolName.equals(ref.name()))
                 .filter(this::offered)
                 .toList();
@@ -79,12 +79,30 @@ public final class SessionTools implements ToolDefinitionProvider {
     public List<Tool> liveTools() {
         // The inline delegation tools have no registry implementation on
         // purpose — resolving them would only produce a spurious error log.
-        List<AgentTool> refs = dynamicToolActivations.effectiveRefs(def, session.id()).stream()
+        List<AgentTool> refs = effectiveRefs().stream()
                 .filter(ref -> !InlineAgentTools.RUN_AGENT.equals(ref.name())
                         && !InlineAgentTools.RUN_AGENTS.equals(ref.name()))
                 .filter(this::offered)
                 .toList();
         return toolRegistry.resolveAll(refs, scope());
+    }
+
+    /**
+     * The agent's tools of this moment, plus — in a chat, not in a sub-agent —
+     * whatever its user keeps in their own account. {@link #isMainAgent()} is
+     * the whole rule.
+     */
+    private List<AgentTool> effectiveRefs() {
+        return dynamicToolActivations.effectiveRefs(def, session.id(), session.userId(), isMainAgent());
+    }
+
+    /**
+     * Whether this session is the chat itself rather than a sub-agent's: a
+     * session that is its own root. A sub-agent's roster is what its
+     * definition says, and nothing a user added to their account joins it.
+     */
+    private boolean isMainAgent() {
+        return rootSessionId.equals(session.id());
     }
 
     @Override

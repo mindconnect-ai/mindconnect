@@ -1,6 +1,22 @@
 package ai.mindconnect.agent.security;
 
+import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
+import ai.mindconnect.agent.tool.Connections;
+import ai.mindconnect.agent.tool.UserToolRoster;
+import ai.mindconnect.user.adapter.tool.StoredUserToolRoster;
+import ai.mindconnect.user.port.out.UserToolRepository;
+import ai.mindconnect.user.service.UserToolService;
+import ai.mindconnect.credentials.adapter.tool.RefreshingConnections;
+import ai.mindconnect.credentials.adapter.tool.ServiceConnections;
+import ai.mindconnect.credentials.oauth.OAuthConnections;
+import ai.mindconnect.credentials.oauth.OAuthFlow;
+import ai.mindconnect.credentials.oauth.OAuthProviderContributions;
+import ai.mindconnect.credentials.port.out.OAuthProviderRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.ObjectProvider;
+import ai.mindconnect.credentials.port.out.ConnectionRepository;
+import ai.mindconnect.credentials.service.ConnectionService;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
 import ai.mindconnect.user.port.out.NotificationRepository;
 import ai.mindconnect.user.port.out.UserRepository;
@@ -67,6 +83,87 @@ public class MindconnectSecurityAutoConfiguration {
     @ConditionalOnBean(NotificationRepository.class)
     NotificationService notificationService(NotificationRepository notifications) {
         return new NotificationService(notifications);
+    }
+
+    /**
+     * What each user keeps in their own tool account, and the roster the
+     * runtime lays over an agent's list for them. Found by the runtime through
+     * its bean fallback into this context, like {@link Connections}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(UserToolRepository.class)
+    UserToolService userToolService(UserToolRepository userTools) {
+        return new UserToolService(userTools);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(UserToolService.class)
+    UserToolRoster userToolRoster(UserToolService userTools, ObjectProvider<ToolRegistry> registry) {
+        return new StoredUserToolRoster(userTools, registry::getIfAvailable);
+    }
+
+    /**
+     * The accounts users attached, beside the other services that are keyed
+     * by person. {@link Connections} is the port the tool registry looks
+     * connections up through; the runtime finds this bean through its
+     * bean fallback into the host context, so no feature has to register it.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(ConnectionRepository.class)
+    ConnectionService connectionService(ConnectionRepository connections) {
+        return new ConnectionService(connections);
+    }
+
+    /**
+     * Deliberately not called {@code toolConnections}: the Admin UI has a
+     * {@code ToolConnections} service of its own, and a bean method of that
+     * name would collide with the scanned class rather than with anything
+     * meaningful.
+     */
+    /**
+     * Stores the app registrations the modules on the classpath brought along,
+     * once. A name the installation already has is left alone — an operator's
+     * own registration is not overwritten by a restart.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(OAuthProviderRepository.class)
+    OAuthProviderContributions oAuthProviderContributions(OAuthProviderRepository providers) {
+        OAuthProviderContributions contributions = new OAuthProviderContributions(providers);
+        contributions.install();
+        return contributions;
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    OAuthFlow oAuthFlow(ObjectMapper objectMapper) {
+        return new OAuthFlow(objectMapper);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean({ConnectionService.class, OAuthProviderRepository.class})
+    OAuthConnections oAuthConnections(ConnectionService connections, OAuthProviderRepository providers,
+                                      OAuthFlow flow) {
+        return new OAuthConnections(connections, providers, flow);
+    }
+
+    /**
+     * Where a token is renewed: on the way to a tool, which is the one place
+     * every call passes and exactly when it is worth renewing. Without an
+     * {@link OAuthConnections} — a host that registered no OAuth app — the
+     * plain lookup is used and nothing is refreshed, because nothing can expire.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(ConnectionService.class)
+    Connections connectionLookup(ConnectionService connections, ObjectProvider<OAuthConnections> oauth) {
+        Connections lookup = new ServiceConnections(connections);
+        OAuthConnections refreshing = oauth.getIfAvailable();
+        return refreshing == null ? lookup : new RefreshingConnections(lookup, refreshing);
     }
 
     @Bean

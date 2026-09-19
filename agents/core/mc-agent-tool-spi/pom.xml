@@ -36,6 +36,12 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-common</artifactId>
         </dependency>
+        <!-- Schema: how a tool declares the form a user fills in to connect an account. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-schema</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
