@@ -354,10 +354,48 @@ A click on the badge opens the task queue, the admin UI's Task Manager:
 
 The dialog updates itself over the same stream while it is open.
 
+## Notifications
+
+Beside the task badge — which says what the *server* is doing — the header
+carries a bell, which says what is waiting for *you*. It shows the number of
+notices you have not read; a click opens the panel, and opening it is what
+marks them read.
+
+A notice is one line, sometimes a paragraph under it, and often a link to the
+place that settles it: "Still to set up: Mail server → Set it up". **Dismiss**
+takes one off the list, **Dismiss all** clears it.
+
+Where they come from: an installation is rarely finished the moment your
+account exists. A tool may want a mailbox configured, a provider your own API
+key — and you cannot be expected to guess that `MC_EMAIL_HOST` is the name it
+looks up. On the first request after you sign in, the installation looks at
+what the installed tools [declare they need](../creating-a-tool.md#asking-the-user-for-something-uservariables),
+fills in what has a sensible default, and raises one notice per value that is
+still missing.
+
+Two things follow from how they are stored, and both are deliberate:
+
+- **A notice does not pile up.** The check runs on every sign-in and says the
+  same thing every time; each notice carries the *condition* it stands for, so
+  the second sign-in finds the entry that is already there — read or unread —
+  and leaves it alone. Dismiss it and it is not raised at you again.
+- **A notice clears itself.** Set the value and the next sign-in stops
+  reporting it; the entry disappears without your having to tidy up. Should
+  the condition come back — a variable removed, a key revoked — you get a
+  fresh notice rather than silence.
+
+For hosts: anything can contribute a notice by implementing `SetupCheck` as a
+Spring bean and returning `Notification.Draft`s for whatever is missing right
+now. `NotificationService` handles the collapsing, and `UserSetup` clears what
+a check has stopped reporting. Where no `NotificationRepository` is assembled
+there is no bell and nothing is raised.
+
 ## Related
 
 - [Environment variables](../environment-variables.md) — every variable you can
   set (API keys, models, Keycloak, …).
+- [Creating a tool](../creating-a-tool.md#asking-the-user-for-something-uservariables) —
+  how a tool declares the variables it needs from each user.
 - [LLM configuration reference](../llm-configs-reference.md) — the bundled
   configs and their fields.
 - [Bundled agents](../bundled-agents.md) — the agents that ship out of the box.

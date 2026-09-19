@@ -32,6 +32,8 @@ public final class AdminLayout {
     private final boolean authEnabled;
     private final String versionLabel;
     private final UiNode taskBadge;
+    /** The notification bell, or null on a host that keeps no notifications. */
+    private UiNode notificationBell;
     private final UiPage.ActiveStream taskStream;
     /** Whether this host has an MCP gateway to administer; false hides its entry. */
     private final boolean mcpGateway;
@@ -129,6 +131,17 @@ public final class AdminLayout {
         return this;
     }
 
+    /**
+     * Adds the notification bell to the header; without it there is none.
+     * Set per request by {@code AdminLayoutFactory}, and only where the host
+     * keeps notifications at all — a bell that can never have anything in it
+     * is one more thing to look at for nothing.
+     */
+    public AdminLayout notifications(UiNode bell) {
+        this.notificationBell = bell;
+        return this;
+    }
+
     /** Adds the namespace switcher to the header; without it the shell shows no namespace at all. */
     public AdminLayout namespaces(NamespaceSwitch namespaces) {
         this.namespaces = namespaces;
@@ -194,6 +207,12 @@ public final class AdminLayout {
             header.extra(live);
         } else if (taskBadge != null) {
             header.extra(taskBadge);
+        }
+        // What is waiting for this user, beside what the server is doing: the
+        // bell sits between the two, in front of the namespace switcher, so
+        // the header reads server → you → where you are.
+        if (notificationBell != null) {
+            header.extra(notificationBell);
         }
         // Where the user works: the active namespace as a menu button, every
         // namespace they may switch to below it. Switching is a GET the SPA

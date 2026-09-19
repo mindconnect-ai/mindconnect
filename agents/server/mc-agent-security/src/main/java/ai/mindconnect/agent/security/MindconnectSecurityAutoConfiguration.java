@@ -2,8 +2,10 @@ package ai.mindconnect.agent.security;
 
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
+import ai.mindconnect.user.port.out.NotificationRepository;
 import ai.mindconnect.user.port.out.UserRepository;
 import ai.mindconnect.user.service.ApiTokenService;
+import ai.mindconnect.user.service.NotificationService;
 import ai.mindconnect.user.service.UserService;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
@@ -53,6 +55,18 @@ public class MindconnectSecurityAutoConfiguration {
     @ConditionalOnMissingBean
     ApiTokenService apiTokenService(ApiTokenRepository tokens) {
         return new ApiTokenService(tokens);
+    }
+
+    /**
+     * Present only where there is somewhere to keep notices — a host that
+     * assembled no {@link NotificationRepository} has no bell and nothing
+     * raises into the void.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(NotificationRepository.class)
+    NotificationService notificationService(NotificationRepository notifications) {
+        return new NotificationService(notifications);
     }
 
     @Bean
