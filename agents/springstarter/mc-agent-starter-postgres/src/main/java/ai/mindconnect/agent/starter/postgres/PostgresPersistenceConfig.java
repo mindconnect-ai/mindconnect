@@ -97,6 +97,12 @@ public class PostgresPersistenceConfig {
         return new ai.mindconnect.user.adapter.pg.PgApiTokenRepository(mindconnectSql).initSchema();
     }
 
+    /** The tools each user keeps in their own account — installation-wide. */
+    @Bean
+    ai.mindconnect.user.port.out.UserToolRepository userToolRepository(Sql mindconnectSql) {
+        return new ai.mindconnect.user.adapter.pg.PgUserToolRepository(mindconnectSql).initSchema();
+    }
+
     /** The accounts users attached — installation-wide, and encrypted like their variables. */
     @Bean
     ai.mindconnect.credentials.port.out.ConnectionRepository connectionRepository(

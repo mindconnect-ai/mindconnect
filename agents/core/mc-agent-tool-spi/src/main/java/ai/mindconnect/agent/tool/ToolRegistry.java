@@ -82,6 +82,14 @@ public interface ToolRegistry {
     default List<ConnectionSpec> connectionSpecs() { return List.of(); }
 
     /**
+     * The account one tool runs on, if it runs on one — the spec of the source
+     * that serves this name. What a screen needs to ask "which of your
+     * mailboxes should this one use?" before the tool has ever been called.
+     * Default: empty.
+     */
+    default Optional<ConnectionSpec> connectionSpecOf(String toolName) { return Optional.empty(); }
+
+    /**
      * Lets go of whatever the tools hold for one session — a pooled connection,
      * a started container. Called by whoever ends the session; today that is
      * the tool test bench, whose sessions last one call. Idempotent, and safe

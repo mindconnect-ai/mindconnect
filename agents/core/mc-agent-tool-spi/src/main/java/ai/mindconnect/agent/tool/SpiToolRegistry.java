@@ -275,6 +275,21 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
         return List.copyOf(byProvider.values());
     }
 
+    @Override
+    public Optional<ConnectionSpec> connectionSpecOf(String toolName) {
+        if (toolName == null) return Optional.empty();
+        ToolFactory factory = factoriesByName.get(toolName);
+        if (factory != null) {
+            return Optional.ofNullable(factory.connectionSpec());
+        }
+        for (MultiToolProvider provider : ready()) {
+            if (provider.toolNames().contains(toolName)) {
+                return Optional.ofNullable(provider.connectionSpec());
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * Puts a tool on the caller's account. Innermost of the chain, so an
      * agent that pins {@code account} still reaches it: {@link PinnedParamsTool}

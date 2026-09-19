@@ -354,6 +354,43 @@ A click on the badge opens the task queue, the admin UI's Task Manager:
 
 The dialog updates itself over the same stream while it is open.
 
+## My tools
+
+An agent brings the tools whoever built it chose. The **My tools** tab on your
+profile is where you add your own — they are offered in every chat of yours, on
+top of what the agent brings, and only in your chats.
+
+Adding one is two steps: which tool, then how. The second step is where the
+interesting part is:
+
+- **Name in your chats.** Leave it empty and you are changing the agent's own
+  entry for that tool. Give it a name — `email_arbeit` — and you get a *second*
+  entry instead. Add the same tool twice with two names and you have one per
+  account.
+- **Account.** For a tool that runs on something you
+  [connected](#connections), pick which one. *Whichever is my default* follows
+  the mark on the Connections tab, so moving the default moves this tool with
+  it; picking one fixes it, and the model cannot change it.
+- **What to tell the model.** "Reads my work mailbox" is what lets it pick the
+  right one of the two without being told every time.
+- **Ask me before every call.** Only ever *adds* a question. It cannot take
+  away one the agent already asks for — an approval is tightened by any layer
+  and relaxed by none.
+
+Switching one off takes it out of your chats without forgetting how it was set
+up. Removing it forgets.
+
+**Sub-agents do not get them.** When an agent hands work to a sub-agent, that
+sub-agent keeps the tools its own definition gives it — somebody chose that
+list for a narrow job, and a research helper that silently gained the ability
+to send mail would be a surprise nobody asked for. Your *connections* are a
+different matter: a sub-agent whose own definition has a mail tool runs it on
+your mailbox, because the call still runs as you. It uses your default account,
+so if you keep two and mean the other one, do that part in the chat itself.
+
+One thing you cannot do: switch on a tool the installation switched off. The
+registry refuses it whoever asks.
+
 ## Connections
 
 Some tools run on an account that is yours and nobody else's — a mailbox, a

@@ -4,7 +4,9 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.skill.SkillTool;
 import ai.mindconnect.agent.runtime.skill.SkillToolFactory;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.UserToolRoster;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -28,6 +30,8 @@ public final class DynamicToolActivations {
     private final ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions;
     /** What the {@code skill} tool would find; empty means the tool is not worth offering. */
     private final SkillCatalog skills;
+    /** What the user keeps in their own account; {@link UserToolRoster#none()} where nobody can. */
+    private final UserToolRoster userTools;
 
     public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions) {
         this(sessions, SkillCatalog.none());
@@ -35,8 +39,31 @@ public final class DynamicToolActivations {
 
     public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions,
                                   SkillCatalog skills) {
+        this(sessions, skills, UserToolRoster.none());
+    }
+
+    public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions,
+                                  SkillCatalog skills, UserToolRoster userTools) {
         this.sessions = sessions;
         this.skills = skills == null ? SkillCatalog.none() : skills;
+        this.userTools = userTools == null ? UserToolRoster.none() : userTools;
+    }
+
+    /**
+     * {@link #effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition, SessionId)}
+     * with the tools the user keeps in their own account laid over — the layer
+     * below the agent's list.
+     *
+     * <p>{@code mainAgent} is what keeps it off the sub-agents: a chat gets
+     * what its user brought along, a sub-agent keeps the roster its definition
+     * gives it, because somebody curated that list for a narrow job. The
+     * user's <em>connections</em> are a different matter and follow them all
+     * the way down — that is the call scope, not this list.
+     */
+    public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
+                                         SessionId sessionId, UserId userId, boolean mainAgent) {
+        List<AgentTool> refs = effectiveRefs(def, sessionId);
+        return mainAgent ? userTools.apply(userId, def.id(), refs) : refs;
     }
 
     /** Marks {@code toolNames} usable for {@code sessionId}, persisted on the session. */

@@ -116,6 +116,11 @@ public final class OverlayToolRegistry implements ToolRegistry {
     }
 
     @Override
+    public java.util.Optional<ConnectionSpec> connectionSpecOf(String toolName) {
+        return delegate.connectionSpecOf(toolName);
+    }
+
+    @Override
     public Map<String, Object> overridesSchema(String toolName) {
         return delegate.overridesSchema(toolName);
     }

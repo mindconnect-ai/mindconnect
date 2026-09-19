@@ -316,6 +316,11 @@ takes it out of the schema. Note that a connection key is **personal**: pin one
 only in an agent that belongs to one person, never in a definition several
 people share.
 
+That is also exactly what a user does for themselves on the
+[My tools](./admin-ui/index.md#my-tools) tab — `UserToolRoster` derives the same
+two overrides from *their* connections, and the runtime applies them to the
+agent they are chatting with. A tool does nothing to support it.
+
 ## Scope-aware tools
 
 `create(AgentTool, ToolCallScope)` runs once per tool resolution, so a tool can

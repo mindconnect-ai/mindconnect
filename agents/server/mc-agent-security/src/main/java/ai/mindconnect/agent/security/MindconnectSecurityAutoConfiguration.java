@@ -2,6 +2,10 @@ package ai.mindconnect.agent.security;
 
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
 import ai.mindconnect.agent.tool.Connections;
+import ai.mindconnect.agent.tool.UserToolRoster;
+import ai.mindconnect.user.adapter.tool.StoredUserToolRoster;
+import ai.mindconnect.user.port.out.UserToolRepository;
+import ai.mindconnect.user.service.UserToolService;
 import ai.mindconnect.credentials.adapter.tool.ServiceConnections;
 import ai.mindconnect.credentials.port.out.ConnectionRepository;
 import ai.mindconnect.credentials.service.ConnectionService;
@@ -71,6 +75,25 @@ public class MindconnectSecurityAutoConfiguration {
     @ConditionalOnBean(NotificationRepository.class)
     NotificationService notificationService(NotificationRepository notifications) {
         return new NotificationService(notifications);
+    }
+
+    /**
+     * What each user keeps in their own tool account, and the roster the
+     * runtime lays over an agent's list for them. Found by the runtime through
+     * its bean fallback into this context, like {@link Connections}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(UserToolRepository.class)
+    UserToolService userToolService(UserToolRepository userTools) {
+        return new UserToolService(userTools);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(UserToolService.class)
+    UserToolRoster userToolRoster(UserToolService userTools) {
+        return new StoredUserToolRoster(userTools);
     }
 
     /**

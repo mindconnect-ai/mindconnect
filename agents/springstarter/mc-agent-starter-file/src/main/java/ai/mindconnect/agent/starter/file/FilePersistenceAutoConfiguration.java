@@ -8,6 +8,8 @@ import ai.mindconnect.credentials.adapter.file.FileConnectionRepository;
 import ai.mindconnect.credentials.port.out.ConnectionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
+import ai.mindconnect.user.adapter.file.FileUserToolRepository;
+import ai.mindconnect.user.port.out.UserToolRepository;
 import ai.mindconnect.user.adapter.file.FileNotificationRepository;
 import ai.mindconnect.user.adapter.file.FileUserRepository;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
@@ -70,6 +72,13 @@ public class FilePersistenceAutoConfiguration {
     @ConditionalOnMissingBean(ApiTokenRepository.class)
     ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
         return new FileApiTokenRepository(Path.of(baseDir));
+    }
+
+    /** The tools each user keeps in their own account — installation-wide, and no secrets in them. */
+    @Bean
+    @ConditionalOnMissingBean(UserToolRepository.class)
+    UserToolRepository userToolRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new FileUserToolRepository(Path.of(baseDir));
     }
 
     /**

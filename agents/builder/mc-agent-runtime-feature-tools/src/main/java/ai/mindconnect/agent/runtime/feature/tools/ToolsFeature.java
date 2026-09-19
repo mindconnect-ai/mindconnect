@@ -81,8 +81,12 @@ public class ToolsFeature extends ConfigurableFeature {
             ctx.require(ToolRegistryRef.class).set(effective);   // tool_search reads the effective one
             return effective;
         });
+        // The user's own tools are the layer below the agent's list. Absent on a
+        // host that keeps none, and then nothing changes for anybody.
         ctx.bean(DynamicToolActivations.class, () -> new DynamicToolActivations(
-                ctx.require(AgentSessionRepository.class), ctx.require(SkillCatalog.class)));
+                ctx.require(AgentSessionRepository.class), ctx.require(SkillCatalog.class),
+                ctx.find(ai.mindconnect.agent.tool.UserToolRoster.class)
+                        .orElseGet(ai.mindconnect.agent.tool.UserToolRoster::none)));
         ctx.bean(ToolExecutor.class, () -> new ToolExecutor(ctx.runtime().beans().all(ToolAdvisor.class)));
     }
 }
