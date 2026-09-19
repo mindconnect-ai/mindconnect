@@ -1,7 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import java.util.Set;
-import ai.mindconnect.adminui.setup.ToolBundles;
+import ai.mindconnect.agent.tool.ToolBundles;
 import ai.mindconnect.adminui.setup.UserTools;
 import ai.mindconnect.adminui.ui.component.UserToolsComponent;
 import ai.mindconnect.agent.UserId;
@@ -65,24 +65,27 @@ public class UserToolUiController {
     }
 
     /**
-     * Step two: how. One tool gets the full form, name of its own included;
-     * several get the account and the approval switch, and land as one row
-     * each. The accounts offered are the ones that fit.
+     * Step two: how. One single tool gets the full form, name of its own
+     * included; anything else — a set, or several picks — gets the account
+     * and the approval switch, and lands as one row per pick.
      */
     @PostMapping("/new")
     public UiPatch configure(@AuthenticationPrincipal OidcUser user, @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
-        List<String> names = userTools.bundles().expand(new FormBody(raw).strList("picks"));
-        if (names.isEmpty()) {
-            return dialog("Add tools", UserToolsComponent.pickForm(userTools.bundles(), "Pick something from the list."));
+        ToolBundles bundles = userTools.bundles();
+        List<String> picks = new FormBody(raw).strList("picks").stream()
+                .filter(key -> bundles.find(key).isPresent()).toList();
+        if (picks.isEmpty()) {
+            return dialog("Add tools", UserToolsComponent.pickForm(bundles, "Pick something from the list."));
         }
-        if (names.size() == 1) {
-            String toolName = names.get(0);
+        if (picks.size() == 1 && !ToolBundles.isSet(picks.get(0))) {
+            String toolName = bundles.expand(picks).get(0);
             return dialog("Add " + toolName, UserToolsComponent.form(toolName,
                     userTools.connectionSpecOf(toolName), userTools.connectionsFor(me, toolName), null, null));
         }
+        List<String> names = picks.stream().map(this::nameOf).toList();
         Optional<ConnectionSpec> shared = sharedSpec(names);
-        return dialog("Add " + names.size() + " tools", UserToolsComponent.bundleForm(names, shared,
+        return dialog("Add to your account", UserToolsComponent.bundleForm(names, bundles, shared,
                 shared.isPresent() ? userTools.connectionsFor(me, names.get(0)) : List.of(), null));
     }
 
@@ -92,7 +95,7 @@ public class UserToolUiController {
         UserId me = userId(user);
         UserToolService service = userTools.service().orElse(null);
         FormBody body = new FormBody(raw);
-        String picked = body.str("tools");
+        String picked = body.str("picks");
         List<String> names = picked == null ? List.of()
                 : java.util.Arrays.stream(picked.split(",")).map(String::strip)
                         .filter(userTools::isKnown).toList();
@@ -104,14 +107,41 @@ public class UserToolUiController {
         int added = 0;
         for (String name : names) {
             if (!present.add(name)) continue;
-            service.add(me, null, name, null, null, params(body), body.bool("needsApproval"));
+            service.add(me, null, name, null, null, params(body), body.bool("needsApproval"), members(body, name));
             added++;
         }
         int skipped = names.size() - added;
-        return refreshed(me).toast(UiToast.success(added + (added == 1 ? " tool is" : " tools are")
+        return refreshed(me).toast(UiToast.success(added + (added == 1 ? " entry is" : " entries are")
                         + " in your chats from the next message on."
                         + (skipped == 0 ? "" : " " + skipped + " you already had."))
-                .title("Tools added"));
+                .title("Added"));
+    }
+
+    /**
+     * The members of set {@code key} as the two checkbox groups left them: a
+     * tool not ticked under "Tools in it" is out, one ticked under "Ask me
+     * before" asks. Tools of other sets in the same form are not this set's.
+     */
+    private Map<String, UserTool.Member> members(FormBody body, String key) {
+        if (!ToolBundles.isSet(key)) return Map.of();
+        Set<String> in = new java.util.HashSet<>(body.strList("members"));
+        Set<String> asks = new java.util.HashSet<>(body.strList("asks"));
+        Map<String, UserTool.Member> members = new java.util.LinkedHashMap<>();
+        for (String tool : userTools.membersOf(key)) {
+            boolean enabled = in.isEmpty() || in.contains(tool);   // no group rendered at all: everything in
+            Boolean ask = asks.contains(tool) ? Boolean.TRUE : null;
+            if (!enabled || ask != null) members.put(tool, new UserTool.Member(enabled, ask));
+        }
+        return members;
+    }
+
+    private String rowName(UserTool tool) {
+        return ToolBundles.isSet(tool.toolName()) ? userTools.bundles().label(tool.toolName()) : tool.effectiveName();
+    }
+
+    /** What is stored for a pick: a set under its key, a single tool under its name. */
+    private String nameOf(String pick) {
+        return ToolBundles.isSet(pick) ? pick : userTools.bundles().expand(List.of(pick)).get(0);
     }
 
     /** The one connection kind all of them run on — or empty, when they differ or need none. */
@@ -161,9 +191,9 @@ public class UserToolUiController {
     public UiPatch edit(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id) {
         UserId me = userId(user);
         return userTools.find(me, UserToolId.of(id))
-                .map(tool -> dialog("Edit " + tool.effectiveName(), UserToolsComponent.form(
+                .map(tool -> dialog("Edit " + rowName(tool), UserToolsComponent.form(
                         tool.toolName(), userTools.connectionSpecOf(tool.toolName()),
-                        userTools.connectionsFor(me, tool.toolName()), tool, null)))
+                        userTools.connectionsFor(me, tool.toolName()), tool, null, userTools.bundles())))
                 .orElseGet(() -> UiPatch.of().toast(gone()));
     }
 
@@ -181,6 +211,9 @@ public class UserToolUiController {
         try {
             service.update(me, stored.id(), body.str("alias"), body.str("description"),
                     params(body), stored.enabled(), body.bool("needsApproval"));
+            if (ToolBundles.isSet(stored.toolName())) {
+                service.updateMembers(me, stored.id(), members(body, stored.toolName()));
+            }
             return refreshed(me).toast(UiToast.success("Saved.").title(stored.effectiveName()));
         } catch (IllegalArgumentException e) {
             return dialog("Edit " + stored.effectiveName(), UserToolsComponent.form(
@@ -249,6 +282,11 @@ public class UserToolUiController {
             Optional<Connection> account = pinned == null
                     ? available.stream().filter(Connection::isDefault).findFirst()
                     : available.stream().filter(c -> c.key().equals(pinned)).findFirst();
+            if (ToolBundles.isSet(tool.toolName())) {
+                List<String> members = userTools.membersOf(tool.toolName());
+                return new UserToolsComponent.Row(tool, spec, account, userTools.bundles().label(tool.toolName()),
+                        members.size() + " tools");
+            }
             return new UserToolsComponent.Row(tool, spec, account);
         }).toList();
     }

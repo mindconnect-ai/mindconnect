@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.security;
 
+import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
 import ai.mindconnect.agent.tool.Connections;
 import ai.mindconnect.agent.tool.UserToolRoster;
@@ -99,8 +100,8 @@ public class MindconnectSecurityAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnBean(UserToolService.class)
-    UserToolRoster userToolRoster(UserToolService userTools) {
-        return new StoredUserToolRoster(userTools);
+    UserToolRoster userToolRoster(UserToolService userTools, ObjectProvider<ToolRegistry> registry) {
+        return new StoredUserToolRoster(userTools, registry::getIfAvailable);
     }
 
     /**

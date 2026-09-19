@@ -74,6 +74,13 @@ public class UserToolService {
      */
     public UserTool add(UserId userId, AgentId agentId, String toolName, String alias,
                         String description, Map<String, Object> params, Boolean needsApproval) {
+        return add(userId, agentId, toolName, alias, description, params, needsApproval, Map.of());
+    }
+
+    /** A set row with its members set: which tools are in, and which ask first. */
+    public UserTool add(UserId userId, AgentId agentId, String toolName, String alias,
+                        String description, Map<String, Object> params, Boolean needsApproval,
+                        Map<String, UserTool.Member> members) {
         Objects.requireNonNull(userId, "userId");
         synchronized (lockFor(userId)) {
             String name = alias == null || alias.isBlank() ? toolName : alias.strip();
@@ -81,7 +88,7 @@ public class UserToolService {
             Instant now = clock.instant();
             UserTool created = new UserTool(UserToolId.random(), userId, agentId, toolName,
                     alias == null || alias.isBlank() ? null : alias.strip(), description,
-                    params, true, tighten(needsApproval), now, now);
+                    params, true, tighten(needsApproval), members, now, now);
             tools.save(created);
             return created;
         }
@@ -98,6 +105,18 @@ public class UserToolService {
                 UserTool updated = stored.with(
                         alias == null || alias.isBlank() ? null : alias.strip(),
                         description, params, enabled, tighten(needsApproval), clock.instant());
+                tools.save(updated);
+                return updated;
+            });
+        }
+    }
+
+    /** Sets a set row's members anew; empty when the id is not theirs. */
+    public Optional<UserTool> updateMembers(UserId userId, UserToolId id, Map<String, UserTool.Member> members) {
+        Objects.requireNonNull(userId, "userId");
+        synchronized (lockFor(userId)) {
+            return find(userId, id).map(stored -> {
+                UserTool updated = stored.withMembers(members, clock.instant());
                 tools.save(updated);
                 return updated;
             });

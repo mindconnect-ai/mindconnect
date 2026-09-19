@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.controller;
 
 import java.util.Set;
 import ai.mindconnect.adminui.ui.page.ToolBundleFormPage;
-import ai.mindconnect.adminui.setup.ToolBundles;
+import ai.mindconnect.agent.tool.ToolBundles;
 import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.adminui.ui.component.AgentFormComponent;
 import ai.mindconnect.adminui.ui.component.ToolTestComponent;

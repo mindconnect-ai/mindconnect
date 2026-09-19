@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.page;
 
-import ai.mindconnect.adminui.setup.ToolBundles;
+import ai.mindconnect.agent.tool.ToolBundles;
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.ToolBundleFormComponent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;

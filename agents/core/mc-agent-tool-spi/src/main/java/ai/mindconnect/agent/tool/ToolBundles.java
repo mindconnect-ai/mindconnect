@@ -1,8 +1,5 @@
-package ai.mindconnect.adminui.setup;
+package ai.mindconnect.agent.tool;
 
-import ai.mindconnect.adminui.ui.component.ToolCatalogComponent;
-import ai.mindconnect.agent.tool.ConnectionSpec;
-import ai.mindconnect.agent.tool.ToolRegistry;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -10,6 +7,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.function.Predicate;
@@ -63,7 +61,7 @@ public final class ToolBundles {
 
         byGroup.forEach((group, names) -> {
             List<String> all = new ArrayList<>(names);
-            sets.add(new Bundle("group:" + group, ToolCatalogComponent.displayGroup(group) + count(all.size()), all));
+            sets.add(new Bundle("group:" + group, displayGroup(group) + count(all.size()), all));
             // A subgroup is a source within the group — one MCP server among
             // several. Offered only where the group actually splits.
             Map<String, List<String>> bySubgroup = new LinkedHashMap<>();
@@ -78,7 +76,7 @@ public final class ToolBundles {
             }
             if (bySubgroup.size() > 1 || (bySubgroup.size() == 1 && bySubgroup.values().iterator().next().size() < all.size())) {
                 bySubgroup.forEach((sub, subNames) -> sets.add(new Bundle("group:" + group + "/" + sub,
-                        ToolCatalogComponent.displayGroup(group) + " / " + sub + count(subNames.size()), subNames)));
+                        displayGroup(group) + " / " + sub + count(subNames.size()), subNames)));
             }
         });
         // Everything one account brings, when that is more than one group —
@@ -92,7 +90,7 @@ public final class ToolBundles {
 
         List<Bundle> singles = new ArrayList<>();
         byGroup.forEach((group, names) -> names.forEach(name ->
-                singles.add(new Bundle("tool:" + name, ToolCatalogComponent.displayGroup(group) + " · " + name, List.of(name)))));
+                singles.add(new Bundle("tool:" + name, displayGroup(group) + " · " + name, List.of(name)))));
 
         List<Bundle> all = new ArrayList<>(sets);
         all.addAll(singles);
@@ -125,6 +123,26 @@ public final class ToolBundles {
                     .ifPresent(b -> names.addAll(b.tools()));
         }
         return List.copyOf(names);
+    }
+
+    /** Whether {@code key} names a set rather than one tool — what a roster has to expand. */
+    public static boolean isSet(String key) {
+        return key != null && (key.startsWith("group:") || key.startsWith("provider:"));
+    }
+
+    /** The bundle behind a key, if offered. */
+    public Optional<Bundle> find(String key) {
+        return bundles.stream().filter(b -> b.key().equals(key)).findFirst();
+    }
+
+    /** What a key reads as — its label when offered, the key itself when not. */
+    public String label(String key) {
+        return find(key).map(Bundle::label).orElse(key);
+    }
+
+    static String displayGroup(String group) {
+        if (group == null || group.isBlank()) return "General";
+        return Character.toUpperCase(group.charAt(0)) + group.substring(1);
     }
 
     private static String count(int n) {

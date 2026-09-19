@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.setup.ToolBundles;
+import ai.mindconnect.agent.tool.ToolBundles;
 import ai.mindconnect.agent.tool.ConnectionSpec;
 import ai.mindconnect.credentials.domain.Connection;
 import ai.mindconnect.ui.model.UiAction;
@@ -57,7 +57,13 @@ public final class UserToolsComponent {
     }
 
     /** One of the user's bindings, with what is needed to describe it. */
-    public record Row(UserTool tool, Optional<ConnectionSpec> spec, Optional<Connection> account) { }
+    /** @param label what the Name cell says — the tool's name, or a set's label */
+    public record Row(UserTool tool, Optional<ConnectionSpec> spec, Optional<Connection> account, String label,
+                      String tools) {
+        public Row(UserTool tool, Optional<ConnectionSpec> spec, Optional<Connection> account) {
+            this(tool, spec, account, tool.effectiveName(), tool.toolName());
+        }
+    }
 
     public static UiTable table(List<Row> rows, boolean canAdd) {
         UiTable table = UiTable.of(TABLE_ID, "My tools").stackOnMobile(true).icon("settings")
@@ -80,8 +86,8 @@ public final class UserToolsComponent {
             UserTool tool = row.tool();
             Map<String, Object> cells = new LinkedHashMap<>();
             cells.put("id", tool.id().value());
-            cells.put("name", tool.effectiveName());
-            cells.put("tool", tool.toolName());
+            cells.put("name", row.label());
+            cells.put("tool", row.tools());
             cells.put("account", account(row));
             cells.put("status", status(tool));
             table.row(cells);
@@ -117,10 +123,12 @@ public final class UserToolsComponent {
         List<UiField.Option> options = new ArrayList<>();
         bundles.all().forEach(b -> options.add(UiField.Option.of(b.key(), b.label())));
         UiForm form = UiForm.of(PICK_FORM_ID, null)
-                .field(UiField.multiselect("picks", "Tools", List.of(), options).asEditable().asRequired()
-                        .hint("A group adds every tool in it; pick single tools to add just those. Which "
-                                + "of your accounts they use comes next. One tool at a time can also be "
-                                + "given a name of its own."))
+                .field(UiField.multiselect("picks", "Tools", List.of(), options)
+                        .asCheckboxes()
+                        .asEditable().asRequired()
+                        .hint("A group is one entry in your account: its account, its switch and its "
+                                + "approval hold for every tool in it. Which of your accounts they use "
+                                + "comes next. One single tool can also be given a name of its own."))
                 .action(UiAction.primary(PICK_FORM_ID + "-next", "Continue").icon("arrow-right")
                         .dispatch("POST", API + "/new", PICK_FORM_ID))
                 .action(UiAction.secondary(PICK_FORM_ID + "-cancel", "Cancel")
@@ -132,21 +140,24 @@ public final class UserToolsComponent {
     }
 
     /**
-     * Step two for several tools at once: the account, when they all run on
-     * the same kind, and whether to ask first. No alias — a name of one's own
-     * is a one-tool affair.
+     * Step two for several picks at once: the account, when they all run on
+     * the same kind, and whether to ask first. Each pick becomes one row — a
+     * set stays a set. No alias: a name of one's own is a one-tool affair.
      */
-    public static UiForm bundleForm(List<String> toolNames, Optional<ConnectionSpec> spec,
+    public static UiForm bundleForm(List<String> picks, ToolBundles bundles, Optional<ConnectionSpec> spec,
                                     List<Connection> connections, String error) {
         UiForm form = UiForm.of(FORM_ID, null)
-                .field(UiField.hidden("tools", String.join(",", toolNames)))
-                .field(UiField.text("picked", "Adding", String.join(", ", toolNames)));
+                .field(UiField.hidden("picks", String.join(",", picks)))
+                .field(UiField.text("picked", "Adding",
+                        String.join(", ", picks.stream().map(bundles::label).toList())));
         if (spec.isPresent()) {
             form.field(accountField(spec.get(), connections, null));
         }
+        memberFields(form, picks.stream().filter(ToolBundles::isSet).toList(), bundles, null);
         form.field(UiField.bool("needsApproval", "Ask me before every call", false).asEditable()
-                .hint("Only ever adds a question. It cannot take away one your agent already asks."));
-        form.action(UiAction.primary(FORM_ID + "-save", "Add " + toolNames.size() + " tools").icon("add")
+                .hint("For everything added here. Only ever adds a question; it cannot take away one "
+                        + "your agent already asks."));
+        form.action(UiAction.primary(FORM_ID + "-save", "Add").icon("add")
                         .dispatch("POST", API + "/add-many", FORM_ID))
                 .action(UiAction.secondary(FORM_ID + "-cancel", "Cancel")
                         .dispatch("POST", API + "/dialog/close"));
@@ -165,23 +176,34 @@ public final class UserToolsComponent {
      */
     public static UiForm form(String toolName, Optional<ConnectionSpec> spec, List<Connection> connections,
                               UserTool editing, String error) {
+        return form(toolName, spec, connections, editing, error, null);
+    }
+
+    /** The same, with the set's members when {@code toolName} is a set and {@code bundles} can expand it. */
+    public static UiForm form(String toolName, Optional<ConnectionSpec> spec, List<Connection> connections,
+                              UserTool editing, String error, ToolBundles bundles) {
         boolean editingExisting = editing != null;
         String target = editingExisting ? API + "/" + editing.id().value() : API + "/add/" + toolName;
 
-        UiForm form = UiForm.of(FORM_ID, null)
-                .field(UiField.text("alias", "Name in your chats",
-                                editingExisting ? editing.alias() : null)
-                        .asEditable()
-                        .placeholder(toolName + "_work")
-                        .hint("Leave it empty to use the tool's own name, which changes the agent's own "
-                                + "entry instead of adding a second one. Give it a name to have both."))
-                .field(UiField.textarea("description", "What to tell the model",
+        UiForm form = UiForm.of(FORM_ID, null);
+        if (!ToolBundles.isSet(toolName)) {
+            form.field(UiField.text("alias", "Name in your chats",
+                            editingExisting ? editing.alias() : null)
+                    .asEditable()
+                    .placeholder(toolName + "_work")
+                    .hint("Leave it empty to use the tool's own name, which changes the agent's own "
+                            + "entry instead of adding a second one. Give it a name to have both."));
+        }
+        form.field(UiField.textarea("description", "What to tell the model",
                                 editingExisting ? editing.description() : null)
                         .asEditable()
                         .hint("Optional. \"Reads my work mailbox\" helps the model pick the right one."));
 
         if (spec.isPresent()) {
             form.field(accountField(spec.get(), connections, editing));
+        }
+        if (bundles != null && ToolBundles.isSet(toolName)) {
+            memberFields(form, List.of(toolName), bundles, editing);
         }
         form.field(UiField.bool("needsApproval", "Ask me before every call",
                         editingExisting && editing.tightensApproval())
@@ -196,6 +218,31 @@ public final class UserToolsComponent {
             form.error(error);
         }
         return form;
+    }
+
+    /**
+     * Two checkbox groups over the tools of the picked sets: which are in, and
+     * which ask first. Set as one row and applied per tool by the roster.
+     */
+    static void memberFields(UiForm form, List<String> setKeys, ToolBundles bundles, UserTool editing) {
+        List<UiField.Option> options = new ArrayList<>();
+        List<String> in = new ArrayList<>();
+        List<String> asks = new ArrayList<>();
+        for (String key : setKeys) {
+            String setLabel = bundles.label(key).replaceAll("\\s+\\(.*\\)$", "");
+            for (String tool : bundles.expand(List.of(key))) {
+                options.add(UiField.Option.of(tool, setKeys.size() > 1 ? setLabel + " · " + tool : tool));
+                UserTool.Member member = editing == null ? UserTool.Member.on()
+                        : editing.members().getOrDefault(tool, UserTool.Member.on());
+                if (member.enabled()) in.add(tool);
+                if (Boolean.TRUE.equals(member.needsApproval())) asks.add(tool);
+            }
+        }
+        if (options.isEmpty()) return;
+        form.field(UiField.multiselect("members", "Tools in it", in, options).asCheckboxes().asEditable()
+                        .hint("Untick one to leave it out for you. A tool the group gains later is in."))
+                .field(UiField.multiselect("asks", "Ask me before", asks, options).asCheckboxes().asEditable()
+                        .hint("These ask before every call, even when the row as a whole does not."));
     }
 
     private static UiField accountField(ConnectionSpec spec, List<Connection> connections, UserTool editing) {

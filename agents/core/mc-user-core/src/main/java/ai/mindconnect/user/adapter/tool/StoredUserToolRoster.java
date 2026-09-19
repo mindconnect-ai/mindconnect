@@ -3,6 +3,8 @@ package ai.mindconnect.user.adapter.tool;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.ToolBundles;
+import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.AliasTool;
 import ai.mindconnect.agent.tool.PinnedParamsTool;
@@ -14,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Lays what a user keeps in their own account over what the agent lists.
@@ -34,9 +37,21 @@ import java.util.Objects;
 public class StoredUserToolRoster implements UserToolRoster {
 
     private final UserToolService tools;
+    private final Supplier<ToolRegistry> registry;
+
+    /**
+     * @param registry where a set row ({@code group:email}) is expanded into
+     *                 its tools — looked up per call, because the registry
+     *                 may come to life after this roster does. Null means set
+     *                 rows are left out rather than guessed at.
+     */
+    public StoredUserToolRoster(UserToolService tools, Supplier<ToolRegistry> registry) {
+        this.tools = Objects.requireNonNull(tools, "tools");
+        this.registry = registry == null ? () -> null : registry;
+    }
 
     public StoredUserToolRoster(UserToolService tools) {
-        this.tools = Objects.requireNonNull(tools, "tools");
+        this(tools, null);
     }
 
     @Override
@@ -52,7 +67,24 @@ public class StoredUserToolRoster implements UserToolRoster {
         for (AgentTool ref : agentRefs) {
             byName.put(ref.name(), ref);
         }
+        ToolBundles bundles = null;
         for (UserTool tool : mine) {
+            if (ToolBundles.isSet(tool.toolName())) {
+                // One row for the set — the account, the switch and the
+                // approval hold for every tool in it, and a tool the group
+                // gains later is in from the next chat on.
+                if (bundles == null) bundles = bundlesOrNull();
+                if (bundles == null) continue;
+                for (String member : bundles.expand(List.of(tool.toolName()))) {
+                    UserTool asMember = tool.member(member);
+                    if (!asMember.offered()) {
+                        byName.remove(member);       // the row is off, or this one tool was taken out
+                        continue;
+                    }
+                    byName.put(member, merge(byName.get(member), asMember));
+                }
+                continue;
+            }
             String name = tool.effectiveName();
             if (!tool.offered()) {
                 byName.remove(name);                // they do not want it in their chats
@@ -61,6 +93,11 @@ public class StoredUserToolRoster implements UserToolRoster {
             byName.put(name, merge(byName.get(name), tool));
         }
         return List.copyOf(byName.values());
+    }
+
+    private ToolBundles bundlesOrNull() {
+        ToolRegistry found = registry.get();
+        return found == null ? null : ToolBundles.of(found, name -> true);
     }
 
     /**

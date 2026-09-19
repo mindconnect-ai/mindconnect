@@ -62,11 +62,13 @@ public record UserTool(
         Map<String, Object> params,
         Boolean enabled,
         Boolean needsApproval,
+        Map<String, Member> members,
         Instant createdAt,
         Instant updatedAt
 ) {
 
     public UserTool {
+        members = members == null ? Map.of() : Map.copyOf(members);
         Objects.requireNonNull(id, "A user tool needs an id");
         Objects.requireNonNull(userId, "A user tool needs a user");
         if (toolName == null || toolName.isBlank()) {
@@ -78,9 +80,20 @@ public record UserTool(
     }
 
     /** A tool the user adds to every agent they chat with, under its own name. */
+    /**
+     * One tool of a set row, as the user set it: whether it is in, and whether
+     * it asks first. Absent means in, and asking only if the row asks.
+     *
+     * @param enabled      false takes this tool out of the set for this user
+     * @param needsApproval true makes this tool ask; null follows the row
+     */
+    public record Member(boolean enabled, Boolean needsApproval) {
+        public static Member on() { return new Member(true, null); }
+    }
+
     public static UserTool added(UserId userId, String toolName, Instant now) {
         return new UserTool(UserToolId.random(), userId, null, toolName, null, null,
-                Map.of(), true, null, now, now);
+                Map.of(), true, null, Map.of(), now, now);
     }
 
     /** The name this binding appears under — its alias, else the tool's own. */
@@ -112,14 +125,36 @@ public record UserTool(
         return agentId == null || agentId.equals(agent);
     }
 
+    /**
+     * This set row as one of its members: the same account, switch and
+     * approval, under the member's own name, with an id that is stable and
+     * unique — the row's id plus the tool. Only meaningful for a set row.
+     */
+    public UserTool member(String memberName) {
+        Member setting = members.getOrDefault(memberName, Member.on());
+        Boolean memberEnabled = enabled == null ? (setting.enabled() ? null : Boolean.FALSE)
+                : enabled && setting.enabled();
+        Boolean asks = Boolean.TRUE.equals(needsApproval) || Boolean.TRUE.equals(setting.needsApproval())
+                ? Boolean.TRUE : needsApproval;
+        return new UserTool(UserToolId.of(id.value() + "-" + memberName.replaceAll("[^A-Za-z0-9_-]", "_")),
+                userId, agentId, memberName, null, description, params, memberEnabled, asks, Map.of(),
+                createdAt, updatedAt);
+    }
+
+    /** This row with the members set anew — for the edit of a set. */
+    public UserTool withMembers(Map<String, Member> newMembers, Instant now) {
+        return new UserTool(id, userId, agentId, toolName, alias, description, params, enabled, needsApproval,
+                newMembers, createdAt, now);
+    }
+
     public UserTool with(String newAlias, String newDescription, Map<String, Object> newParams,
                          Boolean newEnabled, Boolean newApproval, Instant now) {
         return new UserTool(id, userId, agentId, toolName, newAlias, newDescription, newParams,
-                newEnabled, newApproval, createdAt, now);
+                newEnabled, newApproval, members, createdAt, now);
     }
 
     public UserTool forAgent(AgentId agent, Instant now) {
         return new UserTool(id, userId, agent, toolName, alias, description, params,
-                enabled, needsApproval, createdAt, now);
+                enabled, needsApproval, members, createdAt, now);
     }
 }

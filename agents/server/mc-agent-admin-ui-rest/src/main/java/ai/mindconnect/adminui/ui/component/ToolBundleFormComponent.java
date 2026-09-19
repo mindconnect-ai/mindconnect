@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
-import ai.mindconnect.adminui.setup.ToolBundles;
+import ai.mindconnect.agent.tool.ToolBundles;
 import ai.mindconnect.adminui.ui.controller.AgentUiController;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.chatui.ui.UiComponent;
@@ -44,6 +44,7 @@ public final class ToolBundleFormComponent implements UiComponent {
 
         return UiForm.of(id(), "Add a group of tools")
                 .field(UiField.multiselect("bundles", "Tools", List.of(), options)
+                        .asCheckboxes()
                         .asEditable().asRequired()
                         .hint("A group adds every tool in it; a single tool adds just that one. Tools the "
                                 + "agent already has are left as they are. Take single ones out again in "

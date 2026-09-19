@@ -34,6 +34,47 @@ class StoredUserToolRosterTest {
     private final UserToolService service = new UserToolService(new MapUserTools());
     private final StoredUserToolRoster roster = new StoredUserToolRoster(service);
 
+    /** A registry with one group, for the set rows. */
+    private static final ai.mindconnect.agent.tool.ToolRegistry EMAIL_REGISTRY = new ai.mindconnect.agent.tool.ToolRegistry() {
+        @Override public java.util.Optional<ai.mindconnect.agent.tool.Tool> resolve(AgentTool tool,
+                ai.mindconnect.agent.tool.ToolCallScope scope) { return java.util.Optional.empty(); }
+        @Override public java.util.Set<String> knownToolNames() {
+            return java.util.Set.of("email_list_messages", "email_read_message", "email_send_message");
+        }
+        @Override public Map<String, java.util.Set<String>> toolNamesByGroup() {
+            return Map.of("email", new java.util.LinkedHashSet<>(
+                    List.of("email_list_messages", "email_read_message", "email_send_message")));
+        }
+    };
+
+    @Test
+    void a_set_row_is_every_tool_of_the_group_with_one_account_and_the_members_as_set() {
+        StoredUserToolRoster withSets = new StoredUserToolRoster(service, () -> EMAIL_REGISTRY);
+        service.add(ALICE, null, "group:email", null, null, Map.of("account", "arbeit"), null, Map.of(
+                "email_read_message", new UserTool.Member(false, null),        // taken out
+                "email_send_message", new UserTool.Member(true, true)));       // asks first
+
+        List<AgentTool> refs = withSets.apply(ALICE, ASSISTANT, List.of());
+
+        assertThat(refs).extracting(AgentTool::name).containsExactly("email_list_messages", "email_send_message");
+        assertThat(refs).allSatisfy(ref -> assertThat(ref.overrides()).containsEntry(
+                ai.mindconnect.agent.tool.PinnedParamsTool.OVERRIDE_KEY, Map.of("account", "arbeit")));
+        assertThat(refs.get(0).needsApproval()).isFalse();
+        assertThat(refs.get(1).needsApproval()).isTrue();
+        // Two rows, two ids — and stable across calls.
+        assertThat(refs).extracting(ref -> ref.id().value()).doesNotHaveDuplicates()
+                .containsExactlyElementsOf(withSets.apply(ALICE, ASSISTANT, List.of()).stream()
+                        .map(ref -> ref.id().value()).toList());
+    }
+
+    @Test
+    void a_set_row_without_a_registry_to_expand_it_is_left_out_rather_than_guessed() {
+        service.add(ALICE, null, "group:email", null, null, Map.of(), null);
+
+        assertThat(roster.apply(ALICE, ASSISTANT, List.of(AgentTool.of("web_search"))))
+                .extracting(AgentTool::name).containsExactly("web_search");
+    }
+
     @Test
     void a_user_with_nothing_of_their_own_gets_the_agents_list_untouched() {
         List<AgentTool> agentRefs = List.of(AgentTool.of("web_search"));

@@ -1,10 +1,5 @@
-package ai.mindconnect.adminui.setup;
+package ai.mindconnect.agent.tool;
 
-import ai.mindconnect.agent.tool.AgentTool;
-import ai.mindconnect.agent.tool.ConnectionSpec;
-import ai.mindconnect.agent.tool.Tool;
-import ai.mindconnect.agent.tool.ToolCallScope;
-import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.schema.Schema;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -65,6 +60,17 @@ class ToolBundlesTest {
                 .map(ToolBundles.Bundle::key).toList();
 
         assertThat(singles).contains("tool:bash", "tool:gh_issues").doesNotContain("tool:run_agent");
+    }
+
+    @Test
+    @DisplayName("knows a set from a single tool by its key")
+    void sets_vs_singles() {
+        assertThat(ToolBundles.isSet("group:email")).isTrue();
+        assertThat(ToolBundles.isSet("provider:microsoft")).isTrue();
+        assertThat(ToolBundles.isSet("tool:bash")).isFalse();
+        assertThat(ToolBundles.isSet("bash")).isFalse();
+        assertThat(bundles.label("group:outlook")).isEqualTo("Outlook  (2 tools)");
+        assertThat(bundles.label("nope")).isEqualTo("nope");
     }
 
     @Test

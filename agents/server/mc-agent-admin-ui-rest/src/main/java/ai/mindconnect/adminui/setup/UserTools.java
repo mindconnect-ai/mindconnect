@@ -2,6 +2,7 @@ package ai.mindconnect.adminui.setup;
 
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ConnectionSpec;
+import ai.mindconnect.agent.tool.ToolBundles;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.credentials.domain.Connection;
 import ai.mindconnect.user.domain.UserTool;
@@ -86,15 +87,31 @@ public class UserTools {
         return registry == null ? ToolBundles.none() : ToolBundles.of(registry, known::contains);
     }
 
-    /** True when the catalogue knows this name — a hand-typed URL must not store nonsense. */
+    /** True when the catalogue knows this name or set — a hand-typed URL must not store nonsense. */
     public boolean isKnown(String toolName) {
+        if (ToolBundles.isSet(toolName)) return bundles().find(toolName).isPresent();
         return catalogue().values().stream().anyMatch(names -> names.contains(toolName));
+    }
+
+    /** The tools behind a name: the set's members, or the name itself. */
+    public List<String> membersOf(String toolName) {
+        return ToolBundles.isSet(toolName) ? bundles().expand(List.of(toolName)) : List.of(toolName);
     }
 
     /** The account a tool runs on, if it runs on one. */
     public Optional<ConnectionSpec> connectionSpecOf(String toolName) {
         ToolRegistry registry = tools.getIfAvailable();
-        return registry == null ? Optional.empty() : registry.connectionSpecOf(toolName);
+        if (registry == null) return Optional.empty();
+        if (!ToolBundles.isSet(toolName)) return registry.connectionSpecOf(toolName);
+        // A set runs on one kind of account only when every member does.
+        Optional<ConnectionSpec> shared = Optional.empty();
+        for (String member : membersOf(toolName)) {
+            Optional<ConnectionSpec> spec = registry.connectionSpecOf(member);
+            if (spec.isEmpty()) return Optional.empty();
+            if (shared.isEmpty()) shared = spec;
+            else if (!shared.get().provider().equals(spec.get().provider())) return Optional.empty();
+        }
+        return shared;
     }
 
     /** The connections {@code user} could point this tool at; empty when it needs none. */
