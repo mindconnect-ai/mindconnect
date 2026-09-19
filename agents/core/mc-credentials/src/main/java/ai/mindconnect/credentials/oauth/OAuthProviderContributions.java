@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.ServiceLoader;
 
 /**
@@ -36,9 +37,10 @@ public class OAuthProviderContributions {
     }
 
     /**
-     * Stores every contribution the installation does not have yet.
+     * Stores every contribution the installation does not have yet, and puts
+     * the operator's own client id on one it already has.
      *
-     * @return the names actually stored
+     * @return the names actually stored or updated
      */
     public List<String> install() {
         List<String> stored = new ArrayList<>();
@@ -56,8 +58,19 @@ public class OAuthProviderContributions {
                 // shareable registration, waiting for the operator to make one.
                 continue;
             }
-            if (providers.findByName(provider.name()).isPresent()) {
-                continue;                   // theirs now, not ours
+            Optional<OAuthProvider> existing = providers.findByName(provider.name());
+            if (existing.isPresent()) {
+                // Theirs now, not ours — except for the credentials the operator
+                // hands in through the environment: those are their decision of
+                // today, and they may have been made after the first start.
+                OAuthProvider refreshed = withOperatorCredentials(existing.get(), contribution);
+                if (refreshed.equals(existing.get())) {
+                    continue;
+                }
+                providers.save(refreshed);
+                stored.add(refreshed.name());
+                log.info("The OAuth provider '{}' now uses the operator's client id", refreshed.name());
+                continue;
             }
             if (provider.clientSecret() != null && !provider.clientSecret().isBlank()
                     && contribution.clientSecret() == null) {
@@ -78,6 +91,11 @@ public class OAuthProviderContributions {
         if (provider == null) {
             return null;                    // nothing to contribute yet
         }
+        return withOperatorCredentials(provider, contribution);
+    }
+
+    /** {@code provider} — shipped or already stored — with the operator's client id and secret on it. */
+    private static OAuthProvider withOperatorCredentials(OAuthProvider provider, OAuthProviderContribution contribution) {
         String theirId = contribution.clientId();
         String theirSecret = contribution.clientSecret();
         boolean newId = theirId != null && !theirId.isBlank() && !theirId.equals(provider.clientId());
