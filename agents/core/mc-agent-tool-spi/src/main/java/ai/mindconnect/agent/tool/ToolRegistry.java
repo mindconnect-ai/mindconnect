@@ -90,6 +90,13 @@ public interface ToolRegistry {
     default Optional<ConnectionSpec> connectionSpecOf(String toolName) { return Optional.empty(); }
 
     /**
+     * How to try a connection of {@code provider} out, if any source that
+     * declares that provider offers one — the first that does wins, like the
+     * spec. Default: empty.
+     */
+    default Optional<ConnectionTester> connectionTesterOf(String provider) { return Optional.empty(); }
+
+    /**
      * Lets go of whatever the tools hold for one session — a pooled connection,
      * a started container. Called by whoever ends the session; today that is
      * the tool test bench, whose sessions last one call. Idempotent, and safe

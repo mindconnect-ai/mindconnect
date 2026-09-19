@@ -121,6 +121,11 @@ public final class OverlayToolRegistry implements ToolRegistry {
     }
 
     @Override
+    public java.util.Optional<ConnectionTester> connectionTesterOf(String provider) {
+        return delegate.connectionTesterOf(provider);
+    }
+
+    @Override
     public Map<String, Object> overridesSchema(String toolName) {
         return delegate.overridesSchema(toolName);
     }

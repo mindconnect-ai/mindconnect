@@ -60,7 +60,11 @@ public final class ConnectionsComponent {
     }
 
     /** What one provider's card is made of. */
-    public record Card(ConnectionSpec spec, List<Connection> connections) { }
+    /**
+     * @param testable whether the provider's source offers a test — decides
+     *                 whether the rows carry a Test button
+     */
+    public record Card(ConnectionSpec spec, List<Connection> connections, boolean testable) { }
 
     private static UiNode card(Card card) {
         ConnectionSpec spec = card.spec();
@@ -89,8 +93,12 @@ public final class ConnectionsComponent {
                 .column(UiTable.Column.text("key", "Referred to as"))
                 .column(UiTable.Column.text("status", "Status"))
                 .rowAction(UiAction.secondary("edit", "Edit").icon("edit")
-                        .dispatch("GET", API + "/{id}/edit"))
-                .rowAction(UiAction.secondary("make-default", "Make default").icon("check")
+                        .dispatch("GET", API + "/{id}/edit"));
+        if (card.testable()) {
+            table.rowAction(UiAction.secondary("test", "Test").icon("activity")
+                    .dispatch("POST", API + "/{id}/test"));
+        }
+        table.rowAction(UiAction.secondary("make-default", "Make default").icon("check")
                         .dispatch("POST", API + "/{id}/default"))
                 .rowAction(UiAction.danger("remove", "Remove").icon("delete")
                         .confirm("Remove this connection? Tools that used it stop working until you attach "

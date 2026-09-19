@@ -116,6 +116,11 @@ public final class ConfiguredToolRegistry implements ToolRegistry {
     }
 
     @Override
+    public java.util.Optional<ConnectionTester> connectionTesterOf(String provider) {
+        return delegate.connectionTesterOf(provider);
+    }
+
+    @Override
     public Map<String, Object> overridesSchema(String toolName) {
         return disabled.contains(toolName) ? Map.of() : delegate.overridesSchema(toolName);
     }
