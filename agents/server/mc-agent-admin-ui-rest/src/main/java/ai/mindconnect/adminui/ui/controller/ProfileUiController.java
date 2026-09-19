@@ -393,7 +393,8 @@ public class ProfileUiController {
     private List<ConnectionsComponent.Card> connectionCards(UserId id) {
         if (toolConnections == null) return List.of();
         return toolConnections.specs().stream()
-                .map(spec -> new ConnectionsComponent.Card(spec, toolConnections.of(id, spec.provider())))
+                .map(spec -> new ConnectionsComponent.Card(spec, toolConnections.of(id, spec.provider()),
+                        toolConnections.tester(spec.provider()).isPresent()))
                 .toList();
     }
 

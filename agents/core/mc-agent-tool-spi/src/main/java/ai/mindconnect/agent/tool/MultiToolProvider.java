@@ -109,6 +109,13 @@ public interface MultiToolProvider {
      */
     default ConnectionSpec connectionSpec() { return null; }
 
+    /**
+     * A way to try a connection of {@link #connectionSpec()} out from the
+     * Connections page, without a tool call. Empty means the page offers no
+     * test button for this provider. Default: empty.
+     */
+    default Optional<ConnectionTester> connectionTester() { return Optional.empty(); }
+
 
     /**
      * Build a tool for the given name. Returns {@link Optional#empty()} if

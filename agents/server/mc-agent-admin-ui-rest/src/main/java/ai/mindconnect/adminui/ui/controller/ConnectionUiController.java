@@ -5,6 +5,7 @@ import ai.mindconnect.adminui.ui.component.ConnectionsComponent;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.Acquisition;
 import ai.mindconnect.agent.tool.ConnectionSpec;
+import ai.mindconnect.agent.tool.ConnectionTest;
 import ai.mindconnect.credentials.domain.Connection;
 import ai.mindconnect.credentials.domain.ConnectionId;
 import ai.mindconnect.credentials.service.ConnectionService;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -86,12 +88,18 @@ public class ConnectionUiController {
         }
         FormBody body = new FormBody(raw);
         String label = body.str("label");
+        Map<String, String> values = values(spec, raw);
+        List<String> missing = missing(spec, values, Set.of());
+        if (!missing.isEmpty()) {
+            return dialog("Connect " + spec.title(), ConnectionsComponent.form(spec, null, needed(missing)));
+        }
         try {
-            Connection created = service.add(me, provider, label, values(spec, raw), secretFields(spec));
-            return refreshed(me, spec).toast(UiToast.success(
-                            "\"" + created.label() + "\" is connected. Tools refer to it as "
-                                    + created.key() + ".")
-                    .title(spec.title() + " connected"));
+            Connection created = service.add(me, provider, label, values, secretFields(spec));
+            // Tried out right away, while the person who typed the password
+            // is still looking: a wrong one is corrected now or never.
+            return refreshed(me, spec).toast(tested(created,
+                    "\"" + created.label() + "\" is connected. Tools refer to it as " + created.key() + ".",
+                    spec.title() + " connected"));
         } catch (IllegalArgumentException e) {
             return dialog("Connect " + spec.title(), ConnectionsComponent.form(spec, null, e.getMessage()));
         }
@@ -112,12 +120,37 @@ public class ConnectionUiController {
             return UiPatch.of().toast(unknownProvider(stored.provider()));
         }
         FormBody body = new FormBody(raw);
+        Map<String, String> values = values(spec, raw);
+        // A blank secret means "keep the stored one", so it is not missing here.
+        List<String> missing = missing(spec, values, secretFields(spec));
+        if (!missing.isEmpty()) {
+            return dialog("Edit " + stored.label(), ConnectionsComponent.form(spec, stored, needed(missing)));
+        }
         try {
-            service.update(me, stored.id(), body.str("label"), values(spec, raw), secretFields(spec));
-            return refreshed(me, spec).toast(UiToast.success("Saved.").title(stored.label()));
+            service.update(me, stored.id(), body.str("label"), values, secretFields(spec));
+            Connection saved = found(me, id).orElse(stored);
+            return refreshed(me, spec).toast(tested(saved, "Saved.", saved.label()));
         } catch (IllegalArgumentException e) {
             return dialog("Edit " + stored.label(), ConnectionsComponent.form(spec, stored, e.getMessage()));
         }
+    }
+
+    /** Tries it out, and writes the verdict into the Status column. */
+    @PostMapping("/{id}/test")
+    public UiPatch test(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id) {
+        UserId me = userId(user);
+        Connection stored = found(me, id).orElse(null);
+        if (stored == null) {
+            return UiPatch.of().toast(gone());
+        }
+        ConnectionTest result = connections.test(stored).orElse(null);
+        ConnectionSpec spec = connections.spec(stored.provider()).orElse(null);
+        UiPatch patch = spec == null ? UiPatch.of() : refreshed(me, spec);
+        if (result == null) {
+            return patch.toast(UiToast.info("The " + (spec == null ? stored.provider() : spec.title())
+                    + " tools offer no test. Use one of them and see.").title(stored.label()));
+        }
+        return patch.toast(verdict(stored, result));
     }
 
     /** Makes one the default: what a call takes when it names none. */
@@ -164,7 +197,25 @@ public class ConnectionUiController {
                 .patch(UiPatch.Operation.replace(
                         ConnectionsComponent.providerId(spec.provider()) + "-table",
                         ConnectionsComponent.table(new ConnectionsComponent.Card(
-                                spec, connections.of(user, spec.provider())))));
+                                spec, connections.of(user, spec.provider()),
+                                connections.tester(spec.provider()).isPresent()))));
+    }
+
+    /**
+     * The toast after a save: the plain one when the provider offers no test,
+     * the verdict when it does — a save that fails its test is worth more
+     * than "Saved."
+     */
+    private UiToast tested(Connection saved, String message, String title) {
+        return connections.test(saved)
+                .map(result -> verdict(saved, result))
+                .orElseGet(() -> UiToast.success(message).title(title));
+    }
+
+    private static UiToast verdict(Connection connection, ConnectionTest result) {
+        return result.ok()
+                ? UiToast.success(result.message()).title("\"" + connection.label() + "\" works")
+                : UiToast.error(result.message()).title("\"" + connection.label() + "\" does not work yet").sticky();
     }
 
     private Optional<Connection> found(UserId user, String id) {
@@ -186,6 +237,25 @@ public class ConnectionUiController {
             values.put(name, value == null ? "" : String.valueOf(value).strip());
         });
         return values;
+    }
+
+    /**
+     * The schema's required fields the form left blank. The store does not
+     * know the schema, so this is the one place the requirement is enforced —
+     * without it an empty body once produced a mailbox with no host.
+     */
+    private static List<String> missing(ConnectionSpec spec, Map<String, String> values, Set<String> allowedBlank) {
+        Schema schema = spec.form().map(Acquisition.Form::schema).orElse(null);
+        if (schema == null || schema.getRequired() == null) return List.of();
+        return schema.getRequired().stream()
+                .filter(name -> !allowedBlank.contains(name))
+                .filter(name -> values.getOrDefault(name, "").isBlank())
+                .toList();
+    }
+
+    private static String needed(List<String> missing) {
+        return (missing.size() == 1 ? "\"" + missing.get(0) + "\" is" : String.join(", ", missing) + " are")
+                + " required.";
     }
 
     private static Set<String> secretFields(ConnectionSpec spec) {
