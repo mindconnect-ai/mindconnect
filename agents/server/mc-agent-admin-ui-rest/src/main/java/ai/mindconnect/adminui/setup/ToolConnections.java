@@ -100,6 +100,27 @@ public class ToolConnections {
         return Optional.of(verdict);
     }
 
+    /**
+     * A connection that was just made by signing in somewhere else: it is
+     * tried out at once, and when the test says whose account it is, it is
+     * named after that account. Until then it only carried the card's name,
+     * and a person with two accounts of one kind could not tell them apart.
+     *
+     * @return the connection as it is now, and the test when the source
+     *         offered one
+     */
+    public Arrival arrived(Connection created) {
+        Optional<ConnectionTest> test = test(created);
+        Connection named = test.flatMap(ConnectionTest::namedAccount)
+                .filter(account -> !account.equals(created.label()))
+                .flatMap(account -> service().flatMap(service -> service.rename(created.userId(), created.id(), account)))
+                .orElse(created);
+        return new Arrival(named, test);
+    }
+
+    /** What {@link #arrived} found: the connection, possibly renamed, and the test's verdict. */
+    public record Arrival(Connection connection, Optional<ConnectionTest> test) { }
+
     /** True when this host can store a connection at all. */
     public boolean available() {
         return connections.getIfAvailable() != null;

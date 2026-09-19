@@ -167,6 +167,23 @@ public class ConnectionService {
         }
     }
 
+    /**
+     * Gives an existing connection a new name and nothing else — the
+     * credentials stay whatever they are, OAuth tokens included. Empty when
+     * it is not theirs; a blank name changes nothing.
+     */
+    public Optional<Connection> rename(UserId userId, ConnectionId id, String label) {
+        Objects.requireNonNull(userId, "userId");
+        if (label == null || label.isBlank()) return find(userId, id);
+        synchronized (lockFor(userId)) {
+            return find(userId, id).map(stored -> {
+                Connection renamed = stored.withLabel(label.strip(), clock.instant());
+                connections.save(renamed);
+                return renamed;
+            });
+        }
+    }
+
     /** Makes {@code id} the user's default for its provider; false when it is not theirs. */
     public boolean setDefault(UserId userId, ConnectionId id) {
         synchronized (lockFor(userId)) {
