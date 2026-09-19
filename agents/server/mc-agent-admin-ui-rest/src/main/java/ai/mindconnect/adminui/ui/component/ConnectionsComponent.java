@@ -143,7 +143,7 @@ public final class ConnectionsComponent {
     public static UiForm form(ConnectionSpec spec, Connection editing, String error) {
         Schema schema = spec.form().map(Acquisition.Form::schema).orElse(null);
         String target = editing == null
-                ? API + "/" + spec.provider()
+                ? API + "/add/" + spec.provider()
                 : API + "/" + editing.id().value();
 
         UiForm form = UiForm.of(FORM_ID, null)
