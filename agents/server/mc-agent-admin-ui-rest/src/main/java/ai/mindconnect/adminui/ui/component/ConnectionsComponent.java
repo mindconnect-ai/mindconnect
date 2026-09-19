@@ -8,6 +8,7 @@ import ai.mindconnect.schema.Schema;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
+import ai.mindconnect.ui.model.UiLink;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTable;
@@ -73,7 +74,28 @@ public final class ConnectionsComponent {
             stack.child(hint(providerId(spec.provider()) + "-about", spec.description()));
         }
         stack.child(table(card));
+        if (canAddMore(card)) {
+            // A consent page cannot be fetched into the page: the browser has
+            // to go there itself. So it is a real link, not an API call — and
+            // it opens in a new tab, which is the one way the page's own click
+            // handling lets a link leave. The account is on the card in that
+            // tab when the provider sends the browser back.
+            for (Acquisition acquisition : spec.acquisitions()) {
+                if (!(acquisition instanceof Acquisition.Form)) {
+                    stack.child(connectLink(spec, acquisition));
+                }
+            }
+        }
         return stack;
+    }
+
+    private static boolean canAddMore(Card card) {
+        return card.spec().multiple() || card.connections().isEmpty();
+    }
+
+    private static UiLink connectLink(ConnectionSpec spec, Acquisition acquisition) {
+        String id = providerId(spec.provider()) + "-add-" + acquisition.getClass().getSimpleName().toLowerCase();
+        return UiLink.external(id, "/admin/oauth/authorize/" + spec.provider(), acquisition.label()).icon("link");
     }
 
     /** The table id for one provider — what a change replaces in place. */
@@ -85,7 +107,6 @@ public final class ConnectionsComponent {
     public static UiTable table(Card card) {
         ConnectionSpec spec = card.spec();
         List<Connection> connections = card.connections();
-        boolean canAddMore = spec.multiple() || connections.isEmpty();
 
         UiTable table = UiTable.of(providerId(spec.provider()) + "-table", spec.title()).stackOnMobile(true)
                 .icon(spec.icon() == null ? "link" : spec.icon())
@@ -105,11 +126,13 @@ public final class ConnectionsComponent {
                                 + "another one.")
                         .dispatch("DELETE", API + "/{id}"));
 
-        if (canAddMore) {
-            // One button per way of coming by a connection: "Connect with Google"
-            // beside "Add manually" on the same card.
+        if (canAddMore(card)) {
+            // "Add manually" — a form the page fetches into a dialog. A sign-in
+            // ("Connect with Google") is a link under the table, see card().
             for (Acquisition acquisition : spec.acquisitions()) {
-                table.action(addAction(spec, acquisition));
+                if (acquisition instanceof Acquisition.Form) {
+                    table.action(addAction(spec, acquisition));
+                }
             }
         }
         for (Connection connection : connections) {
@@ -125,15 +148,8 @@ public final class ConnectionsComponent {
 
     private static UiAction addAction(ConnectionSpec spec, Acquisition acquisition) {
         String id = providerId(spec.provider()) + "-add-" + acquisition.getClass().getSimpleName().toLowerCase();
-        if (acquisition instanceof Acquisition.Form) {
-            return UiAction.primary(id, acquisition.label()).icon("add")
-                    .dispatch("GET", API + "/" + spec.provider() + "/new");
-        }
-        // A consent page cannot be fetched into a dialog: this one leaves the
-        // SPA, so it is a plain link and not an API call.
-        UiAction connect = UiAction.link(id, acquisition.label()).icon("link");
-        connect.setHref("/admin/oauth/authorize/" + spec.provider());
-        return connect;
+        return UiAction.primary(id, acquisition.label()).icon("add")
+                .dispatch("GET", API + "/" + spec.provider() + "/new");
     }
 
     private static String status(Connection connection) {

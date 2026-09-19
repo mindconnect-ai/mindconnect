@@ -117,7 +117,10 @@ public class OAuthCallbackController {
         try {
             Connection created = service.complete(userId(user), pending.connectionProvider(),
                     pending.providerName(), label(pending), code, pending.codeVerifier(), pending.redirectUri());
-            return back("\"" + created.label() + "\" is connected.");
+            // Tried out at once, and named after the account the test reports.
+            ToolConnections.Arrival arrival = connections.arrived(created);
+            return back("\"" + arrival.connection().label() + "\" is connected."
+                    + arrival.test().map(test -> " " + test.message()).orElse(""));
         } catch (OAuthException e) {
             log.info("Could not complete the {} sign-in: {}", pending.providerName(), e.getMessage());
             return back(e.getMessage());
@@ -125,10 +128,11 @@ public class OAuthCallbackController {
     }
 
     /**
-     * What the new connection is called. The provider is not asked who the
-     * account belongs to — that is a second call and a different scope per
-     * vendor — so it gets the card's name, and the user renames it if they
-     * keep two. Renaming is safe: the key is fixed when it is created.
+     * What the new connection is called until the test has named it: the
+     * card's name. Asking the provider who the account belongs to is a
+     * different call per vendor, and that is what the source's connection
+     * test does — see {@link ToolConnections#arrived}. Renaming is safe: the
+     * key is fixed when it is created.
      */
     private String label(PendingAuthorization pending) {
         return connections.spec(pending.connectionProvider())
