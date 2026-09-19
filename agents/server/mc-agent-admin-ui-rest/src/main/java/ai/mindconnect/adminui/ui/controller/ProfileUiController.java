@@ -1,7 +1,9 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.service.NamespaceMembers;
+import ai.mindconnect.adminui.setup.ToolConnections;
 import ai.mindconnect.adminui.setup.ToolVariables;
+import ai.mindconnect.adminui.ui.component.ConnectionsComponent;
 import ai.mindconnect.adminui.ui.page.ProfilePage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
@@ -66,6 +68,8 @@ public class ProfileUiController {
     private final ScopeSupplier scope;
     /** What the installed tools declare they need from a user; null on a host without tools. */
     private final ToolVariables toolVariables;
+    /** What they ask to be connected, and what this user attached; null likewise. */
+    private final ToolConnections toolConnections;
     private final Clock clock;
     private final boolean authEnabled;
 
@@ -73,20 +77,22 @@ public class ProfileUiController {
     public ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
                                NamespaceMembers members, ScopeSupplier scope,
                                org.springframework.beans.factory.ObjectProvider<ToolVariables> toolVariables,
+                               org.springframework.beans.factory.ObjectProvider<ToolConnections> toolConnections,
                                @org.springframework.beans.factory.annotation.Value("${mindconnect.auth.enabled:false}")
                                boolean authEnabled) {
         this(tokens, users, namespaces, members, scope, toolVariables.getIfAvailable(),
-                Clock.systemUTC(), authEnabled);
+                toolConnections.getIfAvailable(), Clock.systemUTC(), authEnabled);
     }
 
     ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
                         NamespaceMembers members, ScopeSupplier scope, Clock clock, boolean authEnabled) {
-        this(tokens, users, namespaces, members, scope, null, clock, authEnabled);
+        this(tokens, users, namespaces, members, scope, null, null, clock, authEnabled);
     }
 
     ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
                         NamespaceMembers members, ScopeSupplier scope, ToolVariables toolVariables,
-                        Clock clock, boolean authEnabled) {
+                        ToolConnections toolConnections, Clock clock, boolean authEnabled) {
+        this.toolConnections = toolConnections;
         this.toolVariables = toolVariables;
         this.tokens = tokens;
         this.users = users;
@@ -105,7 +111,8 @@ public class ProfileUiController {
                 user == null ? null : user.getEmail(),
                 tokens.list(id), authEnabled,
                 namespaces.forUser(id), namespaces.defaultNamespace(), namespaces.defaultIsOpen(),
-                scope.namespace(), toolVariableRows(id)).render();
+                scope.namespace(), toolVariableRows(id),
+                connectionCards(id), toolConnections != null && toolConnections.available()).render();
     }
 
     /**
@@ -364,6 +371,14 @@ public class ProfileUiController {
                 .map(variable -> new ProfilePage.ToolVariableRow(variable,
                         toolVariables.isSetByUser(id, variable.name()),
                         toolVariables.resolvesElsewhere(variable.name())))
+                .toList();
+    }
+
+    /** What the installed tools ask this user to connect, with what they attached. */
+    private List<ConnectionsComponent.Card> connectionCards(UserId id) {
+        if (toolConnections == null) return List.of();
+        return toolConnections.specs().stream()
+                .map(spec -> new ConnectionsComponent.Card(spec, toolConnections.of(id, spec.provider())))
                 .toList();
     }
 

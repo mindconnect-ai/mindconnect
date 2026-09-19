@@ -3,6 +3,10 @@ package ai.mindconnect.agent.starter.file;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
+import ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository;
+import ai.mindconnect.credentials.adapter.file.FileConnectionRepository;
+import ai.mindconnect.credentials.port.out.ConnectionRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
 import ai.mindconnect.user.adapter.file.FileNotificationRepository;
 import ai.mindconnect.user.adapter.file.FileUserRepository;
@@ -66,6 +70,25 @@ public class FilePersistenceAutoConfiguration {
     @ConditionalOnMissingBean(ApiTokenRepository.class)
     ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
         return new FileApiTokenRepository(Path.of(baseDir));
+    }
+
+    /**
+     * The accounts users attached. Installation-wide like the users
+     * themselves, and encrypted like their variables — a mailbox password is
+     * a secret in the same sense an API key is.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ConnectionRepository.class)
+    ConnectionRepository connectionRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                              ObjectMapper objectMapper,
+                                              ObjectProvider<EncryptionHelper> encryption) {
+        ConnectionRepository files = new FileConnectionRepository(Path.of(baseDir), objectMapper);
+        EncryptionHelper helper = encryption.getIfAvailable();
+        if (helper == null) {
+            log.warn("No EncryptionHelper — connection credentials are stored unencrypted under {}", baseDir);
+            return files;
+        }
+        return new EncryptingConnectionRepository(files, helper);
     }
 
     /** Installation-wide like the users they are addressed to, and not encrypted: a notice is not a secret. */

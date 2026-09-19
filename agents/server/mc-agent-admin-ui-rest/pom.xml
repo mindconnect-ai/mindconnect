@@ -67,6 +67,10 @@
             <artifactId>mc-user</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-credentials</artifactId>
+        </dependency>
         <!-- Semantic UI (from the standalone mc-semantic-ui repo): core
              (model + default TS renderer) + the JSON-viewer and markdown
              extensions (the former mc-semantic-ui-extensions bundle). -->

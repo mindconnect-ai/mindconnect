@@ -52,6 +52,14 @@ run from the admin, from a chat (as a tool) or as a vector-store ingestion reads
 
 ### Variables a tool asks you for
 
+:::note A variable or a connection?
+A variable is right when an operator *could* set the value once for everybody —
+`TAVILY_API_KEY` is the installation's, and the chain above lets a user
+override it. An **account** is not: a mailbox belongs to one person, and a
+person may have two. Those are [connections](./admin-ui/index.md#connections)
+and live on their own tab, not here.
+:::
+
 Some tools need something only you can supply — your mailbox, your own key for
 a service. Such a tool
 [declares](./creating-a-tool.md#asking-the-user-for-something-uservariables)

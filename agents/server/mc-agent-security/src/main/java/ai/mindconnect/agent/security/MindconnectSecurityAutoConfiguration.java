@@ -1,6 +1,10 @@
 package ai.mindconnect.agent.security;
 
 import ai.mindconnect.agentrest.auth.CurrentUserResolver;
+import ai.mindconnect.agent.tool.Connections;
+import ai.mindconnect.credentials.adapter.tool.ServiceConnections;
+import ai.mindconnect.credentials.port.out.ConnectionRepository;
+import ai.mindconnect.credentials.service.ConnectionService;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
 import ai.mindconnect.user.port.out.NotificationRepository;
 import ai.mindconnect.user.port.out.UserRepository;
@@ -67,6 +71,32 @@ public class MindconnectSecurityAutoConfiguration {
     @ConditionalOnBean(NotificationRepository.class)
     NotificationService notificationService(NotificationRepository notifications) {
         return new NotificationService(notifications);
+    }
+
+    /**
+     * The accounts users attached, beside the other services that are keyed
+     * by person. {@link Connections} is the port the tool registry looks
+     * connections up through; the runtime finds this bean through its
+     * bean fallback into the host context, so no feature has to register it.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(ConnectionRepository.class)
+    ConnectionService connectionService(ConnectionRepository connections) {
+        return new ConnectionService(connections);
+    }
+
+    /**
+     * Deliberately not called {@code toolConnections}: the Admin UI has a
+     * {@code ToolConnections} service of its own, and a bean method of that
+     * name would collide with the scanned class rather than with anything
+     * meaningful.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(ConnectionService.class)
+    Connections connectionLookup(ConnectionService connections) {
+        return new ServiceConnections(connections);
     }
 
     @Bean

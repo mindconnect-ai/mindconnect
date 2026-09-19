@@ -73,6 +73,15 @@ public interface ToolRegistry {
     default List<ToolVariable> declaredVariables() { return List.of(); }
 
     /**
+     * Every account the tool sources behind this registry want a user to
+     * connect ({@code connectionSpec()}), one per provider: two sources that
+     * name {@code "microsoft"} mean the same connection, and the first
+     * declaration wins. What the Verbindungen page renders, and what the
+     * sign-in check reads. Default: empty.
+     */
+    default List<ConnectionSpec> connectionSpecs() { return List.of(); }
+
+    /**
      * Lets go of whatever the tools hold for one session — a pooled connection,
      * a started container. Called by whoever ends the session; today that is
      * the tool test bench, whose sessions last one call. Idempotent, and safe

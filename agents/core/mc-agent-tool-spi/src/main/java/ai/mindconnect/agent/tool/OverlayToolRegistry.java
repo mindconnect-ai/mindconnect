@@ -109,6 +109,12 @@ public final class OverlayToolRegistry implements ToolRegistry {
         return delegate.declaredVariables();
     }
 
+    /** Untouched: an operator's tool settings say nothing about whose account a tool runs on. */
+    @Override
+    public java.util.List<ConnectionSpec> connectionSpecs() {
+        return delegate.connectionSpecs();
+    }
+
     @Override
     public Map<String, Object> overridesSchema(String toolName) {
         return delegate.overridesSchema(toolName);

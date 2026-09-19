@@ -262,6 +262,34 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
     }
 
     @Override
+    public List<ConnectionSpec> connectionSpecs() {
+        Map<String, ConnectionSpec> byProvider = new LinkedHashMap<>();
+        for (ToolFactory factory : factoriesByName.values()) {
+            ConnectionSpec spec = factory.connectionSpec();
+            if (spec != null) byProvider.putIfAbsent(spec.provider(), spec);
+        }
+        for (MultiToolProvider provider : ready()) {
+            ConnectionSpec spec = provider.connectionSpec();
+            if (spec != null) byProvider.putIfAbsent(spec.provider(), spec);
+        }
+        return List.copyOf(byProvider.values());
+    }
+
+    /**
+     * Puts a tool on the caller's account. Innermost of the chain, so an
+     * agent that pins {@code account} still reaches it: {@link PinnedParamsTool}
+     * writes the pinned value into the arguments on the way in, and this reads
+     * it there like any other.
+     */
+    private Tool bindConnection(ConnectionSpec spec, Tool tool, ToolCallScope scope) {
+        if (spec == null || tool == null) return tool;
+        Connections lookup = environment == null
+                ? Connections.none()
+                : environment.get(Connections.class).orElse(Connections.none());
+        return ConnectionBoundTool.wrap(tool, spec, lookup, scope);
+    }
+
+    @Override
     public List<ToolVariable> declaredVariables() {
         // Name wins once: two sources asking for MC_EMAIL_HOST mean the same
         // variable, and a second, differently worded declaration of it would
@@ -378,7 +406,8 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
 
         ToolFactory factory = factoriesByName.get(registryName);
         if (factory != null) {
-            return Optional.of(decorate(agentTool, factory.create(agentTool, scope)));
+            return Optional.of(decorate(agentTool,
+                    bindConnection(factory.connectionSpec(), factory.create(agentTool, scope), scope)));
         }
 
         for (MultiToolProvider provider : ready()) {
@@ -390,7 +419,8 @@ public class SpiToolRegistry implements ToolRegistry, AutoCloseable {
                 log.error("MultiToolProvider {} claimed '{}' but returned empty on create — tool will be unavailable",
                         provider.getClass().getSimpleName(), registryName);
             }
-            return built.map(tool -> decorate(agentTool, tool));
+            ConnectionSpec spec = provider.connectionSpec();
+            return built.map(tool -> decorate(agentTool, bindConnection(spec, tool, scope)));
         }
 
         log.error("Tool '{}' is configured on agent but has no registered implementation — tool will be unavailable",

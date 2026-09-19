@@ -354,6 +354,33 @@ A click on the badge opens the task queue, the admin UI's Task Manager:
 
 The dialog updates itself over the same stream while it is open.
 
+## Connections
+
+Some tools run on an account that is yours and nobody else's — a mailbox, a
+calendar. The **Connections** tab on your profile is where you attach them.
+
+One card per thing the installed tools ask for. *Add manually* opens a form —
+host, account, password, whatever that provider needs — and what you save is
+yours alone: a password is stored encrypted and never shown to anyone,
+including you. Everything else stays readable, so a typo in a hostname can be
+corrected without typing the password again.
+
+**You may attach several.** Two mailboxes, "Privat" and "Arbeit", are a normal
+thing to have. One of them is the *default*: it is what a tool uses when a
+chat does not say otherwise, and you can move that mark at any time. As soon
+as you have two, the model is offered the choice — it sees exactly your names
+and cannot invent a third — so "look in my work mail" does what it says.
+
+Renaming is safe. Tools refer to a connection by a short, fixed form of the
+name it had when you attached it; the label above it is yours to change.
+
+Removing one takes the tools that used it out of service until you attach
+another; the next connection of that provider takes over as default.
+
+An installed tool that asks for an account you have not attached raises a
+[notification](#notifications) on your next sign-in — that is the only nudge
+you get, and it clears itself the moment you attach one.
+
 ## Notifications
 
 Beside the task badge — which says what the *server* is doing — the header

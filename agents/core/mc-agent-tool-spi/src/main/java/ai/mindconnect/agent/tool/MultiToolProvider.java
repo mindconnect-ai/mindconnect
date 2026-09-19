@@ -103,6 +103,14 @@ public interface MultiToolProvider {
     default java.util.List<ToolVariable> userVariables() { return java.util.List.of(); }
 
     /**
+     * The account this provider's tools run on; see
+     * {@link ToolFactory#connectionSpec()}. Declared once for the bundle,
+     * because one set of credentials is what its tools share.
+     */
+    default ConnectionSpec connectionSpec() { return null; }
+
+
+    /**
      * Build a tool for the given name. Returns {@link Optional#empty()} if
      * the name is not served by this provider; the registry then continues
      * with the next provider.

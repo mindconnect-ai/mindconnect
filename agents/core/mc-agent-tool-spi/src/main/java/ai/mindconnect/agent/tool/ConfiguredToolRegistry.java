@@ -100,6 +100,16 @@ public final class ConfiguredToolRegistry implements ToolRegistry {
                 .toList();
     }
 
+    /**
+     * Untouched by the disabled list: a provider declares its connection
+     * under a provider key, not a tool name, so switching off one tool never
+     * takes the account with it — the rest of the bundle still runs on it.
+     */
+    @Override
+    public java.util.List<ConnectionSpec> connectionSpecs() {
+        return delegate.connectionSpecs();
+    }
+
     @Override
     public Map<String, Object> overridesSchema(String toolName) {
         return disabled.contains(toolName) ? Map.of() : delegate.overridesSchema(toolName);

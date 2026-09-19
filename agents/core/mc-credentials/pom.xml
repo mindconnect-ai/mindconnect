@@ -30,6 +30,21 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-common</artifactId>
         </dependency>
+        <!-- UserId: a connection belongs to a person, and the id record is the domain's. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-domain</artifactId>
+        </dependency>
+        <!-- ToolConnection and the Connections port: a connection exists so that tools can run on it. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-tool-spi</artifactId>
+        </dependency>
+        <!-- Documents: the file adapter, same store the other file repositories use. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-repo</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
