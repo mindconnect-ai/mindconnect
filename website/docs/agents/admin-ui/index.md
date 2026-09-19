@@ -396,7 +396,16 @@ registry refuses it whoever asks.
 Some tools run on an account that is yours and nobody else's — a mailbox, a
 calendar. The **Connections** tab on your profile is where you attach them.
 
-One card per thing the installed tools ask for. *Add manually* opens a form —
+One card per thing the installed tools ask for, with one or two ways to
+attach an account.
+
+**Connect** sends you to the provider's own sign-in page — Google, Microsoft —
+and brings you back with the account attached. Nothing is typed here and no
+password is stored: what comes back is a token, kept encrypted, renewed by
+itself while you use it. If the provider ever refuses to renew it, the
+connection says `expired` with the reason and *Connect* again is all it takes.
+
+*Add manually* opens a form —
 host, account, password, whatever that provider needs — and what you save is
 yours alone: a password is stored encrypted and never shown to anyone,
 including you. Everything else stays readable, so a typo in a hostname can be
@@ -413,6 +422,14 @@ name it had when you attached it; the label above it is yours to change.
 
 Removing one takes the tools that used it out of service until you attach
 another; the next connection of that provider takes over as default.
+
+:::note For operators
+A *Connect* button only appears where this installation has the provider's app
+registration. The redirect it comes back to is
+`https://<your host>/admin/oauth/callback`, and that exact address has to be
+registered with the app — providers do not accept wildcards, so one entry per
+installation.
+:::
 
 An installed tool that asks for an account you have not attached raises a
 [notification](#notifications) on your next sign-in — that is the only nudge

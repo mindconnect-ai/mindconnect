@@ -97,6 +97,17 @@ public class PostgresPersistenceConfig {
         return new ai.mindconnect.user.adapter.pg.PgApiTokenRepository(mindconnectSql).initSchema();
     }
 
+    /** The OAuth apps this installation can connect through — installation-wide. */
+    @Bean
+    ai.mindconnect.credentials.port.out.OAuthProviderRepository oAuthProviderRepository(
+            Sql mindconnectSql,
+            org.springframework.beans.factory.ObjectProvider<ai.mindconnect.common.util.encryption.EncryptionHelper> encryption) {
+        var rows = new ai.mindconnect.credentials.adapter.pg.PgOAuthProviderRepository(mindconnectSql).initSchema();
+        var helper = encryption.getIfAvailable();
+        return helper == null ? rows
+                : new ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository(rows, helper);
+    }
+
     /** The tools each user keeps in their own account — installation-wide. */
     @Bean
     ai.mindconnect.user.port.out.UserToolRepository userToolRepository(Sql mindconnectSql) {

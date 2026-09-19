@@ -59,15 +59,6 @@ public class ConnectionUiController {
                 .orElseGet(() -> UiPatch.of().toast(unknownProvider(provider)));
     }
 
-    /** Says why an OAuth button does nothing yet, rather than failing silently. */
-    @GetMapping("/{provider}/unavailable")
-    public UiPatch unavailable(@PathVariable("provider") String provider) {
-        return UiPatch.of().toast(UiToast.info(
-                        "Connecting this one through the provider's own login is not wired up yet. "
-                                + "Use \"Add manually\" in the meantime.")
-                .title("Not available yet"));
-    }
-
     /** Opens the form for an account the user already has. */
     @GetMapping("/{id}/edit")
     public UiPatch edit(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id) {

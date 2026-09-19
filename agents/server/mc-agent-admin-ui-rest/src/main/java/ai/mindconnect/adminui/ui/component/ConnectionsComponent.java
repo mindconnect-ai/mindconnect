@@ -121,10 +121,11 @@ public final class ConnectionsComponent {
             return UiAction.primary(id, acquisition.label()).icon("add")
                     .dispatch("GET", API + "/" + spec.provider() + "/new");
         }
-        // OAuth is not wired yet; the button says so rather than being absent,
-        // because a card with no way to connect reads like a broken page.
-        return UiAction.secondary(id, acquisition.label() + " (not available yet)").icon("link")
-                .dispatch("GET", API + "/" + spec.provider() + "/unavailable");
+        // A consent page cannot be fetched into a dialog: this one leaves the
+        // SPA, so it is a plain link and not an API call.
+        UiAction connect = UiAction.link(id, acquisition.label()).icon("link");
+        connect.setHref("/admin/oauth/authorize/" + spec.provider());
+        return connect;
     }
 
     private static String status(Connection connection) {

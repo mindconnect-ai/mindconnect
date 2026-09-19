@@ -260,6 +260,20 @@ a notification, and `Format.PASSWORD` decides what is encrypted at rest and
 never shown again. A tool ships no screen and needs no dependency on the Admin
 UI — which is what lets a tool module live in another repository.
 
+For a service with a real sign-in, declare that way too — both can sit on one
+card, "Connect with Google" beside "Add manually":
+
+```java
+ConnectionSpec.form("microsoft", "Microsoft", schema())
+        .acquire(Acquisition.OAuth.of("ms-graph", "Mail.Read", "Calendars.ReadWrite", "offline_access"));
+```
+
+`"ms-graph"` names an **app registration** the installation holds, not the
+connection: the operator registers it once, every user signs in to their own
+account through it, and the token is renewed on its way to a tool. Ask for
+`offline_access` (or its equivalent) or there will be no refresh token and the
+connection dies at the first expiry.
+
 `provider` (`"email"`) is **not** the tool group. Three bundles — mail,
 calendar, files — can share one `"microsoft"` connection, and keeping the two
 apart is what makes that possible.

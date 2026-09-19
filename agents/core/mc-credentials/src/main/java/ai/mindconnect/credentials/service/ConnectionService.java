@@ -116,6 +116,40 @@ public class ConnectionService {
         }
     }
 
+    /**
+     * Attaches an account whose credentials somebody else produced — the
+     * token an OAuth callback came back with. The same rules as {@link #add}:
+     * a unique key, the first one becomes the default.
+     *
+     * @param label what to call it; the user can rename it afterwards, which
+     *              is safe because the key is fixed here and never changes
+     */
+    public Connection attach(UserId userId, String provider, String label,
+                             UserCredentials credentials, Map<String, String> settings) {
+        Objects.requireNonNull(userId, "userId");
+        synchronized (lockFor(userId)) {
+            List<Connection> existing = of(userId, provider);
+            Connection created = Connection.of(userId, provider,
+                    uniqueKey(existing, Connection.keyFrom(label)), label,
+                    credentials, settings, existing.isEmpty(), clock.instant());
+            connections.save(created);
+            return created;
+        }
+    }
+
+    /**
+     * Replaces just the credentials — a refreshed token, and nothing else.
+     * Not {@link #update}: that is the edit form, and a refresh must not touch
+     * a label or a setting somebody changed in between.
+     */
+    public Connection replaceCredentials(ConnectionId id, UserCredentials credentials) {
+        Connection stored = connections.findById(id).orElseThrow(() ->
+                new IllegalArgumentException("No connection " + id.value()));
+        Connection refreshed = stored.withCredentials(credentials, clock.instant());
+        connections.save(refreshed);
+        return refreshed;
+    }
+
     /** Replaces the values of an existing connection; a blank secret keeps the stored one. */
     public Optional<Connection> update(UserId userId, ConnectionId id, String label,
                                        Map<String, String> values, Set<String> secretFields) {

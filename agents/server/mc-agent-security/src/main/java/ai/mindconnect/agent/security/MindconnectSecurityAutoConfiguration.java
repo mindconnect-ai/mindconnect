@@ -6,7 +6,13 @@ import ai.mindconnect.agent.tool.UserToolRoster;
 import ai.mindconnect.user.adapter.tool.StoredUserToolRoster;
 import ai.mindconnect.user.port.out.UserToolRepository;
 import ai.mindconnect.user.service.UserToolService;
+import ai.mindconnect.credentials.adapter.tool.RefreshingConnections;
 import ai.mindconnect.credentials.adapter.tool.ServiceConnections;
+import ai.mindconnect.credentials.oauth.OAuthConnections;
+import ai.mindconnect.credentials.oauth.OAuthFlow;
+import ai.mindconnect.credentials.port.out.OAuthProviderRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.ObjectProvider;
 import ai.mindconnect.credentials.port.out.ConnectionRepository;
 import ai.mindconnect.credentials.service.ConnectionService;
 import ai.mindconnect.user.port.out.ApiTokenRepository;
@@ -117,9 +123,31 @@ public class MindconnectSecurityAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
+    OAuthFlow oAuthFlow(ObjectMapper objectMapper) {
+        return new OAuthFlow(objectMapper);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean({ConnectionService.class, OAuthProviderRepository.class})
+    OAuthConnections oAuthConnections(ConnectionService connections, OAuthProviderRepository providers,
+                                      OAuthFlow flow) {
+        return new OAuthConnections(connections, providers, flow);
+    }
+
+    /**
+     * Where a token is renewed: on the way to a tool, which is the one place
+     * every call passes and exactly when it is worth renewing. Without an
+     * {@link OAuthConnections} — a host that registered no OAuth app — the
+     * plain lookup is used and nothing is refreshed, because nothing can expire.
+     */
+    @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnBean(ConnectionService.class)
-    Connections connectionLookup(ConnectionService connections) {
-        return new ServiceConnections(connections);
+    Connections connectionLookup(ConnectionService connections, ObjectProvider<OAuthConnections> oauth) {
+        Connections lookup = new ServiceConnections(connections);
+        OAuthConnections refreshing = oauth.getIfAvailable();
+        return refreshing == null ? lookup : new RefreshingConnections(lookup, refreshing);
     }
 
     @Bean

@@ -4,7 +4,10 @@ import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.user.adapter.env.EncryptingUserRepository;
 import ai.mindconnect.credentials.adapter.env.EncryptingConnectionRepository;
+import ai.mindconnect.credentials.adapter.env.EncryptingOAuthProviderRepository;
 import ai.mindconnect.credentials.adapter.file.FileConnectionRepository;
+import ai.mindconnect.credentials.adapter.file.FileOAuthProviderRepository;
+import ai.mindconnect.credentials.port.out.OAuthProviderRepository;
 import ai.mindconnect.credentials.port.out.ConnectionRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import ai.mindconnect.user.adapter.file.FileApiTokenRepository;
@@ -72,6 +75,21 @@ public class FilePersistenceAutoConfiguration {
     @ConditionalOnMissingBean(ApiTokenRepository.class)
     ApiTokenRepository apiTokenRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
         return new FileApiTokenRepository(Path.of(baseDir));
+    }
+
+    /**
+     * The OAuth apps this installation can connect through. Installation-wide,
+     * and the client secret encrypted at rest — a public client, which is what
+     * a shared app registration is, has none to encrypt.
+     */
+    @Bean
+    @ConditionalOnMissingBean(OAuthProviderRepository.class)
+    OAuthProviderRepository oAuthProviderRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                                    ObjectMapper objectMapper,
+                                                    ObjectProvider<EncryptionHelper> encryption) {
+        OAuthProviderRepository files = new FileOAuthProviderRepository(Path.of(baseDir), objectMapper);
+        EncryptionHelper helper = encryption.getIfAvailable();
+        return helper == null ? files : new EncryptingOAuthProviderRepository(files, helper);
     }
 
     /** The tools each user keeps in their own account — installation-wide, and no secrets in them. */
