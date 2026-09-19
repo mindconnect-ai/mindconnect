@@ -1,5 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import java.util.Set;
+import ai.mindconnect.adminui.setup.ToolBundles;
 import ai.mindconnect.adminui.setup.UserTools;
 import ai.mindconnect.adminui.ui.component.UserToolsComponent;
 import ai.mindconnect.agent.UserId;
@@ -54,25 +56,75 @@ public class UserToolUiController {
     /** Step one: which tool. */
     @GetMapping("/new")
     public UiPatch pick() {
-        Map<String, java.util.Set<String>> catalogue = userTools.catalogue();
-        if (catalogue.isEmpty()) {
+        ToolBundles bundles = userTools.bundles();
+        if (bundles.isEmpty()) {
             return UiPatch.of().toast(UiToast.info("This installation offers no tools to add.")
                     .title("Nothing to add"));
         }
-        return dialog("Add a tool", UserToolsComponent.pickForm(catalogue, null));
+        return dialog("Add tools", UserToolsComponent.pickForm(bundles, null));
     }
 
-    /** Step two: how — the accounts offered are the ones that fit this tool. */
+    /**
+     * Step two: how. One tool gets the full form, name of its own included;
+     * several get the account and the approval switch, and land as one row
+     * each. The accounts offered are the ones that fit.
+     */
     @PostMapping("/new")
     public UiPatch configure(@AuthenticationPrincipal OidcUser user, @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
-        String toolName = new FormBody(raw).str("toolName");
-        if (toolName == null || !userTools.isKnown(toolName)) {
-            return dialog("Add a tool", UserToolsComponent.pickForm(userTools.catalogue(),
-                    "Pick a tool from the list."));
+        List<String> names = userTools.bundles().expand(new FormBody(raw).strList("picks"));
+        if (names.isEmpty()) {
+            return dialog("Add tools", UserToolsComponent.pickForm(userTools.bundles(), "Pick something from the list."));
         }
-        return dialog("Add " + toolName, UserToolsComponent.form(toolName,
-                userTools.connectionSpecOf(toolName), userTools.connectionsFor(me, toolName), null, null));
+        if (names.size() == 1) {
+            String toolName = names.get(0);
+            return dialog("Add " + toolName, UserToolsComponent.form(toolName,
+                    userTools.connectionSpecOf(toolName), userTools.connectionsFor(me, toolName), null, null));
+        }
+        Optional<ConnectionSpec> shared = sharedSpec(names);
+        return dialog("Add " + names.size() + " tools", UserToolsComponent.bundleForm(names, shared,
+                shared.isPresent() ? userTools.connectionsFor(me, names.get(0)) : List.of(), null));
+    }
+
+    /** Several at once, one row each; a name already in the account is left as it is. */
+    @PostMapping("/add-many")
+    public UiPatch addMany(@AuthenticationPrincipal OidcUser user, @RequestBody Map<String, Object> raw) {
+        UserId me = userId(user);
+        UserToolService service = userTools.service().orElse(null);
+        FormBody body = new FormBody(raw);
+        String picked = body.str("tools");
+        List<String> names = picked == null ? List.of()
+                : java.util.Arrays.stream(picked.split(",")).map(String::strip)
+                        .filter(userTools::isKnown).toList();
+        if (service == null || names.isEmpty()) {
+            return UiPatch.of().toast(UiToast.error("Nothing to add.").title("Nothing added"));
+        }
+        Set<String> present = new java.util.HashSet<>();
+        userTools.of(me).forEach(tool -> present.add(tool.effectiveName()));
+        int added = 0;
+        for (String name : names) {
+            if (!present.add(name)) continue;
+            service.add(me, null, name, null, null, params(body), body.bool("needsApproval"));
+            added++;
+        }
+        int skipped = names.size() - added;
+        return refreshed(me).toast(UiToast.success(added + (added == 1 ? " tool is" : " tools are")
+                        + " in your chats from the next message on."
+                        + (skipped == 0 ? "" : " " + skipped + " you already had."))
+                .title("Tools added"));
+    }
+
+    /** The one connection kind all of them run on — or empty, when they differ or need none. */
+    private Optional<ConnectionSpec> sharedSpec(List<String> names) {
+        Set<String> providers = new java.util.HashSet<>();
+        Optional<ConnectionSpec> first = Optional.empty();
+        for (String name : names) {
+            Optional<ConnectionSpec> spec = userTools.connectionSpecOf(name);
+            if (spec.isEmpty()) return Optional.empty();
+            providers.add(spec.get().provider());
+            if (first.isEmpty()) first = spec;
+        }
+        return providers.size() == 1 ? first : Optional.empty();
     }
 
     /**

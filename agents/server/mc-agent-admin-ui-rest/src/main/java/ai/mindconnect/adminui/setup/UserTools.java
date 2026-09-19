@@ -78,6 +78,14 @@ public class UserTools {
         return byGroup;
     }
 
+    /** The same catalogue as things to pick whole: groups, subgroups, connections, single tools. */
+    public ToolBundles bundles() {
+        ToolRegistry registry = tools.getIfAvailable();
+        Set<String> known = new java.util.HashSet<>();
+        catalogue().values().forEach(known::addAll);
+        return registry == null ? ToolBundles.none() : ToolBundles.of(registry, known::contains);
+    }
+
     /** True when the catalogue knows this name — a hand-typed URL must not store nonsense. */
     public boolean isKnown(String toolName) {
         return catalogue().values().stream().anyMatch(names -> names.contains(toolName));

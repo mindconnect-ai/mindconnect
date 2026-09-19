@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui.component;
 
+import ai.mindconnect.adminui.setup.ToolBundles;
 import ai.mindconnect.agent.tool.ConnectionSpec;
 import ai.mindconnect.credentials.domain.Connection;
 import ai.mindconnect.ui.model.UiAction;
@@ -112,16 +113,42 @@ public final class UserToolsComponent {
     // ── step one: which tool ────────────────────────────────────────────────
 
     /** The first dialog: pick a tool. Two steps, because the second depends on the answer. */
-    public static UiForm pickForm(Map<String, java.util.Set<String>> catalogue, String error) {
+    public static UiForm pickForm(ToolBundles bundles, String error) {
         List<UiField.Option> options = new ArrayList<>();
-        catalogue.forEach((group, names) ->
-                names.forEach(name -> options.add(UiField.Option.of(name, name + "  (" + group + ")"))));
+        bundles.all().forEach(b -> options.add(UiField.Option.of(b.key(), b.label())));
         UiForm form = UiForm.of(PICK_FORM_ID, null)
-                .field(UiField.select("toolName", "Tool", null, options).asEditable().asRequired()
-                        .hint("What the model will be able to call. Which of your accounts it uses comes next."))
+                .field(UiField.multiselect("picks", "Tools", List.of(), options).asEditable().asRequired()
+                        .hint("A group adds every tool in it; pick single tools to add just those. Which "
+                                + "of your accounts they use comes next. One tool at a time can also be "
+                                + "given a name of its own."))
                 .action(UiAction.primary(PICK_FORM_ID + "-next", "Continue").icon("arrow-right")
                         .dispatch("POST", API + "/new", PICK_FORM_ID))
                 .action(UiAction.secondary(PICK_FORM_ID + "-cancel", "Cancel")
+                        .dispatch("POST", API + "/dialog/close"));
+        if (error != null) {
+            form.error(error);
+        }
+        return form;
+    }
+
+    /**
+     * Step two for several tools at once: the account, when they all run on
+     * the same kind, and whether to ask first. No alias — a name of one's own
+     * is a one-tool affair.
+     */
+    public static UiForm bundleForm(List<String> toolNames, Optional<ConnectionSpec> spec,
+                                    List<Connection> connections, String error) {
+        UiForm form = UiForm.of(FORM_ID, null)
+                .field(UiField.hidden("tools", String.join(",", toolNames)))
+                .field(UiField.text("picked", "Adding", String.join(", ", toolNames)));
+        if (spec.isPresent()) {
+            form.field(accountField(spec.get(), connections, null));
+        }
+        form.field(UiField.bool("needsApproval", "Ask me before every call", false).asEditable()
+                .hint("Only ever adds a question. It cannot take away one your agent already asks."));
+        form.action(UiAction.primary(FORM_ID + "-save", "Add " + toolNames.size() + " tools").icon("add")
+                        .dispatch("POST", API + "/add-many", FORM_ID))
+                .action(UiAction.secondary(FORM_ID + "-cancel", "Cancel")
                         .dispatch("POST", API + "/dialog/close"));
         if (error != null) {
             form.error(error);

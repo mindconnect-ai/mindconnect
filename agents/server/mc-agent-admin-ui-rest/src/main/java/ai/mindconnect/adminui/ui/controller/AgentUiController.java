@@ -1,5 +1,8 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import java.util.Set;
+import ai.mindconnect.adminui.ui.page.ToolBundleFormPage;
+import ai.mindconnect.adminui.setup.ToolBundles;
 import ai.mindconnect.adminui.service.ToolTestService;
 import ai.mindconnect.adminui.ui.component.AgentFormComponent;
 import ai.mindconnect.adminui.ui.component.ToolTestComponent;
@@ -276,6 +279,52 @@ public class AgentUiController {
         return registryService.find(id)
                 .map(a -> ResponseEntity.ok(new ToolFormPage(a, null, toolRegistry).render()))
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /** The form that adds tools by the set — a group, a subgroup, everything on a connection. */
+    @GetMapping("/{id}/tools/new-group")
+    public ResponseEntity<UiPage> newToolBundleForm(@PathVariable("id") String idValue) {
+        AgentId id = AgentId.of(idValue);
+        return registryService.find(id)
+                .map(a -> ResponseEntity.ok(new ToolBundleFormPage(a, bundles()).render()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * Expands what was picked and adds each tool as a row of its own, skipping
+     * names the agent already has — adding the email group twice must not
+     * give the model two of everything.
+     */
+    @PostMapping("/{id}/tools/bundle")
+    public ResponseEntity<UiPage> addToolBundle(@PathVariable("id") String idValue,
+                                                @RequestBody Map<String, Object> raw,
+                                                @AuthenticationPrincipal OidcUser user) {
+        AgentId id = AgentId.of(idValue);
+        FormBody body = new FormBody(raw);
+        List<String> names = bundles().expand(body.strList("bundles"));
+        boolean needsApproval = Boolean.TRUE.equals(body.bool("needsApproval"));
+        boolean deferred = Boolean.TRUE.equals(body.bool("deferred"));
+        return registryService.find(id)
+                .map(a -> {
+                    registryService.updateTools(id, tools -> {
+                        Set<String> present = new java.util.HashSet<>();
+                        tools.forEach(t -> present.add(t.name()));
+                        List<AgentTool> next = new ArrayList<>(tools);
+                        for (String name : names) {
+                            if (present.add(name)) {
+                                next.add(new AgentTool(AgentToolId.random(), name, null, Map.of(),
+                                        true, deferred, needsApproval, null));
+                            }
+                        }
+                        return next;
+                    });
+                    return detail(idValue, "tools", null, user);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    private ToolBundles bundles() {
+        return ToolBundles.of(toolRegistry, name -> !AgentDefinition.DERIVED_TOOLS.contains(name));
     }
 
     @GetMapping("/{id}/tools/{toolId}")
