@@ -63,6 +63,21 @@ public interface ToolFactory {
      */
     default java.util.Map<String, Object> overridesSchema() { return java.util.Map.of(); }
 
+    /**
+     * The user variables this tool needs somebody to fill in — declared, not
+     * read: the value still arrives through the {@code EnvVarResolver} chain
+     * at call time. The installation lists them on a user's profile, writes
+     * the ones with a default, and says so on the next sign-in when a
+     * required one is nowhere to be found. Default: none, which is right for
+     * every tool an operator configures once for everybody.
+     *
+     * <p>Declared here rather than beside {@link #isAvailable()} on purpose:
+     * a tool whose variables are personal is <em>available</em> — it is this
+     * user who is not set up yet, and the answer differs per user, while
+     * availability is decided once at bind time.
+     */
+    default java.util.List<ToolVariable> userVariables() { return java.util.List.of(); }
+
     /** Build a tool for the given configuration and call scope. */
     Tool create(AgentTool agentTool, ToolCallScope scope);
 }

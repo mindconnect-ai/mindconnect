@@ -95,6 +95,14 @@ public interface MultiToolProvider {
     default void releaseSession(SessionId sessionId) {}
 
     /**
+     * The user variables this provider's tools need somebody to fill in; see
+     * {@link ToolFactory#userVariables()}. The whole bundle declares them
+     * together, because one connection is what they share — a mail provider's
+     * host, account and password are one set of credentials, not one per tool.
+     */
+    default java.util.List<ToolVariable> userVariables() { return java.util.List.of(); }
+
+    /**
      * Build a tool for the given name. Returns {@link Optional#empty()} if
      * the name is not served by this provider; the registry then continues
      * with the next provider.

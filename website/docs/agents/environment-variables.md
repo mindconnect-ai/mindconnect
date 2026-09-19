@@ -50,6 +50,28 @@ The same chain feeds the workflow engine's built-in `env` variable: a workflow
 run from the admin, from a chat (as a tool) or as a vector-store ingestion reads
 `${env.OPENAI_API_KEY}` the same way.
 
+### Variables a tool asks you for
+
+Some tools need something only you can supply — your mailbox, your own key for
+a service. Such a tool
+[declares](./creating-a-tool.md#asking-the-user-for-something-uservariables)
+the variables it needs, and the installation does the asking rather than
+leaving you to guess the names:
+
+- what has a **sensible default** is written for you on your first request
+  after signing in — a port, a protocol, a default folder;
+- everything declared is listed on your profile under *Your variables*, in a
+  second table saying what each one is, which tools use it, and whether it is
+  set. **Set** opens the form with the name already in it;
+- what is **required** and has no value anywhere raises a
+  [notification](./admin-ui/index.md#notifications) that goes away by itself
+  once you fill the value in.
+
+A variable is never created empty: an empty user variable would answer the
+lookup and cut off the namespace and the server behind it. And nothing is asked
+of you for a name the namespace or the process already answers — an operator
+who put the value in the server's environment for everyone has settled it.
+
 A config that says `${OPENAI_API_KEY}` therefore uses your key when you have
 one, the namespace's when it has one, and the server's otherwise; the
 `:default` of a placeholder is the last word. Values are stored encrypted with
