@@ -292,10 +292,32 @@ public final class AdminLayout {
         return menu;
     }
 
-    /** The entries modules contributed, after the shipped sections and before the Install group. */
+    /**
+     * The entries modules contributed, after the shipped sections and before
+     * the Install group. Groups with one id, from however many contributions,
+     * become one group with all their links, in the order they came; a group
+     * is open while one of its links is the current page, like Install.
+     */
     private void contributed(UiMenu menu, String navigate) {
+        java.util.Map<String, UiMenuItem> groups = new java.util.LinkedHashMap<>();
         for (AdminMenuContribution.Entry entry : contributed) {
-            menu.item(navItem(entry.id(), entry.label(), entry.href(), entry.icon(), navigate));
+            if (!entry.isGroup()) {
+                menu.item(navItem(entry.id(), entry.label(), entry.href(), entry.icon(), navigate));
+                continue;
+            }
+            UiMenuItem group = groups.get(entry.id());
+            if (group == null) {
+                group = UiMenuItem.group(entry.id(), entry.label());
+                if (entry.icon() != null) group.icon(entry.icon());
+                groups.put(entry.id(), group);
+                menu.item(group);
+            }
+            for (AdminMenuContribution.Entry child : entry.children()) {
+                group.child(navItem(child.id(), child.label(), child.href(), child.icon(), navigate));
+            }
+        }
+        for (UiMenuItem group : groups.values()) {
+            group.open(group.getChildren().stream().anyMatch(UiMenuItem::isSelected));
         }
     }
 

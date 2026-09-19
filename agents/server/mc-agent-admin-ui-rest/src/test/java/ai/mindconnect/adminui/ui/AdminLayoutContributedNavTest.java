@@ -63,6 +63,39 @@ class AdminLayoutContributedNavTest {
         assertThat(json.indexOf("nav-chat")).isLessThan(json.indexOf("nav-my-usage"));
     }
 
+    @Test
+    void a_group_holds_its_links_and_opens_while_one_of_them_is_current() throws Exception {
+        var reports = AdminMenuContribution.Entry.group("nav-reports", "Reports", "bar-chart", List.of(USAGE));
+        String elsewhere = menuJson(false, "/admin/agents", List.of(reports));
+        String inside = menuJson(false, "/admin/usage?days=7", List.of(reports));
+
+        var closed = new ObjectMapper().readTree(elsewhere).findParents("id").stream()
+                .filter(n -> "nav-reports".equals(n.path("id").asText())).findFirst().orElseThrow();
+        assertThat(closed.path("open").asBoolean()).isFalse();
+        assertThat(closed.path("children").get(0).path("id").asText()).isEqualTo("nav-usage");
+        assertThat(elsewhere.indexOf("nav-vector-stores")).isLessThan(elsewhere.indexOf("nav-reports"));
+        assertThat(elsewhere.indexOf("nav-reports")).isLessThan(elsewhere.indexOf("nav-install"));
+
+        var open = new ObjectMapper().readTree(inside).findParents("id").stream()
+                .filter(n -> "nav-reports".equals(n.path("id").asText())).findFirst().orElseThrow();
+        assertThat(open.path("open").asBoolean()).isTrue();
+        assertThat(selectedIds(inside)).containsExactly("nav-usage");
+    }
+
+    @Test
+    void two_contributions_to_one_group_share_it() throws Exception {
+        var mine = AdminMenuContribution.Entry.group("nav-reports", "Reports", "bar-chart", List.of(USAGE));
+        var theirs = AdminMenuContribution.Entry.group("nav-reports", "Reports", null, List.of(
+                AdminMenuContribution.Entry.of("nav-audit", "Audit", "/admin/audit", "shield")));
+        String json = menuJson(false, "/admin/agents", List.of(mine, theirs));
+
+        var groups = new ObjectMapper().readTree(json).findParents("id").stream()
+                .filter(n -> "nav-reports".equals(n.path("id").asText())).toList();
+        assertThat(groups).hasSize(1);
+        assertThat(groups.get(0).path("children")).extracting(n -> n.path("id").asText())
+                .containsExactly("nav-usage", "nav-audit");
+    }
+
     private static List<String> selectedIds(String json) throws Exception {
         var root = new ObjectMapper().readTree(json);
         var out = new java.util.ArrayList<String>();
