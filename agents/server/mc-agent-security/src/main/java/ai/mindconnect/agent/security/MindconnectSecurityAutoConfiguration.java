@@ -10,6 +10,7 @@ import ai.mindconnect.credentials.adapter.tool.RefreshingConnections;
 import ai.mindconnect.credentials.adapter.tool.ServiceConnections;
 import ai.mindconnect.credentials.oauth.OAuthConnections;
 import ai.mindconnect.credentials.oauth.OAuthFlow;
+import ai.mindconnect.credentials.oauth.OAuthProviderContributions;
 import ai.mindconnect.credentials.port.out.OAuthProviderRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.ObjectProvider;
@@ -121,6 +122,20 @@ public class MindconnectSecurityAutoConfiguration {
      * name would collide with the scanned class rather than with anything
      * meaningful.
      */
+    /**
+     * Stores the app registrations the modules on the classpath brought along,
+     * once. A name the installation already has is left alone — an operator's
+     * own registration is not overwritten by a restart.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(OAuthProviderRepository.class)
+    OAuthProviderContributions oAuthProviderContributions(OAuthProviderRepository providers) {
+        OAuthProviderContributions contributions = new OAuthProviderContributions(providers);
+        contributions.install();
+        return contributions;
+    }
+
     @Bean
     @ConditionalOnMissingBean
     OAuthFlow oAuthFlow(ObjectMapper objectMapper) {
