@@ -49,6 +49,50 @@ class OAuthProviderContributionsTest {
     }
 
     @Test
+    void an_operators_client_id_set_after_the_first_start_still_wins() {
+        // The first start stored the shipped registration; the operator made
+        // their own app afterwards and set the variable. Nobody re-installs.
+        install(contribution(null));
+        OAuthProvider shipped = providers.findByName("ms-graph").orElseThrow();
+
+        assertThat(install(contribution("their-own-client-id"))).containsExactly("ms-graph");
+
+        OAuthProvider stored = providers.findByName("ms-graph").orElseThrow();
+        assertThat(stored.clientId()).isEqualTo("their-own-client-id");
+        assertThat(stored.id()).isEqualTo(shipped.id());
+        assertThat(stored.authzUrl()).isEqualTo(shipped.authzUrl());
+        assertThat(stored.defaultScopes()).isEqualTo(shipped.defaultScopes());
+
+        // And a start after that changes nothing again.
+        assertThat(install(contribution("their-own-client-id"))).isEmpty();
+    }
+
+    @Test
+    void a_changed_operator_client_id_replaces_the_previous_one() {
+        install(contribution("first-app"));
+
+        install(contribution("second-app"));
+
+        assertThat(providers.findByName("ms-graph").orElseThrow().clientId()).isEqualTo("second-app");
+        assertThat(providers.findAll()).hasSize(1);
+    }
+
+    @Test
+    void the_operators_own_edits_survive_their_client_id_arriving() {
+        install(contribution(null));
+        OAuthProvider shipped = providers.findByName("ms-graph").orElseThrow();
+        providers.save(new OAuthProvider(shipped.id(), shipped.name(), shipped.kind(), shipped.clientId(), null,
+                shipped.authzUrl(), shipped.tokenUrl(), List.of("offline_access", "Mail.Read"), true,
+                Map.of(), Map.of()));
+
+        install(contribution("their-own-client-id"));
+
+        OAuthProvider stored = providers.findByName("ms-graph").orElseThrow();
+        assertThat(stored.clientId()).isEqualTo("their-own-client-id");
+        assertThat(stored.defaultScopes()).containsExactly("offline_access", "Mail.Read");
+    }
+
+    @Test
     void a_shipped_client_secret_is_dropped_rather_than_stored() {
         // A registration that travels with a jar is a public client: whoever
         // has the jar has whatever it carries.
