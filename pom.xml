@@ -110,6 +110,7 @@
         <module>agents/core/mc-user-core</module>
         <module>agents/core/mc-user</module>
         <module>agents/adapter/postgres/mc-user-pg</module>
+        <module>agents/adapter/postgres/mc-credentials-pg</module>
         <module>agents/core/mc-namespace-core</module>
         <module>agents/core/mc-namespace</module>
         <module>agents/adapter/postgres/mc-namespace-pg</module>
