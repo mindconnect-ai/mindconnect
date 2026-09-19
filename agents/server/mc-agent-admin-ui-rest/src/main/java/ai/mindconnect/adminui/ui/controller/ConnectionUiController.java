@@ -72,7 +72,10 @@ public class ConnectionUiController {
     }
 
     /** Attaches a new account. */
-    @PostMapping("/{provider}")
+    // Under /add/..., not /{provider}: a provider and a connection id are
+    // both one path segment, and Spring cannot tell POST /{provider} from
+    // POST /{id} — every save was a 500. AdminUiRoutesTest guards this.
+    @PostMapping("/add/{provider}")
     public UiPatch add(@AuthenticationPrincipal OidcUser user, @PathVariable("provider") String provider,
                        @RequestBody Map<String, Object> raw) {
         UserId me = userId(user);
