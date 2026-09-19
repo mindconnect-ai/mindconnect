@@ -62,6 +62,38 @@ class OAuthProviderContributionsTest {
     }
 
     @Test
+    void a_module_with_nothing_to_contribute_yet_is_quietly_skipped() {
+        // Google has no shareable registration at all: its restricted scopes
+        // make a shared app need an annual security assessment, while an
+        // operator's own internal app needs none. So it waits for theirs.
+        OAuthProviderContribution waiting = () -> null;
+
+        assertThat(install(waiting)).isEmpty();
+        assertThat(providers.findAll()).isEmpty();
+    }
+
+    @Test
+    void an_operators_client_secret_is_stored_because_it_is_theirs_and_not_the_jars() {
+        // The rule is about where a secret comes from, not whether there is one:
+        // some providers have no public-client model for a server.
+        OAuthProviderContribution theirs = new OAuthProviderContribution() {
+            @Override public OAuthProvider provider() {
+                return new OAuthProvider(UUID.randomUUID(), "google-oauth", "google", "shipped-id", null,
+                        "https://accounts.example.com/authorize", "https://oauth.example.com/token",
+                        List.of("scope"), true, Map.of(), Map.of());
+            }
+            @Override public String clientId() { return "their-id"; }
+            @Override public String clientSecret() { return "their-secret"; }
+        };
+
+        install(theirs);
+
+        OAuthProvider stored = providers.findByName("google-oauth").orElseThrow();
+        assertThat(stored.clientId()).isEqualTo("their-id");
+        assertThat(stored.clientSecret()).isEqualTo("their-secret");
+    }
+
+    @Test
     void one_broken_contribution_does_not_take_the_others_down() {
         OAuthProviderContribution broken = () -> {
             throw new IllegalStateException("no client id configured");

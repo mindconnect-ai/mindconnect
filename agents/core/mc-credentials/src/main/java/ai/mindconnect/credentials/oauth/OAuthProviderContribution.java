@@ -27,8 +27,14 @@ import ai.mindconnect.credentials.domain.OAuthProvider;
 public interface OAuthProviderContribution {
 
     /**
-     * The registration to store when the installation has none of this name.
-     * Its {@code clientSecret} must be null; see the class note.
+     * The registration to store when the installation has none of this name,
+     * or <b>null when there is nothing to contribute yet</b> — a module whose
+     * provider has no shareable registration at all, and whose client the
+     * operator must therefore register themselves, says so by returning null
+     * until they have. Nothing is stored and nothing is logged as broken.
+     *
+     * <p>Its {@code clientSecret} must be null; a secret belongs in
+     * {@link #clientSecret()}, which reads the operator's, not the jar's.
      */
     OAuthProvider provider();
 
@@ -42,6 +48,20 @@ public interface OAuthProviderContribution {
      * that the module knows better than the operator does.
      */
     default String clientId() {
+        return null;
+    }
+
+    /**
+     * The operator's client secret, when their provider has no public-client
+     * model and insists on one — Google does for server-side redemption, where
+     * Microsoft does not. Typically an environment variable this module reads.
+     *
+     * <p>This is allowed to hold a real secret because it comes from the
+     * installation, not from the jar. {@link #provider()} is not: a value
+     * that ships with a download is not a secret, and the installer drops one
+     * it finds there.
+     */
+    default String clientSecret() {
         return null;
     }
 }
