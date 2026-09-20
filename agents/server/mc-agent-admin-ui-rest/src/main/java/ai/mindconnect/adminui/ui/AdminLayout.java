@@ -276,15 +276,9 @@ public final class AdminLayout {
             version(menu);
             return menu;
         }
-        menu.item(navItem("nav-agents", "Agents", "/admin/agents", "bot", navigate));
-        menu.item(navItem("nav-tools", "Tools", "/admin/tools", "tools", navigate));
-        menu.item(navItem("nav-skills", "Skills", "/admin/skills", "graduation-cap", navigate));
-        menu.item(navItem("nav-llm-configs", "LLM Configs", "/admin/llm-configs", "ai", navigate));
-        menu.item(navItem("nav-workflows", "Workflows", "/workflow-admin", "branch", navigate));
-        if (mcpGateway) {
-            menu.item(navItem("nav-mcp", "MCP Servers", "/mcp-gateway", "plug", navigate));
-        }
-        menu.item(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
+        menu.item(aiGroup(navigate));
+        menu.item(toolsGroup(navigate));
+        menu.item(dataGroup(navigate));
         contributed(menu, navigate);
         menu.item(installGroup(navigate));
         menu.item(navItem("nav-api", "API", "/admin/api-explorer", "code", navigate));
@@ -336,6 +330,47 @@ public final class AdminLayout {
     }
 
     /**
+     * What thinks: the agents, the models they run on and the skills they are
+     * given. Open while one of them is the current page, like Install.
+     */
+    private UiMenuItem aiGroup(String navigate) {
+        UiMenuItem ai = UiMenuItem.group("nav-group-ai", "AI").icon("bot");
+        ai.child(navItem("nav-agents", "Agents", "/admin/agents", "bot", navigate));
+        ai.child(navItem("nav-llm-configs", "LLM Configs", "/admin/llm-configs", "ai", navigate));
+        ai.child(navItem("nav-skills", "Skills", "/admin/skills", "graduation-cap", navigate));
+        return openWhenSelected(ai);
+    }
+
+    /**
+     * What an agent can call: tools, MCP servers and workflows. The MCP entry
+     * follows the gateway bean — without one, nobody serves that route.
+     */
+    private UiMenuItem toolsGroup(String navigate) {
+        UiMenuItem tools = UiMenuItem.group("nav-group-tools", "Tools").icon("tools");
+        tools.child(navItem("nav-tools", "Tools", "/admin/tools", "tools", navigate));
+        if (mcpGateway) {
+            tools.child(navItem("nav-mcp", "MCP Servers", "/mcp-gateway", "plug", navigate));
+        }
+        tools.child(navItem("nav-workflows", "Workflows", "/workflow-admin", "branch", navigate));
+        return openWhenSelected(tools);
+    }
+
+    /**
+     * What an agent reads: for now the vector stores. Its own group, one entry
+     * or not, so documents and sources have a home when they arrive.
+     */
+    private UiMenuItem dataGroup(String navigate) {
+        UiMenuItem data = UiMenuItem.group("nav-group-data", "Data").icon("database");
+        data.child(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
+        return openWhenSelected(data);
+    }
+
+    /** A group is open while one of its links is the current page, so the selected item is never hidden. */
+    private static UiMenuItem openWhenSelected(UiMenuItem group) {
+        return group.open(group.getChildren().stream().anyMatch(UiMenuItem::isSelected));
+    }
+
+    /**
      * The two ways something arrives in this installation, under one entry:
      * from a registry, or from the application's own seed data. Open while one
      * of them is the current page, so the selected item is not hidden in a
@@ -347,7 +382,7 @@ public final class AdminLayout {
             install.child(navItem("nav-registry", "Registry", "/registry", "package", navigate));
         }
         install.child(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
-        return install.open(install.getChildren().stream().anyMatch(UiMenuItem::isSelected));
+        return openWhenSelected(install);
     }
 
     /**
