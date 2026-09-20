@@ -96,6 +96,20 @@ class AdminLayoutContributedNavTest {
                 .containsExactly("nav-usage", "nav-audit");
     }
 
+    @Test
+    void a_contribution_to_a_shipped_group_joins_it_instead_of_standing_beside_it() throws Exception {
+        var data = AdminMenuContribution.Entry.group("nav-group-data", "Data", "database", List.of(USAGE));
+        String json = menuJson(false, "/admin/usage?days=7", List.of(data));
+
+        var groups = new ObjectMapper().readTree(json).findParents("id").stream()
+                .filter(n -> "nav-group-data".equals(n.path("id").asText())).toList();
+        assertThat(groups).hasSize(1);
+        assertThat(groups.get(0).path("children")).extracting(n -> n.path("id").asText())
+                .startsWith("nav-vector-stores").endsWith("nav-usage");
+        assertThat(groups.get(0).path("open").asBoolean()).as("open: usage is the current page").isTrue();
+        assertThat(selectedIds(json)).containsExactly("nav-usage");
+    }
+
     private static List<String> selectedIds(String json) throws Exception {
         var root = new ObjectMapper().readTree(json);
         var out = new java.util.ArrayList<String>();

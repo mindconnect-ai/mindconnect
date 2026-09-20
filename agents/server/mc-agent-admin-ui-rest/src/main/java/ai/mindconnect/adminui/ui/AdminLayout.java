@@ -289,11 +289,17 @@ public final class AdminLayout {
     /**
      * The entries modules contributed, after the shipped sections and before
      * the Install group. Groups with one id, from however many contributions,
-     * become one group with all their links, in the order they came; a group
-     * is open while one of its links is the current page, like Install.
+     * become one group with all their links, in the order they came — and a
+     * contribution to a group the menu already has, {@code nav-group-data}
+     * say, joins that group instead of standing beside it. A group is open
+     * while one of its links is the current page, like Install.
      */
     private void contributed(UiMenu menu, String navigate) {
         java.util.Map<String, UiMenuItem> groups = new java.util.LinkedHashMap<>();
+        for (UiMenuItem shipped : menu.getItems()) {
+            if (shipped.getChildren() != null && !shipped.getChildren().isEmpty()) groups.put(shipped.getId(), shipped);
+        }
+        java.util.Set<String> touched = new java.util.HashSet<>();
         for (AdminMenuContribution.Entry entry : contributed) {
             if (!entry.isGroup()) {
                 menu.item(navItem(entry.id(), entry.label(), entry.href(), entry.icon(), navigate));
@@ -306,11 +312,13 @@ public final class AdminLayout {
                 groups.put(entry.id(), group);
                 menu.item(group);
             }
+            touched.add(entry.id());
             for (AdminMenuContribution.Entry child : entry.children()) {
                 group.child(navItem(child.id(), child.label(), child.href(), child.icon(), navigate));
             }
         }
-        for (UiMenuItem group : groups.values()) {
+        for (String id : touched) {
+            UiMenuItem group = groups.get(id);
             group.open(group.getChildren().stream().anyMatch(UiMenuItem::isSelected));
         }
     }
