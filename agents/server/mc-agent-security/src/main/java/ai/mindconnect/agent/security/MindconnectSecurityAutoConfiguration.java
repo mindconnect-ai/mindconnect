@@ -86,6 +86,20 @@ public class MindconnectSecurityAutoConfiguration {
     }
 
     /**
+     * What each user's screens remember — the folder last open, the view last
+     * chosen. Present whenever the host assembled a {@link
+     * ai.mindconnect.user.port.out.PreferenceRepository}; a screen that finds
+     * no service simply starts where it always did.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnBean(ai.mindconnect.user.port.out.PreferenceRepository.class)
+    ai.mindconnect.user.service.PreferenceService preferenceService(
+            ai.mindconnect.user.port.out.PreferenceRepository preferences) {
+        return new ai.mindconnect.user.service.PreferenceService(preferences);
+    }
+
+    /**
      * What each user keeps in their own tool account, and the roster the
      * runtime lays over an agent's list for them. Found by the runtime through
      * its bean fallback into this context, like {@link Connections}.

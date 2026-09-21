@@ -133,4 +133,10 @@ public class PostgresPersistenceConfig {
     ai.mindconnect.user.port.out.NotificationRepository notificationRepository(Sql mindconnectSql) {
         return new ai.mindconnect.user.adapter.pg.PgNotificationRepository(mindconnectSql).initSchema();
     }
+
+    /** What each user's screens remember; installation-wide like the users, and not a secret. */
+    @Bean
+    ai.mindconnect.user.port.out.PreferenceRepository preferenceRepository(Sql mindconnectSql) {
+        return new ai.mindconnect.user.adapter.pg.PgPreferenceRepository(mindconnectSql).initSchema();
+    }
 }
