@@ -124,4 +124,12 @@ public class FilePersistenceAutoConfiguration {
     NotificationRepository notificationRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir) {
         return new FileNotificationRepository(Path.of(baseDir));
     }
+
+    /** What each user's screens remember; installation-wide like the users, and not a secret. */
+    @Bean
+    @ConditionalOnMissingBean(ai.mindconnect.user.port.out.PreferenceRepository.class)
+    ai.mindconnect.user.port.out.PreferenceRepository preferenceRepository(
+            @Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new ai.mindconnect.user.adapter.file.FilePreferenceRepository(Path.of(baseDir));
+    }
 }
