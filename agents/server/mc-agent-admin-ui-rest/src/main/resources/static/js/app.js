@@ -5,29 +5,20 @@
 import { SuiRenderer, installDefaultHandlers } from "/sui/renderer.js";
 import { SuiEventBus }                         from "/sui/eventbus.js";
 import { bffFetch }                            from "/sui/bff.js";
-import { install as installJsonViewer } from "/sui-ext/jsonviewer/extension.js";
-import { install as installMarkdown }   from "/sui-ext/markdown/extension.js";
+// Every extension on the classpath — semantic-ui's own and any module's or
+// plugin's — declares its stylesheets and scripts in META-INF/sui/assets.json;
+// the server resolves them into this one module (see SuiAssetRegistry).
+import { installAll }                   from "/sui/assets.js";
 import { installMarkdownSafety }       from "/js/markdown-safety.js";
-import { install as installDiagram }    from "/sui-ext/diagram/extension.js";
 import { watchConnectionBudget }        from "/js/connection-budget.js";
 import { installAudioRecorder }         from "/js/audio-recorder.js";
 import { installCopyField }             from "/js/copy-field.js";
 
-// ── Renderer + extensions ────────────────────────────────────────────────────
+// ── Renderer ─────────────────────────────────────────────────────────────────
 
 const main = document.getElementById("main");
 
 const renderer = installDefaultHandlers(new SuiRenderer(main));
-await Promise.all([
-    installJsonViewer(renderer),
-    installMarkdown(renderer),
-]);
-// After the extension has loaded marked, before anything renders: raw HTML in
-// markdown is shown as text (see markdown-safety.js).
-await installMarkdownSafety();
-// Teaches the renderer to draw UiDiagram nodes (the embedded workflow admin's
-// "Diagram" tab). Synchronous install — the web component registers itself.
-installDiagram(renderer);
 
 // The header (brand, nav, user widget, optional logout) is part of the
 // server-rendered UiNode tree now (see AdminLayout). Nav links and the logout
@@ -73,6 +64,19 @@ bus.setFetcher(bffFetch)
    // The framework tells us when a stream's state changes; what to do about
    // a lost one is our call.
    .onStreamStateChange(noticeLostStream);
+
+// ── Extensions ───────────────────────────────────────────────────────────────
+
+// Before anything renders, and after the bus exists: an extension may fire
+// triggers through it (the calendar's navigation, say). installAll links the
+// stylesheets, installs the extensions in their declared order, and logs and
+// skips one that fails rather than taking the others down with it — jsonviewer,
+// markdown and diagram from semantic-ui, and whatever a module on the
+// classpath brings (mc-commercial's calendar and charts, a plugin's widgets).
+await installAll(renderer, bus);
+// After the markdown extension has loaded marked, before anything renders: raw
+// HTML in markdown is shown as text (see markdown-safety.js).
+await installMarkdownSafety();
 
 // Too many tabs: each holds a stream or two, and a browser allows six per
 // site. The tabs count each other and warn before the seventh stalls them all.
