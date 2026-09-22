@@ -52,8 +52,9 @@ public interface AgentSessionRepository {
     List<AgentSession> findByAgent(AgentId agent, UserId user);
 
     /**
-     * Every top-level session of one user in one tenant, newest first — the
-     * chat's session list. Sub-agent sessions ({@code parentSessionId != null})
+     * Every top-level session of one user in one tenant, newest first, of
+     * every type — the chat's own list asks {@link #findHeadersByUser(UserId, String)}
+     * for {@link AgentSession#CHAT} instead. Sub-agent sessions ({@code parentSessionId != null})
      * are left out: they belong to the turn that spawned them, not to the
      * user's history.
      */
@@ -67,6 +68,22 @@ public interface AgentSessionRepository {
      */
     default List<? extends AgentSessionHeader> findHeadersByUser(UserId user) {
         return findByUser(user);
+    }
+
+    /**
+     * The top-level sessions of one user that are of one {@code type} —
+     * {@link AgentSession#CHAT} for the chat's history, another type for the
+     * view a feature keeps of its own sessions. Newest first. The default
+     * filters {@link #findByUser}; a store with a column for it asks that.
+     */
+    default List<AgentSession> findByUser(UserId user, String type) {
+        return findByUser(user).stream().filter(s -> s.isOfType(type)).toList();
+    }
+
+    /** {@link #findByUser(UserId, String)} as headers. */
+    default List<? extends AgentSessionHeader> findHeadersByUser(UserId user, String type) {
+        String wanted = type == null || type.isBlank() ? AgentSession.CHAT : type;
+        return findHeadersByUser(user).stream().filter(h -> wanted.equals(h.type())).toList();
     }
 
     /**

@@ -237,7 +237,7 @@ replay and the stream continues live. Every frame is one JSON object with a
 
 | type | carries |
 |---|---|
-| `session_started` | `agentDefinitionId` — a top-level session was opened (sub-agent sessions do not announce themselves) |
+| `session_started` | `agentDefinitionId`, `sessionType` — a top-level session was opened (sub-agent sessions do not announce themselves); `sessionType` is `chat` for a chat and another word for a session a feature opened for itself, which a chat history leaves out |
 | `session_titled` | `title` — the session got its generated title after the first exchange |
 | `turn_started` | `turnId` |
 | `turn_finished` | `turnId`, `outcome` — `completed`, `failed` or `cancelled` |

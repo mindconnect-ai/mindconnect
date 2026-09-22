@@ -27,8 +27,25 @@ public sealed interface UserEvent
     /** How a turn ended, as far as the caller who submitted it can tell. */
     enum TurnOutcome { COMPLETED, FAILED, CANCELLED }
 
-    /** A top-level session was opened. Sub-agent sessions do not announce themselves. */
-    record SessionStarted(SessionId sessionId, AgentId agentDefinitionId) implements UserEvent {}
+    /**
+     * A top-level session was opened. Sub-agent sessions do not announce
+     * themselves. {@code sessionType} is the session's type, so that a list
+     * shows only the sessions it lists — the chat's history only chats.
+     */
+    record SessionStarted(SessionId sessionId, AgentId agentDefinitionId, String sessionType)
+            implements UserEvent {
+
+        public SessionStarted {
+            if (sessionType == null || sessionType.isBlank()) {
+                sessionType = ai.mindconnect.agent.runtime.domain.AgentSession.CHAT;
+            }
+        }
+
+        /** A chat session opened. */
+        public SessionStarted(SessionId sessionId, AgentId agentDefinitionId) {
+            this(sessionId, agentDefinitionId, null);
+        }
+    }
 
     /** The session got its generated title after the first exchange. */
     record SessionTitled(SessionId sessionId, String title) implements UserEvent {}

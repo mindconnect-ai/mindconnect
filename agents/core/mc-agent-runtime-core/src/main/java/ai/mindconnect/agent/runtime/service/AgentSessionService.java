@@ -337,6 +337,25 @@ public class AgentSessionService {
                                   SessionId parentSessionId, ChatTurnId parentTurnId,
                                   String parentToolCallId, String workingDir,
                                   List<String> additionalDirs) {
+        return open(agentDefinitionId, userId, parentSessionId, parentTurnId, parentToolCallId,
+                workingDir, additionalDirs, AgentSession.CHAT);
+    }
+
+    /**
+     * A top-level session with a registry agent, of another type than a chat
+     * — one a feature opens for its own purpose and keeps out of the chat's
+     * history (see {@link AgentSession#type}). Works in its own directory,
+     * like every session that names none.
+     */
+    public AgentSession openChatOfType(AgentId agentDefinitionId, UserId userId, String type) {
+        return inOwnDirectoryWhenNone(open(agentDefinitionId, userId, null, null, null,
+                null, List.of(), type));
+    }
+
+    private AgentSession open(AgentId agentDefinitionId, UserId userId,
+                              SessionId parentSessionId, ChatTurnId parentTurnId,
+                              String parentToolCallId, String workingDir,
+                              List<String> additionalDirs, String type) {
         AgentDefinition def = definitionRepository.findById(agentDefinitionId)
                 .orElseThrow(() -> DomainException.notFound("AgentDefinition", agentDefinitionId.toString()));
 
@@ -351,13 +370,14 @@ public class AgentSessionService {
         AgentSession session = AgentSession.startSubAgent(agentDefinitionId, userId,
                 conversationId, parentSessionId, parentTurnId, parentToolCallId)
                 .withWorkingDir(workingDir)
-                .withAdditionalDirs(additionalDirs);
+                .withAdditionalDirs(additionalDirs)
+                .withType(type);
         AgentSession saved = sessionRepository.create(session);
         // A sub-agent's session is the parent turn's business, not news for
         // the user's session list.
         if (parentSessionId == null) {
             userChannels.publish(userId, new UserEvent
-                    .SessionStarted(saved.id(), agentDefinitionId));
+                    .SessionStarted(saved.id(), agentDefinitionId, saved.type()));
         }
         return saved;
     }
@@ -401,6 +421,17 @@ public class AgentSessionService {
      * chat is not findable under any agent, because it belongs to none.
      */
     public AgentSession openChat(SessionAgent agent, UserId userId) {
+        return openChat(agent, userId, AgentSession.CHAT);
+    }
+
+    /**
+     * {@link #openChat(SessionAgent, UserId)} for a session of another type —
+     * one a feature opens for its own purpose and keeps out of the chat's
+     * history, such as the Office composer's drafting chat. The type is a
+     * free word (see {@link AgentSession#type}); {@link #sessionsOfType}
+     * finds them again.
+     */
+    public AgentSession openChat(SessionAgent agent, UserId userId, String type) {
         ConversationId conversationId = ConversationId.random();
         List<Participant> participants = List.of(
                 Participant.user(conversationId, userId, userId.value()),
@@ -411,11 +442,17 @@ public class AgentSessionService {
 
         AgentSession session = AgentSession
                 .start(agent.id(), userId, conversationId)
-                .withSessionAgents(List.of(agent));
+                .withSessionAgents(List.of(agent))
+                .withType(type);
         AgentSession saved = inOwnDirectoryWhenNone(sessionRepository.create(session));
         userChannels.publish(userId, new UserEvent
-                .SessionStarted(saved.id(), agent.id()));
+                .SessionStarted(saved.id(), agent.id(), saved.type()));
         return saved;
+    }
+
+    /** One user's top-level sessions of one type, newest first — a feature's view of its own sessions. */
+    public List<AgentSession> sessionsOfType(UserId userId, String type) {
+        return sessionRepository.findByUser(userId, type);
     }
 
     /**

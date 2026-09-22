@@ -12,7 +12,7 @@ import ai.mindconnect.agent.EntityId;
  *
  * <table>
  *   <tr><th>type</th><th>fields</th></tr>
- *   <tr><td>{@code session_started}</td><td>{@code sessionId}, {@code agentDefinitionId}</td></tr>
+ *   <tr><td>{@code session_started}</td><td>{@code sessionId}, {@code agentDefinitionId}, {@code sessionType}</td></tr>
  *   <tr><td>{@code session_titled}</td><td>{@code sessionId}, {@code title}</td></tr>
  *   <tr><td>{@code turn_started}</td><td>{@code sessionId}, {@code turnId}</td></tr>
  *   <tr><td>{@code turn_finished}</td><td>{@code sessionId}, {@code turnId}, {@code outcome}</td></tr>
@@ -22,7 +22,7 @@ import ai.mindconnect.agent.EntityId;
  */
 public record UserEventFrame(long seq, String type, String sessionId, String turnId, String outcome,
                              String callId, String toolName, Boolean approved, String title,
-                             String agentDefinitionId) {
+                             String agentDefinitionId, String sessionType) {
 
     /** The first frame of every user stream: what the buffer still holds. */
     public record Attached(String type, long firstBufferedSeq, long latestSeq) {
@@ -35,18 +35,18 @@ public record UserEventFrame(long seq, String type, String sessionId, String tur
         String session = str(event.sessionId());
         return switch (event) {
             case UserEvent.SessionStarted e -> new UserEventFrame(seq, "session_started", session,
-                    null, null, null, null, null, null, str(e.agentDefinitionId()));
+                    null, null, null, null, null, null, str(e.agentDefinitionId()), e.sessionType());
             case UserEvent.SessionTitled e -> new UserEventFrame(seq, "session_titled", session,
-                    null, null, null, null, null, e.title(), null);
+                    null, null, null, null, null, e.title(), null, null);
             case UserEvent.TurnStarted e -> new UserEventFrame(seq, "turn_started", session,
-                    str(e.turnId()), null, null, null, null, null, null);
+                    str(e.turnId()), null, null, null, null, null, null, null);
             case UserEvent.TurnFinished e -> new UserEventFrame(seq, "turn_finished", session,
                     str(e.turnId()), e.outcome().name().toLowerCase(java.util.Locale.ROOT),
-                    null, null, null, null, null);
+                    null, null, null, null, null, null);
             case UserEvent.ApprovalRequested e -> new UserEventFrame(seq, "approval_requested", session,
-                    null, null, e.callId(), e.toolName(), null, null, null);
+                    null, null, e.callId(), e.toolName(), null, null, null, null);
             case UserEvent.ApprovalAnswered e -> new UserEventFrame(seq, "approval_answered", session,
-                    null, null, e.callId(), null, e.approved(), null, null);
+                    null, null, e.callId(), null, e.approved(), null, null, null);
         };
     }
 

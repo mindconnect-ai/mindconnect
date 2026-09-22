@@ -124,7 +124,7 @@ public class ChatUiController {
     @GetMapping({"", "/"})
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
         // Headers for the sidebar; only the chat being shown is loaded whole.
-        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)));
+        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)), AgentSession.CHAT);
         var latest = ChatLanding.pick(sessions, lastShownChat())
                 .flatMap(sessionRepository::findById);
         if (latest.isEmpty()) {
@@ -157,7 +157,7 @@ public class ChatUiController {
         var session = openDefaultChat(userId);
         log.info("New chat {}", session.id());
         return ResponseEntity.ok(
-                shell(session, sessionRepository.findHeadersByUser(UserId.of(userId))));
+                shell(session, sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
     }
 
     /** The agent, the model and the prompt of this chat, as a dialog over the conversation. */
@@ -254,7 +254,7 @@ public class ChatUiController {
         var saved = sessionService.replaceSessionAgent(sessionId, agent);
         String userId = userId(user);
         return ResponseEntity.ok(
-                shell(saved, sessionRepository.findHeadersByUser(UserId.of(userId))));
+                shell(saved, sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
     }
 
     /** This chat's own overrides on the agent it references, or {@code null}. */
@@ -451,7 +451,7 @@ public class ChatUiController {
             sessionService.updateTitle(sessionId, title.trim());
         }
         String userId = userId(user);
-        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId));
+        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT);
         var current = sessionRepository.findById(sessionId).orElseThrow();
         return ResponseEntity.ok(shell(current, sessions));
     }
@@ -471,7 +471,7 @@ public class ChatUiController {
         sessionService.deleteSession(sessionId);
         log.info("Chat {} deleted", sessionId);
 
-        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId));
+        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT);
         var newest = sessions.isEmpty()
                 ? java.util.Optional.<AgentSession>empty()
                 : sessionRepository.findById(sessions.get(0).id());
@@ -779,7 +779,7 @@ public class ChatUiController {
                 .map(agent -> {
                     var session = sessionService.openChat(agentId, UserId.of(userId));
                     return ResponseEntity.ok(shell(session,
-                            sessionRepository.findHeadersByUser(UserId.of(userId))));
+                            sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -1173,7 +1173,7 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         return ownedSession(sessionId, user)
                 .map(session -> ResponseEntity.ok(shell(session,
-                        sessionRepository.findHeadersByUser(UserId.of(userId(user))))))
+                        sessionRepository.findHeadersByUser(UserId.of(userId(user)), AgentSession.CHAT))))
                 .orElse(ResponseEntity.notFound().build());
     }
 

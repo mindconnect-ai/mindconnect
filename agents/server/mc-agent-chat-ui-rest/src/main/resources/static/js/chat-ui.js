@@ -167,7 +167,10 @@
         if (!event || !event.sessionId) return;
         const row = document.getElementById("chat-" + event.sessionId);
         if (!row) {
-            if (event.type === "session_started") addNewRow(event.sessionId);
+            // Only a chat belongs in the chat's history; a session a feature
+            // opened for itself (the Office composer's, say) has a type of its own.
+            if (event.type === "session_started"
+                && (!event.sessionType || event.sessionType === "chat")) addNewRow(event.sessionId);
             return;
         }
         switch (event.type) {
