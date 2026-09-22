@@ -28,6 +28,9 @@
         <springdoc.version>2.8.17</springdoc.version>
         <!-- what spring-security-oauth2-jose of the Boot version pulls in; mc-agent-tools-virtual-env signs with it -->
         <nimbus-jose-jwt.version>9.37.4</nimbus-jose-jwt.version>
+        <!-- IMAP, POP3 and SMTP for mc-mail-imap, and a mail server to test it against. -->
+        <angus-mail.version>2.0.3</angus-mail.version>
+        <greenmail.version>2.1.3</greenmail.version>
     </properties>
 
     <dependencyManagement>
@@ -36,6 +39,17 @@
                 <groupId>com.nimbusds</groupId>
                 <artifactId>nimbus-jose-jwt</artifactId>
                 <version>${nimbus-jose-jwt.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.angus</groupId>
+                <artifactId>angus-mail</artifactId>
+                <version>${angus-mail.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.icegreen</groupId>
+                <artifactId>greenmail-junit5</artifactId>
+                <version>${greenmail.version}</version>
+                <scope>test</scope>
             </dependency>
             <!-- Internal modules -->
             <dependency>

@@ -133,6 +133,11 @@
         <module>agents/core/mc-agent-tools-virtual-env</module>
         <module>agents/core/mc-agent-tools-document</module>
         <module>agents/core/mc-agent-tools-web</module>
+
+        <!-- Office: one port per kind of thing, one module per provider. -->
+        <module>agents/office/mc-mail-core</module>
+        <module>agents/office/mc-mail-imap</module>
+        <module>agents/office/mc-agent-tools-mail</module>
         <module>agents/core/mc-agent-tools-web-browser</module>
         <module>agents/core/mc-agent-tools-workflow</module>
         <module>agents/core/mc-agent-registry-core</module>

@@ -97,6 +97,12 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-agent-tools-virtual-env`: binds those tools to a virtual environment server over its REST API
       (workspace per chat, commands in its container, calls signed per user) when
       `mindconnect.virtual-env.client.url` is set; the server itself is not part of this repo
+    - `office/mc-mail-core`, `office/mc-mail-imap`, `office/mc-agent-tools-mail`:
+      a person's mail. `MailStore` is the port and `MailProvider` the seam a kind
+      of mailbox plugs into (ServiceLoader); IMAP is one, and a distribution that
+      adds Outlook or Gmail adds a provider, not a tool. The tools name a mailbox
+      `provider.key` or `all`, and every change (`mail_send`, `mail_delete`) is a
+      tool of its own so a binding can make it ask for approval
     - `mc-agent-registry-core` / `mc-agent-registry`: importing from a registry — a GitHub
       project with an index of LLM configs, agents, workflows and packages — ports + import
       service / GitHub client, file-backed source store, installers. An installer is
