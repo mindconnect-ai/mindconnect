@@ -126,6 +126,25 @@ public final class ImapMailStore implements MailStore {
         }
     }
 
+    /** One connection for the lot: opening one per message is what made a filtered list crawl. */
+    @Override
+    public List<MailMessage> read(String folderId, List<String> messageIds) {
+        if (messageIds == null || messageIds.isEmpty()) return List.of();
+        try (Mailbox mailbox = Mailbox.open(account, folderId, false)) {
+            List<MailMessage> found = new ArrayList<>();
+            for (String id : messageIds) {
+                try {
+                    found.add(mailbox.read(id, MAX_BODY_CHARS));
+                } catch (MailAccessException e) {
+                    // Gone since it was listed; the others still answer.
+                }
+            }
+            return found;
+        } catch (MailAccessException | MailConfigurationException e) {
+            throw new MailStoreException(e.getMessage(), e);
+        }
+    }
+
     @Override
     public MailBody body(String folderId, String messageId) {
         try (Mailbox mailbox = Mailbox.open(account, folderId, false)) {

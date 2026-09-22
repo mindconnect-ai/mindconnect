@@ -44,7 +44,9 @@ public class CalendarAccounts {
                 known.putIfAbsent(provider.provider(), provider);
             }
         }
-        this.providers = Map.copyOf(known);
+        // The order they were registered in is the order a user's accounts are
+        // listed in; Map.copyOf would shuffle it.
+        this.providers = java.util.Collections.unmodifiableMap(known);
     }
 
     /** The provider names that are calendars here. */

@@ -50,6 +50,27 @@ public interface MailStore extends AutoCloseable {
      */
     MailPage list(String folderId, int skip, int limit, MailQuery query);
 
+    /**
+     * Several messages of one folder, in the order asked for; one that is no
+     * longer there is left out rather than failing the rest.
+     *
+     * <p>The default reads them one after the other, which is right for a
+     * provider that answers each over its own request. A store whose
+     * connection is expensive to open — IMAP — opens the folder once instead,
+     * which is the difference between a second and a minute for fifty.
+     */
+    default List<MailMessage> read(String folderId, List<String> messageIds) {
+        List<MailMessage> found = new java.util.ArrayList<>();
+        for (String id : messageIds) {
+            try {
+                found.add(read(folderId, id));
+            } catch (MailStoreException e) {
+                // Gone since it was listed; the others still answer.
+            }
+        }
+        return found;
+    }
+
     /** One message in full: headers, text, and the names of its attachments. */
     MailMessage read(String folderId, String messageId);
 
