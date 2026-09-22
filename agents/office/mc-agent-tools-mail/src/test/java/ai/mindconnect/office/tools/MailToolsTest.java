@@ -85,7 +85,31 @@ class MailToolsTest {
         assertThat(MailTools.folder(german, "inbox")).as("the store lists the inbox first").isEqualTo("P=");
         assertThat(MailTools.folder(folders, "archive")).isEqualTo("AAMz=");
         assertThat(MailTools.folder(folders, "AAMz=")).isEqualTo("AAMz=");
-        assertThatThrownBy(() -> MailTools.folder(folders, "Spam")).hasMessageContaining("mail_folders");
+    }
+
+    @Test
+    void a_folder_that_is_not_there_is_refused_with_the_ones_that_are() {
+        List<MailFolder> folders = List.of(MailFolder.of("AAMk=", "Inbox"), MailFolder.of("A=", "Archiv"),
+                MailFolder.of("Papierkorb", "Papierkorb"));
+
+        // Sending the caller to mail_folders for a list this very call is
+        // holding costs a round trip to learn what fits in the sentence.
+        assertThatThrownBy(() -> MailTools.folder(folders, "Spam"))
+                .hasMessageContaining("There is no folder \"Spam\"")
+                .hasMessageContaining("AAMk= (\"Inbox\")")
+                .hasMessageContaining("A= (\"Archiv\")")
+                // Id and name are the same word: saying it twice helps nobody.
+                .hasMessageContaining(", Papierkorb.")
+                .hasMessageNotContaining("mail_folders");
+
+        // A mailbox with hundreds of folders is not a listing in a refusal.
+        List<MailFolder> many = new java.util.ArrayList<>();
+        for (int i = 0; i < MailTools.MAX_FOLDERS_NAMED + 5; i++) many.add(MailFolder.of("f" + i, "f" + i));
+        assertThatThrownBy(() -> MailTools.folder(many, "Spam"))
+                .hasMessageContaining("and 5 more").hasMessageContaining("mail_folders lists them all");
+
+        assertThatThrownBy(() -> MailTools.folder(List.of(), "Spam"))
+                .hasMessageContaining("This mailbox names none");
     }
 
     @Test

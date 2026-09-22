@@ -275,8 +275,7 @@ final class MailTools {
                         List<MailFolder> folders = store.folders();
                         String from = folder(folders, str(args, "folder"));
                         String to = named(folders, required(args, "to"))
-                                .orElseThrow(() -> new Refused("There is no folder \"" + str(args, "to") + "\" in "
-                                        + box.id() + "."));
+                                .orElseThrow(() -> new Refused(noSuchFolder(folders, str(args, "to"))));
                         store.move(from, ids, to);
                         return ids.size() + (ids.size() == 1 ? " message" : " messages") + " moved to " + to + ".";
                     }
@@ -380,9 +379,37 @@ final class MailTools {
         // "inbox" is the inbox in every language — Outlook calls it
         // "Posteingang" in a German mailbox.
         if (named == null || "inbox".equalsIgnoreCase(named)) return inbox(folders);
-        return named(folders, named).orElseThrow(() -> new Refused("There is no folder \"" + named
-                + "\". " + FOLDERS + " lists them."));
+        return named(folders, named).orElseThrow(() -> new Refused(noSuchFolder(folders, named)));
     }
+
+    /**
+     * What to say about a folder that is not there — with the folders that
+     * are. Sending the caller off to another tool for a list this method is
+     * holding costs a round trip to learn what could have been in the
+     * sentence.
+     */
+    static String noSuchFolder(List<MailFolder> folders, String named) {
+        StringBuilder out = new StringBuilder("There is no folder \"").append(named).append("\". ");
+        if (folders.isEmpty()) return out.append("This mailbox names none.").toString();
+        out.append(folders.size() == 1 ? "The one there is: " : "The ones there are: ");
+        List<String> names = new ArrayList<>();
+        for (MailFolder folder : folders) {
+            // The id is what a tool takes; the name is what the person sees,
+            // and it is worth saying only when it differs.
+            names.add(folder.name().equals(folder.id()) ? folder.id()
+                    : folder.id() + " (\"" + folder.name() + "\")");
+            if (names.size() >= MAX_FOLDERS_NAMED) break;
+        }
+        out.append(String.join(", ", names));
+        if (folders.size() > names.size()) {
+            out.append(" and ").append(folders.size() - names.size()).append(" more — ")
+                    .append(FOLDERS).append(" lists them all");
+        }
+        return out.append('.').toString();
+    }
+
+    /** A mailbox can have hundreds; a refusal is a sentence, not a listing. */
+    static final int MAX_FOLDERS_NAMED = 30;
 
     static Optional<String> named(List<MailFolder> folders, String named) {
         for (MailFolder f : folders) if (f.id().equals(named)) return Optional.of(f.id());
