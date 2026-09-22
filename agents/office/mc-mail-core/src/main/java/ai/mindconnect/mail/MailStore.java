@@ -71,6 +71,22 @@ public interface MailStore extends AutoCloseable {
         return found;
     }
 
+    /**
+     * The same messages as {@link #read(String, List)}, but only as far as a
+     * <em>listing</em> needs them: sender, subject, date and the read flag —
+     * what {@link #list} puts in a row.
+     *
+     * <p>Worth its own method because reading a message means fetching its
+     * body, and a body is where the bytes are: a mail with a picture in it is
+     * a megabyte, and a list of twenty is twenty megabytes for twenty lines of
+     * text that the reader never sees. IMAP asks for all the envelopes in one
+     * command; the default here still reads them, which is honest for a
+     * provider that has nothing cheaper.
+     */
+    default List<MailMessage> summaries(String folderId, List<String> messageIds) {
+        return read(folderId, messageIds);
+    }
+
     /** One message in full: headers, text, and the names of its attachments. */
     MailMessage read(String folderId, String messageId);
 

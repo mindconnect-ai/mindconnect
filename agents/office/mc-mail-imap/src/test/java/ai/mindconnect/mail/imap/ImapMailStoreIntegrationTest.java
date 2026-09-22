@@ -306,6 +306,30 @@ class ImapMailStoreIntegrationTest {
     }
 
     @Test
+    void a_list_of_ids_comes_back_as_rows_without_pulling_the_bodies() {
+        for (int i = 1; i <= 3; i++) deliver("Message " + i, "body " + i);
+
+        try (MailStore store = accounts.open(ALICE, "email.privat")) {
+            List<String> ids = new java.util.ArrayList<>(store.list("INBOX", 0, 10, false, null).messages()
+                    .stream().map(MailMessage::id).toList());
+            // One id that names nothing: the others must still answer.
+            ids.add("99999");
+
+            List<MailMessage> rows = store.summaries("INBOX", ids);
+
+            assertThat(rows).hasSize(3)
+                    .extracting(MailMessage::subject)
+                    .containsExactlyInAnyOrder("Message 1", "Message 2", "Message 3");
+            assertThat(rows).allSatisfy(row -> {
+                assertThat(row.from()).contains("bob@example.com");
+                assertThat(row.receivedAt()).isNotNull();
+                // What makes it cheap: a row carries no body.
+                assertThat(row.body()).isNull();
+            });
+        }
+    }
+
+    @Test
     void moving_takes_a_message_out_of_one_folder_and_puts_it_in_another() throws Exception {
         deliver("Invoice 4711", "due on Friday");
         MAIL.getManagers().getImapHostManager()

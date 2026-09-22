@@ -308,6 +308,51 @@ public final class Mailbox implements AutoCloseable {
         }
     }
 
+    /**
+     * The named messages as a listing shows them — envelopes and flags, no
+     * bodies — in one FETCH.
+     *
+     * <p>UIDs are how IMAP addresses a set: {@code UID FETCH 12,17,23
+     * (ENVELOPE FLAGS)} is one command for the lot, where reading them means
+     * pulling every body over the wire. Ids that name nothing any more are
+     * left out, the same as {@link #read} on a message that has gone.
+     */
+    public List<MailMessage> summaries(List<String> ids) {
+        try {
+            List<Message> found = new ArrayList<>(ids.size());
+            if (!account.isPop3() && folder instanceof UIDFolder uids) {
+                long[] wanted = new long[ids.size()];
+                int at = 0;
+                for (String id : ids) {
+                    try {
+                        wanted[at++] = Long.parseLong(id.strip());
+                    } catch (NumberFormatException e) {
+                        at--; // Not an id at all; the rest still answer.
+                    }
+                }
+                for (Message message : uids.getMessagesByUID(Arrays.copyOf(wanted, at))) {
+                    if (message != null && !message.isExpunged()) found.add(message);
+                }
+            } else {
+                for (String id : ids) {
+                    try {
+                        found.add(find(id));
+                    } catch (MailAccessException e) {
+                        // Gone since it was listed.
+                    }
+                }
+            }
+            prefetch(found);
+            List<MailMessage> out = new ArrayList<>(found.size());
+            for (Message message : found) {
+                out.add(summary(message));
+            }
+            return out;
+        } catch (MessagingException e) {
+            throw new MailAccessException(explain(account, e), e);
+        }
+    }
+
     /** One message with its text. */
     public MailMessage read(String id, int maxChars) {
         Message message = find(id);

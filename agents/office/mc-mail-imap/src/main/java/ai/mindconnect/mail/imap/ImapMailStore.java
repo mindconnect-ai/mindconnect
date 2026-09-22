@@ -145,6 +145,17 @@ public final class ImapMailStore implements MailStore {
         }
     }
 
+    /** One FETCH for all the envelopes — a listing never needed the bodies. */
+    @Override
+    public List<MailMessage> summaries(String folderId, List<String> messageIds) {
+        if (messageIds == null || messageIds.isEmpty()) return List.of();
+        try (Mailbox mailbox = Mailbox.open(account, folderId, false)) {
+            return mailbox.summaries(messageIds);
+        } catch (MailAccessException | MailConfigurationException e) {
+            throw new MailStoreException(e.getMessage(), e);
+        }
+    }
+
     @Override
     public MailBody body(String folderId, String messageId) {
         try (Mailbox mailbox = Mailbox.open(account, folderId, false)) {
