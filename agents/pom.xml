@@ -83,6 +83,9 @@
         <module>office/mc-mail-core</module>
         <module>office/mc-mail-imap</module>
         <module>office/mc-agent-tools-mail</module>
+        <module>office/mc-calendar-core</module>
+        <module>office/mc-calendar-caldav</module>
+        <module>office/mc-agent-tools-calendar</module>
         <module>core/mc-agent-tools-web-browser</module>
         <module>core/mc-agent-tools-workflow</module>
         <module>core/mc-agent-registry-core</module>

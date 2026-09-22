@@ -60,6 +60,9 @@ the finished report:
 | `mc-mail-core` | `MailStore`: folders, paging, search, reading, organising, sending — and `MailProvider`, the seam a kind of mailbox plugs into |
 | `mc-mail-imap` | IMAP, POP3 and SMTP: the Mailbox card a user fills in, its Test button, and the provider that opens it |
 | `mc-agent-tools-mail` | The mail tools (`mail_list`, `mail_read`, `mail_send` …) over every mailbox a user connected, named `provider.key` or `all` |
+| `mc-calendar-core` | `CalendarStore`: the calendars, a period of appointments, creating, changing, deleting — and `CalendarProvider` |
+| `mc-calendar-caldav` | CalDAV: the card, its Test button, and enough iCalendar to read and write an appointment |
+| `mc-agent-tools-calendar` | The calendar tools (`calendar_events`, `calendar_create` …) over every calendar account, named `provider.key` or `all` |
 
 ### `mcp/` — Model Context Protocol servers as tools
 

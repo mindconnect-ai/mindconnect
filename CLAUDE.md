@@ -103,6 +103,11 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       adds Outlook or Gmail adds a provider, not a tool. The tools name a mailbox
       `provider.key` or `all`, and every change (`mail_send`, `mail_delete`) is a
       tool of its own so a binding can make it ask for approval
+    - `office/mc-calendar-core`, `office/mc-calendar-caldav`,
+      `office/mc-agent-tools-calendar`: the same shape for a person's calendar.
+      `CalendarProvider` is the seam, CalDAV the open kind (its own card, its
+      Test button, a small iCalendar reader/writer), and the tools name an
+      account `provider.key` or `all`
     - `mc-agent-registry-core` / `mc-agent-registry`: importing from a registry — a GitHub
       project with an index of LLM configs, agents, workflows and packages — ports + import
       service / GitHub client, file-backed source store, installers. An installer is
