@@ -11,8 +11,8 @@ id-addressed file storage for uploads:
 
 | Module | What it is |
 |--------|------------|
-| `mc-vector-store` | The SPI (`VectorStore`, `VectorStoreBackend`, `VectorChunk`) plus the built-in `memory` backend. |
-| `mc-vector-store-pgvector` | A Postgres/pgvector backend — plain JDBC, no pool dependency. |
+| `mc-vector-store` | The SPI (`VectorStore`, `VectorStoreBackend`, `VectorChunk`) plus the built-in `memory` backend, and the `EmbeddingIndex` port with its heap implementation. |
+| `mc-vector-store-pgvector` | A Postgres/pgvector backend — plain JDBC, no pool dependency — and `PgEmbeddingIndex`. |
 | `mc-vector-store-tools` | The `knowledge` tool group (`vector_upsert`, `vector_search`, `vector_delete_file`, `vector_ingest_file`) plus templates & registry. |
 | `mc-file-store` | Id-addressed file storage (OpenAI-Files-API style): save bytes once, read by id — with a `filesystem` backend built in. |
 
@@ -53,6 +53,43 @@ fly. The host's `mindconnect.vector-store.*` properties form the built-in
 `default` template, so everything works before anyone defines templates —
 manage them in the Admin UI's **Vector Stores** section (templates, stores,
 file upload, semantic search).
+
+## The embedding index
+
+Next to the named stores there is one **`EmbeddingIndex`** for everything with
+text — files, mail, calendar events, todos, drive items. Entries are keyed by
+an `EntityRef(type, source, container, id)` and the embedding model, with the
+owner and a version beside them, so an entity is embedded once per model and
+only again when its version changes:
+
+```java
+EntityRef mail = new EntityRef("mail", "email.freemail", "INBOX", "1712345678-42");
+index.replace(mail, alice, etag, "nomic", chunks);        // atomic, serialised per entity
+index.relocate(mail, mail.movedTo("Archive", "1712345699-7"));   // moved, not re-embedded
+```
+
+The index knows no data pools, sessions or permissions. A search either names
+its entities — a pool's or a chat session's files, as a list the caller has
+already authorised — or narrows down by type, owner, source and container, and
+must then say whose entries it means:
+
+```java
+index.search(EmbeddingQuery.of("nomic", sessionFiles), vector, 10);
+index.search(EmbeddingQuery.ofTypes("nomic", "mail").owner(alice).in("email.freemail", "INBOX"), vector, 10);
+index.search(EmbeddingQuery.ofTypes("nomic", "mail", "calendar-event", "file").ownerOrShared(alice), vector, 10);
+```
+
+Every search **filters first and ranks second**: only the selected entries are
+compared with the query vector, exactly. Filtering after a global
+nearest-neighbour search — what an HNSW index invites — returns too few hits,
+or none, when the selection is a small part of the table.
+
+`PgEmbeddingIndex` keeps every namespace's entries in the one table
+`mc_embedding` (created on first use; needs PostgreSQL 12+ with `vector`). The
+selection runs in a `MATERIALIZED` CTE over the primary key (by ref) or the
+owner index (by attributes); there is deliberately no HNSW index. That is
+cheap up to some tens of thousands of chunks per search. `MemoryEmbeddingIndex`
+does the same on the heap, without persistence.
 
 ## Embeddings
 
