@@ -112,50 +112,68 @@ final class MailListTools {
                 "account", string("The account mail_list gave for it (provider.key); the open one when omitted.")),
                 "id");
         return new OfficeTool(ADD,
-                "Put messages aside for the list on the user's screen. Call it after every page of mail_list, "
+                "Put messages into the list on the user's screen. Call it after every page of mail_list, "
                         + "with the messages of that page that belong to what was asked — you do not have to "
-                        + "remember them afterwards, and they are not shown yet. Pass each message as mail_list "
-                        + "gave it: its id, and its folder and account. Adding one twice is harmless. At most "
-                        + AgentView.MAX + " are kept.",
-                object(props("messages", Map.of("type", "array", "items", message,
-                        "description", "The messages of this page that belong in the list.")), "messages"),
+                        + "remember them afterwards. The list is on the screen from the first call on and grows "
+                        + "with every one. Pass each message as mail_list gave it: its id, and its folder and "
+                        + "account. Adding one twice is harmless. At most " + AgentView.MAX + " are kept.",
+                object(props(
+                        "messages", Map.of("type", "array", "items", message,
+                                "description", "The messages of this page that belong in the list."),
+                        "title", string("What the list is, in a few words in the user's language — "
+                                + "\"Advertising in INBOX\". Pass it with the first call; later calls may leave it out.")),
+                        "messages"),
                 args -> {
                     List<MailMessage.Ref> refs = refs(args, user, accounts);
                     if (refs.isEmpty()) throw new OfficeTool.Refused("Name at least one message, as mail_list gave it.");
                     AgentView list = listOf(user, sessionId);
                     boolean wasFull = list.full();
                     AgentView now = list.add(refs);
+                    String title = str(args, "title");
+                    if (title != null) now = now.titled(title);
                     views.save(now);
+                    // Shown at once: a list that exists only after a second
+                    // call is a list the person does not see when the model
+                    // forgets the second call — and it did, often.
+                    current.current(user, now.id());
+                    String head = now.size() + " in the list on the user's screen now";
                     if (wasFull || now.full()) {
-                        return now.size() + " in the list — that is the most it holds. Stop searching and call "
-                                + SHOW + ", or narrow down what you are looking for.";
+                        return head + " — that is the most it holds. Stop searching, or narrow down what you are "
+                                + "looking for.\n" + VIEW_MARK + now.id().value() + ")";
                     }
-                    return now.size() + " in the list now. Nothing is on the screen yet: keep going, and call " + SHOW
-                            + " as soon as you have them all — an answer without it shows nobody anything.";
+                    return head + ". Keep going with the next page; you need not call " + SHOW + " for it.\n"
+                            + VIEW_MARK + now.id().value() + ")";
                 });
     }
 
     private Tool remove(UserId user, String sessionId) {
         return new OfficeTool(REMOVE,
                 "Take messages out of the list again — \"all the advertising except the two newsletters I "
-                        + "read\". Name their ids. An id that is not in the list is quietly ignored.",
+                        + "read\". Name their ids; the list on the screen follows at once.",
                 object(props("ids", strings("The message ids to take out.")), "ids"),
                 args -> {
                     List<String> ids = OfficeTool.list(args, "ids");
                     if (ids.isEmpty()) throw new OfficeTool.Refused("Name at least one id to take out.");
                     AgentView list = listOf(user, sessionId);
                     Set<String> rows = rowsOf(list, ids);
+                    if (rows.isEmpty()) {
+                        throw new OfficeTool.Refused("None of those is in the list. Name the ids the list holds — "
+                                + CURRENT + " shows them — and say so when the person named a message that is not in it.");
+                    }
                     AgentView now = (AgentView) list.without(rows);
                     views.save(now);
-                    return (list.size() - now.size()) + " taken out, " + now.size() + " left in the list.";
+                    current.current(user, now.id());
+                    return (list.size() - now.size()) + " taken out, " + now.size() + " left in the list on the "
+                            + "user's screen.\n" + VIEW_MARK + now.id().value() + ")";
                 });
     }
 
     private Tool show(UserId user, String sessionId) {
         return new OfficeTool(SHOW,
-                "Show a list in the mail list on the user's screen, instead of the folder they are looking at "
-                        + "— this is what makes \"show me …\", \"filter …\", \"which mails …\" actually happen. "
-                        + "Without \"list\" it shows what you gathered with " + ADD + ", as you gathered it; with "
+                "Show a list in the mail list on the user's screen, instead of the folder they are looking at. "
+                        + "What you gather with " + ADD + " is shown already; call this to rename it, to show it "
+                        + "again after the person went back to the folder, or to show another list. Without "
+                        + "\"list\" it shows what you gathered, as you gathered it; with "
                         + "\"list\" any list by its id — a folder's (\"f/email.freemail/Archiv\"), \"all\", or a "
                         + "saved one. The title says what the list is now, in the user's language: \"Invoices "
                         + "from Swisscom\", \"Unanswered since Monday\". The user can go back with one click; "
