@@ -1,0 +1,25 @@
+{
+  "id": "test-extension",
+  "name": "Test Extension",
+  "version": "1.2.3",
+  "description": "A manifest the loader test reads from the test classpath.",
+  "vendor": { "id": "mindconnect", "name": "Mindconnect", "homepage": "https://mindconnect.ai" },
+  "runtime": "jar",
+  "requires": { "mindconnect": ">=0.8", "extensions": [ { "id": "mc-mail", "optional": true } ] },
+  "enabledByDefault": true,
+  "permissions": [ "tools:call" ],
+  "contributes": {
+    "tools": { "providers": [ "ai.mindconnect.extension.adapter.classpath.ClasspathAuditTest$DeclaredTools" ],
+               "names": [ "test_*" ] },
+    "content": { "agents": [ "test-agent" ] },
+    "ui": {
+      "menu": [ { "id": "nav-test", "label": "Test", "href": "/admin/test", "icon": "flask", "group": "nav-group-tools" } ],
+      "routes": [ { "path": "/admin/test/**", "roles": [ "ADMIN" ] } ],
+      "assets": [ "test.css" ]
+    },
+    "rest": [ "/admin/api/test/**" ],
+    "persistence": { "schema": "ext_test" },
+    "somethingFromTheFuture": { "ignored": true }
+  },
+  "unknownTopLevel": 42
+}

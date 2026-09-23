@@ -14,6 +14,7 @@ import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.adminui.ui.component.NotificationsComponent;
+import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.user.service.NotificationService;
@@ -27,8 +28,10 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Builds a per-request {@link AdminLayout} from the current security context.
@@ -71,6 +74,12 @@ public class AdminLayoutFactory {
     private final ObjectProvider<NotificationService> notifications;
     /** The sidebar entries modules bring along; see {@link AdminMenuContribution}. */
     private final ObjectProvider<AdminMenuContribution> contributions;
+    /**
+     * Present when this host knows its extensions — then an entry a switched-off
+     * extension declared under {@code contributes.ui.menu} is left out for the
+     * namespace that switched it off.
+     */
+    private final ObjectProvider<ExtensionService> extensions;
 
     @Autowired
     public AdminLayoutFactory(@Value("${mindconnect.auth.enabled:false}") boolean authEnabled,
@@ -83,8 +92,10 @@ public class AdminLayoutFactory {
                               BrandingProperties branding,
                               ObjectProvider<HostNamespaces> hostNamespaces,
                               ObjectProvider<NotificationService> notifications,
-                              ObjectProvider<AdminMenuContribution> contributions) {
+                              ObjectProvider<AdminMenuContribution> contributions,
+                              ObjectProvider<ExtensionService> extensions) {
         this.contributions = contributions;
+        this.extensions = extensions;
         this.notifications = notifications;
         this.branding = branding;
         this.hostNamespaces = hostNamespaces;
@@ -104,7 +115,7 @@ public class AdminLayoutFactory {
                               ObjectProvider<McpRegistryAdmin> mcpRegistryAdmin,
                               ObjectProvider<RegistryService> registryService) {
         this(authEnabled, buildInfo, taskMonitor, mcpRegistryAdmin, registryService, none(), none(),
-                new BrandingProperties(), none(), none(), none());
+                new BrandingProperties(), none(), none(), none(), none());
     }
 
     /**
@@ -122,12 +133,75 @@ public class AdminLayoutFactory {
         layout.brand(currentBrand());
         boolean admin = shapesCurrentNamespace();
         layout.chatOnly(!admin);
-        layout.contributions(contributions.orderedStream()
+        ExtensionService known = extensions.getIfAvailable();
+        layout.contributions(visible(distinct(contributions.orderedStream()
                 .flatMap(contribution -> contribution.entries(admin).stream())
-                .toList());
+                .toList()), known == null ? id -> false : known::hidesMenuEntry));
         notificationBell().ifPresent(layout::notifications);
         namespaceSwitch().ifPresent(layout::namespaces);
         return layout;
+    }
+
+    /**
+     * The contributed entries with every id once: a module's own bean comes
+     * first (contributions are ordered, the manifest's last), so an entry a
+     * manifest describes <em>and</em> a bean registers is the bean's. A group
+     * keeps its first occurrence's label; later occurrences only add members.
+     */
+    static List<AdminMenuContribution.Entry> distinct(List<AdminMenuContribution.Entry> entries) {
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        java.util.Map<String, List<AdminMenuContribution.Entry>> groupMembers = new java.util.LinkedHashMap<>();
+        java.util.Map<String, AdminMenuContribution.Entry> groups = new java.util.LinkedHashMap<>();
+        List<Object> order = new ArrayList<>();   // links, and group ids, in first-seen order
+        for (AdminMenuContribution.Entry entry : entries) {
+            if (!entry.isGroup()) {
+                if (seen.add(entry.id())) order.add(entry);
+                continue;
+            }
+            if (!groups.containsKey(entry.id())) {
+                groups.put(entry.id(), entry);
+                order.add(entry.id());
+            }
+            List<AdminMenuContribution.Entry> members = groupMembers.computeIfAbsent(entry.id(), id -> new ArrayList<>());
+            for (AdminMenuContribution.Entry child : entry.children()) {
+                if (seen.add(child.id())) members.add(child);
+            }
+        }
+        List<AdminMenuContribution.Entry> kept = new ArrayList<>();
+        for (Object item : order) {
+            if (item instanceof AdminMenuContribution.Entry link) {
+                kept.add(link);
+            } else {
+                AdminMenuContribution.Entry group = groups.get((String) item);
+                List<AdminMenuContribution.Entry> members = groupMembers.get(group.id());
+                if (!members.isEmpty()) {
+                    kept.add(new AdminMenuContribution.Entry(group.id(), group.label(), null, group.icon(), members));
+                }
+            }
+        }
+        return kept;
+    }
+
+    /**
+     * The contributed entries without those a switched-off extension declared:
+     * a link whose id is hidden goes, a group loses such children and goes
+     * itself once it has none left.
+     */
+    static List<AdminMenuContribution.Entry> visible(List<AdminMenuContribution.Entry> entries, Predicate<String> hidden) {
+        List<AdminMenuContribution.Entry> kept = new ArrayList<>();
+        for (AdminMenuContribution.Entry entry : entries) {
+            if (hidden.test(entry.id())) continue;
+            if (!entry.isGroup()) {
+                kept.add(entry);
+                continue;
+            }
+            List<AdminMenuContribution.Entry> children = entry.children().stream()
+                    .filter(child -> !hidden.test(child.id())).toList();
+            if (!children.isEmpty()) {
+                kept.add(new AdminMenuContribution.Entry(entry.id(), entry.label(), null, entry.icon(), children));
+            }
+        }
+        return kept;
     }
 
     /**

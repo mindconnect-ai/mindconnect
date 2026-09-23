@@ -45,6 +45,7 @@
         <module>builder/mc-agent-runtime-feature-subagents</module>
         <module>builder/mc-agent-runtime-builder</module>
         <module>demo/mc-agent-simple-demo</module>
+        <module>demo/mc-extension-demo</module>
 
         <module>core/mc-agent-protocol</module>
         <module>core/mc-agent-protocol-openai</module>
@@ -62,6 +63,9 @@
         <module>core/mc-namespace-core</module>
         <module>core/mc-namespace</module>
         <module>adapter/postgres/mc-namespace-pg</module>
+        <module>core/mc-extension-core</module>
+        <module>adapter/postgres/mc-extension-pg</module>
+        <module>core/mc-extension</module>
         <module>springstarter/mc-agent-starter-file</module>
         <module>springstarter/mc-agent-starter-postgres</module>
         <module>springstarter/mc-agent-starter-namespace</module>
