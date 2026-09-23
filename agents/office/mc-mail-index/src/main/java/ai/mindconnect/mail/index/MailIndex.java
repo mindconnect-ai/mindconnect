@@ -98,7 +98,10 @@ public final class MailIndex {
     public FolderWindow window(UserId user, MailStore mail, Location at, boolean force) {
         FolderWindow current = store.load(user, at).orElse(null);
         Instant now = clock.instant();
-        if (current == null) {
+        // None yet, or one that deletes have thinned below what the folder
+        // still holds: filled whole. A window of 258 over a folder of 828
+        // would answer "searched the newest 258" for no reason.
+        if (current == null || current.counted() && current.size() < Math.min(window, current.total()) - PAGE) {
             FolderWindow filled = fill(mail, at, now);
             store.save(user, filled);
             return filled;

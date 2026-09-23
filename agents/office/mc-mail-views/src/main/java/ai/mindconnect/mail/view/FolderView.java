@@ -147,8 +147,17 @@ public final class FolderView implements MailListView {
             String name = folderId;
             boolean organises = true;
             try (MailStore store = accounts.open(user, account)) {
-                for (MailFolder folder : store.folders()) {
-                    if (folder.id().equals(folderId)) { name = folder.name(); break; }
+                List<MailFolder> folders = store.folders();
+                boolean found = false;
+                for (MailFolder folder : folders) {
+                    if (folder.id().equals(folderId)) { name = folder.name(); found = true; break; }
+                }
+                // "INBOX" is how a screen names an account's inbox before it
+                // knows the account; to Graph the inbox has an id of its own.
+                // Every store lists its inbox first.
+                if (!found && "inbox".equalsIgnoreCase(folderId) && !folders.isEmpty()) {
+                    folderId = folders.get(0).id();
+                    name = folders.get(0).name();
                 }
                 organises = store.canOrganise();
             }
