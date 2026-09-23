@@ -390,6 +390,7 @@ public final class AdminLayout {
             install.child(navItem("nav-registry", "Registry", "/registry", "package", navigate));
         }
         install.child(navItem("nav-migrations", "Migrations", "/admin/migrations", "refresh", navigate));
+        install.child(navItem("nav-extensions", "Extensions", "/admin/extensions", "package", navigate));
         return openWhenSelected(install);
     }
 

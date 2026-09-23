@@ -308,6 +308,7 @@ The navigation has eight top-level entries:
 | **Workflows** | The embedded workflow admin UI (`mc-workflow-admin-rest`): edit, save and run workflows. |
 | **[Vector Stores](./vector-stores.md)** | Manage vector-store templates and stores, upload files, run semantic searches. |
 | **[Migrations](./migrations.md)** | Review and apply changes to the bundled seed data (agents, LLM configs, workflows). |
+| **[Extensions](./extensions.md)** | What the jars on the classpath declare they bring, and the switch per namespace. |
 | **API** | Embedded Swagger UI for the REST API under `/api/**`. |
 
 ## The task manager

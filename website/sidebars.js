@@ -22,6 +22,7 @@ const sidebars = {
             'agents/admin-ui/skills',
             'agents/admin-ui/vector-stores',
             'agents/admin-ui/migrations',
+            'agents/admin-ui/extensions',
           ],
         },
         'agents/cli',
