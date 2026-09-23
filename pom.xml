@@ -61,6 +61,7 @@
         <module>agents/builder/mc-agent-runtime-feature-subagents</module>
         <module>agents/builder/mc-agent-runtime-builder</module>
         <module>agents/demo/mc-agent-simple-demo</module>
+        <module>agents/demo/mc-extension-demo</module>
         <module>common/mc-pathaccessor</module>
         <module>common/mc-script-mini</module>
         <module>common/mc-file-manager</module>
@@ -114,6 +115,9 @@
         <module>agents/core/mc-namespace-core</module>
         <module>agents/core/mc-namespace</module>
         <module>agents/adapter/postgres/mc-namespace-pg</module>
+        <module>agents/core/mc-extension-core</module>
+        <module>agents/adapter/postgres/mc-extension-pg</module>
+        <module>agents/core/mc-extension</module>
         <module>agents/springstarter/mc-agent-starter-file</module>
         <module>agents/springstarter/mc-agent-starter-postgres</module>
         <module>agents/springstarter/mc-agent-starter-namespace</module>
@@ -137,6 +141,8 @@
         <!-- Office: one port per kind of thing, one module per provider. -->
         <module>agents/office/mc-mail-core</module>
         <module>agents/office/mc-mail-imap</module>
+        <module>agents/office/mc-mail-views</module>
+        <module>agents/office/mc-mail-index</module>
         <module>agents/office/mc-agent-tools-mail</module>
         <module>agents/office/mc-calendar-core</module>
         <module>agents/office/mc-calendar-caldav</module>
