@@ -23,7 +23,704 @@ never conflict here.
 [keepachangelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
 
-## [Unreleased]
+## [0.8.3] - 2026-09-23
+
+### Added
+
+- **agents:** **a module can add its screen to the admin UI's sidebar.** A jar on
+  the classpath that serves a page of its own had no way into the navigation —
+  the menu was a fixed list, so the page was reachable by URL only. It now
+  registers an `AdminMenuContribution` bean and says which entries to show,
+  for an admin of the namespace and for a plain user of it separately, so a
+  contribution never offers a viewer a route the server would refuse. An entry
+  is a link or a group of links, like Install; groups with one id from several
+  modules become one. The entries follow the shipped sections, before the
+  Install group.
+- **agents:** **a module on the classpath ships its own agents, skills and workflows.** The
+  seeds were read from the app's own jar only: `initial-data/` in a second jar
+  was never scanned, so a module that brings an agent had to install it by
+  hand. The loaders — and the Migrations screen — now look through every jar
+  on the classpath, so a module's `initial-data/agent-definitions/*.json`,
+  `skills/*.md` and `workflows/*.json` are seeded and migrated exactly like the
+  bundled ones.
+- **agents:** **a turn that waits for an approval can say so.** A tool marked
+  `needsApproval` used to leave the caller waiting for the final answer until
+  somebody answered the card elsewhere. `AgentRuntime.send(…)` returns as soon
+  as a call waits, with a `TurnResult` that is `INCOMPLETE` and lists the open
+  questions; `approve(…)` and `deny(…)` continue the same turn and return its
+  answer or the next question. Underneath, `ChatTurnHandle.outcome()` completes
+  at the question, and `AgentChatService.sendChat`, `approve` and `deny` are the
+  non-blocking forms. Over REST the chat stream ends a waiting stretch with an
+  `incomplete` frame, and `POST /api/sessions/{id}/approvals/{callId}/continue`
+  answers and streams the turn on. The runtime protocol backend ends such a
+  response `INCOMPLETE(WAITING_FOR_APPROVAL)` with an `ApprovalRequest` item,
+  and an `ApprovalResponse` as the next input continues the turn.
+- **agents:** **the Admin UI can carry your own name, mark and stylesheet.**
+  `mindconnect.branding.*` sets the heading in the header, the logo beside it
+  and where it leads, the browser tab's title and icon, the look the shell
+  opens in, and any number of stylesheets that are linked after the shipped
+  ones so their rules win. `assets-dir` serves a directory next to the running
+  app at `/branding/**`, so an installation brands itself by dropping files in
+  rather than by building its own image; the login page follows the same
+  settings. Unset, everything looks exactly as before — except the browser tab,
+  which now says "Mindconnect Agent Runtime" instead of "Agent Admin".
+  `switch` takes it one step further: named variants with a `url-pattern` each,
+  so one deployment behind two host names wears two brands, decided per request
+  rather than per process. `style-picker` says what the header's theme picker
+  may offer — every shipped theme, a named few, or none at all, and with none
+  the look is genuinely fixed. See
+  [Branding the app](https://mindconnect-ai.github.io/mindconnect/docs/agents/admin-ui/#branding-the-app).
+- **agents:** **the calendar is a port too, and CalDAV comes with it.**
+  `mc-calendar-core` has `CalendarStore` — the calendars, a period of
+  appointments, reading one, creating, changing and deleting — and the
+  `CalendarProvider` seam a kind of account plugs into. `mc-calendar-caldav`
+  brings CalDAV, which nearly every mail provider and every self-hosted
+  calendar speaks: a card with the CalDAV address, user and password, a Test
+  button that signs in and says which calendars it found, and as much
+  iCalendar as an appointment needs. `mc-agent-tools-calendar` brings
+  `calendar_calendars`, `calendar_events`, `calendar_read`, `calendar_create`,
+  `calendar_update` and `calendar_delete`, which name an account
+  `provider.key` (`caldav.web`) or ask `all` — one set of tools whatever kind
+  of calendar a user connected, and each change a tool of its own so a binding
+  can make it ask for approval.
+- **agents:** **`code_execute` runs python in an image with the office libraries.**
+  The default python image is now `ghcr.io/mindconnect-ai/code-exec-python`:
+  Python 3.12 with python-pptx, python-docx, openpyxl, matplotlib and pandas, and
+  the `mc_office` package whose `pptx_builder`, `docx_builder` and `xlsx_builder`
+  build a deck, a Word document or a workbook from a small spec. The office
+  skills used to carry those generators as text the model had to copy into every
+  call — tens of kilobytes that crowded a local model's context before the first
+  slide was written. The tool tells the model what the image carries. It is
+  published for amd64 and arm64; `mindconnect.code-exec.languages=python=python:3.12-slim`
+  goes back to the plain image.
+- **agents:** **a connection made by signing in is named after the account.** After
+  "Connect with Microsoft" the card said "Microsoft account", and with two of them
+  nobody could tell which was which — nor which mailbox a mail would leave from. The
+  connection is now tried out the moment it arrives, and when the source's test says
+  whose account it is, the connection takes that name: the address, as a rule. The
+  toast after signing in says what the test found. A `ConnectionTest` can carry the
+  `account` it saw; sources that do not say leave the card's name in place.
+- **agents:** **a connection can be tried out from the Connections page.** A
+  tool source that declares a `ConnectionSpec` may offer a `ConnectionTester`
+  (`connectionTester()` on `ToolFactory` and `MultiToolProvider`); the page
+  then shows a **Test** button on each of that provider's rows, runs the test
+  right after a connection is added or edited — while the person who typed
+  the password is still looking — and writes the verdict into the Status
+  column, so a wrong password reads "error — the server refused the account"
+  instead of every tool call failing the same way. An OAuth token is renewed
+  before the test, as it would be before a tool call. `ToolRegistry`
+  gained `connectionTesterOf(provider)`.
+- **agents:** **a jar on the classpath declares what it brings, and a namespace can switch it off.**
+  A module that ships tools, agents or a screen was loaded by whatever
+  `ServiceLoader` found, with no record of what it brought and no way to keep
+  it out of one namespace. It now carries a manifest,
+  `META-INF/mindconnect/extension.json` — id, vendor, version, and under
+  `contributes` its tools (as name patterns), agents, menu entries, routes,
+  decorated ports and more. The host reads every manifest at start and the
+  new **Extensions** screen (Install → Extensions) lists them; an admin
+  switches an extension off for the namespace at hand, and its tools leave
+  the catalogs and its sidebar entries the menu there. From a brand's own
+  namespace the decision can be taken for the whole brand, locked against
+  the namespaces' own say or not; `mindconnect.extensions.disabled` lets the
+  operator switch an extension off everywhere. Decisions are stored per
+  namespace (`system/extensions/` on files, `mc_extension_activation` in
+  Postgres) and per brand (`system/extension-brands/`,
+  `mc_extension_brand_activation`). Menu entries a manifest declares with a
+  label and href are rendered by the host, into a shipped group or a new
+  one; the routes it declares are sections of the admin UI — shell, layout
+  and a 404 where the extension is off — so a jar's own screen needs no
+  filter of its own; and beside every declared tool pattern and provider
+  class the screen says whether the classpath actually has it. A worked
+  example ships with the admin UI app, switched off: `mc-extension-demo`, a
+  short adventure with the LLM as game master — a dice tool, an agent, a
+  decorator around the trace store, a store of its own for scenarios, saved
+  games and rolls, and two screens; switch it on under Install → Extensions. Problems — two manifests with one id, an unreadable one, two
+  extensions replacing the same bean — and jars that bring providers without
+  a manifest are logged and shown; `mindconnect.extensions.strict=true`
+  refuses to start on them instead.
+- **agents:** **the chat's Files dialog opens, edits and deletes files.** A file
+  opens in place of the tree: text up to 1 MB in an editor with Save, images
+  scaled to fit, PDFs in the browser's viewer; Office documents and other
+  binaries are offered as a download. Files and folders can be deleted, a folder
+  with everything in it, after a confirmation; a directory of the chat itself
+  never can, and a link is removed without touching what it points to. Behind
+  it are `GET …/files/view`, `POST …/files/save` and `POST …/files/delete` under
+  `/admin/api/sessions/{id}`, for the session's owner only. Workspaces on a
+  virtual environment server work the same way; `WorkspaceFiles` gained
+  `delete(Path)`.
+- **agents:** **a folder in the chat's Files dialog downloads as a zip.** Every
+  folder, each of the chat's directories included, has a download button that
+  packs everything below it into one zip, instead of fetching file by file. The
+  zip holds only what the dialog would list, so a link out of the directory
+  stays out. A folder with more than 10,000 files or more than 1 GB is refused
+  (413). Behind it is `GET /admin/api/sessions/{id}/files/zip?root=…&path=…`,
+  for the session's owner only, like the rest of the dialog.
+- **agents:** **A folder's newest thousand messages are kept, and a list or a search answers from there.** `mc-mail-index` holds a window per folder somebody looks at — headers only, in a file per user, account and folder — filled on the first look, compared with the provider's top page when older than two minutes, widened when a page below it is read, and written through by every delete, move and read flag. The folder views and a gathered list read from it; `mail_list` searches it, all heads at once, and says how far that reached ("searched the newest 1,000 of 3,835, back to 12 March; 2,835 older not searched") — `everything=true` has the provider search the whole folder as before.
+- **agents:** **mail is a port now, and IMAP comes with it.** `mc-mail-core`
+  has `MailStore` — folders, paging, search by sender, subject and date,
+  reading, marking, moving, deleting, sending — and the `MailProvider` seam a
+  kind of mailbox plugs into; `mc-mail-imap` brings IMAP, POP3 and SMTP, the
+  Mailbox card on a user's profile and its Test button; `mc-agent-tools-mail`
+  brings the tools: `mail_folders`, `mail_list`, `mail_read`, `mail_mark_read`,
+  `mail_move`, `mail_delete`, `mail_send`. A call names its mailbox as
+  `provider.key` (`email.work`) or asks `all`, so one set of tools serves every
+  mailbox a user has; `MailAccounts` lists what the classpath can open, and a
+  distribution that adds a provider (Outlook, Gmail) changes no tool, no name
+  and no argument. Changing is a tool of its own, so an agent binding can make
+  `mail_send` ask for approval while `mail_list` runs freely.
+- **agents:** **A list of mail is now a thing with a name.** `mc-mail-views` brings `MailListView` — the interface a folder, all inboxes and what an agent gathered all implement — with a `ViewState` (selection, search, page) that is saved with the view and comes back with it, a file store for the views that are kept, and four tools beside the mail tools: `mail_list_add`, `mail_list_remove`, `mail_list_show` (a chat gathers a list page by page and puts it on the screen without naming a single id) and `mail_view_current` (what the person is looking at, ticks included). A view says what it is about — `account()`, `folderId()`, `from()` and `session()`, the chat that gathered it — so a screen never asks what class it is; a gathered list is read a page at a time and holds up to 5,000 rows.
+- **agents:** **What an agent gathers is on the screen at once.** `mail_list_add` puts the list on the screen with its first call and grows it with every one (an optional `title` names it); `mail_list_show` is only needed to rename it or show another list. `mail_list_remove` with ids that are not in the list says so instead of ignoring them.
+- **agents:** **a namespace now says who shapes it and who works in it.** Its
+  people are two lists of e-mail addresses — `admins` and `users` — instead of
+  one flat membership. Admins create and change what the namespace holds,
+  invite, promote and set its variables; users work in it. The one right an
+  admin cannot be given is deleting the namespace: that stays with whoever
+  created it, who is also the one entry that cannot be taken out of the admins.
+  Because the lists are addresses and not accounts, somebody can be invited
+  **before they have ever signed in** — the membership is simply waiting at
+  their first sign-in, with nothing to send and nothing pending. A name without
+  an `@` gets `mindconnect.email-domain` appended, so a company whose accounts
+  are all `<name>@company.example` invites by name. Records written before this
+  read as they did: their members become users, their creator stays an admin.
+
+- **agents:** **a brand can bring its own namespace.**
+  `mindconnect.branding.switch.<brand>.namespace` names the admins its hosts
+  work under (`creator: <address>` for a single one); the namespace's id is the
+  brand's own name unless `id` says otherwise, and its display name is the
+  brand's title. It is created the first time somebody arrives under one of
+  that brand's hosts — and never changed from configuration afterwards: who is
+  in a namespace is its admins' business, not that of a file edited later.
+
+- **agents:** **signing in is no longer the same as being let in.**
+  `mindconnect.namespace-admins` names who shapes the default namespace, and
+  naming anybody closes it: an account this installation lists nowhere now sees
+  a page saying so, with the way to sign out, instead of an empty app — and the
+  API answers 403 rather than falling back into the default namespace. Nobody
+  is put into a namespace by arriving under a host; an admin invites them.
+  Whoever is listed somewhere also gets an empty namespace of their own, and
+  the first sign-in under a brand opens that brand's work. Left unset,
+  `namespace-admins` keeps the default namespace open to every signed-in user,
+  so a single-user installation and the dev mode are exactly as they were.
+- **agents:** **a user can attach an account by signing in at the provider,
+  not only by typing a password.** The second way to come by a
+  [connection](#): `Acquisition.OAuth` on a `ConnectionSpec` puts a *Connect*
+  button on the card, the browser goes to the provider's consent page and
+  comes back with a stored connection. `OAuthFlow` does the
+  authorization-code exchange with **PKCE by default** and sends a client
+  secret only where a provider actually has one — an app registration several
+  installations share cannot carry a secret, so it is a public client proving
+  possession of a one-time verifier instead. The one-time `state` is generated
+  per attempt, kept on the browser's session and consumed by the callback, so
+  a callback that does not echo it is refused before the code is redeemed.
+  `OAuthProvider` gets a repository (file, Postgres, in-memory) with the
+  client secret encrypted at rest, and a token is renewed **on its way to a
+  tool** — the one place every call passes and exactly when it is worth
+  renewing. A refresh the provider refuses marks the connection `EXPIRED` with
+  the reason rather than failing every call the same way, so the profile says
+  what happened and the tool says to connect it again. Installations that
+  register no OAuth app are unaffected; the callback lives at
+  `/admin/oauth/callback` and has to be registered with the app.
+- **agents:** **OpenAI goes through the Responses API.** Configs with provider `OPENAI`
+  now talk to `/v1/responses` instead of `/v1/chat/completions` — the only endpoint
+  where gpt-5.6 and later take tools and reasoning together. Reasoning survives tool
+  rounds (replayed as encrypted items, nothing stored at OpenAI), and its summary
+  shows up in the chat as the thought. New `additionalParams.reasoning_summary`
+  (`auto` default, `concise`, `detailed`, `none`) — set `none` if OpenAI refuses
+  summaries to your organization. Other OpenAI-compatible providers and Azure are
+  unchanged. A config that has to stay on Chat Completions picks the new provider
+  `OPENAI_CHAT_COMPLETIONS`.
+- **agents:** **`presentation-builder`, a sub-agent for PowerPoint decks**, bundled
+  with the `pptx-builder` skill and callable from `default-chat`. The chat hands it
+  a brief — the outline and facts, or the path of a deck to revise — and gets back
+  the path and the slide titles; the planning, the spec and any failed attempts stay
+  in the sub-agent's own context. It saves the spec beside the deck as
+  `<name>.spec.json`, which is how a later brief changes the deck. New installations
+  get both; an existing one imports the agent and the skill on start, while its
+  stored `default-chat` keeps its roster until you add the agent there.
+- **agents:** **Import an entry, or a whole rubric, straight from the registry
+  list.** Every row on a registry's catalog now carries the button that
+  installs it — **Import**, or **Overwrite** for something already here —
+  instead of only a link to the entry page, and every rubric carries **Import
+  missing (n)** for everything of that kind that is not here yet, imported in
+  one walk so what several of them require is fetched once. The import runs
+  there and then and the page that comes back is the same list, with its report
+  above it, the row's new *Already here* badge, and the search and kind filter
+  untouched. The entry page keeps everything it had: the warning, the details,
+  and a package's Contents tab for leaving members out.
+- **agents:** **the file tools, the document tools, `bash`, `process_list`, `process_kill` and
+  `code_execute` can work on a virtual environment server instead of the agent's machine.**
+  Add `mc-agent-tools-virtual-env` (the admin UI and API apps ship it) and set
+  `mindconnect.virtual-env.client.url` (`MC_VIRTUAL_ENV_URL` in the `server` profile). Each chat
+  then gets a workspace of its own there, mounted at `/workspace` in its container; its uploads
+  are copied in, the session directory the prompt names is read as `/workspace`, and `bash` runs
+  in the container — so the `server` profile can offer it (`MC_TOOLS_DISABLED=`). A binding picks
+  its template with the override `{"environment": "office"}`. Tools and schemas are unchanged;
+  tool code reaches the disk through the new `WorkspaceFiles` port in `mc-agent-tool-spi`, and a
+  `WorkspaceProvider` bean decides where. `vector_ingest_file` stays on the agent's machine.
+- **agents:** **calls to a virtual environment server carry a token signed for the chat's user.**
+  With `mindconnect.virtual-env.client.issuer` (`MC_VIRTUAL_ENV_ISSUER`) every call carries a
+  short-lived RS256 token for the calling user and namespace, and the agent apps publish the
+  public key at `/.well-known/mc-virtual-env/jwks.json`. The key pair exists only in memory and is
+  new on every start; a server that trusts the issuer tells users apart without any shared secret.
+- **agents:** the embedded runtime is now **a core plus installed features**, the way
+  a Jackson `ObjectMapper` is a core plus modules. `AgentRuntimeBuilder.of(persistence)`
+  is the smallest runtime that chats — the `CoreFeature`: LLM, messages, agents, no tools;
+  `install(new ToolsFeature())`, `install(new
+  WorkflowsFeature().seed("workflows/x.json"))`, … add what the runtime should have,
+  and `installFromClasspath()` picks up every feature registered as a service. A feature declares what it depends on and installing it
+  without that dependency is an error, not an auto-install. After `build()` every
+  bean any feature registered is reachable — `runtime.beans().get(LlmChat.class)`,
+  `runtime.feature(LlmFeature.class)` — and a feature of your own registers beans,
+  decorates others' (the way encryption wraps the config store) and contributes
+  task and tool advisors. The shipped features live in one Maven module each under
+  `agents/builder/mc-agent-runtime-feature-*`. Each domain module gained a
+  repository factory per backend (`AgentRepositoryFactory`, `MessageRepositoryFactory`,
+  `LlmRepositoryFactory`, `FileStoreFactory`, `WorkflowRepositoryFactory`, with `File…`,
+  `InMemory…` and `Pg…` implementations), so a custom assembly picks a factory instead
+  of switching per repository. **If you embed the runtime:** the optional features
+  are now what you put on the classpath — add `mc-agent-runtime-feature-tools`,
+  `-skills`, `-workflows`, `-file-upload` to your pom instead of the capability
+  modules they bring along; a builder without them chats without tools. The
+  builder's `skill()`, `skillFromClasspath()` and `workflowFromClasspath()` moved to
+  `SkillsFeature` and `WorkflowsFeature`. The `use…()` factories still build
+  the batteries-included runtime they always did, so nothing changes for a caller
+  who does not install anything.
+- **agents:** **a Files dialog in the chat** — next to Working Memory, Traces and
+  Todos. It lists the session's directories (the working directory, the
+  additional ones and the session's own) and lets you open their folders, view a
+  file and download it, so what the agent produced with `bash` or `code_execute`
+  reaches you again, the way the Workspace dialog did before the workspace tools
+  were removed. Only the session's owner sees anything, nothing outside those
+  directories is reachable (`..` and symbolic links included), and HTML or SVG is
+  shown as source rather than rendered.
+- **agents:** **a session has a type, and the chat lists only chats.**
+  `AgentSession.type` is a free word — `chat` for a conversation a person
+  started in the chat, anything else for a session a feature opens for its own
+  purpose (the Office composer's drafting chat is `office`). The chat's history
+  and its live list ask for `chat` only: `AgentSessionRepository.findByUser` and
+  `findHeadersByUser` take a type, Postgres keeps it in a `session_type` column,
+  and `session_started` on the user stream carries `sessionType`, which
+  `chat-ui.js` checks before adding a row. `AgentSessionService.openChat(agent,
+  user, type)` (and `openChatOfType(agentId, user, type)` for a registry agent) opens one and `sessionsOfType(user, type)` finds them again, so a
+  feature can build its own view of its sessions or tidy them up. Sessions
+  written before the field — and rows with no `session_type` — are chats.
+- **agents:** **An agent can keep its own know-how: skills have a group, and four tools write and read them.** A `Skill` carries a `group` (`general` when none — in the `SKILL.md` front matter as `group:`, in the admin form and list), so an installation can tell an office assistant's rules from a coder's release checklist. `skills_list`, `skills_get`, `skills_save` and `skills_delete` (group `skills`, beside the `skill` tool that loads one) let a chat write a skill into the namespace's store — the person's rules for clearing out their inbox, dictated once — where the admin UI shows it and every agent on `ALL` has it from its next turn. Only managed skills are written; a skill off disk is edited where it lies. Bind `skills_save` with approval where a save should be confirmed.
+- **agents:** **`mail_list` takes several senders.** `from: "InfoQ OR coop.ch"` is one search per sender, merged — the same rule `text` already had, because a model writes it that way whatever the description says.
+- **agents:** **`mc-agent-starter-runtime`** — the Spring Boot applications now build
+  their agent runtime the way the embedded builder does: the core plus installed
+  features, configured from the `mindconnect.*` properties, with the runtime's beans
+  exported to the context. The persistence starters supply a `Persistence`
+  (and the installation-wide users and API tokens), the namespace starter the
+  thread-bound scope; `DefaultAgentRuntimeConfig`, `TodoToolsConfig` and
+  `MessageRepositoryConfig` are gone, and so are the LLM gateway beans the admin
+  and API apps declared themselves. An application contributes `RuntimeFeature`
+  beans (installed, replacing a shipped feature of the same name) and
+  `AgentRuntimeCustomizer` beans, and injects `AgentRuntime` to reach any bean or
+  feature. `mc-agent-runtime-feature-namespace` is the feature behind it: a runtime
+  that works in the namespace of the call, for any host that binds a scope;
+  `mc-agent-runtime-feature-transcription` is speech to text as a feature of its
+  own, installed by the starter, left out by a runtime that never hears audio. Every
+  domain module's repository factory can build for a namespace, and the tool
+  environment falls back to the host's beans.
+- **agents:** the server's scope is **strict**: a thread that touches a store without
+  a bound namespace fails instead of silently working in `mindconnect.namespace`.
+  Requests bind through the namespace filter, tasks through the runtime; start-up
+  routines (the runtime build, the tool warm-up, the seed loaders, the MCP and
+  registry seeds) bind the default namespace explicitly. A custom start-up routine
+  that reads a repository has to do the same (`scope.runIn(Scope.of(ns), …)`).
+- **agents:** two more features. **`SubAgentsFeature`** (`mc-agent-runtime-feature-subagents`)
+  is delegation: an agent's roster yields `run_agent`/`run_agents` only with it
+  installed, and `maxDepth` bounds the chain (`mindconnect.agent.sub-agents.max-depth`
+  in Spring, default 5). **`TaskQueueFeature`** (`mc-agent-runtime-feature-taskqueue`)
+  configures the queue the turns run on — `retention`, `maintenanceInterval`, and
+  `jdbc()` for a `JdbcTaskStore` shared across nodes on Postgres; in Spring
+  `mindconnect.task-queue.{retention,maintenance-interval,store,node-id,lease}`,
+  with the store in memory and finished tasks kept, as before.
+- **agents:** **a user attaches their own account to a tool, and may attach
+  several.** What a tool can do is the installation's business; whose mailbox
+  it does it with is the user's. A tool source declares a `ConnectionSpec` —
+  a provider key, a title and a `Schema` for the form — and implements
+  `ConnectedTool`; the registry then hands each call the account of whoever it
+  runs for. `Connection` / `ConnectionRepository` (file, Postgres, in-memory)
+  / `ConnectionService` keep them per user and installation-wide beside the
+  API tokens, with the schema deciding what is a secret: a `Format.PASSWORD`
+  field is encrypted at rest and never shown again, everything else stays
+  readable so a typo can be corrected. The profile has a **Connections** tab
+  rendered entirely from the schema — no tool ships a screen — and a missing
+  connection becomes a notification on the next sign-in. A user with several
+  accounts gets an `account` parameter whose values are exactly their own
+  connection keys; with one, nothing appears at all. An agent can pin it
+  (`overrides: {"params": {"account": "arbeit"}}`) and so carry the same tool
+  twice under two names. Nothing changes for a tool that declares no
+  connection.
+- **agents:** **tools can be added by the group, and a group is one entry.**
+  The agent's Tools table has **Add a group…** beside Add Tool, and the
+  profile's My tools picker offers the same sets as checkboxes: a whole group
+  (the five email tools), a subgroup within it (one MCP server), everything
+  one connection brings (the thirteen Microsoft tools), or several single
+  tools at once. On an agent a set expands into its tools right there — each
+  its own row, so Remove takes one out again. In a user's account a set stays
+  **one row**: its account, its on/off switch and its approval hold for every
+  tool in it, and a tool the group gains later is in from the next chat on.
+- **agents:** **a tool can say which variables it needs from a user, and the
+  installation asks them for it.** A `ToolFactory` or `MultiToolProvider`
+  returns `userVariables()` — a list of `ToolVariable`s with a title, whether
+  the tool can work without it and whether its value is a secret — and
+  `ToolRegistry.declaredVariables()` aggregates them across everything on the
+  classpath. On a user's first request of a session the Admin UI writes the
+  ones that have a sensible default, lists all of them under *Your variables*
+  on the profile with a *Set* action that opens the form ready-named, and
+  raises a notification for every required one that neither the user, their
+  namespace nor the process has a value for. Nothing is ever created empty: a
+  blank user variable would answer the `${VAR}` lookup and cut off the
+  namespace and the server behind it. A tool that declares nothing behaves
+  exactly as before.
+- **agents:** **bring your own API key** — a `${VAR}` placeholder in an LLM config
+  no longer has to come from the server's environment. On the profile page every
+  user keeps *Your variables* (an `OPENAI_API_KEY` of their own, say), the creator
+  of a namespace keeps *Variables* for everyone working there, and a placeholder
+  takes the user's value first, then the namespace's, then the process
+  environment; values are encrypted at rest and never shown again. What a user
+  brought for themselves reaches a config's **`apiKey` only** — its `model`,
+  `baseUrl` and `name` resolve without anybody's personal variables, so nobody
+  redirects a shared config's endpoint to a host of their own while the
+  installation's key still travels with it. A namespace's variables are its
+  creator's to set, like renaming and deleting it; the **default namespace has
+  none of its own** — nobody created it and everyone works there — so a `${VAR}`
+  there means your own value, else the server's environment. The lookup itself
+  is a port now (`EnvVarResolver` in `mc-common`, with `system()`, `of(map)`,
+  `chain(…)`, `shared()` and `memoized()`; the static `EnvVarResolver.resolve(value)`
+  became `resolver.resolve(value)`): the gateways take one,
+  `AgentRuntimeBuilder.envVarResolver(…)` plugs a source of your own into an
+  embedded runtime, a runtime feature reads it with
+  `ctx.require(EnvVarResolver.class)`, and a Spring host may define its own
+  `EnvVarResolver` bean. Model listing and the workflow engine's `env` variable
+  (a run from the admin, a workflow tool in a chat, a vector-store ingestion)
+  resolve through the same chain; the migration diff stays on the process
+  environment, so it reads the same for whoever opens it.
+- **agents:** **the Admin UI has a notification bell: what is waiting for you,
+  not what the server is doing.** `Notification`, `NotificationRepository` (file
+  and Postgres) and `NotificationService` keep a list per user, installation-wide
+  beside their API tokens; the bell in the header carries the unread count and
+  opens the panel, where each notice can carry a link to the place that clears
+  it. A notice has a *key* — the condition it stands for — so a check that runs
+  on every sign-in collapses onto the entry that is already there instead of
+  piling up, raising nothing again for a condition the user dismissed, and a
+  condition that goes away takes its notice with it without anybody tidying up.
+  Anything can contribute one by implementing `SetupCheck` as a bean; the one
+  shipped reports the tool variables a user still has to fill in. A host that
+  assembles no `NotificationRepository` has no bell and is unaffected.
+- **agents:** **what a user's screens remember has a place of its own.**
+  `Preferences`, `PreferenceRepository` (file and Postgres, `mc_user_preference`)
+  and `PreferenceService` keep one small document per user and *scope*
+  (`office.email`, `admin.agents`) — the folder last open, the view last chosen,
+  a column last sorted by. A value is a string; changing one is a merge, and a
+  write that changes nothing writes nothing, so a screen can store where it is
+  on every navigation. Scopes, keys and sizes are bounded (64-character names,
+  100 keys, 4,096 characters a value). Preferences are not the user's variables:
+  they are not encrypted, not handed to tools and not listed under Variables —
+  which is what screens storing their state as variables had been doing. A host
+  that assembles no `PreferenceRepository` has no `PreferenceService`, and a
+  screen that asks for one simply starts where it always did.
+- **agents:** **a user can put tools in their own account, and the same tool
+  twice.** The chain of who may say what about a tool ran Source →
+  Installation → Namespace → Agent and stopped there; `UserTool` is the step
+  below it. One record does both things a person wants: a binding for a tool
+  the agent does not list **adds** it to their chats, one for a tool it does
+  **changes** it for them alone — its name, its description, which of their
+  connections it runs on, whether it asks first, or whether they want it at
+  all. Added under a name of their own it becomes a second entry, so
+  `email_privat` and `email_arbeit` can sit side by side, one mailbox each;
+  underneath they are ordinary `AliasTool` and `PinnedParamsTool` overrides,
+  the same thing an operator could write into an agent definition by hand —
+  only derived from *their* connections instead of typed into a definition
+  several people share. It reaches **the agent they are chatting with and no
+  sub-agent**: a sub-agent's roster was curated for a narrow job. Their
+  *connections* do follow them everywhere, because the call scope carries the
+  user all the way down. Two rules the layer keeps: a name is claimed once,
+  and an approval is tightened by any layer and relaxed by none — a user
+  cannot switch on what the installation switched off, nor ask for fewer
+  questions than their agent asks for. `UserToolRepository` has file, Postgres
+  and in-memory adapters; the profile has a **My tools** tab. A host that
+  keeps no per-user tools is unaffected.
+- **workflow:** `WorkflowExecutorService.withEnvironment(supplier)` — where the
+  built-in `env` variable comes from; the process environment plus system
+  properties as before when not set. `WorkflowRunService` and
+  `WorkflowAdminService` take the same supplier.
+
+### Changed
+
+- **agents:** **the chat's "+" counts what the conversation holds, and keeps pictures
+  and documents apart.** The "+" carries the number of attached files; its menu
+  shows badges on Upload files (the documents), Add images (the pictures), Tools
+  and Sub-agents. The Upload files dialog lists only documents, the Add images
+  dialog only pictures. The file count no longer disappears from the menu after a
+  turn.
+- **agents:** **`code_execute` works in the chat's directories.** Its container's
+  `/workspace` used to be a scratch directory of its own under the data
+  directory, so a file the code wrote — a chart, a PowerPoint — was out of reach
+  of `bash`, the file tools and the user, and an agent telling you where it saved
+  it named a path that did not exist. The chat's working directory (its own
+  directory unless one was chosen) and its additional directories are now
+  mounted writable under their own host paths, so a path means the same inside
+  the container and out; the working directory is also `/workspace` and the
+  current directory. Only a session without a working directory keeps a scratch
+  directory. A chat that changes its directories gets a fresh container on the
+  next call, with its files but without packages installed in the old one.
+  The bundled `default-chat` no longer mounts your home directory read-only at
+  `/mnt/host` for `code_execute`: the container sees the chat's directories and
+  nothing else, and its prompt tells the model to save files for you there. The
+  bundled definition changes for new installations; an existing `default-chat`
+  keeps its stored tool binding until you edit it.
+  `code_execute` also describes itself correctly now: which image each language
+  runs in and that it carries only the standard library, where files go, that
+  installed packages go when the container is recreated, and its time and memory
+  limits. The bundled `default-chat` no longer overrides that description with a
+  fixed text of its own, which had kept all of it from the model.
+- **agents:** **tool and thinking cards in the chat are compact again.** A run of
+  cards sits close together in small, muted type instead of a turn's gap and
+  body-size text per card. Collapsible summaries elsewhere in the admin UI keep
+  their size. While a turn streamed, a finished card also showed a framed, rounded
+  box until the turn ended; it no longer does. A thought now carries a marker like a
+  tool — ⧖ while the model thinks, ✓ once it is done — so its words line up with the
+  tool names around it, and everything still running (tools, reviewers, sub-agents)
+  shows the monochrome ⧖ instead of the coloured ⏳ emoji.
+- **agents:** **an image sent with a message shows in the chat right away.** The
+  bubble a turn shows the moment it is sent now carries the attachment line and
+  the pictures of the stored message, instead of the text alone until the turn
+  ended.
+- **agents:** **a module's sidebar entry can join a shipped group.** A contributed
+  group with the id of one the menu already has — `nav-group-data`, say — used
+  to stand beside it as a second group of the same name. It now joins it: its
+  links follow the shipped ones, and the group opens while one of them is the
+  current page.
+- **agents:** **a new message ends a turn that waits for an approval.** The
+  turn used to stay parked forever while the new one ran; now its waiting
+  calls are closed as "Not approved: superseded by a new message" — no
+  further model round, so nothing from it lands in the new turn — before the
+  new message is written.
+- **agents:** **A mail message now knows where it lies, and a move says where it went.** `MailMessage.folder` became `MailMessage.location` (account and folder) — no caller has to carry the account beside the message or recover it from a `mailbox:id` string. `MailStore.list` answers `Fetched<MailMessage>` (when and how each row was fetched, for a cache to say so later), and `move`/`delete` answer one `Outcome` per id — `Moved` with the new location and id (IMAP `COPYUID`, Graph), `Deleted` with the Undo handle, `Gone`, `Failed` — instead of `void` or a throw for the batch.
+- **agents:** **the profile page is split into tabs, and shows your namespaces'
+  variables.** Account, Namespaces, Your variables, Namespace variables and API tokens
+  each have a tab instead of one long page. The new Namespace variables tab lists the
+  variables of every namespace you created, where you add and remove them — until now
+  they could only be set on the Namespaces & members screen behind the namespace
+  switcher.
+- **agents:** **the admin sidebar is grouped into AI, Tools and Data.** The
+  seven admin entries sat in one flat list. Agents, LLM Configs and Skills
+  now sit under **AI**; Tools, MCP Servers and Workflows under **Tools**;
+  Vector Stores under **Data**. A group is open while one of its pages is the
+  current one, so the selected entry is never folded away. Entries modules
+  contribute, Install and API keep their places below.
+- **agents:** **the Admin UI installs its semantic-ui extensions from the asset registry (semantic-ui 0.4.0).**
+  `app.js` no longer imports a fixed list (jsonviewer, markdown, diagram); it
+  calls `installAll(renderer, bus)` from `/sui/assets.js`, so any jar on the
+  classpath that declares its scripts and stylesheets in
+  `META-INF/sui/assets.json` — a module's calendar or charts, a plugin's
+  widgets — is on the page from the first render, with no filter or loader
+  script of its own. The registry's stylesheets are written into the shell's
+  head ahead of the branding stylesheets, which still win. A host that ships
+  its own `index.html`/`app.js` should switch to `installAll` too. The 0.4.0
+  update also means an iframe with `sandbox("")` is now really sandboxed and
+  RICHTEXT values are sanitised wherever they are rendered.
+- **agents:** `ToolApproval` moved from `ai.mindconnect.agent.runtime.service.approval`
+  to `ai.mindconnect.agent.runtime.domain`, next to the new `TurnResult`. Code that
+  reads open approvals needs the new import; the JSON is unchanged.
+- **agents:** **open approval questions are stored behind a port.** `ToolApprovalStore`
+  is now the interface `ToolApprovalRepository` (`ai.mindconnect.agent.runtime.port.out`)
+  with `InMemoryToolApprovalRepository` in `mc-agent-runtime` as the default; a runtime
+  feature that registers its own `ToolApprovalRepository` replaces it. The runtime
+  accessor `AgentRuntime.approvalStore()` is now `toolApprovals()`. Storage is still
+  in memory only, so an open question does not survive a restart.
+- **agents:** **the admin UI's pages sit in a centred column, and containers are outlined instead of filled.**
+  Page content is centred next to the menu (at most 1280px wide), so a wide monitor no longer shows a bare
+  strip on the right. Lists, tables and tab panels draw a hairline border with only their header filled;
+  the chat and its composer sit on the page ground too. Tables keep their outline wherever they are nested,
+  and "Register MCP Server" in Tools is a primary button.
+
+### Removed
+
+- **agents:** **the `deploy/` directory is gone from this repository.** The
+  single-host Compose setup (Caddy, Postgres, Keycloak, the admin UI) was never
+  part of a build or a release here — it described one installation, named its
+  hosts and carried its Keycloak realm. It now lives with the rest of that
+  installation's infrastructure. If you were using it as a starting point, the
+  last version is in this repository's history
+  (`git show <tag>:deploy/docker-compose.yml`); nothing about the application
+  changed with it.
+
+### Fixed
+
+- **agents:** **an approved tool call stays in the chat.** Answering an approval
+  card rebuilt the whole message list, which wiped the card of the tool that had
+  just started running; it only came back when the turn ended. Now only the
+  approval card is removed.
+- **agents:** **the note on an attached file agrees with the system prompt.** The
+  note ahead of your next question still said an upload was only indexed for
+  search and not on the filesystem, while the system prompt named its path on disk
+  and said to open it there — the model got two opposite instructions. The note now
+  names the same path and says to open the file by it with the file and document
+  tools; only a file without a copy on disk is still pointed at `vector_search`.
+- **agents:** **an attached file's tools reach the agent.** After `attachFile` (or an
+  upload in the chat) the system note told the model to read the file with
+  `vector_search`, but an agent whose definition did not list that tool never got
+  it, so it could only answer that it had no way to look. A chat's attachments now
+  bring what reads them — `vector_search` for what was indexed, `view_attachment`
+  for an image or a PDF, `file_read` and `file_list` for a copy on disk — for as
+  long as the file is attached, whether or not the definition lists them. Nothing
+  else is granted this way, and what the installation disabled stays disabled.
+- **agents:** **a stopped turn no longer leaves its tool spinning in the chat.** After
+  **Stop** — or a turn that failed — the card of the tool or sub-agent that was running
+  kept showing "running…" until the page was reloaded, and after the reload it was
+  gone: the calls of a turn without an answer were not drawn once another message
+  followed. The card now turns failed the moment the turn ends, and the history shows
+  it, failed, above the next question.
+- **agents:** **HTML in a conversation no longer breaks the chat.** An answer, a
+  thought, a tool's output or a user message that contained HTML or JSX outside a
+  code block was rendered as real elements — an unclosed `<div>` swallowed the rest
+  of the conversation and the layout fell apart, and markup like `<img onerror>`
+  could run script. Such text now shows as text; code blocks and inline code render
+  as before, and tool output that itself contains a code fence stays inside its
+  block. The admin UI also tells the markdown renderer itself to show raw HTML as text
+  (only its own icon markup passes), so no reply can build elements in the page
+  even where the escaping and the renderer read the markdown differently.
+- **agents:** **the chat's microphone button turns red while it records.** The style
+  aimed at a class the framework never renders on an icon button, so the button kept
+  its idle colour and only the placeholder showed the recording, hidden as soon as
+  the field had text. The rule now matches the composer's mic by its action.
+- **common:** **a document table in a schema of its own gets its indexes.**
+  `DocumentTable` named an index after its table, schema included
+  (`CREATE INDEX … ext_demo_dungeon.dice_roll_…_idx`), which Postgres refuses
+  as a syntax error — so an extension that keeps its data in its own schema
+  failed the first time it wrote (the demo's dice answered 500). The index is
+  now named after the table alone; Postgres puts it in the table's schema.
+- **agents:** **a route an extension's manifest opens to users is open to them.**
+  `contributes.ui.routes[].roles` naming `USER` was shown on the Extensions
+  screen but not enforced: the namespace access guard only knew its fixed list
+  of open paths, so a plain user of the namespace was refused (403) a screen
+  whose sidebar entry the same manifest showed them. The guard now lets a
+  member of the namespace through on such a route while the extension is on
+  there; where routes nest, the most specific one decides. Somebody who is not
+  in the namespace is refused as before.
+- **agents:** **`mindconnect.file-store.backend` is honoured on Postgres again.** A
+  Postgres installation that kept its uploads on a volume (`filesystem`) had them put
+  into the database instead.
+- **agents:** **a finished response is reported as finished.** A turn's events
+  reach their listener on a thread of their own, so the turn could end before its
+  final event had been handed over. A caller reading the result at that moment —
+  a synchronous `POST` to the responses API, an approval answer — now and then got
+  the response back still `in_progress`. The turn's outcome now waits until its
+  final event has reached the listener.
+- **agents:** **gpt-5.6 with tools works on `OPENAI_CHAT_COMPLETIONS`.** From gpt-5.6
+  on, OpenAI refuses function tools together with reasoning on Chat Completions,
+  and those models reason by default — every turn of an agent with tools ended in a
+  "Streaming error" (HTTP 400). A config that stays on Chat Completions now sends
+  `reasoning_effort: none` to these models when tools are offered; a configured
+  effort still applies to turns without tools. For reasoning and tools together,
+  use provider `OPENAI` (the Responses API).
+- **agents:** **a loaded skill is no longer evicted from the context.** With
+  `toolResultEviction` on, a skill's text was replaced by a stub after the user's
+  next message, and the model reloaded it with `fetch_tool_result` straight away —
+  paying for the skill twice.
+- **agents:** **Test connection names the MCP server it could not reach.** A url whose
+  host does not resolve showed only `java.nio.channels.UnresolvedAddressException` —
+  no host, no sentence. The result now reads "MCP initialize failed for endpoint
+  https://…: …" with the cause's name after it.
+- **agents:** **a deleted namespace stays deleted.** Deleting it while a variable or
+  member change was being saved could bring the record back with its creator and
+  variables, and switching into it worked again; the deletion now waits for such a
+  write, and a write that waited for the deletion fails with `No namespace`. The task
+  board no longer re-creates an empty `data/<namespace>/` for the finished tasks of a
+  deleted namespace — they show without agent and owner. And a namespace created
+  again under a deleted id gets its `.mc-partition.lock` back, so a second process
+  on that partition is refused again.
+- **agents:** **an OAuth client id set after the first start is used.** A module's
+  shipped OAuth registration is stored on the first start, and an operator who set
+  their own client id (`MC_MICROSOFT_CLIENT_ID`, or the variable of another module)
+  only afterwards was ignored for good — every "Connect" still went to Microsoft
+  with the placeholder id. The operator's client id and secret now go onto the
+  stored registration on every start; their other edits to it stay.
+- **agents:** **"Connect with Microsoft" reaches Microsoft.** The button was an
+  API call the page fetched, and a consent page cannot be fetched into the page:
+  the browser reported the backend as unreachable. It is a real link now and opens
+  the sign-in in a new tab; the account is on the card there when the provider
+  sends the browser back.
+- **agents:** **a cut-off OpenAI response is no longer taken for a finished one.** A
+  Responses stream that ends without its completed event (a proxy closing the
+  connection) fails the call instead of storing half an answer as final; an answer cut
+  off at `max_output_tokens` in the middle of a tool call reports `LENGTH` instead of
+  running the call with broken arguments; and GPT models after 5 are treated as
+  reasoning models.
+- **agents:** **OpenAI reasoning models work for organizations without reasoning
+  summaries.** The Responses gateway asks for a summary by default, and OpenAI refuses
+  one to an organization that is not verified — every call failed with HTTP 400 until
+  `reasoning_summary=none` was set. The call is now repeated without the summary, and
+  the gateway remembers that for the endpoint. A summary a config asks for explicitly
+  still fails loudly.
+- **agents:** **parallel sub-agents no longer corrupt the chat's live cards.** Agents
+  run with `run_agents` report from several threads at once, and the chat kept its live
+  cards in structures only one thread may touch — a card could stay "running" for good,
+  or an update fail inside the stream. Events of a turn are now handled one at a time.
+  A client that joins a turn after a tool call also no longer sees the thought before
+  that call twice.
+- **agents:** **the admin UI and the API server start on Postgres again.** With
+  `mindconnect.persistence=postgres` the application stopped at start-up with a
+  circular reference between `agentRuntime` and `toolRepository`: the runtime asked
+  the application for a tool repository, and the only one there was the runtime
+  starter's own export of it. The runtime now looks among the application's beans
+  only, never among the ones the starter hands out from the runtime itself.
+- **agents:** **asking for the background processes lists them instead of killing
+  one.** Listing was hidden in `process_kill` called without a pid, so a model asked
+  for the session's processes ran `ps`, or called `process_kill` with a pid and ended
+  the server. A read-only `process_list` tool now lists them; `process_kill` says it
+  is for ending one and still lists without a pid. The bundled `coding-assistant`
+  and `default-chat` bind `process_list` for new installations; an existing agent
+  keeps its stored bindings until you edit it, and its seed shows as differing. The
+  `server` profile disables `process_list` along with `bash` and `process_kill`.
+- **agents:** **a Chat Completions config no longer fails a turn when OpenAI refuses `reasoning_effort`.**
+  The gateway only leaves the field out, or sends `none`, for the models it knows OpenAI refuses it
+  on; gpt-5.4-mini together with function tools was not among them and answered HTTP 400. On such a
+  400 the gateway now logs a warning and sends the same request once more without the field.
+  Configs on the provider `OPENAI` (Responses API) were not affected.
+- **agents:** **the REST chat stream no longer loses the end of an answer.**
+  `POST /api/sessions/{id}/chat` closed its Server-Sent Events stream the moment the
+  turn finished, while the last text deltas and the `done` frame were still on their
+  way — a fast final round could reach the client without its ending. The stream now
+  closes once its `done` frame has been sent.
+- **agents:** **the stores use the application's JSON settings again.** Sessions,
+  messages and the other file stores were written with a default `ObjectMapper`
+  instead of the application's — timestamps as numbers rather than ISO strings, and
+  unknown fields failing a read. `AgentRuntimeBuilder.objectMapper(...)` now reaches
+  every feature.
+- **agents:** **a thought keeps streaming after you come back to the chat.** Leaving a
+  chat while the model was thinking — to the agents page and back — lost the
+  thinking card: it was not saved yet, so the page could not rebuild it, and the
+  updates that followed had nowhere to go. A client that attaches mid-turn now gets
+  the running (or just finished) thought along with the streaming reply.
+- **agents:** **the chat's Tools badge agrees with the Tools picker.** The badge on
+  the "+" menu's **Tools** entry counted every tool the chat binds, while the
+  picker's header counts the tools that are on and have a row. A fresh
+  `default-chat` read `19` on the menu and `12 on` in the picker: the badge also
+  counted the tools set to Search and the `gmail_*` tools a host without Gmail
+  credentials cannot resolve. Both numbers now come from one count — tools on and
+  resolvable here — on the chat page and after every redraw of the composer.
+- **agents:** **a turn after a cancelled one streams into its own cards.** Stopping a
+  turn left its thinking card, tool cards and reply bubble on the page, and the next
+  turn reused their ids — its thought and its answer streamed into the cancelled
+  turn's card or bubble while its own stayed empty. Every live card now gets an id no
+  earlier turn used.
+- **agents:** **a workflow no longer sees the calling user's own variables.** A
+  workflow's `env` held the whole variable chain, including what the user running the
+  agent stored for themselves — so a workflow written by one user and called by
+  another's agent could read that user's API keys. It now gets the shared view, the
+  namespace's and the server's values, like a config's non-secret fields.
+- **agents:** **a wrong encryption key no longer deletes users' and namespaces'
+  variables.** A stored value that did not decrypt was left out when the record was
+  read and then saved back without it — on a user's next login, or when a namespace
+  was renamed — so starting once with a wrong or rotated
+  `MINDCONNECT_ENCRYPTION_SECRET_KEY` deleted them for good. Unreadable values are
+  now kept as they are until their name is set again, and read again once the right
+  key is back.
 
 ## [0.8.2] - 2026-09-16
 
