@@ -26,6 +26,7 @@ import ai.mindconnect.agent.runtime.service.round.TurnOutcome;
 import ai.mindconnect.agent.runtime.service.round.Usage;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSections;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.service.turn.WorkingMemoryBuilder;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -101,6 +102,7 @@ public final class AgentTurnWorker implements TaskWorker {
     private final InstructionFiles instructions;
     private final SkillCatalog skills;
     private final SubAgentSupport subAgents;
+    private final PromptSections promptSections;
 
     public AgentTurnWorker(ConversationManager conversationManager,
                            AgentDefinitionRepository definitionRepository,
@@ -157,6 +159,30 @@ public final class AgentTurnWorker implements TaskWorker {
                            InstructionFiles instructions,
                            SkillCatalog skills,
                            SubAgentSupport subAgents) {
+        this(conversationManager, definitionRepository, sessionService, memoryStrategyFactory,
+                promptRenderer, toolRegistry, dynamicToolActivations, llmChat, traceRepository,
+                sessionChannels, agentTaskRunner, workingMemoryRepository, instructions, skills,
+                subAgents, PromptSections.none());
+    }
+
+    /** With the prompt sections the features contributed — see {@link PromptSections}. */
+    public AgentTurnWorker(ConversationManager conversationManager,
+                           AgentDefinitionRepository definitionRepository,
+                           AgentSessionService sessionService,
+                           MemoryStrategyFactory memoryStrategyFactory,
+                           PromptRenderer promptRenderer,
+                           ToolRegistry toolRegistry,
+                           DynamicToolActivations dynamicToolActivations,
+                           LlmChat llmChat,
+                           LlmCallTraceRepository traceRepository,
+                           SessionChannels sessionChannels,
+                           AgentTaskRunner agentTaskRunner,
+                           WorkingMemoryRepository workingMemoryRepository,
+                           InstructionFiles instructions,
+                           SkillCatalog skills,
+                           SubAgentSupport subAgents,
+                           PromptSections promptSections) {
+        this.promptSections = promptSections == null ? PromptSections.none() : promptSections;
         this.subAgents = subAgents == null ? SubAgentSupport.disabled() : subAgents;
         this.conversationManager = conversationManager;
         this.definitionRepository = definitionRepository;
@@ -311,7 +337,7 @@ public final class AgentTurnWorker implements TaskWorker {
         LlmChatProvider llm = new LlmChatProvider(llmChat, def, session, memoryStrategy,
                 promptRenderer, stream, traceRepository,
                 new TraceContext(conversationId, session.id(), turnId, parentTurnId, depth, def.name()),
-                instructions, skills);
+                instructions, skills, promptSections);
 
         // Turn-level policy as advisors around each round: the reviewer chain
         // rewrites an ANSWERED outcome before persistence.
@@ -428,7 +454,7 @@ public final class AgentTurnWorker implements TaskWorker {
                                            AgentSession session, AuthenticationInfo auth) {
         try {
             WorkingMemory stats = WorkingMemoryBuilder.build(
-                    promptRenderer, memoryStrategy, def, session, auth, instructions, skills);
+                    promptRenderer, memoryStrategy, def, session, auth, instructions, skills, promptSections);
             workingMemoryRepository.save(session.id(), auth, stats);
         } catch (Exception e) {
             log.warn("Failed to save working memory for session {}: {}", session.id(), e.getMessage());

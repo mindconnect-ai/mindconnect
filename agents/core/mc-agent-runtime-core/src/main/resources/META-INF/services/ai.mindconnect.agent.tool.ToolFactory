@@ -3,3 +3,6 @@ ai.mindconnect.agent.runtime.tools.todo.TodoWriteToolFactory
 ai.mindconnect.agent.runtime.tools.todo.TodoReadToolFactory
 ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentToolFactory
 ai.mindconnect.agent.runtime.skill.SkillToolFactory
+ai.mindconnect.agent.runtime.usermemory.MemoryWriteToolFactory
+ai.mindconnect.agent.runtime.usermemory.MemoryReadToolFactory
+ai.mindconnect.agent.runtime.usermemory.MemoryDeleteToolFactory

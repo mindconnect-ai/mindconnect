@@ -45,6 +45,8 @@ import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSection;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSections;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
@@ -421,6 +423,8 @@ public class AgentRuntimeBuilder {
             providers.addAll(beans.all(PromptContextProvider.class));
             return new PebblePromptRenderer(providers);
         });
+        // The sections the features add to every system prompt, in contribution order.
+        context.bean(PromptSections.class, () -> PromptSections.of(beans.all(PromptSection.class)));
         context.bean(AgentTaskRunner.class, () -> {
             String defaultConfig = features.find(CoreFeature.class).map(CoreFeature::defaultLlmConfigName).orElse(null);
             var definitions = context.require(AgentDefinitionRepository.class);
@@ -488,7 +492,7 @@ public class AgentRuntimeBuilder {
                 context.require(LlmCallTraceRepository.class), context.require(SessionChannels.class),
                 context.require(AgentTaskRunner.class), context.require(WorkingMemoryRepository.class),
                 context.require(InstructionFiles.class), context.require(SkillCatalog.class),
-                context.require(SubAgentSupport.class)));
+                context.require(SubAgentSupport.class), context.require(PromptSections.class)));
         context.bean(ToolCallWorker.class, () -> new ToolCallWorker(
                 context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
@@ -506,7 +510,7 @@ public class AgentRuntimeBuilder {
                 context.require(SessionChannels.class), context.require(UserChannels.class),
                 context.require(TaskQueue.class), context.require(ToolApprovalRepository.class),
                 context.require(InstructionFiles.class), context.require(SkillCatalog.class),
-                context.require(ScopeSupplier.class)));
+                context.require(ScopeSupplier.class), context.require(PromptSections.class)));
 
         // The features' start hooks (schema, seeds) ran before this one: hooks run in registration order.
         context.onStart(() -> {
