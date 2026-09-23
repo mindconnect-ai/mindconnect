@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -132,7 +133,13 @@ public class GrepTool implements Tool {
         if (start == null) {
             return roots.outsideError(rawPath);
         }
-        if (!files.exists(start)) {
+        Optional<WorkspaceEntry> startEntry;
+        try {
+            startEntry = files.stat(start);
+        } catch (IOException e) {
+            return FileWalks.couldNotCheck(relative, e);
+        }
+        if (startEntry.isEmpty()) {
             return "Error: path does not exist: " + relative;
         }
         PathMatcher nameFilter = null;
@@ -152,7 +159,7 @@ public class GrepTool implements Tool {
         List<WorkspaceEntry> candidates = new ArrayList<>();
         long deadline = System.currentTimeMillis() + timeoutMs;
         boolean[] timedOut = {false};
-        if (files.isDirectory(start)) {
+        if (startEntry.get().directory()) {
             PathMatcher filter = nameFilter;
             try {
                 files.walk(start, FileWalks.EXCLUDED_DIRS, new WorkspaceWalker() {
@@ -178,11 +185,7 @@ public class GrepTool implements Tool {
                 return "Error walking directory: " + e.getMessage();
             }
         } else {
-            try {
-                files.stat(start).ifPresent(candidates::add);
-            } catch (IOException e) {
-                return "Error reading file: " + e.getMessage();
-            }
+            candidates.add(startEntry.get());
         }
         // Newest first, like glob: the file being worked on is what the caller means.
         candidates.sort((x, y) -> Long.compare(y.lastModifiedMillis(), x.lastModifiedMillis()));

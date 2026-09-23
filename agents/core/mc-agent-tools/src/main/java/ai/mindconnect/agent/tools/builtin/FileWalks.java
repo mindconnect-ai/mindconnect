@@ -29,6 +29,16 @@ final class FileWalks {
             ".next", ".nuxt", ".cache"
     );
 
+    /**
+     * The answer when the workspace could not say whether {@code shownPath} is
+     * there — a remote workspace refusing or timing out. It must not read like
+     * "does not exist": the model would write the file anew over the real one.
+     */
+    static String couldNotCheck(String shownPath, IOException e) {
+        return "Error: could not check " + shownPath + " — the workspace did not answer ("
+                + e.getMessage() + "). The file may well exist; do not recreate it, try again later.";
+    }
+
     /** How much of a file's head decides whether it is binary. */
     static final int SNIFF_BYTES = 8_192;
 
