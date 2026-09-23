@@ -87,7 +87,7 @@ module has a manifest yet.
   "version": "1.4.0",
   "description": "Contacts and leads from Acme, as tools and a screen.",
   "vendor": { "id": "acme", "name": "Acme GmbH", "homepage": "https://acme.example" },
-  "runtime": "jar",
+  "runtime": "jar",   // a "remote" manifest found on the classpath is reported and not wired
   "requires": { "mindconnect": ">=0.8", "extensions": [ { "id": "mc-mail", "optional": true } ] },
   "enabledByDefault": true,
   "permissions": [],
@@ -96,12 +96,12 @@ module has a manifest yet.
     "features": [ "ai.acme.CrmFeature" ],
     "content": { "agents": [ "acme-sales" ], "skills": [], "workflows": [] },
     "ui": {
-      "menu":   [ { "id": "nav-acme", "label": "Acme", "href": "/admin/acme", "icon": "briefcase", "group": "nav-group-tools" },
-                  { "id": "nav-my-acme", "label": "My Acme", "href": "/admin/profile/acme", "roles": [ "ADMIN", "USER" ] } ],
-      "routes": [ { "path": "/admin/acme/**", "roles": [ "ADMIN" ] } ],
+      "menu":   [ { "id": "nav-acme", "label": "Acme", "href": "/admin/acme-crm", "icon": "briefcase", "group": "nav-group-tools" },
+                  { "id": "nav-my-acme", "label": "My Acme", "href": "/admin/acme-crm/mine", "roles": [ "ADMIN", "USER" ] } ],
+      "routes": [ { "path": "/admin/acme-crm/**", "roles": [ "ADMIN" ] } ],
       "assets": [ "acme.css" ]
     },
-    "rest": [ "/admin/api/acme/**" ],
+    "rest": [ "/admin/acme-crm/**" ],
     "decorates": [ "LlmCallTraceRepository" ],
     "replaces": [],
     "persistence": { "schema": "ext_acme_crm" }
@@ -122,8 +122,8 @@ module has a manifest yet.
 | `contributes.tools.names[]` | The tool names the extension carries, as patterns (`acme_*`, `crm_export`). **This is what a namespace that switched the extension off stops seeing.** |
 | `contributes.features[]` | `RuntimeFeature` classes, like the providers above. |
 | `contributes.content` | Agents, skills and workflows the jar seeds (`initial-data/**`), by name. |
-| `contributes.ui.menu[]` | Sidebar entries. With `label` and `href` the host renders the entry itself — into the shipped group `group` names (`nav-group-ai`, `nav-group-tools`, `nav-group-data`), or into a new group called `groupLabel`; for admins of the namespace, and for its plain users too when `roles` names `USER`. An entry with only an `id` declares one the jar's own `AdminMenuContribution` registers; an id both declare is the bean's. **Either way an entry whose id a switched-off extension declares is left out of the menu** for that namespace. |
-| `contributes.ui.routes[]` | The screens the extension serves, as prefix patterns (`/admin/acme/**`). The host treats them as sections of the SPA (a browser gets the shell, the shell fetches the page), wraps a `UiPage` answered there in the admin layout whatever package served it, and answers **404** on them where the extension is off. Admin-only unless `roles` names `USER` (not enforced yet). |
+| `contributes.ui.menu[]` | Sidebar entries. With `label` and `href` the host renders the entry itself — into the shipped group `group` names (`nav-group-ai`, `nav-group-tools`, `nav-group-data`), or into a new group called `groupLabel`; for admins of the namespace, and for its plain users too when `roles` names `USER` (give the route the same role). An entry with only an `id` declares one the jar's own `AdminMenuContribution` registers; an id both declare is the bean's. **Either way an entry whose id a switched-off extension declares is left out of the menu** for that namespace. |
+| `contributes.ui.routes[]` | The screens the extension serves, as prefix patterns under the extension's own place: `/admin/<id>/**` or `/ext/<id>/**` — a route anywhere else is reported and ignored, so no manifest can claim a shipped screen. The host treats them as sections of the SPA (a browser gets the shell, the shell fetches the page), wraps a `UiPage` answered there in the admin layout whatever package served it, and answers **404** on them where the extension is off. Admin-only unless `roles` names `USER`; then a plain user of the namespace may open the route, and menu entries with that role are shown to them. |
 | `contributes.ui.assets[]`, `rest[]`, `decorates[]`, `replaces[]`, `persistence` | Declared and shown; the steps that enforce them follow. `replaces` is checked already: two extensions replacing one seam is a problem. |
 
 Fields the host does not know are ignored, so a manifest written for a newer

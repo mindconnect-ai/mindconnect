@@ -18,6 +18,11 @@ mindconnect:
       # /.well-known/mc-virtual-env/jwks.json here. Empty: MC_VIRTUAL_ENV_TOKEN, or no token.
       issuer: ${MC_VIRTUAL_ENV_ISSUER:}
       token: ${MC_VIRTUAL_ENV_TOKEN:}
+  extensions:
+    # Off everywhere, whatever a namespace or a brand decides — extension ids, comma-separated.
+    disabled: ${MC_EXTENSIONS_DISABLED:}
+    # true: refuse to start on a manifest problem or a jar that brings providers without a manifest.
+    strict: ${MC_EXTENSIONS_STRICT:false}
   tools:
     # Not offered at all, whatever an agent names or an admin switches on.
     # bash runs as this process — with its environment, its API keys, the whole

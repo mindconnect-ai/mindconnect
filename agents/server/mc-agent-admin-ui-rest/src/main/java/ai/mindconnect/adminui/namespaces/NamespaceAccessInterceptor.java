@@ -12,6 +12,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * The net under the roles: a user of the namespace they are working in reaches
@@ -61,17 +62,24 @@ public class NamespaceAccessInterceptor implements HandlerInterceptor {
 
     private final NamespaceService namespaces;
     private final ScopeSupplier scope;
+    /** Routes an extension's manifest opens to plain users ({@code roles: [USER]}), beside the shipped list. */
+    private final Predicate<String> openToUsers;
 
     public NamespaceAccessInterceptor(NamespaceService namespaces, ScopeSupplier scope) {
+        this(namespaces, scope, path -> false);
+    }
+
+    public NamespaceAccessInterceptor(NamespaceService namespaces, ScopeSupplier scope, Predicate<String> openToUsers) {
         this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
         this.scope = Objects.requireNonNull(scope, "scope");
+        this.openToUsers = Objects.requireNonNull(openToUsers, "openToUsers");
     }
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
         String path = path(request);
-        if (isOpen(path)) return true;
+        if (isOpen(path) || openToUsers.test(path)) return true;
         UserId user = signedIn();
         if (user == null) return true;
         Namespace namespace = scope.namespace();

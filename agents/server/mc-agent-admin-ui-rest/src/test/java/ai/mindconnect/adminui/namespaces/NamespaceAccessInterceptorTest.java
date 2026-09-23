@@ -145,4 +145,20 @@ class NamespaceAccessInterceptorTest {
                 .as("a screen that merely starts with an open name is not open").isFalse();
         assertThat(NamespaceAccessInterceptor.isOpen("/admin/api/namespaces-secret")).isFalse();
     }
+
+    @Test
+    void a_route_an_extension_s_manifest_opens_to_users_is_open_to_a_user() throws Exception {
+        // Alice is a plain user of ACME (see the fixture); the predicate stands for the manifests' say.
+        signedIn(ALICE);
+        var withExtensions = new NamespaceAccessInterceptor(namespaces, ScopeSupplier.fixed(Scope.of(ACME, DAVID)),
+                path -> path.startsWith("/admin/acme-crm/"));
+
+        var response = new MockHttpServletResponse();
+        assertThat(withExtensions.preHandle(new MockHttpServletRequest("GET", "/admin/acme-crm/dialogs/new"),
+                response, new Object())).isTrue();
+        var refused = new MockHttpServletResponse();
+        assertThat(withExtensions.preHandle(new MockHttpServletRequest("GET", "/admin/other-ext/page"),
+                refused, new Object())).isFalse();
+        assertThat(refused.getStatus()).isEqualTo(403);
+    }
 }
