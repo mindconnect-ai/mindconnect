@@ -28,7 +28,8 @@ final class FakeTokenEndpoint implements AutoCloseable {
 
     private final HttpServer server;
     private final Deque<Canned> answers = new ArrayDeque<>();
-    private final List<Map<String, String>> received = new ArrayList<>();
+    private final List<Map<String, String>> received = java.util.Collections.synchronizedList(new ArrayList<>());
+    private volatile long delayMillis;
 
     FakeTokenEndpoint() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -36,6 +37,7 @@ final class FakeTokenEndpoint implements AutoCloseable {
             try (InputStream in = exchange.getRequestBody()) {
                 received.add(split(new String(in.readAllBytes(), StandardCharsets.UTF_8)));
             }
+            pause();
             Canned answer = answers.isEmpty() ? new Canned(500, "{}") : answers.removeFirst();
             byte[] body = answer.body().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -59,6 +61,29 @@ final class FakeTokenEndpoint implements AutoCloseable {
     FakeTokenEndpoint refuses(int status, String json) {
         answers.addLast(new Canned(status, json));
         return this;
+    }
+
+    /**
+     * Takes this long over every answer — long enough for a second caller to
+     * arrive while the first is still waiting.
+     */
+    FakeTokenEndpoint slow(long millis) {
+        delayMillis = millis;
+        return this;
+    }
+
+    /** How many requests have come in so far. */
+    int requests() {
+        return received.size();
+    }
+
+    private void pause() {
+        if (delayMillis <= 0) return;
+        try {
+            Thread.sleep(delayMillis);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /** The form of the request at {@code index}, by field name. */
