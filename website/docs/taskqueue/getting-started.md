@@ -11,7 +11,7 @@ sidebar_position: 2
 <dependency>
   <groupId>ai.mindconnect</groupId>
   <artifactId>mc-task-queue</artifactId>
-  <version>0.8.3</version>
+  <version>0.8.4</version>
 </dependency>
 ```
 
