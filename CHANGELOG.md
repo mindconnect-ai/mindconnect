@@ -23,6 +23,8 @@ never conflict here.
 [keepachangelog]: https://keepachangelog.com/en/1.1.0/
 [semver]: https://semver.org/spec/v2.0.0.html
 
+## [Unreleased]
+
 ## [0.8.3] - 2026-09-23
 
 ### Added
