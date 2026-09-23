@@ -43,6 +43,13 @@ public final class ExtensionRegistry {
         Map<ExtensionId, Extension> map = new LinkedHashMap<>();
         List<Problem> issues = new ArrayList<>(loadProblems);
         for (Extension extension : found) {
+            if (extension.manifest().runtime() != ExtensionRuntime.JAR) {
+                // Reported, and not wired: what a remote manifest declares is for a server the host
+                // talks to, not for the classpath it was found on.
+                issues.add(new Problem(extension.id(), "runtime " + extension.manifest().runtime().wireName()
+                        + " found on the classpath — only jar extensions load from there; ignored"));
+                continue;
+            }
             Extension previous = map.putIfAbsent(extension.id(), extension);
             if (previous != null) {
                 issues.add(new Problem(extension.id(), "declared twice: " + previous.origin()
@@ -64,9 +71,11 @@ public final class ExtensionRegistry {
                     issues.add(new Problem(manifest.id(), "requires " + dependency.id() + ", which is not installed"));
                 }
             }
-            if (manifest.runtime() != ExtensionRuntime.JAR) {
-                issues.add(new Problem(manifest.id(), "runtime " + manifest.runtime().wireName()
-                        + " found on the classpath — only jar extensions load from there"));
+            for (ExtensionManifest.Ui.Route route : manifest.contributes().ui().routes()) {
+                if (!route.isOwnedBy(manifest.id())) {
+                    issues.add(new Problem(manifest.id(), "route " + route.path() + " is not under /admin/"
+                            + manifest.id() + "/ or /ext/" + manifest.id() + "/ — ignored"));
+                }
             }
         }
         // Not Map.copyOf: that forgets the order, and the order is the classpath's — what the screen lists by.
@@ -95,14 +104,30 @@ public final class ExtensionRegistry {
         return byId.size();
     }
 
-    /** The extension whose manifest names a route covering the path, if any — whatever its state anywhere. */
-    public Optional<Extension> routeOwner(String requestPath) {
+    /** An extension and the one of its routes that covers a path. */
+    public record RouteMatch(Extension extension, ExtensionManifest.Ui.Route route) {
+    }
+
+    /**
+     * The extension whose manifest names a route covering the path, and that
+     * route — whatever the extension's state anywhere. Only routes an
+     * extension may own count ({@link ExtensionManifest.Ui.Route#isOwnedBy});
+     * the others were reported at start and are ignored.
+     */
+    public Optional<RouteMatch> routeFor(String requestPath) {
         for (Extension extension : byId.values()) {
             for (ExtensionManifest.Ui.Route route : extension.manifest().contributes().ui().routes()) {
-                if (route.covers(requestPath)) return Optional.of(extension);
+                if (route.isOwnedBy(extension.id()) && route.covers(requestPath)) {
+                    return Optional.of(new RouteMatch(extension, route));
+                }
             }
         }
         return Optional.empty();
+    }
+
+    /** The extension whose manifest names a route covering the path, if any. */
+    public Optional<Extension> routeOwner(String requestPath) {
+        return routeFor(requestPath).map(RouteMatch::extension);
     }
 
     /** What is wrong with the set as a whole; empty when everything fits. */
