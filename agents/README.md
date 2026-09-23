@@ -178,7 +178,21 @@ tools: file_read, vector_search
 
 ## Memory
 
-Agents remember across sessions via episodic memory.
+Within a chat, the agent's memory strategy decides what of the conversation
+the model sees: the full history, a window, or summaries of older turns
+(`memoryConfig` on the agent).
+
+Across chats, an agent remembers the user through **user memory**: small
+entries per user and namespace — who they are, how they want things done,
+ongoing projects, where to find things. An agent that has the `memory_write`
+tool keeps it current itself; one with only `memory_read` reads it. The
+names and one-line descriptions of the entries stand in the system prompt
+of every round, the content is read on demand. `default-chat` has all three
+tools. Entries live in `mc_user_memory` (Postgres) or as Markdown files
+under `<data>/<namespace>/memory/<user>/` (file persistence).
+
+Episodic memory — condensed past chats found by similarity — is not built
+yet.
 
 ![Episodic memory](doc/images/episodic-memory.svg)
 
