@@ -325,7 +325,11 @@ final class MailTools {
                     boolean read = flag(args, "read", true);
                     try (MailStore store = mail.open(user, box.id())) {
                         String folder = folder(store.folders(), str(args, "folder"));
-                        for (String id : ids) store.setSeen(folder, id, read);
+                        Location at = new Location(box.id(), folder);
+                        for (String id : ids) {
+                            store.setSeen(folder, id, read);
+                            if (index != null) writeThrough(user, at, () -> index.seen(user, at, id, read));
+                        }
                     }
                     return ids.size() + (ids.size() == 1 ? " message" : " messages") + " marked "
                             + (read ? "read." : "unread.");
@@ -350,7 +354,9 @@ final class MailTools {
                         String from = folder(folders, str(args, "folder"));
                         String to = named(folders, required(args, "to"))
                                 .orElseThrow(() -> new Refused(noSuchFolder(folders, str(args, "to"))));
-                        return whatBecame(store.move(from, ids, to), "moved to " + to);
+                        List<Outcome> outcomes = store.move(from, ids, to);
+                        gone(user, new Location(box.id(), from), new Location(box.id(), to), outcomes);
+                        return whatBecame(outcomes, "moved to " + to);
                     }
                 });
     }
@@ -368,8 +374,10 @@ final class MailTools {
                     List<String> ids = ids(args);
                     try (MailStore store = mail.open(user, box.id())) {
                         if (!store.canOrganise()) throw new Refused(box.id() + " cannot delete messages (POP3).");
-                        return whatBecame(store.delete(folder(store.folders(), str(args, "folder")), ids),
-                                "moved to the deleted items of " + box.id());
+                        String folder = folder(store.folders(), str(args, "folder"));
+                        List<Outcome> outcomes = store.delete(folder, ids);
+                        gone(user, new Location(box.id(), folder), null, outcomes);
+                        return whatBecame(outcomes, "moved to the deleted items of " + box.id());
                     }
                 });
     }
@@ -398,6 +406,69 @@ final class MailTools {
                     }
                     return "Sent from " + box.id() + " to " + String.join(", ", to) + ".";
                 });
+    }
+
+    // ── writing through ─────────────────────────────────────────────────────
+
+    /**
+     * What a move or a delete did, into the window index: the messages that
+     * left {@code at} (or were not there any more) are taken out of its
+     * window, and a moved one goes into the window of {@code to} under the
+     * id it has there.
+     *
+     * <p>Without this the window kept listing them. Its comparison with the
+     * provider only reaches the newest page, so an older message that was
+     * deleted stayed in {@code mail_list} for good. A move whose new id the
+     * provider did not say (IMAP without UIDPLUS), or whose head the source
+     * window did not hold, cannot be put into the target's window; that
+     * window is forgotten instead, and filled again the next time somebody
+     * looks.
+     */
+    private void gone(UserId user, Location at, Location to, List<Outcome> outcomes) {
+        if (index == null) return;
+        List<String> left = new ArrayList<>();
+        for (Outcome outcome : outcomes) {
+            if (outcome instanceof Outcome.Moved || outcome instanceof Outcome.Deleted
+                    || outcome instanceof Outcome.Gone) {
+                left.add(outcome.id());
+            }
+        }
+        if (left.isEmpty()) return;
+        // The heads, before they leave the window they are in.
+        Map<String, ai.mindconnect.mail.Fetched<MailMessage>> heads =
+                to == null ? Map.of() : index.heads(user, at, left);
+        writeThrough(user, at, () -> index.removed(user, at, left));
+        if (to == null || !index.has(user, to)) return;
+        for (Outcome outcome : outcomes) {
+            if (!(outcome instanceof Outcome.Moved moved)) continue;
+            ai.mindconnect.mail.Fetched<MailMessage> head = heads.get(moved.id());
+            if (moved.newId() == null || head == null) {
+                writeThrough(user, to, () -> index.forget(user, to));
+                return;
+            }
+            MailMessage was = head.value();
+            MailMessage now = new MailMessage(moved.newId(), to, was.subject(), was.from(), was.to(),
+                    was.receivedAt(), was.seen(), was.hasAttachments(), was.attachments(), was.body(),
+                    was.truncated());
+            writeThrough(user, to, () -> index.arrived(user, to, now));
+        }
+    }
+
+    /**
+     * One change into the index. The mailbox has changed already, so a
+     * window that cannot follow is forgotten rather than left saying
+     * otherwise — and the call still answers with what it did.
+     */
+    private void writeThrough(UserId user, Location at, Runnable change) {
+        try {
+            change.run();
+        } catch (RuntimeException e) {
+            try {
+                index.forget(user, at);
+            } catch (RuntimeException ignored) {
+                // Nothing more to do; the next look compares with the provider.
+            }
+        }
     }
 
     // ── the parts ───────────────────────────────────────────────────────────
