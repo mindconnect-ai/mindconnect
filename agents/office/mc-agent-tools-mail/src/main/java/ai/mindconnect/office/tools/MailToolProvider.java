@@ -7,6 +7,7 @@ import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.mail.MailAccounts;
+import ai.mindconnect.mail.index.MailIndex;
 import ai.mindconnect.mail.view.CurrentView;
 import ai.mindconnect.mail.view.MailListViews;
 
@@ -65,7 +66,8 @@ public class MailToolProvider implements MultiToolProvider {
         MailAccounts accounts = env.get(MailAccounts.class)
                 .orElseGet(() -> env.get(Connections.class).map(MailAccounts::new).orElse(null));
         bind(accounts, env.get(MailListViews.class).orElse(null),
-                env.get(CurrentView.class).orElseGet(CurrentView.Memory::new));
+                env.get(CurrentView.class).orElseGet(CurrentView.Memory::new),
+                env.get(MailIndex.class).orElse(null));
     }
 
     /** The registry directly — for a host without an environment, and for tests. */
@@ -75,9 +77,14 @@ public class MailToolProvider implements MultiToolProvider {
 
     /** With the views as well: the list tools appear beside the mail tools. */
     public MailToolProvider bind(MailAccounts accounts, MailListViews views, CurrentView current) {
-        this.mail = accounts == null ? null : new MailTools(accounts, ZoneId.systemDefault());
+        return bind(accounts, views, current, null);
+    }
+
+    /** With the window index: {@code mail_list} searches it and says how far that reached. */
+    public MailToolProvider bind(MailAccounts accounts, MailListViews views, CurrentView current, MailIndex index) {
+        this.mail = accounts == null ? null : new MailTools(accounts, ZoneId.systemDefault(), index);
         this.lists = accounts == null || views == null ? null
-                : new MailListTools(accounts, views, current == null ? new CurrentView.Memory() : current);
+                : new MailListTools(accounts, views, current == null ? new CurrentView.Memory() : current, index);
         return this;
     }
 

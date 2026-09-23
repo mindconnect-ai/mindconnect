@@ -30,10 +30,15 @@ public final class MailListViews {
 
     /** The three kinds that ship: a folder, all inboxes, what an agent gathered. */
     public static MailListViews standard(MailAccounts accounts, ViewStore store) {
+        return standard(accounts, store, null);
+    }
+
+    /** The three kinds, reading through {@code index} where it has a window; null reads the provider. */
+    public static MailListViews standard(MailAccounts accounts, ViewStore store, ai.mindconnect.mail.index.MailIndex index) {
         return new MailListViews(store, List.of(
-                new FolderView.Factory(accounts),
-                new AllInboxesView.Factory(accounts),
-                new AgentView.Factory(accounts)));
+                new FolderView.Factory(accounts, index),
+                new AllInboxesView.Factory(accounts, index),
+                new AgentView.Factory(accounts, index)));
     }
 
     /** Another kind — a module's own view, registered by the host. */

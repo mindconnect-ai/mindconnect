@@ -11,15 +11,10 @@
         <relativePath>../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>mc-agent-tools-mail</artifactId>
-    <name>mc-agent-tools-mail</name>
+    <artifactId>mc-mail-index</artifactId>
+    <name>mc-mail-index</name>
     <packaging>jar</packaging>
-    <description>
-        The mail tools — mail_list, mail_read, mail_send and the rest — over
-        every mailbox a user connected, named provider.key or "all". On
-        mc-mail-core, so a new kind of mailbox needs no new tool. Carries the
-        pieces every Office tool family shares: OfficeTool and Accounts.
-    </description>
+    <description>The window index: the newest heads of every folder somebody looks at, read through and written through, so a list and a search answer from here and say how far they reach</description>
 
     <dependencies>
         <dependency>
@@ -29,25 +24,15 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-mail-index</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-mail-views</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-tool-spi</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-domain</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
         <dependency>

@@ -55,6 +55,12 @@ public record MailMessage(
     }
 
     /** The same message, lying somewhere else — after a move. */
+    /** The same message, read or unread — what a flag change leaves behind in a window. */
+    public MailMessage withSeen(boolean seen) {
+        return new MailMessage(id, location, subject, from, to, receivedAt, seen, hasAttachments,
+                attachments, body, truncated);
+    }
+
     public MailMessage at(Location where) {
         return new MailMessage(id, where, subject, from, to, receivedAt, seen, hasAttachments,
                 attachments, body, truncated);

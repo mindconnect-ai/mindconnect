@@ -107,6 +107,14 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       (a folder, all inboxes, what an agent gathered) with a `ViewState` that is
       saved with it, `MailListViewFactory` as the seam for a new kind, a file
       `ViewStore`, and `CurrentView` for "what is on the screen"
+    - `office/mc-mail-index`: the window index — the newest heads of every
+      folder somebody looks at (`FolderWindow`, a thousand by default, in a
+      file per user, account and folder), read through by the views and
+      `mail_list`, written through by the actions, compared with the
+      provider's top page when older than two minutes. A search runs over
+      the window and says how far it reached (`MailIndex.Coverage`);
+      `everything=true` on `mail_list` asks the provider instead. No
+      background sync yet — that is Concept 42, step 3
     - `office/mc-calendar-core`, `office/mc-calendar-caldav`,
       `office/mc-agent-tools-calendar`: the same shape for a person's calendar.
       `CalendarProvider` is the seam, CalDAV the open kind (its own card, its

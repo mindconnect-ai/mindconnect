@@ -9,6 +9,7 @@ import ai.mindconnect.mail.MailMessage;
 import ai.mindconnect.mail.MailPage;
 import ai.mindconnect.mail.MailQuery;
 import ai.mindconnect.mail.MailStore;
+import ai.mindconnect.mail.index.MailIndex;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -39,9 +40,16 @@ public final class FolderView implements MailListView {
     private final boolean organises;
     private final ViewState state;
     private final MailAccounts accounts;
+    /** The window index, when the host has one; null reads every page from the provider. */
+    private final MailIndex index;
 
     FolderView(ViewId id, UserId owner, String account, String folderId, String folderName,
                boolean organises, ViewState state, MailAccounts accounts) {
+        this(id, owner, account, folderId, folderName, organises, state, accounts, null);
+    }
+
+    FolderView(ViewId id, UserId owner, String account, String folderId, String folderName,
+               boolean organises, ViewState state, MailAccounts accounts, MailIndex index) {
         this.id = Objects.requireNonNull(id, "id");
         this.owner = Objects.requireNonNull(owner, "owner");
         this.account = Objects.requireNonNull(account, "account");
@@ -50,6 +58,7 @@ public final class FolderView implements MailListView {
         this.organises = organises;
         this.state = state == null ? ViewState.EMPTY : state;
         this.accounts = Objects.requireNonNull(accounts, "accounts");
+        this.index = index;
     }
 
     @Override public ViewId id() { return id; }
@@ -74,12 +83,29 @@ public final class FolderView implements MailListView {
     public ListPage page(int offset, int limit) {
         MailQuery query = MailQuery.of(state.flag(UNREAD_ONLY), state.query());
         try (MailStore store = accounts.open(owner, account)) {
-            MailPage page = store.list(folderId, offset, limit, query);
-            List<MailItem> items = new ArrayList<>(page.fetched().size());
-            for (Fetched<MailMessage> fetched : page.fetched()) {
-                items.add(MailItem.of(fetched, state.selected().contains(fetched.value().ref().rowId())));
+            List<Fetched<MailMessage>> fetched;
+            long total;
+            boolean counted;
+            java.time.Instant asOf;
+            if (index != null) {
+                // The window answers; a page below it is read live and widens it.
+                MailIndex.Slice slice = index.page(owner, store, new Location(account, folderId), offset, limit, query);
+                fetched = slice.fetched();
+                total = slice.total();
+                counted = slice.counted();
+                asOf = slice.asOf();
+            } else {
+                MailPage page = store.list(folderId, offset, limit, query);
+                fetched = page.fetched();
+                total = page.total();
+                counted = page.counted() && !page.estimate();
+                asOf = page.asOf();
             }
-            return ListPage.of(items, page.total(), page.counted() && !page.estimate(), page.asOf());
+            List<MailItem> items = new ArrayList<>(fetched.size());
+            for (Fetched<MailMessage> f : fetched) {
+                items.add(MailItem.of(f, state.selected().contains(f.value().ref().rowId())));
+            }
+            return ListPage.of(items, total, counted, asOf);
         }
     }
 
@@ -91,16 +117,22 @@ public final class FolderView implements MailListView {
 
     @Override
     public MailListView withState(ViewState state) {
-        return new FolderView(id, owner, account, folderId, folderName, organises, state, accounts);
+        return new FolderView(id, owner, account, folderId, folderName, organises, state, accounts, index);
     }
 
     /** Builds folder views from their id; the folder's name comes from the mailbox. */
     public static final class Factory implements MailListViewFactory {
 
         private final MailAccounts accounts;
+        private final MailIndex index;
 
         public Factory(MailAccounts accounts) {
+            this(accounts, null);
+        }
+
+        public Factory(MailAccounts accounts, MailIndex index) {
             this.accounts = Objects.requireNonNull(accounts, "accounts");
+            this.index = index;
         }
 
         @Override public String kind() { return KIND; }
@@ -121,7 +153,7 @@ public final class FolderView implements MailListView {
                 organises = store.canOrganise();
             }
             return new FolderView(id, user, account, folderId, name, organises,
-                    stored == null ? ViewState.EMPTY : stored.state(), accounts);
+                    stored == null ? ViewState.EMPTY : stored.state(), accounts, index);
         }
     }
 }

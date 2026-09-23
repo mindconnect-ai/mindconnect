@@ -9,6 +9,7 @@ import ai.mindconnect.mail.MailMessage;
 import ai.mindconnect.mail.MailPage;
 import ai.mindconnect.mail.MailQuery;
 import ai.mindconnect.mail.MailStore;
+import ai.mindconnect.mail.index.MailIndex;
 import ai.mindconnect.mail.MailStoreException;
 
 import java.time.Instant;
@@ -35,11 +36,17 @@ public final class AllInboxesView implements MailListView {
     private final UserId owner;
     private final ViewState state;
     private final MailAccounts accounts;
+    private final MailIndex index;
 
     AllInboxesView(UserId owner, ViewState state, MailAccounts accounts) {
+        this(owner, state, accounts, null);
+    }
+
+    AllInboxesView(UserId owner, ViewState state, MailAccounts accounts, MailIndex index) {
         this.owner = Objects.requireNonNull(owner, "owner");
         this.state = state == null ? ViewState.EMPTY : state;
         this.accounts = Objects.requireNonNull(accounts, "accounts");
+        this.index = index;
     }
 
     @Override public ViewId id() { return ViewId.allInboxes(); }
@@ -66,10 +73,18 @@ public final class AllInboxesView implements MailListView {
         for (ConnectedMailbox mailbox : accounts.of(owner)) {
             if (!mailbox.usable()) continue;
             try (MailStore store = accounts.open(owner, mailbox.id())) {
-                MailPage page = store.list(inboxOf(store), 0, offset + limit, query);
-                merged.addAll(page.fetched());
-                if (page.counted() && !page.estimate()) total += page.total(); else counted = false;
-                if (page.asOf().isBefore(asOf)) asOf = page.asOf();
+                String inbox = inboxOf(store);
+                if (index != null) {
+                    MailIndex.Slice slice = index.page(owner, store, new Location(mailbox.id(), inbox), 0, offset + limit, query);
+                    merged.addAll(slice.fetched());
+                    if (slice.counted()) total += slice.total(); else counted = false;
+                    if (slice.asOf().isBefore(asOf)) asOf = slice.asOf();
+                } else {
+                    MailPage page = store.list(inbox, 0, offset + limit, query);
+                    merged.addAll(page.fetched());
+                    if (page.counted() && !page.estimate()) total += page.total(); else counted = false;
+                    if (page.asOf().isBefore(asOf)) asOf = page.asOf();
+                }
             } catch (MailStoreException e) {
                 counted = false;   // one account short: the page is still worth showing
             }
@@ -107,14 +122,20 @@ public final class AllInboxesView implements MailListView {
 
     @Override
     public MailListView withState(ViewState state) {
-        return new AllInboxesView(owner, state, accounts);
+        return new AllInboxesView(owner, state, accounts, index);
     }
 
     public static final class Factory implements MailListViewFactory {
 
         private final MailAccounts accounts;
+        private final MailIndex index;
 
         public Factory(MailAccounts accounts) {
+            this(accounts, null);
+        }
+
+        public Factory(MailAccounts accounts, MailIndex index) {
+            this.index = index;
             this.accounts = Objects.requireNonNull(accounts, "accounts");
         }
 
@@ -124,7 +145,7 @@ public final class AllInboxesView implements MailListView {
 
         @Override
         public MailListView open(UserId user, ViewId id, StoredView stored) {
-            return new AllInboxesView(user, stored == null ? ViewState.EMPTY : stored.state(), accounts);
+            return new AllInboxesView(user, stored == null ? ViewState.EMPTY : stored.state(), accounts, index);
         }
     }
 }

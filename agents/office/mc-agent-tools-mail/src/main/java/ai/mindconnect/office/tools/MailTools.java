@@ -12,6 +12,8 @@ import ai.mindconnect.mail.MailPage;
 import ai.mindconnect.mail.MailQuery;
 import ai.mindconnect.mail.MailStore;
 import ai.mindconnect.mail.MailStoreException;
+import ai.mindconnect.mail.Location;
+import ai.mindconnect.mail.index.MailIndex;
 
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -58,10 +60,17 @@ final class MailTools {
 
     private final MailAccounts mail;
     private final ZoneId zone;
+    /** The window index, when the host has one: {@code mail_list} searches it first and says how far that reached. */
+    private final MailIndex index;
 
     MailTools(MailAccounts mail, ZoneId zone) {
+        this(mail, zone, null);
+    }
+
+    MailTools(MailAccounts mail, ZoneId zone, MailIndex index) {
         this.mail = mail;
         this.zone = zone;
+        this.index = index;
     }
 
     Optional<Tool> create(String name, UserId user) {
@@ -137,7 +146,10 @@ final class MailTools {
                         "limit", integer("How many, at most " + MAX_LIMIT + " (default " + DEFAULT_LIMIT
                                 + "). Above " + BRIEF_ABOVE + " the lines come without the preview text."),
                         "offset", integer("Skip this many of the newest matches first — for the next page. "
-                                + "Page on your own until you have what was asked for; do not stop to ask."))),
+                                + "Page on your own until you have what was asked for; do not stop to ask."),
+                        "everything", bool("Search the whole folder at the provider instead of the newest "
+                                + "messages this installation keeps. Slower and paged; use it only when the "
+                                + "answer said older messages were not searched and the person wants those too."))),
                 args -> {
                     List<ConnectedMailbox> boxes = accounts.pick(args, true);
                     int limit = Math.max(1, number(args, "limit", DEFAULT_LIMIT, MAX_LIMIT));
@@ -152,6 +164,31 @@ final class MailTools {
                             queries.add(new MailQuery(flag(args, "unread_only", false), term,
                                     sender, str(args, "subject"),
                                     instant(args, "since", zone), instant(args, "before", zone)));
+                        }
+                    }
+                    // One mailbox with a window: the search runs over the window,
+                    // all heads at once, and the answer says how far that reached.
+                    if (index != null && boxes.size() == 1 && !flag(args, "everything", false)) {
+                        ConnectedMailbox box = boxes.get(0);
+                        try (MailStore store = mail.open(user, box.id())) {
+                            String folder = folder(store.folders(), str(args, "folder"));
+                            Location at = new Location(box.id(), folder);
+                            java.util.LinkedHashMap<String, MailMessage> hits = new java.util.LinkedHashMap<>();
+                            MailIndex.Coverage coverage = null;
+                            for (MailQuery query : queries) {
+                                MailIndex.Found found = index.search(user, store, at, query);
+                                for (MailMessage m : found.matches()) hits.putIfAbsent(m.id(), m);
+                                coverage = found.coverage();
+                            }
+                            List<MailMessage> all = new ArrayList<>(hits.values());
+                            all.sort(Comparator.comparing((MailMessage m) -> m.receivedAt(),
+                                    Comparator.nullsLast(Comparator.reverseOrder())));
+                            List<Row> rows = all.stream().skip(offset).limit(limit)
+                                    .map(m -> new Row(box.id(), folder, m)).toList();
+                            return listing(rows, offset, all.size(), true, false, List.of(),
+                                    queries.get(0).isEmpty(), coverage);
+                        } catch (MailStoreException e) {
+                            throw new Refused(box.id() + " did not answer: " + e.getMessage());
                         }
                     }
                     boolean several = boxes.size() > 1 || queries.size() > 1;
@@ -188,30 +225,59 @@ final class MailTools {
                     }
                     // Two words that find the same message would count it twice.
                     if (queries.size() > 1) counted = false;
-                    StringBuilder out = new StringBuilder();
-                    if (rows.isEmpty()) {
-                        out.append(queries.get(0).isEmpty() ? "No messages." : "No message matches.")
-                                .append('\n');
-                    } else {
-                        out.append("Messages ").append(offset + 1).append('–').append(offset + rows.size());
-                        if (counted) out.append(" of ").append(matching);
-                        out.append(boxes.size() > 1 ? ", all inboxes" : "").append(", newest first:\n\n");
-                        boolean preview = rows.size() <= BRIEF_ABOVE;
-                        for (Row row : rows) out.append(line(row, preview));
-                        // The listing is for the model's eyes only. A tool that
-                        // puts messages on the user's screen is a different call,
-                        // and an answer that claims one without making it is a lie
-                        // the person sees through at once.
-                        out.append("\n(Read by you, not shown to the user.)\n");
-                        if (counted && matching > offset + rows.size()) {
-                            out.append("\n(").append(matching - offset - rows.size())
-                                    .append(" more match — the next page is offset ")
-                                    .append(offset + rows.size()).append(".)\n");
-                        }
-                    }
-                    if (!silent.isEmpty()) out.append("\n(Did not answer: ").append(String.join(", ", silent)).append(")\n");
-                    return out.toString();
+                    return listing(rows, offset, matching, counted, boxes.size() > 1, silent,
+                            queries.get(0).isEmpty(), null);
                 });
+    }
+
+    /**
+     * The answer of {@code mail_list}: the rows, how many matched, and —
+     * when the search ran over a window — how far it reached.
+     */
+    private String listing(List<Row> rows, int offset, long matching, boolean counted, boolean allInboxes,
+                           List<String> silent, boolean plain, MailIndex.Coverage coverage) {
+        StringBuilder out = new StringBuilder();
+        if (rows.isEmpty()) {
+            out.append(plain ? "No messages." : "No message matches.").append('\n');
+        } else {
+            out.append("Messages ").append(offset + 1).append('–').append(offset + rows.size());
+            if (counted) out.append(" of ").append(matching);
+            out.append(allInboxes ? ", all inboxes" : "").append(", newest first:\n\n");
+            boolean preview = rows.size() <= BRIEF_ABOVE;
+            for (Row row : rows) out.append(line(row, preview));
+            // The listing is for the model's eyes only. A tool that
+            // puts messages on the user's screen is a different call,
+            // and an answer that claims one without making it is a lie
+            // the person sees through at once.
+            out.append("\n(Read by you, not shown to the user.)\n");
+            if (counted && matching > offset + rows.size()) {
+                out.append("\n(").append(matching - offset - rows.size())
+                        .append(" more match — the next page is offset ")
+                        .append(offset + rows.size()).append(".)\n");
+            }
+        }
+        if (coverage != null && !plain) {
+            // How far the search reached: the one thing a search at the
+            // provider could never say, and the one thing a person wants to
+            // know before trusting "nothing found".
+            out.append("\n(Searched the newest ").append(coverage.searched()).append(" message")
+                    .append(coverage.searched() == 1 ? "" : "s");
+            if (coverage.total() >= 0) out.append(" of ").append(coverage.total());
+            if (coverage.oldestAt() != null) {
+                out.append(", back to ").append(java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")
+                        .withZone(zone).format(coverage.oldestAt()));
+            }
+            if (coverage.whole()) {
+                out.append(" — the whole folder.)\n");
+            } else if (coverage.unsearched() > 0) {
+                out.append(". ").append(coverage.unsearched()).append(" older not searched — call again with "
+                        + "everything=true to have the provider search them all.)\n");
+            } else {
+                out.append(".)\n");
+            }
+        }
+        if (!silent.isEmpty()) out.append("\n(Did not answer: ").append(String.join(", ", silent)).append(")\n");
+        return out.toString();
     }
 
     private Tool read(UserId user, Accounts<ConnectedMailbox> accounts) {

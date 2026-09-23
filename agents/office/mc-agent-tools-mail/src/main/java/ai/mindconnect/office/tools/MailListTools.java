@@ -64,9 +64,16 @@ final class MailListTools {
 
     private final MailAccounts mail;
     private final MailListViews views;
+    /** The window index, when the host has one; a gathered list reads its rows from it first. */
+    private final ai.mindconnect.mail.index.MailIndex index;
     private final CurrentView current;
 
     MailListTools(MailAccounts mail, MailListViews views, CurrentView current) {
+        this(mail, views, current, null);
+    }
+
+    MailListTools(MailAccounts mail, MailListViews views, CurrentView current, ai.mindconnect.mail.index.MailIndex index) {
+        this.index = index;
         this.mail = mail;
         this.views = views;
         this.current = current;
@@ -95,7 +102,7 @@ final class MailListTools {
                 }
             }
         }
-        return AgentView.empty(user, sessionId, current.current(user).orElse(null), mail);
+        return AgentView.empty(user, sessionId, current.current(user).orElse(null), mail, index);
     }
 
     private Tool add(UserId user, String sessionId, Accounts<ConnectedMailbox> accounts) {

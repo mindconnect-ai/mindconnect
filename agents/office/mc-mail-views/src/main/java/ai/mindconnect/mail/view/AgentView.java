@@ -7,6 +7,7 @@ import ai.mindconnect.mail.MailAccounts;
 import ai.mindconnect.mail.MailMessage;
 import ai.mindconnect.mail.MailStore;
 import ai.mindconnect.mail.MailStoreException;
+import ai.mindconnect.mail.index.MailIndex;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -51,21 +52,33 @@ public final class AgentView implements MailListView {
     private final List<MailMessage.Ref> entries;
     private final ViewState state;
     private final MailAccounts accounts;
+    /** The window index, when the host has one: a row in a window is read from there, not from the provider. */
+    private final MailIndex index;
 
     AgentView(ViewId id, UserId owner, String title, List<MailMessage.Ref> entries, ViewState state,
               MailAccounts accounts) {
+        this(id, owner, title, entries, state, accounts, null);
+    }
+
+    AgentView(ViewId id, UserId owner, String title, List<MailMessage.Ref> entries, ViewState state,
+              MailAccounts accounts, MailIndex index) {
         this.id = Objects.requireNonNull(id, "id");
         this.owner = Objects.requireNonNull(owner, "owner");
         this.title = title == null || title.isBlank() ? "Found" : title.strip();
         this.entries = entries == null ? List.of() : List.copyOf(entries);
         this.state = state == null ? ViewState.EMPTY : state;
         this.accounts = Objects.requireNonNull(accounts, "accounts");
+        this.index = index;
     }
 
     /** A new, empty one for a chat to gather into. */
     public static AgentView empty(UserId owner, String sessionId, ViewId from, MailAccounts accounts) {
+        return empty(owner, sessionId, from, accounts, null);
+    }
+
+    public static AgentView empty(UserId owner, String sessionId, ViewId from, MailAccounts accounts, MailIndex index) {
         ViewState state = ViewState.EMPTY.with(SESSION, sessionId).with(FROM, from == null ? null : from.value());
-        return new AgentView(ViewId.saved(), owner, null, List.of(), state, accounts);
+        return new AgentView(ViewId.saved(), owner, null, List.of(), state, accounts, index);
     }
 
     @Override public ViewId id() { return id; }
@@ -129,13 +142,23 @@ public final class AgentView implements MailListView {
         }
         Map<String, Fetched<MailMessage>> found = new LinkedHashMap<>();
         for (Map.Entry<Location, List<String>> group : perFolder.entrySet()) {
+            List<String> wanted = group.getValue();
+            if (index != null) {
+                // What the window has is read from it; only the rest costs a connection.
+                Map<String, Fetched<MailMessage>> cached = index.heads(owner, group.getKey(), wanted);
+                for (Map.Entry<String, Fetched<MailMessage>> e : cached.entrySet()) {
+                    found.put(e.getValue().value().ref().rowId(), e.getValue());
+                }
+                wanted = wanted.stream().filter(id -> !cached.containsKey(id)).toList();
+                if (wanted.isEmpty()) continue;
+            }
             try (MailStore store = accounts.open(owner, group.getKey().account())) {
-                for (MailMessage message : store.summaries(group.getKey().folderId(), group.getValue())) {
+                for (MailMessage message : store.summaries(group.getKey().folderId(), wanted)) {
                     found.put(message.ref().rowId(), Fetched.live(message));
                 }
             } catch (MailStoreException e) {
                 // That mailbox does not answer; its rows are not gone, they are unread this time.
-                for (String id : group.getValue()) {
+                for (String id : wanted) {
                     found.put(new MailMessage.Ref(group.getKey(), id).rowId(), null);
                 }
             }
@@ -156,7 +179,7 @@ public final class AgentView implements MailListView {
     public MailListView without(Collection<String> rowIds) {
         Set<String> out = new HashSet<>(rowIds);
         List<MailMessage.Ref> left = entries.stream().filter(ref -> !out.contains(ref.rowId())).toList();
-        return new AgentView(id, owner, title, left, state.untick(rowIds), accounts);
+        return new AgentView(id, owner, title, left, state.untick(rowIds), accounts, index);
     }
 
     /** Moved rows stay — under their new location and id; the ticks follow. */
@@ -173,7 +196,7 @@ public final class AgentView implements MailListView {
                 renamed.put(ref.rowId(), now.rowId());
             }
         }
-        return new AgentView(id, owner, title, after, state.renamed(renamed), accounts);
+        return new AgentView(id, owner, title, after, state.renamed(renamed), accounts, index);
     }
 
     /** More rows, in the order given; what is already there stays where it was. At most {@link #MAX}. */
@@ -185,24 +208,30 @@ public final class AgentView implements MailListView {
             if (all.size() >= MAX) break;
             if (have.add(ref.rowId())) all.add(ref);
         }
-        return new AgentView(id, owner, title, all, state, accounts);
+        return new AgentView(id, owner, title, all, state, accounts, index);
     }
 
     public AgentView titled(String title) {
-        return new AgentView(id, owner, title, entries, state, accounts);
+        return new AgentView(id, owner, title, entries, state, accounts, index);
     }
 
     @Override
     public MailListView withState(ViewState state) {
-        return new AgentView(id, owner, title, entries, state, accounts);
+        return new AgentView(id, owner, title, entries, state, accounts, index);
     }
 
     public static final class Factory implements MailListViewFactory {
 
         private final MailAccounts accounts;
+        private final MailIndex index;
 
         public Factory(MailAccounts accounts) {
+            this(accounts, null);
+        }
+
+        public Factory(MailAccounts accounts, MailIndex index) {
             this.accounts = Objects.requireNonNull(accounts, "accounts");
+            this.index = index;
         }
 
         @Override public String kind() { return KIND; }
@@ -223,7 +252,7 @@ public final class AgentView implements MailListView {
                 }
             }
             return new AgentView(id, user, stored == null ? null : stored.title(), entries,
-                    stored == null ? ViewState.EMPTY : stored.state(), accounts);
+                    stored == null ? ViewState.EMPTY : stored.state(), accounts, index);
         }
     }
 }
