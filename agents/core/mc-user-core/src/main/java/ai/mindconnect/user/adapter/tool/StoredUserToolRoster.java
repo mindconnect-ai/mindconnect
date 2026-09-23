@@ -104,8 +104,17 @@ public class StoredUserToolRoster implements UserToolRoster {
      * One user binding as an agent binding. {@code base} is what the agent
      * already said about this name, or null when the user is adding a tool the
      * agent does not list.
+     *
+     * <p>What the agent said about its own binding holds: its pinned values,
+     * its approval, and which tool the name stands for. A user binding that
+     * would put a different tool under a name the agent already uses is
+     * therefore left out, and the agent's entry stays as it was — the user can
+     * still add that tool under a name of its own.
      */
     private static AgentTool merge(AgentTool base, UserTool mine) {
+        if (base != null && !AliasTool.registryName(base).equals(mine.toolName())) {
+            return base;
+        }
         Map<String, Object> overrides = new LinkedHashMap<>(base == null ? Map.of() : base.overrides());
         if (!mine.effectiveName().equals(mine.toolName())) {
             // Under a name of its own it has to say which tool it really is.
@@ -127,13 +136,17 @@ public class StoredUserToolRoster implements UserToolRoster {
                 base == null ? null : base.maxResultChars());
     }
 
-    /** The agent's pins with the user's over them — theirs wins on the same key. */
+    /**
+     * The user's values with the agent's pins over them — the agent wins on the
+     * same key. A pin is how an agent is kept to one folder, one site, one
+     * account; a person using the agent fills in what it left open, and does
+     * not undo what it fixed.
+     */
     private static Map<String, Object> pinned(AgentTool base, UserTool mine) {
-        Map<String, Object> merged = new LinkedHashMap<>();
+        Map<String, Object> merged = new LinkedHashMap<>(mine.params());
         if (base != null && base.overrides().get(PinnedParamsTool.OVERRIDE_KEY) instanceof Map<?, ?> existing) {
             existing.forEach((key, value) -> merged.put(String.valueOf(key), value));
         }
-        merged.putAll(mine.params());
         return merged;
     }
 }
