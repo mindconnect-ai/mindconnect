@@ -1,5 +1,6 @@
 package ai.mindconnect.mail.imap;
 
+import ai.mindconnect.mail.Location;
 import ai.mindconnect.mail.MailMessage;
 import jakarta.mail.Transport;
 import ai.mindconnect.agent.tool.ConnectionTest;
@@ -360,7 +361,7 @@ public final class Mailbox implements AutoCloseable {
             MailText.Extract extract = MailText.of(message);
             String text = extract.text();
             String cut = MailText.truncate(text, maxChars);
-            return new MailMessage(id, folderName(), message.getSubject(), addresses(message.getFrom()),
+            return new MailMessage(id, here(), message.getSubject(), addresses(message.getFrom()),
                     addressList(message.getRecipients(Message.RecipientType.TO)),
                     received(message), seen(message), !extract.attachments().isEmpty(),
                     extract.attachments(), cut, cut != null && !cut.equals(text));
@@ -453,14 +454,20 @@ public final class Mailbox implements AutoCloseable {
         }
     }
 
+    /** What a move answers: the subject, for a sentence, and the UID the message has now — when the server said. */
+    public record Moved(String subject, String newUid) { }
+
     /**
      * Moves one message to another folder of the same mailbox. IMAP MOVE where
      * the server has it, copy-then-expunge where it does not; either way the
      * message is in one place afterwards.
      *
-     * @return the subject, so the answer can say what went where
+     * <p>The message has a new UID in the target folder. A server with UIDPLUS
+     * (RFC 4315) says which in its {@code COPYUID} answer, and that is what a
+     * list that keeps the message needs; one without leaves {@code newUid}
+     * null, and the message has to be found again by its {@code Message-ID}.
      */
-    public String move(String id, String targetName) {
+    public Moved move(String id, String targetName) {
         if (account.isPop3()) {
             throw new MailAccessException("POP3 has exactly one folder, so there is nowhere to move a "
                     + "message to. Change that mailbox to imap under Connections if your provider offers it.");
@@ -480,14 +487,20 @@ public final class Mailbox implements AutoCloseable {
             }
             String subject = message.getSubject();
             Message[] one = {message};
+            String newUid = null;
             if (folder instanceof org.eclipse.angus.mail.imap.IMAPFolder imap) {
-                imap.moveMessages(one, target);      // MOVE when the server has it, COPY+DELETE+EXPUNGE when not
+                // MOVE when the server has it, COPY+DELETE+EXPUNGE when not; the
+                // UID variant hands back COPYUID where the server supports UIDPLUS.
+                org.eclipse.angus.mail.imap.AppendUID[] answered = imap.moveUIDMessages(one, target);
+                if (answered != null && answered.length > 0 && answered[0] != null) {
+                    newUid = String.valueOf(answered[0].uid);
+                }
             } else {
                 folder.copyMessages(one, target);
                 message.setFlag(Flags.Flag.DELETED, true);
                 folder.expunge();
             }
-            return subject == null ? "(no subject)" : subject;
+            return new Moved(subject == null ? "(no subject)" : subject, newUid);
         } catch (MessagingException e) {
             throw new MailAccessException("Could not move that message: " + e.getMessage(), e);
         }
@@ -507,7 +520,7 @@ public final class Mailbox implements AutoCloseable {
             if (account.isPop3()) {
                 int number = number(id);
                 if (number < 1 || number > folder.getMessageCount()) {
-                    throw new MailAccessException("There is no message " + id + " in " + folderName() + ".");
+                    throw new NoSuchMessageException("There is no message " + id + " in " + folderName() + ".");
                 }
                 return folder.getMessage(number);
             }
@@ -516,7 +529,7 @@ public final class Mailbox implements AutoCloseable {
             }
             Message message = uids.getMessageByUID(Long.parseLong(id.strip()));
             if (message == null) {
-                throw new MailAccessException("There is no message " + id + " in " + folderName()
+                throw new NoSuchMessageException("There is no message " + id + " in " + folderName()
                         + " any more — it may have been moved or deleted.");
             }
             return message;
@@ -611,8 +624,13 @@ public final class Mailbox implements AutoCloseable {
         }
     }
 
+    /** Where everything read here lies: this account, this folder. */
+    private Location here() {
+        return new Location(account.id(), folderName());
+    }
+
     private MailMessage summary(Message message) throws MessagingException {
-        return new MailMessage(idOf(message), folderName(), message.getSubject(), addresses(message.getFrom()),
+        return new MailMessage(idOf(message), here(), message.getSubject(), addresses(message.getFrom()),
                 addressList(message.getRecipients(Message.RecipientType.TO)), received(message), seen(message),
                 false, List.of(), null, false);
     }

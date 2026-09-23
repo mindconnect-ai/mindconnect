@@ -3,6 +3,7 @@ package ai.mindconnect.office.tools;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.mail.MailMessage;
+import ai.mindconnect.mail.Outcome;
 import ai.mindconnect.mail.ConnectedMailbox;
 import ai.mindconnect.mail.MailAccounts;
 import ai.mindconnect.mail.MailDraft;
@@ -276,8 +277,7 @@ final class MailTools {
                         String from = folder(folders, str(args, "folder"));
                         String to = named(folders, required(args, "to"))
                                 .orElseThrow(() -> new Refused(noSuchFolder(folders, str(args, "to"))));
-                        store.move(from, ids, to);
-                        return ids.size() + (ids.size() == 1 ? " message" : " messages") + " moved to " + to + ".";
+                        return whatBecame(store.move(from, ids, to), "moved to " + to);
                     }
                 });
     }
@@ -295,10 +295,9 @@ final class MailTools {
                     List<String> ids = ids(args);
                     try (MailStore store = mail.open(user, box.id())) {
                         if (!store.canOrganise()) throw new Refused(box.id() + " cannot delete messages (POP3).");
-                        store.delete(folder(store.folders(), str(args, "folder")), ids);
+                        return whatBecame(store.delete(folder(store.folders(), str(args, "folder")), ids),
+                                "moved to the deleted items of " + box.id());
                     }
-                    return ids.size() + (ids.size() == 1 ? " message" : " messages")
-                            + " moved to the deleted items of " + box.id() + ".";
                 });
     }
 
@@ -345,6 +344,25 @@ final class MailTools {
             if (terms.size() == MAX_TERMS) break;
         }
         return terms.isEmpty() ? java.util.Collections.singletonList(null) : terms;
+    }
+
+    /**
+     * One sentence for a call that changed where messages are: how many it
+     * did, which were not there any more, and what the provider refused. A
+     * model told "3 moved" when one of the three was gone acts on a list that
+     * is not the mailbox.
+     */
+    static String whatBecame(List<Outcome> outcomes, String did) {
+        int done = Outcome.done(outcomes);
+        StringBuilder out = new StringBuilder();
+        out.append(done).append(done == 1 ? " message " : " messages ").append(did).append('.');
+        List<String> gone = Outcome.gone(outcomes);
+        if (!gone.isEmpty()) {
+            out.append(gone.size() == 1 ? " One was" : " " + gone.size() + " were")
+                    .append(" not there any more: ").append(String.join(", ", gone)).append('.');
+        }
+        for (String why : Outcome.failures(outcomes)) out.append(" Not done: ").append(why);
+        return out.toString();
     }
 
     private record Row(String account, String folder, MailMessage message) { }

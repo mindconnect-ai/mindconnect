@@ -2,6 +2,7 @@ package ai.mindconnect.mail.imap;
 
 import ai.mindconnect.mail.MailStoreException;
 import ai.mindconnect.mail.MailStore;
+import ai.mindconnect.mail.Outcome;
 import ai.mindconnect.mail.MailPage;
 import ai.mindconnect.mail.MailFolder;
 import ai.mindconnect.mail.MailDraft;
@@ -232,7 +233,7 @@ class ImapMailStoreIntegrationTest {
         try (MailStore store = accounts.open(ALICE, "email.privat")) {
             String id = idOf(store, "Invoice 4711");
 
-            List<String> receipt = store.delete("INBOX", List.of(id));
+            List<String> receipt = Outcome.handles(store.delete("INBOX", List.of(id)));
 
             assertThat(store.list("INBOX", 0, 10, false, null).messages())
                     .extracting(MailMessage::subject).containsExactly("Reminder");
@@ -252,7 +253,7 @@ class ImapMailStoreIntegrationTest {
             List<String> ids = store.list("INBOX", 0, 10, false, null).messages().stream()
                     .map(MailMessage::id).limit(2).toList();
 
-            List<String> receipt = store.delete("INBOX", ids);
+            List<String> receipt = Outcome.handles(store.delete("INBOX", ids));
             assertThat(store.list("INBOX", 0, 10, false, null).messages()).hasSize(1);
 
             // The UIDs changed in Trash; the receipt finds them by Message-ID.
@@ -336,13 +337,40 @@ class ImapMailStoreIntegrationTest {
                 .createMailbox(MAIL.getManagers().getUserManager().getUser(ADDRESS), "Archiv");
 
         try (MailStore store = accounts.open(ALICE, "email.privat")) {
-            String id = store.list("INBOX", 0, 10, false, null).messages().get(0).id();
+            MailMessage before = store.list("INBOX", 0, 10, false, null).messages().get(0);
+            // Every message read knows where it lies — the account as well as the folder.
+            assertThat(before.location().account()).isEqualTo("email.privat");
+            assertThat(before.location().folderId()).isEqualTo("INBOX");
 
-            store.move("INBOX", List.of(id), "Archiv");
+            List<Outcome> outcomes = store.move("INBOX", List.of(before.id()), "Archiv");
 
             assertThat(store.list("INBOX", 0, 10, false, null).messages()).isEmpty();
-            assertThat(store.list("Archiv", 0, 10, false, null).messages())
-                    .extracting(MailMessage::subject).containsExactly("Invoice 4711");
+            MailMessage after = store.list("Archiv", 0, 10, false, null).messages().get(0);
+            assertThat(after.subject()).isEqualTo("Invoice 4711");
+            // The move says where it went and what it is called there: a new
+            // UID, which a list that keeps the message needs to follow it.
+            assertThat(outcomes).singleElement().isInstanceOfSatisfying(Outcome.Moved.class, moved -> {
+                assertThat(moved.id()).isEqualTo(before.id());
+                assertThat(moved.to().folderId()).isEqualTo("Archiv");
+                assertThat(moved.newId()).isEqualTo(after.id());
+            });
+        }
+    }
+
+    @Test
+    void a_message_that_is_gone_answers_for_itself_and_does_not_stop_the_others() throws Exception {
+        folder("Archiv");
+        deliver("Invoice 4711", "due on Friday");
+
+        try (MailStore store = accounts.open(ALICE, "email.privat")) {
+            String id = store.list("INBOX", 0, 10, false, null).messages().get(0).id();
+
+            List<Outcome> outcomes = store.move("INBOX", List.of("99999", id), "Archiv");
+
+            assertThat(outcomes).hasSize(2);
+            assertThat(outcomes.get(0)).isEqualTo(new Outcome.Gone("99999"));
+            assertThat(outcomes.get(1)).isInstanceOf(Outcome.Moved.class);
+            assertThat(store.list("Archiv", 0, 10, false, null).messages()).hasSize(1);
         }
     }
 

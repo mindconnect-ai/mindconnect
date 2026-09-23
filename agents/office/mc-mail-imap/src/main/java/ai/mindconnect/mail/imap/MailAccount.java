@@ -17,6 +17,8 @@ import java.util.Properties;
  * their default. Nothing here knows or cares which.
  *
  * @param protocol     {@code imap} or {@code pop3}
+ * @param id           the mailbox id the connection opens as — {@code email.freemail} — what
+ *                     every message read here is stamped with as its {@link ai.mindconnect.mail.Location}
  * @param host         the mail server
  * @param port         its port
  * @param ssl          TLS from the first byte (imaps/pop3s)
@@ -32,6 +34,7 @@ import java.util.Properties;
  * @param from         the address to send as; the SMTP account when unset
  */
 public record MailAccount(
+        String id,
         String protocol,
         String host,
         int port,
@@ -145,7 +148,7 @@ public record MailAccount(
         boolean ssl = flag(value(connection, SSL), true);
         int port = number(connection, PORT, ssl ? (protocol.equals("imap") ? 993 : 995)
                                                 : (protocol.equals("imap") ? 143 : 110), "port");
-        return new MailAccount(protocol, host, port, ssl, user, password,
+        return new MailAccount(ai.mindconnect.mail.ConnectedMailbox.idOf(connection), protocol, host, port, ssl, user, password,
                 orDefault(value(connection, FOLDER), "INBOX"),
                 value(connection, SMTP_HOST),
                 number(connection, SMTP_PORT, 587, "SMTP port"),

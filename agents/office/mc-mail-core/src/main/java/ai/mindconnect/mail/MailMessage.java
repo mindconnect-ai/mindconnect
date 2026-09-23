@@ -9,7 +9,7 @@ import java.util.List;
  *
  * @param id          how a later call names this message: the IMAP UID, or the
  *                    message number on POP3, which has no UIDs a folder can look up
- * @param folder      where it was found
+ * @param location    where it lies — the account and the folder, as the store that read it knows them
  * @param subject     never null; an empty subject becomes "(no subject)"
  * @param from        the sender, as written
  * @param to          the recipients, as written
@@ -22,7 +22,7 @@ import java.util.List;
  */
 public record MailMessage(
         String id,
-        String folder,
+        Location location,
         String subject,
         String from,
         List<String> to,
@@ -50,7 +50,39 @@ public record MailMessage(
      */
     public MailMessage withPreview(String preview) {
         if (preview == null || preview.isBlank()) return this;
-        return new MailMessage(id, folder, subject, from, to, receivedAt, seen, hasAttachments,
+        return new MailMessage(id, location, subject, from, to, receivedAt, seen, hasAttachments,
                 attachments, preview, true);
+    }
+
+    /** The same message, lying somewhere else — after a move. */
+    public MailMessage at(Location where) {
+        return new MailMessage(id, where, subject, from, to, receivedAt, seen, hasAttachments,
+                attachments, body, truncated);
+    }
+
+    /** Where it lies and what it is called there — enough to find it again. */
+    public Ref ref() {
+        return new Ref(location, id);
+    }
+
+    /**
+     * A message by address: its place and its id there. What a list keeps of
+     * a message it does not hold, and what a row on a screen is named after.
+     */
+    public record Ref(Location location, String id) {
+
+        public Ref {
+            java.util.Objects.requireNonNull(location, "location");
+            java.util.Objects.requireNonNull(id, "id");
+        }
+
+        /**
+         * The one spelling of "this message" for a row: account and id. Only
+         * ever produced here, and read back by nobody — a screen that has a
+         * row id asks the list that drew it where the message is.
+         */
+        public String rowId() {
+            return location.account() + ":" + id;
+        }
     }
 }

@@ -10,6 +10,8 @@ import ai.mindconnect.mail.MailDraft;
 import ai.mindconnect.mail.MailBody;
 import ai.mindconnect.mail.MailAttachment;
 import ai.mindconnect.mail.MailMessage;
+import ai.mindconnect.mail.Location;
+import ai.mindconnect.mail.Outcome;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -205,7 +207,7 @@ public final class ImapMailStore implements MailStore {
      * eight connections is eight IMAP handshakes for eight flag changes.
      */
     @Override
-    public List<String> delete(String folderId, List<String> messageIds) {
+    public List<Outcome> delete(String folderId, List<String> messageIds) {
         if (!canOrganise()) {
             throw new MailStoreException("POP3 has no wastebasket to move a message to, and this "
                     + "screen deletes nothing for good. Change that mailbox to imap under Connections "
@@ -218,22 +220,28 @@ public final class ImapMailStore implements MailStore {
                     + "deletes nothing for good. Move the messages to a folder instead.");
         }
         // A message moved to another folder gets a new UID there, so the
-        // receipt is its Message-ID header — what Undo finds it by in Trash.
-        List<String> receipt = new java.util.ArrayList<>();
+        // handle is its Message-ID header — what Undo finds it by in Trash.
+        List<Outcome> outcomes = new ArrayList<>(messageIds.size());
         try (Mailbox mailbox = Mailbox.open(account, folderId, true)) {
             if (mailbox.folderName().equals(trash)) {
                 throw new MailStoreException("These are already in the wastebasket. Empty it in your "
                         + "mail provider's own client — this screen deletes nothing for good.");
             }
             for (String id : messageIds) {
-                String header = mailbox.messageIdHeader(id);
-                mailbox.move(id, trash);
-                if (header != null) receipt.add(header);
+                try {
+                    String header = mailbox.messageIdHeader(id);
+                    mailbox.move(id, trash);
+                    outcomes.add(new Outcome.Deleted(id, header));
+                } catch (NoSuchMessageException e) {
+                    outcomes.add(new Outcome.Gone(id));
+                } catch (MailAccessException e) {
+                    outcomes.add(new Outcome.Failed(id, e.getMessage()));
+                }
             }
         } catch (MailAccessException | MailConfigurationException e) {
             throw new MailStoreException(e.getMessage(), e);
         }
-        return receipt;
+        return outcomes;
     }
 
     @Override
@@ -251,28 +259,38 @@ public final class ImapMailStore implements MailStore {
         }
     }
 
+    /**
+     * One connection for the lot, because the connection is the expensive
+     * part: moving eight messages as eight connections is eight IMAP
+     * handshakes for eight commands. Each id answers for itself — one that is
+     * gone does not stop the seven others.
+     */
     @Override
-    public void move(String folderId, List<String> messageIds, String targetFolderId) {
+    public List<Outcome> move(String folderId, List<String> messageIds, String targetFolderId) {
         if (targetFolderId == null || targetFolderId.isBlank()) {
             throw new MailStoreException("Say which folder to move them to.");
         }
-        organise(folderId, messageIds, (mailbox, id) -> mailbox.move(id, targetFolderId));
-    }
-
-    private void organise(String folderId, List<String> messageIds,
-                          java.util.function.BiConsumer<Mailbox, String> what) {
         if (!canOrganise()) {
             throw new MailStoreException("POP3 has one folder and nothing to move between. "
                     + "Change that mailbox to imap under Connections if the server offers it.");
         }
-        if (messageIds == null || messageIds.isEmpty()) return;
+        if (messageIds == null || messageIds.isEmpty()) return List.of();
+        Location there = new Location(account.id(), targetFolderId);
+        List<Outcome> outcomes = new ArrayList<>(messageIds.size());
         try (Mailbox mailbox = Mailbox.open(account, folderId, true)) {
             for (String id : messageIds) {
-                what.accept(mailbox, id);
+                try {
+                    outcomes.add(new Outcome.Moved(id, there, mailbox.move(id, targetFolderId).newUid()));
+                } catch (NoSuchMessageException e) {
+                    outcomes.add(new Outcome.Gone(id));
+                } catch (MailAccessException e) {
+                    outcomes.add(new Outcome.Failed(id, e.getMessage()));
+                }
             }
         } catch (MailAccessException | MailConfigurationException e) {
             throw new MailStoreException(e.getMessage(), e);
         }
+        return outcomes;
     }
 
     @Override

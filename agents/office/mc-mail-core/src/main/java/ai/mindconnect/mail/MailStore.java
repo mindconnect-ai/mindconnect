@@ -137,8 +137,11 @@ public interface MailStore extends AutoCloseable {
     /**
      * Moves messages to the mailbox's wastebasket.
      *
-     * @return the receipt {@link #restore} needs to bring them back; empty
-     *         when there is nothing to undo
+     * @return one {@link Outcome} per id, in the order asked: {@link Outcome.Deleted}
+     *         with the handle {@link #restore} needs, {@link Outcome.Gone} for one
+     *         that was not there any more, {@link Outcome.Failed} for one the
+     *         provider refused. A refusal that concerns the whole call — no
+     *         wastebasket, POP3 — is still thrown.
      *
      * <p>Deliberately not an expunge. All three providers have somewhere
      * things go before they are gone — IMAP's Trash, Graph's Deleted Items,
@@ -146,21 +149,28 @@ public interface MailStore extends AutoCloseable {
      * be undone from the provider's own client would be the wrong kind of
      * honest.
      */
-    java.util.List<String> delete(String folderId, java.util.List<String> messageIds);
+    java.util.List<Outcome> delete(String folderId, java.util.List<String> messageIds);
 
     /**
      * Brings deleted messages back into {@code folderId} — the Undo of
      * {@link #delete}.
      *
-     * @param receipt what {@link #delete} returned: the handles the messages
-     *                have in the wastebasket, which are not always the ids
-     *                they had before (Graph gives a moved message a new id,
+     * @param receipt the handles {@link #delete} answered with
+     *                ({@link Outcome#handles}): what the messages are called
+     *                in the wastebasket, which is not always what they were
+     *                called before (Graph gives a moved message a new id,
      *                IMAP a new UID)
      */
     void restore(String folderId, java.util.List<String> receipt);
 
-    /** Moves messages to another folder of the same mailbox. */
-    void move(String folderId, java.util.List<String> messageIds, String targetFolderId);
+    /**
+     * Moves messages to another folder of the same mailbox.
+     *
+     * @return one {@link Outcome} per id, in the order asked — {@link Outcome.Moved}
+     *         says where it is now and what it is called there, which at IMAP
+     *         and Graph is a new id
+     */
+    java.util.List<Outcome> move(String folderId, java.util.List<String> messageIds, String targetFolderId);
 
     boolean canSend();
 

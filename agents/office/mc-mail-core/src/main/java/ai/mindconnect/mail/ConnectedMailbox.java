@@ -37,6 +37,11 @@ public record ConnectedMailbox(String provider, String key, String label, boolea
         return provider + "." + key;
     }
 
+    /** The mailbox id a connection opens as — what a store stamps on every {@link Location}. */
+    public static String idOf(ai.mindconnect.agent.tool.ToolConnection connection) {
+        return connection.provider() + "." + connection.key();
+    }
+
     public static String providerOf(String id) {
         int dot = id == null ? -1 : id.indexOf('.');
         return dot < 0 ? null : id.substring(0, dot);
