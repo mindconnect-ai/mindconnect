@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -26,13 +27,25 @@ import java.util.UUID;
  * the account's own is either one calendar or the home that holds several,
  * and an appointment is a file in one of them. So {@link UserCalendar#id()} is
  * the calendar's collection URL and an appointment's id is its {@code UID} —
- * the two things the server needs, and both stable.
+ * the two things the server needs, and both stable. The file an appointment
+ * lives in is usually {@code <calendar>/<UID>.ics} — it is where this store
+ * writes new ones — but a server or another client may have named it
+ * otherwise, so when that address is empty the store asks the calendar which
+ * file holds the UID.
  *
- * <p>What this does not do: recurrence rules (a recurring appointment is read
- * as the occurrences the server returns for the period, and changing one of
- * them changes the file), free/busy, invitations beyond writing the attendees
- * into the event, and calendars shared by somebody else unless the account's
- * home lists them.
+ * <p><b>Every request goes to the account's own server.</b> Each one carries
+ * the account's password, and a calendar id arrives from the model — which
+ * reads mail and web pages somebody else wrote. An id is therefore only
+ * followed when it is one of the account's {@link #calendars()} or lies under
+ * the account's address on the same scheme, host and port; anything else is
+ * refused before a byte is sent.
+ *
+ * <p>What this does not do: recurrence rules beyond keeping them (a recurring
+ * appointment is read as the occurrences the server expands for the period,
+ * changing its title, place, notes or attendees changes the series, and moving
+ * it is refused), free/busy, invitations beyond writing the attendees into the
+ * event, and calendars shared by somebody else unless the account's home lists
+ * them.
  */
 public final class CalDavCalendarStore implements CalendarStore {
 
@@ -45,6 +58,14 @@ public final class CalDavCalendarStore implements CalendarStore {
 
     /** Calendars are asked for once per store; the screens ask several times per request. */
     private List<UserCalendar> calendars;
+
+    /**
+     * The files read in this store, by calendar and appointment id. A change
+     * reads the appointment first (the tools do, to fill in what the model
+     * left out) and then writes it: the write goes to the file that was read
+     * and only if it is still the version that was read.
+     */
+    private final Map<String, CalDavClient.Resource> read = new HashMap<>();
 
     public CalDavCalendarStore(CalDavClient dav, CalDavAccount account) {
         this(dav, account, ZoneId.systemDefault());
@@ -109,12 +130,10 @@ public final class CalDavCalendarStore implements CalendarStore {
     @Override
     public CalendarEvent read(String calendarId, String eventId) {
         URI calendar = calendar(calendarId);
-        String ical = call(() -> dav.get(account, file(calendar, eventId)));
-        List<CalendarEvent> found = ICalendar.events(ical, calendar.toString(), eventId);
-        if (found.isEmpty()) {
-            throw new CalendarStoreException("There is no appointment " + eventId + " in that calendar.");
-        }
-        return found.get(0);
+        CalDavClient.Resource file = call(() -> locate(calendar, eventId));
+        CalendarEvent found = ICalendar.master(file.body(), calendar.toString(), eventId);
+        if (found == null) throw missing(eventId);
+        return found;
     }
 
     @Override
@@ -134,15 +153,20 @@ public final class CalDavCalendarStore implements CalendarStore {
     }
 
     /**
-     * Writes the appointment again, whole. CalDAV has no partial write: a PUT
-     * replaces the file, which is why the caller reads the appointment first
-     * and hands back everything it means to keep.
+     * Writes the appointment again. CalDAV has no partial write: a PUT
+     * replaces the file, so the file as the server holds it is patched with
+     * what the draft changes ({@link ICalendar#patch}) — a recurrence rule, an
+     * alarm or an attendee's answer is kept — and written back with
+     * {@code If-Match}, so that a change somebody made in between fails
+     * instead of being overwritten.
      */
     @Override
     public void update(String calendarId, String eventId, EventDraft draft) {
         URI calendar = calendar(calendarId);
         call(() -> {
-            dav.put(account, file(calendar, eventId), ICalendar.write(draft, eventId, zone));
+            CalDavClient.Resource file = locate(calendar, eventId);
+            dav.put(account, file.url(), ICalendar.patch(file.body(), draft), file.etag());
+            read.remove(key(calendar, eventId));
             return "";
         });
     }
@@ -151,7 +175,9 @@ public final class CalDavCalendarStore implements CalendarStore {
     public void delete(String calendarId, String eventId) {
         URI calendar = calendar(calendarId);
         call(() -> {
-            dav.delete(account, file(calendar, eventId));
+            CalDavClient.Resource file = locate(calendar, eventId);
+            dav.delete(account, file.url(), file.etag());
+            read.remove(key(calendar, eventId));
             return "";
         });
     }
@@ -163,20 +189,117 @@ public final class CalDavCalendarStore implements CalendarStore {
 
     // ── addresses ───────────────────────────────────────────────────────────
 
-    /** The calendar a call names, or the first one when it names none. */
+    /**
+     * The calendar a call names, or the first one when it names none.
+     *
+     * <p>The id comes from the model, and whatever URL it is, the request to
+     * it carries the account's password. So it has to be a calendar the
+     * server listed, or an address under the account's own on the same
+     * server; a prompt that talks the model into
+     * {@code https://attacker.example/} gets a refusal, not the password.
+     */
     private URI calendar(String calendarId) {
         if (calendarId == null || calendarId.isBlank()) {
             List<UserCalendar> all = calendars();
             if (all.isEmpty()) throw new CalendarStoreException("This account has no calendar.");
             return URI.create(all.get(0).id());
         }
-        return resolve(calendarId);
+        URI uri;
+        try {
+            uri = resolve(calendarId);
+        } catch (IllegalArgumentException e) {
+            throw notOurs(calendarId);
+        }
+        if (sameServer(uri, account.url()) && under(uri, account.url())) return uri;
+        for (UserCalendar listed : calendars()) {
+            URI known = URI.create(listed.id());
+            if (known.normalize().equals(uri.normalize())) return known;
+        }
+        throw notOurs(calendarId);
     }
 
-    /** Where an appointment's file lives: {@code <calendar>/<uid>.ics}. */
-    private static URI file(URI calendar, String eventId) {
+    private static CalendarStoreException notOurs(String calendarId) {
+        return new CalendarStoreException("\"" + calendarId + "\" is not a calendar of this account. "
+                + "Use a calendar id from the account's list of calendars.");
+    }
+
+    /**
+     * The file that holds {@code eventId}, with the version it has now.
+     *
+     * <p>First where this store would have put it, {@code <calendar>/<uid>.ics};
+     * when nothing is there — or something else is — the calendar is asked
+     * which of its files holds that {@code UID}.
+     */
+    private CalDavClient.Resource locate(URI calendar, String eventId) {
+        String key = key(calendar, eventId);
+        CalDavClient.Resource known = read.get(key);
+        if (known != null) return known;
+        CalDavClient.Resource found = null;
+        try {
+            CalDavClient.Resource direct = dav.fetch(account, file(calendar, eventId));
+            if (holds(direct.body(), eventId)) found = direct;
+        } catch (CalDavException e) {
+            if (e.status() != 404) throw e;
+        }
+        if (found == null) found = byUid(calendar, eventId);
+        if (found == null) throw missing(eventId);
+        read.put(key, found);
+        return found;
+    }
+
+    /** The file whose {@code VEVENT} carries this {@code UID}, asked of the calendar; null when none does. */
+    private CalDavClient.Resource byUid(URI calendar, String uid) {
+        String xml;
+        try {
+            xml = dav.report(account, calendar, CalDavClient.Bodies.eventByUid(uid));
+        } catch (CalDavException e) {
+            // A server that cannot filter by UID has no such file to offer either.
+            if (e.status() == 0 || e.status() == 401 || e.status() == 403) throw e;
+            return null;
+        }
+        Map<String, String> etags = CalDavClient.responses(xml, "getetag");
+        for (Map.Entry<String, String> response : CalDavClient.responses(xml, "calendar-data").entrySet()) {
+            if (!holds(response.getValue(), uid)) continue;
+            URI href = resolve(response.getKey());
+            // The server's answer, but the password goes wherever it points.
+            if (!sameServer(href, calendar)) continue;
+            String etag = etags.get(response.getKey());
+            return new CalDavClient.Resource(href, etag == null || etag.isBlank() ? null : etag.strip(),
+                    response.getValue());
+        }
+        return null;
+    }
+
+    private static boolean holds(String ical, String eventId) {
+        return ICalendar.events(ical, "", eventId).stream().anyMatch(e -> e.id().equals(eventId));
+    }
+
+    private static String key(URI calendar, String eventId) {
+        return calendar + "\n" + eventId;
+    }
+
+    private static CalendarStoreException missing(String eventId) {
+        return new CalendarStoreException("There is no appointment " + eventId + " in that calendar.");
+    }
+
+    /**
+     * Where an appointment's file lives: {@code <calendar>/<uid>.ics}. An
+     * appointment without a {@code UID} is known by its file's path, which
+     * has to lie inside the calendar.
+     */
+    private URI file(URI calendar, String eventId) {
         String base = calendar.toString();
         if (!base.endsWith("/")) base = base + "/";
+        if (eventId.startsWith("/")) {
+            URI path;
+            try {
+                path = calendar.resolve(eventId);
+            } catch (IllegalArgumentException e) {
+                throw missing(eventId);
+            }
+            if (!sameServer(path, calendar) || !under(path, calendar)) throw missing(eventId);
+            return path;
+        }
         String name = eventId.endsWith(".ics") ? eventId : eventId + ".ics";
         return URI.create(base + encode(name));
     }
@@ -185,6 +308,29 @@ public final class CalDavCalendarStore implements CalendarStore {
     private URI resolve(String href) {
         URI uri = URI.create(href.strip());
         return uri.isAbsolute() ? uri : account.url().resolve(uri);
+    }
+
+    /** Same scheme, host and port — and no user name smuggled in front of the host. */
+    static boolean sameServer(URI uri, URI home) {
+        return uri.getScheme() != null && uri.getHost() != null && uri.getRawUserInfo() == null
+                && uri.getScheme().equalsIgnoreCase(home.getScheme())
+                && uri.getHost().equalsIgnoreCase(home.getHost())
+                && port(uri) == port(home);
+    }
+
+    /** True when {@code uri}'s path is {@code home}'s or below it, after {@code ..} is taken out. */
+    static boolean under(URI uri, URI home) {
+        String path = uri.normalize().getPath();
+        String base = home.normalize().getPath();
+        if (path == null || base == null) return false;
+        if (path.contains("/../") || path.endsWith("/..") || path.startsWith("..")) return false;
+        String dir = base.endsWith("/") ? base : base + "/";
+        return path.equals(base) || (path + "/").equals(dir) || path.startsWith(dir);
+    }
+
+    private static int port(URI uri) {
+        if (uri.getPort() >= 0) return uri.getPort();
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
     }
 
     private static String encode(String segment) {
