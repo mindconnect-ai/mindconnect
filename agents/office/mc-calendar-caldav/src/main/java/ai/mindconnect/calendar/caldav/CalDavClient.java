@@ -27,13 +27,22 @@ public class CalDavClient {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(30);
 
+    /** How many redirects one request follows before it gives up — a loop ends here. */
+    static final int MAX_REDIRECTS = 5;
+
     private final HttpClient http;
 
+    /**
+     * A client that follows no redirect on its own: the JDK's would carry the
+     * {@code Authorization} header to wherever a redirect points, so this
+     * class follows them itself, and only on the account's own server.
+     */
     public CalDavClient() {
         this(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
-                .followRedirects(HttpClient.Redirect.NORMAL).build());
+                .followRedirects(HttpClient.Redirect.NEVER).build());
     }
 
+    /** Over {@code http}, which should not follow redirects itself — see {@link #CalDavClient()}. */
     public CalDavClient(HttpClient http) {
         this.http = http;
     }
@@ -118,7 +127,52 @@ public class CalDavClient {
         return response.body() == null ? "" : response.body();
     }
 
+    /**
+     * Sends {@code request} and follows the server's redirects — but only
+     * while they stay on the account's scheme, host and port. Every request
+     * carries the account's password; a redirect to another server, whether
+     * a misconfiguration or an attack, is refused rather than handed it.
+     */
     private HttpResponse<String> exchange(CalDavAccount account, HttpRequest request) {
+        HttpResponse<String> response = once(request);
+        for (int hops = 0; redirect(response.statusCode()); hops++) {
+            String location = response.headers().firstValue("Location").orElse(null);
+            if (location == null || location.isBlank()) break;
+            if (hops >= MAX_REDIRECTS) {
+                throw new CalDavException("The calendar server at " + host(account.url())
+                        + " keeps redirecting. Check the CalDAV address on your provider's help page.",
+                        response.statusCode());
+            }
+            URI target;
+            try {
+                target = request.uri().resolve(location.strip());
+            } catch (IllegalArgumentException e) {
+                throw new CalDavException("The calendar server redirected to an address that is none.",
+                        response.statusCode());
+            }
+            if (!CalDavCalendarStore.sameServer(target, account.url())) {
+                throw new CalDavException("The calendar server redirected to " + host(target)
+                        + ", which is not the server of this account, so your password was not sent there. "
+                        + "If that is where your calendar lives now, enter it as the CalDAV address.",
+                        response.statusCode());
+            }
+            HttpRequest.Builder next = HttpRequest.newBuilder(request, (name, value) -> true).uri(target);
+            // 303 means "look over there": a GET, whatever was asked.
+            if (response.statusCode() == 303) next.method("GET", HttpRequest.BodyPublishers.noBody());
+            request = next.build();
+            response = once(request);
+        }
+        if (response.statusCode() >= 400) {
+            throw explain(account, response.statusCode(), request.uri());
+        }
+        return response;
+    }
+
+    private static boolean redirect(int status) {
+        return status == 301 || status == 302 || status == 303 || status == 307 || status == 308;
+    }
+
+    private HttpResponse<String> once(HttpRequest request) {
         HttpResponse<String> response;
         try {
             response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -127,9 +181,6 @@ public class CalDavClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new CalDavException("Interrupted while talking to " + host(request.uri()), e);
-        }
-        if (response.statusCode() >= 400) {
-            throw explain(account, response.statusCode(), request.uri());
         }
         return response;
     }

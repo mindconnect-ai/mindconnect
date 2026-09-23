@@ -8,3 +8,6 @@
   addresses are accepted only for a server on the same machine or the local
   network (`localhost`, private addresses, `nas`, `*.local`); anything else
   has to be `https://`.
+  A redirect from the calendar server is followed only on the same server
+  as well; the HTTP client used to carry the password along to wherever a
+  redirect pointed.

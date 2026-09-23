@@ -19,7 +19,7 @@ final class FakeDav implements AutoCloseable {
     record Call(String method, String path, String authorization, String depth, String ifMatch, String body) { }
 
     /** One answer: a status (0 for the server's default), a body and an ETag header, if any. */
-    private record Answer(int status, String body, String etag) { }
+    private record Answer(int status, String body, String etag, String location) { }
 
     private final HttpServer server;
     private final List<Call> calls = new ArrayList<>();
@@ -34,10 +34,11 @@ final class FakeDav implements AutoCloseable {
                     exchange.getRequestHeaders().getFirst("Authorization"),
                     exchange.getRequestHeaders().getFirst("Depth"),
                     exchange.getRequestHeaders().getFirst("If-Match"), body));
-            Answer answer = answers.isEmpty() ? new Answer(0, "", null) : answers.remove(0);
+            Answer answer = answers.isEmpty() ? new Answer(0, "", null, null) : answers.remove(0);
             byte[] bytes = answer.body().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/xml; charset=utf-8");
             if (answer.etag() != null) exchange.getResponseHeaders().add("ETag", answer.etag());
+            if (answer.location() != null) exchange.getResponseHeaders().add("Location", answer.location());
             exchange.sendResponseHeaders(answer.status() == 0 ? status : answer.status(),
                     bytes.length == 0 ? -1 : bytes.length);
             if (bytes.length > 0) exchange.getResponseBody().write(bytes);
@@ -52,13 +53,19 @@ final class FakeDav implements AutoCloseable {
 
     /** The next answer, and the one after it. */
     FakeDav answers(String... bodies) {
-        for (String body : bodies) answers.add(new Answer(0, body, null));
+        for (String body : bodies) answers.add(new Answer(0, body, null, null));
         return this;
     }
 
     /** The next answer, with its own status and an {@code ETag} header when {@code etag} is not null. */
     FakeDav answer(int status, String body, String etag) {
-        answers.add(new Answer(status, body, etag));
+        answers.add(new Answer(status, body, etag, null));
+        return this;
+    }
+
+    /** The next answer sends the client on to {@code location}. */
+    FakeDav redirects(int status, String location) {
+        answers.add(new Answer(status, "", null, location));
         return this;
     }
 

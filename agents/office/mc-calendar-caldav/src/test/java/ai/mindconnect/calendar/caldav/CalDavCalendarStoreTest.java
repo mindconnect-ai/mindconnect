@@ -402,6 +402,55 @@ class CalDavCalendarStoreTest {
     }
 
     @Test
+    void a_redirect_to_another_server_is_not_followed_with_the_password() throws IOException {
+        try (FakeDav elsewhere = new FakeDav()) {
+            dav.redirects(302, elsewhere.url("/dav/me/").toString());
+
+            assertThatThrownBy(() -> store("/dav/me/").calendars())
+                    .isInstanceOf(CalendarStoreException.class)
+                    .hasMessageContaining("not the server of this account");
+
+            assertThat(elsewhere.calls()).isZero();
+            assertThat(dav.calls()).isEqualTo(1);
+        }
+    }
+
+    @Test
+    void a_redirect_on_the_same_server_is_followed_with_method_and_body() {
+        dav.redirects(301, "/dav/users/me/")
+                .answers("""
+                        <d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+                          <d:response>
+                            <d:href>/dav/users/me/calendar/</d:href>
+                            <d:propstat><d:prop>
+                              <d:resourcetype><d:collection/><c:calendar/></d:resourcetype>
+                              <d:displayname>Privat</d:displayname>
+                            </d:prop></d:propstat>
+                          </d:response>
+                        </d:multistatus>
+                        """);
+
+        List<UserCalendar> calendars = store("/dav/me/").calendars();
+
+        assertThat(calendars).extracting(UserCalendar::name).containsExactly("Privat");
+        assertThat(dav.call(1).method()).isEqualTo("PROPFIND");
+        assertThat(dav.call(1).path()).isEqualTo("/dav/users/me/");
+        assertThat(dav.call(1).depth()).isEqualTo("1");
+        assertThat(dav.call(1).authorization()).startsWith("Basic ");
+        assertThat(dav.call(1).body()).contains("displayname");
+    }
+
+    @Test
+    void a_redirect_loop_ends() {
+        for (int i = 0; i <= CalDavClient.MAX_REDIRECTS; i++) dav.redirects(307, "/dav/me/");
+
+        assertThatThrownBy(() -> store("/dav/me/").calendars())
+                .isInstanceOf(CalendarStoreException.class)
+                .hasMessageContaining("keeps redirecting");
+        assertThat(dav.calls()).isEqualTo(CalDavClient.MAX_REDIRECTS + 1);
+    }
+
+    @Test
     void a_refused_sign_in_says_what_to_do_about_it() {
         dav.refuses(401);
 
