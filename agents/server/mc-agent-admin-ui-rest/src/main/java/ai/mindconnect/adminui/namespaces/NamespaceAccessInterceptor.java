@@ -48,6 +48,12 @@ public class NamespaceAccessInterceptor implements HandlerInterceptor {
      *   <li>the chat, its API and its stream — what they are here for;</li>
      *   <li>their own account: profile, tokens, their variables, and the
      *       namespaces screen, where they see who they work with and can leave;</li>
+     *   <li>what the profile keeps for them alone: the accounts they attach
+     *       (and the sign-in at a provider that attaches one), the tools they
+     *       add to their own chats, and the notifications behind the bell.
+     *       Each of these controllers acts on the caller's own records only —
+     *       an id that is not theirs is answered like one that does not
+     *       exist;</li>
      *   <li>the shell itself: the SPA, its assets, the About dialog, the live
      *       stream of their own events, signing out.</li>
      * </ul>
@@ -60,6 +66,7 @@ public class NamespaceAccessInterceptor implements HandlerInterceptor {
             "/chat", "/admin/api/chat", "/admin/api/sessions", "/admin/api/messages",
             "/admin/profile", "/admin/api/profile",
             "/admin/namespaces", "/admin/api/namespaces",
+            "/admin/api/connections", "/admin/oauth", "/admin/api/user-tools", "/admin/api/notifications",
             "/admin/api/about", "/admin/api/user-stream", "/admin/api/tasks",
             "/admin/logout", "/logout", "/login", "/index.html", "/login.html",
             "/no-access", "/error", "/favicon.ico",

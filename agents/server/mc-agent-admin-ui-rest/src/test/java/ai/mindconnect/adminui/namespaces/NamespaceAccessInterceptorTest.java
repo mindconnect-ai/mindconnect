@@ -116,6 +116,23 @@ class NamespaceAccessInterceptorTest {
     }
 
     @Test
+    void whatTheProfileKeepsForTheUserAloneStaysOpen() throws Exception {
+        signedIn(ALICE);
+
+        for (String path : List.of("/admin/api/connections/imap/new", "/admin/api/connections/c-1/edit",
+                "/admin/api/connections/add/imap", "/admin/api/connections/c-1/test",
+                "/admin/oauth/authorize/google-mail", "/admin/oauth/callback",
+                "/admin/api/user-tools/new", "/admin/api/user-tools/add/web_search",
+                "/admin/api/user-tools/t-1/toggle", "/admin/api/notifications",
+                "/admin/api/notifications/n-1/dismiss", "/admin/api/notifications/dismiss-all")) {
+            assertThat(allowed(path)).as(path).isTrue();
+        }
+        assertThat(NamespaceAccessInterceptor.isOpen("/admin/oauth-providers"))
+                .as("only the sign-in's own two routes, not a screen that merely starts with the name")
+                .isFalse();
+    }
+
+    @Test
     void theRestApiIsNotOpenEither_aTokenCarriesItsOwnersRights() throws Exception {
         signedIn(ALICE);
 

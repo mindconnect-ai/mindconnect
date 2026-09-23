@@ -18,6 +18,9 @@ import java.util.Objects;
  * authentication that does not pass through a place of ours where it could be
  * recorded, the way a JWT or an API token does. Not a bean: an app adds it to
  * its filter chains, so it never runs outside them.
+ *
+ * <p>The address is recorded only when the provider does not say it is
+ * unverified — see {@link VerifiedEmail}.
  */
 public class UserRecordingFilter extends OncePerRequestFilter {
 
@@ -36,7 +39,7 @@ public class UserRecordingFilter extends OncePerRequestFilter {
                 && oidc.getPreferredUsername() != null && !oidc.getPreferredUsername().isBlank()) {
             recorder.record(UserId.of(oidc.getPreferredUsername()), oidc.getSubject(),
                     oidc.getIssuer() == null ? null : oidc.getIssuer().toString(),
-                    oidc.getFullName(), oidc.getEmail());
+                    oidc.getFullName(), VerifiedEmail.of(oidc.getEmail(), oidc.getClaims()));
         }
         chain.doFilter(request, response);
     }
