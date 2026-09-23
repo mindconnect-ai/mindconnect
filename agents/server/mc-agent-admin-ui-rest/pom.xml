@@ -107,6 +107,10 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-extension</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-initial-data</artifactId>
             <version>${project.version}</version>
         </dependency>

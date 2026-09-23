@@ -134,6 +134,11 @@
             <artifactId>mc-agent-admin-ui-rest</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- The worked example of an extension, shipped switched off: Install → Extensions turns it on per namespace. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-extension-demo</artifactId>
+        </dependency>
         <!-- Seeds the bundled example workflows into the store on startup -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

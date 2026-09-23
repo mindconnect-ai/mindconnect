@@ -4,6 +4,8 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import ai.mindconnect.extension.domain.ExtensionRegistry;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
@@ -33,7 +35,7 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
 
     /** Sections whose controllers already serve JSON on the page URL. */
     private static final List<String> SAME_URL_SECTIONS = List.of(
-            "/workflow-admin", "/admin/vector-stores", "/mcp-gateway", "/registry");
+            "/workflow-admin", "/admin/vector-stores", "/mcp-gateway", "/registry", "/admin/extensions");
 
     /** Sections whose controllers still live under /admin/api/<section>. */
     private static final List<String> LEGACY_SECTIONS = List.of(
@@ -44,12 +46,19 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
     /** The chat lives under its own prefix: /chat/... → /chat/api/... */
     private static final List<String> CHAT_SECTION = List.of("/chat");
 
+    /** The extensions' manifests: a route one of them names is a same-URL section of its own. */
+    private final ObjectProvider<ExtensionRegistry> extensions;
+
+    public AdminSameUrlFilter(ObjectProvider<ExtensionRegistry> extensions) {
+        this.extensions = extensions;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res,
                                     FilterChain chain) throws ServletException, IOException {
         if ("GET".equals(req.getMethod())) {
             String path = req.getRequestURI();
-            boolean sameUrl = matches(path, SAME_URL_SECTIONS);
+            boolean sameUrl = matches(path, SAME_URL_SECTIONS) || extensionRoute(path);
             boolean legacy = matches(path, LEGACY_SECTIONS);
             boolean chat = matches(path, CHAT_SECTION) && !path.startsWith("/chat/api");
             if (chat) {
@@ -76,6 +85,11 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
             }
         }
         chain.doFilter(req, res);
+    }
+
+    private boolean extensionRoute(String path) {
+        ExtensionRegistry registry = extensions.getIfAvailable();
+        return registry != null && registry.routeOwner(path).isPresent();
     }
 
     private static boolean matches(String path, List<String> prefixes) {

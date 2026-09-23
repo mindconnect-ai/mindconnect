@@ -1,0 +1,70 @@
+{
+  "id": "demo-dungeon",
+  "name": "Dungeon demo",
+  "version": "0.1.0",
+  "description": "A worked example of an extension: a game master agent that plays one of several scenarios from the extension's own store and saves the character's state through a tool, a dice tool, a runtime feature that decorates a core port, and two screens — play, and see which die face fell most per day.",
+  "vendor": {
+    "id": "mindconnect",
+    "name": "Mindconnect",
+    "homepage": "https://mindconnect.ai"
+  },
+  "runtime": "jar",
+  "requires": {
+    "mindconnect": ">=0.8"
+  },
+  "enabledByDefault": false,
+  "contributes": {
+    "tools": {
+      "providers": [
+        "ai.mindconnect.extension.demo.DiceToolFactory",
+        "ai.mindconnect.extension.demo.StateToolFactory"
+      ],
+      "names": [
+        "demo_*"
+      ]
+    },
+    "features": [
+      "ai.mindconnect.extension.demo.DemoFeature"
+    ],
+    "content": {
+      "agents": [
+        "dungeon-master"
+      ]
+    },
+    "ui": {
+      "menu": [
+        {
+          "id": "nav-demo-dungeon",
+          "label": "Dungeon demo",
+          "href": "/admin/demo-dungeon",
+          "icon": "sparkles",
+          "group": "nav-group-ai"
+        },
+        {
+          "id": "nav-demo-dice-stats",
+          "label": "Dice statistics",
+          "href": "/admin/demo-dungeon/stats",
+          "icon": "bar-chart",
+          "group": "nav-group-data"
+        }
+      ],
+      "routes": [
+        {
+          "path": "/admin/demo-dungeon/**",
+          "roles": [
+            "ADMIN"
+          ]
+        }
+      ]
+    },
+    "rest": [
+      "/admin/demo-dungeon/**"
+    ],
+    "decorates": [
+      "LlmCallTraceRepository"
+    ],
+    "persistence": {
+      "schema": "ext_demo_dungeon"
+    }
+  }
+}

@@ -46,18 +46,19 @@ class AdminLayoutRegistryNavTest {
         UiMenuItem onAgents = install(layout, "/admin/agents");
 
         assertThat(onAgents.getChildren()).extracting(UiMenuItem::getId)
-                .containsExactly("nav-registry", "nav-migrations");
+                .containsExactly("nav-registry", "nav-migrations", "nav-extensions");
         assertThat(onAgents.isOpen()).isFalse();
+        assertThat(install(layout, "/admin/extensions").isOpen()).isTrue();
         assertThat(install(layout, "/admin/migrations").isOpen()).isTrue();
         assertThat(install(layout, "/registry/mindconnect-ai-mc-registry").isOpen()).isTrue();
     }
 
     @Test
-    void without_a_registry_install_holds_migrations_alone() {
+    void without_a_registry_install_holds_migrations_and_extensions() {
         AdminLayout layout = new AdminLayout("mc_user", false, "0.8.2", null, null, false, false);
 
         assertThat(install(layout, "/admin/agents").getChildren()).extracting(UiMenuItem::getId)
-                .containsExactly("nav-migrations");
+                .containsExactly("nav-migrations", "nav-extensions");
     }
 
     /** The Install group of the menu the layout draws around a page at {@code path}. */

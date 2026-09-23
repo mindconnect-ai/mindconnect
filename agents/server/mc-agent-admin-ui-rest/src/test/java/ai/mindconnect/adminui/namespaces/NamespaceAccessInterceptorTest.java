@@ -94,7 +94,7 @@ class NamespaceAccessInterceptorTest {
         for (String path : List.of("/admin/agents", "/admin/api/agents", "/admin/api/agents/new",
                 "/workflow-admin", "/workflow-admin/wf-1/run", "/admin/llm-configs",
                 "/admin/skills", "/admin/tools", "/admin/vector-stores", "/mcp-gateway",
-                "/admin/api-explorer", "/registry", "/admin/migrations")) {
+                "/admin/api-explorer", "/registry", "/admin/migrations", "/admin/extensions")) {
             MockHttpServletResponse response = call(path);
             assertThat(response.getStatus()).as(path).isEqualTo(403);
             assertThat(response.getErrorMessage()).as(path).contains("Only an admin of 'acme'");
