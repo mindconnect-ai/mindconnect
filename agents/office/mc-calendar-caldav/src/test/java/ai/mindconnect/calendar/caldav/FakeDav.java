@@ -16,11 +16,14 @@ import java.util.List;
 final class FakeDav implements AutoCloseable {
 
     /** One request as the server saw it. */
-    record Call(String method, String path, String authorization, String depth, String body) { }
+    record Call(String method, String path, String authorization, String depth, String ifMatch, String body) { }
+
+    /** One answer: a status (0 for the server's default), a body and an ETag header, if any. */
+    private record Answer(int status, String body, String etag) { }
 
     private final HttpServer server;
     private final List<Call> calls = new ArrayList<>();
-    private final List<String> answers = new ArrayList<>();
+    private final List<Answer> answers = new ArrayList<>();
     private int status = 207;
 
     FakeDav() throws IOException {
@@ -29,11 +32,14 @@ final class FakeDav implements AutoCloseable {
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             calls.add(new Call(exchange.getRequestMethod(), exchange.getRequestURI().getPath(),
                     exchange.getRequestHeaders().getFirst("Authorization"),
-                    exchange.getRequestHeaders().getFirst("Depth"), body));
-            String answer = answers.isEmpty() ? "" : answers.remove(0);
-            byte[] bytes = answer.getBytes(StandardCharsets.UTF_8);
+                    exchange.getRequestHeaders().getFirst("Depth"),
+                    exchange.getRequestHeaders().getFirst("If-Match"), body));
+            Answer answer = answers.isEmpty() ? new Answer(0, "", null) : answers.remove(0);
+            byte[] bytes = answer.body().getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/xml; charset=utf-8");
-            exchange.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
+            if (answer.etag() != null) exchange.getResponseHeaders().add("ETag", answer.etag());
+            exchange.sendResponseHeaders(answer.status() == 0 ? status : answer.status(),
+                    bytes.length == 0 ? -1 : bytes.length);
             if (bytes.length > 0) exchange.getResponseBody().write(bytes);
             exchange.close();
         });
@@ -46,7 +52,13 @@ final class FakeDav implements AutoCloseable {
 
     /** The next answer, and the one after it. */
     FakeDav answers(String... bodies) {
-        answers.addAll(List.of(bodies));
+        for (String body : bodies) answers.add(new Answer(0, body, null));
+        return this;
+    }
+
+    /** The next answer, with its own status and an {@code ETag} header when {@code etag} is not null. */
+    FakeDav answer(int status, String body, String etag) {
+        answers.add(new Answer(status, body, etag));
         return this;
     }
 

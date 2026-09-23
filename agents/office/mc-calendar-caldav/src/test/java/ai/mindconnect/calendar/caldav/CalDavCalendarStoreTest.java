@@ -164,21 +164,241 @@ class CalDavCalendarStoreTest {
     }
 
     @Test
-    void changing_one_writes_the_whole_file_again_and_deleting_removes_it() {
-        dav.answers("<d:multistatus xmlns:d=\"DAV:\"/>", "", "");
+    void changing_one_writes_the_file_it_read_and_deleting_removes_it() {
+        dav.answers("<d:multistatus xmlns:d=\"DAV:\"/>")
+                .answer(200, "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:erster\r\nSUMMARY:Ferien\r\n"
+                        + "DTSTART;VALUE=DATE:20260923\r\nDTEND;VALUE=DATE:20260925\r\n"
+                        + "END:VEVENT\r\nEND:VCALENDAR\r\n", "\"v1\"")
+                .answer(204, "", null)
+                .answer(200, "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:erster\r\nSUMMARY:Ferien\r\n"
+                        + "DTSTART;VALUE=DATE:20260923\r\nDTEND;VALUE=DATE:20260928\r\n"
+                        + "END:VEVENT\r\nEND:VCALENDAR\r\n", "\"v2\"")
+                .answer(204, "", null);
 
         CalDavCalendarStore store = store("/dav/me/calendar/");
         store.update(null, "erster", new EventDraft(null, "Ferien (verlängert)",
                 EventTime.on(LocalDate.of(2026, 9, 23), LocalDate.of(2026, 9, 27)), null, null, List.of()));
         store.delete(null, "erster");
 
-        assertThat(dav.call(1).method()).isEqualTo("PUT");
-        assertThat(dav.call(1).path()).endsWith("/erster.ics");
-        // An all-day event ends the morning after its last day.
-        assertThat(dav.call(1).body()).contains("DTSTART;VALUE=DATE:20260923")
-                .contains("DTEND;VALUE=DATE:20260928");
-        assertThat(dav.call(2).method()).isEqualTo("DELETE");
+        assertThat(dav.call(1).method()).isEqualTo("GET");
+        assertThat(dav.call(2).method()).isEqualTo("PUT");
         assertThat(dav.call(2).path()).endsWith("/erster.ics");
+        // Only if nobody changed it since it was read.
+        assertThat(dav.call(2).ifMatch()).isEqualTo("\"v1\"");
+        // An all-day event ends the morning after its last day.
+        assertThat(dav.call(2).body()).contains("DTSTART;VALUE=DATE:20260923")
+                .contains("DTEND;VALUE=DATE:20260928").contains("SUMMARY:Ferien (verlängert)")
+                .doesNotContain("DTEND;VALUE=DATE:20260925");
+        assertThat(dav.call(4).method()).isEqualTo("DELETE");
+        assertThat(dav.call(4).path()).endsWith("/erster.ics");
+        assertThat(dav.call(4).ifMatch()).isEqualTo("\"v2\"");
+    }
+
+    @Test
+    void a_change_somebody_made_in_between_fails_instead_of_being_overwritten() {
+        dav.answer(200, "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:erster\r\nSUMMARY:Ferien\r\n"
+                        + "DTSTART;VALUE=DATE:20260923\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n", "\"v1\"")
+                .answer(412, "", null);
+        CalDavCalendarStore store = store("/dav/me/calendar/");
+        String calendar = dav.url("/dav/me/calendar/").toString();
+
+        CalendarEvent was = store.read(calendar, "erster");
+
+        assertThatThrownBy(() -> store.update(calendar, "erster", new EventDraft(null, "Urlaub",
+                was.when(), null, null, List.of())))
+                .isInstanceOf(CalendarStoreException.class)
+                .hasMessageContaining("changed on the server");
+        assertThat(dav.call(1).ifMatch()).isEqualTo("\"v1\"");
+    }
+
+    @Test
+    void an_appointment_filed_under_another_name_is_found_by_its_uid_and_written_back_there() {
+        // Apple, Outlook and DAVx5 name the file themselves; <UID>.ics is empty.
+        dav.answer(404, "", null)
+                .answers("<d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">"
+                        + "<d:response><d:href>/dav/me/calendar/1F2E-3D4C.ics</d:href><d:propstat><d:prop>"
+                        + "<d:getetag>&quot;e1&quot;</d:getetag>"
+                        + "<c:calendar-data>"
+                        + "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:abc@apple\nSUMMARY:Coiffeur\n"
+                        + "DTSTART:20260924T080000Z\nDTEND:20260924T090000Z\nEND:VEVENT\nEND:VCALENDAR"
+                        + "</c:calendar-data></d:prop></d:propstat></d:response></d:multistatus>")
+                .answer(204, "", null);
+        CalDavCalendarStore store = store("/dav/me/calendar/");
+        String calendar = dav.url("/dav/me/calendar/").toString();
+
+        CalendarEvent was = store.read(calendar, "abc@apple");
+        store.update(calendar, "abc@apple", new EventDraft(null, "Coiffeur Anna", was.when(), null, null,
+                List.of()));
+
+        assertThat(was.title()).isEqualTo("Coiffeur");
+        assertThat(dav.call(0).method()).isEqualTo("GET");
+        assertThat(dav.call(0).path()).isEqualTo("/dav/me/calendar/abc@apple.ics");
+        assertThat(dav.call(1).method()).isEqualTo("REPORT");
+        assertThat(dav.call(1).body()).contains("<c:prop-filter name=\"UID\">").contains(">abc@apple<");
+        FakeDav.Call put = dav.call(2);
+        assertThat(put.method()).isEqualTo("PUT");
+        assertThat(put.path()).isEqualTo("/dav/me/calendar/1F2E-3D4C.ics");
+        assertThat(put.ifMatch()).isEqualTo("\"e1\"");
+        assertThat(put.body()).contains("UID:abc@apple").contains("SUMMARY:Coiffeur Anna");
+    }
+
+    @Test
+    void the_listing_asks_the_server_for_the_occurrences_of_a_recurring_appointment() {
+        dav.answers("<d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">"
+                + "<d:response><d:href>/dav/me/calendar/weekly.ics</d:href><d:propstat><d:prop>"
+                + "<c:calendar-data>"
+                + "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:weekly\nSUMMARY:Jour fixe\n"
+                + "RECURRENCE-ID:20260923T080000Z\n"
+                + "DTSTART:20260923T080000Z\nDTEND:20260923T090000Z\nEND:VEVENT\n"
+                + "BEGIN:VEVENT\nUID:weekly\nSUMMARY:Jour fixe\n"
+                + "RECURRENCE-ID:20260930T080000Z\n"
+                + "DTSTART:20260930T080000Z\nDTEND:20260930T090000Z\nEND:VEVENT\nEND:VCALENDAR"
+                + "</c:calendar-data></d:prop></d:propstat></d:response></d:multistatus>");
+        String calendar = dav.url("/dav/me/calendar/").toString();
+
+        List<CalendarEvent> events = store("/dav/me/calendar/").events(calendar,
+                Instant.parse("2026-09-21T00:00:00Z"), Instant.parse("2026-10-05T00:00:00Z"), 50);
+
+        assertThat(dav.call(0).body())
+                .contains("<c:expand start=\"20260921T000000Z\" end=\"20261005T000000Z\"/>");
+        assertThat(events).extracting(e -> e.when().start()).containsExactly(
+                Instant.parse("2026-09-23T08:00:00Z"), Instant.parse("2026-09-30T08:00:00Z"));
+    }
+
+    @Test
+    void changing_a_recurring_appointment_keeps_its_rule_and_what_the_draft_does_not_know() {
+        String original = String.join("\r\n",
+                "BEGIN:VCALENDAR",
+                "VERSION:2.0",
+                "PRODID:-//Apple Inc.//iCal//EN",
+                "BEGIN:VTIMEZONE",
+                "TZID:Europe/Zurich",
+                "END:VTIMEZONE",
+                "BEGIN:VEVENT",
+                "UID:weekly",
+                "SEQUENCE:2",
+                "DTSTAMP:20250101T000000Z",
+                "SUMMARY:Jour fixe",
+                "DTSTART;TZID=Europe/Zurich:20250106T100000",
+                "DTEND;TZID=Europe/Zurich:20250106T110000",
+                "RRULE:FREQ=WEEKLY;BYDAY=MO",
+                "EXDATE;TZID=Europe/Zurich:20250113T100000",
+                "DESCRIPTION:A long description that the server folded because it is longer",
+                "  than seventy-five characters",
+                "ATTENDEE;CN=Anna;PARTSTAT=ACCEPTED:mailto:anna@example.com",
+                "X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC",
+                "BEGIN:VALARM",
+                "ACTION:DISPLAY",
+                "DESCRIPTION:Reminder",
+                "TRIGGER:-PT15M",
+                "END:VALARM",
+                "END:VEVENT",
+                "BEGIN:VEVENT",
+                "UID:weekly",
+                "RECURRENCE-ID;TZID=Europe/Zurich:20250120T100000",
+                "SUMMARY:Jour fixe (verschoben)",
+                "DTSTART;TZID=Europe/Zurich:20250120T140000",
+                "DTEND;TZID=Europe/Zurich:20250120T150000",
+                "END:VEVENT",
+                "END:VCALENDAR", "");
+        dav.answer(200, original, "\"r1\"").answer(204, "", null);
+        CalDavCalendarStore store = store("/dav/me/calendar/");
+        String calendar = dav.url("/dav/me/calendar/").toString();
+
+        CalendarEvent was = store.read(calendar, "weekly");
+        // The series, not its moved occurrence.
+        assertThat(was.title()).isEqualTo("Jour fixe");
+
+        assertThatThrownBy(() -> store.update(calendar, "weekly", new EventDraft(null, was.title(),
+                EventTime.at(Instant.parse("2026-09-28T09:00:00Z"), Instant.parse("2026-09-28T10:00:00Z")),
+                was.location(), was.notes(), was.attendees())))
+                .isInstanceOf(CalendarStoreException.class)
+                .hasMessageContaining("recurring");
+        assertThat(dav.calls()).isEqualTo(1);
+
+        store.update(calendar, "weekly", new EventDraft(null, "Jour fixe Team", was.when(), was.location(),
+                was.notes(), List.of("anna@example.com", "bob@example.com")));
+
+        String put = dav.call(1).body();
+        assertThat(put)
+                .contains("RRULE:FREQ=WEEKLY;BYDAY=MO")
+                .contains("EXDATE;TZID=Europe/Zurich:20250113T100000")
+                .contains("DTSTART;TZID=Europe/Zurich:20250106T100000")
+                .contains("DTEND;TZID=Europe/Zurich:20250106T110000")
+                .contains("BEGIN:VTIMEZONE")
+                .contains("X-APPLE-TRAVEL-ADVISORY-BEHAVIOR:AUTOMATIC")
+                .contains("DESCRIPTION:A long description that the server folded because it is longer\r\n"
+                        + "  than seventy-five characters")
+                .contains("DESCRIPTION:Reminder")
+                .contains("ATTENDEE;CN=Anna;PARTSTAT=ACCEPTED:mailto:anna@example.com")
+                .contains("ATTENDEE;ROLE=REQ-PARTICIPANT:mailto:bob@example.com")
+                .contains("SUMMARY:Jour fixe Team")
+                .contains("SEQUENCE:3")
+                .contains("SUMMARY:Jour fixe (verschoben)")
+                .contains("RECURRENCE-ID;TZID=Europe/Zurich:20250120T100000")
+                .doesNotContain("SUMMARY:Jour fixe\r\n")
+                .doesNotContain("SEQUENCE:2")
+                .doesNotContain("DTSTAMP:20250101T000000Z");
+        // The new lines go before the alarm, where RFC 5545 wants properties.
+        assertThat(put.indexOf("SUMMARY:Jour fixe Team")).isLessThan(put.indexOf("BEGIN:VALARM"));
+    }
+
+    @Test
+    void a_calendar_id_on_another_server_is_refused_before_the_password_leaves() throws IOException {
+        try (FakeDav elsewhere = new FakeDav()) {
+            dav.answers("<d:multistatus xmlns:d=\"DAV:\"/>", "<d:multistatus xmlns:d=\"DAV:\"/>");
+            CalDavCalendarStore store = store("/dav/me/");
+            String stolen = elsewhere.url("/collect/").toString();
+            String networkPath = "//127.0.0.1:" + elsewhere.url("/").getPort() + "/collect/";
+
+            for (String id : List.of(stolen, networkPath, "https://attacker.example/collect/",
+                    "http://me%40web.de@127.0.0.1:" + dav.url("/").getPort() + "/dav/me/")) {
+                assertThatThrownBy(() -> store.read(id, "erster"))
+                        .isInstanceOf(CalendarStoreException.class)
+                        .hasMessageContaining("not a calendar of this account");
+                assertThatThrownBy(() -> store.events(id, Instant.parse("2026-09-23T00:00:00Z"),
+                        Instant.parse("2026-09-24T00:00:00Z"), 10))
+                        .isInstanceOf(CalendarStoreException.class);
+            }
+            // The same server, but above the account's address, is not the account's either.
+            assertThatThrownBy(() -> store.delete(dav.url("/dav/someone-else/").toString(), "erster"))
+                    .isInstanceOf(CalendarStoreException.class);
+            assertThatThrownBy(() -> store.read(dav.url("/dav/me/../someone-else/").toString(), "erster"))
+                    .isInstanceOf(CalendarStoreException.class);
+
+            assertThat(elsewhere.calls()).isZero();
+            // The account's own server was only asked for its list of calendars.
+            for (int i = 0; i < dav.calls(); i++) assertThat(dav.call(i).method()).isEqualTo("PROPFIND");
+        }
+    }
+
+    @Test
+    void a_calendar_under_the_account_or_one_the_server_listed_is_followed() {
+        String ical = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:erster\r\nSUMMARY:Ferien\r\n"
+                + "DTSTART;VALUE=DATE:20260923\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n";
+        dav.answer(200, ical, null)
+                .answers("""
+                        <d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+                          <d:response>
+                            <d:href>/dav/shared/team/</d:href>
+                            <d:propstat><d:prop>
+                              <d:resourcetype><d:collection/><c:calendar/></d:resourcetype>
+                              <d:displayname>Team</d:displayname>
+                            </d:prop></d:propstat>
+                          </d:response>
+                        </d:multistatus>
+                        """)
+                .answer(200, ical, null);
+        CalDavCalendarStore store = store("/dav/me/");
+
+        // Under the account's address: followed without asking.
+        assertThat(store.read("/dav/me/calendar/", "erster").title()).isEqualTo("Ferien");
+        // Elsewhere on the server, but listed by it as one of the account's calendars.
+        assertThat(store.read("/dav/shared/team/", "erster").title()).isEqualTo("Ferien");
+
+        assertThat(dav.call(0).path()).isEqualTo("/dav/me/calendar/erster.ics");
+        assertThat(dav.call(1).method()).isEqualTo("PROPFIND");
+        assertThat(dav.call(2).path()).isEqualTo("/dav/shared/team/erster.ics");
     }
 
     @Test
@@ -207,6 +427,24 @@ class CalDavCalendarStoreTest {
         assertThatThrownBy(() -> CalDavAccount.from(connection(Map.of(
                 "url", "caldav.web.de", "user", "me", "password", "p"))))
                 .isInstanceOf(CalDavException.class).hasMessageContaining("https://");
+    }
+
+    @Test
+    void plain_http_is_only_accepted_for_a_server_nearby() {
+        // Basic authentication without TLS hands the password to everyone on the way.
+        assertThatThrownBy(() -> CalDavAccount.from(connection(Map.of(
+                "url", "http://caldav.example.com/dav/", "user", "me", "password", "p"))))
+                .isInstanceOf(CalDavException.class).hasMessageContaining("https://");
+        assertThatThrownBy(() -> CalDavAccount.from(connection(Map.of(
+                "url", "http://8.8.8.8/dav/", "user", "me", "password", "p"))))
+                .isInstanceOf(CalDavException.class);
+
+        for (String url : List.of("http://localhost:5232/", "http://127.0.0.1:5232/", "http://192.168.1.10/dav/",
+                "http://10.0.0.5/", "http://[::1]:5232/", "http://nas:5232/", "http://radicale.local/",
+                "https://caldav.example.com/dav/")) {
+            assertThat(CalDavAccount.from(connection(Map.of("url", url, "user", "me", "password", "p"))).url())
+                    .hasToString(url);
+        }
     }
 
     private static ToolConnection connection(Map<String, String> fields) {

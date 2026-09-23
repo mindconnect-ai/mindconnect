@@ -4,9 +4,12 @@ import ai.mindconnect.agent.tool.ConnectionSpec;
 import ai.mindconnect.agent.tool.ToolConnection;
 import ai.mindconnect.schema.Schema;
 
+import java.net.InetAddress;
 import java.net.URI;
+import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.Objects;
 
 /**
@@ -78,10 +81,44 @@ public record CalDavAccount(URI url, String user, String password) {
         } catch (IllegalArgumentException e) {
             throw new CalDavException("\"" + url + "\" is not a web address.");
         }
-        if (uri.getScheme() == null || !uri.getScheme().startsWith("http")) {
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        if (!scheme.equals("https") && !scheme.equals("http") || uri.getHost() == null) {
             throw new CalDavException("The calendar address has to start with https://.");
         }
+        if (scheme.equals("http") && !nearby(uri.getHost())) {
+            throw new CalDavException("The calendar address has to start with https:// — over http:// the "
+                    + "password would cross the internet readable to anyone on the way. Plain http:// is "
+                    + "only accepted for a server on this machine or the local network.");
+        }
         return new CalDavAccount(uri, user, password);
+    }
+
+    /**
+     * True for a host plain {@code http://} is acceptable for: this machine,
+     * a private or link-local address, or a name that only a local network
+     * resolves ({@code nas}, {@code radicale.local}, {@code ….home.arpa}).
+     * Every request carries the password in Basic form, which without TLS is
+     * as good as plain text — fine between a server and the Radicale next to
+     * it, not across the internet. The name is judged as written; it is not
+     * looked up.
+     */
+    static boolean nearby(String host) {
+        String name = host.toLowerCase(Locale.ROOT);
+        if (name.startsWith("[") && name.endsWith("]")) name = name.substring(1, name.length() - 1);
+        if (name.equals("localhost") || name.endsWith(".localhost")) return true;
+        if (name.endsWith(".local") || name.endsWith(".lan") || name.endsWith(".internal")
+                || name.endsWith(".home.arpa")) {
+            return true;
+        }
+        boolean literal = name.contains(":") || name.matches("[0-9.]+");
+        if (!literal) return !name.contains(".");
+        try {
+            InetAddress address = InetAddress.getByName(name);
+            return address.isLoopbackAddress() || address.isSiteLocalAddress() || address.isLinkLocalAddress()
+                    || address instanceof java.net.Inet6Address && (address.getAddress()[0] & 0xfe) == 0xfc;
+        } catch (UnknownHostException e) {
+            return false;
+        }
     }
 
     /** The Authorization header value — CalDAV servers take Basic over TLS. */

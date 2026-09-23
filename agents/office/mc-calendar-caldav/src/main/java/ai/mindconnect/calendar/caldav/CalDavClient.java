@@ -58,20 +58,51 @@ public class CalDavClient {
 
     /** One resource — an {@code .ics} file. */
     public String get(CalDavAccount account, URI url) {
-        return send(account, request(account, url).GET().build());
+        return fetch(account, url).body();
+    }
+
+    /**
+     * One resource with the {@code ETag} it has on the server right now — what
+     * a later write hands back as {@code If-Match}, so that it fails rather
+     * than overwrites when somebody changed the file in between.
+     */
+    public Resource fetch(CalDavAccount account, URI url) {
+        HttpResponse<String> response = exchange(account, request(account, url).GET().build());
+        return new Resource(url, response.headers().firstValue("ETag").orElse(null),
+                response.body() == null ? "" : response.body());
     }
 
     /** Writes an {@code .ics}: a new appointment, or a new version of one. */
     public void put(CalDavAccount account, URI url, String ical) {
-        send(account, request(account, url)
+        put(account, url, ical, null);
+    }
+
+    /**
+     * Writes an {@code .ics} only if it is still the version {@code etag}
+     * names; the server answers 412 otherwise. A null {@code etag} writes
+     * unconditionally.
+     */
+    public void put(CalDavAccount account, URI url, String ical, String etag) {
+        HttpRequest.Builder request = request(account, url)
                 .header("Content-Type", "text/calendar; charset=utf-8")
-                .PUT(HttpRequest.BodyPublishers.ofString(ical, StandardCharsets.UTF_8))
-                .build());
+                .PUT(HttpRequest.BodyPublishers.ofString(ical, StandardCharsets.UTF_8));
+        if (etag != null && !etag.isBlank()) request.header("If-Match", etag);
+        send(account, request.build());
     }
 
     public void delete(CalDavAccount account, URI url) {
-        send(account, request(account, url).DELETE().build());
+        delete(account, url, null);
     }
+
+    /** Removes a resource only if it is still the version {@code etag} names, when one is given. */
+    public void delete(CalDavAccount account, URI url, String etag) {
+        HttpRequest.Builder request = request(account, url).DELETE();
+        if (etag != null && !etag.isBlank()) request.header("If-Match", etag);
+        send(account, request.build());
+    }
+
+    /** An {@code .ics} as it is on the server: where, which version, and what it says. */
+    public record Resource(URI url, String etag, String body) { }
 
     // ── internals ───────────────────────────────────────────────────────────
 
@@ -83,6 +114,11 @@ public class CalDavClient {
     }
 
     private String send(CalDavAccount account, HttpRequest request) {
+        HttpResponse<String> response = exchange(account, request);
+        return response.body() == null ? "" : response.body();
+    }
+
+    private HttpResponse<String> exchange(CalDavAccount account, HttpRequest request) {
         HttpResponse<String> response;
         try {
             response = http.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
@@ -95,24 +131,25 @@ public class CalDavClient {
         if (response.statusCode() >= 400) {
             throw explain(account, response.statusCode(), request.uri());
         }
-        return response.body() == null ? "" : response.body();
+        return response;
     }
 
     private CalDavException explain(CalDavAccount account, int status, URI url) {
-        return switch (status) {
-            case 401, 403 -> new CalDavException("The calendar server refused the sign-in for "
+        String message = switch (status) {
+            case 401, 403 -> "The calendar server refused the sign-in for "
                     + account.user() + ". Many providers want an app-specific password here; open the "
-                    + "connection under Connections in your profile and check it.");
-            case 404 -> new CalDavException("There is no calendar at " + url.getPath()
-                    + ". Check the CalDAV address on your provider's help page.");
-            case 405 -> new CalDavException("The server does not allow that here — the address is probably "
-                    + "not a calendar but a page above it.");
-            case 412 -> new CalDavException("The appointment changed on the server while this was writing. "
-                    + "Read it again and repeat the change.");
-            case 429, 503 -> new CalDavException("The calendar server is asking us to slow down. "
-                    + "Try again in a moment.");
-            default -> new CalDavException("The calendar server refused (HTTP " + status + ").");
+                    + "connection under Connections in your profile and check it.";
+            case 404 -> "There is no calendar at " + url.getPath()
+                    + ". Check the CalDAV address on your provider's help page.";
+            case 405 -> "The server does not allow that here — the address is probably "
+                    + "not a calendar but a page above it.";
+            case 412 -> "The appointment changed on the server while this was writing. "
+                    + "Read it again and repeat the change.";
+            case 429, 503 -> "The calendar server is asking us to slow down. "
+                    + "Try again in a moment.";
+            default -> "The calendar server refused (HTTP " + status + ").";
         };
+        return new CalDavException(message, status);
     }
 
     private static String host(URI url) {
@@ -141,8 +178,42 @@ public class CalDavClient {
                     """;
         }
 
-        /** The appointments of one calendar that touch a period, with their data. */
+        /**
+         * The appointments of one calendar that touch a period, with their data.
+         *
+         * <p>{@code expand} asks the server to turn a recurring appointment
+         * into the occurrences that fall into the period (RFC 4791, 9.6.5):
+         * without it the answer is the series' first VEVENT with its rule,
+         * and a weekly meeting that began last year would be listed on the
+         * day it began.
+         */
         public static String eventsBetween(String from, String to) {
+            return """
+                    <?xml version="1.0" encoding="utf-8"?>
+                    <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+                      <d:prop>
+                        <d:getetag/>
+                        <c:calendar-data>
+                          <c:expand start="%s" end="%s"/>
+                        </c:calendar-data>
+                      </d:prop>
+                      <c:filter>
+                        <c:comp-filter name="VCALENDAR">
+                          <c:comp-filter name="VEVENT">
+                            <c:time-range start="%s" end="%s"/>
+                          </c:comp-filter>
+                        </c:comp-filter>
+                      </c:filter>
+                    </c:calendar-query>
+                    """.formatted(from, to, from, to);
+        }
+
+        /**
+         * The resource that holds the appointment with this {@code UID} — for
+         * servers whose file names are not the UID (Apple, Outlook, DAVx5 all
+         * pick their own).
+         */
+        public static String eventByUid(String uid) {
             return """
                     <?xml version="1.0" encoding="utf-8"?>
                     <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
@@ -153,12 +224,19 @@ public class CalDavClient {
                       <c:filter>
                         <c:comp-filter name="VCALENDAR">
                           <c:comp-filter name="VEVENT">
-                            <c:time-range start="%s" end="%s"/>
+                            <c:prop-filter name="UID">
+                              <c:text-match collation="i;octet">%s</c:text-match>
+                            </c:prop-filter>
                           </c:comp-filter>
                         </c:comp-filter>
                       </c:filter>
                     </c:calendar-query>
-                    """.formatted(from, to);
+                    """.formatted(escape(uid));
+        }
+
+        private static String escape(String text) {
+            return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                    .replace("\"", "&quot;");
         }
     }
 
