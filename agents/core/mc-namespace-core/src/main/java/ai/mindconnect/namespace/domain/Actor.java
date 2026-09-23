@@ -3,6 +3,7 @@ package ai.mindconnect.namespace.domain;
 import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.UserId;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -42,9 +43,18 @@ public record Actor(UserId id, Email email) {
         return new Actor(id, Email.parse(email).orElse(null));
     }
 
-    /** Whether this actor is listed under {@code entry}. */
+    /**
+     * Whether this actor is listed under {@code entry}. An entry without an
+     * {@code @} is a user id: records written before namespaces listed people
+     * by address (0.8.2 and older) name them that way, and they must keep
+     * their namespaces after an upgrade. A bare name can no longer be written
+     * ({@link Email#qualified} adds a domain), so this matches old entries only.
+     */
     public boolean matches(Email entry) {
-        return entry != null && entry.equals(email);
+        if (entry == null) return false;
+        if (entry.equals(email)) return true;
+        return entry.value().indexOf('@') < 0
+                && entry.value().equals(id.value().toLowerCase(Locale.ROOT));
     }
 
     public Optional<Email> address() {

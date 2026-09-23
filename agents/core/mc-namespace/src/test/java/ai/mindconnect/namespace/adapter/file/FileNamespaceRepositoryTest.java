@@ -5,6 +5,7 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
+import ai.mindconnect.namespace.domain.NamespaceRole;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
@@ -84,6 +85,28 @@ class FileNamespaceRepositoryTest {
                 .satisfies(ns -> assertThat(ns.createdBy()).isEqualTo(DAVID))
                 .satisfies(ns -> assertThat(ns.admins()).as("the creator shapes it").containsExactly(DAVID))
                 .satisfies(ns -> assertThat(ns.users()).as("everyone else worked in it").containsExactly(ALICE));
+    }
+
+    @Test
+    void aRecordFrom082ListsUserIds_andTheyKeepTheirNamespaceAfterTheUpgrade() throws Exception {
+        // What 0.8.2 wrote: the creator and the members by user id, not by address.
+        Files.createDirectories(dir.resolve("system/namespaces"));
+        Files.writeString(dir.resolve("system/namespaces/old.json"), """
+                {"id":"old","displayName":null,"createdBy":"david","createdAt":"2026-09-15T12:00:00Z",\
+                "members":["david","alice"]}
+                """);
+        var repo = new FileNamespaceRepository(dir, mapper);
+        Actor david = Actor.of(UserId.of("david"), Email.of("david@corp.example"));
+        Actor alice = Actor.of(UserId.of("Alice"), Email.of("alice@corp.example"));
+        Actor mallory = Actor.of(UserId.of("mallory"), Email.of("david@evil.example"));
+
+        NamespaceDefinition old = repo.findById(new Namespace("old")).orElseThrow();
+        assertThat(old.role(david)).contains(NamespaceRole.ADMIN);
+        assertThat(old.isCreator(david)).isTrue();
+        assertThat(old.role(alice)).as("an id matches whatever case it signs in with").contains(NamespaceRole.USER);
+        assertThat(old.role(mallory)).as("an old entry is an id, never the local part of an address").isEmpty();
+        assertThat(repo.findFor(alice)).extracting(NamespaceDefinition::id).containsExactly(new Namespace("old"));
+        assertThat(old.entryOf(alice)).contains(Email.of("alice"));
     }
 
     @Test

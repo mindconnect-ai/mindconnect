@@ -438,6 +438,24 @@ class NamespaceServiceTest {
     }
 
     @Test
+    void namingAdminsLaterAddsThemToTheDefaultRecordThatAlreadyExists() {
+        // Written while the default namespace was open (0.8.2, or before the admins were named): nobody listed.
+        service.defaultDefinition();
+        repository.save(repository.findById(Namespace.DEFAULT).orElseThrow().withUser(ALICES));
+        NamespaceService closed = new NamespaceService(repository, Namespace.DEFAULT,
+                Clock.fixed(NOW, ZoneOffset.UTC), List.of(), id -> Optional.empty(), "local",
+                List.of(DAVIDS));
+
+        assertThat(closed.role(DAVID, Namespace.DEFAULT)).as("the named admin is not locked out")
+                .contains(NamespaceRole.ADMIN);
+        assertThat(closed.role(ALICE, Namespace.DEFAULT)).as("who was already listed stays")
+                .contains(NamespaceRole.USER);
+        assertThat(closed.role(BOB, Namespace.DEFAULT)).isEmpty();
+        assertThat(repository.findById(Namespace.DEFAULT)).get()
+                .satisfies(ns -> assertThat(ns.admins()).containsExactly(DAVIDS));
+    }
+
+    @Test
     void withoutAnAdminListTheDefaultNamespaceStaysOpenToEverybody() {
         assertThat(service.defaultIsOpen()).isTrue();
         assertThat(service.role(ALICE, Namespace.DEFAULT)).contains(NamespaceRole.ADMIN);

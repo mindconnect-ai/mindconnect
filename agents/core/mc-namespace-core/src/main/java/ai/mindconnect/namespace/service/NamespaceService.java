@@ -138,15 +138,28 @@ public class NamespaceService {
 
     /**
      * The default namespace's record, created on first use — with the admins the
-     * installation named, if it named any.
+     * installation named, if it named any. A record that already exists gets the
+     * named admins it lacks: one written while the default namespace was still
+     * open (by 0.8.2, or before {@code namespace-admins} was set) lists nobody,
+     * and closing the namespace would otherwise lock everyone out, the named
+     * admins included.
      */
     public NamespaceDefinition defaultDefinition() {
-        return namespaces.findById(defaultNamespace).orElseGet(() -> {
-            NamespaceDefinition created = NamespaceDefinition.create(
-                    defaultNamespace, null, defaultAdmins, Instant.now(clock));
-            namespaces.save(created);
-            return created;
-        });
+        NamespaceDefinition stored = namespaces.findById(defaultNamespace).orElse(null);
+        if (stored != null && stored.admins().containsAll(defaultAdmins)) return stored;
+        synchronized (lockFor(defaultNamespace)) {
+            NamespaceDefinition current = namespaces.findById(defaultNamespace).orElse(null);
+            NamespaceDefinition wanted;
+            if (current == null) {
+                wanted = NamespaceDefinition.create(defaultNamespace, null, defaultAdmins, Instant.now(clock));
+            } else {
+                wanted = current;
+                for (Email admin : defaultAdmins) wanted = wanted.withAdmin(admin);
+                if (wanted == current) return current;
+            }
+            namespaces.save(wanted);
+            return wanted;
+        }
     }
 
     public Optional<NamespaceDefinition> find(Namespace id) {
