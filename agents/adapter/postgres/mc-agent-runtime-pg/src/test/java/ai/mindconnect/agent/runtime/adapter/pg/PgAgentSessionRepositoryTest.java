@@ -64,6 +64,23 @@ class PgAgentSessionRepositoryTest {
     }
 
     @Test
+    void aTypeKeepsASessionOutOfTheChatsListAndInItsOwn() {
+        AgentSession chat = session("david", "2026-09-03T00:00:00Z", null);
+        AgentSession office = session("david", "2026-09-04T00:00:00Z", null).withType("office");
+        repo.create(chat);
+        repo.create(office);
+
+        assertThat(repo.findByUser(UserId.of("david"))).containsExactly(office, chat);
+        assertThat(repo.findByUser(UserId.of("david"), AgentSession.CHAT)).containsExactly(chat);
+        assertThat(repo.findByUser(UserId.of("david"), "office")).containsExactly(office);
+        assertThat(repo.findHeadersByUser(UserId.of("david"), AgentSession.CHAT))
+                .extracting(AgentSessionHeader::id).containsExactly(chat.id());
+        assertThat(repo.findHeadersByUser(UserId.of("david"), "office"))
+                .extracting(AgentSessionHeader::type).containsExactly("office");
+        assertThat(repo.findById(office.id())).map(AgentSession::type).contains("office");
+    }
+
+    @Test
     void headersMatchTheFullSessionsFieldForField() {
         AgentSession a = session("david", "2026-09-03T00:00:00Z", null).withApprovedTool("bash");
         AgentSession b = session("david", "2026-09-01T00:00:00Z", null);

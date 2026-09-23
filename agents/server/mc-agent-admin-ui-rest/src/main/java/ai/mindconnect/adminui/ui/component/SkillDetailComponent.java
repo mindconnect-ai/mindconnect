@@ -50,6 +50,7 @@ public final class SkillDetailComponent implements UiComponent {
         UiDetail detail = UiDetail.of(id(), skill.name())
                 .field(UiField.text("name", "Name", skill.name()))
                 .field(UiField.text("description", "Description", skill.description()))
+                .field(UiField.text("group", "Group", skill.group()))
                 .field(UiField.bool("enabled", "Enabled", skill.enabled()))
                 .field(UiField.text("source", "Source", sourceLabel(skill)))
                 .field(UiField.text("tools", "Tools it expects",

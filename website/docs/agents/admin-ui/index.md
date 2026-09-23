@@ -472,6 +472,30 @@ now. `NotificationService` handles the collapsing, and `UserSetup` clears what
 a check has stopped reporting. Where no `NotificationRepository` is assembled
 there is no bell and nothing is raised.
 
+## Preferences
+
+A screen may remember where you left it — the folder that was open, the view
+you chose, the column you sorted by — and open there the next time, on any
+device you sign in from.
+
+For hosts: inject `PreferenceService` and keep what a screen remembers under a
+*scope* of its own (`office.email`, `admin.agents`), as string values:
+
+```java
+preferences.merge(user, "office.email", Map.of("mailbox", mailboxId, "folder", folderId));
+String folder = preferences.get(user, "office.email", "folder").orElse("INBOX");
+```
+
+Changing one value keeps the others of the scope, and a write that changes
+nothing writes nothing, so storing the state on every navigation is fine.
+Names are at most 64 characters, a scope holds at most 100 keys and a value at
+most 4,096 characters. Preferences live beside the users — a file per user and
+scope under `system/preferences/`, or the table `mc_user_preference` — and they
+are **not** the user's variables: not encrypted, not passed to tools, not shown
+under Variables. A value a tool should read belongs there instead. Where no
+`PreferenceRepository` is assembled there is no `PreferenceService`; a screen
+should treat that as "remembers nothing".
+
 ## Related
 
 - [Environment variables](../environment-variables.md) — every variable you can

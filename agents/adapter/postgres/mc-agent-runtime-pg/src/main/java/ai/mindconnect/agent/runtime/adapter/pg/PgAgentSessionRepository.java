@@ -56,6 +56,8 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
                 .column("title", "TEXT", AgentSession::title)
                 .column("status", "TEXT", AgentSession::status)
                 .column("completed_at", "TIMESTAMPTZ", AgentSession::completedAt)
+                // Added later: rows written before it hold NULL, which is a chat.
+                .column("session_type", "TEXT", AgentSession::type)
                 .index("namespace", "user_id", "started_at")
                 .index("namespace", "parent_session_id")
                 .build(sql);
@@ -109,10 +111,32 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
                 namespace.value(), user.value());
     }
 
+    @Override
+    public List<AgentSession> findByUser(UserId user, String type) {
+        return sessions.find("WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
+                        + "AND COALESCE(session_type, 'chat') = ? "
+                        + "ORDER BY started_at DESC NULLS LAST, id",
+                namespace.value(), user.value(), typeOrChat(type));
+    }
+
+    @Override
+    public List<Header> findHeadersByUser(UserId user, String type) {
+        return sessions.select(PgAgentSessionRepository::header,
+                "WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
+                        + "AND COALESCE(session_type, 'chat') = ? "
+                        + "ORDER BY started_at DESC NULLS LAST, id",
+                namespace.value(), user.value(), typeOrChat(type));
+    }
+
+    private static String typeOrChat(String type) {
+        return type == null || type.isBlank() ? AgentSession.CHAT : type;
+    }
+
     /** {@link AgentSessionHeader} built from the row — every scalar of a session, none of its collections. */
     public record Header(SessionId id, AgentId agentDefinitionId, UserId userId,
                          ConversationId conversationId, String title, SessionStatus status,
-                         Instant startedAt, Instant completedAt, SessionId parentSessionId)
+                         Instant startedAt, Instant completedAt, SessionId parentSessionId,
+                         String type)
             implements AgentSessionHeader { }
 
     private static Header header(Row row) throws SQLException {
@@ -123,7 +147,8 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
                 ConversationId.of(row.string("conversation_id")),
                 row.string("title"), row.enumValue("status", SessionStatus.class),
                 row.instant("started_at"), row.instant("completed_at"),
-                parent == null ? null : SessionId.of(parent));
+                parent == null ? null : SessionId.of(parent),
+                typeOrChat(row.string("session_type")));
     }
 
     @Override

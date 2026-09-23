@@ -39,4 +39,12 @@ public interface AgentSessionHeader {
     Instant completedAt();
 
     SessionId parentSessionId();
+
+    /**
+     * What kind of session — see {@link ai.mindconnect.agent.runtime.domain.AgentSession#type}.
+     * A header that does not know is a chat.
+     */
+    default String type() {
+        return ai.mindconnect.agent.runtime.domain.AgentSession.CHAT;
+    }
 }

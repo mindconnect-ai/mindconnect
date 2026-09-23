@@ -53,6 +53,17 @@ the finished report:
 | `mc-agent-tools*` | Built-in tool providers (web, browser, document, todo, workflow) |
 | `mc-agent-registry-core` / `mc-agent-registry` | Import LLM configs, agents, workflows and whole packages from a registry — a GitHub project with an index |
 
+### `office/` — a person's own things, one port per kind
+
+| Module | Purpose |
+|--------|---------|
+| `mc-mail-core` | `MailStore`: folders, paging, search, reading, organising, sending — and `MailProvider`, the seam a kind of mailbox plugs into |
+| `mc-mail-imap` | IMAP, POP3 and SMTP: the Mailbox card a user fills in, its Test button, and the provider that opens it |
+| `mc-agent-tools-mail` | The mail tools (`mail_list`, `mail_read`, `mail_send` …) over every mailbox a user connected, named `provider.key` or `all` |
+| `mc-calendar-core` | `CalendarStore`: the calendars, a period of appointments, creating, changing, deleting — and `CalendarProvider` |
+| `mc-calendar-caldav` | CalDAV: the card, its Test button, and enough iCalendar to read and write an appointment |
+| `mc-agent-tools-calendar` | The calendar tools (`calendar_events`, `calendar_create` …) over every calendar account, named `provider.key` or `all` |
+
 ### `mcp/` — Model Context Protocol servers as tools
 
 Registered, not compiled in: an operator adds a server in the admin UI and its

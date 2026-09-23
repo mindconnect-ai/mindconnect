@@ -39,6 +39,10 @@ import java.util.regex.Pattern;
  *                     lower case, digits and dashes
  * @param description  when to reach for it, in one line; this is what the
  *                     model decides on, so it says WHEN, not what
+ * @param group        whose skill it is — {@code office} for the mail
+ *                     assistant's rules, {@code general} when nobody said:
+ *                     a rubric for the list and a filter for a tool, like a
+ *                     tool's group, never a permission
  * @param instructions the body, handed over whole on use
  * @param tools        the tools the instructions expect, if any — named to
  *                     the model when the skill is loaded, never granted:
@@ -55,6 +59,7 @@ public record Skill(
         SkillId id,
         String name,
         String description,
+        String group,
         String instructions,
         List<String> tools,
         boolean enabled,
@@ -71,9 +76,13 @@ public record Skill(
     /** Past this the instructions are a manual, not a skill, and are cut on load. */
     public static final int MAX_INSTRUCTION_CHARS = 50_000;
 
+    /** The group of a skill nobody filed: what every skill had before there were groups. */
+    public static final String GENERAL = "general";
+
     public Skill {
         name = normalisedName(name);
         description = description == null ? "" : description.strip();
+        group = normalisedGroup(group);
         instructions = instructions == null ? "" : instructions.strip();
         tools = tools == null ? List.of() : List.copyOf(tools);
         source = source == null ? SkillSource.MANAGED : source;
@@ -88,10 +97,20 @@ public record Skill(
         return value == null ? null : value.strip().toLowerCase(Locale.ROOT);
     }
 
-    /** A new skill, as created in the admin UI. */
+    /** Lower case, {@link #GENERAL} when blank — a rubric is typed by people and models alike. */
+    private static String normalisedGroup(String value) {
+        return value == null || value.isBlank() ? GENERAL : value.strip().toLowerCase(Locale.ROOT);
+    }
+
+    /** A new skill, as created in the admin UI, in the general group. */
     public static Skill create(String name, String description, String instructions, List<String> tools) {
+        return create(name, null, description, instructions, tools);
+    }
+
+    /** A new skill in {@code group}. */
+    public static Skill create(String name, String group, String description, String instructions, List<String> tools) {
         Instant now = Instant.now();
-        return new Skill(SkillId.random(), name, description, instructions, tools, true,
+        return new Skill(SkillId.random(), name, description, group, instructions, tools, true,
                 SkillSource.MANAGED, null, now, now, null);
     }
 
@@ -112,20 +131,26 @@ public record Skill(
 
     /** This skill as read with, or to be saved against, {@code version}. */
     public Skill withVersion(Long version) {
-        return new Skill(id, name, description, instructions, tools, enabled, source, directory,
+        return new Skill(id, name, description, group, instructions, tools, enabled, source, directory,
+                createdAt, updatedAt, version);
+    }
+
+    /** The same skill filed under {@code group}. */
+    public Skill withGroup(String group) {
+        return new Skill(id, name, description, group, instructions, tools, enabled, source, directory,
                 createdAt, updatedAt, version);
     }
 
     /** The same skill marked as coming from {@code source}, out of {@code directory}. */
     public Skill from(SkillSource source, String directory) {
-        return new Skill(id, name, description, instructions, tools, enabled, source, directory,
+        return new Skill(id, name, description, group, instructions, tools, enabled, source, directory,
                 createdAt, updatedAt, version);
     }
 
     /** Everything the admin form can change, with {@code updatedAt} moved on. */
     public Skill withFields(String name, String description, String instructions,
                             List<String> tools, boolean enabled) {
-        return new Skill(id, name, description, instructions, tools, enabled, source, directory,
+        return new Skill(id, name, description, group, instructions, tools, enabled, source, directory,
                 createdAt, Instant.now(), version);
     }
 
@@ -154,6 +179,7 @@ public record Skill(
     public String toMarkdown() {
         StringBuilder out = new StringBuilder("---\n");
         out.append("name: ").append(name).append('\n');
+        if (!GENERAL.equals(group)) out.append("group: ").append(group).append('\n');
         if (!description.isBlank()) out.append("description: ").append(description).append('\n');
         if (!tools.isEmpty()) out.append("tools: ").append(String.join(", ", tools)).append('\n');
         return out.append("---\n\n").append(instructions).append('\n').toString();
@@ -182,7 +208,8 @@ public record Skill(
         String normalised = name.strip().toLowerCase(Locale.ROOT);
         if (!NAME.matcher(normalised).matches()) return null;
         List<String> tools = parsed.list("tools");
-        return new Skill(SkillId.of(normalised), normalised, parsed.get("description", ""), instructions,
+        return new Skill(SkillId.of(normalised), normalised, parsed.get("description", ""),
+                parsed.get("group", null), instructions,
                 tools == null ? List.of() : tools, true, source, directory, null, null, null);
     }
 }
