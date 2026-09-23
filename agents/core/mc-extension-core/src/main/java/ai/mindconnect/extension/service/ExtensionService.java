@@ -250,6 +250,20 @@ public class ExtensionService {
     }
 
     /**
+     * Whether a plain user of the current namespace may open the path: an
+     * extension that is on here names a route for it, and the most specific
+     * such route names {@code USER}. Every other path is left to the host's
+     * own rules.
+     */
+    public boolean opensToUsers(String requestPath) {
+        return routeOwner(requestPath)
+                .filter(Status::enabled)
+                .flatMap(status -> status.manifest().contributes().ui().routeFor(requestPath))
+                .map(ExtensionManifest.Ui.Route::forUsers)
+                .orElse(false);
+    }
+
+    /**
      * Whether a tool of that name belongs to an extension that is off in the
      * current namespace — matched against the name patterns the manifests
      * declare ({@code acme_*}). A name no extension claims is nobody's to hide.

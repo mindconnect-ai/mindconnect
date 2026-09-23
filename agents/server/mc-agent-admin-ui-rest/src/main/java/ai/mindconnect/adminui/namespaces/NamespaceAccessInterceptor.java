@@ -12,6 +12,7 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * The net under the roles: a user of the namespace they are working in reaches
@@ -27,6 +28,12 @@ import java.util.Objects;
  * where it is done ({@code NamespaceService}), and the navigation simply does
  * not offer what a user cannot reach ({@code AdminLayout.chatOnly}). This
  * catches the controller somebody adds without asking either.
+ *
+ * <p>Beside the list, an extension's manifest can open a route to users
+ * ({@code "roles": ["USER"]}): a member of the namespace passes there while
+ * the extension is on in it. The manifest names the route, so the list does
+ * not have to — and a user who is not in the namespace gets no further than
+ * before.
  *
  * <p>Admins pass untouched, and so does everything on an installation with no
  * namespace service at all.
@@ -61,10 +68,21 @@ public class NamespaceAccessInterceptor implements HandlerInterceptor {
 
     private final NamespaceService namespaces;
     private final ScopeSupplier scope;
+    private final Predicate<String> userRoutes;
 
     public NamespaceAccessInterceptor(NamespaceService namespaces, ScopeSupplier scope) {
+        this(namespaces, scope, path -> false);
+    }
+
+    /**
+     * @param userRoutes whether a path is a route an extension that is on in
+     *                   the current namespace opens to its users
+     */
+    public NamespaceAccessInterceptor(NamespaceService namespaces, ScopeSupplier scope,
+                                      Predicate<String> userRoutes) {
         this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
         this.scope = Objects.requireNonNull(scope, "scope");
+        this.userRoutes = Objects.requireNonNull(userRoutes, "userRoutes");
     }
 
     @Override
@@ -76,6 +94,7 @@ public class NamespaceAccessInterceptor implements HandlerInterceptor {
         if (user == null) return true;
         Namespace namespace = scope.namespace();
         if (namespaces.isAdmin(user, namespace)) return true;
+        if (userRoutes.test(path) && namespaces.role(user, namespace).isPresent()) return true;
         response.sendError(HttpServletResponse.SC_FORBIDDEN,
                 "Only an admin of '" + namespace.value() + "' may do that");
         return false;
