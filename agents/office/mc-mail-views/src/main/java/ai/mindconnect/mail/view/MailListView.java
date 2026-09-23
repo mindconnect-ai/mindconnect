@@ -83,6 +83,36 @@ public interface MailListView {
         return without(moved.keySet());
     }
 
+    /**
+     * The one account this view is about, or null when it spans several or
+     * none — what the sidebar opens, what the composer writes from.
+     */
+    default String account() {
+        return null;
+    }
+
+    /** The one folder this view is about, or null — what the sidebar highlights. */
+    default String folderId() {
+        return null;
+    }
+
+    /** Where "back" leads from this view, or null when there is no back. */
+    default ViewId from() {
+        return null;
+    }
+
+    /** {@link ViewState#extra} key: the chat this view belongs to. */
+    String SESSION = "sessionId";
+
+    /**
+     * The chat this view belongs to — the one that gathered it — or null.
+     * Opening the view opens that chat again beside it: a list and the
+     * conversation that made it are one thing to the person.
+     */
+    default String session() {
+        return state().extra(SESSION);
+    }
+
     /** True for a view that has no record in the store until somebody changes its state. */
     default boolean derived() {
         return data().isEmpty() && !id().isSaved();

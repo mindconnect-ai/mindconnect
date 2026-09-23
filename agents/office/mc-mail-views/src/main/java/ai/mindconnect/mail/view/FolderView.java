@@ -62,8 +62,8 @@ public final class FolderView implements MailListView {
     @Override public boolean organises() { return organises; }
     @Override public MailListView without(Collection<String> rowIds) { return this; }
 
-    public String account() { return account; }
-    public String folderId() { return folderId; }
+    @Override public String account() { return account; }
+    @Override public String folderId() { return folderId; }
 
     @Override
     public String title() {

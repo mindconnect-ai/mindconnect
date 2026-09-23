@@ -33,11 +33,14 @@ public final class AgentView implements MailListView {
 
     public static final String KIND = "agent";
 
-    /** More is a folder, not a finding. */
-    public static final int MAX = 200;
+    /**
+     * A bound, not a page: a list is references, read a page at a time, so
+     * "the five hundred newsletters" is an ordinary answer. Past this it is
+     * the folder itself, and a folder is a view of its own.
+     */
+    public static final int MAX = 5_000;
 
-    /** {@link ViewState#extra} keys: the chat that gathered it, and the view it was gathered from. */
-    public static final String SESSION = "sessionId";
+    /** {@link ViewState#extra} key: the view it was gathered from. The chat is {@link MailListView#SESSION}. */
     public static final String FROM = "from";
 
     private static final String ENTRIES = "entries";
@@ -73,11 +76,19 @@ public final class AgentView implements MailListView {
     @Override public boolean lives() { return false; }
     @Override public boolean canRemove() { return true; }
 
+    /** The account it was gathered from, when that was one account's folder — for the sidebar and the composer. */
+    @Override
+    public String account() {
+        ViewId from = from();
+        return from == null ? null : from.account();
+    }
+
     public List<MailMessage.Ref> entries() { return entries; }
     public int size() { return entries.size(); }
     public boolean full() { return entries.size() >= MAX; }
 
     /** The view the chat was opened on — where "back" leads. */
+    @Override
     public ViewId from() {
         String from = state.extra(FROM);
         return from == null ? null : ViewId.of(from);

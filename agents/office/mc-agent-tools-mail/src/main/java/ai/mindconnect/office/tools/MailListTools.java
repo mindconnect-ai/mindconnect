@@ -90,7 +90,7 @@ final class MailListTools {
     private AgentView listOf(UserId user, String sessionId) {
         if (sessionId != null) {
             for (StoredView stored : views.saved(user, AgentView.KIND)) {
-                if (sessionId.equals(stored.state().extra(AgentView.SESSION))) {
+                if (sessionId.equals(stored.state().extra(MailListView.SESSION))) {
                     return (AgentView) views.open(user, stored.id());
                 }
             }
