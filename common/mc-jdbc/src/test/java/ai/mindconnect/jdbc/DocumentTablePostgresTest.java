@@ -48,6 +48,23 @@ class DocumentTablePostgresTest {
     }
 
     @Test
+    void aTableInASchemaOfItsOwnIsCreatedWithItsIndexesTwiceOver() {
+        sql.execute("DROP SCHEMA IF EXISTS mc_jdbc_test_ext CASCADE");
+        sql.execute("CREATE SCHEMA mc_jdbc_test_ext");
+        DocumentTable<Thing> inSchema = table().table("mc_jdbc_test_ext.thing").build(sql);
+
+        inSchema.createSchema();
+        inSchema.createSchema();   // idempotent, as every start runs it
+        Thing t = thing("default", "one");
+        inSchema.save(t);
+
+        assertThat(inSchema.findById(t.id())).contains(t);
+        assertThat(sql.scalar("SELECT count(*) FROM pg_indexes WHERE schemaname = 'mc_jdbc_test_ext'"
+                + " AND indexname = 'thing_namespace_name_idx'", Long.class)).isEqualTo(1L);
+        sql.execute("DROP SCHEMA mc_jdbc_test_ext CASCADE");
+    }
+
+    @Test
     void saveThenFindByIdReturnsAnEqualObject() {
         Thing t = thing("default", "one");
         things.save(t);

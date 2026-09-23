@@ -138,6 +138,32 @@ class NamespaceAccessInterceptorTest {
     }
 
     @Test
+    void aRouteAnExtensionOpensToUsersLetsAMemberThroughAndNobodyElse() throws Exception {
+        // What ExtensionService.opensToUsers answers for a manifest with
+        // /admin/usage/** for admins and /admin/usage/mine/** for users.
+        NamespaceAccessInterceptor withExtensions = new NamespaceAccessInterceptor(namespaces,
+                ScopeSupplier.fixed(Scope.of(ACME, DAVID)),
+                path -> path.equals("/admin/usage/mine") || path.startsWith("/admin/usage/mine/"));
+
+        signedIn(ALICE);
+        assertThat(status(withExtensions, "/admin/usage/mine")).isEqualTo(200);
+        assertThat(status(withExtensions, "/admin/usage/mine/export")).isEqualTo(200);
+        assertThat(status(withExtensions, "/admin/usage")).as("the admin's page of the same extension").isEqualTo(403);
+        assertThat(status(interceptor, "/admin/usage/mine")).as("without extensions nothing is opened").isEqualTo(403);
+
+        signedIn(UserId.of("mallory"));
+        assertThat(status(withExtensions, "/admin/usage/mine"))
+                .as("a route open to users is open to the namespace's users, not to anybody signed in")
+                .isEqualTo(403);
+    }
+
+    private static int status(NamespaceAccessInterceptor interceptor, String path) throws Exception {
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        interceptor.preHandle(new MockHttpServletRequest("GET", path), response, new Object());
+        return response.getStatus();
+    }
+
+    @Test
     void aPrefixOnlyMatchesWholeSegments() {
         assertThat(NamespaceAccessInterceptor.isOpen("/chat")).isTrue();
         assertThat(NamespaceAccessInterceptor.isOpen("/chat/session-1")).isTrue();

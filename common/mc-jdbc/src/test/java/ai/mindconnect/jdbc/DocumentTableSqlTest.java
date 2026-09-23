@@ -39,6 +39,19 @@ class DocumentTableSqlTest {
                 """);
     }
 
+    @Test
+    void anIndexOfATableInASchemaIsNamedWithoutTheSchema() {
+        String ddl = DocumentTable.of(Thing.class)
+                .table("ext_acme.mc_thing")
+                .id("id", "UUID", Thing::id)
+                .column("name", "TEXT", Thing::name)
+                .index("name")
+                .build(Sql.of(null)).ddl();
+
+        assertThat(ddl).contains("CREATE TABLE IF NOT EXISTS ext_acme.mc_thing (")
+                .contains("CREATE INDEX IF NOT EXISTS mc_thing_name_idx ON ext_acme.mc_thing (name);");
+    }
+
     private final DocumentTable<Thing> tenantThings = DocumentTable.of(Thing.class)
             .table("mc_tenant_thing")
             .partitionKey("namespace", "TEXT", Thing::namespace)

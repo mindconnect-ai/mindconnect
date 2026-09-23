@@ -109,9 +109,12 @@ public final class DocumentTable<T> {
             out.append("ALTER TABLE ").append(table).append(" ADD COLUMN IF NOT EXISTS ")
                .append(c.name()).append(' ').append(c.type()).append(";\n");
         }
+        // An index is named without the schema: Postgres puts it in the table's
+        // schema and refuses a qualified name ("ext_x.t_a_idx" is a syntax error).
+        String indexPrefix = table.substring(table.lastIndexOf('.') + 1);
         for (Index i : indexes) {
             out.append("CREATE ").append(i.unique() ? "UNIQUE " : "").append("INDEX IF NOT EXISTS ")
-               .append(table).append('_').append(String.join("_", i.columns())).append("_idx ON ")
+               .append(indexPrefix).append('_').append(String.join("_", i.columns())).append("_idx ON ")
                .append(table).append(" (").append(String.join(", ", i.columns())).append(");\n");
         }
         return out.toString();
