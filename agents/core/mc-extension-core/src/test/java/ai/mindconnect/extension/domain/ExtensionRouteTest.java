@@ -34,4 +34,22 @@ class ExtensionRouteTest {
                 .isEqualTo(ExtensionId.of("acme-crm"));
         assertThat(registry.routeOwner("/admin/agents")).isEmpty();
     }
+
+    @Test
+    void the_most_specific_route_answers_for_a_path_and_says_whether_users_may_open_it() {
+        var admin = new ExtensionManifest.Ui.Route("/admin/usage/**", List.of("ADMIN"));
+        var mine = new ExtensionManifest.Ui.Route("/admin/usage/mine/**", List.of("USER"));
+        var ui = new ExtensionManifest.Ui(null, List.of(admin, mine), null);
+
+        assertThat(ui.routeFor("/admin/usage")).contains(admin);
+        assertThat(ui.routeFor("/admin/usage/mine")).contains(mine);
+        assertThat(ui.routeFor("/admin/usage/mine/export")).contains(mine);
+        assertThat(ui.routeFor("/admin/usage/minefield")).contains(admin);
+        assertThat(ui.routeFor("/admin/agents")).isEmpty();
+
+        assertThat(admin.forUsers()).isFalse();
+        assertThat(mine.forUsers()).isTrue();
+        assertThat(new ExtensionManifest.Ui.Route("/admin/x/**", List.of("admin", "user")).forUsers()).isTrue();
+        assertThat(ROUTE.forUsers()).as("no roles: an admin's").isFalse();
+    }
 }

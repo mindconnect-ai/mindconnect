@@ -169,6 +169,16 @@ public record ExtensionManifest(
         }
 
         /**
+         * The route that answers for a request path: the most specific one
+         * covering it, so {@code /admin/acme/mine/**} decides for its own
+         * pages although {@code /admin/acme/**} covers them too.
+         */
+        public java.util.Optional<Route> routeFor(String requestPath) {
+            return routes.stream().filter(route -> route.covers(requestPath))
+                    .max(java.util.Comparator.comparingInt(route -> route.prefix().length()));
+        }
+
+        /**
          * A sidebar entry the extension contributes. With {@code label} and
          * {@code href} the host renders it — into the group {@code group}
          * names (a shipped one like {@code nav-group-tools}, or a new one
@@ -222,6 +232,11 @@ public record ExtensionManifest(
                 if (requestPath == null) return false;
                 String prefix = prefix();
                 return requestPath.equals(prefix) || requestPath.startsWith(prefix + "/");
+            }
+
+            /** Whether a plain user of the namespace (not an admin) may open it. */
+            public boolean forUsers() {
+                return roles.stream().anyMatch("USER"::equalsIgnoreCase);
             }
         }
     }
