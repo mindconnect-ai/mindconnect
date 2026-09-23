@@ -4,6 +4,7 @@ import ai.mindconnect.adminui.setup.ToolConnections;
 import ai.mindconnect.agent.tool.Acquisition;
 import ai.mindconnect.agent.tool.ConnectionSpec;
 import ai.mindconnect.credentials.domain.Connection;
+import ai.mindconnect.credentials.domain.OAuth2UserCreds;
 import ai.mindconnect.schema.Schema;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
@@ -164,6 +165,10 @@ public final class ConnectionsComponent {
      * The add/edit form, rendered from the provider's schema. Secrets come back
      * empty on an edit and empty means "leave it" — a password is never shown
      * again, so anything else would wipe it on every rename.
+     *
+     * <p>A connection made by signing in is edited by its name alone: the
+     * schema describes the hand-filled way to connect, and none of its fields
+     * belong to a token.
      */
     public static UiForm form(ConnectionSpec spec, Connection editing, String error) {
         Schema schema = spec.form().map(Acquisition.Form::schema).orElse(null);
@@ -178,7 +183,10 @@ public final class ConnectionsComponent {
                         .hint(editing == null
                                 ? "What you call this account. Tools refer to it by a short form of the name."
                                 : "Renaming is safe: tools keep referring to it as \"" + editing.key() + "\"."));
-        if (schema != null) {
+        if (editing != null && signedIn(editing)) {
+            form.field(UiField.text("signed-in", "Account",
+                    "Signed in at the provider. To use another account, remove this one and connect again."));
+        } else if (schema != null) {
             ParamFormFields.addTo(form, schema, null, editing == null ? Map.of() : settingsOf(editing));
         }
         form.action(UiAction.primary(FORM_ID + "-save", editing == null ? "Connect" : "Save").icon("link")
@@ -189,6 +197,14 @@ public final class ConnectionsComponent {
             form.error(error);
         }
         return form;
+    }
+
+    /**
+     * True for a connection whose credentials came from a sign-in rather than
+     * the form — its edit form offers the name only, and saving it renames.
+     */
+    public static boolean signedIn(Connection connection) {
+        return connection.credentials() instanceof OAuth2UserCreds;
     }
 
     /** Only the readable half is prefilled; a secret is never sent back to the browser. */

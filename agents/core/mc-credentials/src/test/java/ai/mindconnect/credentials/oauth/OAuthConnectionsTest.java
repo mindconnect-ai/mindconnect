@@ -115,6 +115,75 @@ class OAuthConnectionsTest {
     }
 
     @Test
+    void two_calls_that_find_the_same_token_running_out_refresh_it_once() throws Exception {
+        // A provider that rotates refresh tokens: the first refresh gets a new
+        // pair, a second one with the old refresh token is refused.
+        server.slow(300)
+                .answers("""
+                        {"access_token":"at-2","refresh_token":"rt-2","expires_in":3600}""")
+                .refuses(400, """
+                        {"error":"invalid_grant","error_description":"refresh token already used"}""");
+        Connection stored = attached(NOW.plusSeconds(30));
+
+        java.util.concurrent.CyclicBarrier start = new java.util.concurrent.CyclicBarrier(2);
+        java.util.concurrent.Callable<Connection> call = () -> {
+            start.await();
+            return oauth.ensureFresh(stored);
+        };
+        List<Connection> results;
+        try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var first = pool.submit(call);
+            var second = pool.submit(call);
+            results = List.of(first.get(10, java.util.concurrent.TimeUnit.SECONDS),
+                    second.get(10, java.util.concurrent.TimeUnit.SECONDS));
+        }
+
+        assertThat(server.requests()).as("the second call used the first one's token").isEqualTo(1);
+        assertThat(server.request(0)).containsEntry("refresh_token", "rt-1");
+        assertThat(results).allSatisfy(result -> {
+            assertThat(result.usable()).isTrue();
+            assertThat(((OAuth2UserCreds) result.credentials()).accessToken()).isEqualTo("at-2");
+        });
+        Connection after = repository.findById(stored.id()).orElseThrow();
+        assertThat(after.usable()).isTrue();
+        assertThat(((OAuth2UserCreds) after.credentials()).refreshToken()).isEqualTo("rt-2");
+    }
+
+    @Test
+    void a_refresh_does_not_write_over_a_rename_that_landed_in_between() {
+        server.answers("""
+                {"access_token":"at-2","expires_in":3600}""");
+        Connection stored = attached(NOW.plusSeconds(30));
+        connections.rename(ALICE, stored.id(), "Work");
+
+        // The caller still holds the record from before the rename.
+        Connection fresh = oauth.ensureFresh(stored);
+
+        assertThat(fresh.label()).isEqualTo("Work");
+        assertThat(repository.findById(stored.id()).orElseThrow().label()).isEqualTo("Work");
+        assertThat(((OAuth2UserCreds) repository.findById(stored.id()).orElseThrow().credentials())
+                .accessToken()).isEqualTo("at-2");
+    }
+
+    @Test
+    void editing_a_signed_in_connection_keeps_its_token_and_its_app_registration() {
+        Connection stored = attached(NOW.plusSeconds(3600));
+
+        // What the edit form sends for a provider whose schema has a secret
+        // field: the name, a setting and the secret left blank.
+        Connection edited = connections.update(ALICE, stored.id(), "Work",
+                java.util.Map.of("mailbox", "shared@example.com", "password", ""),
+                java.util.Set.of("password")).orElseThrow();
+
+        assertThat(edited.label()).isEqualTo("Work");
+        assertThat(edited.credentials()).isEqualTo(stored.credentials());
+        assertThat(edited.settings())
+                .containsEntry(OAuthConnections.PROVIDER_SETTING, "ms-graph")
+                .containsEntry("mailbox", "shared@example.com");
+        assertThat(repository.findById(stored.id()).orElseThrow().credentials()).isEqualTo(stored.credentials());
+    }
+
+    @Test
     void a_refusal_marks_the_connection_rather_than_failing_every_call_the_same_way() {
         server.refuses(400, """
                 {"error":"invalid_grant","error_description":"refresh token expired"}""");
