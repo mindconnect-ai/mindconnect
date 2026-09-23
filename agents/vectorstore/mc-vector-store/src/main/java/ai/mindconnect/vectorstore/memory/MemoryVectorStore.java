@@ -2,6 +2,7 @@ package ai.mindconnect.vectorstore.memory;
 
 import ai.mindconnect.vectorstore.VectorChunk;
 import ai.mindconnect.vectorstore.VectorStore;
+import ai.mindconnect.vectorstore.Vectors;
 import com.fasterxml.jackson.databind.MappingIterator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -88,10 +89,10 @@ final class MemoryVectorStore implements VectorStore {
     public List<SearchHit> search(float[] queryEmbedding, int topK) {
         return locked(() -> {
             Map<String, VectorChunk> current = ensureLoaded();
-            float[] query = normalised(queryEmbedding.clone());
+            float[] query = Vectors.normalised(queryEmbedding);
             List<SearchHit> hits = new ArrayList<>();
             for (VectorChunk chunk : current.values()) {
-                hits.add(new SearchHit(chunk, dot(query, chunk.embedding())));
+                hits.add(new SearchHit(chunk, Vectors.dot(query, chunk.embedding())));
             }
             hits.sort(Comparator.comparingDouble(SearchHit::score).reversed());
             return hits.size() > topK ? List.copyOf(hits.subList(0, topK)) : hits;
@@ -195,21 +196,6 @@ final class MemoryVectorStore implements VectorStore {
 
     private static VectorChunk normalised(VectorChunk chunk) {
         return new VectorChunk(chunk.id(), chunk.fileId(), chunk.ordinal(), chunk.text(),
-                chunk.metadata(), normalised(chunk.embedding().clone()));
-    }
-
-    private static float[] normalised(float[] vector) {
-        double norm = 0;
-        for (float v : vector) norm += v * v;
-        norm = Math.sqrt(norm);
-        if (norm == 0) return vector;
-        for (int i = 0; i < vector.length; i++) vector[i] /= (float) norm;
-        return vector;
-    }
-
-    private static double dot(float[] a, float[] b) {
-        double sum = 0;
-        for (int i = 0; i < a.length; i++) sum += a[i] * b[i];
-        return sum;
+                chunk.metadata(), Vectors.normalised(chunk.embedding()));
     }
 }

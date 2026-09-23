@@ -195,7 +195,7 @@ class PgEmbeddingIndexTest {
         assertThat(index.chunkCount(INBOX_1, "nomic")).isZero();
         assertThat(index.indexedVersion(moved, "nomic")).contains("v1");
         assertThat(index.chunkCount(moved, "other")).isEqualTo(1);
-        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "mail").in("email.freemail", "Archive"),
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "mail").owner(ALICE).in("email.freemail", "Archive"),
                 vec(1f, 0f, 0f), 10)).extracting(h -> h.ref() + "/" + h.chunk().id()).containsExactly(moved + "/c0");
         assertThatThrownBy(() -> index.relocate(moved, EntityRef.of("file", "files", "x")))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -257,7 +257,7 @@ class PgEmbeddingIndexTest {
         EmbeddingIndex other = new PgEmbeddingIndex(dataSource, new Namespace(namespace.value() + "-other"));
 
         assertThat(other.search(EmbeddingQuery.of(MODEL, Set.of(FILE_A)), vec(1f, 0f, 0f), 10)).isEmpty();
-        assertThat(other.search(EmbeddingQuery.ofTypes(MODEL, "file"), vec(1f, 0f, 0f), 10)).isEmpty();
+        assertThat(other.search(EmbeddingQuery.ofTypes(MODEL, "file").anyOwner(), vec(1f, 0f, 0f), 10)).isEmpty();
         other.delete(FILE_A);
         assertThat(index.chunkCount(FILE_A, MODEL)).isEqualTo(1);
     }
@@ -274,6 +274,52 @@ class PgEmbeddingIndexTest {
         assertThatThrownBy(() -> index.search(EmbeddingQuery.of(MODEL, Set.of(FILE_A)), vec(0f, 0f, 0f), 1))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThat(index.indexedVersion(FILE_A, MODEL)).contains("1");
+    }
+
+    @Test
+    void relocatingSomethingNeverIndexedLeavesTheTargetAlone() {
+        EntityRef moved = INBOX_1.movedTo("Archive", "9-5");
+        index.replace(moved, ALICE, "v1", MODEL, List.of(chunk("c0", 1f, 0f, 0f)));
+
+        index.relocate(INBOX_1, moved);
+
+        assertThat(index.indexedVersion(moved, MODEL)).contains("v1");
+    }
+
+    @Test
+    void anAttributeSearchMustSayWhoseEntriesItMeans() {
+        index.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", 1f, 0f, 0f)));
+        index.replace(FILE_B, BOB, "1", MODEL, List.of(chunk("b0", 1f, 0f, 0f)));
+
+        assertThatThrownBy(() -> index.search(EmbeddingQuery.ofTypes(MODEL, "file"), vec(1f, 0f, 0f), 10))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "file").anyOwner(), vec(1f, 0f, 0f), 10))
+                .extracting(EmbeddingHit::ref).containsExactlyInAnyOrder(FILE_A, FILE_B);
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "file").sharedOnly(), vec(1f, 0f, 0f), 10)).isEmpty();
+        // A ref list was authorised by whoever built it: no owner needed.
+        assertThat(index.search(EmbeddingQuery.of(MODEL, Set.of(FILE_B)), vec(1f, 0f, 0f), 10)).hasSize(1);
+    }
+
+    @Test
+    void rejectsChunksWithoutTextAndVectorsThatAreNotFinite() {
+        assertThatThrownBy(() -> index.replace(FILE_A, ALICE, "1", MODEL, List.of(
+                new EmbeddingChunk("a0", 0, null, Map.of(), vec(1f, 0f, 0f)))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> index.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", Float.NaN, 1f, 0f))))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> index.search(EmbeddingQuery.of(MODEL, Set.of(FILE_A)),
+                vec(Float.POSITIVE_INFINITY, 0f, 0f), 1)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void metadataWithoutAValueIsDropped() {
+        Map<String, String> metadata = new java.util.HashMap<>();
+        metadata.put("from", null);
+        metadata.put("subject", "Rechnung");
+        index.replace(FILE_A, ALICE, "1", MODEL, List.of(new EmbeddingChunk("a0", 0, "a0", metadata, vec(1f, 0f, 0f))));
+
+        assertThat(index.search(EmbeddingQuery.of(MODEL, Set.of(FILE_A)), vec(1f, 0f, 0f), 1).get(0).chunk().metadata())
+                .containsExactly(Map.entry("subject", "Rechnung"));
     }
 
     private static EmbeddingChunk chunk(String id, float x, float y, float z) {

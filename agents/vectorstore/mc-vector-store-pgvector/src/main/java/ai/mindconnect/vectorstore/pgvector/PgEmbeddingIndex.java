@@ -43,7 +43,8 @@ import java.util.stream.Stream;
  *
  * <p>Writes to one entity are serialised with a transaction-scoped advisory
  * lock, so two concurrent re-indexes of the same entity leave one of them, not
- * both. The table is created on first use. Deleting a namespace needs nothing
+ * both. Needs PostgreSQL 12 or newer with the {@code vector} extension; the
+ * first use checks the version and says so, and creates the table. Deleting a namespace needs nothing
  * extra: the namespace purge clears every table with a {@code namespace} column.
  */
 public final class PgEmbeddingIndex implements EmbeddingIndex {
@@ -55,6 +56,9 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
 
     /** Serialises concurrent first uses across JVMs; any constant key will do. */
     private static final long SCHEMA_LOCK = 0x6d63_656d_6265_6464L;
+
+    /** {@code AS MATERIALIZED} needs 12; {@code hashtextextended} 11. */
+    private static final int MIN_SERVER_VERSION = 120000;
 
     private static final String KEY = "namespace = ? AND entity_type = ? AND source = ? AND container = ? AND entity_id = ?";
 
@@ -128,6 +132,12 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
             // Both locks, always in the same order, so two opposite moves cannot deadlock.
             Stream.of(from, to).map(this::lockKey).sorted()
                     .forEach(key -> tx.query("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", row -> 1, key));
+            // Nothing indexed under `from`: leave `to` alone — it may already
+            // have been indexed at its new place.
+            long moving = tx.scalar("SELECT count(*) FROM " + TABLE + " WHERE " + KEY, Long.class, keyParams(from));
+            if (moving == 0) {
+                return;
+            }
             tx.update("DELETE FROM " + TABLE + " WHERE " + KEY, keyParams(to));
             tx.update("UPDATE " + TABLE + " SET container = ?, entity_id = ? WHERE " + KEY,
                     concat(new Object[]{to.container(), to.id()}, keyParams(from)));
@@ -148,7 +158,8 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
 
     @Override
     public List<EmbeddingHit> search(EmbeddingQuery query, float[] queryEmbedding, int topK) {
-        EmbeddingChecks.requireNonZero(queryEmbedding, "The query");
+        EmbeddingChecks.requireUsable(queryEmbedding, "The query");
+        query.requireOwnerDecision();
         if (topK <= 0 || (query.refs() != null && query.refs().isEmpty())) {
             return List.of();
         }
@@ -175,7 +186,7 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
         }
         if (!query.owners().isEmpty()) {
             where.add(query.shared() ? "(owner_id = ANY(?::text[]) OR owner_id IS NULL)" : "owner_id = ANY(?::text[])");
-            params.add(query.ownerIds().toArray(String[]::new));
+            params.add(query.owners().stream().map(UserId::value).toArray(String[]::new));
         } else if (query.shared()) {
             where.add("owner_id IS NULL");
         }
@@ -254,6 +265,11 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
     private synchronized void createSchema() {
         if (schemaReady) {
             return;
+        }
+        int version = sql.scalar("SELECT current_setting('server_version_num')::int", Integer.class);
+        if (version < MIN_SERVER_VERSION) {
+            throw new IllegalStateException("The embedding index needs PostgreSQL 12 or newer ("
+                    + "MATERIALIZED CTEs, hashtextextended); this server is " + version);
         }
         sql.inTransaction(tx -> {
             // Concurrent CREATE ... IF NOT EXISTS can still collide in the

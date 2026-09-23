@@ -35,8 +35,9 @@ public interface EmbeddingIndex {
      * @param version whatever changes when the text does — an ETag, a hash, a
      *                revision; a constant for entities that never change. Read
      *                back with {@link #indexedVersion} to skip re-embedding.
-     * @throws IllegalArgumentException for duplicate chunk ids, mixed or zero
-     *                                  dimensions, or an all-zero vector
+     * @throws IllegalArgumentException for duplicate chunk ids, chunks without
+     *                                  text, mixed or zero dimensions, or an
+     *                                  all-zero or non-finite vector
      */
     void replace(EntityRef ref, UserId owner, String version, String embeddingModel, List<EmbeddingChunk> chunks);
 
@@ -62,7 +63,9 @@ public interface EmbeddingIndex {
      * {@code queryEmbedding}, best first. Only chunks of the query's model and
      * dimension are compared. Scores are cosine similarities in {@code [-1, 1]}.
      *
-     * @throws IllegalArgumentException for an all-zero query vector
+     * @throws IllegalArgumentException for an all-zero or non-finite query vector,
+     *                                  or an attribute query that does not say
+     *                                  whose entries it means
      */
     List<EmbeddingHit> search(EmbeddingQuery query, float[] queryEmbedding, int topK);
 

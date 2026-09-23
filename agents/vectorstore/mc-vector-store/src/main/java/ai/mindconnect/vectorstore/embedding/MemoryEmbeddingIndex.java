@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.embedding;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.vectorstore.Vectors;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -37,7 +38,7 @@ public final class MemoryEmbeddingIndex implements EmbeddingIndex {
             models.remove(embeddingModel);
         } else {
             List<EmbeddingChunk> normalised = chunks.stream()
-                    .map(chunk -> chunk.withEmbedding(normalised(chunk.embedding())))
+                    .map(chunk -> chunk.withEmbedding(Vectors.normalised(chunk.embedding())))
                     .toList();
             models.put(embeddingModel, new Indexed(owner, version, normalised));
         }
@@ -78,11 +79,12 @@ public final class MemoryEmbeddingIndex implements EmbeddingIndex {
 
     @Override
     public List<EmbeddingHit> search(EmbeddingQuery query, float[] queryEmbedding, int topK) {
-        EmbeddingChecks.requireNonZero(queryEmbedding, "The query");
+        EmbeddingChecks.requireUsable(queryEmbedding, "The query");
+        query.requireOwnerDecision();
         if (topK <= 0) {
             return List.of();
         }
-        float[] normalisedQuery = normalised(queryEmbedding);
+        float[] normalisedQuery = Vectors.normalised(queryEmbedding);
         Iterable<EntityRef> candidates = query.refs() != null ? query.refs() : entities.keySet();
         List<EmbeddingHit> hits = new ArrayList<>();
         for (EntityRef ref : candidates) {
@@ -93,27 +95,11 @@ public final class MemoryEmbeddingIndex implements EmbeddingIndex {
             for (EmbeddingChunk chunk : indexed.chunks()) {
                 if (chunk.embedding().length == normalisedQuery.length && query.matches(ref, indexed.owner(), chunk)) {
                     hits.add(new EmbeddingHit(ref, indexed.owner(), chunk.withEmbedding(new float[0]),
-                            dot(normalisedQuery, chunk.embedding())));
+                            Vectors.dot(normalisedQuery, chunk.embedding())));
                 }
             }
         }
         hits.sort(Comparator.comparingDouble(EmbeddingHit::score).reversed());
         return List.copyOf(hits.subList(0, Math.min(topK, hits.size())));
-    }
-
-    /** A normalised copy; the caller's array is left alone. */
-    private static float[] normalised(float[] vector) {
-        double norm = 0;
-        for (float v : vector) norm += v * v;
-        norm = Math.sqrt(norm);
-        float[] copy = new float[vector.length];
-        for (int i = 0; i < vector.length; i++) copy[i] = (float) (vector[i] / norm);
-        return copy;
-    }
-
-    private static double dot(float[] a, float[] b) {
-        double sum = 0;
-        for (int i = 0; i < a.length; i++) sum += a[i] * b[i];
-        return sum;
     }
 }

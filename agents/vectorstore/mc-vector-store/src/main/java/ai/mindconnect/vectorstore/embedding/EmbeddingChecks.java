@@ -12,7 +12,8 @@ public final class EmbeddingChecks {
 
     /**
      * Rejects a missing ref or version, a blank model, duplicate chunk ids,
-     * mixed or zero dimensions and all-zero vectors with
+     * chunks without text, mixed or zero dimensions, and vectors that are
+     * all zero or not finite with
      * {@link IllegalArgumentException}.
      */
     public static void checkReplace(EntityRef ref, String version, String embeddingModel, List<EmbeddingChunk> chunks) {
@@ -29,11 +30,14 @@ public final class EmbeddingChecks {
             if (chunk.id() == null || !ids.add(chunk.id())) {
                 throw new IllegalArgumentException("Chunk id '" + chunk.id() + "' is missing or occurs twice in " + ref);
             }
+            if (chunk.text() == null) {
+                throw new IllegalArgumentException("Chunk '" + chunk.id() + "' of " + ref + " has no text");
+            }
             if (chunk.embedding().length != dimension) {
                 throw new IllegalArgumentException("Chunk '" + chunk.id() + "' has dimension "
                         + chunk.embedding().length + ", the first chunk of " + ref + " " + dimension);
             }
-            requireNonZero(chunk.embedding(), "Chunk '" + chunk.id() + "' of " + ref);
+            requireUsable(chunk.embedding(), "Chunk '" + chunk.id() + "' of " + ref);
         }
     }
 
@@ -49,16 +53,24 @@ public final class EmbeddingChecks {
         }
     }
 
-    /** A vector without direction has no cosine similarity to anything. */
-    public static void requireNonZero(float[] vector, String what) {
+    /**
+     * A vector without direction has no cosine similarity to anything, and one
+     * with NaN or infinite components none that means anything — pgvector
+     * rejects those outright.
+     */
+    public static void requireUsable(float[] vector, String what) {
         if (vector.length == 0) {
             throw new IllegalArgumentException(what + " has no embedding");
         }
+        boolean direction = false;
         for (float v : vector) {
-            if (v != 0f) {
-                return;
+            if (!Float.isFinite(v)) {
+                throw new IllegalArgumentException(what + " has a component that is not a finite number");
             }
+            direction |= v != 0f;
         }
-        throw new IllegalArgumentException(what + " is an all-zero vector");
+        if (!direction) {
+            throw new IllegalArgumentException(what + " is an all-zero vector");
+        }
     }
 }
