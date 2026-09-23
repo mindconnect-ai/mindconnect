@@ -66,6 +66,29 @@ class FileViewStoreTest {
     }
 
     @Test
+    void views_saved_at_once_are_all_kept() throws Exception {
+        FileViewStore store = store();
+        UserId me = UserId.of("me");
+
+        // Every save reads the user's one file, adds its view and writes the
+        // lot back. Without a lock around that, saves at the same moment each
+        // wrote the file as they had read it and all but one view was lost —
+        // and sharing one .tmp, they also wrote into each other's file.
+        List<Thread> savers = new java.util.ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            StoredView view = new StoredView(ViewId.saved(), "agent", me, "List " + i, ViewState.EMPTY, Map.of(),
+                    Instant.parse("2026-09-23T10:00:00Z").plusSeconds(i));
+            savers.add(Thread.ofVirtual().start(() -> store.save(view)));
+        }
+        for (Thread saver : savers) saver.join();
+
+        assertThat(store.list(me, "agent")).hasSize(40);
+        try (var files = Files.list(dir.resolve("local/mail-views"))) {
+            assertThat(files.map(f -> f.getFileName().toString())).containsExactly("me.json");
+        }
+    }
+
+    @Test
     void nothing_saved_is_nothing_found_and_no_file() {
         assertThat(store().load(UserId.of("me"), ViewId.allInboxes())).isEmpty();
         assertThat(store().list(UserId.of("me"), null)).isEqualTo(List.of());

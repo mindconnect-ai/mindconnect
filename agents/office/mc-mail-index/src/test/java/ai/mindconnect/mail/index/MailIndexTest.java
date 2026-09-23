@@ -58,16 +58,34 @@ class MailIndexTest {
     }
 
     @Test
-    void a_page_below_the_window_is_read_live_and_the_window_grows_to_it() {
+    void the_page_right_below_the_window_is_read_live_and_the_window_grows_to_it() {
         index.page(ME, mail, INBOX, 0, 25, null);
         int before = mail.lists;
+
+        MailIndex.Slice next = index.page(ME, mail, INBOX, 1_000, 25, null);
+
+        assertThat(next.messages().get(0).id()).isEqualTo("1500");
+        assertThat(next.fetched().get(0).freshness()).isEqualTo(Fetched.Freshness.LIVE);
+        assertThat(mail.lists).isEqualTo(before + 1);
+        assertThat(kept.load(ME, INBOX).orElseThrow().size()).isEqualTo(1_025);
+        // And from the window now, at the place in the folder it came from.
+        assertThat(index.page(ME, mail, INBOX, 1_000, 25, null).messages().get(0).id()).isEqualTo("1500");
+        assertThat(mail.lists).isEqualTo(before + 1);
+    }
+
+    @Test
+    void a_page_further_down_is_read_live_and_leaves_the_window_alone() {
+        index.page(ME, mail, INBOX, 0, 25, null);
 
         MailIndex.Slice deep = index.page(ME, mail, INBOX, 1_200, 25, null);
 
         assertThat(deep.messages().get(0).id()).isEqualTo("1300");
         assertThat(deep.fetched().get(0).freshness()).isEqualTo(Fetched.Freshness.LIVE);
-        assertThat(mail.lists).isEqualTo(before + 1);
-        assertThat(kept.load(ME, INBOX).orElseThrow().size()).isEqualTo(1_025);
+        // Appended, those 25 would have sat at places 1,000-1,024 of the
+        // window, and the page there would have been messages 1300-1276
+        // instead of 1500-1476.
+        assertThat(kept.load(ME, INBOX).orElseThrow().size()).isEqualTo(1_000);
+        assertThat(index.page(ME, mail, INBOX, 1_000, 25, null).messages().get(0).id()).isEqualTo("1500");
     }
 
     @Test
@@ -85,6 +103,24 @@ class MailIndexTest {
         assertThat(fresh.messages().get(2).seen()).isTrue();
         assertThat(fresh.total()).isEqualTo(2_500);   // one came, one went
         assertThat(kept.load(ME, INBOX).orElseThrow().has("2499")).isFalse();
+    }
+
+    @Test
+    void a_folder_the_provider_renamed_throughout_is_filled_again() {
+        index.page(ME, mail, INBOX, 0, 25, null);
+        // What an IMAP server does when it changes the folder's UIDVALIDITY:
+        // the same messages, every one under another id.
+        mail.rename(id -> "7-" + id);
+        clock.advance(Duration.ofMinutes(3));
+
+        MailIndex.Slice fresh = index.page(ME, mail, INBOX, 0, 3, null);
+
+        assertThat(fresh.messages()).extracting(MailMessage::id).containsExactly("7-2500", "7-2499", "7-2498");
+        FolderWindow w = kept.load(ME, INBOX).orElseThrow();
+        // Merged, only the newest page would have been renamed, and the 800
+        // below it would have gone on answering to ids that name nothing.
+        assertThat(w.size()).isEqualTo(1_000);
+        assertThat(w.heads()).allMatch(h -> h.id().startsWith("7-"));
     }
 
     @Test
@@ -121,6 +157,31 @@ class MailIndexTest {
 
         index.forget(ME, INBOX);
         assertThat(index.has(ME, INBOX)).isFalse();
+    }
+
+    @Test
+    void changes_written_through_at_once_are_all_kept(@TempDir Path dir) throws Exception {
+        FileMailIndexStore files = new FileMailIndexStore(dir, "local");
+        MailIndex onDisk = new MailIndex(files, clock, 300, MailIndex.TTL);
+        onDisk.page(ME, mail, INBOX, 0, 10, null);
+
+        // Fifty removals at once, each a read-change-write of the same file:
+        // without the lock each saved the window as it had read it, and
+        // most of the removals were lost; with one shared .tmp the writers
+        // also wrote into each other's file.
+        List<Thread> writers = new ArrayList<>();
+        for (int i = 0; i < 50; i++) {
+            String id = String.valueOf(2_500 - i);
+            writers.add(Thread.ofVirtual().start(() -> onDisk.removed(ME, INBOX, List.of(id))));
+        }
+        for (Thread writer : writers) writer.join();
+
+        FolderWindow w = files.load(ME, INBOX).orElseThrow();
+        assertThat(w.size()).isEqualTo(250);
+        assertThat(w.total()).isEqualTo(2_450);
+        try (var left = java.nio.file.Files.list(dir.resolve("local/mail-index/me/email.privat"))) {
+            assertThat(left.map(f -> f.getFileName().toString())).containsExactly("INBOX.json");
+        }
     }
 
     @Test
@@ -172,6 +233,10 @@ class MailIndexTest {
         void arrive(String id, String subject) { messages.add(build(Integer.parseInt(id), subject, false)); }
         void delete(String id) { messages.removeIf(m -> m.id().equals(id)); }
         void markSeen(String id) { messages.replaceAll(m -> m.id().equals(id) ? m.withSeen(true) : m); }
+        void rename(java.util.function.UnaryOperator<String> name) {
+            messages.replaceAll(m -> new MailMessage(name.apply(m.id()), m.location(), m.subject(), m.from(), m.to(),
+                    m.receivedAt(), m.seen(), m.hasAttachments(), m.attachments(), m.body(), m.truncated()));
+        }
 
         @Override public MailPage list(String folderId, int skip, int limit, MailQuery query) {
             lists++;
