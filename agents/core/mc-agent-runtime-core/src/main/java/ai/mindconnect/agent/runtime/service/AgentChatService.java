@@ -330,11 +330,18 @@ public class AgentChatService {
             if (event.value() instanceof StreamEvent.Done) {
                 doneHandedOver.complete(null);
             }
-            if (event.value() instanceof StreamEvent.ApprovalRequested asked && !outcome.isDone()
-                    // a replayed question that was answered meanwhile asks nothing any more
-                    && approvalStore.find(sessionId, asked.callId()).isPresent()) {
-                resumeCursors.put(sessionId, event.seq());
-                outcome.complete(TurnResult.incomplete(turnId, approvalStore.openForRoot(sessionId)));
+            if (event.value() instanceof StreamEvent.ApprovalRequested asked) {
+                // One read decides: a question answered meanwhile — replayed, or answered
+                // while this event travelled — asks nothing any more, and the turn goes on.
+                List<ToolApproval> open = approvalStore.openForRoot(sessionId);
+                if (open.stream().anyMatch(a -> a.callId().equals(asked.callId()))) {
+                    // Every open gate moves the cursor, also one this handle's outcome is
+                    // already past: a later gate of the same turn is where the answer's
+                    // handle continues, not the first one. A handle that replays an older
+                    // gate never moves it back.
+                    resumeCursors.merge(sessionId, event.seq(), Math::max);
+                    outcome.complete(TurnResult.incomplete(turnId, open));
+                }
             }
         });
         if (stopAtGate) {

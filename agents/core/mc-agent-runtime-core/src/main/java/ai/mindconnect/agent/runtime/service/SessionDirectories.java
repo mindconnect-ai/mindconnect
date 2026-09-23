@@ -131,8 +131,9 @@ public class SessionDirectories {
     public Optional<Content> open(String root, String path) throws IOException {
         WorkspaceFiles remote = root == null ? null : workspaces.get(root);
         if (remote != null) {
-            Optional<Path> target = workspacePath(remote, path);
-            if (target.isEmpty() || !remote.isRegularFile(target.get())) return Optional.empty();
+            String rel = relative(path);
+            Optional<Path> target = workspacePath(remote, rel);
+            if (target.isEmpty() || internal(rel) || !remote.isRegularFile(target.get())) return Optional.empty();
             byte[] bytes = remote.readAllBytes(target.get());
             return Optional.of(new Content(target.get().getFileName().toString(), bytes.length,
                     new ByteArrayInputStream(bytes)));
@@ -247,7 +248,11 @@ public class SessionDirectories {
         return normalized.equals(".") ? "" : normalized;
     }
 
-    /** Whether a workspace path lies in the environment's own folders. */
+    /**
+     * Whether a workspace path lies in the environment's own folders — the folder
+     * itself or anything below it. Every way into a workspace asks this: listing,
+     * opening, previewing, saving, deleting and zipping.
+     */
     private static boolean internal(String rel) {
         int slash = rel.indexOf('/');
         return WORKSPACE_INTERNALS.contains(slash < 0 ? rel : rel.substring(0, slash));
@@ -328,8 +333,9 @@ public class SessionDirectories {
     public Optional<Archive> archive(String root, String path, String name) {
         WorkspaceFiles remote = root == null ? null : workspaces.get(root);
         if (remote != null) {
-            Optional<Path> dir = workspacePath(remote, path);
-            if (dir.isEmpty() || !remote.isDirectory(dir.get())) return Optional.empty();
+            String rel = relative(path);
+            Optional<Path> dir = workspacePath(remote, rel);
+            if (dir.isEmpty() || internal(rel) || !remote.isDirectory(dir.get())) return Optional.empty();
             boolean atRoot = dir.get().equals(remote.roots().base());
             var packer = new Packer(archiveName(name, root, atRoot ? Path.of(root) : dir.get()));
             try {
@@ -442,8 +448,10 @@ public class SessionDirectories {
 
     private Optional<Listing> listWorkspace(String root, String path) {
         WorkspaceFiles remote = workspaces.get(root);
-        Optional<Path> dir = workspacePath(remote, path);
-        if (dir.isEmpty() || !remote.isDirectory(dir.get())) return Optional.empty();
+        String rel = relative(path);
+        Optional<Path> dir = workspacePath(remote, rel);
+        // The environment's own folders are hidden at the root and not entered below it either.
+        if (dir.isEmpty() || internal(rel) || !remote.isDirectory(dir.get())) return Optional.empty();
         Path base = remote.roots().base();
         String dirPath = base.relativize(dir.get()).toString().replace('\\', '/');
         List<Entry> entries = new ArrayList<>();
