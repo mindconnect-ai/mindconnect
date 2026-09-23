@@ -103,6 +103,10 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       adds Outlook or Gmail adds a provider, not a tool. The tools name a mailbox
       `provider.key` or `all`, and every change (`mail_send`, `mail_delete`) is a
       tool of its own so a binding can make it ask for approval
+    - `office/mc-mail-views`: a list of mail as a thing with a name — `MailListView`
+      (a folder, all inboxes, what an agent gathered) with a `ViewState` that is
+      saved with it, `MailListViewFactory` as the seam for a new kind, a file
+      `ViewStore`, and `CurrentView` for "what is on the screen"
     - `office/mc-calendar-core`, `office/mc-calendar-caldav`,
       `office/mc-agent-tools-calendar`: the same shape for a person's calendar.
       `CalendarProvider` is the seam, CalDAV the open kind (its own card, its

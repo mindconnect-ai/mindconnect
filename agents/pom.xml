@@ -82,6 +82,7 @@
         <!-- Office: one port per kind of thing, one module per provider. -->
         <module>office/mc-mail-core</module>
         <module>office/mc-mail-imap</module>
+        <module>office/mc-mail-views</module>
         <module>office/mc-agent-tools-mail</module>
         <module>office/mc-calendar-core</module>
         <module>office/mc-calendar-caldav</module>

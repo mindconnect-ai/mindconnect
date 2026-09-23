@@ -7,6 +7,8 @@ import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.mail.MailAccounts;
+import ai.mindconnect.mail.view.CurrentView;
+import ai.mindconnect.mail.view.MailListViews;
 
 import java.time.ZoneId;
 import java.util.Optional;
@@ -36,10 +38,15 @@ import java.util.Set;
 public class MailToolProvider implements MultiToolProvider {
 
     private MailTools mail;
+    /** The list tools — only with a host that keeps views; a bare runtime has the mail tools alone. */
+    private MailListTools lists;
 
     @Override
     public Set<String> toolNames() {
-        return MailTools.NAMES;
+        if (lists == null) return MailTools.NAMES;
+        Set<String> all = new java.util.LinkedHashSet<>(MailTools.NAMES);
+        all.addAll(MailListTools.NAMES);
+        return all;
     }
 
     @Override
@@ -57,12 +64,20 @@ public class MailToolProvider implements MultiToolProvider {
     public void bind(ToolEnvironment env) {
         MailAccounts accounts = env.get(MailAccounts.class)
                 .orElseGet(() -> env.get(Connections.class).map(MailAccounts::new).orElse(null));
-        bind(accounts);
+        bind(accounts, env.get(MailListViews.class).orElse(null),
+                env.get(CurrentView.class).orElseGet(CurrentView.Memory::new));
     }
 
     /** The registry directly — for a host without an environment, and for tests. */
     public MailToolProvider bind(MailAccounts accounts) {
+        return bind(accounts, null, null);
+    }
+
+    /** With the views as well: the list tools appear beside the mail tools. */
+    public MailToolProvider bind(MailAccounts accounts, MailListViews views, CurrentView current) {
         this.mail = accounts == null ? null : new MailTools(accounts, ZoneId.systemDefault());
+        this.lists = accounts == null || views == null ? null
+                : new MailListTools(accounts, views, current == null ? new CurrentView.Memory() : current);
         return this;
     }
 
@@ -74,6 +89,10 @@ public class MailToolProvider implements MultiToolProvider {
     @Override
     public Optional<Tool> create(String toolName, AgentTool agentTool, ToolCallScope scope) {
         if (mail == null || scope == null || scope.userId() == null) return Optional.empty();
+        if (lists != null && MailListTools.NAMES.contains(toolName)) {
+            return lists.create(toolName, scope.userId(),
+                    scope.sessionId() == null ? null : scope.sessionId().value());
+        }
         return mail.create(toolName, scope.userId());
     }
 }
