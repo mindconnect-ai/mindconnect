@@ -12,7 +12,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -28,6 +30,15 @@ import java.util.stream.Stream;
  * work in the files of the chat they serve. Files a user attached to the chat
  * live in the session's directory on this machine; before a tool works on the
  * workspace, new ones under {@code uploads/} are copied to {@code /workspace/uploads/}.
+ *
+ * <p>What the provider remembers per workspace — the running environment's id and
+ * which uploads it copied — is dropped once the workspace has not been used for
+ * the idle timeout (two hours by default); nothing tells the provider when a chat
+ * is over. Dropping it costs nothing but a fresh acquire and one more copy of the
+ * uploads. Stopping the environment is the server's business: it stops one that
+ * is idle for its template's idle stop and deletes the workspace after the
+ * template's retention. The timeout has to stay below that retention, or the
+ * provider would take uploads for copied that went with the deleted workspace.
  */
 public class VirtualEnvWorkspaceProvider implements WorkspaceProvider {
 
@@ -36,6 +47,8 @@ public class VirtualEnvWorkspaceProvider implements WorkspaceProvider {
     /** The tool binding override naming the template, e.g. {@code {"environment": "office"}}. */
     public static final String ENVIRONMENT_OVERRIDE = "environment";
     static final String UPLOADS = "uploads";
+    /** How long a workspace's state is kept without use, unless configured otherwise. */
+    public static final Duration DEFAULT_IDLE_TIMEOUT = Duration.ofHours(2);
 
     private final VirtualEnvClient client;
     private final String defaultTemplate;
@@ -43,16 +56,38 @@ public class VirtualEnvWorkspaceProvider implements WorkspaceProvider {
     private final ConcurrentMap<String, String> environmentIds = new ConcurrentHashMap<>();
     /** Uploads already copied, per workspace: relative name → size and modification time. */
     private final ConcurrentMap<String, Map<String, String>> mirrored = new ConcurrentHashMap<>();
+    /** When each workspace was last asked for. */
+    private final ConcurrentMap<String, Instant> lastUsed = new ConcurrentHashMap<>();
+    private final Duration idleTimeout;
+    private final Clock clock;
+    /** When the maps were last swept for idle workspaces. */
+    private volatile Instant lastSweep;
 
     public VirtualEnvWorkspaceProvider(VirtualEnvClient client, String defaultTemplate, Duration queueTimeout) {
+        this(client, defaultTemplate, queueTimeout, DEFAULT_IDLE_TIMEOUT, Clock.systemUTC());
+    }
+
+    /**
+     * @param idleTimeout how long the state of a workspace nobody uses is kept; stay below
+     *                    the server's retention
+     */
+    public VirtualEnvWorkspaceProvider(VirtualEnvClient client, String defaultTemplate, Duration queueTimeout,
+                                       Duration idleTimeout, Clock clock) {
+        if (idleTimeout == null || idleTimeout.isNegative() || idleTimeout.isZero()) {
+            throw new IllegalArgumentException("The idle timeout must be positive: " + idleTimeout);
+        }
         this.client = client;
         this.defaultTemplate = defaultTemplate;
         this.queueTimeout = queueTimeout;
+        this.idleTimeout = idleTimeout;
+        this.clock = clock;
+        this.lastSweep = clock.instant();
     }
 
     @Override
     public WorkspaceFiles files(ToolCallScope scope, AgentTool tool, FileRoots localRoots) {
         WorkspaceKey key = key(scope, tool);
+        used(key);
         mirrorUploads(scope, key);
         return new RemoteWorkspaceFiles(client, key, localDir(scope));
     }
@@ -60,6 +95,7 @@ public class VirtualEnvWorkspaceProvider implements WorkspaceProvider {
     @Override
     public Optional<CommandRunner> commands(ToolCallScope scope, AgentTool tool) {
         WorkspaceKey key = key(scope, tool);
+        used(key);
         mirrorUploads(scope, key);
         Path local = localDir(scope);
         return Optional.of(new RemoteCommandRunner(client, key, environmentIds, queueTimeout,
@@ -119,11 +155,47 @@ public class VirtualEnvWorkspaceProvider implements WorkspaceProvider {
         }
     }
 
+    /**
+     * Marks the workspace as used now, and — at most every tenth of the idle timeout —
+     * forgets the workspaces nobody used for the idle timeout. Swept on use rather than
+     * by a thread of its own: while nothing is used, nothing is added either.
+     */
+    private void used(WorkspaceKey key) {
+        Instant now = clock.instant();
+        lastUsed.put(key.id(), now);
+        if (Duration.between(lastSweep, now).compareTo(idleTimeout.dividedBy(10)) >= 0) {
+            lastSweep = now;
+            sweep(now);
+        }
+    }
+
+    /** Forgets every workspace unused since {@code now} minus the idle timeout. */
+    void sweep(Instant now) {
+        Instant cutoff = now.minus(idleTimeout);
+        for (Map.Entry<String, Instant> entry : Set.copyOf(lastUsed.entrySet())) {
+            if (entry.getValue().isBefore(cutoff) && lastUsed.remove(entry.getKey(), entry.getValue())) {
+                environmentIds.remove(entry.getKey());
+                mirrored.remove(entry.getKey());
+                log.debug("Forgot idle workspace {}", entry.getKey());
+            }
+        }
+    }
+
+    /** How many workspaces the provider currently remembers anything about. */
+    int remembered() {
+        Set<String> ids = new java.util.HashSet<>(lastUsed.keySet());
+        ids.addAll(environmentIds.keySet());
+        ids.addAll(mirrored.keySet());
+        return ids.size();
+    }
+
     /** Forgets what this provider knows about the workspaces of a session. */
     public void forget(String rootSessionId) {
         Set.copyOf(environmentIds.keySet()).stream().filter(id -> id.endsWith("/" + rootSessionId))
                 .forEach(environmentIds::remove);
         Set.copyOf(mirrored.keySet()).stream().filter(id -> id.endsWith("/" + rootSessionId))
                 .forEach(mirrored::remove);
+        Set.copyOf(lastUsed.keySet()).stream().filter(id -> id.endsWith("/" + rootSessionId))
+                .forEach(lastUsed::remove);
     }
 }

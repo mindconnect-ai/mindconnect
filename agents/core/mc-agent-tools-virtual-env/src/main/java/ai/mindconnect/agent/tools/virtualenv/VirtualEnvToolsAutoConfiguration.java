@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
 
 import java.net.URI;
+import java.time.Clock;
 import java.time.Duration;
 
 /**
@@ -36,6 +37,9 @@ import java.time.Duration;
  *       without authentication</li>
  *   <li>{@code .queue-timeout} — how long a command waits for a queued environment (default 10m)</li>
  *   <li>{@code .request-timeout} — for file calls (default 60s)</li>
+ *   <li>{@code .idle-timeout} — how long the client keeps what it knows about a workspace
+ *       nobody uses (default 2h); the server stops idle environments by itself. Keep it
+ *       below the server's retention</li>
  * </ul>
  */
 @AutoConfiguration
@@ -66,6 +70,8 @@ public class VirtualEnvToolsAutoConfiguration {
                 Duration.ofMinutes(10));
         Duration requestTimeout = env.getProperty("mindconnect.virtual-env.client.request-timeout", Duration.class,
                 Duration.ofSeconds(60));
+        Duration idleTimeout = env.getProperty("mindconnect.virtual-env.client.idle-timeout", Duration.class,
+                VirtualEnvWorkspaceProvider.DEFAULT_IDLE_TIMEOUT);
         OnBehalfTokens signer = onBehalf.getIfAvailable();
         TokenSource tokens;
         String auth;
@@ -85,7 +91,7 @@ public class VirtualEnvToolsAutoConfiguration {
         }
         VirtualEnvClient client = new VirtualEnvClient(URI.create(url), tokens, requestTimeout);
         log.info("Agent tools work in virtual environments on {} (default template {}, {})", url, template, auth);
-        return new VirtualEnvWorkspaceProvider(client, template, queueTimeout);
+        return new VirtualEnvWorkspaceProvider(client, template, queueTimeout, idleTimeout, Clock.systemUTC());
     }
 
     /** The public key of the on-behalf tokens, where the server fetches it. */
