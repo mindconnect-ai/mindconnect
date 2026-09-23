@@ -28,8 +28,10 @@ public class RemoteCommandRunner implements CommandRunner {
     private final String localAlias;
 
     /**
-     * @param localAlias the session directory on this machine; where a command names it, the
-     *                   container gets {@code /workspace} instead. {@code null} when there is none
+     * @param localAlias the session directory on this machine; where a command or its stdin names
+     *                   it, the container gets {@code /workspace} instead — stdin too, because
+     *                   {@code code_execute} sends the whole program that way. {@code null} when
+     *                   there is none
      */
     public RemoteCommandRunner(VirtualEnvClient client, WorkspaceKey key, ConcurrentMap<String, String> environmentIds,
                                Duration queueTimeout, String localAlias) {
@@ -49,6 +51,9 @@ public class RemoteCommandRunner implements CommandRunner {
     public Result run(String command, String stdin, Map<String, String> env, Duration timeout) throws CommandException {
         if (localAlias != null) {
             command = command.replace(localAlias, workingDirectory());
+            if (stdin != null) {
+                stdin = stdin.replace(localAlias, workingDirectory());
+            }
         }
         try {
             String id = environmentIds.get(key.id());

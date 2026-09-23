@@ -88,11 +88,9 @@ public class DocumentOutlineTool implements Tool {
         if (target == null) {
             return roots.outsideError(relative);
         }
-        if (!files.exists(target)) {
-            return "Error: file does not exist: " + relative;
-        }
-        if (!files.isRegularFile(target)) {
-            return "Error: not a regular file: " + relative;
+        String fileError = DocBaseDirs.fileError(files, target, relative);
+        if (fileError != null) {
+            return fileError;
         }
 
         DocumentModel model;

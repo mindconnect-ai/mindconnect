@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -162,11 +163,17 @@ public class GlobTool implements Tool {
         if (searchRoot == null) {
             return roots.outsideError(rawPath);
         }
-        if (!files.exists(searchRoot)) {
+        Optional<WorkspaceEntry> rootEntry;
+        try {
+            rootEntry = files.stat(searchRoot);
+        } catch (IOException e) {
+            return FileWalks.couldNotCheck(relativeRoot, e);
+        }
+        if (rootEntry.isEmpty()) {
             return "Error: path does not exist: " + relativeRoot
                     + suggestionsFor(searchRoot);
         }
-        if (!files.isDirectory(searchRoot)) {
+        if (!rootEntry.get().directory()) {
             return "Error: path is not a directory: " + relativeRoot;
         }
 
@@ -315,11 +322,15 @@ public class GlobTool implements Tool {
     private String suggestionsFor(Path missing) {
         Path parent = missing.getParent();
         // Walk up until we find a parent that exists and is inside baseDir.
-        while (parent != null && roots.contains(parent) && !files.isDirectory(parent)) {
-            parent = parent.getParent();
-        }
-        if (parent == null || !roots.contains(parent) || !files.isDirectory(parent)) {
-            return "";
+        try {
+            while (parent != null && roots.contains(parent) && !files.isDirectory(parent)) {
+                parent = parent.getParent();
+            }
+            if (parent == null || !roots.contains(parent) || !files.isDirectory(parent)) {
+                return "";
+            }
+        } catch (IOException e) {
+            return "";   // only suggestions: without them the error still stands
         }
         String missingName = missing.getFileName() != null ? missing.getFileName().toString() : "";
         if (missingName.isEmpty()) return "";

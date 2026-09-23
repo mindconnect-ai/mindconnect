@@ -174,8 +174,10 @@ A **skill** is the one entry that is not JSON: its file is a `SKILL.md` —
 front matter with `name`, `description` and `tools`, then the instructions —
 the same file the [Skills](./skills.md) screen offers for download, so a skill
 travels between a repository's `.mindconnect/skills/`, a registry and an
-installation unchanged. Imported, it is stored as a managed skill; the name
-comes from the front matter, or from the entry when the file names none. Only
+installation unchanged. Imported, it is stored as a managed skill under the
+entry's `name` (lower-cased) — the name the screen checks and a package removes
+it by; a front matter that calls it something else is noted in the import
+report. Only
 the file is fetched: a skill that keeps scripts or templates beside its
 `SKILL.md` in the repository has to carry them in its own text to be usable
 from a registry. Re-importing keeps the local id and the enabled flag — a

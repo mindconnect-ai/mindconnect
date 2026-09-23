@@ -90,8 +90,9 @@ public final class ReadDocumentSectionTool implements Tool {
         if (target == null) {
             return roots.outsideError(relative);
         }
-        if (!files.exists(target)) {
-            return "Error: file does not exist: " + relative;
+        String fileError = DocBaseDirs.fileError(files, target, relative);
+        if (fileError != null) {
+            return fileError;
         }
 
         try {

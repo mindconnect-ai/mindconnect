@@ -329,7 +329,7 @@ public class SessionDirectories {
         WorkspaceFiles remote = root == null ? null : workspaces.get(root);
         if (remote != null) {
             Optional<Path> dir = workspacePath(remote, path);
-            if (dir.isEmpty() || !remote.isDirectory(dir.get())) return Optional.empty();
+            if (dir.isEmpty() || !isDirectory(remote, dir.get())) return Optional.empty();
             boolean atRoot = dir.get().equals(remote.roots().base());
             var packer = new Packer(archiveName(name, root, atRoot ? Path.of(root) : dir.get()));
             try {
@@ -443,7 +443,7 @@ public class SessionDirectories {
     private Optional<Listing> listWorkspace(String root, String path) {
         WorkspaceFiles remote = workspaces.get(root);
         Optional<Path> dir = workspacePath(remote, path);
-        if (dir.isEmpty() || !remote.isDirectory(dir.get())) return Optional.empty();
+        if (dir.isEmpty() || !isDirectory(remote, dir.get())) return Optional.empty();
         Path base = remote.roots().base();
         String dirPath = base.relativize(dir.get()).toString().replace('\\', '/');
         List<Entry> entries = new ArrayList<>();
@@ -466,6 +466,15 @@ public class SessionDirectories {
         entries.sort(Comparator.comparing((Entry e) -> !e.directory())
                 .thenComparing(e -> e.name().toLowerCase()));
         return Optional.of(new Listing(Path.of(root), dirPath, List.copyOf(entries), truncated));
+    }
+
+    /** Whether {@code dir} is a directory of the workspace; a workspace that does not answer shows nothing. */
+    private static boolean isDirectory(WorkspaceFiles remote, Path dir) {
+        try {
+            return remote.isDirectory(dir);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** {@code path} in a workspace, when its roots accept it. */

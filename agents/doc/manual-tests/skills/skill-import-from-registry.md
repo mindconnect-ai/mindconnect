@@ -152,7 +152,7 @@ agents name it and leaves it out of the removal unless it is ticked.
   agent in `ALL` mode depends on it just as much but is not listed.
 - The registry caches index and files for ten minutes; **Refresh** on the
   registry's page drops the cache after a push to `<REGISTRY>`.
-- The import stores the name from the SKILL.md front matter, while Remove and
-  the "already here" check look the skill up by the registry entry's `name`.
-  The example uses the same name in both places; a registry where they differ
-  is not covered here.
+- The import stores the skill under the registry entry's `name` (lower-cased),
+  the name Remove and the "already here" check look it up by. A SKILL.md whose
+  front matter calls it something else is imported under the entry's name, and
+  the import report says so; the example uses the same name in both places.
