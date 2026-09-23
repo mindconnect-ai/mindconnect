@@ -127,7 +127,7 @@ public class SkillUiController {
                                     @AuthenticationPrincipal OidcUser user) {
         if (!canStore()) return ResponseEntity.ok(VersionedForms.noStore());
         var body = new FormBody(raw);
-        Skill skill = Skill.create(body.str("name"), body.str("description"),
+        Skill skill = Skill.create(body.str("name"), body.str("group"), body.str("description"),
                 body.str("instructions"), toolList(body.str("tools")));
         if (!body.bool("enabled", true)) {
             skill = skill.withFields(skill.name(), skill.description(), skill.instructions(),
@@ -158,6 +158,7 @@ public class SkillUiController {
         Skill updated = existing
                 .withFields(body.str("name"), body.str("description"), body.str("instructions"),
                         toolList(body.str("tools")), body.bool("enabled", existing.enabled()))
+                .withGroup(body.str("group"))
                 .withVersion(VersionedForms.version(body));
         if (!updated.hasValidName()) {
             return ResponseEntity.ok(VersionedForms.unusableName("Skill", updated.name()));

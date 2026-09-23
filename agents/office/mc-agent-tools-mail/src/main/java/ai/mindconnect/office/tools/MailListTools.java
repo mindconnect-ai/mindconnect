@@ -123,7 +123,8 @@ final class MailListTools {
                         return now.size() + " in the list — that is the most it holds. Stop searching and call "
                                 + SHOW + ", or narrow down what you are looking for.";
                     }
-                    return now.size() + " in the list now. Keep going, or call " + SHOW + " when you have them all.";
+                    return now.size() + " in the list now. Nothing is on the screen yet: keep going, and call " + SHOW
+                            + " as soon as you have them all — an answer without it shows nobody anything.";
                 });
     }
 

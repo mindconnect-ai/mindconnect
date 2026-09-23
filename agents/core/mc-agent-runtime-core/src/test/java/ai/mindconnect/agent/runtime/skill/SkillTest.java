@@ -85,6 +85,17 @@ class SkillTest {
         assertThat(read.description()).isEqualTo(skill.description());
         assertThat(read.instructions()).isEqualTo(skill.instructions());
         assertThat(read.tools()).isEqualTo(skill.tools());
+        assertThat(read.group()).isEqualTo("general");
+    }
+
+    @Test
+    void theGroupRidesInTheFrontMatterAndIsGeneralWhenNobodySaid() {
+        Skill office = Skill.create("mail-rules", "Office", "Use before a cleanup", "Never delete invoices.", List.of());
+        assertThat(office.group()).isEqualTo("office");
+        assertThat(office.toMarkdown()).startsWith("---\nname: mail-rules\ngroup: office\n");
+        assertThat(Skill.fromMarkdown("x", office.toMarkdown(), SkillSource.MANAGED, null).group()).isEqualTo("office");
+        assertThat(Skill.fromMarkdown("x", "---\nname: plain\n---\nBody", SkillSource.USER, null).group()).isEqualTo("general");
+        assertThat(office.withGroup(" ").group()).isEqualTo("general");
     }
 
     @Test

@@ -53,6 +53,11 @@ public final class SkillFormComponent implements UiComponent {
                 // with the rest — the save is refused if the skill was saved since.
                 .field(UiField.hidden("version",
                         isNew || skill.version() == null ? "0" : skill.version().toString()))
+                .field(UiField.text("group", "Group", isNew ? null : skill.group())
+                        .asEditable()
+                        .placeholder("general")
+                        .hint("Whose skill it is — \"office\" for the mail assistant's rules. A rubric "
+                                + "for this list and a filter for the skills tools, never a permission"))
                 .field(UiField.text("description", "Description", isNew ? null : skill.description())
                         .asEditable().asRequired()
                         .placeholder("Use when writing the weekly status report for a customer")

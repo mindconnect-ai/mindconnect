@@ -81,6 +81,7 @@ public class SkillInstaller implements RegistryInstaller {
                 existing.map(Skill::id).orElseGet(SkillId::random),
                 name,
                 incoming.description(),
+                existing.map(Skill::group).orElse(incoming.group()),
                 incoming.instructions(),
                 incoming.tools(),
                 existing.map(Skill::enabled).orElse(true),

@@ -54,7 +54,10 @@ public final class SkillListComponent implements UiComponent {
             return list;
         }
 
-        for (Skill skill : skills) {
+        // By group, then by name: an office assistant's rules read as one block.
+        List<Skill> ordered = new java.util.ArrayList<>(skills);
+        ordered.sort(java.util.Comparator.comparing(Skill::group).thenComparing(Skill::name));
+        for (Skill skill : ordered) {
             UiList.Item item = UiList.Item.of(skill.id().value(), title(skill))
                     .description(description(skill));
             if (skill.source() == SkillSource.MANAGED) {
@@ -70,7 +73,8 @@ public final class SkillListComponent implements UiComponent {
 
     /** The name, and for a skill nobody can load right now, why not. */
     private static String title(Skill skill) {
-        return skill.enabled() ? skill.name() : skill.name() + " (off)";
+        String name = skill.enabled() ? skill.name() : skill.name() + " (off)";
+        return Skill.GENERAL.equals(skill.group()) ? name : skill.group() + " · " + name;
     }
 
     private static String description(Skill skill) {

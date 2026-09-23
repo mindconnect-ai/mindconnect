@@ -123,7 +123,9 @@ final class MailTools {
                         "account", account(accounts, true),
                         "folder", string("A folder id or name from " + FOLDERS + "; the inbox when omitted. "
                                 + "Only the inbox with \"all\"."),
-                        "from", string("Only messages whose sender (name or address) contains this."),
+                        "from", string("Only messages whose sender (name or address) contains this — one "
+                                + "sender, or several separated by OR (\"InfoQ OR coop.ch\"), each searched on "
+                                + "its own like text."),
                         "subject", string("Only messages whose subject contains this."),
                         "text", string("Words to look for in the sender or the subject. This is not a query "
                                 + "language: write the words, or several separated by OR "
@@ -141,11 +143,16 @@ final class MailTools {
                     int limit = Math.max(1, number(args, "limit", DEFAULT_LIMIT, MAX_LIMIT));
                     int offset = number(args, "offset", 0, 10_000);
                     List<String> terms = terms(str(args, "text"));
+                    // "InfoQ OR coop.ch" as a sender is the same mistake as in text,
+                    // and the same answer: one search per sender, merged.
+                    List<String> senders = terms(str(args, "from"));
                     List<MailQuery> queries = new ArrayList<>();
                     for (String term : terms) {
-                        queries.add(new MailQuery(flag(args, "unread_only", false), term,
-                                str(args, "from"), str(args, "subject"),
-                                instant(args, "since", zone), instant(args, "before", zone)));
+                        for (String sender : senders) {
+                            queries.add(new MailQuery(flag(args, "unread_only", false), term,
+                                    sender, str(args, "subject"),
+                                    instant(args, "since", zone), instant(args, "before", zone)));
+                        }
                     }
                     boolean several = boxes.size() > 1 || queries.size() > 1;
                     // One search per word per mailbox; the same message found
