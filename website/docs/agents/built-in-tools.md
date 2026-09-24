@@ -155,6 +155,57 @@ required.
 | `todo_write` | Creates / updates the session todo list. |
 | `todo_read` | Reads the current session todo list. |
 
+## Calendar tools (`mc-agent-tools-calendar`)
+
+One set of tools for every calendar account the user attached under
+**Connections**, whatever kind it is — CalDAV with `mc-calendar-caldav` on the
+classpath, and whatever else a distribution plugs in through the
+`CalendarProvider` SPI. A call names its account as `provider.key`
+(`caldav.web`), or `all` where a listing spans them. The three tools that
+change something are tools of their own, so an agent's binding can make each
+ask for approval.
+
+| Tool | Description |
+|------|-------------|
+| `calendar_calendars` | Lists the calendars of an account (or all accounts) with their ids, the main one and which are read-only. |
+| `calendar_events` | Lists appointments in a time window, earliest first — with their reminders where the calendar reports them. |
+| `calendar_read` | Reads one appointment in full: time, place, organiser, attendees, reminders and notes. |
+| `calendar_create` | Puts an appointment into a calendar; `reminders` sets its alarms. |
+| `calendar_update` | Changes an appointment; what is not given stays as it is, `reminders` replaces its alarms. |
+| `calendar_delete` | Deletes an appointment; for a meeting the user organised, the attendees are told. |
+
+### Reminders
+
+`calendar_create` and `calendar_update` take `reminders`: minutes before the
+start, as a list of whole numbers — `[10]` for "remind me 10 minutes before",
+`[60]` for "an alarm an hour before", `[10, 60]` for both. For an all-day
+entry the minutes count from its first midnight.
+
+| `reminders` | `calendar_create` | `calendar_update` |
+|---|---|---|
+| left out | the calendar's default reminder | the reminders stay as they are |
+| `[]` | no reminder at all | every reminder is removed |
+| `[10, 60]` | these two | these two, replacing the old ones |
+
+What a calendar can keep differs, and the tool result says what became of the
+reminders asked for rather than claiming more than was set. Each store states
+its limits as `CalendarStore.reminders()` (`ReminderSupport`), and the tools
+ask it before anything is written:
+
+| `ReminderSupport` | Meant for | More than it keeps |
+|---|---|---|
+| `ANY` | CalDAV: any number, each a `VALARM` (`ACTION:DISPLAY`, `TRIGGER:-PT<n>M`), no limit ahead | — |
+| `upTo(max, maxMinutes)` | a calendar with limits, e.g. Google Calendar's 5 per entry and 40,320 minutes (4 weeks) | refused with the limit; nothing is written |
+| `onlyOne(maxMinutes)` | a calendar with one reminder per entry, e.g. Outlook | the one closest to the start is kept; the result names the ones dropped |
+| `NONE` (the default) | a store that writes no reminders | the entry is created without them; the result says no reminder was set |
+
+A CalDAV update that names reminders replaces **every** alarm of the
+appointment (of a recurring one, the series' own; a changed occurrence keeps
+its alarms). Reading lists an alarm as a reminder when its trigger is a
+duration before the start; alarms at a fixed moment or relative to the end are
+kept on the server but not listed. A store that a distribution adds for
+another kind of account takes no reminders until it overrides `reminders()`.
+
 ## MCP servers (`agents/mcp`)
 
 Tools from [Model Context Protocol](https://modelcontextprotocol.io) servers are

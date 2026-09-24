@@ -20,15 +20,25 @@ import java.util.Objects;
  * As much of iCalendar as an appointment is: reading a {@code VEVENT} into a
  * {@link CalendarEvent} and writing one back.
  *
- * <p><b>Not a calendar library.</b> Recurrence rules, alarms, time-zone
- * definitions and journals are left where they are: a recurring appointment is
- * read as the occurrences the server expanded for a period, and changing an
+ * <p><b>Not a calendar library.</b> Recurrence rules, time-zone definitions
+ * and journals are left where they are: a recurring appointment is read as
+ * the occurrences the server expanded for a period, and changing an
  * appointment {@linkplain #patch patches} the file the server holds — only
  * the lines the {@link EventDraft} actually changes are rewritten, so a rule,
  * an exception date, an alarm or a line this class has never heard of
  * survives the change. Only a new appointment is written from scratch. The
  * reader is deliberately forgiving; every provider writes this format a
  * little differently.
+ *
+ * <p><b>Reminders are {@code VALARM}s.</b> Each one is read as minutes before
+ * the start when its {@code TRIGGER} is a duration relative to the start —
+ * {@code -PT10M}, {@code -P1D}, {@code PT0S}; an alarm at a fixed moment,
+ * one relative to the end, one after the start and Apple's
+ * {@code ACTION:NONE} placeholder are not reminders in that sense and are
+ * not listed. They are written as {@code ACTION:DISPLAY} with
+ * {@code TRIGGER:-PT<n>M}, and a change that names reminders replaces every
+ * alarm of the appointment with them — the only way "these reminders, and no
+ * others" can be true of the file afterwards.
  */
 final class ICalendar {
 
@@ -76,21 +86,86 @@ final class ICalendar {
     }
 
     private static CalendarEvent event(String block, String calendarId, String id) {
-        String uid = value(block, "UID");
-        String summary = value(block, "SUMMARY");
-        EventTime when = when(block);
+        // An alarm has a DESCRIPTION, a DURATION, an ATTENDEE of its own; none
+        // of them is the appointment's.
+        Parts parts = parts(block);
+        String own = parts.own();
+        String uid = value(own, "UID");
+        String summary = value(own, "SUMMARY");
+        EventTime when = when(own);
         if (when == null) return null;
         List<String> attendees = new ArrayList<>();
-        for (String line : lines(block, "ATTENDEE")) {
+        for (String line : lines(own, "ATTENDEE")) {
             String address = address(line);
             if (address != null) attendees.add(address);
         }
-        String organiser = address(firstLine(block, "ORGANIZER"));
-        boolean cancelled = "CANCELLED".equalsIgnoreCase(value(block, "STATUS"));
+        String organiser = address(firstLine(own, "ORGANIZER"));
+        boolean cancelled = "CANCELLED".equalsIgnoreCase(value(own, "STATUS"));
         return new CalendarEvent(uid == null || uid.isBlank() ? id : uid, calendarId,
                 summary == null || summary.isBlank() ? "(no title)" : text(summary),
-                when, text(value(block, "LOCATION")), organiser, attendees,
-                text(value(block, "DESCRIPTION")), cancelled);
+                when, text(value(own, "LOCATION")), organiser, attendees,
+                text(value(own, "DESCRIPTION")), cancelled, reminders(parts.alarms()));
+    }
+
+    /** A {@code VEVENT}'s own lines, and apart from them each {@code VALARM} nested in it. */
+    private record Parts(String own, List<String> alarms) { }
+
+    private static Parts parts(String block) {
+        StringBuilder own = new StringBuilder();
+        List<String> alarms = new ArrayList<>();
+        StringBuilder nested = null;
+        int depth = 0;
+        boolean opened = false;
+        for (String line : block.split("\n")) {
+            String flat = line.strip();
+            String upper = flat.toUpperCase(Locale.ROOT);
+            if (!opened && depth == 0 && upper.startsWith("BEGIN:VEVENT")) {
+                opened = true;
+                own.append(line).append('\n');
+            } else if (upper.startsWith("BEGIN:")) {
+                if (depth++ == 0) nested = new StringBuilder();
+                nested.append(flat).append('\n');
+            } else if (depth > 0) {
+                nested.append(flat).append('\n');
+                if (upper.startsWith("END:") && --depth == 0) {
+                    if (nested.toString().toUpperCase(Locale.ROOT).startsWith("BEGIN:VALARM")) {
+                        alarms.add(nested.toString());
+                    }
+                    nested = null;
+                }
+            } else {
+                own.append(line).append('\n');
+            }
+        }
+        return new Parts(own.toString(), alarms);
+    }
+
+    /** The alarms that are reminders — minutes before the start — shortest first. */
+    private static List<Integer> reminders(List<String> alarms) {
+        List<Integer> minutes = new ArrayList<>();
+        for (String alarm : alarms) {
+            if ("NONE".equalsIgnoreCase(value(alarm, "ACTION"))) continue;
+            Integer m = minutesBefore(firstLine(alarm, "TRIGGER"));
+            if (m != null) minutes.add(m);
+        }
+        return minutes;
+    }
+
+    /**
+     * A {@code TRIGGER} line as minutes before the start, or null when it is
+     * not one: a fixed moment ({@code VALUE=DATE-TIME}), relative to the end
+     * ({@code RELATED=END}), or after the start.
+     */
+    static Integer minutesBefore(String trigger) {
+        if (trigger == null) return null;
+        int colon = trigger.indexOf(':');
+        String params = colon < 0 ? "" : trigger.substring(0, colon).toUpperCase(Locale.ROOT);
+        if (params.contains("VALUE=DATE-TIME") || params.contains("RELATED=END")) return null;
+        Length length = length(valueOf(trigger));
+        if (length == null) return null;
+        long seconds = length.days() * 86_400 + length.seconds();
+        if (seconds > 0 || -seconds / 60 > Integer.MAX_VALUE) return null;
+        return (int) (-seconds / 60);
     }
 
     /**
@@ -172,6 +247,7 @@ final class ICalendar {
                 out.append("ATTENDEE;ROLE=REQ-PARTICIPANT:mailto:").append(attendee.strip()).append("\r\n");
             }
         }
+        alarms(out, draft);
         return out.append("END:VEVENT\r\n").append("END:VCALENDAR\r\n").toString();
     }
 
@@ -180,7 +256,7 @@ final class ICalendar {
      * changes {@code draft} makes to its appointment, and nothing else.
      *
      * <p>A PUT replaces the whole file, and a draft knows only title, time,
-     * place, notes and attendees. Writing the file from the draft would drop
+     * place, notes, attendees and reminders. Writing the file from the draft would drop
      * everything else: the recurrence rule and its exception dates (a weekly
      * meeting would become a single one), changed occurrences, alarms,
      * time-zone definitions, an attendee's answer. So the series' own
@@ -188,7 +264,8 @@ final class ICalendar {
      * it was keeps its line — parameters and all — a changed one is written
      * anew, an attendee still invited keeps their {@code PARTSTAT}.
      * {@code DTSTAMP}, {@code LAST-MODIFIED} and {@code SEQUENCE} say that it
-     * changed.
+     * changed. Reminders the draft names replace every {@code VALARM} of that
+     * {@code VEVENT}; with none named (null) its alarms are kept as they are.
      *
      * @throws CalDavException when the draft moves a recurring appointment:
      *         the draft cannot say whether it means the one occurrence or the
@@ -303,6 +380,22 @@ final class ICalendar {
             }
         }
 
+        // New reminders replace the old alarms, all of them: "these and no
+        // others" is what a list of reminders says.
+        StringBuilder reminded = new StringBuilder();
+        if (draft.reminders() != null) {
+            for (int i = begin + 1; i < end; i++) {
+                if (!unfoldedName(raw.get(i)).equals("BEGIN")) continue;
+                int close = closing(raw, i);
+                if (close < 0 || close > end) break;
+                if (valueOf(unfold(raw.get(i))).equalsIgnoreCase("VALARM")) {
+                    for (int n = i; n <= close; n++) dropped.add(n);
+                }
+                i = close;
+            }
+            alarms(reminded, draft);
+        }
+
         // Properties come before the alarms inside a VEVENT (RFC 5545, 3.6.1).
         int alarms = end;
         for (int i = begin + 1; i < end; i++) {
@@ -314,9 +407,24 @@ final class ICalendar {
         StringBuilder out = new StringBuilder();
         for (int i = 0; i < raw.size(); i++) {
             if (i == alarms) out.append(added);
+            if (i == end) out.append(reminded);
             if (!dropped.contains(i)) out.append(raw.get(i)).append("\r\n");
         }
         return out.toString();
+    }
+
+    /**
+     * A {@code VALARM} per reminder of {@code draft}: a popup, so many minutes
+     * before the start. {@code DESCRIPTION} is required of a display alarm
+     * (RFC 5545, 3.6.6); the appointment's title is what it shows.
+     */
+    private static void alarms(StringBuilder out, EventDraft draft) {
+        if (draft.reminders() == null) return;
+        for (int minutes : draft.reminders()) {
+            out.append("BEGIN:VALARM\r\n").append("ACTION:DISPLAY\r\n");
+            line(out, "DESCRIPTION", draft.title());
+            out.append("TRIGGER:-PT").append(minutes).append("M\r\n").append("END:VALARM\r\n");
+        }
     }
 
     private static void times(StringBuilder out, EventTime when) {

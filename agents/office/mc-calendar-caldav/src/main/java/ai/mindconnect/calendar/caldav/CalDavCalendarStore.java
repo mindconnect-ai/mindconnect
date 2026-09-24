@@ -4,6 +4,7 @@ import ai.mindconnect.calendar.CalendarEvent;
 import ai.mindconnect.calendar.CalendarStore;
 import ai.mindconnect.calendar.CalendarStoreException;
 import ai.mindconnect.calendar.EventDraft;
+import ai.mindconnect.calendar.ReminderSupport;
 import ai.mindconnect.calendar.UserCalendar;
 
 import java.net.URI;
@@ -169,6 +170,17 @@ public final class CalDavCalendarStore implements CalendarStore {
             read.remove(key(calendar, eventId));
             return "";
         });
+    }
+
+    /**
+     * As many reminders as asked, as far ahead as asked: iCalendar has no
+     * limit, each one is a {@code VALARM} ({@link ICalendar}). A new
+     * appointment without reminders gets no alarm — the server has no default
+     * to give it; a calendar app may still add its own when it shows it.
+     */
+    @Override
+    public ReminderSupport reminders() {
+        return ReminderSupport.ANY;
     }
 
     @Override
