@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class FileListTool implements Tool {
@@ -69,10 +70,16 @@ public class FileListTool implements Tool {
         if (target == null) {
             return roots.outsideError(raw);
         }
-        if (!files.exists(target)) {
+        Optional<WorkspaceEntry> targetEntry;
+        try {
+            targetEntry = files.stat(target);
+        } catch (IOException e) {
+            return FileWalks.couldNotCheck(relative, e);
+        }
+        if (targetEntry.isEmpty()) {
             return "Error: path does not exist: " + relative;
         }
-        if (!files.isDirectory(target)) {
+        if (!targetEntry.get().directory()) {
             return "Error: path is not a directory: " + relative;
         }
 

@@ -110,6 +110,8 @@ public class DungeonController {
 
     @PostMapping("/forget/{adventureId}")
     public UiPage forget(@PathVariable("adventureId") String adventureId) {
+        // Only one's own: adventure() finds nothing that belongs to somebody else.
+        if (adventure(adventureId).isEmpty()) return lobby("No such adventure.");
         adventures().ifPresent(store -> store.store().delete(adventureId));
         return lobby(null);
     }

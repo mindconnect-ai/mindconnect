@@ -335,7 +335,7 @@ public class SessionDirectories {
         if (remote != null) {
             String rel = relative(path);
             Optional<Path> dir = workspacePath(remote, rel);
-            if (dir.isEmpty() || internal(rel) || !remote.isDirectory(dir.get())) return Optional.empty();
+            if (dir.isEmpty() || internal(rel) || !isDirectory(remote, dir.get())) return Optional.empty();
             boolean atRoot = dir.get().equals(remote.roots().base());
             var packer = new Packer(archiveName(name, root, atRoot ? Path.of(root) : dir.get()));
             try {
@@ -451,7 +451,7 @@ public class SessionDirectories {
         String rel = relative(path);
         Optional<Path> dir = workspacePath(remote, rel);
         // The environment's own folders are hidden at the root and not entered below it either.
-        if (dir.isEmpty() || internal(rel) || !remote.isDirectory(dir.get())) return Optional.empty();
+        if (dir.isEmpty() || internal(rel) || !isDirectory(remote, dir.get())) return Optional.empty();
         Path base = remote.roots().base();
         String dirPath = base.relativize(dir.get()).toString().replace('\\', '/');
         List<Entry> entries = new ArrayList<>();
@@ -474,6 +474,15 @@ public class SessionDirectories {
         entries.sort(Comparator.comparing((Entry e) -> !e.directory())
                 .thenComparing(e -> e.name().toLowerCase()));
         return Optional.of(new Listing(Path.of(root), dirPath, List.copyOf(entries), truncated));
+    }
+
+    /** Whether {@code dir} is a directory of the workspace; a workspace that does not answer shows nothing. */
+    private static boolean isDirectory(WorkspaceFiles remote, Path dir) {
+        try {
+            return remote.isDirectory(dir);
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /** {@code path} in a workspace, when its roots accept it. */

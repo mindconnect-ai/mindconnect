@@ -73,10 +73,16 @@ public class DocumentFileReadTool implements Tool {
         if (target == null) {
             return roots.outsideError(relative);
         }
-        if (!files.exists(target)) {
+        java.util.Optional<ai.mindconnect.agent.tool.workspace.WorkspaceEntry> entry;
+        try {
+            entry = files.stat(target);
+        } catch (java.io.IOException e) {
+            return DocBaseDirs.couldNotCheck(relative, e);
+        }
+        if (entry.isEmpty()) {
             return "Error: file does not exist: " + relative;
         }
-        if (files.isDirectory(target)) {
+        if (entry.get().directory()) {
             return "Error: path is a directory, use file_list instead";
         }
         try {
