@@ -14,7 +14,7 @@ list of bundled configs and every field, see the
 - **New LLM Config** — add a provider/model configuration.
 - **Edit** — change fields on an existing config.
 - **Delete** — remove a config.
-- **Pricing** — what the model costs, per period; see [Pricing](#pricing).
+- **Pricing** — what each model costs through the config, per period; see [Pricing](#pricing).
 
 A config has a `name`, `provider`, `model`, `baseUrl`, `apiKey`,
 `contextWindowTokens`, and optional `additionalParams`, rate-limit and retry
@@ -82,9 +82,25 @@ so switching the model cannot collide with one.
 ## Pricing {#pricing}
 
 Under a config's fields — on its detail view and on its edit form — sits a
-**Pricing** section: what the model costs, one row per **price period**,
-because rates change. Each period has
+**Pricing** section: what a model costs through this config, one row per
+**price period**, because rates change.
 
+A price is for **one config and one model**. A config's model changes over
+time: someone edits it, or it is a placeholder such as
+`${OPENAI_MODEL:gpt-5.4-mini}` and the variable is set to another model. A
+price therefore names the model it is for, and **a price applies only to calls
+this config served with that model** — calls of another model stay unpriced
+rather than being charged at the wrong rate. One config can carry prices for
+every model it serves or has served; the table has a **Model** column and
+lists each model's periods together, oldest first.
+
+Each period has
+
+- **Model** — the model as the provider names it, the name a call reports:
+  `gpt-5.4-mini`, `claude-sonnet-4-6`. It is compared ignoring case. The dialog
+  prefills it with the model the config serves now, a `${VAR:default}`
+  placeholder resolved exactly as the server resolves it for a call; any other
+  name may be typed — a model the config served before, or one it is about to;
 - **Valid from** — the first day (UTC) the price applies, inclusive;
 - **Valid to** — the first day it no longer applies, exclusive. Empty means
   *until further notice*, so the current price usually has none; when the rate
@@ -99,32 +115,66 @@ because rates change. Each period has
 **Remove** deletes a period. The section is a separate form with its own
 endpoints (`/admin/api/llm-configs/{id}/prices…`): a price is its own entity,
 not a field of the config, so saving the config form never touches it. The
-table marks the period valid today as *current*, the others as *past* or
-*upcoming*.
+table marks the period of each model valid today as *current*, the others as
+*past* or *upcoming*.
 
-Two rules are checked on save, and a refused save keeps the dialog open with
-the reason:
+Rules checked on save — a refused save keeps the dialog open with the reason:
 
-- the periods of one config **must not overlap** — the message names the
-  period that is in the way;
+- a price **names its model**;
+- the periods of one config and model **must not overlap** — the message names
+  the period that is in the way. Periods of different models of one config are
+  independent;
 - an **alias has no prices**: its calls are served by the config it points at
   and cost what that one costs, so an alias's section just says *Priced by
   &lt;target&gt;*.
 
 A price names its config. **Renaming** the config in the form takes its prices
-along; **deleting** it deletes them, so a new config of the same name starts
-unpriced. A config removed another way (the REST API, a file deleted by hand)
-leaves its prices behind — harmless, since nothing asks for that name, and
-visible again on a new config of that name.
+along, each with its model; **deleting** it deletes them, so a new config of the
+same name starts unpriced. A config removed another way (the REST API, a file
+deleted by hand) leaves its prices behind — harmless, since nothing asks for
+that name, and visible again on a new config of that name.
 
 The prices are stored per namespace like the configs: a file per period under
 `<data>/<namespace>/system/llm-prices/`, or the table `mc_llm_price` on
-Postgres. Nothing in the open-source runtime charges anything with them; they
-are there for whoever reports on usage. The port, `LlmPriceRepository`, offers
-`priceAt(configName, instant)` — the period valid on that UTC day — and
-`LlmPrice.cost(inputTokens, cachedInputTokens, outputTokens)` does the
-arithmetic in `BigDecimal`, so a report prices each call with the rate of its
-own day and a corrected price applies to past calls too.
+Postgres, with the config name and the model as columns next to the JSON
+document. A period stored before prices named their model still reads: it
+prices *any* model of its config (the table says *any model*), behind a price
+that names the call's model, and the server logs the first one it reads. Edit
+it to give it a model.
+
+Nothing in the open-source runtime charges anything with the prices; they are
+there for whoever reports on usage. The port, `LlmPriceRepository`, offers
+`priceAt(configName, model, instant)` — the period of that config and model
+valid on that UTC day — and `LlmPrice.cost(inputTokens, cachedInputTokens,
+outputTokens)` does the arithmetic in `BigDecimal`, so a report prices each
+call with the rate of its own model and day, and a corrected price applies to
+past calls too.
+
+### Writing prices with SQL {#pricing-sql}
+
+A price is one row of `mc_llm_price`; the document in `doc` is the truth and
+the columns beside it must agree with it:
+
+```sql
+INSERT INTO mc_llm_price (namespace, id, config_name, model, doc)
+VALUES ('local', 'price-openai-default-gpt-5.4-mini-2026', 'openai-default', 'gpt-5.4-mini',
+        '{"id": "price-openai-default-gpt-5.4-mini-2026",
+          "configName": "openai-default",
+          "model": "gpt-5.4-mini",
+          "validFrom": "2026-01-01",
+          "validTo": null,
+          "currency": "USD",
+          "inputPerMillion": 0.40,
+          "outputPerMillion": 1.60,
+          "cachedInputPerMillion": 0.10}'::jsonb);
+```
+
+`namespace` is the namespace the config lives in (`local` is the default one).
+`validTo` and `cachedInputPerMillion` may be `null` or left out; `currency`
+defaults to `USD`. The id is any unique text of lower-case letters, digits, `.`, `_` and `-`,
+starting with a letter or digit, at most 128 characters.
+Nothing checks overlaps on this path — keep the periods of one config and
+model apart yourself.
 
 ## Dictating in the chat {#dictation}
 

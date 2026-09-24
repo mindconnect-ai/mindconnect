@@ -40,7 +40,7 @@ matching adapter in `adapter/file`:
 | `TodoListRepository` | Session todo lists | `FileTodoListRepository` | `PgTodoListRepository` |
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
 | `LlmConfigRepository` | LLM configs (credentials encrypted) | `FileLlmConfigRepository` | `PgLlmConfigRepository` |
-| `LlmPriceRepository` | LLM prices, one per config and period | `FileLlmPriceRepository` | `PgLlmPriceRepository` |
+| `LlmPriceRepository` | LLM prices, one per config, model and period | `FileLlmPriceRepository` | `PgLlmPriceRepository` |
 | `FileStore` | Uploaded files (ports in `mc-file-store-core`) | `FilesystemFileStore` | `PgFileStore` |
 | `WorkflowDataRepository` | Workflow definitions ([workflow area](../workflow/overview.md)) | `FileWorkflowDataRepository` | `PgWorkflowDataRepository` |
 | `WorkflowInstanceRepository` | Suspended workflow runs | `FileWorkflowInstanceRepository` | `PgWorkflowInstanceRepository` |

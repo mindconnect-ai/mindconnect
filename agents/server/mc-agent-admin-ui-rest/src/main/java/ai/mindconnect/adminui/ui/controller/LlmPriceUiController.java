@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent.Draft;
 import ai.mindconnect.chatui.ui.controller.FormBody;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmPrice;
@@ -14,6 +15,7 @@ import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -42,6 +44,12 @@ import java.util.Optional;
  * periods, a price for an alias, a malformed number) keeps the dialog open
  * with the reason. Every change answers with the section's table replaced
  * in place.
+ *
+ * <p>A price is for one model of the config. The dialog's Model field is
+ * prefilled with the model the config serves now — a
+ * {@code ${OPENAI_MODEL:gpt-5.4-mini}} placeholder resolved the way the
+ * gateways resolve it ({@link LlmConfig#resolvedModel}), from the same
+ * {@link EnvVarResolver} — and any other name may be typed.
  */
 @RestController
 @RequestMapping("/admin/api/llm-configs")
@@ -50,23 +58,47 @@ public class LlmPriceUiController {
     private final LlmConfigRepository configs;
     private final LlmPriceService prices;
     private final Clock clock;
+    private final EnvVarResolver environment;
 
     @Autowired
-    public LlmPriceUiController(LlmConfigRepository configs, LlmPriceRepository prices) {
-        this(configs, new LlmPriceService(prices, configs), Clock.systemUTC());
+    public LlmPriceUiController(LlmConfigRepository configs, LlmPriceRepository prices,
+                                ObjectProvider<EnvVarResolver> environment) {
+        this(configs, new LlmPriceService(prices, configs), Clock.systemUTC(),
+                environment.getIfAvailable(EnvVarResolver::system));
     }
 
-    LlmPriceUiController(LlmConfigRepository configs, LlmPriceService prices, Clock clock) {
+    LlmPriceUiController(LlmConfigRepository configs, LlmPriceService prices, Clock clock,
+                         EnvVarResolver environment) {
         this.configs = Objects.requireNonNull(configs, "configs");
         this.prices = Objects.requireNonNull(prices, "prices");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.environment = Objects.requireNonNull(environment, "environment");
+    }
+
+    /**
+     * The model {@code config} serves now, placeholders resolved as a call resolves them;
+     * null for an alias, a config without a model, or a placeholder nothing resolves.
+     */
+    static String currentModel(LlmConfig config, EnvVarResolver environment) {
+        if (config.isAlias() || config.model() == null) return null;
+        try {
+            String model = config.resolvedModel(environment);
+            return model == null || model.isBlank() ? null : model.strip();
+        } catch (RuntimeException e) {
+            return null;
+        }
+    }
+
+    private String currentModel(LlmConfig config) {
+        return currentModel(config, environment);
     }
 
     /** The section on its own — what the detail and edit pages embed. */
     @GetMapping("/{id}/prices")
     public ResponseEntity<UiNode> section(@PathVariable("id") String configId) {
         return config(configId)
-                .map(c -> ResponseEntity.ok(LlmPricingComponent.render(c, prices.pricesOf(c.name()), today())))
+                .map(c -> ResponseEntity.ok(LlmPricingComponent.render(c, prices.pricesOf(c.name()), today(),
+                        currentModel(c))))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -74,7 +106,8 @@ public class LlmPriceUiController {
     public ResponseEntity<UiPatch> newPrice(@PathVariable("id") String configId) {
         return config(configId)
                 .map(c -> ResponseEntity.ok(dialog("Add price: " + c.name(),
-                        LlmPricingComponent.form(c, Draft.empty(today()), LlmPricingComponent.api(c), true, null))))
+                        LlmPricingComponent.form(c, Draft.empty(today(), currentModel(c)),
+                                LlmPricingComponent.api(c), true, null))))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -93,7 +126,7 @@ public class LlmPriceUiController {
         if (config.isEmpty()) return ResponseEntity.notFound().build();
         LlmConfig c = config.get();
         return ResponseEntity.ok(ownPrice(c, priceId)
-                .map(p -> dialog("Edit price: " + c.name(), LlmPricingComponent.form(c, Draft.of(p),
+                .map(p -> dialog("Edit price: " + c.name(), LlmPricingComponent.form(c, Draft.of(p, currentModel(c)),
                         LlmPricingComponent.api(c) + "/" + p.id().value(), false, null)))
                 .orElseGet(() -> refreshed(c).toast(gone())));
     }
@@ -132,19 +165,19 @@ public class LlmPriceUiController {
 
     private UiPatch save(LlmConfig config, LlmPriceId id, Map<String, Object> raw, boolean isNew) {
         FormBody body = new FormBody(raw);
-        Draft draft = new Draft(body.str("validFrom"), body.str("validTo"), body.str("currency"),
+        Draft draft = new Draft(body.str("model"), body.str("validFrom"), body.str("validTo"), body.str("currency"),
                 body.str("inputPerMillion"), body.str("outputPerMillion"), body.str("cachedInputPerMillion"));
         String target = isNew ? LlmPricingComponent.api(config) : LlmPricingComponent.api(config) + "/" + id.value();
         String title = (isNew ? "Add price: " : "Edit price: ") + config.name();
         try {
-            LlmPrice price = new LlmPrice(id, config.name(),
+            LlmPrice price = new LlmPrice(id, config.name(), LlmPrice.requireModel(draft.model()),
                     date(draft.validFrom(), "Valid from"), date(draft.validTo(), "Valid to"),
                     draft.currency(),
                     rate(draft.input(), "Input"), rate(draft.output(), "Output"),
                     rate(draft.cachedInput(), "Cached input"));
             prices.save(price);
             return refreshed(config).toast(UiToast.success("The period "
-                    + ai.mindconnect.llm.domain.LlmPrices.period(price) + " is saved.")
+                    + ai.mindconnect.llm.domain.LlmPrices.period(price) + " of " + price.model() + " is saved.")
                     .title(isNew ? "Price added" : "Price saved"));
         } catch (IllegalArgumentException e) {
             return dialog(title, LlmPricingComponent.form(config, draft, target, isNew, e.getMessage()));
