@@ -9,6 +9,7 @@ import ai.mindconnect.adminui.ui.component.UserToolsComponent;
 import ai.mindconnect.adminui.ui.page.ProfilePage;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.agent.tool.ToolVariable;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
@@ -25,6 +26,7 @@ import ai.mindconnect.user.domain.ApiTokenId;
 import ai.mindconnect.user.service.ApiTokenService;
 import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.service.UserService;
+import ai.mindconnect.user.service.UserTimeZones;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -78,6 +80,8 @@ public class ProfileUiController {
     private final UserToolUiController userToolRows;
     private final Clock clock;
     private final boolean authEnabled;
+    /** Whose zone is what — the users' own, else the installation's ({@code mindconnect.time-zone}). */
+    private TimeZones zones;
 
     @org.springframework.beans.factory.annotation.Autowired
     public ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
@@ -86,11 +90,13 @@ public class ProfileUiController {
                                org.springframework.beans.factory.ObjectProvider<ToolConnections> toolConnections,
                                org.springframework.beans.factory.ObjectProvider<UserTools> userTools,
                                org.springframework.beans.factory.ObjectProvider<UserToolUiController> userToolRows,
+                               org.springframework.beans.factory.ObjectProvider<TimeZones> zones,
                                @org.springframework.beans.factory.annotation.Value("${mindconnect.auth.enabled:false}")
                                boolean authEnabled) {
         this(tokens, users, namespaces, members, scope, toolVariables.getIfAvailable(),
                 toolConnections.getIfAvailable(), userTools.getIfAvailable(), userToolRows.getIfAvailable(),
                 Clock.systemUTC(), authEnabled);
+        timeZones(zones.getIfAvailable());
     }
 
     ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
@@ -113,6 +119,13 @@ public class ProfileUiController {
         this.scope = scope;
         this.clock = clock;
         this.authEnabled = authEnabled;
+        this.zones = new UserTimeZones(users);
+    }
+
+    /** Where the installation's zone comes from — for a host that resolves zones its own way, and for tests. */
+    ProfileUiController timeZones(TimeZones zones) {
+        if (zones != null) this.zones = zones;
+        return this;
     }
 
     @GetMapping
@@ -127,7 +140,34 @@ public class ProfileUiController {
                 connectionCards(id), toolConnections != null && toolConnections.available(),
                 userToolRows == null ? List.of() : userToolRows.rows(id),
                 userToolsUi == null ? java.util.Map.of() : userToolsUi.catalogue(),
-                userToolsUi != null && userToolsUi.available()).render();
+                userToolsUi != null && userToolsUi.available()).timeZone(zones.zoneOf(id)).render();
+    }
+
+    /**
+     * Saves the zone the user lives in, as {@link UserService#setTimeZone}
+     * checks it, and shows the form again — with the reason when the value is
+     * no zone. Takes effect on the agents' next tool call and prompt.
+     */
+    @PostMapping("/time-zone")
+    public UiPatch saveTimeZone(@AuthenticationPrincipal OidcUser user, @RequestBody Map<String, Object> raw) {
+        UserId id = userId(user);
+        String wanted = new FormBody(raw).str("timeZone");
+        User updated;
+        try {
+            if (wanted == null || wanted.isBlank()) {
+                throw new IllegalArgumentException("Choose a time zone, such as Europe/Zurich.");
+            }
+            updated = users.setTimeZone(id, wanted);
+        } catch (IllegalArgumentException e) {
+            return UiPatch.of().patch(UiPatch.Operation.replace(ProfilePage.TIME_ZONE_FORM_ID,
+                    ProfilePage.timeZoneForm(users.timeZone(id).orElse(null), zones.zoneOf(id), e.getMessage())));
+        }
+        java.time.ZoneId zone = zones.zoneOf(id);
+        return UiPatch.of()
+                .patch(UiPatch.Operation.replace(ProfilePage.TIME_ZONE_FORM_ID,
+                        ProfilePage.timeZoneForm(updated.timeZone(), zone, null)))
+                .toast(UiToast.success("Your agents now read and show times in " + zone.getId() + ".")
+                        .title("Time zone saved"));
     }
 
     /**

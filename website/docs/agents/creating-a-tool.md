@@ -342,6 +342,30 @@ be bound to the current call. The `ToolCallScope` carries things like the
 session id — useful for tools whose state is per-conversation (the todo list
 above passes `scope.sessionId()` into the tool).
 
+### Times: the user's zone, not the server's
+
+A tool that reads or writes a local time — "16:16", "2026-09-22" — asks for
+the zone of the user the call runs for, never `ZoneId.systemDefault()`: the
+server often runs in UTC, and a train at 16:16 in Zurich would otherwise be
+booked two hours late. Take the resolver in `bind`, ask it in `execute`, so a
+zone the user changes on their profile page applies to the next call:
+
+```java
+private TimeZones zones = TimeZones.system();
+
+@Override public void bind(ToolEnvironment env) {
+    zones = TimeZones.of(env);            // the host's resolver, the JVM's zone without one
+}
+
+@Override public Tool create(AgentTool agentTool, ToolCallScope scope) {
+    return new MyTool(() -> zones.zoneOf(scope.userId()));
+}
+```
+
+Show times back in the same zone, so the model reads what it wrote. The
+system prompt already tells the model which zone that is (see
+[the user's time zone](./prompt-renderer.md#the-users-time-zone)).
+
 ## Streaming results
 
 If a tool's output should go straight to the user (not just back to the LLM),

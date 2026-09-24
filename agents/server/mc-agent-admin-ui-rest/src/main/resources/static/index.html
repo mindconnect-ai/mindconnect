@@ -56,6 +56,24 @@
             }
         })();
     </script>
+    <script>
+        /*
+         * The browser's time zone, for the server: the first time it sees it
+         * for a user without one, it becomes theirs — what their agents read
+         * "16:16" in (UserRecordingFilter). A cookie rather than a header, so
+         * every request carries it, the renderer's own fetches included; the
+         * user changes it on the profile page, and this never overrides that.
+         */
+        (function () {
+            try {
+                var zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (zone) {
+                    document.cookie = "mc-time-zone=" + encodeURIComponent(zone)
+                        + "; path=/; max-age=31536000; SameSite=Lax";
+                }
+            } catch (e) { /* no Intl, or cookies off: the installation's zone applies */ }
+        })();
+    </script>
     <!-- Chat shell (sidebar + conversation) — ships with mc-agent-chat-ui-rest. -->
     <link rel="stylesheet" href="/css/chat-ui.css">
     <!-- Embedded workflow admin (/workflow-admin): step cards and workflow

@@ -92,6 +92,30 @@ class ProfileUiControllerTest {
     }
 
     @Test
+    void theTimeZoneIsShownSavedAndValidated() throws Exception {
+        users.recordLogin(UserId.of("alice"), "sub", "iss", "Alice", null);
+        ProfileUiController installationInTokyo = controller.timeZones(
+                new ai.mindconnect.user.service.UserTimeZones(users, java.time.ZoneId.of("Asia/Tokyo")));
+
+        String before = json(installationInTokyo.profile(user("alice")));
+        assertThat(before).contains(ProfilePage.TIME_ZONE_FORM_ID).contains("\"Asia/Tokyo\"")
+                .contains("the installation's zone applies").contains("Europe/Zurich");
+
+        String saved = json(installationInTokyo.saveTimeZone(user("alice"), Map.of("timeZone", "Europe/Zurich")));
+        assertThat(saved).contains("Time zone saved").contains("Europe/Zurich");
+        assertThat(users.timeZone(UserId.of("alice"))).contains("Europe/Zurich");
+        assertThat(json(installationInTokyo.profile(user("alice")))).contains("In Europe/Zurich it is");
+
+        String refused = json(installationInTokyo.saveTimeZone(user("alice"), Map.of("timeZone", "Mars/Olympus_Mons")));
+        assertThat(refused).contains("is not a time zone").doesNotContain("Time zone saved");
+        assertThat(users.timeZone(UserId.of("alice"))).as("a refused value changes nothing").contains("Europe/Zurich");
+
+        String empty = json(installationInTokyo.saveTimeZone(user("alice"), Map.of("timeZone", " ")));
+        assertThat(empty).contains("Choose a time zone");
+        assertThat(users.timeZone(UserId.of("alice"))).contains("Europe/Zurich");
+    }
+
+    @Test
     void neverMeansNoExpiryAndAnUnknownChoiceTheDefault() {
         assertThat(controller.expiry("never")).isNull();
         assertThat(controller.expiry("365")).isEqualTo(NOW.plus(Duration.ofDays(365)));

@@ -3,6 +3,7 @@ package ai.mindconnect.office.tools;
 
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.calendar.CalendarAccounts;
 import ai.mindconnect.calendar.CalendarEvent;
@@ -52,11 +53,17 @@ final class CalendarTools {
     static final Set<String> NAMES = Set.of(CALENDARS, EVENTS, READ, CREATE, UPDATE, DELETE);
 
     private final CalendarAccounts calendars;
-    private final ZoneId zone;
+    /** The zone a time without an offset is read in, and times are shown in: the calling user's, asked per call. */
+    private final TimeZones zones;
 
+    /** One zone for everyone — for a host without users, and for tests. */
     CalendarTools(CalendarAccounts calendars, ZoneId zone) {
+        this(calendars, TimeZones.fixed(zone));
+    }
+
+    CalendarTools(CalendarAccounts calendars, TimeZones zones) {
         this.calendars = calendars;
-        this.zone = zone;
+        this.zones = zones;
     }
 
     Optional<Tool> create(String name, UserId user) {
@@ -108,10 +115,12 @@ final class CalendarTools {
                 object(props(
                         "account", account(accounts, true),
                         "calendar", string("One calendar id from " + CALENDARS + "; every calendar when omitted."),
-                        "from", string("Start of the window, as 2026-09-22 or 2026-09-22T14:00; today when omitted."),
+                        "from", string("Start of the window, as 2026-09-22 or 2026-09-22T14:00 in the user's time zone; "
+                                + "today when omitted."),
                         "to", string("End of the window; seven days after the start when omitted."),
                         "limit", integer("At most this many (default 50, at most 200)."))),
                 args -> {
+                    ZoneId zone = zones.zoneOf(user);
                     Instant from = Optional.ofNullable(instant(args, "from", zone))
                             .orElse(LocalDate.now(zone).atStartOfDay(zone).toInstant());
                     Instant to = Optional.ofNullable(instant(args, "to", zone)).orElse(from.plus(7, ChronoUnit.DAYS));
@@ -137,7 +146,7 @@ final class CalendarTools {
                     out.append(rows.isEmpty() ? "Nothing" : rows.size() + " appointments")
                             .append(" between ").append(when(from, zone)).append(" and ").append(when(to, zone))
                             .append(rows.isEmpty() ? ".\n" : ":\n\n");
-                    for (Row row : rows.stream().limit(limit).toList()) out.append(line(row));
+                    for (Row row : rows.stream().limit(limit).toList()) out.append(line(row, zone));
                     if (!silent.isEmpty()) out.append("\n(Did not answer: ").append(String.join(", ", silent)).append(")\n");
                     return out.toString();
                 });
@@ -154,7 +163,8 @@ final class CalendarTools {
                     ConnectedCalendar account = accounts.one(args);
                     try (CalendarStore store = calendars.open(user, account.id())) {
                         CalendarEvent e = store.read(required(args, "calendar"), required(args, "id"));
-                        StringBuilder out = new StringBuilder(line(new Row(account.id(), e.calendarId(), e)));
+                        StringBuilder out = new StringBuilder(line(new Row(account.id(), e.calendarId(), e),
+                                zones.zoneOf(user)));
                         if (e.organiser() != null) out.append("  organiser: ").append(e.organiser()).append('\n');
                         if (e.attendees() != null && !e.attendees().isEmpty()) {
                             out.append("  attendees: ").append(String.join(", ", e.attendees())).append('\n');
@@ -174,7 +184,8 @@ final class CalendarTools {
                         "account", account(accounts, false),
                         "calendar", string("The calendar id; the main one when omitted."),
                         "title", string("What it is."),
-                        "start", string("When it starts, as 2026-09-22T14:00 — or 2026-09-22 for a whole day."),
+                        "start", string("When it starts, as 2026-09-22T14:00 in the user's time zone — or 2026-09-22 "
+                                + "for a whole day."),
                         "end", string("When it ends; an hour after the start (or the same day) when omitted."),
                         "location", string("Where."),
                         "notes", string("A description."),
@@ -186,6 +197,7 @@ final class CalendarTools {
                                 + "reminder applies. Some calendars keep fewer — the result says what was set.")),
                         "title", "start"),
                 args -> {
+                    ZoneId zone = zones.zoneOf(user);
                     ConnectedCalendar account = accounts.one(args);
                     String start = required(args, "start");
                     EventTime when;
@@ -228,7 +240,8 @@ final class CalendarTools {
                         "calendar", string("The calendar id it is in."),
                         "id", string("The appointment id from " + EVENTS + "."),
                         "title", string("A new title."),
-                        "start", string("A new start, as 2026-09-22T14:00 — or 2026-09-22 for a whole day."),
+                        "start", string("A new start, as 2026-09-22T14:00 in the user's time zone — or 2026-09-22 "
+                                + "for a whole day."),
                         "end", string("A new end."),
                         "location", string("A new place; an empty string clears it."),
                         "notes", string("New notes."),
@@ -239,6 +252,7 @@ final class CalendarTools {
                                 + "reminder; leave it out and the reminders stay as they are.")),
                         "calendar", "id"),
                 args -> {
+                    ZoneId zone = zones.zoneOf(user);
                     ConnectedCalendar account = accounts.one(args);
                     String calendar = required(args, "calendar");
                     List<Integer> asked = reminders(args);
@@ -296,7 +310,7 @@ final class CalendarTools {
 
     private record Row(String account, String calendar, CalendarEvent event) { }
 
-    private String line(Row row) {
+    private static String line(Row row, ZoneId zone) {
         CalendarEvent e = row.event();
         EventTime t = e.when();
         String time = t.allDay()

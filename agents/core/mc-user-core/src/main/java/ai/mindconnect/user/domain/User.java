@@ -28,6 +28,10 @@ import java.util.Objects;
  * @param environment     the user's own variables — an API key of their own, say — which
  *                        {@code ${VAR}} placeholders resolve from before the namespace's and the
  *                        process's; values are stored encrypted, {@code enc:} prefixed. Never null
+ * @param timeZone        the IANA zone the user lives in ({@code Europe/Zurich}) — what a time without
+ *                        an offset means to their agents' tools and how times are written back to them;
+ *                        null until they chose one or their browser told us, then the installation's
+ *                        default applies (see {@code UserTimeZones})
  */
 public record User(
         UserId id,
@@ -38,23 +42,31 @@ public record User(
         Instant createdAt,
         Instant lastLoginAt,
         String activeNamespace,
-        Map<String, String> environment
+        Map<String, String> environment,
+        String timeZone
 ) {
     public User {
         Objects.requireNonNull(id, "A user needs an id");
         environment = environment == null ? Map.of() : Map.copyOf(environment);
+        timeZone = timeZone == null || timeZone.isBlank() ? null : timeZone.strip();
+    }
+
+    /** A user who has not chosen a time zone yet. */
+    public User(UserId id, String subject, String issuer, String displayName, String email,
+                Instant createdAt, Instant lastLoginAt, String activeNamespace, Map<String, String> environment) {
+        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment, null);
     }
 
     /** A user without variables of their own. */
     public User(UserId id, String subject, String issuer, String displayName, String email,
                 Instant createdAt, Instant lastLoginAt, String activeNamespace) {
-        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, null);
+        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, null, null);
     }
 
     /** A user who has not chosen a namespace yet. */
     public User(UserId id, String subject, String issuer, String displayName, String email,
                 Instant createdAt, Instant lastLoginAt) {
-        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, null, null);
+        this(id, subject, issuer, displayName, email, createdAt, lastLoginAt, null, null, null);
     }
 
     /** The name to show: the display name, else the id. */
@@ -64,11 +76,19 @@ public record User(
 
     /** This user with {@code activeNamespace} as the namespace they last chose to work in. */
     public User withActiveNamespace(String activeNamespace) {
-        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment);
+        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment,
+                timeZone);
     }
 
     /** This user with exactly {@code environment} as their variables ({@code null}: none). */
     public User withEnvironment(Map<String, String> environment) {
-        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment);
+        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment,
+                timeZone);
+    }
+
+    /** This user living in {@code timeZone}, an IANA zone id ({@code null}: none chosen). */
+    public User withTimeZone(String timeZone) {
+        return new User(id, subject, issuer, displayName, email, createdAt, lastLoginAt, activeNamespace, environment,
+                timeZone);
     }
 }

@@ -23,6 +23,7 @@ import ai.mindconnect.user.port.out.UserRepository;
 import ai.mindconnect.user.service.ApiTokenService;
 import ai.mindconnect.user.service.NotificationService;
 import ai.mindconnect.user.service.UserService;
+import ai.mindconnect.user.service.UserTimeZones;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springdoc.core.customizers.OpenApiCustomizer;
@@ -178,6 +179,23 @@ public class MindconnectSecurityAutoConfiguration {
         Connections lookup = new ServiceConnections(connections);
         OAuthConnections refreshing = oauth.getIfAvailable();
         return refreshing == null ? lookup : new RefreshingConnections(lookup, refreshing);
+    }
+
+    /**
+     * The zone each user lives in, for the runtime's tools and the system
+     * prompt: what the user chose on the profile page or their browser
+     * reported, else {@code mindconnect.time-zone} — the JVM's zone when that
+     * is unset. The runtime finds it through its bean fallback into this
+     * context, like {@link Connections}.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ai.mindconnect.agent.tool.TimeZones.class)
+    UserTimeZones userTimeZones(UserService users, @Value("${mindconnect.time-zone:}") String installationZone) {
+        if (installationZone == null || installationZone.isBlank()) return new UserTimeZones(users);
+        java.time.ZoneId zone = ai.mindconnect.agent.tool.TimeZones.parse(installationZone)
+                .orElseThrow(() -> new IllegalStateException("mindconnect.time-zone is not a time zone: \""
+                        + installationZone + "\". Use an id such as Europe/Zurich."));
+        return new UserTimeZones(users, zone);
     }
 
     @Bean
