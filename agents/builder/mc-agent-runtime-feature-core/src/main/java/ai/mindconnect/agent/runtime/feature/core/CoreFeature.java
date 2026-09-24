@@ -47,6 +47,7 @@ import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmGateway;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
 import ai.mindconnect.llm.port.out.LlmRepositoryFactory;
@@ -237,6 +238,9 @@ public class CoreFeature extends ConfigurableFeature {
         ctx.instance(EncryptionHelper.class, encryption);
         ctx.bean(LlmConfigRepository.class, () -> routing(ctx).route(LlmConfigRepository.class,
                 ns -> llmRepositories.apply(ns).llmConfigRepository()));
+        // What the configs cost, per period — its own entity beside the configs, routed the same way.
+        ctx.bean(LlmPriceRepository.class, () -> routing(ctx).route(LlmPriceRepository.class,
+                ns -> llmRepositories.apply(ns).llmPriceRepository()));
         if (encryptionKey != null) {
             // The decorator model: the store stays plain, the key wraps it.
             ctx.decorate(LlmConfigRepository.class, repo -> new EncryptingLlmConfigRepository(repo, encryption));

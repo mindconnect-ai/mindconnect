@@ -14,6 +14,7 @@ list of bundled configs and every field, see the
 - **New LLM Config** — add a provider/model configuration.
 - **Edit** — change fields on an existing config.
 - **Delete** — remove a config.
+- **Pricing** — what the model costs, per period; see [Pricing](#pricing).
 
 A config has a `name`, `provider`, `model`, `baseUrl`, `apiKey`,
 `contextWindowTokens`, and optional `additionalParams`, rate-limit and retry
@@ -77,6 +78,53 @@ A fresh installation is seeded with a `speech-to-text` config: OpenAI's
 Groq or a local Whisper server to use it without an OpenAI key, and
 `SPEECH_TO_TEXT_MODEL` at another model — the seed pins no response format,
 so switching the model cannot collide with one.
+
+## Pricing {#pricing}
+
+Under a config's fields — on its detail view and on its edit form — sits a
+**Pricing** section: what the model costs, one row per **price period**,
+because rates change. Each period has
+
+- **Valid from** — the first day (UTC) the price applies, inclusive;
+- **Valid to** — the first day it no longer applies, exclusive. Empty means
+  *until further notice*, so the current price usually has none; when the rate
+  changes, give the old period an end on the day the new one starts;
+- **Currency** — a three-letter ISO code, `USD` unless you say otherwise;
+- **Input**, **Output** and **Cached input per 1M tokens** — decimal rates per
+  million tokens. Cached input is input the provider read from its prompt
+  cache (OpenAI reports it on its own, Anthropic when prompt caching is used);
+  leave it empty and cached input is priced as input.
+
+**Add price…** and each row's **Edit** open a small dialog of their own, and
+**Remove** deletes a period. The section is a separate form with its own
+endpoints (`/admin/api/llm-configs/{id}/prices…`): a price is its own entity,
+not a field of the config, so saving the config form never touches it. The
+table marks the period valid today as *current*, the others as *past* or
+*upcoming*.
+
+Two rules are checked on save, and a refused save keeps the dialog open with
+the reason:
+
+- the periods of one config **must not overlap** — the message names the
+  period that is in the way;
+- an **alias has no prices**: its calls are served by the config it points at
+  and cost what that one costs, so an alias's section just says *Priced by
+  &lt;target&gt;*.
+
+A price names its config. **Renaming** the config in the form takes its prices
+along; **deleting** it deletes them, so a new config of the same name starts
+unpriced. A config removed another way (the REST API, a file deleted by hand)
+leaves its prices behind — harmless, since nothing asks for that name, and
+visible again on a new config of that name.
+
+The prices are stored per namespace like the configs: a file per period under
+`<data>/<namespace>/system/llm-prices/`, or the table `mc_llm_price` on
+Postgres. Nothing in the open-source runtime charges anything with them; they
+are there for whoever reports on usage. The port, `LlmPriceRepository`, offers
+`priceAt(configName, instant)` — the period valid on that UTC day — and
+`LlmPrice.cost(inputTokens, cachedInputTokens, outputTokens)` does the
+arithmetic in `BigDecimal`, so a report prices each call with the rate of its
+own day and a corrected price applies to past calls too.
 
 ## Dictating in the chat {#dictation}
 

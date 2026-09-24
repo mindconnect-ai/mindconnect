@@ -23,6 +23,10 @@ import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.RateLimitConfig;
 import ai.mindconnect.llm.domain.RetryConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
+import ai.mindconnect.llm.service.LlmPriceService;
+import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
+import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.chatui.ui.controller.FormBody;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
@@ -53,6 +57,8 @@ public class LlmConfigUiController {
     private final EnvVarResolver environment;
     private final LmStudioModelCatalog lmStudio;
     private final ProviderModelCatalog providerModels;
+    /** The configs' prices, for the Pricing section and to follow a rename or delete; null on a host without them. */
+    private LlmPriceService prices;
 
     @org.springframework.beans.factory.annotation.Autowired
     public LlmConfigUiController(LlmConfigRepository repository,
@@ -60,10 +66,26 @@ public class LlmConfigUiController {
                                     EncryptionHelper encryption,
                                     ObjectProvider<EnvVarResolver> environment,
                                     OkHttpClient httpClient,
-                                    ObjectMapper objectMapper) {
+                                    ObjectMapper objectMapper,
+                                    ObjectProvider<LlmPriceRepository> prices) {
         this(repository, testService, encryption, environment.getIfAvailable(EnvVarResolver::system),
                 new LmStudioModelCatalog(httpClient, objectMapper),
                 new ProviderModelCatalog(httpClient, objectMapper));
+        LlmPriceRepository priceRepository = prices.getIfAvailable();
+        if (priceRepository != null) withPrices(new LlmPriceService(priceRepository, repository));
+    }
+
+    /** Shows the Pricing section and keeps the prices with their config on rename and delete. */
+    LlmConfigUiController withPrices(LlmPriceService prices) {
+        this.prices = prices;
+        return this;
+    }
+
+    /** The Pricing section under a config, or null when this host keeps no prices. */
+    private UiNode pricing(LlmConfig config) {
+        if (prices == null) return null;
+        return LlmPricingComponent.render(config, prices.pricesOf(config.name()),
+                java.time.LocalDate.now(java.time.ZoneOffset.UTC));
     }
 
     /** For tests: catalogs that answer without an LM Studio or a provider account. */
@@ -338,14 +360,14 @@ public class LlmConfigUiController {
     public ResponseEntity<UiPage> detail(@PathVariable("id") String idValue) {
         LlmConfigId id = LlmConfigId.of(idValue);
         return repository.findById(id)
-                .map(c -> ResponseEntity.ok(new LlmConfigDetailPage(c).render()))
+                .map(c -> ResponseEntity.ok(new LlmConfigDetailPage(c, pricing(c)).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/byName/{name}")
     public ResponseEntity<UiPage> detailByName(@PathVariable String name) {
         return repository.findByName(name)
-                .map(c -> ResponseEntity.ok(new LlmConfigDetailPage(c).render()))
+                .map(c -> ResponseEntity.ok(new LlmConfigDetailPage(c, pricing(c)).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -355,7 +377,7 @@ public class LlmConfigUiController {
         LlmConfigId id = LlmConfigId.of(idValue);
         return repository.findById(id)
                 .map(c -> ResponseEntity.ok(new LlmConfigFormPage(c, repository.findAll(),
-                        modelChoicesFor(c)).render()))
+                        modelChoicesFor(c)).pricing(pricing(c)).render()))
                 .orElse(ResponseEntity.notFound().build());
     }
 
@@ -449,6 +471,8 @@ public class LlmConfigUiController {
         } catch (StaleVersionException e) {
             return ResponseEntity.ok(VersionedForms.changedMeanwhile("LLM config '" + existing.name() + "'"));
         }
+        // A price names its config: renamed, the config takes its prices along.
+        if (prices != null && updated.name() != null) prices.configRenamed(existing.name(), updated.name());
         return ResponseEntity.ok(list());
     }
 
@@ -561,8 +585,11 @@ public class LlmConfigUiController {
     @DeleteMapping("/{id}")
     public ResponseEntity<UiPage> delete(@PathVariable("id") String idValue) {
         LlmConfigId id = LlmConfigId.of(idValue);
-        if (repository.findById(id).isEmpty()) return ResponseEntity.notFound().build();
+        LlmConfig existing = repository.findById(id).orElse(null);
+        if (existing == null) return ResponseEntity.notFound().build();
         repository.deleteById(id);
+        // Its prices go with it, so a later config of the same name starts unpriced.
+        if (prices != null) prices.configDeleted(existing.name());
         return ResponseEntity.ok(list());
     }
 
