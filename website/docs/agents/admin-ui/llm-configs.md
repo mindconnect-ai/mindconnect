@@ -157,7 +157,7 @@ the columns beside it must agree with it:
 
 ```sql
 INSERT INTO mc_llm_price (namespace, id, config_name, model, doc)
-VALUES ('default', 'price-openai-default-gpt-5.4-mini-2026', 'openai-default', 'gpt-5.4-mini',
+VALUES ('local', 'price-openai-default-gpt-5.4-mini-2026', 'openai-default', 'gpt-5.4-mini',
         '{"id": "price-openai-default-gpt-5.4-mini-2026",
           "configName": "openai-default",
           "model": "gpt-5.4-mini",
@@ -169,6 +169,7 @@ VALUES ('default', 'price-openai-default-gpt-5.4-mini-2026', 'openai-default', '
           "cachedInputPerMillion": 0.10}'::jsonb);
 ```
 
+`namespace` is the namespace the config lives in (`local` is the default one).
 `validTo` and `cachedInputPerMillion` may be `null` or left out; `currency`
 defaults to `USD`. The id is any unique text of lower-case letters, digits, `.`, `_` and `-`,
 starting with a letter or digit, at most 128 characters.
