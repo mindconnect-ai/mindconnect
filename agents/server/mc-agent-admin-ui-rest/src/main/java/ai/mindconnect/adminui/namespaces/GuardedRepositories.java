@@ -9,6 +9,9 @@ import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.domain.LlmPrice;
+import ai.mindconnect.llm.domain.LlmPriceId;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpProbeResult;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -95,6 +98,38 @@ public final class GuardedRepositories {
 
         @Override
         public List<LlmConfig> findAll() {
+            return delegate.findAll();
+        }
+    }
+
+    /** LLM prices: what the configs cost, which the admins who own the configs maintain. */
+    public record LlmPrices(LlmPriceRepository delegate, NamespaceWriteGuard guard)
+            implements LlmPriceRepository {
+
+        @Override
+        public void save(LlmPrice price) {
+            guard.requireAdmin("an LLM price");
+            delegate.save(price);
+        }
+
+        @Override
+        public void deleteById(LlmPriceId id) {
+            guard.requireAdmin("an LLM price");
+            delegate.deleteById(id);
+        }
+
+        @Override
+        public Optional<LlmPrice> findById(LlmPriceId id) {
+            return delegate.findById(id);
+        }
+
+        @Override
+        public List<LlmPrice> findByConfigName(String configName) {
+            return delegate.findByConfigName(configName);
+        }
+
+        @Override
+        public List<LlmPrice> findAll() {
             return delegate.findAll();
         }
     }

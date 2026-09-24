@@ -4,6 +4,7 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -55,6 +56,7 @@ public class NamespaceWriteGuardConfig {
             public Object postProcessAfterInitialization(Object bean, String name) throws BeansException {
                 if (bean instanceof GuardedRepositories.Agents
                         || bean instanceof GuardedRepositories.LlmConfigs
+                        || bean instanceof GuardedRepositories.LlmPrices
                         || bean instanceof GuardedRepositories.Skills
                         || bean instanceof GuardedRepositories.Workflows
                         || bean instanceof GuardedRepositories.McpServers) {
@@ -65,6 +67,9 @@ public class NamespaceWriteGuardConfig {
                 }
                 if (bean instanceof LlmConfigRepository configs) {
                     return new GuardedRepositories.LlmConfigs(configs, guard());
+                }
+                if (bean instanceof LlmPriceRepository prices) {
+                    return new GuardedRepositories.LlmPrices(prices, guard());
                 }
                 if (bean instanceof SkillRepository skills) {
                     return new GuardedRepositories.Skills(skills, guard());

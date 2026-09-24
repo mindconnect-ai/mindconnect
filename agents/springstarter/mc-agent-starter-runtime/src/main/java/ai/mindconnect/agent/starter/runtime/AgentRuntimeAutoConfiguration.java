@@ -46,6 +46,7 @@ import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.MessageRepository;
@@ -278,6 +279,7 @@ public class AgentRuntimeAutoConfiguration {
     @Bean TodoListRepository todoListRepository(AgentRuntime r) { return r.beans().get(TodoListRepository.class); }
     @Bean ToolRegistry toolRegistry(AgentRuntime r) { return r.beans().get(ToolRegistry.class); }
     @Bean LlmConfigRepository llmConfigRepository(AgentRuntime r) { return r.beans().get(LlmConfigRepository.class); }
+    @Bean LlmPriceRepository llmPriceRepository(AgentRuntime r) { return r.beans().get(LlmPriceRepository.class); }
     @Bean LlmEmbeddings llmEmbeddings(AgentRuntime r) { return r.beans().get(LlmEmbeddings.class); }
     @Bean LlmTranscription llmTranscription(AgentRuntime r) { return r.beans().get(LlmTranscription.class); }
     /** The routing chat by its class too: the config test service asks for the concrete type. */

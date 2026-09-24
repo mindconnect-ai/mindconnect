@@ -20,7 +20,7 @@ installation-wide: the users and their API tokens.
 
 Each domain module also ships a **repository factory** for its ports —
 `AgentRepositoryFactory` (agent runtime), `MessageRepositoryFactory` (messages),
-`LlmRepositoryFactory` (LLM configs) — with one implementation per backend:
+`LlmRepositoryFactory` (LLM configs and their prices) — with one implementation per backend:
 `FileAgentRepositoryFactory`, `InMemoryAgentRepositoryFactory`,
 `PgAgentRepositoryFactory`, and so on. Whoever assembles a runtime picks the
 factory once for the backend it wants; the repositories come from it.
@@ -40,6 +40,7 @@ matching adapter in `adapter/file`:
 | `TodoListRepository` | Session todo lists | `FileTodoListRepository` | `PgTodoListRepository` |
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
 | `LlmConfigRepository` | LLM configs (credentials encrypted) | `FileLlmConfigRepository` | `PgLlmConfigRepository` |
+| `LlmPriceRepository` | LLM prices, one per config and period | `FileLlmPriceRepository` | `PgLlmPriceRepository` |
 | `FileStore` | Uploaded files (ports in `mc-file-store-core`) | `FilesystemFileStore` | `PgFileStore` |
 | `WorkflowDataRepository` | Workflow definitions ([workflow area](../workflow/overview.md)) | `FileWorkflowDataRepository` | `PgWorkflowDataRepository` |
 | `WorkflowInstanceRepository` | Suspended workflow runs | `FileWorkflowInstanceRepository` | `PgWorkflowInstanceRepository` |
@@ -149,7 +150,7 @@ have written, rendered by the application's `ObjectMapper`.
 
 The tables are named `mc_agent_definition`, `mc_agent_session`,
 `mc_conversation`, `mc_message`, `mc_working_memory`, `mc_conversation_summary`,
-`mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`,
+`mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`, `mc_llm_price`,
 `mc_workflow`, `mc_workflow_instance`, `mc_file`, `mc_vector_store_template`
 and `mc_vector_store_instance` (plus one `vs_<namespace>__<store>` table per
 pgvector store). The small JDBC layer
