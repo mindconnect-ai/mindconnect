@@ -74,7 +74,8 @@ public final class ExtensionRegistry {
             for (ExtensionManifest.Ui.Route route : manifest.contributes().ui().routes()) {
                 if (!route.isOwnedBy(manifest.id())) {
                     issues.add(new Problem(manifest.id(), "route " + route.path() + " is not under /admin/"
-                            + manifest.id() + "/ or /ext/" + manifest.id() + "/ — ignored"));
+                            + manifest.id() + "/, /ext/" + manifest.id() + "/ or /api/" + manifest.id()
+                            + "/ — ignored"));
                 }
             }
         }
@@ -128,6 +129,16 @@ public final class ExtensionRegistry {
     /** The extension whose manifest names a route covering the path, if any. */
     public Optional<Extension> routeOwner(String requestPath) {
         return routeFor(requestPath).map(RouteMatch::extension);
+    }
+
+    /**
+     * The extension whose manifest names a <em>screen</em> covering the path:
+     * like {@link #routeOwner}, but an API route ({@link ExtensionManifest.Ui.Route#isApi})
+     * does not count — the host gives such a path neither the SPA shell nor
+     * the admin layout.
+     */
+    public Optional<Extension> pageOwner(String requestPath) {
+        return routeFor(requestPath).filter(match -> !match.route().isApi()).map(RouteMatch::extension);
     }
 
     /** What is wrong with the set as a whole; empty when everything fits. */

@@ -41,7 +41,9 @@ class ExtensionServiceTest {
                             new ExtensionManifest.Ui(List.of(
                                     new ExtensionManifest.Ui.MenuEntry("nav-acme", "Acme", "/admin/acme-crm", null, null, null, null)),
                                     List.of(new ExtensionManifest.Ui.Route("/admin/acme-crm/**", List.of("ADMIN")),
-                                            new ExtensionManifest.Ui.Route("/admin/acme-crm/mine/**", List.of("USER"))),
+                                            new ExtensionManifest.Ui.Route("/admin/acme-crm/mine/**", List.of("USER")),
+                                            new ExtensionManifest.Ui.Route("/api/acme-crm/**", List.of("ADMIN", "USER")),
+                                            new ExtensionManifest.Ui.Route("/api/acme-crm/admin/**", List.of("ADMIN"))),
                                     null),
                             null, null, null, null)), "acme.jar"),
             new Extension(new ExtensionManifest(OPT_IN, null, null, null, null, null, null, false, null, null), "opt.jar"))),
@@ -117,5 +119,23 @@ class ExtensionServiceTest {
         service.disable(ACME, null);
 
         assertThat(service.opensToUsers("/admin/acme-crm/mine")).isFalse();
+    }
+
+    @Test
+    void an_api_route_opens_to_users_like_a_screen_and_goes_away_with_the_extension() {
+        assertThat(service.opensToUsers("/api/acme-crm/jobs")).isTrue();
+        assertThat(service.opensToUsers("/api/acme-crm/jobs/42/runs")).isTrue();
+        assertThat(service.opensToUsers("/api/acme-crm/admin/purge")).as("the API's admin-only part").isFalse();
+        assertThat(service.opensToUsers("/api/agents")).as("a shipped endpoint is nobody's").isFalse();
+        assertThat(service.routeOwner("/api/acme-crm/jobs")).get().extracting(ExtensionService.Status::enabled)
+                .isEqualTo(true);
+        assertThat(service.pageOwner("/api/acme-crm/jobs")).as("never wrapped in the layout").isEmpty();
+        assertThat(service.pageOwner("/admin/acme-crm")).isPresent();
+
+        service.disable(ACME, null);
+
+        assertThat(service.opensToUsers("/api/acme-crm/jobs")).isFalse();
+        assertThat(service.routeOwner("/api/acme-crm/jobs")).as("still its route — answered 404 now")
+                .get().extracting(ExtensionService.Status::enabled).isEqualTo(false);
     }
 }

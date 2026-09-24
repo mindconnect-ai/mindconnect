@@ -242,17 +242,39 @@ public record ExtensionManifest(
             }
 
             /**
+             * The places an extension's routes may lie: its screens under
+             * {@code /admin/<id>} and {@code /ext/<id>}, its REST API under
+             * {@code /api/<id>} — the one home the bearer-token chain
+             * ({@code /api/**}) covers, so scripts can reach it with a token.
+             */
+            public static List<String> homes(ExtensionId id) {
+                return List.of("/admin/" + id.value(), "/ext/" + id.value(), "/api/" + id.value());
+            }
+
+            /**
              * Whether the route lies where an extension's routes may lie:
-             * under {@code /admin/<id>} or {@code /ext/<id>}. A route anywhere
-             * else would let a manifest claim a shipped screen — and, switched
-             * off, take it down.
+             * under one of its {@linkplain #homes homes}. A route anywhere
+             * else would let a manifest claim a shipped screen or endpoint —
+             * and, switched off, take it down.
              */
             public boolean isOwnedBy(ExtensionId id) {
                 String prefix = prefix();
-                for (String home : List.of("/admin/" + id.value(), "/ext/" + id.value())) {
+                for (String home : homes(id)) {
                     if (prefix.equals(home) || prefix.startsWith(home + "/")) return true;
                 }
                 return false;
+            }
+
+            /**
+             * Whether the route is a REST API rather than a screen: it lies
+             * under {@code /api/}. Such a route answers JSON to scripts, so
+             * the host never hands a browser the SPA shell there and never
+             * wraps what it answers in the admin layout. Roles and the 404 of
+             * a switched-off extension apply to it all the same.
+             */
+            public boolean isApi() {
+                String prefix = prefix();
+                return prefix.equals("/api") || prefix.startsWith("/api/");
             }
 
             /** Whether a plain user of the namespace (not an admin) may open it. */
