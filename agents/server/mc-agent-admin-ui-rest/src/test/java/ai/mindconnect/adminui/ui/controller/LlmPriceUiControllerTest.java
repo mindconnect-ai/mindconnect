@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
+import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
@@ -32,7 +33,8 @@ class LlmPriceUiControllerTest {
     private final InMemoryLlmPriceRepository prices = new InMemoryLlmPriceRepository();
     private final LlmPriceService service = new LlmPriceService(prices, configs);
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-24T10:00:00Z"), ZoneOffset.UTC);
-    private final LlmPriceUiController controller = new LlmPriceUiController(configs, service, clock);
+    private final LlmPriceUiController controller = new LlmPriceUiController(configs, service, clock,
+            EnvVarResolver.none());
     private final LlmConfigUiController configController = new LlmConfigUiController(configs, null,
             EncryptionHelper.noEncryption(), new LmStudioModelCatalog()).withPrices(service);
 
@@ -145,9 +147,105 @@ class LlmPriceUiControllerTest {
         assertThat(prices.findAll()).isEmpty();
     }
 
+    @Test
+    void theDialogIsPrefilledWithTheModelTheConfigServesNow() throws Exception {
+        String dialog = json(controller.newPrice(claude.id().value()).getBody());
+
+        assertThat(fieldValue(dialog, "model")).isEqualTo("claude-sonnet-5");
+    }
+
+    @Test
+    void aPlaceholderModelIsPrefilledAsTheServerResolvesIt() throws Exception {
+        LlmConfig openai = LlmConfig.lmStudio("openai-default", "${OPENAI_MODEL:gpt-5.4-mini}", "http://localhost:1234");
+        configs.save(openai);
+        LlmPriceUiController withVariable = new LlmPriceUiController(configs, service, clock,
+                EnvVarResolver.of(Map.of("OPENAI_MODEL", "bonsai-27b")));
+
+        assertThat(fieldValue(json(withVariable.newPrice(openai.id().value()).getBody()), "model"))
+                .isEqualTo("bonsai-27b");
+        assertThat(fieldValue(json(controller.newPrice(openai.id().value()).getBody()), "model"))
+                .isEqualTo("gpt-5.4-mini");
+        assertThat(json(withVariable.section(openai.id().value()).getBody())).contains("it serves bonsai-27b now");
+    }
+
+    @Test
+    void aPlaceholderNothingResolvesLeavesTheModelToBeTyped() throws Exception {
+        LlmConfig openai = LlmConfig.lmStudio("strict", "${STRICT_MODEL}", "http://localhost:1234");
+        configs.save(openai);
+
+        assertThat(fieldValue(json(controller.newPrice(openai.id().value()).getBody()), "model")).isNull();
+    }
+
+    @Test
+    void anyModelMayBeTypedAndThePeriodsAreGroupedByModel() throws Exception {
+        controller.create(claude.id().value(), form("claude-sonnet-5", "2026-01-01", "", "USD", "3", "15", ""));
+        controller.create(claude.id().value(), form(" claude-opus-5 ", "2026-01-01", "", "USD", "15", "75", ""));
+        controller.create(claude.id().value(), form("claude-sonnet-5", "2025-01-01", "2026-01-01", "USD", "4", "20", ""));
+
+        assertThat(prices.findByConfigName("claude")).extracting(LlmPrice::model)
+                .containsExactlyInAnyOrder("claude-sonnet-5", "claude-opus-5", "claude-sonnet-5");
+        String section = json(controller.section(claude.id().value()).getBody());
+        assertThat(section).contains("\"model\"").contains("Model")
+                .contains("A price applies only to calls this config served with that model")
+                .contains("it serves claude-sonnet-5 now");
+        // opus first, then sonnet's two periods, oldest first
+        int opus = section.indexOf("\"claude-opus-5\"");
+        int sonnetOld = section.indexOf("\"2025-01-01\"");
+        int sonnetNew = section.lastIndexOf("\"claude-sonnet-5\"");
+        assertThat(opus).isPositive().isLessThan(sonnetOld);
+        assertThat(sonnetOld).isLessThan(sonnetNew);
+    }
+
+    @Test
+    void aSecondModelMayShareThePeriodButTheSameModelMayNot() throws Exception {
+        controller.create(claude.id().value(), form("claude-sonnet-5", "2026-01-01", "", "USD", "3", "15", ""));
+
+        controller.create(claude.id().value(), form("claude-opus-5", "2026-01-01", "", "USD", "15", "75", ""));
+        String refused = json(controller.create(claude.id().value(),
+                form("CLAUDE-SONNET-5", "2026-06-01", "", "USD", "2", "10", "")).getBody());
+
+        assertThat(refused).contains("must not overlap");
+        assertThat(prices.findAll()).hasSize(2);
+    }
+
+    @Test
+    void aMissingModelKeepsTheDialogOpen() throws Exception {
+        String refused = json(controller.create(claude.id().value(), form("", "2026-01-01", "", "USD", "3", "15", ""))
+                .getBody());
+
+        assertThat(refused).contains(LlmPricingComponent.DIALOG_ID).contains("needs the model");
+        assertThat(prices.findAll()).isEmpty();
+    }
+
+    @Test
+    void editingAPriceStoredWithoutAModelOffersTheCurrentOne() throws Exception {
+        LlmPrice legacy = new LlmPrice(ai.mindconnect.llm.domain.LlmPriceId.random(), "claude", null,
+                LocalDate.parse("2026-01-01"), null, "USD", java.math.BigDecimal.ONE, java.math.BigDecimal.TEN, null);
+        prices.save(legacy);
+
+        assertThat(json(controller.section(claude.id().value()).getBody())).contains("any model");
+        String dialog = json(controller.edit(claude.id().value(), legacy.id().value()).getBody());
+        assertThat(fieldValue(dialog, "model")).isEqualTo("claude-sonnet-5");
+    }
+
+    /** The value of the form field {@code id} in a rendered patch, or null when it has none. */
+    private static String fieldValue(String json, String id) throws Exception {
+        var found = new ObjectMapper().readTree(json).findParents("id").stream()
+                .filter(n -> id.equals(n.path("id").asText()) && n.has("fieldType"))
+                .findFirst().orElseThrow(() -> new AssertionError("no field " + id + " in " + json));
+        var value = found.get("value");
+        return value == null || value.isNull() ? null : value.asText();
+    }
+
     private static Map<String, Object> form(String from, String to, String currency, String in, String out,
                                             String cached) {
+        return form("claude-sonnet-5", from, to, currency, in, out, cached);
+    }
+
+    private static Map<String, Object> form(String model, String from, String to, String currency, String in,
+                                            String out, String cached) {
         Map<String, Object> raw = new HashMap<>();
+        raw.put("model", model);
         raw.put("validFrom", from);
         raw.put("validTo", to);
         raw.put("currency", currency);

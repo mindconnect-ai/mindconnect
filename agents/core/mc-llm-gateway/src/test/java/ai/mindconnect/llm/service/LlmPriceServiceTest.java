@@ -29,7 +29,11 @@ class LlmPriceServiceTest {
     }
 
     static LlmPrice price(String config, String from, String to) {
-        return LlmPrice.of(config, LocalDate.parse(from), to == null ? null : LocalDate.parse(to), "USD",
+        return price(config, "claude-sonnet-5", from, to);
+    }
+
+    static LlmPrice price(String config, String model, String from, String to) {
+        return LlmPrice.of(config, model, LocalDate.parse(from), to == null ? null : LocalDate.parse(to), "USD",
                 new BigDecimal("3"), new BigDecimal("15"), null);
     }
 
@@ -48,7 +52,7 @@ class LlmPriceServiceTest {
         assertThatThrownBy(() -> service.save(price("claude", "2026-06-01", "2026-09-01")))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("2026-06-01 – 2026-09-01")
-                .hasMessageContaining("overlaps 2026-01-01 – open")
+                .hasMessageContaining("overlaps 2026-01-01 – open of claude-sonnet-5 on 'claude'")
                 .hasMessageContaining("must not overlap");
         assertThat(service.pricesOf("claude")).hasSize(1);
     }
@@ -56,7 +60,7 @@ class LlmPriceServiceTest {
     @Test
     void editingAPeriodDoesNotClashWithItself() {
         LlmPrice stored = service.save(price("claude", "2026-01-01", null));
-        LlmPrice moved = new LlmPrice(stored.id(), "claude", LocalDate.parse("2026-02-01"), null, "USD",
+        LlmPrice moved = new LlmPrice(stored.id(), "claude", "claude-sonnet-5", LocalDate.parse("2026-02-01"), null, "USD",
                 BigDecimal.ONE, BigDecimal.TEN, null);
 
         service.save(moved);
@@ -92,5 +96,37 @@ class LlmPriceServiceTest {
         service.configDeleted("claude-5");
         assertThat(service.pricesOf("claude-5")).isEmpty();
         assertThat(prices.findAll()).extracting(LlmPrice::configName).containsExactly("gpt");
+    }
+
+    @Test
+    void periodsOverlapPerModelOnly() {
+        service.save(price("claude", "claude-sonnet-5", "2026-01-01", null));
+
+        service.save(price("claude", "claude-opus-5", "2026-01-01", null));
+        assertThatThrownBy(() -> service.save(price("claude", "Claude-Sonnet-5", "2026-03-01", null)))
+                .hasMessageContaining("must not overlap");
+
+        assertThat(service.pricesOf("claude")).extracting(LlmPrice::model)
+                .containsExactlyInAnyOrder("claude-sonnet-5", "claude-opus-5");
+    }
+
+    @Test
+    void aPriceWithoutAModelIsRefused() {
+        LlmPrice noModel = new LlmPrice(ai.mindconnect.llm.domain.LlmPriceId.random(), "claude", " ",
+                LocalDate.parse("2026-01-01"), null, "USD", BigDecimal.ONE, BigDecimal.ONE, null);
+
+        assertThatThrownBy(() -> service.save(noModel)).hasMessageContaining("needs the model");
+        assertThat(prices.findAll()).isEmpty();
+    }
+
+    @Test
+    void aRenameKeepsEachPricesModel() {
+        service.save(price("claude", "claude-sonnet-5", "2026-01-01", null));
+        service.save(price("claude", "claude-opus-5", "2026-01-01", null));
+
+        service.configRenamed("claude", "claude-5");
+
+        assertThat(service.pricesOf("claude-5")).extracting(LlmPrice::model)
+                .containsExactlyInAnyOrder("claude-sonnet-5", "claude-opus-5");
     }
 }

@@ -10,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,7 +31,21 @@ class FileLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
 
         Path file = dir.resolve("test/system/llm-prices/" + price.id().value() + ".json");
         assertThat(file).exists();
-        assertThat(Files.readString(file)).contains("\"validFrom\":\"2026-01-01\"").contains("\"validTo\":\"2026-07-01\"");
+        assertThat(Files.readString(file)).contains("\"validFrom\":\"2026-01-01\"").contains("\"validTo\":\"2026-07-01\"")
+                .contains("\"model\":\"" + MODEL + "\"");
         assertThat(new FileLlmPriceRepository(dir, new Namespace("other")).findAll()).isEmpty();
+    }
+
+    @Test
+    void aFileWrittenBeforePricesNamedTheirModelStillReadsAndPricesAnyModel() throws Exception {
+        Path file = dir.resolve("test/system/llm-prices/old-price.json");
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, "{\"id\":\"old-price\",\"configName\":\"claude\",\"validFrom\":\"2026-01-01\","
+                + "\"currency\":\"USD\",\"inputPerMillion\":3,\"outputPerMillion\":15}");
+
+        LlmPriceRepository repo = repository();
+
+        assertThat(repo.findAll()).singleElement().satisfies(p -> assertThat(p.anyModel()).isTrue());
+        assertThat(repo.priceAt("claude", "whatever-model", Instant.parse("2026-09-24T00:00:00Z"))).isPresent();
     }
 }

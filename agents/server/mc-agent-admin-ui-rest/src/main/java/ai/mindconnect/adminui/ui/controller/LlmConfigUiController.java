@@ -85,7 +85,8 @@ public class LlmConfigUiController {
     private UiNode pricing(LlmConfig config) {
         if (prices == null) return null;
         return LlmPricingComponent.render(config, prices.pricesOf(config.name()),
-                java.time.LocalDate.now(java.time.ZoneOffset.UTC));
+                java.time.LocalDate.now(java.time.ZoneOffset.UTC),
+                LlmPriceUiController.currentModel(config, environment));
     }
 
     /** For tests: catalogs that answer without an LM Studio or a provider account. */

@@ -14,7 +14,10 @@ import java.util.stream.Collectors;
 
 /**
  * Keeps the price periods of the LLM configs consistent: a price is for a
- * concrete config that exists, and the periods of one config never overlap.
+ * concrete config that exists and names the model it prices, and the periods
+ * of one config and model never overlap — those of different models of one
+ * config are independent. The model is not checked against the config's: it
+ * may be one the config served before, or one it is about to serve.
  * Reading goes straight to the {@link LlmPriceRepository}; this is the way
  * to write.
  *
@@ -35,7 +38,7 @@ public class LlmPriceService {
         this.configs = Objects.requireNonNull(configs, "configs");
     }
 
-    /** The periods of one config, oldest first. */
+    /** The periods of one config, every model's, oldest first. */
     public List<LlmPrice> pricesOf(String configName) {
         return prices.findByConfigName(configName);
     }
@@ -47,14 +50,16 @@ public class LlmPriceService {
     /**
      * Saves a new or changed period after checking it.
      *
-     * @throws IllegalArgumentException when the config is unknown or an alias, or the
-     *                                  period overlaps another of the same config — the
-     *                                  message says which, for the form to show
+     * @throws IllegalArgumentException when the config is unknown or an alias, the model
+     *                                  is missing, or the period overlaps another of the
+     *                                  same config and model — the message says which,
+     *                                  for the form to show
      */
     public LlmPrice save(LlmPrice price) {
         LlmConfig config = configs.findByName(price.configName())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "There is no LLM config named '" + price.configName() + "' to price"));
+        LlmPrice.requireModel(price.model());
         if (config.isAlias()) {
             throw new IllegalArgumentException("'" + config.name() + "' is an alias: it uses the prices of '"
                     + config.delegatesTo() + "', its target. Set the price there.");
@@ -63,8 +68,8 @@ public class LlmPriceService {
         if (!clashes.isEmpty()) {
             throw new IllegalArgumentException("The period " + LlmPrices.period(price)
                     + " overlaps " + clashes.stream().map(LlmPrices::period)
-                    .collect(Collectors.joining(", ")) + " of '" + price.configName()
-                    + "'. Periods of one config must not overlap — end the earlier one on the day the next starts.");
+                    .collect(Collectors.joining(", ")) + " of " + price.model() + " on '" + price.configName()
+                    + "'. Periods of one model must not overlap — end the earlier one on the day the next starts.");
         }
         prices.save(price);
         return price;

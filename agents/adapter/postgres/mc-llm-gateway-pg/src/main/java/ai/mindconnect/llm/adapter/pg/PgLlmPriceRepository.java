@@ -16,8 +16,13 @@ import java.util.Optional;
 /**
  * {@link LlmPriceRepository} on Postgres. Each price period is one row of
  * {@code mc_llm_price}, keyed by {@code (namespace, id)}: the JSON document,
- * and the config name beside it because that is what a lookup asks by. The
- * namespace column is what the namespace purge deletes by.
+ * and the config name and model beside it, for queries — and an SQL reader —
+ * that go by them. The namespace column is what the namespace purge deletes by.
+ *
+ * <p>The {@code model} column came after the table: {@link #initSchema} adds
+ * it to a table that lacks it ({@code ADD COLUMN IF NOT EXISTS}, nullable
+ * there), and a row written before stays readable — its document has no
+ * model, so it prices any model of its config (see {@link LlmPrice}).
  */
 public final class PgLlmPriceRepository implements LlmPriceRepository {
 
@@ -36,7 +41,8 @@ public final class PgLlmPriceRepository implements LlmPriceRepository {
                 .partitionKey("namespace", "TEXT", p -> namespace.value())
                 .id("id", "TEXT", p -> p.id().value())
                 .requiredColumn("config_name", "TEXT", LlmPrice::configName)
-                .index("namespace", "config_name")
+                .requiredColumn("model", "TEXT", LlmPrice::model)
+                .index("namespace", "config_name", "model")
                 .build(sql);
     }
 
