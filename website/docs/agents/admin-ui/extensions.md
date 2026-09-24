@@ -78,6 +78,43 @@ refuses the start instead — for an installation that wants nothing on its
 classpath it has not been told about. The default is `false` while not every
 module has a manifest yet.
 
+## Content per namespace
+
+An extension that ships agents, skills or workflows puts them under
+`initial-data/` in its jar, like the host's own [initial data](../initial-data.md),
+and names them in its manifest under `contributes.content`:
+
+```json
+"content": { "agents": [ "email-assistant", "email-checker" ], "skills": [ "mail-etiquette" ], "workflows": [] }
+```
+
+They are installed into **every namespace where the extension is on** — the
+start-up namespace at start, every other namespace the first time it is used
+after a start (the first request into it, an admin's or a plain user's, or the
+first task that runs there). Only what the namespace **never had** is
+installed:
+
+- a record of that name that is there is left as it is — a differing one is a
+  CHANGED entry on **Install → Migrations**, never overwritten;
+- one an admin deleted stays deleted — each namespace remembers what it got
+  (`<data.base-dir>/<namespace>/system/installed-seeds.json`, `mc_installed_seed`
+  in Postgres); Migrations lists it as NEW to bring it back;
+- a new version of the extension that ships a new agent brings it into every
+  namespace on its next use after the upgrade.
+
+Where the extension is **off** — by the namespace, its brand or the operator —
+nothing of its content is installed, and nothing is removed either: switching
+off hides tools and screens, it does not delete agents someone may have
+edited. **Switching it on** installs its missing content in the namespace at
+hand right away (the toast says what), and every other namespace checks again
+on its next use — which is how a brand's decision reaches the brand's
+namespaces.
+
+What a manifest does not name is the host's: a record under `initial-data/`
+that no manifest lists is installed into every namespace regardless of any
+extension. Names are matched per kind — an agent's `name`, a skill's name,
+a workflow's file name without `.json`.
+
 ## The manifest
 
 ```json
@@ -121,7 +158,7 @@ module has a manifest yet.
 | `contributes.tools.providers[]` | The `ToolFactory` / `MultiToolProvider` classes the classpath finds. A provider named here is managed wherever its jar is. |
 | `contributes.tools.names[]` | The tool names the extension carries, as patterns (`acme_*`, `crm_export`). **This is what a namespace that switched the extension off stops seeing.** |
 | `contributes.features[]` | `RuntimeFeature` classes, like the providers above. |
-| `contributes.content` | Agents, skills and workflows the jar seeds (`initial-data/**`), by name. |
+| `contributes.content` | Agents, skills and workflows the jar seeds (`initial-data/**`), by name — installed into every namespace where the extension is on; see [Content per namespace](#content-per-namespace). |
 | `contributes.ui.menu[]` | Sidebar entries. With `label` and `href` the host renders the entry itself — into the shipped group `group` names (`nav-group-ai`, `nav-group-tools`, `nav-group-data`), or into a new group called `groupLabel` with the icon `groupIcon` (the first entry that names one gives the group its icon; a shipped group keeps its own); for admins of the namespace, and for its plain users too when `roles` names `USER`. An entry with only an `id` declares one the jar's own `AdminMenuContribution` registers; an id both declare is the bean's. **Either way an entry whose id a switched-off extension declares is left out of the menu** for that namespace. |
 | `contributes.ui.routes[]` | The screens and the REST API the extension serves, as prefix patterns under one of the extension's own homes (see [Route homes](#route-homes)): `/admin/<id>/**`, `/ext/<id>/**` or `/api/<id>/**` — a route anywhere else is reported and ignored, so no manifest can claim a shipped screen or endpoint. The host answers **404** on every one of them where the extension is off. Admin-only unless `roles` names `USER`; then a plain user of the namespace may open the route, and menu entries with that role are shown to them. |
 | `contributes.ui.assets[]`, `rest[]`, `decorates[]`, `replaces[]`, `persistence` | Declared and shown; the steps that enforce them follow. `replaces` is checked already: two extensions replacing one seam is a problem. |
@@ -172,7 +209,8 @@ short fantasy adventure with the LLM as game master:
 - a tool, `demo_dice` (registered through `META-INF/services`, named in the
   manifest), which the game master rolls for monsters and traps;
 - an agent, `dungeon-master`, seeded from the jar's
-  `initial-data/agent-definitions/`: it tells the story, offers choices and
+  `initial-data/agent-definitions/` into a namespace once the extension is on
+  there (`contributes.content`): it tells the story, offers choices and
   asks the player to roll;
 - a runtime feature, `DemoFeature` (a bean of the jar's auto-configuration,
   and in `META-INF/services` for library hosts), which decorates the core's

@@ -226,7 +226,10 @@ directory each.
 
 A namespace holds everything — agents, LLM configs, workflows, skills,
 sessions, files, vector stores — and it says who may do what in it, in two
-lists of **e-mail addresses**:
+lists of **e-mail addresses**. A new namespace is not empty: the first time it
+is used it gets the shipped agents, LLM configs, skills and workflows, and the
+content of every extension that is on there (see
+[Initial data](../initial-data.md)).
 
 | | Admin | User |
 |---|---|---|
@@ -292,7 +295,7 @@ creator. `creator: <address>` is the short form of a single admin.
 It is created the first time somebody arrives under one of that brand's hosts,
 and **never changed from configuration afterwards** — who is in a namespace is
 its admins' business, not that of a file edited later. Somebody listed in it
-lands there on their first sign-in; somebody listed anywhere also gets an empty
+lands there on their first sign-in; somebody listed anywhere also gets a
 namespace of their own, with them as its admin.
 
 ## The main sections

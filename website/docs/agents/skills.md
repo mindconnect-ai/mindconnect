@@ -121,12 +121,13 @@ a `SKILL.md` (`/admin/api/skills/{id}/markdown`, or `/api/skills/{id}/markdown`)
 — drop that file into a repository's `.mindconnect/skills/` and it travels with
 the code.
 
-Skills shipped with the app are imported on start from
-`initial-data/skills/*.md` whenever no stored skill carries their name; see
-[Initial data](./initial-data.md). A stored skill is never overwritten by the
-shipped version — it is prose someone has since made their own. Deleting a
-shipped skill therefore brings it back on the next start; to be rid of one,
-switch it off.
+Skills shipped with the app are installed from `initial-data/skills/*.md`
+into every namespace, the first time the namespace is used, when no stored
+skill carries their name; see [Initial data](./initial-data.md). A stored skill
+is never overwritten by the shipped version — it is prose someone has since
+made their own. A shipped skill that was deleted stays deleted: the namespace
+remembers that it had it. **Install → Migrations** lists it as NEW and brings
+it back.
 
 A skill can also come from a [registry](./registry.md): an entry of type
 `skill` points at a `SKILL.md` in a GitHub repository, and *Import* on the

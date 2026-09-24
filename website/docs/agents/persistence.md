@@ -126,8 +126,10 @@ What happens on start:
   declares. There is no migration tool and nothing to run by hand; a plain
   Postgres without extensions is enough.
 - The bundled [initial data](./initial-data.md) — agent definitions, LLM
-  configs, example workflows — is seeded into the database exactly as it
-  would be seeded into `data/`, and skipped when already present.
+  configs, skills, example workflows — is seeded into the database exactly as
+  it would be seeded into `data/`: into the start-up namespace at start, into
+  every other namespace on its first use, and only what the namespace never
+  had (`mc_installed_seed` remembers what it had).
 - Uploaded files go to the database as well (`mc_file`, content as
   `bytea`) unless `mindconnect.file-store.backend` names another backend —
   keeping records in Postgres and files on a volume is a valid pairing.

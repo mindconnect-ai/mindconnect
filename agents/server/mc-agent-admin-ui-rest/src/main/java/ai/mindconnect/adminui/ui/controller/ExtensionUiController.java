@@ -1,5 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.adminui.service.NamespaceSeeder;
+import ai.mindconnect.adminui.service.NamespaceSeeding;
 import ai.mindconnect.adminui.ui.page.ExtensionsPage;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
@@ -32,6 +34,11 @@ import java.util.Optional;
  * list; switching is what an admin of the namespace does. Deciding for a
  * brand is offered only while working in the brand's own namespace, whose
  * admins are the brand's admins.
+ *
+ * <p>A switch can make an extension's content due: after each one the
+ * namespace at hand gets what it is now missing right away
+ * ({@link NamespaceSeeding#extensionsChanged()}), every other namespace on its
+ * next use.
  */
 @RestController
 @RequestMapping(ExtensionsPage.NAVIGATE)
@@ -41,13 +48,16 @@ public class ExtensionUiController {
     private final ObjectProvider<ExtensionAudit> audit;
     private final ObjectProvider<ContributionChecker> checker;
     private final ObjectProvider<ScopeSupplier> scope;
+    private final ObjectProvider<NamespaceSeeding> seeding;
 
     public ExtensionUiController(ExtensionService extensions, ObjectProvider<ExtensionAudit> audit,
-                                 ObjectProvider<ContributionChecker> checker, ObjectProvider<ScopeSupplier> scope) {
+                                 ObjectProvider<ContributionChecker> checker, ObjectProvider<ScopeSupplier> scope,
+                                 ObjectProvider<NamespaceSeeding> seeding) {
         this.extensions = extensions;
         this.audit = audit;
         this.checker = checker;
         this.scope = scope;
+        this.seeding = seeding;
     }
 
     @GetMapping
@@ -152,11 +162,19 @@ public class ExtensionUiController {
 
     private UiPage attempt(String id, String okTitle, String failTitle, Act act) {
         try {
-            String message = act.apply(ExtensionId.of(id));
+            String message = act.apply(ExtensionId.of(id)) + installed();
             return list().toast(UiToast.success(message).title(okTitle));
         } catch (IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
             return list().toast(UiToast.error(e.getMessage()).title(failTitle));
         }
+    }
+
+    /** Seeds what the switch made due here; a sentence naming it, or nothing. */
+    private String installed() {
+        NamespaceSeeding service = seeding.getIfAvailable();
+        if (service == null) return "";
+        List<String> installed = service.extensionsChanged().map(NamespaceSeeder.Report::installed).orElse(List.of());
+        return installed.isEmpty() ? "" : " Installed here: " + String.join(", ", installed) + ".";
     }
 
     @FunctionalInterface
