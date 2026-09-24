@@ -135,17 +135,46 @@ class StoredUserToolRosterTest {
     }
 
     @Test
-    void the_users_pin_wins_over_the_agents_and_the_rest_of_it_survives() {
-        service.add(ALICE, null, "email_list_messages", null, null, pin("arbeit"), null);
+    void the_agents_pin_wins_over_the_users_and_theirs_fills_what_it_left_open() {
+        service.add(ALICE, null, "email_list_messages", null, null,
+                Map.of("folder", "Archive", "account", "arbeit"), null);
         AgentTool fromAgent = AgentTool.of("email_list_messages", "Reads a mailbox",
-                Map.of("params", Map.of("account", "shared", "folder", "INBOX")));
+                Map.of("params", Map.of("folder", "INBOX")));
 
         List<AgentTool> refs = roster.apply(ALICE, ASSISTANT, List.of(fromAgent));
 
         Object pinned = refs.get(0).overrides().get(PinnedParamsTool.OVERRIDE_KEY);
         assertThat(pinned).asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
-                .containsEntry("account", "arbeit")     // theirs wins
-                .containsEntry("folder", "INBOX");      // the agent's other pin is left alone
+                .containsEntry("folder", "INBOX")       // the agent kept it to one folder
+                .containsEntry("account", "arbeit");    // the user's pick where the agent pinned nothing
+    }
+
+    @Test
+    void a_user_binding_cannot_put_another_tool_under_a_name_the_agent_uses() {
+        // An alias that happens to be the agent's tool name would otherwise
+        // swap the tool behind it and carry the agent's pins and approval to it.
+        service.add(ALICE, null, "bash", "web_search", null, Map.of("cmd", "anything"), false);
+        AgentTool fromAgent = new AgentTool(ai.mindconnect.agent.tool.AgentToolId.of("agent-ws"), "web_search",
+                "Searches the web", Map.of("params", Map.of("site", "example.org")), true, false, true, null);
+
+        List<AgentTool> refs = roster.apply(ALICE, ASSISTANT, List.of(fromAgent));
+
+        assertThat(refs).singleElement().isEqualTo(fromAgent);
+        assertThat(AliasTool.registryName(refs.get(0))).isEqualTo("web_search");
+    }
+
+    @Test
+    void a_tool_the_user_adds_under_its_own_name_is_still_theirs_to_add() {
+        // By design a person may bring a catalogue tool the agent does not list —
+        // under a name the agent does not use, it touches nothing of the agent's.
+        service.add(ALICE, null, "bash", "my_shell", null, Map.of(), null);
+        AgentTool fromAgent = AgentTool.of("web_search", "Searches the web",
+                Map.of("params", Map.of("site", "example.org")));
+
+        List<AgentTool> refs = roster.apply(ALICE, ASSISTANT, List.of(fromAgent));
+
+        assertThat(refs).extracting(AgentTool::name).containsExactly("web_search", "my_shell");
+        assertThat(refs.get(0)).isEqualTo(fromAgent);
     }
 
     @Test
