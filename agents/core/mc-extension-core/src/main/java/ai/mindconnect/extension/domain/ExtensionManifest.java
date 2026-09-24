@@ -182,18 +182,25 @@ public record ExtensionManifest(
          * A sidebar entry the extension contributes. With {@code label} and
          * {@code href} the host renders it — into the group {@code group}
          * names (a shipped one like {@code nav-group-tools}, or a new one
-         * called {@code groupLabel}), for admins of the namespace and, when
-         * {@code roles} names {@code USER}, for its plain users too. Without
-         * them it only declares the id of an entry the jar's own
-         * {@code AdminMenuContribution} registers. Either way, an entry whose
-         * id a switched-off extension declares is left out of the menu.
+         * called {@code groupLabel}, with the icon {@code groupIcon}), for
+         * admins of the namespace and, when {@code roles} names {@code USER},
+         * for its plain users too. Without them it only declares the id of an
+         * entry the jar's own {@code AdminMenuContribution} registers. Either
+         * way, an entry whose id a switched-off extension declares is left out
+         * of the menu.
          */
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record MenuEntry(String id, String label, String href, String icon, String group, String groupLabel,
-                                List<String> roles) {
+                                String groupIcon, List<String> roles) {
             public MenuEntry {
                 Objects.requireNonNull(id, "id");
                 roles = roles == null ? List.of() : List.copyOf(roles);
+            }
+
+            /** An entry that names no icon for its group. */
+            public MenuEntry(String id, String label, String href, String icon, String group, String groupLabel,
+                             List<String> roles) {
+                this(id, label, href, icon, group, groupLabel, null, roles);
             }
 
             /** Whether the host can render this entry itself. */

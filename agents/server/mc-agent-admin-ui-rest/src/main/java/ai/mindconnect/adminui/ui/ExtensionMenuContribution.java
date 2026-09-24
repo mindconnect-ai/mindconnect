@@ -32,6 +32,8 @@ public final class ExtensionMenuContribution {
         List<AdminMenuContribution.Entry> links = new ArrayList<>();
         Map<String, List<AdminMenuContribution.Entry>> groupMembers = new LinkedHashMap<>();
         Map<String, ExtensionManifest.Ui.MenuEntry> groupHeads = new LinkedHashMap<>();
+        // The first entry that names an icon for its group gives it one, whichever extension that is.
+        Map<String, String> groupIcons = new LinkedHashMap<>();
         for (ExtensionService.Status status : statuses) {
             if (!status.enabled()) continue;
             for (ExtensionManifest.Ui.MenuEntry entry : status.manifest().contributes().ui().menu()) {
@@ -42,6 +44,9 @@ public final class ExtensionMenuContribution {
                     links.add(link);
                 } else {
                     groupHeads.putIfAbsent(entry.group(), entry);
+                    if (entry.groupIcon() != null && !entry.groupIcon().isBlank()) {
+                        groupIcons.putIfAbsent(entry.group(), entry.groupIcon());
+                    }
                     groupMembers.computeIfAbsent(entry.group(), g -> new ArrayList<>()).add(link);
                 }
             }
@@ -50,7 +55,7 @@ public final class ExtensionMenuContribution {
         groupMembers.forEach((group, members) -> {
             ExtensionManifest.Ui.MenuEntry head = groupHeads.get(group);
             String label = head.groupLabel() == null || head.groupLabel().isBlank() ? group : head.groupLabel();
-            all.add(AdminMenuContribution.Entry.group(group, label, null, members));
+            all.add(AdminMenuContribution.Entry.group(group, label, groupIcons.get(group), members));
         });
         return all;
     }
