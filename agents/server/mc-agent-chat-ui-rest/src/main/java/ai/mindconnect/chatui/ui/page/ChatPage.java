@@ -251,7 +251,7 @@ public final class ChatPage {
         var chatPanel = UiSection.of("chat-panel-" + session.id().value(), null)
                 .section("messages", null,
                         ai.mindconnect.ui.model.UiScrollPane
-                                .of("chat-scroll-" + session.id().value(), messages.render())
+                                .of(scrollPaneId(), messages.render())
                                 .stickToLatest(true))
                 .section("input",    null, chatForm.render());
 
@@ -260,6 +260,14 @@ public final class ChatPage {
         return UiSection.of("session-" + session.id().value(), null)
                 .section("chat", null, chatPanel)
                 .withCssClass("chat-conversation");
+    }
+
+    /**
+     * The conversation's scroll pane. The typing bubble is appended here,
+     * after the message list rather than into it — see {@link #streamStart}.
+     */
+    private String scrollPaneId() {
+        return "chat-scroll-" + session.id().value();
     }
 
     /** The live streams this page would reattach to — for hosts that wrap it. */
@@ -294,50 +302,71 @@ public final class ChatPage {
         return patch(messages.replaceAll());
     }
 
-    /**
-     * Initial events of a streaming turn:
-     * <ol>
-     *   <li>Append the user's message immediately so they see it land.</li>
-     *   <li>Swap the form to its streaming variant (Send → Stop).</li>
-     *   <li>Append the "AI is thinking …" indicator.</li>
-     * </ol>
-     * Task cards from tool calls during the thinking phase land
-     * <i>above</i> the indicator (lists append at the tail; the
-     * indicator stays last). The indicator is removed on the first
-     * incoming token via {@link #streamFirstToken(String, String)}.
-     */
-    /**
-     * Streaming start for a RESUMED turn (approval answered): no user bubble
-     * to append — the trigger was a card click, not typed text. Only the form
-     * swaps to its streaming state (Send → Stop, thinking indicator).
-     */
     /** APPEND a live approval card pushed by a suspended (sub-)turn. */
     public UiPatch appendApprovalCard(ai.mindconnect.ui.model.UiList.Item card) {
         return patch(messages.appendApprovalCard(card));
     }
 
+    /**
+     * Streaming start for a RESUMED turn (approval answered): no user bubble
+     * to append — the trigger was a card click, not typed text. Only the form
+     * swaps to its streaming state (Send → Stop).
+     */
     public UiPatch streamResume() {
         return patch(chatForm.toStreaming());
     }
 
-    public UiPatch streamStart(String userBubble, String thinkingId) {
-        // The thinking indicator lives in the composer's streaming state
-        // (see ChatFormComponent#streamingForm) — nothing extra is appended
-        // to the conversation, so the composer stays pinned in place.
+    /**
+     * Initial events of a streaming turn:
+     * <ol>
+     *   <li>Append the user's message immediately so they see it land.</li>
+     *   <li>Swap the form to its streaming variant (Stop, Send disabled). The
+     *       textarea stays open and keeps anything typed into it.</li>
+     *   <li>Show the typing bubble where the reply will appear.</li>
+     * </ol>
+     * The typing bubble sits after the message list, in the scroll pane, not
+     * in the list: task cards from tool calls during the thinking phase are
+     * APPENDed to the list and so land <i>above</i> it, and the bubble stays
+     * the last thing in the conversation until the reply takes its place. It
+     * is removed on the first token ({@link #streamFirstToken}) or, when
+     * none comes, at the end of the turn ({@link #streamDone},
+     * {@link #streamError(String, String)}).
+     */
+    public UiPatch streamStart(String userBubble, String typingId) {
         return patch(
                 messages.appendUserMessage(userBubble),
-                chatForm.toStreaming());
+                chatForm.toStreaming(),
+                appendTyping(typingId));
     }
 
     /**
-     * First bot token arrived. Drop the thinking indicator and append
-     * the streaming-reply placeholder. Subsequent tokens grow the
-     * placeholder via {@link #streamToken(String, String)}.
+     * The typing bubble on its own — what a client that opens the page
+     * mid-turn, before the first token, needs to see it too (the catch-up
+     * frame; the rendered page never contains it).
      */
-    public UiPatch streamFirstToken(String pendingId, String thinkingId) {
-        // No thinking bubble to remove — the indicator sits in the composer
-        // and disappears when the form resets at the end of the turn.
-        return patch(messages.appendBotPending(pendingId, agent.name()));
+    public UiPatch streamTyping(String typingId) {
+        return patch(appendTyping(typingId));
+    }
+
+    /**
+     * First bot token arrived. The typing bubble gives way to the
+     * streaming-reply placeholder, appended at the tail of the list — which
+     * is where the bubble was. Subsequent tokens grow the placeholder via
+     * {@link #streamToken(String, String)}.
+     */
+    public UiPatch streamFirstToken(String pendingId, String typingId) {
+        return patch(
+                removeTyping(typingId),
+                messages.appendBotPending(pendingId, agent.name()));
+    }
+
+    private UiPatch.Operation appendTyping(String typingId) {
+        return UiPatch.Operation.append(scrollPaneId(), MessageListComponent.typingIndicator(typingId));
+    }
+
+    /** A no-op for a client that does not show the bubble (any more). */
+    private static UiPatch.Operation removeTyping(String typingId) {
+        return UiPatch.Operation.remove(typingId);
     }
 
     /** Every subsequent token: grow the bot-pending body to the cumulative text. */
@@ -384,27 +413,24 @@ public final class ChatPage {
     }
 
     /**
-     * Turn completed successfully. Reset the form back to its idle
-     * variant and refresh the whole conversation so the streamed
-     * bot-pending placeholder + live task cards get swapped for the
-     * persisted assistant message and its historic task cards.
+     * Turn completed successfully. Put the form back to its idle variant —
+     * keeping what was typed during the turn — and refresh the whole
+     * conversation so the streamed bot-pending placeholder + live task cards
+     * get swapped for the persisted assistant message and its historic task
+     * cards. The typing bubble lives outside the list, so it is removed by
+     * name: a turn that ends without a single token still has it.
      */
-    public UiPatch streamDone() {
-        return patch(chatForm.reset(), messages.replaceAll());
+    public UiPatch streamDone(String typingId) {
+        return patch(chatForm.toIdle(), messages.replaceAll(), removeTyping(typingId));
     }
 
     /**
-     * Streaming failed before completion. Only restore the form to
-     * idle — the live partial state stays visible (the user gets a
-     * separate error banner via the SSE 'error' event), and the next
-     * page load will rebuild from persisted history.
+     * Streaming failed or was cancelled. The typing bubble goes, an error
+     * bubble says why, and the form is back to Send — keeping the draft. The
+     * live partial state stays visible; the next page load rebuilds from
+     * persisted history.
      */
-    public UiPatch streamError() {
-        return patch(chatForm.reset());
-    }
-
-    /** Failure with a face: error bubble into the chat, form back to Send. */
-    public UiPatch streamError(String message) {
-        return patch(messages.appendErrorNotice(message), chatForm.reset());
+    public UiPatch streamError(String message, String typingId) {
+        return patch(removeTyping(typingId), messages.appendErrorNotice(message), chatForm.toIdle());
     }
 }

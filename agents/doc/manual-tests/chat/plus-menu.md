@@ -96,10 +96,14 @@ change the chat while staying open, and what the menu says about the chat
 
 9. Start a long turn (`Write a 1500-word story about a lighthouse, no
    tools.`) and look at the composer while it streams.
-   **Expected:** The composer is replaced by `AI is thinking` and a **Stop**
-   button — no textarea and no **+**, so no tool can be toggled mid-turn and
-   the Stop button cannot be swapped for Send. After the turn the composer
-   with its **+** is back.
+   **Expected:** Until the story starts, a bubble with three animated dots
+   sits below your message. The composer keeps its textarea but loses its
+   **+**, microphone, directory and model buttons, so no tool can be toggled
+   mid-turn; its footer shows **Stop** and a greyed-out **Send**. Type
+   `next question` into the textarea while the story streams and press
+   Enter: nothing is sent, the text stays. After the turn the composer with
+   its **+** is back, `next question` is still in the textarea, and Send
+   sends it.
 
 ## Cleanup
 

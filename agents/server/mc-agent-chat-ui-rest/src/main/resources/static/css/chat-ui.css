@@ -722,11 +722,9 @@
    The absolute-positioning of the footer row (further up this file) is what
    makes this possible and is also why it is fiddly — a chat-composer variant
    in the framework would render this shape directly instead. */
-/* The measure belongs to BOTH states of the composer. It used to sit on
-   .chat-form.sui-form alone — but the streaming state is a stack, not a
-   form, so while a turn ran the composer lost its width and stretched across
-   the whole panel while the conversation stayed in its column. The card look
-   below is the idle form's own; the streaming state brings its own. */
+/* The measure belongs to both states of the composer. Both are the same
+   form now (the streaming state keeps the textarea open), so the card look
+   below serves both; the streaming state only rearranges its footer. */
 .chat-form {
     width: 100%;
     max-width: var(--chat-measure, 48rem);
@@ -824,20 +822,91 @@
     border-radius: var(--sui-radius-md, 8px);
 }
 
-/* The streaming state is the same surface, so the composer does not jump
-   when the turn starts. */
-.chat-form--streaming {
-    background: var(--sui-color-bg);
-    border: 1px solid var(--sui-color-border);
-    border-radius: var(--sui-radius-md, 8px);
-    padding: 14px 14px 14px 20px;
-    margin-bottom: 18px;
-    align-items: center;
+/* While a turn runs the composer is the same card with the same textarea —
+   the next message can be typed meanwhile. The footer holds Stop and a
+   disabled Send, and both sit at the right edge, where Send always is,
+   instead of Stop starting the row on the left. */
+.chat-form--streaming .sui-form-footer > :first-child {
+    margin-inline-start: auto;
 }
 
-.chat-thinking {
+.chat-form--streaming .sui-form-footer > :last-child {
+    margin-inline-start: 0;
+}
+
+
+/* ── The typing bubble ────────────────────────────────────────────────────
+   Between the user's message and the first token of the reply the assistant
+   shows a bubble with three dots that rise one after another, the way a
+   messenger shows that the other side is typing. It is the one place the
+   assistant gets a bubble: it stands for a reply that has no text yet, and
+   a bare row of dots would read as a loading glitch rather than as someone
+   answering.
+
+   The row sits after the message list, not in it (see ChatPage#streamStart),
+   so it takes the list items' measure and gutter itself. The bubble is a
+   UiSpinner (role="status", aria-label "The assistant is typing"); its glyph
+   and the two pseudo-elements around it are the three dots. */
+.chat-typing-row {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: var(--chat-measure, 48rem);
+    margin-inline: auto;
+    margin-block: var(--chat-turn-gap, 1.35rem);
+    padding: 0 20px;
+    /* A stack stretches its children across; the bubble is as wide as its
+       dots. */
+    align-items: flex-start;
+}
+
+.chat-typing.sui-spinner {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 12px 15px;
+    background: var(--sui-color-surface-alt);
     color: var(--sui-color-text-muted);
-    font-style: italic;
+    border-radius: 14px;
+    border-bottom-left-radius: 6px;
+    vertical-align: middle;
+}
+
+.chat-typing::before,
+.chat-typing > .sui-spinner-glyph,
+.chat-typing::after {
+    content: "";
+    display: block;
+    width: 7px;
+    height: 7px;
+    border: none;
+    border-radius: 50%;
+    background: currentColor;
+    opacity: .4;
+    animation: chat-typing-dot 1.2s ease-in-out infinite;
+}
+
+.chat-typing > .sui-spinner-glyph {
+    animation-delay: .15s;
+}
+
+.chat-typing::after {
+    animation-delay: .3s;
+}
+
+@keyframes chat-typing-dot {
+    0%, 60%, 100% { transform: translateY(0);    opacity: .4; }
+    30%           { transform: translateY(-4px); opacity: 1;  }
+}
+
+/* Still dots for a reader who asked for less motion: the bubble alone says
+   that an answer is coming. */
+@media (prefers-reduced-motion: reduce) {
+    .chat-typing::before,
+    .chat-typing > .sui-spinner-glyph,
+    .chat-typing::after {
+        animation: none;
+        opacity: .7;
+    }
 }
 
 

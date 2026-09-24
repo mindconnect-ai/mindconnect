@@ -1604,7 +1604,7 @@ public class ChatUiController {
         // one sat empty below.
         String turnKey = liveNodeKey();
         String pendingId  = "bot-pending-"  + sessionId.value() + "-" + turnKey;
-        String thinkingId = "bot-thinking-" + sessionId.value() + "-" + turnKey;
+        String typingId   = "bot-typing-"   + sessionId.value() + "-" + turnKey;
 
         // The streaming-time page is built once with the pre-turn history;
         // it owns the form / message-list / task-card patch shapes the
@@ -1641,11 +1641,17 @@ public class ChatUiController {
             publishPatch(bus, liveView.headerOnly());
         }
 
-        // 1. Append user message (a typed turn) or just swap the form to
-        //    streaming (an approval resume), add thinking indicator.
-        publishPatch(bus, userParts != null
-                ? liveView.streamStart(userBubble(session, userParts), thinkingId)
-                : liveView.streamResume());
+        // 1. Append user message (a typed turn) and the typing bubble, or
+        //    just swap the form to streaming (an approval resume).
+        if (userParts != null) {
+            publishPatch(bus, liveView.streamStart(userBubble(session, userParts), typingId));
+            // The catch-up frame until the first token replaces it: a client
+            // that opens the page now gets the bubble too — nothing it renders
+            // from history has one.
+            sessionStreams.rememberBubble(channelId, json(liveView.streamTyping(typingId)));
+        } else {
+            publishPatch(bus, liveView.streamResume());
+        }
 
         // 2. Stream tokens + per-task cards.
         StringBuilder cumulativeText = new StringBuilder();
@@ -1689,14 +1695,14 @@ public class ChatUiController {
                 case StreamEvent.Token t -> {
                     cumulativeText.append(t.text());
                     if (!pendingAppended[0]) {
-                        // First token: drop the thinking indicator and append
+                        // First token: drop the typing bubble and append
                         // the streaming bot-reply placeholder BELOW any task
                         // cards that arrived during the thinking phase.
                         // Kept as the catch-up frame: a client that opens the
                         // page mid-turn has no bubble, and every token after
                         // it is a REPLACE that would land nowhere.
                         sessionStreams.rememberBubble(channelId,
-                                publishPatch(bus, liveView.streamFirstToken(pendingId, thinkingId)));
+                                publishPatch(bus, liveView.streamFirstToken(pendingId, typingId)));
                         pendingAppended[0] = true;
                     }
                     // Token patches carry the CUMULATIVE text, so the newest
@@ -1815,7 +1821,7 @@ public class ChatUiController {
                                         ? "Cancelled by user before the tool finished"
                                         : "The turn failed before the tool finished: " + message);
                     }
-                    publishPatch(bus, liveView.streamError(message));
+                    publishPatch(bus, liveView.streamError(message, typingId));
                 } catch (Exception ignored) {}
                 try {
                     bus.publish("error", message);
@@ -1839,7 +1845,7 @@ public class ChatUiController {
                 // streamDone() patch reflects what's actually been persisted
                 // (assistant message, historic task cards, updated tokens).
                 ChatPage finalView = buildChatPage(session, agent);
-                publishPatch(bus, finalView.streamDone());
+                publishPatch(bus, finalView.streamDone(typingId));
                 // After the rebuild, or they would be wiped by it. They sit
                 // below the answer, which is also when they ran.
                 for (var verdict : reviewerVerdicts) {

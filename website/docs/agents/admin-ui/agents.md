@@ -67,7 +67,13 @@ started/completed, sortable). Here you can:
 - **Delete** — remove a session.
 
 Opening or starting a session takes you into the chat view, where you see
-streamed responses, tool calls and sub-agent runs. The chat view also offers:
+streamed responses, tool calls and sub-agent runs. Until the first words of a
+reply arrive, a typing bubble with three animated dots stands where the reply
+will appear (screen readers hear "The assistant is typing"; with reduced
+motion the dots stay still). While a turn runs the message field stays open:
+you can type your next message, and it is still there when the turn ends.
+**Send** — and Enter — wait for the turn to finish; queuing a message during
+a turn is not supported yet. The chat view also offers:
 
 - **file attachments** on a turn, and a **Stop** button for a running stream
   (streams survive a page reload — you can re-attach);
