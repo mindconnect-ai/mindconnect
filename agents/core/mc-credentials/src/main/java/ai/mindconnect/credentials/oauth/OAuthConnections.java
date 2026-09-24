@@ -2,6 +2,7 @@ package ai.mindconnect.credentials.oauth;
 
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.credentials.domain.Connection;
+import ai.mindconnect.credentials.domain.ConnectionId;
 import ai.mindconnect.credentials.domain.OAuth2UserCreds;
 import ai.mindconnect.credentials.domain.OAuthProvider;
 import ai.mindconnect.credentials.port.out.OAuthProviderRepository;
@@ -15,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Attaching an account by signing in at the provider, rather than by typing a
@@ -44,6 +47,8 @@ public class OAuthConnections {
     private final OAuthProviderRepository providers;
     private final OAuthFlow flow;
     private final Clock clock;
+    /** One lock per connection; a {@link ReentrantLock} because it is held across an HTTP call. */
+    private final Map<ConnectionId, ReentrantLock> refreshLocks = new ConcurrentHashMap<>();
 
     public OAuthConnections(ConnectionService connections, OAuthProviderRepository providers, OAuthFlow flow) {
         this(connections, providers, flow, Clock.systemUTC());
@@ -100,26 +105,47 @@ public class OAuthConnections {
      * used. A connection that is not OAuth, or whose token has time left, is
      * handed back untouched.
      *
+     * <p>One refresh per connection at a time. Two tool calls of one turn
+     * often find the same token about to run out, and providers that rotate
+     * refresh tokens take each one only once — the second call would be
+     * refused and the connection marked expired, although nothing is wrong
+     * with it. So the second waits for the first, reads the connection again
+     * and uses the token the first one fetched.
+     *
      * <p>A refusal is recorded on the connection rather than thrown: the tool
      * then says "connect it again" instead of failing the same way on every
      * call, and the list on the profile says so too.
      */
     public Connection ensureFresh(Connection connection) {
-        if (!(connection.credentials() instanceof OAuth2UserCreds credentials)
-                || !OAuthFlow.needsRefresh(credentials, clock.instant())) {
+        if (!(connection.credentials() instanceof OAuth2UserCreds seen)
+                || !OAuthFlow.needsRefresh(seen, clock.instant())) {
             return connection;
         }
-        String providerName = connection.settings().get(PROVIDER_SETTING);
-        OAuthProvider provider = providerName == null ? null : providers.findByName(providerName).orElse(null);
-        if (provider == null) {
-            return unusable(connection, "the app registration it was made with is gone");
-        }
+        ReentrantLock lock = refreshLocks.computeIfAbsent(connection.id(), id -> new ReentrantLock());
+        lock.lock();
         try {
-            return connections.replaceCredentials(connection.id(), flow.refresh(provider, credentials));
-        } catch (OAuthException e) {
-            log.info("Could not refresh {} of {}: {}", connection.key(), connection.userId().value(),
-                    e.getMessage());
-            return unusable(connection, e.getMessage());
+            Connection current = connections.find(connection.userId(), connection.id()).orElse(connection);
+            if (!(current.credentials() instanceof OAuth2UserCreds credentials)) {
+                return current;
+            }
+            if (!OAuthFlow.needsRefresh(credentials, clock.instant())) {
+                // Somebody else refreshed it while this call was waiting.
+                return current;
+            }
+            String providerName = current.settings().get(PROVIDER_SETTING);
+            OAuthProvider provider = providerName == null ? null : providers.findByName(providerName).orElse(null);
+            if (provider == null) {
+                return unusable(current, "the app registration it was made with is gone");
+            }
+            try {
+                return connections.replaceCredentials(current.id(), flow.refresh(provider, credentials));
+            } catch (OAuthException e) {
+                log.info("Could not refresh {} of {}: {}", current.key(), current.userId().value(),
+                        e.getMessage());
+                return unusable(current, e.getMessage());
+            }
+        } finally {
+            lock.unlock();
         }
     }
 
