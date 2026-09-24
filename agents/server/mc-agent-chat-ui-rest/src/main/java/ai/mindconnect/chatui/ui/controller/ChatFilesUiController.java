@@ -55,13 +55,20 @@ public class ChatFilesUiController {
     /** What the Tools picker offers — the redrawn composer's tool badge counts over it. */
     private final ai.mindconnect.agent.tool.ToolRegistry toolRegistry;
 
+    /** For the model button's label: the model behind the agent's config. */
+    private final org.springframework.beans.factory.ObjectProvider<
+            ai.mindconnect.llm.port.out.LlmConfigRepository> llmConfigs;
+
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  AgentSessionRepository sessions,
                                  AgentSessionService sessionService,
                                  AgentDefinitionRepository agents,
                                  SessionOwnership ownership,
                                  ai.mindconnect.chatui.service.ActiveStreams activeStreams,
-                                 ai.mindconnect.agent.tool.ToolRegistry toolRegistry) {
+                                 ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
+                                 org.springframework.beans.factory.ObjectProvider<
+                                         ai.mindconnect.llm.port.out.LlmConfigRepository> llmConfigs) {
+        this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
         this.sessions = sessions;
@@ -189,7 +196,8 @@ public class ChatFilesUiController {
                 SessionOwnership.channelOf(sessionId)).isPresent();
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         sessionId, agent == null ? null : agent.id(), streaming)
-                .withModelLabel(agent == null ? null : agent.llmConfigName())
+                .withModelLabel(agent == null ? null : ai.mindconnect.chatui.ui.component.ModelLabel.of(
+                        llmConfigs == null ? null : llmConfigs.getIfAvailable(), agent.llmConfigName()))
                 .withAttachments(sessionFiles.attachments(sessionId))
                 .withAgentCounts(agent, ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent
                         .offered(toolRegistry.toolNamesByGroup()))
