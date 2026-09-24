@@ -43,6 +43,18 @@ pgbouncer if you need pooling. The `vector` extension must be installed
 (the backend runs `CREATE EXTENSION IF NOT EXISTS vector` on first use).
 Config keys: `url` (required), `user` / `password`.
 
+Under Postgres persistence (`mindconnect.persistence=postgres`) the backend
+needs no URL: a store without one lives in the application's own database, on
+its pool, and `pgvector` is the default backend there — provided the database
+has the extension. A plain `postgres:16-alpine` has not; then the vectors stay
+on the `memory` backend (one warning at start names the fix: pgvector built
+into the image, for an existing Alpine data directory an Alpine build, since a
+Debian image changes the text collation) and everything else works as before. Once the extension is there, each namespace's `memory` stores move over
+on first use: a store's `<store>.jsonl` is imported into its (empty) pgvector
+table and its record — and every template that named `memory` — then names
+`pgvector`. A file whose embedding dimension does not fit stays on `memory`,
+logged. The files are left in place.
+
 ### Templates & instances
 
 A **`VectorStoreTemplate`** is the policy for a family of stores: which
@@ -191,11 +203,15 @@ for itself.
 
 | Property | Default | Notes |
 |----------|---------|-------|
-| `mindconnect.vector-store.backend` | `memory` | Backend type (`memory`, `pgvector`, or your own). |
-| `mindconnect.vector-store.url` / `.user` / `.password` | — | `pgvector` backend connection. |
+| `mindconnect.vector-store.backend` | `memory`; `pgvector` under Postgres persistence when the database has it | Backend type (`memory`, `pgvector`, or your own). |
+| `mindconnect.vector-store.url` / `.user` / `.password` | — | `pgvector` backend connection; unset under Postgres persistence: the application's database. |
 | `mindconnect.vector-store.embedding-config` | `embeddings` | Name of the `EMBEDDING` LLM config. |
 | `mindconnect.file-store.backend` | `filesystem` | File-store backend type. |
 
 The `memory` vector-store backend and the `filesystem` file store keep their
 files next to everything else of the namespace: `<mindconnect.data.base-dir>/<mindconnect.namespace>/vector-stores`
-and `…/files` (default `data/local/vector-stores`, `data/local/files`).
+and `…/files` (default `data/local/vector-stores`, `data/local/files`). On
+file persistence the registry of templates and instances lives there too
+(`vector-stores/templates`, `vector-stores/instances`); under Postgres
+persistence it is kept in `mc_vector_store_template` and
+`mc_vector_store_instance`, filled once per namespace from those directories.

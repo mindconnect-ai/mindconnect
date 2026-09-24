@@ -65,6 +65,39 @@ class McpGatewayAutoConfigurationTest {
     }
 
     @Test
+    void by_default_registrations_are_files() {
+        runner().run(context -> {
+            NamespacedMcpGateways gateways = context.getBean(NamespacedMcpGateways.class);
+            assertThat(gateways.forNamespace(ai.mindconnect.agent.Namespace.DEFAULT).repository())
+                    .isInstanceOf(FileMcpServerRepository.class);
+        });
+    }
+
+    @Test
+    void a_store_factory_bean_takes_the_place_of_the_files() {
+        // How the Postgres starter puts registrations and discovery cache into tables.
+        runner().withUserConfiguration(OwnStores.class).run(context -> {
+            assertThat(context).hasNotFailed();
+            NamespacedMcpGateways gateways = context.getBean(NamespacedMcpGateways.class);
+            assertThat(gateways.forNamespace(new ai.mindconnect.agent.Namespace("acme")).repository())
+                    .isSameAs(OwnStores.REPOSITORY);
+            // The bundled registrations went into that store, not into a directory.
+            assertThat(dataDir.resolve("local")).doesNotExist();
+        });
+    }
+
+    @Test
+    void postgres_without_a_store_factory_keeps_the_files() {
+        // mc-mcp-gateway-pg not on the classpath: the servers stay where they are rather than vanish.
+        runner().withPropertyValues("mindconnect.persistence=postgres").run(context -> {
+            assertThat(context).hasNotFailed();
+            assertThat(context.getBean(NamespacedMcpGateways.class)
+                    .forNamespace(ai.mindconnect.agent.Namespace.DEFAULT).repository())
+                    .isInstanceOf(FileMcpServerRepository.class);
+        });
+    }
+
+    @Test
     void a_host_with_its_own_gateway_gets_a_context_that_starts() {
         // The point of this test: it did not. The admin bean returned null,
         // Spring filed a NullBean whose declared type still satisfied the
@@ -115,6 +148,47 @@ class McpGatewayAutoConfigurationTest {
             assertThat(probe.ok()).isFalse();
             assertThat(probe.message()).contains("process targets are switched off");
         });
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class OwnStores {
+        static final McpServerRepository REPOSITORY = new InMemoryRepository();
+
+        @Bean
+        McpStoreFactory mcpStoreFactory() {
+            return new McpStoreFactory() {
+                @Override
+                public McpServerRepository serverRepository(ai.mindconnect.agent.Namespace namespace) {
+                    return REPOSITORY;
+                }
+
+                @Override
+                public McpDiscoveryStore discoveryStore(ai.mindconnect.agent.Namespace namespace) {
+                    return new McpDiscoveryStore() {
+                        @Override public java.util.Optional<ai.mindconnect.mcp.gateway.McpDiscovery> find(
+                                McpServerId server) { return java.util.Optional.empty(); }
+                        @Override public void save(McpServerId server,
+                                                   ai.mindconnect.mcp.gateway.McpDiscovery discovery) { }
+                        @Override public boolean delete(McpServerId server) { return false; }
+                    };
+                }
+            };
+        }
+    }
+
+    /** A registration store that is neither a file nor a table. */
+    static final class InMemoryRepository implements McpServerRepository {
+        private final Map<McpServerId, McpServerRegistration> byId = new java.util.concurrent.ConcurrentHashMap<>();
+        @Override public java.util.Optional<McpServerRegistration> findById(McpServerId id) {
+            return java.util.Optional.ofNullable(byId.get(id));
+        }
+        @Override public List<McpServerRegistration> findAll() { return List.copyOf(byId.values()); }
+        @Override public java.util.Optional<McpServerRegistration> findByName(String name) {
+            return byId.values().stream().filter(r -> r.displayName().equalsIgnoreCase(name)).findFirst();
+        }
+        @Override public void save(McpServerRegistration registration) { byId.put(registration.id(), registration); }
+        @Override public void deleteById(McpServerId id) { byId.remove(id); }
+        @Override public long version() { return byId.hashCode(); }
     }
 
     @Configuration(proxyBeanMethods = false)

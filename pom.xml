@@ -150,10 +150,12 @@
         <module>agents/core/mc-agent-tools-web-browser</module>
         <module>agents/core/mc-agent-tools-workflow</module>
         <module>agents/core/mc-agent-registry-core</module>
+        <module>agents/adapter/postgres/mc-agent-registry-pg</module>
         <module>agents/core/mc-agent-registry</module>
         <module>agents/mcp/mc-mcp-proxy</module>
         <module>agents/mcp/mc-mcp-gateway-core</module>
         <module>agents/mcp/mc-mcp-gateway-local</module>
+        <module>agents/adapter/postgres/mc-mcp-gateway-pg</module>
         <module>agents/mcp/mc-agent-tools-mcp</module>
         <module>agents/mcp/mc-mcp-gateway-admin-ui-rest</module>
         <module>agents/server/mc-agent-api-rest</module>

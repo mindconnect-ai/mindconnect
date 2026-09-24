@@ -112,8 +112,10 @@ public class AttachSupport {
         try {
             String storeName = "session-" + sessionId.value();
             var template = stores.template(namespace, "chat-uploads").orElseGet(() -> {
+                // On the backend of the built-in template: the one the host's settings and persistence chose.
                 var created = new ai.mindconnect.vectorstore.tools.VectorStoreTemplate(
-                        "chat-uploads", environment.getOrDefault("vectorStoreBackend", "memory"),
+                        "chat-uploads", stores.template(namespace,
+                                ai.mindconnect.vectorstore.tools.VectorStores.DEFAULT_TEMPLATE).orElseThrow().backend(),
                         Map.of(), environment.getOrDefault("vectorStoreEmbeddingConfig", "embeddings"),
                         null, Map.of("description", "Per-chat-session upload stores (auto-created)"));
                 stores.registry(namespace).saveTemplate(created);

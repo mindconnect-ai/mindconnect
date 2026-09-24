@@ -11,7 +11,10 @@ import java.util.Objects;
  *
  * <p>{@link #dataDir()} is always set: file persistence roots everything
  * there; Postgres and in-memory persistence still root their file-based side
- * channels (workflow definitions, vector-store files, scratch space) there.
+ * channels (vector-store files, scratch space) there. Workflows are no side
+ * channel on Postgres — definitions and instances are tables, and what file
+ * persistence left under {@code dataDir} is imported once — while in memory
+ * the suspended instances still go to files there.
  */
 public sealed interface Persistence {
 

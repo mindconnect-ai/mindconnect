@@ -175,6 +175,23 @@ public final class PgVectorStore implements VectorStore {
         }
     }
 
+    /** The dimension of the table's {@code vector(n)} column — none before the first upsert created it. */
+    @Override
+    public java.util.OptionalInt dimension() {
+        try (Connection connection = connect();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT atttypmod FROM pg_attribute"
+                             + " WHERE attrelid = to_regclass(?) AND attname = 'embedding' AND NOT attisdropped")) {
+            statement.setString(1, table);
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next() && rs.getInt(1) > 0
+                        ? java.util.OptionalInt.of(rs.getInt(1)) : java.util.OptionalInt.empty();
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("pgvector dimension failed for store '" + id + "': " + e.getMessage(), e);
+        }
+    }
+
     // ── plumbing ───────────────────────────────────────────────────────────
 
     private Connection connect() throws SQLException {

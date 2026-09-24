@@ -8,8 +8,9 @@ import java.util.Optional;
 
 /**
  * Where the windows are kept: one per user, account and folder. A file per
- * window in the file adapter, a row in a Postgres one — small either way,
- * a thousand heads being half a megabyte.
+ * window in the file adapter — small, a thousand heads being half a
+ * megabyte — and in {@link PgMailIndexStore} a row for the window and a
+ * row per head.
  */
 public interface MailIndexStore {
 

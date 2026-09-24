@@ -20,24 +20,62 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@link PgVectorStore} directly with its own {@link DataSource} — in a
  * Spring Boot app that is the auto-configured Hikari pool.
  *
+ * <p>A host that keeps its own data in Postgres binds the backend to that
+ * database instead — {@link #PgVectorBackend(DataSource)} — and a store
+ * without a {@code url} of its own then lives there, on the host's pool.
+ *
  * <p>Config keys:
  * <ul>
- *   <li>{@code url} — JDBC URL, e.g. {@code jdbc:postgresql://localhost:5432/mindconnect} (required)</li>
+ *   <li>{@code url} — JDBC URL, e.g. {@code jdbc:postgresql://localhost:5432/mindconnect}
+ *       (required unless the backend is bound to a data source)</li>
  *   <li>{@code user} / {@code password} — credentials (optional if in the URL)</li>
  * </ul>
  *
  * <p>The {@code vector} extension must be installed in the database; the
  * backend runs {@code CREATE EXTENSION IF NOT EXISTS vector} on first use and
- * degrades with a clear error if it lacks the privilege.
+ * degrades with a clear error if it lacks the privilege. {@link #enableExtension}
+ * asks up front.
  */
 public final class PgVectorBackend implements VectorStoreBackend {
+
+    public static final String TYPE = "pgvector";
 
     /** One DataSource per url+user — PGSimpleDataSource is stateless, sharing is safe. */
     private static final Map<String, DataSource> DATA_SOURCES = new ConcurrentHashMap<>();
 
+    /** Where a store without a {@code url} lives; null: every store names its own. */
+    private final DataSource bound;
+
+    /** The ServiceLoader's backend: every store names its database by {@code url}. */
+    public PgVectorBackend() {
+        this(null);
+    }
+
+    /** A backend whose stores live in {@code dataSource} unless their config names a {@code url}. */
+    public PgVectorBackend(DataSource dataSource) {
+        this.bound = dataSource;
+    }
+
+    /**
+     * Makes sure the database has the {@code vector} extension, by
+     * {@code CREATE EXTENSION IF NOT EXISTS vector}.
+     *
+     * @return empty when the extension is there; otherwise the database's reason —
+     *         typically that the server has no pgvector at all (a plain
+     *         {@code postgres} image), or that the user may not create it
+     */
+    public static java.util.Optional<String> enableExtension(DataSource dataSource) {
+        try (var connection = dataSource.getConnection(); var statement = connection.createStatement()) {
+            statement.execute("CREATE EXTENSION IF NOT EXISTS vector");
+            return java.util.Optional.empty();
+        } catch (java.sql.SQLException e) {
+            return java.util.Optional.of(e.getMessage());
+        }
+    }
+
     @Override
     public String type() {
-        return "pgvector";
+        return TYPE;
     }
 
     @Override
@@ -48,7 +86,7 @@ public final class PgVectorBackend implements VectorStoreBackend {
     @Override
     public List<String> listStores(Map<String, String> config) {
         String url = config == null ? null : config.get("url");
-        if (url == null || url.isBlank()) {
+        if ((url == null || url.isBlank()) && bound == null) {
             return List.of();
         }
         String prefix = PgVectorStore.tablePrefix(namespace(config));
@@ -76,8 +114,11 @@ public final class PgVectorBackend implements VectorStoreBackend {
         return namespace;
     }
 
-    private static DataSource dataSource(Map<String, String> config) {
+    private DataSource dataSource(Map<String, String> config) {
         String url = config == null ? null : config.get("url");
+        if ((url == null || url.isBlank()) && bound != null) {
+            return bound;
+        }
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("pgvector backend requires the 'url' config key");
         }

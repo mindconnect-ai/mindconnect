@@ -159,8 +159,9 @@ public class AgentRuntimeBuilder {
     /**
      * Every repository in Postgres, over the given (ideally pooled) data
      * source; the tables are created on {@link #build()}. {@code dataDir}
-     * still roots the file-based side channels — workflows, vector-store
-     * files, code-execution scratch — that have no database form.
+     * still roots the file-based side channels — vector-store files,
+     * code-execution scratch — that have no database form; workflows kept
+     * there by file persistence are imported into the tables once.
      */
     public static AgentRuntimeBuilder usePostgres(javax.sql.DataSource dataSource, Path dataDir) {
         return of(Persistence.postgres(dataSource, dataDir)).installFromClasspath();
@@ -174,7 +175,7 @@ public class AgentRuntimeBuilder {
     /**
      * Purely in-memory persistence — nothing survives {@link AgentRuntime#close()}.
      * The simplest possible setup for tests and short-lived embeddings. File-rooted
-     * side channels (vector store files, workflow definitions, code-exec scratch)
+     * side channels (vector store files, suspended workflow instances, code-exec scratch)
      * still use a temp directory when their optional modules are present.
      */
     public static AgentRuntimeBuilder useInMemoryPersistence() {
@@ -389,7 +390,7 @@ public class AgentRuntimeBuilder {
         return runtime;
     }
 
-    /** What every feature may rely on before anything else: the namespace, the mapper, the Sql. */
+    /** What every feature may rely on before anything else: the namespace, the mapper, the Sql and its DataSource. */
     private void registerCoreSettings() {
         context.bean(Namespace.class, () -> new Namespace(namespaceName));
         // Where this runtime works — one namespace for its whole life.
@@ -404,6 +405,8 @@ public class AgentRuntimeBuilder {
             // the documents in the database are the JSON the file store writes.
             context.bean(ai.mindconnect.jdbc.Sql.class, () -> ai.mindconnect.jdbc.Sql.of(
                     postgres.dataSource(), new ai.mindconnect.jdbc.Json(objectMapper)));
+            // The pool itself, for what runs its own JDBC on the same database — the pgvector tables.
+            context.bean(javax.sql.DataSource.class, postgres::dataSource);
         }
         context.bean(ToolEnvironment.class, () -> new BeansToolEnvironment(beans, context::properties));
     }

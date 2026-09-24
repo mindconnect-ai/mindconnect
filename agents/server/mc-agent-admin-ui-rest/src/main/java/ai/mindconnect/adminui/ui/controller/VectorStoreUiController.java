@@ -355,7 +355,7 @@ public class VectorStoreUiController {
                 // the template was saved since.
                 .field(UiField.hidden("version",
                         isNew || t.version() == null ? "0" : t.version().toString()))
-                .field(UiField.select("backend", "Backend", t == null ? "memory" : t.backend(), backends)
+                .field(UiField.select("backend", "Backend", t == null ? defaultBackend() : t.backend(), backends)
                         .asEditable()
                         // Switching the backend swaps the backend-config group below.
                         .onChange(ai.mindconnect.ui.model.UiTrigger.api("POST",
@@ -370,13 +370,19 @@ public class VectorStoreUiController {
                         .hint("Workflow started by 'Ingest file…' on stores of this template"))
                 .field(UiField.text("description", "Description",
                         t == null || builtIn ? null : t.metadata().get("description")).asEditable());
-        form.content(backendConfigGroup(t == null ? "memory" : t.backend(),
+        form.content(backendConfigGroup(t == null ? defaultBackend() : t.backend(),
                 t == null ? Map.of() : t.backendConfig()));
         form.action(UiAction.primary("save", builtIn ? "Save as new template" : "Save").icon("save")
                         .dispatch("POST", "/admin/vector-stores/templates", "vs-template-form"))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel").dispatch("GET", "/admin/vector-stores"))
                 .link(UiLink.of("back", BASE, "← Back to Vector Stores"));
         return UiPage.of(BASE + (t == null ? "/templates/new" : "/templates/" + t.name() + "/edit"), form);
+    }
+
+    /** What a new template starts on: the built-in template's backend, which follows the host's settings. */
+    private String defaultBackend() {
+        return stores.template(scope.namespace(), VectorStores.DEFAULT_TEMPLATE)
+                .map(VectorStoreTemplate::backend).orElse("memory");
     }
 
     /** The backend-specific settings, swapped in place when the dropdown changes. */
@@ -386,7 +392,8 @@ public class VectorStoreUiController {
                 "pgvector".equals(backend) ? "Backend: pgvector" : "Backend: memory");
         if ("pgvector".equals(backend)) {
             group.field(UiField.text("url", "JDBC URL", config.get("url")).asEditable()
-                    .hint("e.g. jdbc:postgresql://localhost:5433/postgres"));
+                    .hint("e.g. jdbc:postgresql://localhost:5433/postgres — empty: the host's "
+                            + "mindconnect.vector-store.url, or its own database under Postgres persistence"));
             group.field(UiField.text("user", "DB User", config.get("user")).asEditable());
             group.field(UiField.password("password", "DB Password", config.get("password")).asEditable());
         }
@@ -428,7 +435,7 @@ public class VectorStoreUiController {
         putIfPresent(metadata, "description", body.str("description"));
         String templateName = name.trim();
         VectorStoreTemplate template = new VectorStoreTemplate(templateName,
-                body.str("backend") == null ? "memory" : body.str("backend"),
+                body.str("backend") == null ? defaultBackend() : body.str("backend"),
                 backendConfig,
                 body.str("embeddingConfig") == null ? "embeddings" : body.str("embeddingConfig"),
                 body.str("ingestionWorkflow"), metadata)

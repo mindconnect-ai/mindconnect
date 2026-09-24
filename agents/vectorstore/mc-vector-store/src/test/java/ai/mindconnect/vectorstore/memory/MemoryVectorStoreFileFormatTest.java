@@ -68,6 +68,25 @@ class MemoryVectorStoreFileFormatTest {
     }
 
     @Test
+    void aStoreFileReadsBackAsWritten_forMovingItElsewhere() throws Exception {
+        Map<String, String> config = Map.of("baseDir", dir.toString(), "namespace", "ns");
+        Path file = MemoryVectorBackend.storeFile("session/1", config);
+        assertThat(file).isEqualTo(dir.resolve("ns/vector-stores/session-1.jsonl").toAbsolutePath());
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, """
+                {"id":"a:0","fileId":"a","ordinal":0,"text":"alpha","metadata":{},"embedding":[3.0,4.0]}
+                """);
+
+        List<VectorChunk> chunks = MemoryVectorBackend.readChunks(file);
+
+        assertThat(chunks).singleElement().satisfies(c ->
+                assertThat(c.embedding()).as("not normalised").containsExactly(3f, 4f));
+        assertThat(MemoryVectorBackend.readChunks(dir.resolve("missing.jsonl"))).isEmpty();
+        assertThat(new MemoryVectorStore("s", file, 1000).dimension()).hasValue(2);
+        assertThat(new MemoryVectorStore("t", dir.resolve("t.jsonl"), 1000).dimension()).isEmpty();
+    }
+
+    @Test
     void aBrokenFileIsAnErrorNotAnEmptyStore() throws Exception {
         Path file = dir.resolve("s.jsonl");
         Files.writeString(file, "{ \"id\" : \"a:0\", \"fileId\" : ");

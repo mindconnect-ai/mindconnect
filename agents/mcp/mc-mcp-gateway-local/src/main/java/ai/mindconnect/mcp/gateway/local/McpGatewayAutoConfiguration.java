@@ -9,6 +9,8 @@ import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.mcp.proxy.McpProxy;
 import ai.mindconnect.mcp.proxy.McpSessionRegistry;
 import ai.mindconnect.mcp.proxy.SdkMcpProxy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -35,11 +37,14 @@ import java.time.Duration;
 @ConditionalOnProperty(prefix = "mindconnect.mcp", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class McpGatewayAutoConfiguration {
 
+    private static final Logger log = LoggerFactory.getLogger(McpGatewayAutoConfiguration.class);
+
     /**
-     * The data directory. Both MCP stores live in the configuration folder of
-     * the namespace this process serves — {@code <namespace>/system/mcp-servers}
+     * The data directory. On files both MCP stores live in the configuration
+     * folder of the namespace this process serves — {@code <namespace>/system/mcp-servers}
      * and {@code <namespace>/system/mcp-schema-cache}, beside agents and LLM
-     * configs.
+     * configs. Under {@code mindconnect.persistence=postgres} the Postgres
+     * starter contributes a {@link McpStoreFactory} of tables instead.
      */
     static Path storageRoot(String dataBaseDir) {
         return Path.of(dataBaseDir);
@@ -60,6 +65,7 @@ public class McpGatewayAutoConfiguration {
             McpSessionRegistry sessions,
             Environment environment,
             ObjectProvider<ScopeSupplier> scope,
+            ObjectProvider<McpStoreFactory> stores,
             // The installation's default namespace: seeds go there, whatever scope a thread binds — and at
             // start-up the main thread binds none.
             @Value("${mindconnect.namespace:local}") String defaultNamespace,
@@ -67,13 +73,27 @@ public class McpGatewayAutoConfiguration {
             @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime) {
         // Whether process and docker targets start is the installation's call:
         // mindconnect.mcp.allow-process / allow-docker, unset following sign-in.
-        NamespacedMcpGateways gateways = new NamespacedMcpGateways(storageRoot(dataBaseDir), mcpProxy, sessions,
+        NamespacedMcpGateways gateways = new NamespacedMcpGateways(
+                stores.getIfAvailable(() -> fileStores(environment, dataBaseDir)), mcpProxy, sessions,
                 containerRuntime, McpStartPolicy.from(environment));
         gateways.seed(seedNamespace(scope, defaultNamespace), "classpath:initial-data/mcp-servers/*.json");
         return gateways;
     }
 
-    /** A deleted namespace's gateway is closed and forgotten; its registrations went with its directory. */
+    /**
+     * Registrations and discovery cache as files — unless a {@link McpStoreFactory}
+     * bean says otherwise. Postgres persistence without one (its adapter not on
+     * the classpath) keeps the files, and says so.
+     */
+    private static McpStoreFactory fileStores(Environment environment, String dataBaseDir) {
+        if ("postgres".equals(environment.getProperty("mindconnect.persistence"))) {
+            log.warn("mindconnect.persistence=postgres, but no Postgres store for MCP registrations "
+                    + "(mc-mcp-gateway-pg) on the classpath — they stay in files under {}", dataBaseDir);
+        }
+        return McpStoreFactory.files(storageRoot(dataBaseDir));
+    }
+
+    /** A deleted namespace's gateway is closed and forgotten; its registrations went with its directory or its rows. */
     @Bean
     @ConditionalOnBean(NamespacedMcpGateways.class)
     public NamespacePurge mcpGatewayPurge(NamespacedMcpGateways gateways) {

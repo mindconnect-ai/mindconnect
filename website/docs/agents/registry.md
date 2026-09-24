@@ -229,7 +229,11 @@ export ACME_REGISTRY_TOKEN=ghp_…
 | `mindconnect.registry.timeout` | `PT20S` | per-request HTTP timeout |
 
 Registries are stored per namespace under
-`<data-base-dir>/<namespace>/system/registries/<id>.json`.
+`<data-base-dir>/<namespace>/system/registries/<id>.json`. With
+`mindconnect.persistence=postgres` they are rows of `mc_registry_source`, keyed
+by `(namespace, id)` (`mc-agent-registry-pg`, brought in by
+`mc-agent-starter-postgres`). A namespace that has no row yet imports its
+`system/registries/*.json` once, on first use; the files are left in place.
 
 ### Shipping a registry with an application
 

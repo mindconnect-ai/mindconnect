@@ -39,6 +39,15 @@ public record VectorStoreTemplate(
         this(name, backend, backendConfig, embeddingConfig, ingestionWorkflow, metadata, null);
     }
 
+    /**
+     * This template moved to {@code backend}, with the host's settings for it
+     * (the old backend's config means nothing there); the version stays.
+     */
+    public VectorStoreTemplate onBackend(String backend) {
+        return new VectorStoreTemplate(name, backend, Map.of(), embeddingConfig, ingestionWorkflow,
+                metadata, version);
+    }
+
     /** This template as read with, or to be saved against, {@code version} — nothing else changes. */
     public VectorStoreTemplate withVersion(Long version) {
         return new VectorStoreTemplate(name, backend, backendConfig, embeddingConfig, ingestionWorkflow,

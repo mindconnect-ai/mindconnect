@@ -9,9 +9,11 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 
 import javax.sql.DataSource;
@@ -138,5 +140,27 @@ public class PostgresPersistenceConfig {
     @Bean
     ai.mindconnect.user.port.out.PreferenceRepository preferenceRepository(Sql mindconnectSql) {
         return new ai.mindconnect.user.adapter.pg.PgPreferenceRepository(mindconnectSql).initSchema();
+    }
+
+    // ── MCP gateway ─────────────────────────────────────────────────────────
+
+    /**
+     * The in-process MCP gateway's registrations ({@code mc_mcp_server}) and
+     * discovery cache ({@code mc_mcp_schema_cache}), per namespace. A
+     * namespace's registration files under {@code <mindconnect.data.base-dir>}
+     * are imported the first time it is used, and kept. Without this bean the
+     * gateway keeps both in files.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "ai.mindconnect.mcp.gateway.adapter.pg.PgMcpStoreFactory")
+    @ConditionalOnProperty(prefix = "mindconnect.mcp", name = "enabled", havingValue = "true", matchIfMissing = true)
+    static class Mcp {
+        @Bean
+        @ConditionalOnMissingBean(ai.mindconnect.mcp.gateway.local.McpStoreFactory.class)
+        ai.mindconnect.mcp.gateway.local.McpStoreFactory mcpStoreFactory(
+                Sql mindconnectSql, @Value("${mindconnect.data.base-dir:data}") String baseDir) {
+            return new ai.mindconnect.mcp.gateway.adapter.pg.PgMcpStoreFactory(mindconnectSql,
+                    java.nio.file.Path.of(baseDir));
+        }
     }
 }

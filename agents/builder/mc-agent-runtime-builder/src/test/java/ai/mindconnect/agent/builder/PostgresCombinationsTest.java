@@ -15,7 +15,13 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.jdbc.JdbcTaskStore;
 import ai.mindconnect.taskqueue.TaskStore;
+import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.workflow.domain.WorkflowData;
+import ai.mindconnect.workflow.persist.WorkflowInstanceSnapshot;
+import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
+import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
+import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
 
@@ -23,6 +29,7 @@ import javax.sql.DataSource;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.util.UUID;
 
@@ -96,6 +103,56 @@ class PostgresCombinationsTest {
             runtime.sessionService().deleteSession(session.id());
             assertThat(runtime.conversationManager().findById(session.conversationId())).isEmpty();
             assertThatThrownBy(() -> runtime.sessionService().findSession(session.id())).isInstanceOf(Exception.class);
+        }
+    }
+
+    @Test
+    void workflowsAreTablesAndTheFilesOfFilePersistenceAreImportedOnce() throws Exception {
+        assumeTrue(reachable(), "no Postgres reachable on " + URL + " — skipping");
+        String namespace = "t-" + UUID.randomUUID().toString().substring(0, 8);
+        Path dataDir = Files.createTempDirectory("mc-pg");
+        // what an installation on file persistence left behind
+        WorkflowData fromFile = new WorkflowData();
+        fromFile.setName("from-file");
+        new FileWorkflowDataRepository(dataDir, namespace).save("from-file", fromFile);
+        WorkflowInstanceSnapshot halted = new WorkflowInstanceSnapshot();
+        halted.setWorkflowName("from-file");
+        halted.setSuspendedAt(1_000);
+        String haltedId = new FileWorkflowInstanceRepository(dataDir, namespace).save(halted);
+        Sql sql = Sql.of(dataSource());
+
+        try (AgentRuntime runtime = AgentRuntimeBuilder.of(Persistence.postgres(dataSource(), dataDir))
+                .namespace(namespace)
+                .install(new WorkflowsFeature())
+                .build()) {
+            WorkflowDataRepository workflows = runtime.beans().get(WorkflowDataRepository.class);
+            WorkflowInstanceRepository instances = runtime.beans().get(WorkflowInstanceRepository.class);
+
+            assertThat(workflows.listIds()).containsExactly("from-file");
+            assertThat(instances.findById(haltedId)).isPresent();
+
+            // a new definition is a row, not a file
+            WorkflowData created = new WorkflowData();
+            created.setName("created");
+            workflows.save("created", created);
+            assertThat(sql.query("SELECT id FROM mc_workflow WHERE partition_key = ? ORDER BY id",
+                    row -> row.string("id"), namespace)).containsExactly("created", "from-file");
+            assertThat(sql.scalar("SELECT count(*) FROM mc_workflow_instance WHERE partition_key = ?", Long.class, namespace))
+                    .isEqualTo(1);
+            assertThat(new FileWorkflowDataRepository(dataDir, namespace).listIds()).containsExactly("from-file");
+
+            workflows.delete("created");
+            workflows.delete("from-file");
+            instances.delete(haltedId);
+        }
+
+        // the next start does not bring the deleted ones back from the files
+        try (AgentRuntime runtime = AgentRuntimeBuilder.of(Persistence.postgres(dataSource(), dataDir))
+                .namespace(namespace)
+                .install(new WorkflowsFeature())
+                .build()) {
+            assertThat(runtime.beans().get(WorkflowDataRepository.class).listIds()).isEmpty();
+            assertThat(runtime.beans().get(WorkflowInstanceRepository.class).findAll()).isEmpty();
         }
     }
 

@@ -14,12 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
- * File-persisted registry of {@link VectorStoreTemplate}s and
- * {@link VectorStoreInstance}s — one JSON file each under
+ * File-persisted {@link VectorStoreRegistry} — one JSON file each under
  * {@code <root>/templates} and {@code <root>/instances}, following the same
  * conventions as the agent/workflow stores. Instances are registered on the
  * fly by the tools; templates are managed in the admin UI (or seeded).
@@ -30,7 +28,7 @@ import java.util.Optional;
  * what lets {@link #registerInstance} decide and write as one step: two
  * uploads opening the same store register it once.
  */
-public final class FileVectorStoreRegistry {
+public final class FileVectorStoreRegistry implements VectorStoreRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(FileVectorStoreRegistry.class);
     private static final ObjectMapper MAPPER = new ObjectMapper()
@@ -47,10 +45,12 @@ public final class FileVectorStoreRegistry {
 
     // ── templates ──────────────────────────────────────────────────────────
 
+    @Override
     public List<VectorStoreTemplate> templates() {
         return list(templatesDir, VectorStoreTemplate.class);
     }
 
+    @Override
     public Optional<VectorStoreTemplate> template(String name) {
         return read(templatesDir, name, VectorStoreTemplate.class);
     }
@@ -62,6 +62,7 @@ public final class FileVectorStoreRegistry {
      * @return the template as stored, with its new version
      * @throws ai.mindconnect.common.StaleVersionException when it was saved by someone else meanwhile
      */
+    @Override
     public VectorStoreTemplate saveTemplate(VectorStoreTemplate template) {
         Path file = fileFor(templatesDir, template.name());
         return locked(file, () -> {
@@ -74,16 +75,19 @@ public final class FileVectorStoreRegistry {
         });
     }
 
+    @Override
     public void deleteTemplate(String name) {
         delete(templatesDir, name);
     }
 
     // ── instances ──────────────────────────────────────────────────────────
 
+    @Override
     public List<VectorStoreInstance> instances() {
         return list(instancesDir, VectorStoreInstance.class);
     }
 
+    @Override
     public Optional<VectorStoreInstance> instance(String name) {
         return read(instancesDir, name, VectorStoreInstance.class);
     }
@@ -94,6 +98,7 @@ public final class FileVectorStoreRegistry {
      * concurrent registrations of one name exactly one is written and both callers
      * get it back.
      */
+    @Override
     public VectorStoreInstance registerInstance(VectorStoreInstance candidate) {
         Path file = fileFor(instancesDir, candidate.name());
         return locked(file, () -> {
@@ -109,18 +114,12 @@ public final class FileVectorStoreRegistry {
     }
 
     /** Overwrites an instance record — instances may diverge from their template. */
+    @Override
     public void saveInstance(VectorStoreInstance instance) {
         write(instancesDir, instance.name(), instance);
     }
 
-    /** Instances of one scope (e.g. all SESSION stores of a session id). */
-    public List<VectorStoreInstance> instances(VectorStoreInstance.Scope scope, String scopeRef) {
-        return instances().stream()
-                .filter(i -> i.scope() == scope
-                        && (scopeRef == null || scopeRef.equals(i.scopeRef())))
-                .toList();
-    }
-
+    @Override
     public void deleteInstance(String name) {
         delete(instancesDir, name);
     }
@@ -185,6 +184,6 @@ public final class FileVectorStoreRegistry {
     }
 
     private static Path fileFor(Path dir, String name) {
-        return dir.resolve(name.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9._-]", "-") + ".json");
+        return dir.resolve(VectorStoreRegistry.key(name) + ".json");
     }
 }

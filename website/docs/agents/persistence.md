@@ -148,7 +148,9 @@ have written, rendered by the application's `ObjectMapper`.
 The tables are named `mc_agent_definition`, `mc_agent_session`,
 `mc_conversation`, `mc_message`, `mc_working_memory`, `mc_conversation_summary`,
 `mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`,
-`mc_workflow`, `mc_workflow_instance` and `mc_file`. The small JDBC layer
+`mc_workflow`, `mc_workflow_instance`, `mc_file`, `mc_vector_store_template`
+and `mc_vector_store_instance` (plus one `vs_<namespace>__<store>` table per
+pgvector store). The small JDBC layer
 underneath — `Sql`, `Row`, `DocumentTable` — lives in `common/mc-jdbc`; the
 adapters are the `agents/adapter/postgres/*-pg` and
 `workflow/mc-workflow-persistence-pg` modules, the Spring wiring is
@@ -162,10 +164,18 @@ from the columns.
 
 ### What stays on disk
 
-The registry of vector-store templates and instances, and the vectors of the
-`memory` backend are still file-based in Postgres mode. Vectors move to the
-database with the `pgvector` backend (`mindconnect.vector-store.backend=pgvector`),
-which has its own connection settings. The registry is the next candidate.
+The vector stores keep nothing on disk in Postgres mode — as long as the
+database has the pgvector extension. Their registry of templates and instances
+is in `mc_vector_store_template` and `mc_vector_store_instance` (filled once
+per namespace from `vector-stores/templates|instances`), and their vectors are
+in one pgvector table per store, in the application's own database: `pgvector`
+is the default backend there and needs no URL of its own. A plain
+`postgres:16-alpine` has no pgvector; then the vectors stay on the `memory`
+backend in `<data-dir>/<namespace>/vector-stores/*.jsonl`, with a warning at
+start. Install pgvector into the image — for an existing Alpine data directory
+an Alpine build, since a Debian image changes the text collation — and the
+stores move into the database on first use — see
+[Vector stores](./vector-store.md#the-pgvector-backend).
 
 ### Embedding without Spring
 
@@ -179,6 +189,13 @@ There is no automatic migration from `data/` to Postgres. A fresh Postgres
 start seeds the bundled defaults; your own agents, sessions and conversations
 would need to be re-created or copied by a script through the two adapter
 families — both speak the same JSON, so that script is a read-and-save loop.
+
+Workflows are the exception: the first time a namespace is used on Postgres,
+the definitions and suspended runs the file stores kept under
+`<data dir>/<namespace>/workflows` are imported, when `mc_workflow` and
+`mc_workflow_instance` have nothing for the namespace yet. Once — a row in
+`mc_workflow_import` records it, so what is deleted later stays deleted — and
+the files are left where they are.
 
 ### Testing against Postgres
 

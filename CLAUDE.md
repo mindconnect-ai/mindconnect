@@ -122,13 +122,14 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       account `provider.key` or `all`
     - `mc-agent-registry-core` / `mc-agent-registry`: importing from a registry — a GitHub
       project with an index of LLM configs, agents, workflows and packages — ports + import
-      service / GitHub client, file-backed source store, installers. An installer is
+      service / GitHub client, file-backed source store (Postgres: `adapter/postgres/mc-agent-registry-pg`),
+      installers. An installer is
       contributed by the module owning the entity (the workflow one sits in
       `mc-agent-tools-workflow`)
     - `mc-credentials`: credential storage for tools & providers
   - `mcp/` — MCP servers as registered tools, split like the rest (ports in `-core`)
     - `mc-mcp-gateway-core` / `mc-mcp-gateway-local`: gateway ports and types / the in-process gateway
-      (registrations on disk, discovery cache, Docker catalog)
+      (registrations on disk, discovery cache, Docker catalog; Postgres: `adapter/postgres/mc-mcp-gateway-pg`)
     - `mc-mcp-proxy`: one server over stdio or streamable HTTP, on the MCP Java SDK
     - `mc-agent-tools-mcp`: the `MultiToolProvider` exposing registered servers' tools
     - `mc-mcp-gateway-admin-ui-rest`: the `/mcp-gateway` admin screen

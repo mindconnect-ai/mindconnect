@@ -26,10 +26,13 @@ import java.util.Optional;
  * resolve to it.
  *
  * <p>ToolEnvironment strings: {@code vectorStoreBackend} (default
- * {@code memory}), {@code dataBaseDir} (the {@code memory} backend and the
- * registry live in {@code <dataBaseDir>/<namespace>/vector-stores}),
+ * {@code memory}; under Postgres persistence {@code pgvector} when the
+ * database has it), {@code dataBaseDir} (the {@code memory} backend and, on
+ * files, the registry live in {@code <dataBaseDir>/<namespace>/vector-stores}),
  * {@code vectorStoreUrl} / {@code vectorStoreUser} / {@code vectorStorePassword},
- * {@code vectorStoreEmbeddingConfig} (default {@code embeddings}).
+ * {@code vectorStoreEmbeddingConfig} (default {@code embeddings}). Under
+ * Postgres persistence — the environment offers the runtime's {@code Sql} and
+ * {@code DataSource} — the registry is kept in the database.
  */
 public interface VectorStores {
 
@@ -42,8 +45,8 @@ public interface VectorStores {
         return DefaultVectorStores.fromEnvironment(env);
     }
 
-    /** The namespace's registry of templates and instances. */
-    FileVectorStoreRegistry registry(Namespace namespace);
+    /** The namespace's registry of templates and instances — on files or in Postgres, following the persistence. */
+    VectorStoreRegistry registry(Namespace namespace);
 
     /** The built-in default plus every template persisted in the namespace. */
     List<VectorStoreTemplate> templates(Namespace namespace);

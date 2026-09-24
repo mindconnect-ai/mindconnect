@@ -14,6 +14,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 
 import javax.sql.DataSource;
+import java.nio.file.Path;
 
 /**
  * Workflow definitions and suspended instances in Postgres, switched on by
@@ -49,18 +50,23 @@ public class WorkflowPostgresAutoConfiguration {
         return new HikariDataSource(config);
     }
 
-    /** Backs off when the host brings its own — the agents area hands out stores routed per namespace. */
+    /**
+     * Backs off when the host brings its own — the agents area hands out stores routed per namespace.
+     * What the file store kept under {@code mindconnect.data.base-dir} is imported once.
+     */
     @Bean
     @ConditionalOnMissingBean(WorkflowDataRepository.class)
     WorkflowDataRepository workflowDataRepository(DataSource dataSource,
-                                                  @Value("${mindconnect.namespace:local}") String partition) {
-        return new PgWorkflowDataRepository(Sql.of(dataSource), partition).initSchema();
+                                                  @Value("${mindconnect.namespace:local}") String partition,
+                                                  @Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), partition, Path.of(baseDir)).workflowDataRepository();
     }
 
     @Bean
     @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
     WorkflowInstanceRepository workflowInstanceRepository(DataSource dataSource,
-                                                          @Value("${mindconnect.namespace:local}") String partition) {
-        return new PgWorkflowInstanceRepository(Sql.of(dataSource), partition).initSchema();
+                                                          @Value("${mindconnect.namespace:local}") String partition,
+                                                          @Value("${mindconnect.data.base-dir:data}") String baseDir) {
+        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), partition, Path.of(baseDir)).workflowInstanceRepository();
     }
 }

@@ -39,13 +39,22 @@ public class FileWorkflowInstanceRepository implements WorkflowInstanceRepositor
     }
 
     public FileWorkflowInstanceRepository(Path baseDir, String partition, SnapshotSerializer serializer) {
-        this.directory = baseDir.resolve(checkPartition(partition)).resolve("workflows").resolve("instances");
+        this.directory = directory(baseDir, partition);
         this.serializer = serializer;
         try {
             Files.createDirectories(directory);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot create " + directory, e);
         }
+    }
+
+    /**
+     * The directory a repository over {@code baseDir} and {@code partition}
+     * keeps its snapshot files in — for a reader that must find them without
+     * creating it, such as the import into another store.
+     */
+    public static Path directory(Path baseDir, String partition) {
+        return FileWorkflowDataRepository.directory(baseDir, partition).resolve("instances");
     }
 
     /** A partition is one directory level: a plain, non-blank name. */
