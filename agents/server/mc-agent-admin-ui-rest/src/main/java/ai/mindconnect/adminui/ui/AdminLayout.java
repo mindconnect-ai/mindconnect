@@ -183,7 +183,12 @@ public final class AdminLayout {
     }
 
     private UiHeader buildHeader() {
-        var header = UiHeader.of(brand.title()).brandHref(brand.href());
+        var header = UiHeader.of(brand.title()).brandHref(brand.href())
+                // One row whatever the width: what does not fit — the task chip,
+                // the bell, the namespace switch, the theme switch js/theme-switch.js
+                // puts among them — goes into a "⋯" menu rather than squeezing
+                // the brand to nothing on a phone.
+                .extrasOverflow(UiHeader.ExtrasOverflow.MENU);
         // No logo is a valid answer: an installation whose mark is the word
         // itself wants the heading alone, not the shipped one as a fallback.
         if (brand.logo() != null) {

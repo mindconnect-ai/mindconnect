@@ -123,13 +123,22 @@
         return el;
     }
 
-    /** Puts the control in the header, ahead of the user widget. */
+    /**
+     * Puts the control in the header: first among the header's extras, so that
+     * on a narrow screen it goes into the "⋯" menu with the task chip, the bell
+     * and the namespace switch instead of squeezing the brand to nothing. A
+     * header without extras gets it ahead of the user widget, as before.
+     */
     function inject() {
         const offer = offered();
         if (offer.length === 0) return;
-        const right = document.querySelector(".sui-header .sui-header-right");
-        if (!right || right.querySelector(".sui-theme-switch")) return;
-        right.insertBefore(build(offer), right.firstChild);
+        const header = document.querySelector(".sui-header");
+        if (!header || header.querySelector(".sui-theme-switch")) return;
+        const extras = header.querySelector(".sui-header-right .sui-header-extras");
+        const right = header.querySelector(".sui-header-right");
+        const into = extras || right;
+        if (!into) return;
+        into.insertBefore(build(offer), into.firstChild);
     }
 
     // The header is re-rendered by navigations and by patches that redraw the
