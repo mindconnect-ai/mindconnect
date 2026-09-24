@@ -16,7 +16,8 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  * knows the shipped modules by package; an extension's controller lives in
  * a package the host has never heard of, so this one goes by the request:
  * a {@link UiPage} answered on a route an extension's manifest names gets
- * the layout, whatever package served it.
+ * the layout, whatever package served it. An API route
+ * ({@code /api/<id>/**}) is not a screen: what it answers goes out as it is.
  */
 @ControllerAdvice
 public class ExtensionPageAdvice implements ResponseBodyAdvice<Object> {
@@ -42,7 +43,7 @@ public class ExtensionPageAdvice implements ResponseBodyAdvice<Object> {
         if (page.getDialogs() != null && !page.getDialogs().isEmpty()) return page;
         UiNode root = page.getNode();
         if (root != null && AdminLayoutAdvice.LAYOUT_ID.equals(root.getId())) return page;
-        if (extensions.routeOwner(request.getURI().getPath()).isEmpty()) return page;
+        if (extensions.pageOwner(request.getURI().getPath()).isEmpty()) return page;
         return layoutFactory.current().withLayout(page);
     }
 }

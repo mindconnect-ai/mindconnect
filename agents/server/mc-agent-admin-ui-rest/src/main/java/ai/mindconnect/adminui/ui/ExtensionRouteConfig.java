@@ -11,9 +11,11 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import java.util.Optional;
 
 /**
- * An extension switched off in the namespace at hand takes its screens with
- * it: a request to a route its manifest names is answered 404, so a
- * bookmark does not reach a page whose menu entry has gone. Whether the
+ * An extension switched off in the namespace at hand takes its screens and
+ * its API with it: a request to a route its manifest names — under
+ * {@code /admin/<id>/}, {@code /ext/<id>/} or {@code /api/<id>/} — is
+ * answered 404, so a bookmark does not reach a page whose menu entry has
+ * gone, nor a script an endpoint that is off. Whether the
  * caller may open the route at all is the access interceptor's question,
  * asked before this one.
  */

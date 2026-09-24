@@ -243,11 +243,21 @@ public class ExtensionService {
 
     /**
      * The extension whose manifest names a route covering the path, with its
-     * state in the current namespace — for the host to wrap its pages in the
-     * shell, and to refuse them where the extension is off.
+     * state in the current namespace — for the host to refuse its routes,
+     * screens and API alike, where the extension is off.
      */
     public Optional<Status> routeOwner(String requestPath) {
         return registry.routeOwner(requestPath).map(extension -> status(extension, currentBrand.get()));
+    }
+
+    /**
+     * The same for a screen only: the owner of a route covering the path that
+     * is not an API route ({@link ExtensionManifest.Ui.Route#isApi}) — what
+     * the host wraps in the admin layout. An {@code /api/<id>/} route answers
+     * its JSON as it is.
+     */
+    public Optional<Status> pageOwner(String requestPath) {
+        return registry.pageOwner(requestPath).map(extension -> status(extension, currentBrand.get()));
     }
 
     /**
