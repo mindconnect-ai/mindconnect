@@ -7,7 +7,9 @@ import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import ai.mindconnect.user.domain.NotificationId;
 import ai.mindconnect.user.service.NotificationService;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,9 +17,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Clock;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * The notification panel behind the header's bell. Everything here acts on
@@ -28,30 +32,50 @@ import java.util.Objects;
  * means — so the bell loses its count in the same patch that shows the list.
  * Dismissing keeps the entry but takes it off the list; see
  * {@link ai.mindconnect.user.domain.Notification}.
+ *
+ * <p>The service is looked up per request, not made a condition of this
+ * class: the controller is found by component scanning, which runs before the
+ * auto-configuration that defines {@link NotificationService}, so a
+ * {@code @ConditionalOnBean} here never matched and the bell answered 404.
+ * Without the service the panel still answers 404, as it always meant to.
  */
 @RestController
 @RequestMapping(NotificationsComponent.API)
-@ConditionalOnBean(NotificationService.class)
 public class NotificationUiController {
 
-    private final NotificationService notifications;
+    private final Supplier<NotificationService> notifications;
     private final Clock clock;
 
-    public NotificationUiController(NotificationService notifications) {
-        this(notifications, Clock.systemUTC());
+    @Autowired
+    public NotificationUiController(ObjectProvider<NotificationService> notifications) {
+        this(notifications::getIfAvailable, Clock.systemUTC());
     }
 
     NotificationUiController(NotificationService notifications, Clock clock) {
-        this.notifications = Objects.requireNonNull(notifications, "notifications");
+        this(always(Objects.requireNonNull(notifications, "notifications")), clock);
+    }
+
+    private static Supplier<NotificationService> always(NotificationService notifications) {
+        return () -> notifications;
+    }
+
+    private NotificationUiController(Supplier<NotificationService> notifications, Clock clock) {
+        this.notifications = notifications;
         this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    private NotificationService notifications() {
+        NotificationService service = notifications.get();
+        if (service == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "No notifications here");
+        return service;
     }
 
     /** Opens the panel with the list as it is, and marks it read. */
     @GetMapping
     public UiPatch open(@AuthenticationPrincipal OidcUser user) {
         UserId id = userId(user);
-        var list = notifications.open(id);
-        notifications.markAllRead(id);
+        var list = notifications().open(id);
+        notifications().markAllRead(id);
         UiDialog dialog = UiDialog.of("Notifications", null,
                 NotificationsComponent.body(list, clock.instant()));
         dialog.setId(NotificationsComponent.DIALOG_ID);
@@ -70,7 +94,7 @@ public class NotificationUiController {
     @PostMapping("/{id}/dismiss")
     public UiPatch dismiss(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id) {
         UserId me = userId(user);
-        boolean dismissed = notifications.dismiss(me, NotificationId.of(id));
+        boolean dismissed = notifications().dismiss(me, NotificationId.of(id));
         UiPatch patch = redraw(me);
         return dismissed ? patch
                 : patch.toast(UiToast.info("That notification is already gone.").title("Nothing to dismiss"));
@@ -80,7 +104,7 @@ public class NotificationUiController {
     @PostMapping("/dismiss-all")
     public UiPatch dismissAll(@AuthenticationPrincipal OidcUser user) {
         UserId me = userId(user);
-        int count = notifications.dismissAll(me);
+        int count = notifications().dismissAll(me);
         return redraw(me).toast(count == 0
                 ? UiToast.info("There was nothing on the list.").title("Nothing to dismiss")
                 : UiToast.success(count == 1 ? "One notification dismissed."
@@ -96,12 +120,12 @@ public class NotificationUiController {
     private UiPatch redraw(UserId user) {
         return UiPatch.of()
                 .patch(UiPatch.Operation.replace(NotificationsComponent.BODY_ID,
-                        NotificationsComponent.body(notifications.open(user), clock.instant())))
+                        NotificationsComponent.body(notifications().open(user), clock.instant())))
                 .patch(UiPatch.Operation.replace(NotificationsComponent.BADGE_ID, badge(user)));
     }
 
     private ai.mindconnect.ui.model.UiNode badge(UserId user) {
-        return NotificationsComponent.badge(notifications.unreadCount(user), notifications.hasActionRequired(user));
+        return NotificationsComponent.badge(notifications().unreadCount(user), notifications().hasActionRequired(user));
     }
 
     private static UserId userId(OidcUser user) {
