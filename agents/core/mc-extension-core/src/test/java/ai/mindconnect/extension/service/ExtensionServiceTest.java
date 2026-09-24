@@ -39,9 +39,9 @@ class ExtensionServiceTest {
                             new ExtensionManifest.Tools(List.of("ai.acme.CrmTools"), List.of("acme_*", "crm_export")),
                             null, null,
                             new ExtensionManifest.Ui(List.of(
-                                    new ExtensionManifest.Ui.MenuEntry("nav-acme", "Acme", "/admin/acme", null, null, null, null)),
-                                    List.of(new ExtensionManifest.Ui.Route("/admin/acme/**", List.of("ADMIN")),
-                                            new ExtensionManifest.Ui.Route("/admin/acme/mine/**", List.of("USER"))),
+                                    new ExtensionManifest.Ui.MenuEntry("nav-acme", "Acme", "/admin/acme-crm", null, null, null, null)),
+                                    List.of(new ExtensionManifest.Ui.Route("/admin/acme-crm/**", List.of("ADMIN")),
+                                            new ExtensionManifest.Ui.Route("/admin/acme-crm/mine/**", List.of("USER"))),
                                     null),
                             null, null, null, null)), "acme.jar"),
             new Extension(new ExtensionManifest(OPT_IN, null, null, null, null, null, null, false, null, null), "opt.jar"))),
@@ -109,13 +109,13 @@ class ExtensionServiceTest {
 
     @Test
     void a_route_the_manifest_opens_to_users_is_open_only_while_the_extension_is_on() {
-        assertThat(service.opensToUsers("/admin/acme/mine")).isTrue();
-        assertThat(service.opensToUsers("/admin/acme/mine/export")).isTrue();
-        assertThat(service.opensToUsers("/admin/acme")).as("the admin's route of the same extension").isFalse();
+        assertThat(service.opensToUsers("/admin/acme-crm/mine")).isTrue();
+        assertThat(service.opensToUsers("/admin/acme-crm/mine/export")).isTrue();
+        assertThat(service.opensToUsers("/admin/acme-crm")).as("the admin's route of the same extension").isFalse();
         assertThat(service.opensToUsers("/admin/agents")).as("nobody's route").isFalse();
 
         service.disable(ACME, null);
 
-        assertThat(service.opensToUsers("/admin/acme/mine")).isFalse();
+        assertThat(service.opensToUsers("/admin/acme-crm/mine")).isFalse();
     }
 }
