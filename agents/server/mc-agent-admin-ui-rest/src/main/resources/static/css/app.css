@@ -905,3 +905,21 @@ body {
 .session-files-frame { width: 100%; border: 1px solid var(--sui-color-border); border-radius: 6px; background: #fff; }
 .session-files-image img { display: block; max-width: 100%; max-height: 65vh; margin: 0 auto; object-fit: contain; }
 .session-files-editor textarea { min-height: 55vh; width: 100%; font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; white-space: pre; tab-size: 4; }
+
+/* ── Row buttons on a stacked table (workaround, semantic-ui ≤ 0.4.2) ─────────
+   Under 640px a table with stackOnMobile becomes one card per row, and
+   semantic-ui keeps the row's buttons on one right-aligned, unwrapping line
+   (.sui-table-row-actions: white-space nowrap, justify-content flex-end). Four
+   buttons on a connection card (Edit, Test, Make default, Remove) ran out of
+   the card on the left, the first ones cut off. Here they wrap, right-aligned,
+   with a gap instead of each button's left margin so a wrapped line starts at
+   the edge. Remove once semantic-ui wraps them itself. */
+@media (max-width: 640px) {
+    .sui-table--stack .sui-table-row-actions {
+        flex-wrap: wrap;
+        row-gap: 8px;
+        column-gap: 8px;
+        white-space: normal;
+    }
+    .sui-table--stack .sui-table-row-actions > * + * { margin-left: 0; }
+}
