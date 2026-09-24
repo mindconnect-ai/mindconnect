@@ -187,6 +187,9 @@ with prefix `gmail` turns its `search_emails` into `gmail_search_emails`.
   produces. Register a new server to use a different one.
 - **Storage:** one JSON file per server under
   `<data.base-dir>/<namespace>/system/mcp-servers/`, the discovered tools cached beside it.
+  With `mindconnect.persistence=postgres` the same documents are rows of `mc_mcp_server`
+  and `mc_mcp_schema_cache`, per namespace; a namespace's files are imported once, the
+  first time it is used, and left where they are.
 
 Gmail ships as a bundled, **disabled** registration running
 `@gongrzhe/server-gmail-autoauth-mcp` via `npx`. Run

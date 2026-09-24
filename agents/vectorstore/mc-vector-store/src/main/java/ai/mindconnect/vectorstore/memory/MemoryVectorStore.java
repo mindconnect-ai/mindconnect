@@ -18,7 +18,9 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
@@ -126,6 +128,12 @@ final class MemoryVectorStore implements VectorStore {
         });
     }
 
+    @Override
+    public OptionalInt dimension() {
+        return locked(() -> ensureLoaded().values().stream().findFirst()
+                .map(c -> OptionalInt.of(c.embedding().length)).orElse(OptionalInt.empty()));
+    }
+
     /** Drops the heap copy when unused since {@code cutoffMs}; file stays. */
     boolean unloadIfIdleSince(long cutoffMs) {
         return locked(() -> {
@@ -154,25 +162,34 @@ final class MemoryVectorStore implements VectorStore {
             return loaded;
         }
         Map<String, VectorChunk> chunks = new LinkedHashMap<>();
-        if (Files.exists(file)) {
-            // A sequence of JSON objects, whatever the whitespace between and
-            // inside them: the file is written one chunk per line, but a copy
-            // someone pretty-printed to read it must load all the same.
-            try (MappingIterator<VectorChunk> it = MAPPER.readerFor(VectorChunk.class).readValues(file.toFile())) {
-                while (it.hasNext()) {
-                    VectorChunk chunk = it.next();
-                    chunks.put(chunk.id(), normalised(chunk));
-                }
-            } catch (IOException e) {
-                throw new UncheckedIOException("Could not load vector store file " + file, e);
-            } catch (RuntimeException e) {
-                // The iterator reports broken JSON unchecked; it is still an unreadable file.
-                throw new UncheckedIOException("Could not load vector store file " + file,
-                        e.getCause() instanceof IOException io ? io : new IOException(e.getMessage(), e));
-            }
-        }
+        read(file, chunk -> chunks.put(chunk.id(), normalised(chunk)));
         loaded = chunks;
         return chunks;
+    }
+
+    /**
+     * Every chunk of a store file, as written, in file order; nothing for a
+     * missing file. The file is a sequence of JSON objects, whatever the
+     * whitespace between and inside them: it is written one chunk per line,
+     * but a copy someone pretty-printed to read it must load all the same.
+     *
+     * @throws UncheckedIOException when the file cannot be read or is broken
+     */
+    static void read(Path file, Consumer<VectorChunk> chunks) {
+        if (!Files.exists(file)) {
+            return;
+        }
+        try (MappingIterator<VectorChunk> it = MAPPER.readerFor(VectorChunk.class).readValues(file.toFile())) {
+            while (it.hasNext()) {
+                chunks.accept(it.next());
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not load vector store file " + file, e);
+        } catch (RuntimeException e) {
+            // The iterator reports broken JSON unchecked; it is still an unreadable file.
+            throw new UncheckedIOException("Could not load vector store file " + file,
+                    e.getCause() instanceof IOException io ? io : new IOException(e.getMessage(), e));
+        }
     }
 
     /** Atomic rewrite: temp file next to the target, then move-with-replace. */

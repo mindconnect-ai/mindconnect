@@ -52,7 +52,8 @@ class LocalMcpGatewayForgetTest {
     }
 
     private LocalMcpGateway gateway(InMemoryRepository repository) {
-        return new LocalMcpGateway(repository, proxy, sessions, storage, Namespace.DEFAULT, "nothing-here",
+        return new LocalMcpGateway(repository, proxy, sessions,
+                new FileMcpDiscoveryStore(storage, Namespace.DEFAULT), Namespace.DEFAULT, "nothing-here",
                 McpStartPolicy.allowAll());
     }
 

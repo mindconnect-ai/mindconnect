@@ -272,8 +272,10 @@ public class SessionFileService {
         }
         String storeName = "session-" + sessionId.value();
         VectorStoreTemplate template = stores.template(scope.namespace(), CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
+            // On the backend of the built-in template: the one the host's settings and persistence chose.
             VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE,
-                    "memory", Map.of(), "embeddings", "file-ingestion",
+                    stores.template(scope.namespace(), VectorStores.DEFAULT_TEMPLATE).orElseThrow().backend(),
+                    Map.of(), "embeddings", "file-ingestion",
                     Map.of("description", "Per-chat-session upload stores (auto-created)"));
             stores.registry(scope.namespace()).saveTemplate(created);
             return created;

@@ -54,6 +54,15 @@ public record VectorStoreInstance(
     }
 
     /**
+     * This instance moved to {@code backend}, with the host's settings for it
+     * (the old backend's config means nothing there); everything else stays.
+     */
+    public VectorStoreInstance onBackend(String backend) {
+        return new VectorStoreInstance(name, templateName, backend, Map.of(), embeddingConfig,
+                ingestionWorkflow, metadata, scope, scopeRef, owner, createdAt);
+    }
+
+    /**
      * This instance as the upload store of chat {@code scopeRef}, belonging to
      * {@code owner}; its backend settings stay as they were.
      */

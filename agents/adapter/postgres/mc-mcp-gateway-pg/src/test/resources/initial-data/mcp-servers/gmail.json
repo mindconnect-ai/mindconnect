@@ -1,0 +1,11 @@
+{
+  "id": "gmail",
+  "displayName": "Bundled Gmail",
+  "enabled": false,
+  "toolNamePrefix": "gmail",
+  "target": {
+    "type": "process",
+    "command": ["npx", "-y", "@gongrzhe/server-gmail-autoauth-mcp"],
+    "env": {}
+  }
+}

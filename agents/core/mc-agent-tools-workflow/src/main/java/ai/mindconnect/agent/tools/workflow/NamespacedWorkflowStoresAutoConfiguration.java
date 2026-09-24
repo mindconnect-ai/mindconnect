@@ -69,23 +69,32 @@ public class NamespacedWorkflowStoresAutoConfiguration {
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
     static class Postgres {
 
+        /** What the file store kept for a namespace under {@code mindconnect.data.base-dir} is imported on its first call. */
         @Bean
         @ConditionalOnMissingBean(WorkflowDataRepository.class)
-        WorkflowDataRepository namespacedWorkflowDataRepository(DataSource dataSource, ScopeSupplier scope) {
+        WorkflowDataRepository namespacedWorkflowDataRepository(DataSource dataSource, ScopeSupplier scope,
+                                                                @Value("${mindconnect.data.base-dir:data}") String baseDir) {
             ai.mindconnect.jdbc.Sql sql = ai.mindconnect.jdbc.Sql.of(dataSource);
             // The schema is shared (the namespace is a column): create it once here, not on each namespace's first call.
             new ai.mindconnect.workflow.persistence.pg.PgWorkflowDataRepository(sql, Namespace.DEFAULT.value()).initSchema();
-            return NamespaceRouted.route(WorkflowDataRepository.class, scope,
-                    ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowDataRepository(sql, ns.value()));
+            return NamespaceRouted.route(WorkflowDataRepository.class, scope, ns -> {
+                var store = new ai.mindconnect.workflow.persistence.pg.PgWorkflowDataRepository(sql, ns.value());
+                store.importFiles(FileWorkflowDataRepository.directory(Path.of(baseDir), ns.value()));
+                return store;
+            });
         }
 
         @Bean
         @ConditionalOnMissingBean(WorkflowInstanceRepository.class)
-        WorkflowInstanceRepository namespacedWorkflowInstanceRepository(DataSource dataSource, ScopeSupplier scope) {
+        WorkflowInstanceRepository namespacedWorkflowInstanceRepository(DataSource dataSource, ScopeSupplier scope,
+                                                                        @Value("${mindconnect.data.base-dir:data}") String baseDir) {
             ai.mindconnect.jdbc.Sql sql = ai.mindconnect.jdbc.Sql.of(dataSource);
             new ai.mindconnect.workflow.persistence.pg.PgWorkflowInstanceRepository(sql, Namespace.DEFAULT.value()).initSchema();
-            return NamespaceRouted.route(WorkflowInstanceRepository.class, scope,
-                    ns -> new ai.mindconnect.workflow.persistence.pg.PgWorkflowInstanceRepository(sql, ns.value()));
+            return NamespaceRouted.route(WorkflowInstanceRepository.class, scope, ns -> {
+                var store = new ai.mindconnect.workflow.persistence.pg.PgWorkflowInstanceRepository(sql, ns.value());
+                store.importFiles(FileWorkflowInstanceRepository.directory(Path.of(baseDir), ns.value()));
+                return store;
+            });
         }
     }
 

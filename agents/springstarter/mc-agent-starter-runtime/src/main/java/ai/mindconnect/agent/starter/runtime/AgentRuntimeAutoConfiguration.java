@@ -168,7 +168,8 @@ public class AgentRuntimeAutoConfiguration {
                 .property("codeExecCpus", env.getProperty("mindconnect.code-exec.cpus", "1"))
                 .property("codeExecTimeoutSeconds", env.getProperty("mindconnect.code-exec.timeout-seconds", "60"))
                 .property("codeExecIdleSeconds", env.getProperty("mindconnect.code-exec.idle-seconds", "600"))
-                .property("vectorStoreBackend", env.getProperty("mindconnect.vector-store.backend", "memory"))
+                // Unset: memory — or, under Postgres persistence, pgvector when the database has it.
+                .property("vectorStoreBackend", env.getProperty("mindconnect.vector-store.backend", ""))
                 .property("vectorStoreUrl", env.getProperty("mindconnect.vector-store.url", ""))
                 .property("vectorStoreUser", env.getProperty("mindconnect.vector-store.user", ""))
                 .property("vectorStorePassword", env.getProperty("mindconnect.vector-store.password", ""))

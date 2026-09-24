@@ -8,6 +8,7 @@ import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 
 import javax.sql.DataSource;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 
@@ -21,6 +22,10 @@ import java.util.Optional;
  * {@link JacksonWorkflowSerializer}, not by a generic mapper: step
  * polymorphism and the mixins live there, and a definition in the database
  * must read back exactly as the same definition in a file would.
+ *
+ * <p>An installation that kept its workflows in files keeps them:
+ * {@link #importFiles} reads what the file store wrote, once, into a
+ * partition that has no row yet.
  */
 public final class PgWorkflowDataRepository implements WorkflowDataRepository {
 
@@ -54,10 +59,33 @@ public final class PgWorkflowDataRepository implements WorkflowDataRepository {
         this.partition = partition;
     }
 
-    /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */
+    /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}), the import marker's included. */
     public PgWorkflowDataRepository initSchema() {
         sql.execute(DDL);
+        sql.execute(WorkflowFileImport.DDL);
         return this;
+    }
+
+    /**
+     * Imports the definitions a file store kept in {@code directory} — one
+     * {@code <id>.json} each, as {@code FileWorkflowDataRepository} writes
+     * them, under the id the file store listed them by — when this partition
+     * has no row yet. Once: after the first look the files are not read
+     * again, even when every row has been deleted since. They stay where
+     * they are.
+     *
+     * <p>A file that is not a workflow is skipped with a warning rather than
+     * holding up the start.
+     *
+     * @return how many definitions were imported
+     */
+    public int importFiles(Path directory) {
+        return WorkflowFileImport.once(sql, partition, "mc_workflow", directory,
+                (file, id) -> new Imported(id, serializer.read(file)),
+                (tx, wf) -> new PgWorkflowDataRepository(tx, partition, serializer).save(wf.id(), wf.workflow()));
+    }
+
+    private record Imported(String id, WorkflowData workflow) {
     }
 
     @Override

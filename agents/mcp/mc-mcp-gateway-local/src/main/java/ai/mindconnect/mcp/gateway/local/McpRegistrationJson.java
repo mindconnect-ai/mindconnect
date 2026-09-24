@@ -16,7 +16,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Reads a registration from its JSON form.
+ * Reads a registration from its JSON form, and writes it — the document every
+ * {@link McpServerRepository} stores, a file or a row.
  *
  * <p>Hand-written rather than annotation-driven so that
  * {@code mc-mcp-gateway-core} stays free of Jackson: the port's types are
@@ -43,13 +44,13 @@ import java.util.Map;
  * }
  * }</pre>
  */
-final class McpRegistrationJson {
+public final class McpRegistrationJson {
 
     private McpRegistrationJson() {
     }
 
     /** The JSON form of a registration, in the shape {@link #read} expects. */
-    static ObjectNode write(McpServerRegistration registration, JsonNodeFactory nodes) {
+    public static ObjectNode write(McpServerRegistration registration, JsonNodeFactory nodes) {
         // Kein namespace im Dokument: er steckt im Verzeichnis. Zwei Quellen
         // für dieselbe Wahrheit würden irgendwann auseinanderlaufen.
         ObjectNode root = nodes.objectNode();
@@ -105,7 +106,13 @@ final class McpRegistrationJson {
         values.forEach(target::add);
     }
 
-    static McpServerRegistration read(JsonNode node, String source) {
+    /**
+     * Reads what {@link #write} wrote. {@code source} names where it came from — a file, a row — in the
+     * error messages.
+     *
+     * @throws IllegalArgumentException when a field is missing or the registration is invalid
+     */
+    public static McpServerRegistration read(JsonNode node, String source) {
         String id = text(node, "id", source);
         JsonNode targetNode = node.get("target");
         if (targetNode == null || !targetNode.isObject()) {

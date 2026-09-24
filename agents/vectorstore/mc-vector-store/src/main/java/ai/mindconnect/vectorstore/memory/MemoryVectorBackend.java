@@ -50,11 +50,31 @@ public final class MemoryVectorBackend implements VectorStoreBackend {
     @Override
     public VectorStore open(String storeId, Map<String, String> config) {
         ensureReaper(config);
-        Path dir = storesDir(config);
         int maxChunks = Integer.parseInt(value(config, "maxChunksPerStore", "100000"));
-        Path file = dir.resolve(sanitize(storeId) + ".jsonl").toAbsolutePath();
+        Path file = storeFile(storeId, config);
         return STORES.computeIfAbsent(file.toString(),
                 key -> new MemoryVectorStore(storeId, file, maxChunks));
+    }
+
+    /**
+     * The file store {@code storeId} keeps its chunks in under {@code config}
+     * ({@code baseDir} and {@code namespace}), whether or not it exists yet.
+     */
+    public static Path storeFile(String storeId, Map<String, String> config) {
+        return storesDir(config).resolve(sanitize(storeId) + ".jsonl").toAbsolutePath();
+    }
+
+    /**
+     * Every chunk of a store file as it was written — embeddings as they came
+     * from the model, not normalised — for moving a store to another backend.
+     * A missing file has none.
+     *
+     * @throws java.io.UncheckedIOException when the file cannot be read or is broken
+     */
+    public static java.util.List<ai.mindconnect.vectorstore.VectorChunk> readChunks(Path file) {
+        java.util.List<ai.mindconnect.vectorstore.VectorChunk> chunks = new java.util.ArrayList<>();
+        MemoryVectorStore.read(file, chunks::add);
+        return chunks;
     }
 
     @Override

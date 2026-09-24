@@ -45,6 +45,15 @@ public class FileRegistrySourceRepository implements RegistrySourceRepository {
         return directory;
     }
 
+    /**
+     * Where the store of {@code namespace} under {@code storageDir} keeps its
+     * files, without opening it — for a reader that must not take the
+     * partition's lock, such as the import into another store.
+     */
+    public static Path directory(Path storageDir, Namespace namespace) {
+        return storageDir.resolve(namespace.value()).resolve(DIR);
+    }
+
     @Override
     public RegistrySource save(RegistrySource source) {
         return sources.compute(source.id(), current -> source.withVersion(Versions.next(

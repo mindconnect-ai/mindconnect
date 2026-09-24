@@ -40,6 +40,14 @@ public interface VectorStore {
         return java.util.Map.of();
     }
 
+    /**
+     * The embedding dimension the store is fixed to, once it has one — a
+     * store that never saw a chunk has none. Default: unknown (empty).
+     */
+    default java.util.OptionalInt dimension() {
+        return java.util.OptionalInt.empty();
+    }
+
     /** One search result: the chunk and its cosine similarity. */
     record SearchHit(VectorChunk chunk, double score) {}
 }

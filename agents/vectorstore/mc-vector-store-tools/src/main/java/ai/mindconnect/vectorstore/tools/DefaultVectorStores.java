@@ -2,12 +2,15 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.ToolEnvironment;
+import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.vectorstore.VectorStore;
 import ai.mindconnect.vectorstore.VectorStoreBackend;
+import ai.mindconnect.vectorstore.pgvector.PgVectorBackend;
 
+import javax.sql.DataSource;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -15,26 +18,33 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
  * The one {@link VectorStores} implementation: templates from the host's
  * {@code mindconnect.vector-store.*} properties plus the persisted ones, one
- * {@link FileVectorStoreRegistry} per namespace under
- * {@code <dataBaseDir>/<namespace>/vector-stores}, and the backends found on
- * the classpath. Every call names its namespace; nothing here is bound to one.
+ * {@link VectorStoreRegistry} per namespace, and the backends found on the
+ * classpath. Every call names its namespace; nothing here is bound to one.
+ *
+ * <p>The registry follows the runtime's persistence: a {@link FileVectorStoreRegistry}
+ * under {@code <dataBaseDir>/<namespace>/vector-stores}, or — when the runtime
+ * keeps its data in Postgres — a {@link PgVectorStoreRegistry} (see
+ * {@link PostgresVectorStores}).
  */
 public final class DefaultVectorStores implements VectorStores {
 
     public static final String DEFAULT_TEMPLATE = "default";
+
+    private static final String MEMORY = "memory";
 
     /** The backend config key that names the namespace a store belongs to. */
     public static final String NAMESPACE_KEY = "namespace";
 
     private final List<VectorStoreBackend> backends;
     private final VectorStoreTemplate defaultTemplate;
-    /** One registry per namespace, under {@code <baseDir>/<namespace>/vector-stores}; opened on first use. */
-    private final Map<Namespace, FileVectorStoreRegistry> registries = new ConcurrentHashMap<>();
-    private final Path baseDir;
+    /** One registry per namespace, opened on first use. */
+    private final Map<Namespace, VectorStoreRegistry> registries = new ConcurrentHashMap<>();
+    private final Function<Namespace, VectorStoreRegistry> openRegistry;
     private final LlmEmbeddings embeddings;
     private final LlmConfigRepository configs;
     /** Who says which namespace the config repository answers for; null when it is bound for good. */
@@ -45,21 +55,44 @@ public final class DefaultVectorStores implements VectorStores {
         this(backends, defaultTemplate, baseDir, embeddings, configs, null);
     }
 
+    /** The registries on files, under {@code <baseDir>/<namespace>/vector-stores}. */
     DefaultVectorStores(List<VectorStoreBackend> backends, VectorStoreTemplate defaultTemplate,
                         Path baseDir, LlmEmbeddings embeddings, LlmConfigRepository configs,
                         ai.mindconnect.agent.ScopeSupplier scope) {
+        this(backends, defaultTemplate, fileRegistries(baseDir), embeddings, configs, scope);
+    }
+
+    DefaultVectorStores(List<VectorStoreBackend> backends, VectorStoreTemplate defaultTemplate,
+                        Function<Namespace, VectorStoreRegistry> openRegistry, LlmEmbeddings embeddings,
+                        LlmConfigRepository configs, ai.mindconnect.agent.ScopeSupplier scope) {
         this.backends = backends;
         this.defaultTemplate = defaultTemplate;
-        this.baseDir = baseDir;
+        this.openRegistry = openRegistry;
         this.embeddings = embeddings;
         this.configs = configs;
         this.scope = scope;
     }
 
-    /** Empty when the environment lacks a backend or the embedding services. */
+    /**
+     * Empty when the environment lacks a backend or the embedding services.
+     *
+     * <p>A runtime that keeps its data in Postgres registers its {@link Sql} and
+     * {@link DataSource}: the registry then lives in that database, and so does
+     * a {@code pgvector} store without a {@code url} of its own. Unless
+     * {@code vectorStoreBackend} names another backend (or {@code vectorStoreUrl}
+     * another database), the vectors go there too — when the database has
+     * pgvector; without it they stay on {@code memory}.
+     */
     static Optional<VectorStores> fromEnvironment(ToolEnvironment env) {
-        String type = env.getString("vectorStoreBackend").orElse("memory");
+        Sql sql = env.get(Sql.class).orElse(null);
+        DataSource dataSource = sql == null ? null : env.get(DataSource.class).orElse(null);
         List<VectorStoreBackend> backends = VectorStoreBackend.discover();
+        if (dataSource != null) {
+            backends = backends.stream()
+                    .map(b -> PgVectorBackend.TYPE.equals(b.type()) ? new PgVectorBackend(dataSource) : b)
+                    .toList();
+        }
+        String type = backendType(env, dataSource);
         LlmEmbeddings embeddings = env.get(LlmEmbeddings.class).orElse(null);
         LlmConfigRepository configs = env.get(LlmConfigRepository.class).orElse(null);
         boolean backendKnown = backends.stream().anyMatch(b -> type.equals(b.type()));
@@ -82,9 +115,37 @@ public final class DefaultVectorStores implements VectorStores {
                 env.getString("vectorStoreEmbeddingConfig").orElse("embeddings"),
                 "file-ingestion",
                 Map.of("description", "Built-in template from mindconnect.vector-store.* properties"));
-        return Optional.of(new DefaultVectorStores(backends, defaultTemplate,
-                Path.of(config.getOrDefault("baseDir", "data")), embeddings, configs,
+        Path baseDir = Path.of(config.getOrDefault("baseDir", "data"));
+        Function<Namespace, VectorStoreRegistry> registries = fileRegistries(baseDir);
+        if (sql != null) {
+            MemoryToPgVector move = PgVectorBackend.TYPE.equals(type)
+                    ? new MemoryToPgVector(backend(backends, type), config, defaultTemplate) : null;
+            registries = new PostgresVectorStores(sql, baseDir, move)::open;
+        }
+        return Optional.of(new DefaultVectorStores(backends, defaultTemplate, registries, embeddings, configs,
                 env.get(ai.mindconnect.agent.ScopeSupplier.class).orElse(null)));
+    }
+
+    /**
+     * The backend of the built-in template: the one {@code vectorStoreBackend}
+     * names, else {@code memory} — but on the runtime's own database, pgvector
+     * whenever that database has it, and {@code memory} when it has not.
+     */
+    private static String backendType(ToolEnvironment env, DataSource dataSource) {
+        String named = env.getString("vectorStoreBackend").orElse(null);
+        boolean ownDatabase = dataSource != null && env.getString("vectorStoreUrl").isEmpty();
+        if (ownDatabase && (named == null || PgVectorBackend.TYPE.equals(named))) {
+            return PostgresVectorStores.pgvectorAvailable(dataSource) ? PgVectorBackend.TYPE : MEMORY;
+        }
+        return named == null ? MEMORY : named;
+    }
+
+    private static Function<Namespace, VectorStoreRegistry> fileRegistries(Path baseDir) {
+        return ns -> new FileVectorStoreRegistry(baseDir.resolve(ns.value()).resolve("vector-stores"));
+    }
+
+    private static VectorStoreBackend backend(List<VectorStoreBackend> backends, String type) {
+        return backends.stream().filter(b -> type.equals(b.type())).findFirst().orElseThrow();
     }
 
     // ── templates & instances (registry + built-in default) ───────────────
@@ -95,9 +156,8 @@ public final class DefaultVectorStores implements VectorStores {
     }
 
     @Override
-    public FileVectorStoreRegistry registry(Namespace namespace) {
-        return registries.computeIfAbsent(namespace,
-                ns -> new FileVectorStoreRegistry(baseDir.resolve(ns.value()).resolve("vector-stores")));
+    public VectorStoreRegistry registry(Namespace namespace) {
+        return registries.computeIfAbsent(namespace, openRegistry);
     }
 
     /** The built-in default plus every persisted template. */
@@ -151,7 +211,7 @@ public final class DefaultVectorStores implements VectorStores {
     @Override
     public VectorStore open(Namespace namespace, String storeName, String templateName,
                             VectorStoreInstance.Scope scope, String scopeRef, String owner) {
-        FileVectorStoreRegistry registry = registry(namespace);
+        VectorStoreRegistry registry = registry(namespace);
         VectorStoreInstance instance = registry.instance(storeName).orElse(null);
         if (instance == null) {
             VectorStoreTemplate template = template(namespace, templateName).orElseThrow(() ->

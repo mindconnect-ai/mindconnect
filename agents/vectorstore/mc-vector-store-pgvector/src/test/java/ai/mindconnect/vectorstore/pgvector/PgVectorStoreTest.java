@@ -86,6 +86,31 @@ class PgVectorStoreTest {
     }
 
     @Test
+    void aBackendBoundToADataSourceNeedsNoUrl() {
+        assumeTrue(reachable(), "no pgvector database reachable — skipping");
+
+        // The host's own database: a store without a url of its own lives there.
+        org.postgresql.ds.PGSimpleDataSource ds = new org.postgresql.ds.PGSimpleDataSource();
+        ds.setUrl(URL);
+        ds.setUser(USER);
+        ds.setPassword(PASSWORD);
+        assertThat(PgVectorBackend.enableExtension(ds)).isEmpty();
+
+        String storeId = "it_bound_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+        PgVectorBackend backend = new PgVectorBackend(ds);
+        VectorStore store = backend.open(storeId, Map.of("namespace", "test"));
+        assertThat(store.dimension()).as("no table before the first upsert").isEmpty();
+
+        store.upsert(List.of(new VectorChunk("x", "f1", 0, "x text", Map.of(), new float[]{1f, 0f})));
+        assertThat(store.dimension()).hasValue(2);
+        assertThat(backend.listStores(Map.of("namespace", "test"))).contains(storeId);
+        assertThat(new PgVectorBackend().listStores(Map.of("namespace", "test")))
+                .as("unbound and without a url, the backend knows no database").isEmpty();
+        store.deleteFile("f1");
+        assertThat(store.dimension()).as("an emptied table keeps its dimension").hasValue(2);
+    }
+
+    @Test
     void storesOfTwoNamespacesDoNotMix() {
         assumeTrue(reachable(), "no pgvector database reachable — skipping");
 
