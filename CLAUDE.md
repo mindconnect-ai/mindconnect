@@ -83,7 +83,10 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       proxy picks the adapter for the namespace the `ScopeSupplier` names right now (`Scope` =
       namespace + optional `UserId` + host attributes; a library embeds with `ScopeSupplier.fixed`,
       a server binds a `ThreadBoundScope` per request and per queued task via `ScopeTaskAdvisor`;
-      `mindconnect.namespace` is only the fallback while not every entry point binds)
+      `mindconnect.namespace` is only the fallback while not every entry point binds). Work a
+      namespace needs once per process — the Admin UI's seeding of `initial-data/**` into every
+      namespace, see `NamespaceSeeding` — is a `NamespaceFirstUse` registered with
+      `ThreadBoundScope.onBind`, so requests, tasks and start-up routines all trigger it
     - `mc-agent-runtime-core` / `mc-agent-runtime` (packages `ai.mindconnect.agent.runtime.*`):
       execution engine (turn loop, tool dispatch, sub-agent calls, approvals) / its adapters
       (file & in-memory repos, Pebble prompt renderer, tokenizer)

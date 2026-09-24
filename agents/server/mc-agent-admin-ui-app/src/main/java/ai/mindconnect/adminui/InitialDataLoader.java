@@ -1,77 +1,51 @@
 package ai.mindconnect.adminui;
 
-import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
-import ai.mindconnect.agent.runtime.skill.SkillSource;
-import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.boot.ApplicationArguments;
+import ai.mindconnect.adminui.service.MigrationService;
+import ai.mindconnect.adminui.service.NamespaceSeeding;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.StartupScope;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 /**
- * Loads initial data from {@code initial-data/} on startup — from every jar
- * on the classpath, not only the app's own: a module that ships agents or
- * skills of its own puts them under the same paths in its jar and they are
- * seeded, and later migrated, like the bundled ones.
- * <p>
- * <ul>
- *   <li>{@code initial-data/llm-configs/*.json} — imported if no config with the same name exists;
- *       if the stored config differs from the classpath version the supplied {@link ConfirmOverwrite}
- *       callback is invoked and the record is overwritten only if it returns {@code true}.</li>
- *   <li>{@code initial-data/agent-definitions/*.json} — same semantics per name.</li>
- *   <li>{@code initial-data/skills/*.md} — one {@code SKILL.md} per skill, imported
- *       when no skill of that name is stored. A stored one is never touched: a
- *       skill is text someone edits, and the shipped version has nothing to say
- *       about what they made of it.</li>
- * </ul>
- * New records are always imported. Existing identical records are silently skipped.
+ * Seeds the start-up namespace ({@code mindconnect.namespace}, {@code local}
+ * unless configured) at start, so that it has its content before anybody
+ * asks: the LLM configs, agents, skills and workflows every jar ships under
+ * {@code initial-data/} — the app's own and those of every module or
+ * extension on the classpath.
+ *
+ * <p>It is the same seeding every other namespace gets on its first use
+ * ({@link NamespaceSeeding}): a record the namespace never had is installed,
+ * one that is there is never touched, one an admin deleted stays deleted, and
+ * an extension's content waits until the extension is on here. What differs
+ * from the stored version is reviewed on Install → Migrations; this only says
+ * how many such records there are.
  */
 @Component
 public class InitialDataLoader implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(InitialDataLoader.class);
 
-    /** Called when a stored entity differs from the classpath version. Return true to overwrite. */
-    @FunctionalInterface
-    public interface ConfirmOverwrite {
-        boolean confirm(String entityType, String name, String diff);
-    }
-
-    private final LlmConfigRepository llmConfigRepository;
-    private final AgentDefinitionRepository agentDefinitionRepository;
-    private final SkillRepository skillRepository;
-    private final ObjectMapper objectMapper;
-
+    private final NamespaceSeeding seeding;
+    private final MigrationService migrations;
     private final ScopeSupplier scope;
     private final Namespace startupNamespace;
 
-    public InitialDataLoader(LlmConfigRepository llmConfigRepository,
-                             AgentDefinitionRepository agentDefinitionRepository,
-                             SkillRepository skillRepository,
-                             ObjectMapper objectMapper,
-                             org.springframework.beans.factory.ObjectProvider<ScopeSupplier> scope,
+    public InitialDataLoader(NamespaceSeeding seeding, MigrationService migrations,
+                             ObjectProvider<ScopeSupplier> scope,
                              @Value("${mindconnect.namespace:local}") String startupNamespace) {
+        this.seeding = seeding;
+        this.migrations = migrations;
         this.scope = scope.getIfAvailable();
         this.startupNamespace = new Namespace(startupNamespace);
-        this.llmConfigRepository = llmConfigRepository;
-        this.agentDefinitionRepository = agentDefinitionRepository;
-        this.skillRepository = skillRepository;
-        this.objectMapper = objectMapper;
     }
 
     /** Seeds run in the default namespace: the main thread binds no scope of its own. */
@@ -80,155 +54,20 @@ public class InitialDataLoader implements ApplicationRunner {
         StartupScope.run(scope, startupNamespace, this::load);
     }
 
-    /** Load without interactive prompts — existing differing records are skipped with a log warning. */
+    /** Seeds the bound namespace, then names the bundled records that differ from the stored ones. */
     public void load() {
-        load((type, name, diff) -> {
-            log.warn("Initial data '{}' '{}' differs from stored version — skipping (run interactively to overwrite)",
-                    type, name);
-            return false;
-        });
-    }
-
-    /** Load with a confirm callback for overwrite decisions. */
-    public void load(ConfirmOverwrite confirmOverwrite) {
-        loadLlmConfigs(confirmOverwrite);
-        loadAgentDefinitions(confirmOverwrite);
-        loadSkills();
-    }
-
-    // ── LLM configs ───────────────────────────────────────────────────────────
-
-    private void loadLlmConfigs(ConfirmOverwrite confirm) {
-        for (Resource resource : scan("classpath*:initial-data/llm-configs/*.json")) {
-            try {
-                LlmConfig incoming = read(resource, LlmConfig.class);
-                llmConfigRepository.findByName(incoming.name()).ifPresentOrElse(existing -> {
-                    String diff = diffJson(existing, incoming);
-                    if (diff == null) {
-                        log.debug("LLM config '{}' is up to date — skipping", incoming.name());
-                    } else if (confirm.confirm("LLM config", incoming.name(), diff)) {
-                        llmConfigRepository.save(incoming);
-                        log.info("Updated LLM config '{}'", incoming.name());
-                    } else {
-                        log.debug("LLM config '{}' update skipped by user", incoming.name());
-                    }
-                }, () -> {
-                    llmConfigRepository.save(incoming);
-                    log.info("Imported LLM config '{}'", incoming.name());
-                });
-            } catch (Exception e) {
-                log.warn("Failed to load LLM config from {}: {}", resource.getFilename(), e.getMessage());
-            }
-        }
-    }
-
-    // ── Agent definitions ─────────────────────────────────────────────────────
-
-    private void loadAgentDefinitions(ConfirmOverwrite confirm) {
-        for (Resource resource : scan("classpath*:initial-data/agent-definitions/*.json")) {
-            try {
-                AgentDefinition incoming = read(resource, AgentDefinition.class);
-                agentDefinitionRepository.findByName(incoming.name()).ifPresentOrElse(existing -> {
-                    String diff = diffJson(existing, incoming);
-                    if (diff == null) {
-                        log.debug("Agent '{}' is up to date — skipping", incoming.name());
-                    } else if (confirm.confirm("agent", incoming.name(), diff)) {
-                        agentDefinitionRepository.save(incoming);
-                        log.info("Updated agent '{}'", incoming.name());
-                    } else {
-                        log.debug("Agent '{}' update skipped by user", incoming.name());
-                    }
-                }, () -> {
-                    agentDefinitionRepository.save(incoming);
-                    log.info("Imported agent '{}'", incoming.name());
-                });
-            } catch (Exception e) {
-                log.warn("Failed to load agent definition from {}: {}", resource.getFilename(), e.getMessage());
-            }
-        }
-    }
-
-    // ── Skills ────────────────────────────────────────────────────────────────
-
-    /**
-     * Imports the shipped {@code SKILL.md} files, and only those the store
-     * does not already know by name. No overwrite prompt: unlike a config,
-     * a skill is prose someone has since rewritten for their own house, and
-     * the shipped wording has no claim on it.
-     */
-    private void loadSkills() {
-        for (Resource resource : scan("classpath*:initial-data/skills/*.md")) {
-            String fileName = resource.getFilename() == null ? "skill" : resource.getFilename();
-            String fallback = fileName.endsWith(".md")
-                    ? fileName.substring(0, fileName.length() - 3) : fileName;
-            try {
-                String content = new String(resource.getInputStream().readAllBytes(),
-                        java.nio.charset.StandardCharsets.UTF_8);
-                Skill incoming = Skill.fromMarkdown(fallback, content, SkillSource.MANAGED, null);
-                if (incoming == null) {
-                    log.warn("Initial skill {} has no instructions, or a name that is not lower-case "
-                            + "letters, digits and dashes — skipping", fileName);
-                    continue;
-                }
-                if (skillRepository.findByName(incoming.name()).isPresent()) {
-                    log.debug("Skill '{}' is already stored — skipping", incoming.name());
-                    continue;
-                }
-                skillRepository.save(incoming);
-                log.info("Imported skill '{}'", incoming.name());
-            } catch (Exception e) {
-                log.warn("Failed to load skill from {}: {}", fileName, e.getMessage());
-            }
-        }
-    }
-
-    // ── helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * Returns a human-readable summary of fields that differ between stored and incoming,
-     * or {@code null} if they are identical (ignoring {@code updatedAt} / {@code createdAt}).
-     */
-    private String diffJson(Object stored, Object incoming) {
+        seeding.ensure(startupNamespace);
         try {
-            JsonNode storedNode  = objectMapper.valueToTree(stored);
-            JsonNode incomingNode = objectMapper.valueToTree(incoming);
-            // Strip the fields that are expected to differ: timestamps, and the
-            // version, which counts saves — a seed never carries one.
-            for (String field : List.of("createdAt", "updatedAt", "version")) {
-                ((com.fasterxml.jackson.databind.node.ObjectNode) storedNode).remove(field);
-                ((com.fasterxml.jackson.databind.node.ObjectNode) incomingNode).remove(field);
+            List<String> changed = migrations.pending().stream()
+                    .filter(pending -> pending.status() == MigrationService.Status.CHANGED)
+                    .map(MigrationService.PendingMigration::id)
+                    .toList();
+            if (!changed.isEmpty()) {
+                log.info("{} bundled record(s) differ from the stored version in namespace '{}' — review them "
+                        + "on Install → Migrations: {}", changed.size(), startupNamespace.value(), changed);
             }
-            if (storedNode.equals(incomingNode)) return null;
-
-            StringBuilder sb = new StringBuilder();
-            incomingNode.fields().forEachRemaining(entry -> {
-                String key = entry.getKey();
-                JsonNode newVal = entry.getValue();
-                JsonNode oldVal = storedNode.get(key);
-                if (oldVal != null && !oldVal.equals(newVal)) {
-                    sb.append("  ").append(key).append(": ")
-                      .append(oldVal).append(" → ").append(newVal).append("\n");
-                }
-            });
-            return sb.isEmpty() ? "(structural difference)" : sb.toString();
-        } catch (Exception e) {
-            return "(could not diff: " + e.getMessage() + ")";
-        }
-    }
-
-    /** Reads a seed document. */
-    private <T> T read(Resource resource, Class<T> type) throws java.io.IOException {
-        return objectMapper.readerFor(type)
-                .readValue(resource.getInputStream());
-    }
-
-    private List<Resource> scan(String pattern) {
-        try {
-            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-            return List.of(resolver.getResources(pattern));
-        } catch (Exception e) {
-            log.debug("No resources found for pattern {}: {}", pattern, e.getMessage());
-            return List.of();
+        } catch (RuntimeException e) {
+            log.warn("Could not compare the bundled records with the stored ones: {}", e.getMessage());
         }
     }
 }

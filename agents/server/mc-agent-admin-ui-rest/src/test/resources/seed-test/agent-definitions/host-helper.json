@@ -1,0 +1,11 @@
+{
+  "id": "5eed0000-0000-0000-0000-000000000011",
+  "name": "host-helper",
+  "description": "Shipped by the host itself",
+  "systemPrompt": "You are host-helper.",
+  "maxIterations": 5,
+  "memoryConfig": { "kind": "none" },
+  "status": "ACTIVE",
+  "tools": [],
+  "llmConfigName": "seed-test-llm"
+}

@@ -12,9 +12,11 @@ import ai.mindconnect.extension.adapter.classpath.ClasspathManifests;
 import ai.mindconnect.extension.adapter.classpath.ContributionChecker;
 import ai.mindconnect.extension.adapter.file.FileBrandActivationRepository;
 import ai.mindconnect.extension.adapter.file.FileExtensionActivationRepository;
+import ai.mindconnect.extension.adapter.file.FileInstalledSeedRepository;
 import ai.mindconnect.extension.domain.ExtensionRegistry;
 import ai.mindconnect.extension.port.out.BrandActivationRepository;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;
+import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.runtime.ExtensionsFeature;
 import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
@@ -108,6 +110,22 @@ public class ExtensionAutoConfiguration {
                 ns -> new FileExtensionActivationRepository(storage, objectMapper, ns));
     }
 
+    /**
+     * Which bundled records a namespace got once, in
+     * {@code <mindconnect.data.base-dir>/<namespace>/system/installed-seeds.json} —
+     * what the per-namespace seeding looks at so that a deleted record stays deleted.
+     */
+    @Bean
+    @ConditionalOnMissingBean(InstalledSeedRepository.class)
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
+    InstalledSeedRepository fileInstalledSeedRepository(@Value("${mindconnect.data.base-dir:data}") String baseDir,
+                                                         ObjectMapper objectMapper,
+                                                         ObjectProvider<ScopeSupplier> scope) {
+        Path storage = Path.of(baseDir);
+        return NamespaceRouted.route(InstalledSeedRepository.class, scope.getIfAvailable(ScopeSupplier::local),
+                ns -> new FileInstalledSeedRepository(storage, objectMapper, ns));
+    }
+
     /** The brands' decisions under {@code <mindconnect.data.base-dir>/system/extension-brands}. */
     @Bean
     @ConditionalOnMissingBean(BrandActivationRepository.class)
@@ -129,6 +147,17 @@ public class ExtensionAutoConfiguration {
             return NamespaceRouted.route(ExtensionActivationRepository.class, scope.getIfAvailable(ScopeSupplier::local),
                     ns -> new ai.mindconnect.extension.adapter.pg.PgExtensionActivationRepository(mindconnectSql, ns)
                             .initSchema());
+        }
+
+        /** One row per bundled record a namespace got once, in {@code mc_installed_seed}. */
+        @Bean
+        @ConditionalOnMissingBean(InstalledSeedRepository.class)
+        InstalledSeedRepository pgInstalledSeedRepository(ai.mindconnect.jdbc.Sql mindconnectSql,
+                                                           ObjectProvider<ScopeSupplier> scope) {
+            // The table is shared (the namespace is a column): create it once here, not on each namespace's first call.
+            new ai.mindconnect.extension.adapter.pg.PgInstalledSeedRepository(mindconnectSql, Namespace.DEFAULT).initSchema();
+            return NamespaceRouted.route(InstalledSeedRepository.class, scope.getIfAvailable(ScopeSupplier::local),
+                    ns -> new ai.mindconnect.extension.adapter.pg.PgInstalledSeedRepository(mindconnectSql, ns));
         }
 
         /** One row per brand decision in {@code mc_extension_brand_activation}. */

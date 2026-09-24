@@ -1,0 +1,11 @@
+{
+  "id": "5eed0000-0000-0000-0000-000000000012",
+  "name": "crm-assistant",
+  "description": "Shipped by the seed-crm extension",
+  "systemPrompt": "You are crm-assistant.",
+  "maxIterations": 5,
+  "memoryConfig": { "kind": "none" },
+  "status": "ACTIVE",
+  "tools": [],
+  "llmConfigName": "seed-test-llm"
+}

@@ -4,6 +4,7 @@ import ai.mindconnect.adminui.service.MigrationService.FieldDiff;
 import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
@@ -44,7 +45,7 @@ class MigrationServiceFileRepoTest {
     private void wire(Path dir, Optional<EncryptionHelper> encryption) {
         repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, new Namespace("test")), ENCRYPTION);
         service = new MigrationService(repo,
-                new InMemoryAgentDefinitionRepository(), new InMemoryWorkflowDataRepository(),
+                new InMemoryAgentDefinitionRepository(), new InMemorySkillRepository(), new InMemoryWorkflowDataRepository(),
                 new ObjectMapper().registerModule(new JavaTimeModule())
                         .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                         .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),

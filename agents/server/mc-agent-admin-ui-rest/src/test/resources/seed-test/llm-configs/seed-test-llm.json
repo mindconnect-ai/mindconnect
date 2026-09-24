@@ -1,0 +1,11 @@
+{
+  "id": "5eed0000-0000-0000-0000-000000000001",
+  "name": "seed-test-llm",
+  "provider": "ANTHROPIC",
+  "model": "a-model",
+  "baseUrl": "https://api.anthropic.com",
+  "apiKey": "${SEED_TEST_KEY}",
+  "defaultTemperature": 0.7,
+  "maxOutputTokens": 1024,
+  "contextWindowTokens": 200000
+}
