@@ -7,6 +7,7 @@ import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSections;
 import ai.mindconnect.agent.runtime.service.prompt.SystemPromptRenderer;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.AuthenticationInfo;
@@ -38,8 +39,19 @@ public final class WorkingMemoryBuilder {
                                     AuthenticationInfo auth,
                                     InstructionFiles instructions,
                                     SkillCatalog skills) {
+        return build(renderer, strategy, def, session, auth, instructions, skills, PromptSections.none());
+    }
+
+    public static WorkingMemory build(PromptRenderer renderer,
+                                    MemoryStrategy strategy,
+                                    AgentDefinition def,
+                                    AgentSession session,
+                                    AuthenticationInfo auth,
+                                    InstructionFiles instructions,
+                                    SkillCatalog skills,
+                                    PromptSections sections) {
         String systemText = SystemPromptRenderer.render(renderer, strategy, def, session, auth,
-                instructions, skills);
+                instructions, skills, sections);
         TokenCounter counter = strategy.resolveTokenCounter(def);
         int systemTokens = counter.countText(systemText);
         List<WorkingMemory.WorkingMemoryMessage> messages = strategy.getWindowMessages(def, session);

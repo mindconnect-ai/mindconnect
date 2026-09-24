@@ -8,6 +8,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
 
 /** The agent runtime's repositories in memory — nothing survives the process. */
 public class InMemoryAgentRepositoryFactory implements AgentRepositoryFactory {
@@ -30,4 +31,5 @@ public class InMemoryAgentRepositoryFactory implements AgentRepositoryFactory {
     @Override public TodoListRepository todoListRepository() { return new InMemoryTodoListRepository(); }
     @Override public LlmCallTraceRepository llmCallTraceRepository() { return new InMemoryLlmCallTraceRepository(maxTracesPerConversation); }
     @Override public SkillRepository skillRepository() { return new InMemorySkillRepository(); }
+    @Override public UserMemoryRepository userMemoryRepository() { return new InMemoryUserMemoryRepository(); }
 }
