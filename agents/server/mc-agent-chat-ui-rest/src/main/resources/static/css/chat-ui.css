@@ -818,9 +818,12 @@
 }
 
 /* The model and folder buttons are chips with the card's corner, whatever a
-   theme does to a secondary button: under some themes that is a pill, and a
-   pill beside the square Send reads as a different kind of control. */
-.chat-form .sui-form-footer .chat-model-btn {
+   theme does to a button: Gipiti, Sorbet and Amethyst draw every button as a
+   pill (":root.sui-theme-… .sui-btn"), and a pill beside the square Send reads
+   as a different kind of control. By id, because the css class set on the
+   action does not reach the rendered button, and so the rule outranks the
+   themes' own. */
+.chat-form .sui-form-footer :is(#model, #dir) {
     border-radius: var(--sui-radius-md, 8px);
 }
 
