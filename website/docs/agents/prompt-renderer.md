@@ -52,7 +52,7 @@ override an earlier one. The built-in providers:
 
 | Provider | Variables |
 |----------|-----------|
-| `CurrentDateProvider` | `current_date`, `current_datetime`, `current_time` |
+| `CurrentDateProvider` | `current_date`, `current_datetime`, `current_time`, `time_zone` — the date and time in the [user's time zone](#the-users-time-zone), `current_datetime` as a UTC instant |
 | `AgentMetadataProvider` | `agent_name`, `agent_id`, `user_id`, `session_id` |
 | `AgentToolsProvider` | `tools` |
 | `TodoListPromptContextProvider` | `todos`, `todo_list_md` |
@@ -73,6 +73,7 @@ change shows up on the next turn without touching the agent.
 | `## Project instructions` | the working directory holds one of them | The project's own instructions, verbatim |
 | `## Skills` | the agent has [skills](./skills.md) switched on and there are any | One line per skill — name and description — and that the `skill` tool loads the rest |
 | `## Attached files` | files are attached to the chat | Their names, kinds and on-disk paths, and how to search them |
+| `## Date and time` | always, last | The time in the user's zone with the zone and its offset — *It is Thursday, 24 September 2026, 17:36 (Europe/Zurich, UTC+02:00).* — and that a time without an offset is a time in that zone |
 
 The skills section is the one that deliberately says less than it knows: the
 instructions stay out until the model asks for a skill by name, which is what
@@ -153,3 +154,32 @@ Some call sites inject extra variables for a single render — for example a
 response-reviewer sub-agent receives the user's message and the agent's draft
 answer. These are passed as an `extraVars` map to `render(...)` and override any
 value a provider produced for the same key.
+
+## The user's time zone
+
+A server usually runs in UTC; its users do not. Every time the runtime shows
+the model — the `## Date and time` section, `current_date` and
+`current_time`, the times the Office tools list — is in the zone of the user
+the turn runs for, and every time the model writes without an offset
+(`2026-09-25T16:16` in `calendar_create`, `2026-09-01` as `since` in
+`mail_list`) is read in that same zone. So "the train at 16:16" is 16:16 where
+the user is, whatever `TZ` the server has.
+
+Where the zone comes from:
+
+1. what the user chose on their profile page (**Account → Time zone**);
+2. else what their browser reported the first time it was seen — the Admin UI
+   sends `Intl.DateTimeFormat().resolvedOptions().timeZone` along, and it is
+   stored once, never over a choice;
+3. else `mindconnect.time-zone` (`MC_TIME_ZONE`), the installation's default;
+4. else the JVM's zone.
+
+It is a `TimeZones` port in `mc-agent-tool-spi` — `ZoneId zoneOf(UserId)` —
+which the Admin UI and the agent server fill from the user records. An
+embedding sets one with `AgentRuntimeBuilder.timeZones(TimeZones.fixed(zone))`;
+without one, the JVM's zone applies, as before. A tool reaches it with
+`TimeZones.of(env)` in `bind` and asks it per call with the scope's user — see
+[Creating a tool](./creating-a-tool.md).
+
+The section changes every minute, which is why it comes last: everything
+before it stays the same from one round to the next.

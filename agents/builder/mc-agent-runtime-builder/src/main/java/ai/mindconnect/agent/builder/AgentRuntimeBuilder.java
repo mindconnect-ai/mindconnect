@@ -44,6 +44,8 @@ import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
+import ai.mindconnect.agent.runtime.service.prompt.CurrentTimeSection;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
 import ai.mindconnect.agent.runtime.service.prompt.PromptSection;
 import ai.mindconnect.agent.runtime.service.prompt.PromptSections;
@@ -131,6 +133,8 @@ public class AgentRuntimeBuilder {
     /** null → the default mapper, reading media parts from the runtime's file store. */
     private LlmMessageMapper llmMessageMapper;
     private java.time.Duration taskRetention = java.time.Duration.ZERO;
+    /** Whose local time the prompt states and the tools read; null: the host's bean, else the JVM's zone. */
+    private TimeZones timeZones;
     private boolean built;
 
     private AgentRuntimeBuilder(Persistence persistence) {
@@ -260,6 +264,18 @@ public class AgentRuntimeBuilder {
     public AgentRuntimeBuilder beanFallback(java.util.function.Function<Class<?>, java.util.Optional<?>> fallback) {
         requireNotBuilt();
         beans.fallback(fallback);
+        return this;
+    }
+
+    /**
+     * The zone each user lives in: what the system prompt states the time in,
+     * and what the Office tools read a time without an offset in. Unset, the
+     * runtime asks the host ({@link #beanFallback}) for a {@link TimeZones} on
+     * first use, and takes the JVM's zone when there is none.
+     */
+    public AgentRuntimeBuilder timeZones(TimeZones zones) {
+        requireNotBuilt();
+        this.timeZones = zones;
         return this;
     }
 
@@ -411,6 +427,7 @@ public class AgentRuntimeBuilder {
             context.bean(javax.sql.DataSource.class, postgres::dataSource);
         }
         context.bean(ToolEnvironment.class, () -> new BeansToolEnvironment(beans, context::properties));
+        if (timeZones != null) context.instance(TimeZones.class, timeZones);
     }
 
     /**
@@ -420,14 +437,23 @@ public class AgentRuntimeBuilder {
      */
     private void registerCore() {
         context.bean(TokenCounters.class, TokenCounterRegistry::new);
+        // Whose local time: asked of the beans on first use, not now — a host's resolver
+        // (the users' zones) is found through the bean fallback once the host is up.
+        TimeZones zones = new LazyTimeZones(() -> context.find(TimeZones.class).orElse(null));
         context.bean(PromptRenderer.class, () -> {
             List<PromptContextProvider> providers = new ArrayList<>(List.of(
-                    new CurrentDateProvider(), new AgentMetadataProvider(), new AgentToolsProvider()));
+                    new CurrentDateProvider(java.time.Clock.systemUTC(), zones),
+                    new AgentMetadataProvider(), new AgentToolsProvider()));
             providers.addAll(beans.all(PromptContextProvider.class));
             return new PebblePromptRenderer(providers);
         });
-        // The sections the features add to every system prompt, in contribution order.
-        context.bean(PromptSections.class, () -> PromptSections.of(beans.all(PromptSection.class)));
+        // The sections the features add to every system prompt, in contribution order,
+        // then the date and time — last, as it is the part that changes every minute.
+        context.bean(PromptSections.class, () -> {
+            List<PromptSection> sections = new ArrayList<>(beans.all(PromptSection.class));
+            sections.add(new CurrentTimeSection(java.time.Clock.systemUTC(), zones));
+            return PromptSections.of(sections);
+        });
         context.bean(AgentTaskRunner.class, () -> {
             String defaultConfig = features.find(CoreFeature.class).map(CoreFeature::defaultLlmConfigName).orElse(null);
             var definitions = context.require(AgentDefinitionRepository.class);
@@ -533,6 +559,34 @@ public class AgentRuntimeBuilder {
 
     /** A registry that knows no tool: every resolve is empty, every listing blank. */
     private static final ToolRegistry NO_TOOLS = (agentTool, scope) -> Optional.empty();
+
+    /**
+     * The {@link TimeZones} the beans have, looked up on first use and kept
+     * once found: the prompt asks every round, and a lookup through the host
+     * container each time would cost more than the answer. None there (yet):
+     * the JVM's zone, and the next call looks again — a call that came before
+     * the host was up must not decide for the life of the process.
+     */
+    static final class LazyTimeZones implements TimeZones {
+
+        private final java.util.function.Supplier<TimeZones> lookup;
+        private volatile TimeZones resolved;
+
+        LazyTimeZones(java.util.function.Supplier<TimeZones> lookup) {
+            this.lookup = lookup;
+        }
+
+        @Override
+        public java.time.ZoneId zoneOf(ai.mindconnect.agent.UserId user) {
+            TimeZones zones = resolved;
+            if (zones == null) {
+                zones = lookup.get();
+                if (zones == null) return TimeZones.system().zoneOf(user);
+                resolved = zones;
+            }
+            return zones.zoneOf(user);
+        }
+    }
 
     /** Value of the {@code taskRetention} property that means "keep finished task trees for the life of the process". */
     public static final String KEEP_FOREVER = "keep";

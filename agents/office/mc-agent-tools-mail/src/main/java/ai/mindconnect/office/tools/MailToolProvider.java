@@ -3,6 +3,7 @@ package ai.mindconnect.office.tools;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Connections;
 import ai.mindconnect.agent.tool.MultiToolProvider;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
@@ -11,7 +12,6 @@ import ai.mindconnect.mail.index.MailIndex;
 import ai.mindconnect.mail.view.CurrentView;
 import ai.mindconnect.mail.view.MailListViews;
 
-import java.time.ZoneId;
 import java.util.Optional;
 import java.util.Set;
 
@@ -67,7 +67,7 @@ public class MailToolProvider implements MultiToolProvider {
                 .orElseGet(() -> env.get(Connections.class).map(MailAccounts::new).orElse(null));
         bind(accounts, env.get(MailListViews.class).orElse(null),
                 env.get(CurrentView.class).orElseGet(CurrentView.Memory::new),
-                env.get(MailIndex.class).orElse(null));
+                env.get(MailIndex.class).orElse(null), TimeZones.of(env));
     }
 
     /** The registry directly — for a host without an environment, and for tests. */
@@ -82,7 +82,18 @@ public class MailToolProvider implements MultiToolProvider {
 
     /** With the window index: {@code mail_list} searches it and says how far that reached. */
     public MailToolProvider bind(MailAccounts accounts, MailListViews views, CurrentView current, MailIndex index) {
-        this.mail = accounts == null ? null : new MailTools(accounts, ZoneId.systemDefault(), index);
+        return bind(accounts, views, current, index, TimeZones.system());
+    }
+
+    /**
+     * With the zone each user lives in: a date the model writes is a day in
+     * the calling user's zone, asked on every call, and the times the tools
+     * show are in it too.
+     */
+    public MailToolProvider bind(MailAccounts accounts, MailListViews views, CurrentView current, MailIndex index,
+                                 TimeZones zones) {
+        this.mail = accounts == null ? null
+                : new MailTools(accounts, zones == null ? TimeZones.system() : zones, index);
         this.lists = accounts == null || views == null ? null
                 : new MailListTools(accounts, views, current == null ? new CurrentView.Memory() : current, index);
         return this;

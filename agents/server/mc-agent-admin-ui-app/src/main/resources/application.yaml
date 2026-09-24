@@ -48,6 +48,11 @@ mindconnect:
   # default namespace stays open to every signed-in user, which is what a
   # single-user installation and the dev mode work with.
   namespace-admins: ${MC_NAMESPACE_ADMINS:}
+  # The time zone of a user who has none of their own yet — an IANA id such as
+  # Europe/Zurich. A user's own zone comes from their browser the first time it
+  # is seen, or from their profile page; this is only what applies before that
+  # (and to work on nobody's behalf). Unset: the JVM's zone.
+  time-zone: ${MC_TIME_ZONE:}
   postgres:
     url: ${MC_POSTGRES_URL:jdbc:postgresql://localhost:5432/mindconnect}
     username: ${MC_POSTGRES_USER:}

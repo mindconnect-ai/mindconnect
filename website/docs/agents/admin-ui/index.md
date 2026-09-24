@@ -475,6 +475,19 @@ now. `NotificationService` handles the collapsing, and `UserSetup` clears what
 a check has stopped reporting. Where no `NotificationRepository` is assembled
 there is no bell and nothing is raised.
 
+## Time zone
+
+Your agents read a time without an offset — "tomorrow at 16:16", a calendar
+entry at `2026-09-25T16:16` — in your time zone, and show times in it; the
+system prompt tells them which one it is. **Account → Time zone** on your
+profile shows it and lets you change it; the next tool call uses the new one.
+
+You rarely have to: the first time your browser is seen, the zone it reports
+becomes yours. It happens once — travelling does not move your calendar
+around, and a zone you chose is never overwritten. Until then (and for work on
+nobody's behalf) the installation's zone applies: `MC_TIME_ZONE`
+(`mindconnect.time-zone`), else the server's.
+
 ## Preferences
 
 A screen may remember where you left it — the folder that was open, the view

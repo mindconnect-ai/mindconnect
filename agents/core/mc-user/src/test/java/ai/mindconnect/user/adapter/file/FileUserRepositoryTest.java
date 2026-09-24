@@ -46,6 +46,21 @@ class FileUserRepositoryTest {
     }
 
     @Test
+    void theTimeZoneSurvivesTheRoundTrip_andAnOldRecordWithoutOneReadsAsNone() throws Exception {
+        var repo = new FileUserRepository(dir);
+        User alice = user("alice").withTimeZone("Europe/Zurich");
+        repo.save(alice);
+
+        assertThat(repo.findById(UserId.of("alice"))).get().extracting(User::timeZone).isEqualTo("Europe/Zurich");
+
+        java.nio.file.Path file = java.nio.file.Files.list(dir.resolve("system/users")).findFirst().orElseThrow();
+        java.nio.file.Files.writeString(file, java.nio.file.Files.readString(file)
+                .replaceAll(",?\\s*\"timeZone\"\\s*:\\s*\"[^\"]*\"", ""));
+        assertThat(java.nio.file.Files.readString(file)).doesNotContain("timeZone");
+        assertThat(repo.findById(UserId.of("alice"))).get().extracting(User::timeZone).isNull();
+    }
+
+    @Test
     void idsThatAreNoFileNamesAndDifferOnlyInCaseStayApart() {
         var repo = new FileUserRepository(dir);
         repo.save(user("Alice"));

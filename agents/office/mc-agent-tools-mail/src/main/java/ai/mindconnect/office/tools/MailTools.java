@@ -1,6 +1,7 @@
 package ai.mindconnect.office.tools;
 
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.mail.MailMessage;
 import ai.mindconnect.mail.Outcome;
@@ -59,7 +60,8 @@ final class MailTools {
     static final int MAX_CHARS = 40000;
 
     private final MailAccounts mail;
-    private final ZoneId zone;
+    /** The zone a date is read in and times are shown in: the calling user's, asked per call. */
+    private final TimeZones zones;
     /** The window index, when the host has one: {@code mail_list} searches it first and says how far that reached. */
     private final MailIndex index;
 
@@ -67,9 +69,14 @@ final class MailTools {
         this(mail, zone, null);
     }
 
+    /** One zone for everyone — for a host without users, and for tests. */
     MailTools(MailAccounts mail, ZoneId zone, MailIndex index) {
+        this(mail, TimeZones.fixed(zone), index);
+    }
+
+    MailTools(MailAccounts mail, TimeZones zones, MailIndex index) {
         this.mail = mail;
-        this.zone = zone;
+        this.zones = zones;
         this.index = index;
     }
 
@@ -140,7 +147,7 @@ final class MailTools {
                                 + "language: write the words, or several separated by OR "
                                 + "(\"newsletter OR Rabatt OR unsubscribe\") — each is searched on its own and "
                                 + "the results are merged. At most " + MAX_TERMS + " of them."),
-                        "since", string("Only messages received on or after this, as 2026-09-01."),
+                        "since", string("Only messages received on or after this, as 2026-09-01 (a day in the user's time zone)."),
                         "before", string("Only messages received before this, as 2026-09-15."),
                         "unread_only", bool("Only messages not marked as read."),
                         "limit", integer("How many, at most " + MAX_LIMIT + " (default " + DEFAULT_LIMIT
@@ -151,6 +158,7 @@ final class MailTools {
                                 + "messages this installation keeps. Slower and paged; use it only when the "
                                 + "answer said older messages were not searched and the person wants those too."))),
                 args -> {
+                    ZoneId zone = zones.zoneOf(user);
                     List<ConnectedMailbox> boxes = accounts.pick(args, true);
                     int limit = Math.max(1, number(args, "limit", DEFAULT_LIMIT, MAX_LIMIT));
                     int offset = number(args, "offset", 0, 10_000);
@@ -186,7 +194,7 @@ final class MailTools {
                             List<Row> rows = all.stream().skip(offset).limit(limit)
                                     .map(m -> new Row(box.id(), folder, m)).toList();
                             return listing(rows, offset, all.size(), true, false, List.of(),
-                                    queries.get(0).isEmpty(), coverage);
+                                    queries.get(0).isEmpty(), coverage, zone);
                         } catch (MailStoreException e) {
                             throw new Refused(box.id() + " did not answer: " + e.getMessage());
                         }
@@ -226,7 +234,7 @@ final class MailTools {
                     // Two words that find the same message would count it twice.
                     if (queries.size() > 1) counted = false;
                     return listing(rows, offset, matching, counted, boxes.size() > 1, silent,
-                            queries.get(0).isEmpty(), null);
+                            queries.get(0).isEmpty(), null, zone);
                 });
     }
 
@@ -235,7 +243,7 @@ final class MailTools {
      * when the search ran over a window — how far it reached.
      */
     private String listing(List<Row> rows, int offset, long matching, boolean counted, boolean allInboxes,
-                           List<String> silent, boolean plain, MailIndex.Coverage coverage) {
+                           List<String> silent, boolean plain, MailIndex.Coverage coverage, ZoneId zone) {
         StringBuilder out = new StringBuilder();
         if (rows.isEmpty()) {
             out.append(plain ? "No messages." : "No message matches.").append('\n');
@@ -244,7 +252,7 @@ final class MailTools {
             if (counted) out.append(" of ").append(matching);
             out.append(allInboxes ? ", all inboxes" : "").append(", newest first:\n\n");
             boolean preview = rows.size() <= BRIEF_ABOVE;
-            for (Row row : rows) out.append(line(row, preview));
+            for (Row row : rows) out.append(line(row, preview, zone));
             // The listing is for the model's eyes only. A tool that
             // puts messages on the user's screen is a different call,
             // and an answer that claims one without making it is a lie
@@ -296,7 +304,8 @@ final class MailTools {
                     try (MailStore store = mail.open(user, box.id())) {
                         String folder = folder(store.folders(), str(args, "folder"));
                         MailMessage m = store.read(folder, id);
-                        StringBuilder out = new StringBuilder(line(new Row(box.id(), folder, m), false));
+                        StringBuilder out = new StringBuilder(line(new Row(box.id(), folder, m), false,
+                                zones.zoneOf(user)));
                         if (m.to() != null && !m.to().isEmpty()) out.append("  to: ").append(String.join(", ", m.to())).append('\n');
                         if (m.attachments() != null && !m.attachments().isEmpty()) {
                             out.append("  attachments: ").append(String.join(", ", m.attachments())).append('\n');
@@ -511,7 +520,7 @@ final class MailTools {
 
     private record Row(String account, String folder, MailMessage message) { }
 
-    private String line(Row row, boolean preview) {
+    private static String line(Row row, boolean preview, ZoneId zone) {
         MailMessage m = row.message();
         StringBuilder out = new StringBuilder("- id ").append(m.id())
                 .append(" · account ").append(row.account())

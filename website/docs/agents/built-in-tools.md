@@ -23,7 +23,7 @@ Always available; no API keys required.
 
 | Tool | Description | Needs |
 |------|-------------|-------|
-| `get_current_datetime` | Returns the current date and time in ISO-8601 with timezone. | — |
+| `get_current_datetime` | Returns the current date and time in the user's [time zone](./prompt-renderer.md#the-users-time-zone), in ISO-8601 with the offset and the zone id (`2026-09-24T17:36:05+02:00[Europe/Zurich]`). | — |
 | `list_agents` | Lists the agents this one may call, with their names and descriptions. Added by the runtime with `run_agent`. | — |
 | `bash` | Runs a bash command in the session's working directory; output drained as it comes, capped at 30,000 characters; `timeout` per call (default 120 s, max 600); a timed-out or cancelled command is killed with everything it spawned. `background` starts a server or watcher detached, watches it for three seconds and returns its pid, whether it is still running or already exited with which code, the log so far, and the log file (`logs/` in the session's directory). | Working dir |
 | `process_list` | Lists the background processes of this session: pid, running or exited, command and log file. Read-only. | — |

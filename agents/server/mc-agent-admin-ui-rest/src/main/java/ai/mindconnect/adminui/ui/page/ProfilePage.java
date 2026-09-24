@@ -24,6 +24,7 @@ import ai.mindconnect.user.domain.ApiToken;
 import ai.mindconnect.user.domain.User;
 
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
@@ -59,6 +60,8 @@ public class ProfilePage extends AdminPage {
     public static final String TOOL_VARIABLES_ID = "profile-tool-variables";
     /** The namespace variables tab's content — replaced when a namespace the user created comes or goes. */
     public static final String NAMESPACE_ENVIRONMENT_ID = "profile-namespace-variables";
+    /** The time zone form — replaced in place after it is saved. */
+    public static final String TIME_ZONE_FORM_ID = "profile-time-zone";
 
     /** What a user of an installation without authentication has to know before trusting a token to protect anything. */
     public static final String AUTH_OFF_NOTE = "Authentication is off on this installation: the API answers every "
@@ -94,6 +97,8 @@ public class ProfilePage extends AdminPage {
     private final Map<String, java.util.Set<String>> toolCatalogue;
     /** False on a host that keeps no per-user tools — then the tab says so. */
     private final boolean userToolStore;
+    /** The zone the user's agents work in — theirs, or the installation's; null leaves the form out. */
+    private ZoneId timeZone;
 
     /**
      * @param me          who the signed-in user is to a namespace — id and the address they are
@@ -161,6 +166,16 @@ public class ProfilePage extends AdminPage {
         this.active = active;
     }
 
+    /**
+     * With the time zone form in the Account tab.
+     *
+     * @param effective the zone the user's agents work in now: theirs, else the installation's
+     */
+    public ProfilePage timeZone(ZoneId effective) {
+        this.timeZone = effective;
+        return this;
+    }
+
     @Override
     public UiPage render() {
         UiDetail details = UiDetail.of("profile-user", title()).icon("user-round")
@@ -176,6 +191,9 @@ public class ProfilePage extends AdminPage {
             account.child(authOffNote("profile-auth-off"));
         }
         account.child(details);
+        if (timeZone != null) {
+            account.child(timeZoneForm(user == null ? null : user.timeZone(), timeZone, null));
+        }
         // One tab per concern: the page had grown into a scroll through five
         // unrelated blocks. The tab ids differ from the ids of the tables inside
         // them, because a tab id becomes its panel's DOM id and the tables are
@@ -431,6 +449,43 @@ public class ProfilePage extends AdminPage {
         return NamespacesPage.environmentForm(ENVIRONMENT_FORM_ID, error, API + "/environment",
                 API + "/environment/dialog/close");
     }
+
+    /**
+     * The zone the user lives in: what a time without an offset means to
+     * their agents' tools ("16:16" in a calendar entry) and what the system
+     * prompt states the time in. A select of the region ids this JVM knows;
+     * the current zone is among them even when it is none of those.
+     *
+     * @param chosen    what the user record holds — chosen here or taken from the browser; null when neither
+     * @param effective the zone in force, the installation's when {@code chosen} is null
+     * @param error     why the last save was refused; null otherwise
+     */
+    public static UiForm timeZoneForm(String chosen, ZoneId effective, String error) {
+        String current = effective.getId();
+        List<UiField.Option> options = new java.util.ArrayList<>();
+        java.util.SortedSet<String> ids = new java.util.TreeSet<>(REGION_ZONES);
+        ids.add(current);
+        for (String id : ids) options.add(UiField.Option.of(id, id));
+        String hint = "Your agents read a time without an offset — \"tomorrow at 16:16\", 2026-09-25T16:16 — "
+                + "in this zone, and show times in it. "
+                + (chosen != null ? "In " + current + " it is " + java.time.ZonedDateTime.now(effective)
+                        .format(DateTimeFormatter.ofPattern("HH:mm", java.util.Locale.ROOT)) + " now."
+                : "You have not chosen one; the installation's zone applies.");
+        UiForm form = UiForm.of(TIME_ZONE_FORM_ID, "Time zone")
+                .field(UiField.select("timeZone", "Time zone", current, options).asEditable().hint(hint))
+                .action(UiAction.primary(TIME_ZONE_FORM_ID + "-save", "Save").icon("save")
+                        .dispatch("POST", API + "/time-zone", TIME_ZONE_FORM_ID));
+        if (error != null) {
+            form.error(error);
+        }
+        return form;
+    }
+
+    /** The zone ids a person picks from: Europe/Zurich, America/New_York, … and UTC — not the Etc/ and SystemV/ aliases. */
+    private static final java.util.Set<String> REGION_ZONES = java.time.ZoneId.getAvailableZoneIds().stream()
+            .filter(id -> id.equals("UTC") || (id.contains("/") && !id.startsWith("Etc/")
+                    && !id.startsWith("SystemV/") && Character.isUpperCase(id.charAt(0))))
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
 
     /** The body of the invite dialog for {@code ns}; {@code error} keeps it open with the reason. */
     public static UiForm inviteForm(NamespaceDefinition ns, String error) {

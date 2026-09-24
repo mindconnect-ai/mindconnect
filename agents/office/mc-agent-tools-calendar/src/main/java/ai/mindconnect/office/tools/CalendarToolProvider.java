@@ -3,12 +3,12 @@ package ai.mindconnect.office.tools;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Connections;
 import ai.mindconnect.agent.tool.MultiToolProvider;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.calendar.CalendarAccounts;
 
-import java.time.ZoneId;
 import java.util.Optional;
 import java.util.Set;
 
@@ -49,12 +49,23 @@ public class CalendarToolProvider implements MultiToolProvider {
     @Override
     public void bind(ToolEnvironment env) {
         bind(env.get(CalendarAccounts.class)
-                .orElseGet(() -> env.get(Connections.class).map(CalendarAccounts::new).orElse(null)));
+                .orElseGet(() -> env.get(Connections.class).map(CalendarAccounts::new).orElse(null)),
+                TimeZones.of(env));
     }
 
-    /** The registry directly — for a host without an environment, and for tests. */
+    /** The registry directly, in the JVM's zone — for a host without an environment, and for tests. */
     public CalendarToolProvider bind(CalendarAccounts accounts) {
-        this.calendar = accounts == null ? null : new CalendarTools(accounts, ZoneId.systemDefault());
+        return bind(accounts, TimeZones.system());
+    }
+
+    /**
+     * With the zone each user lives in: a time the model writes without an
+     * offset is read in the calling user's zone, asked on every call, and the
+     * times the tools show are in it too.
+     */
+    public CalendarToolProvider bind(CalendarAccounts accounts, TimeZones zones) {
+        this.calendar = accounts == null ? null
+                : new CalendarTools(accounts, zones == null ? TimeZones.system() : zones);
         return this;
     }
 
