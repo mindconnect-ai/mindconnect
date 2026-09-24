@@ -409,7 +409,8 @@ public class ChatUiController {
                 ai.mindconnect.chatui.service.SessionOwnership.channelOf(session.id())).isPresent();
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         session.id(), agent.id(), streaming)
-                .withModelLabel(agent.llmConfigName())
+                .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
+                        llmConfigRepository, agent.llmConfigName()))
                 .withAttachments(sessionFiles.attachments(session.id()))
                 .withAgentCounts(agent, offeredToolNames())
                 .withWorkingDir(session.workingDir())
@@ -1196,6 +1197,8 @@ public class ChatUiController {
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
+                .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
+                        llmConfigRepository, agent.llmConfigName()))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks)
                 .withOfferedTools(offeredToolNames());

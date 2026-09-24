@@ -817,6 +817,13 @@
     color: var(--sui-color-text);
 }
 
+/* The model and folder buttons are chips with the card's corner, whatever a
+   theme does to a secondary button: under some themes that is a pill, and a
+   pill beside the square Send reads as a different kind of control. */
+.chat-form .sui-form-footer .chat-model-btn {
+    border-radius: var(--sui-radius-md, 8px);
+}
+
 /* Send is an icon button like any other, with the icon button's corner. */
 .chat-form .sui-form-footer .sui-icon-btn--primary {
     border-radius: var(--sui-radius-md, 8px);

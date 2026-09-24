@@ -194,6 +194,12 @@ public final class ChatPage {
         return this;
     }
 
+    /** The model the chat runs on, on the composer's model button (see {@code ModelLabel}). */
+    public ChatPage withModelLabel(String label) {
+        chatForm.withModelLabel(label);
+        return this;
+    }
+
     /**
      * The open sub-agent approval cards of this (root) session — built by
      * the controller from the ToolApprovalRepository, rendered by the message
