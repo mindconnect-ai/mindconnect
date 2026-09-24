@@ -19,7 +19,7 @@ import java.util.Objects;
  *
  * <pre>
  * ## Date and time
- * It is Thursday, 24 September 2026, 17:36 (Europe/Zurich, UTC+02:00).
+ * Today is Thursday, 24 September 2026 (Europe/Zurich, UTC+02:00).
  * A time without an offset is a time in Europe/Zurich — …
  * </pre>
  *
@@ -29,12 +29,16 @@ import java.util.Objects;
  * ({@link TimeZones}), never the server's — a server in UTC would otherwise
  * move every appointment by the user's offset.
  *
- * <p>Rendered fresh every round, like every {@link PromptSection}.
+ * <p>Rendered fresh every round, like every {@link PromptSection} — but to the
+ * day, not the minute: the system prompt is the front of every request, and
+ * a line that changed every minute would miss the provider's prompt cache on
+ * nearly every call. The time itself is one {@code get_current_datetime}
+ * call away, in the same zone.
  */
 public final class CurrentTimeSection implements PromptSection {
 
     private static final DateTimeFormatter SPOKEN =
-            DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy, HH:mm", Locale.ENGLISH);
+            DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.ENGLISH);
 
     private final Clock clock;
     private final TimeZones zones;
@@ -51,13 +55,14 @@ public final class CurrentTimeSection implements PromptSection {
         return "\n\n## Date and time\n" + line(Instant.now(clock), zone)
                 + "\nA time without an offset is a time in " + id + " — what the user says (\"tomorrow at "
                 + "16:00\") and what you pass to a tool (2026-09-25T16:16 is 16:16 in " + id + "); write "
-                + "an offset only for a time that is somewhere else. Times the tools show are in " + id + " too.";
+                + "an offset only for a time that is somewhere else. Times the tools show are in " + id + " too. "
+                + "For the time of day, call get_current_datetime.";
     }
 
-    /** {@code It is Thursday, 24 September 2026, 17:36 (Europe/Zurich, UTC+02:00).} */
+    /** {@code Today is Thursday, 24 September 2026 (Europe/Zurich, UTC+02:00).} */
     public static String line(Instant now, ZoneId zone) {
         ZonedDateTime local = now.atZone(zone);
-        return "It is " + SPOKEN.format(local) + " (" + zone.getId() + ", " + utc(local.getOffset()) + ").";
+        return "Today is " + SPOKEN.format(local) + " (" + zone.getId() + ", " + utc(local.getOffset()) + ").";
     }
 
     /** {@code UTC+02:00}, {@code UTC-04:00}, {@code UTC+00:00}. */

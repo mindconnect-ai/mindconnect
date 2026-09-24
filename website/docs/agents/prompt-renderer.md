@@ -73,7 +73,7 @@ change shows up on the next turn without touching the agent.
 | `## Project instructions` | the working directory holds one of them | The project's own instructions, verbatim |
 | `## Skills` | the agent has [skills](./skills.md) switched on and there are any | One line per skill — name and description — and that the `skill` tool loads the rest |
 | `## Attached files` | files are attached to the chat | Their names, kinds and on-disk paths, and how to search them |
-| `## Date and time` | always, last | The time in the user's zone with the zone and its offset — *It is Thursday, 24 September 2026, 17:36 (Europe/Zurich, UTC+02:00).* — and that a time without an offset is a time in that zone |
+| `## Date and time` | always, last | The date in the user's zone with the zone and its offset (to the day, so the system prompt stays cacheable; the time is `get_current_datetime`) — *Today is Thursday, 24 September 2026 (Europe/Zurich, UTC+02:00).* — and that a time without an offset is a time in that zone |
 
 The skills section is the one that deliberately says less than it knows: the
 instructions stay out until the model asks for a skill by name, which is what

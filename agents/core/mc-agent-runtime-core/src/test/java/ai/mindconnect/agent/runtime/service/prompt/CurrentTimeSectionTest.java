@@ -55,30 +55,33 @@ class CurrentTimeSectionTest {
     void zurichInSummer() {
         assertThat(render(SUMMER, ALICE))
                 .startsWith("\n\n## Date and time\n")
-                .contains("It is Thursday, 24 September 2026, 17:36 (Europe/Zurich, UTC+02:00).")
+                .contains("Today is Thursday, 24 September 2026 (Europe/Zurich, UTC+02:00).")
                 .contains("A time without an offset is a time in Europe/Zurich")
-                .contains("2026-09-25T16:16 is 16:16 in Europe/Zurich");
+                .contains("2026-09-25T16:16 is 16:16 in Europe/Zurich")
+                .contains("call get_current_datetime")
+                // To the day: a minute in the system prompt would miss the provider's prompt cache.
+                .doesNotContain("17:36");
     }
 
     @Test
     void zurichInWinter() {
         assertThat(render(WINTER, ALICE))
-                .contains("It is Tuesday, 15 December 2026, 16:36 (Europe/Zurich, UTC+01:00).");
+                .contains("Today is Tuesday, 15 December 2026 (Europe/Zurich, UTC+01:00).");
     }
 
     @Test
     void newYork() {
-        assertThat(render(SUMMER, BOB)).contains("It is Thursday, 24 September 2026, 11:36 (America/New_York, UTC-04:00).")
+        assertThat(render(SUMMER, BOB)).contains("Today is Thursday, 24 September 2026 (America/New_York, UTC-04:00).")
                 .contains("A time without an offset is a time in America/New_York");
-        assertThat(render(WINTER, BOB)).contains("10:36 (America/New_York, UTC-05:00)");
+        assertThat(render(WINTER, BOB)).contains("(America/New_York, UTC-05:00)");
     }
 
     @Test
     void aSessionOnNobodysBehalfGetsTheInstallationsZone() {
         assertThat(new CurrentTimeSection(Clock.fixed(SUMMER, ZoneOffset.UTC), ZONES).render(null, null))
-                .contains("It is Thursday, 24 September 2026, 15:36 (Z, UTC+00:00).");
+                .contains("Today is Thursday, 24 September 2026 (Z, UTC+00:00).");
         assertThat(CurrentTimeSection.line(SUMMER, ZoneId.of("UTC")))
-                .isEqualTo("It is Thursday, 24 September 2026, 15:36 (UTC, UTC+00:00).");
+                .isEqualTo("Today is Thursday, 24 September 2026 (UTC, UTC+00:00).");
     }
 
     @Test
@@ -131,6 +134,6 @@ class CurrentTimeSectionTest {
                 PromptSections.of(List.of(new CurrentTimeSection(Clock.fixed(SUMMER, ZoneOffset.UTC), ZONES))));
 
         assertThat(prompt).startsWith("You help.")
-                .contains("It is Thursday, 24 September 2026, 17:36 (Europe/Zurich, UTC+02:00).");
+                .contains("Today is Thursday, 24 September 2026 (Europe/Zurich, UTC+02:00).");
     }
 }

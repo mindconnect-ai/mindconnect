@@ -6,8 +6,7 @@
   `mail_list` — is read in the calling user's zone, asked on every call, and
   the times the tools show, `get_current_datetime` and the prompt's
   `current_date`/`current_time` are in it too. The system prompt ends with a
-  `## Date and time` section — *It is Thursday, 24 September 2026, 17:36
-  (Europe/Zurich, UTC+02:00)* — that says so. A user's zone is what their
+  `## Date and time` section — *Today is Thursday, 24 September 2026 (Europe/Zurich, UTC+02:00)* — that says so. A user's zone is what their
   browser reports the first time it is seen (stored once, never over a
   choice), changeable under **Account → Time zone** on the profile page;
   until then `mindconnect.time-zone` (`MC_TIME_ZONE`) applies, else the JVM's
