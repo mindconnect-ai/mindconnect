@@ -211,7 +211,7 @@ public final class PgVectorStore implements VectorStore {
         }
     }
 
-    private static String vectorLiteral(float[] embedding) {
+    static String vectorLiteral(float[] embedding) {
         StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < embedding.length; i++) {
             if (i > 0) sb.append(',');
