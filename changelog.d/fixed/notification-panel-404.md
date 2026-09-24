@@ -1,0 +1,1 @@
+- **agents:** **The bell's panel opens.** Clicking the bell answered 404 while it showed a count: its controller carried the same `@ConditionalOnBean` on a scanned class and was never registered. A test now fails for any scanned admin UI class with a bean condition.
