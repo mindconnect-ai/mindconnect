@@ -5,6 +5,7 @@ import ai.mindconnect.calendar.CalendarEvent;
 import ai.mindconnect.calendar.CalendarStoreException;
 import ai.mindconnect.calendar.EventDraft;
 import ai.mindconnect.calendar.EventTime;
+import ai.mindconnect.calendar.ReminderSupport;
 import ai.mindconnect.calendar.UserCalendar;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,6 +193,55 @@ class CalDavCalendarStoreTest {
         assertThat(dav.call(4).method()).isEqualTo("DELETE");
         assertThat(dav.call(4).path()).endsWith("/erster.ics");
         assertThat(dav.call(4).ifMatch()).isEqualTo("\"v2\"");
+    }
+
+    @Test
+    void reminders_are_written_as_alarms_read_back_and_replaced_by_a_change() {
+        dav.answers("<d:multistatus xmlns:d=\"DAV:\"/>", "");
+        CalDavCalendarStore store = store("/dav/me/calendar/");
+
+        assertThat(store.reminders()).isEqualTo(ReminderSupport.ANY);
+        String id = store.create(new EventDraft(null, "Zahnarzt",
+                EventTime.at(Instant.parse("2026-09-25T08:00:00Z"), Instant.parse("2026-09-25T09:00:00Z")),
+                null, null, List.of(), List.of(60, 10)));
+
+        String created = dav.call(1).body();
+        assertThat(created).contains("BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Zahnarzt\r\n"
+                + "TRIGGER:-PT10M\r\nEND:VALARM").contains("TRIGGER:-PT60M");
+
+        // Read it back as the server holds it, then give it one reminder instead of two.
+        dav.answer(200, created, "\"v1\"").answer(204, "", null);
+        String calendar = dav.url("/dav/me/calendar/").toString();
+        CalendarEvent was = store.read(calendar, id);
+        store.update(calendar, id, new EventDraft(null, was.title(), was.when(), null, null, List.of(),
+                List.of(1440)));
+
+        assertThat(was.reminders()).containsExactly(10, 60);
+        FakeDav.Call put = dav.call(3);
+        assertThat(put.method()).isEqualTo("PUT");
+        assertThat(put.ifMatch()).isEqualTo("\"v1\"");
+        assertThat(put.body()).contains("TRIGGER:-PT1440M").doesNotContain("-PT10M").doesNotContain("-PT60M")
+                .containsOnlyOnce("BEGIN:VALARM");
+    }
+
+    @Test
+    void a_listing_shows_each_appointments_reminders() {
+        dav.answers("<d:multistatus xmlns:d=\"DAV:\" xmlns:c=\"urn:ietf:params:xml:ns:caldav\">"
+                + "<d:response><d:href>/dav/me/calendar/a.ics</d:href><d:propstat><d:prop>"
+                + "<c:calendar-data>"
+                + "BEGIN:VCALENDAR\nBEGIN:VEVENT\nUID:a\nSUMMARY:Standup\n"
+                + "DTSTART:20260924T070000Z\nDTEND:20260924T071500Z\n"
+                + "BEGIN:VALARM\nACTION:DISPLAY\nDESCRIPTION:Standup\nTRIGGER:-PT5M\nEND:VALARM\n"
+                + "END:VEVENT\nEND:VCALENDAR"
+                + "</c:calendar-data></d:prop></d:propstat></d:response></d:multistatus>");
+
+        List<CalendarEvent> events = store("/dav/me/calendar/").events(dav.url("/dav/me/calendar/").toString(),
+                Instant.parse("2026-09-24T00:00:00Z"), Instant.parse("2026-09-25T00:00:00Z"), 10);
+
+        assertThat(events).singleElement().satisfies(e -> {
+            assertThat(e.reminders()).containsExactly(5);
+            assertThat(e.notes()).isNull();
+        });
     }
 
     @Test

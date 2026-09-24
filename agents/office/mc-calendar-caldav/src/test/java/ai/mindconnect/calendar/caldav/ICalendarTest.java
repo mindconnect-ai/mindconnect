@@ -86,4 +86,129 @@ class ICalendarTest {
                 .doesNotContain("DURATION").doesNotContain("20260924T080000Z")
                 .contains("SUMMARY:Call\r\n").contains("LOCATION:Phone");
     }
+
+    // ── reminders ───────────────────────────────────────────────────────────
+
+    @Test
+    void every_alarm_before_the_start_is_a_reminder_and_nothing_of_an_alarm_is_the_appointments() {
+        CalendarEvent call = only("DTSTART:20260924T080000Z",
+                "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:Reminder", "TRIGGER:-PT1H", "END:VALARM",
+                "BEGIN:VALARM", "ACTION:EMAIL", "ATTENDEE:mailto:me@example.com", "SUMMARY:x",
+                "DESCRIPTION:Mail", "TRIGGER;RELATED=START:-PT10M", "DURATION:PT5M", "REPEAT:2", "END:VALARM",
+                "BEGIN:VALARM", "ACTION:AUDIO", "TRIGGER:-P1D", "END:VALARM",
+                "BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:now", "TRIGGER:PT0S", "END:VALARM");
+
+        assertThat(call.reminders()).containsExactly(0, 10, 60, 1440);
+        // The alarms' DESCRIPTION, ATTENDEE and DURATION belong to them, not to the appointment.
+        assertThat(call.notes()).isNull();
+        assertThat(call.attendees()).isEmpty();
+        assertThat(call.when().end()).isEqualTo(Instant.parse("2026-09-24T09:00:00Z"));
+    }
+
+    @Test
+    void alarms_that_are_not_minutes_before_the_start_are_not_listed() {
+        CalendarEvent call = only("DTSTART:20260924T080000Z", "DESCRIPTION:Agenda",
+                "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER;VALUE=DATE-TIME:20260924T070000Z", "END:VALARM",
+                "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER;RELATED=END:-PT5M", "END:VALARM",
+                "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:PT15M", "END:VALARM",
+                "BEGIN:VALARM", "ACTION:NONE", "TRIGGER;VALUE=DATE-TIME:19760401T005545Z", "END:VALARM",
+                "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT30M", "END:VALARM");
+
+        assertThat(call.reminders()).containsExactly(30);
+        assertThat(call.notes()).isEqualTo("Agenda");
+        assertThat(only("DTSTART:20260924T080000Z").reminders()).as("no alarm, no reminder").isEmpty();
+    }
+
+    @Test
+    void a_trigger_is_read_as_minutes_before_the_start() {
+        assertThat(ICalendar.minutesBefore("TRIGGER:-PT15M")).isEqualTo(15);
+        assertThat(ICalendar.minutesBefore("TRIGGER:-P1DT2H")).isEqualTo(1560);
+        assertThat(ICalendar.minutesBefore("TRIGGER:-P1W")).isEqualTo(10080);
+        assertThat(ICalendar.minutesBefore("TRIGGER;RELATED=START:-PT0M")).isEqualTo(0);
+        assertThat(ICalendar.minutesBefore("TRIGGER:PT5M")).isNull();
+        assertThat(ICalendar.minutesBefore("TRIGGER:soon")).isNull();
+        assertThat(ICalendar.minutesBefore(null)).isNull();
+    }
+
+    @Test
+    void a_new_appointment_carries_a_display_alarm_per_reminder_even_all_day() {
+        String written = ICalendar.write(new EventDraft(null, "Geburtstag Anna",
+                EventTime.on(LocalDate.of(2026, 9, 24), null), null, null, List.of(), List.of(60, 10)),
+                "x", java.time.ZoneOffset.UTC);
+
+        assertThat(written).contains("BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Geburtstag Anna\r\n"
+                + "TRIGGER:-PT10M\r\nEND:VALARM\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\n"
+                + "DESCRIPTION:Geburtstag Anna\r\nTRIGGER:-PT60M\r\nEND:VALARM\r\nEND:VEVENT");
+        assertThat(ICalendar.master(written, "cal", "x").reminders()).containsExactly(10, 60);
+        assertThat(ICalendar.master(written, "cal", "x").notes()).isNull();
+
+        String none = ICalendar.write(new EventDraft(null, "Call",
+                EventTime.on(LocalDate.of(2026, 9, 24), null), null, null, List.of(), List.of()),
+                "y", java.time.ZoneOffset.UTC);
+        String untouched = ICalendar.write(new EventDraft(null, "Call",
+                EventTime.on(LocalDate.of(2026, 9, 24), null), null, null, List.of()),
+                "z", java.time.ZoneOffset.UTC);
+        assertThat(none).doesNotContain("VALARM");
+        assertThat(untouched).doesNotContain("VALARM");
+    }
+
+    private static final String WITH_ALARMS = "BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:x\r\nSUMMARY:Call\r\n"
+            + "DTSTART:20260924T080000Z\r\nDTEND:20260924T090000Z\r\n"
+            + "BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:Old\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\n"
+            + "BEGIN:VALARM\r\nACTION:EMAIL\r\nSUMMARY:Old\r\nDESCRIPTION:Old\r\n"
+            + "ATTENDEE:mailto:me@example.com\r\nTRIGGER:-P1D\r\nEND:VALARM\r\n"
+            + "END:VEVENT\r\nEND:VCALENDAR\r\n";
+
+    @Test
+    void reminders_a_change_names_replace_every_alarm() {
+        CalendarEvent was = ICalendar.master(WITH_ALARMS, "cal", "x");
+        assertThat(was.reminders()).containsExactly(15, 1440);
+
+        String changed = ICalendar.patch(WITH_ALARMS, new EventDraft(null, "Call", was.when(), null, null,
+                List.of(), List.of(5, 60)));
+
+        assertThat(changed).doesNotContain("-PT15M").doesNotContain("-P1D").doesNotContain("ACTION:EMAIL")
+                .contains("TRIGGER:-PT5M").contains("TRIGGER:-PT60M")
+                .containsOnlyOnce("END:VEVENT").endsWith("END:VALARM\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n");
+        CalendarEvent now = ICalendar.master(changed, "cal", "x");
+        assertThat(now.reminders()).containsExactly(5, 60);
+        assertThat(now.when()).isEqualTo(was.when());
+        assertThat(now.attendees()).as("the e-mail alarm's recipient was never an attendee").isEmpty();
+    }
+
+    @Test
+    void no_reminders_remove_every_alarm_and_null_keeps_them() {
+        CalendarEvent was = ICalendar.master(WITH_ALARMS, "cal", "x");
+
+        String cleared = ICalendar.patch(WITH_ALARMS, new EventDraft(null, "Call", was.when(), null, null,
+                List.of(), List.of()));
+        String renamed = ICalendar.patch(WITH_ALARMS, new EventDraft(null, "Call with Anna", was.when(), null,
+                null, List.of()));
+
+        assertThat(cleared).doesNotContain("VALARM");
+        assertThat(ICalendar.master(cleared, "cal", "x").reminders()).isEmpty();
+        assertThat(renamed).contains("TRIGGER:-PT15M").contains("TRIGGER:-P1D").contains("SUMMARY:Call with Anna");
+        assertThat(ICalendar.master(renamed, "cal", "x").reminders()).containsExactly(15, 1440);
+    }
+
+    @Test
+    void only_the_series_alarms_are_replaced_not_those_of_a_changed_occurrence() {
+        String series = "BEGIN:VCALENDAR\r\n"
+                + "BEGIN:VEVENT\r\nUID:w\r\nSUMMARY:Jour fixe\r\nDTSTART:20260924T080000Z\r\n"
+                + "RRULE:FREQ=WEEKLY\r\n"
+                + "BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:x\r\nTRIGGER:-PT15M\r\nEND:VALARM\r\n"
+                + "END:VEVENT\r\n"
+                + "BEGIN:VEVENT\r\nUID:w\r\nRECURRENCE-ID:20261001T080000Z\r\nSUMMARY:Jour fixe\r\n"
+                + "DTSTART:20261001T090000Z\r\n"
+                + "BEGIN:VALARM\r\nACTION:DISPLAY\r\nDESCRIPTION:x\r\nTRIGGER:-PT45M\r\nEND:VALARM\r\n"
+                + "END:VEVENT\r\nEND:VCALENDAR\r\n";
+        CalendarEvent was = ICalendar.master(series, "cal", "w");
+
+        String changed = ICalendar.patch(series, new EventDraft(null, was.title(), was.when(), null, null,
+                List.of(), List.of(10)));
+
+        assertThat(changed).doesNotContain("-PT15M").contains("TRIGGER:-PT10M").contains("TRIGGER:-PT45M")
+                .contains("RRULE:FREQ=WEEKLY");
+        assertThat(ICalendar.master(changed, "cal", "w").reminders()).containsExactly(10);
+    }
 }
