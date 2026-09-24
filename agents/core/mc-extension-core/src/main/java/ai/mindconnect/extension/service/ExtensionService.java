@@ -12,6 +12,7 @@ import ai.mindconnect.extension.port.out.BrandActivationRepository;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;
 
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -264,35 +265,61 @@ public class ExtensionService {
     }
 
     /**
-     * Whether a tool of that name belongs to an extension that is off in the
-     * current namespace — matched against the name patterns the manifests
-     * declare ({@code acme_*}). A name no extension claims is nobody's to hide.
+     * The tool-name patterns ({@code acme_*}) of every extension that is off
+     * in the current namespace — one pass over the stores, for callers that
+     * have many names to check. A name no extension claims is nobody's to hide.
      */
-    public boolean hidesTool(String toolName) {
+    public Set<String> hiddenToolPatterns() {
+        return hiddenToolPatterns(list());
+    }
+
+    /** The same, from statuses already listed. */
+    public static Set<String> hiddenToolPatterns(List<Status> statuses) {
+        Set<String> patterns = new LinkedHashSet<>();
+        for (Status status : statuses) {
+            if (!status.enabled()) patterns.addAll(status.manifest().contributes().tools().names());
+        }
+        return patterns;
+    }
+
+    /** Whether a tool name matches any of the patterns — {@link #hiddenToolPatterns()} resolved once by the caller. */
+    public static boolean hidden(Set<String> patterns, String toolName) {
         if (toolName == null) return false;
-        for (Status status : list()) {
-            if (status.enabled()) continue;
-            for (String pattern : status.manifest().contributes().tools().names()) {
-                if (matches(pattern, toolName)) return true;
-            }
+        for (String pattern : patterns) {
+            if (matches(pattern, toolName)) return true;
         }
         return false;
     }
 
+    /** Whether a tool of that name belongs to an extension that is off in the current namespace. */
+    public boolean hidesTool(String toolName) {
+        return hidden(hiddenToolPatterns(), toolName);
+    }
+
     /**
-     * Whether a sidebar entry of that id belongs to an extension that is off
-     * in the current namespace — the ids the manifests declare under
-     * {@code contributes.ui.menu}.
+     * The ids of every sidebar entry the manifests declare under
+     * {@code contributes.ui.menu} for an extension that is off in the current
+     * namespace.
      */
-    public boolean hidesMenuEntry(String entryId) {
-        if (entryId == null) return false;
-        for (Status status : list()) {
+    public Set<String> hiddenMenuEntries() {
+        return hiddenMenuEntries(list());
+    }
+
+    /** The same, from statuses already listed. */
+    public static Set<String> hiddenMenuEntries(List<Status> statuses) {
+        Set<String> ids = new LinkedHashSet<>();
+        for (Status status : statuses) {
             if (status.enabled()) continue;
             for (ExtensionManifest.Ui.MenuEntry entry : status.manifest().contributes().ui().menu()) {
-                if (entryId.equals(entry.id())) return true;
+                ids.add(entry.id());
             }
         }
-        return false;
+        return ids;
+    }
+
+    /** Whether a sidebar entry of that id belongs to an extension that is off in the current namespace. */
+    public boolean hidesMenuEntry(String entryId) {
+        return entryId != null && hiddenMenuEntries().contains(entryId);
     }
 
     /** See {@link NamePattern}. */
