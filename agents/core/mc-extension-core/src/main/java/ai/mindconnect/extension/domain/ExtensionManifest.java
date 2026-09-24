@@ -234,6 +234,20 @@ public record ExtensionManifest(
                 return requestPath.equals(prefix) || requestPath.startsWith(prefix + "/");
             }
 
+            /**
+             * Whether the route lies where an extension's routes may lie:
+             * under {@code /admin/<id>} or {@code /ext/<id>}. A route anywhere
+             * else would let a manifest claim a shipped screen — and, switched
+             * off, take it down.
+             */
+            public boolean isOwnedBy(ExtensionId id) {
+                String prefix = prefix();
+                for (String home : List.of("/admin/" + id.value(), "/ext/" + id.value())) {
+                    if (prefix.equals(home) || prefix.startsWith(home + "/")) return true;
+                }
+                return false;
+            }
+
             /** Whether a plain user of the namespace (not an admin) may open it. */
             public boolean forUsers() {
                 return roles.stream().anyMatch("USER"::equalsIgnoreCase);
