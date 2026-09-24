@@ -913,7 +913,14 @@ body {
    buttons on a connection card (Edit, Test, Make default, Remove) ran out of
    the card on the left, the first ones cut off. Here they wrap, right-aligned,
    with a gap instead of each button's left margin so a wrapped line starts at
-   the edge. Remove once semantic-ui wraps them itself. */
+   the edge. Remove once semantic-ui wraps them itself.
+
+   The same at any width: between a phone and a desktop the table is not
+   stacked yet, and one line of four buttons made it wider than its card
+   (712px in 696px at 760px wide) — the last button cut off. Allowed to
+   wrap, the cell takes what the other columns leave. */
+.sui-table-row-actions { white-space: normal; }
+.sui-table-row-actions > * { margin-block: 3px; }
 @media (max-width: 640px) {
     .sui-table--stack .sui-table-row-actions {
         flex-wrap: wrap;
