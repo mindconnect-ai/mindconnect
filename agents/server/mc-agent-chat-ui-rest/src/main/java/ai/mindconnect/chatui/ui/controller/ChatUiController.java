@@ -125,7 +125,7 @@ public class ChatUiController {
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
         // Headers for the sidebar; only the chat being shown is loaded whole.
         var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)), AgentSession.CHAT);
-        var latest = ChatLanding.pick(sessions, lastShownChat())
+        var latest = ChatLanding.pick(sessions, lastShownChat(), this::written)
                 .flatMap(sessionRepository::findById);
         if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
@@ -134,6 +134,16 @@ public class ChatUiController {
             return ResponseEntity.ok(emptyShell());
         }
         return ResponseEntity.ok(shell(latest.get(), sessions));
+    }
+
+    /** Whether somebody wrote in {@code chat}; a store that cannot say counts it as written. */
+    private boolean written(AgentSessionHeader chat) {
+        try {
+            return sessionService.hasMessages(chat.id());
+        } catch (RuntimeException e) {
+            log.debug("Could not tell whether chat {} is empty: {}", chat.id(), e.toString());
+            return true;
+        }
     }
 
     /** What the chat looks like before there is anything to look at. */
@@ -774,11 +784,23 @@ public class ChatUiController {
     @PostMapping("/agents/{agentId}/sessions")
     public ResponseEntity<UiPage> startSession(@PathVariable("agentId") String agentIdValue,
                                                @AuthenticationPrincipal OidcUser user) {
+        return startSession(agentIdValue, user, AgentSession.CHAT);
+    }
+
+    /**
+     * Starts a session of {@code type} with the agent and shows it in the chat —
+     * for a feature that hosts its own conversations in the chat's page, such
+     * as a builder. A type other than {@link AgentSession#CHAT} keeps the
+     * session out of the chat's history and out of what {@code /chat} opens.
+     */
+    public ResponseEntity<UiPage> startSession(String agentIdValue, OidcUser user, String type) {
         AgentId agentId = AgentId.of(agentIdValue);
         String userId = user.getPreferredUsername();
         return agentRepository.findById(agentId)
                 .map(agent -> {
-                    var session = sessionService.openChat(agentId, UserId.of(userId));
+                    var session = type == null || AgentSession.CHAT.equals(type)
+                            ? sessionService.openChat(agentId, UserId.of(userId))
+                            : sessionService.openChatOfType(agentId, UserId.of(userId), type);
                     return ResponseEntity.ok(shell(session,
                             sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
                 })
