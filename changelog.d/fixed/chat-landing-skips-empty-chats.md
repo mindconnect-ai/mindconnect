@@ -1,0 +1,1 @@
+- **Chat**: on a fresh sign-in, `/chat` opens the newest chat somebody wrote in, not an empty one a page or a stray click had started. Extensions can start a session of their own type through `ChatUiController.startSession(agentId, user, type)` and keep it out of the chat's history.
