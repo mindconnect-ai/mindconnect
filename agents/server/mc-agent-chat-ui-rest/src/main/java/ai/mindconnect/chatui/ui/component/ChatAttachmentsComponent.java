@@ -11,8 +11,6 @@ import ai.mindconnect.ui.model.UiNode;
 import ai.mindconnect.ui.model.UiStack;
 import ai.mindconnect.ui.model.UiTable;
 
-import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import ai.mindconnect.agent.SessionId;
@@ -69,7 +67,7 @@ public final class ChatAttachmentsComponent {
      * attach/delete patches always have a target.
      *
      * @param files  the session's attached files, in attach order — all of them; the kind picks its own
-     * @param chunks ingested file id → searchable chunks, for the files that were indexed
+     * @param chunks attached file's id → searchable chunks, for the files that were indexed
      */
     public static UiNode node(SessionId sessionId, Kind kind, List<AttachedFile> files, Map<String, Long> chunks) {
         var panel = UiStack.of(kind.panelId()).gap(4);
@@ -77,9 +75,6 @@ public final class ChatAttachmentsComponent {
         if (files.isEmpty()) {
             return panel;
         }
-        Map<String, Long> chunksByName = new HashMap<>();
-        chunks.forEach((ingestedId, count) ->
-                chunksByName.merge(Path.of(ingestedId).getFileName().toString(), count, Long::sum));
         var table = UiTable.of(kind.panelId() + "-table", kind.title + " (" + files.size() + ")")
                 .column(UiTable.Column.text("file", "File"))
                 .column(UiTable.Column.text("kind", "Kind"))
@@ -93,7 +88,7 @@ public final class ChatAttachmentsComponent {
                     "id", java.net.URLEncoder.encode(f.name(), java.nio.charset.StandardCharsets.UTF_8),
                     "file", f.name(),
                     "kind", kind(f),
-                    "reach", reach(f, chunksByName.getOrDefault(f.name(), 0L))));
+                    "reach", reach(f, chunks.getOrDefault(f.id(), 0L))));
         }
         panel.child(table);
         return panel;

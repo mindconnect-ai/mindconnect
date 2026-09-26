@@ -7,6 +7,8 @@ import ai.mindconnect.vectorstore.embedding.EmbeddingIndex;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex.EmbeddingHit;
 import ai.mindconnect.vectorstore.embedding.EmbeddingQuery;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
+import ai.mindconnect.vectorstore.embedding.EntityType;
+import ai.mindconnect.vectorstore.embedding.MetadataField;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,11 +49,11 @@ class PgEmbeddingIndexTest {
     private static final UserId ALICE = UserId.of("alice");
     private static final UserId BOB = UserId.of("bob");
 
-    private static final EntityRef FILE_A = EntityRef.of("file", "files", "file-a");
-    private static final EntityRef FILE_B = EntityRef.of("file", "files", "file-b");
-    private static final EntityRef INBOX_1 = new EntityRef("mail", "email.freemail", "INBOX", "7-1");
-    private static final EntityRef INBOX_2 = new EntityRef("mail", "email.freemail", "INBOX", "7-2");
-    private static final EntityRef ARCHIVE_1 = new EntityRef("mail", "email.freemail", "Archive", "9-1");
+    private static final EntityRef FILE_A = EntityRef.of(EntityType.FILE, "files", "file-a");
+    private static final EntityRef FILE_B = EntityRef.of(EntityType.FILE, "files", "file-b");
+    private static final EntityRef INBOX_1 = new EntityRef(EntityType.MAIL, "email.freemail", "INBOX", "7-1");
+    private static final EntityRef INBOX_2 = new EntityRef(EntityType.MAIL, "email.freemail", "INBOX", "7-2");
+    private static final EntityRef ARCHIVE_1 = new EntityRef(EntityType.MAIL, "email.freemail", "Archive", "9-1");
 
     private PGSimpleDataSource dataSource;
     private Namespace namespace;
@@ -105,14 +107,14 @@ class PgEmbeddingIndexTest {
         for (int i = 0; i < 3000; i++) {
             near.add(new EmbeddingChunk("n" + i, i, "noise " + i, Map.of(), nudge(query, random, 0.05f)));
         }
-        index.replace(EntityRef.of("file", "files", "noise"), null, "1", MODEL, near);
+        index.replace(EntityRef.of(EntityType.FILE, "files", "noise"), null, "1", MODEL, near);
 
         Map<EntityRef, List<EmbeddingChunk>> allChunks = new LinkedHashMap<>();
         Map<String, Set<EntityRef>> lists = new LinkedHashMap<>();
         for (String pool : List.of("handbuch", "vertraege", "support")) {
             Set<EntityRef> refs = new LinkedHashSet<>();
             for (int f = 0; f < 5; f++) {
-                EntityRef file = EntityRef.of("file", "files", pool + "-" + f);
+                EntityRef file = EntityRef.of(EntityType.FILE, "files", pool + "-" + f);
                 List<EmbeddingChunk> chunks = new ArrayList<>();
                 for (int ordinal = 0; ordinal < 20; ordinal++) {
                     chunks.add(new EmbeddingChunk("c" + ordinal, ordinal, pool + " text", Map.of(),
@@ -124,7 +126,7 @@ class PgEmbeddingIndexTest {
             }
             lists.put(pool, refs);
         }
-        lists.put("session", Set.of(EntityRef.of("file", "files", "vertraege-0"), EntityRef.of("file", "files", "support-3")));
+        lists.put("session", Set.of(EntityRef.of(EntityType.FILE, "files", "vertraege-0"), EntityRef.of(EntityType.FILE, "files", "support-3")));
 
         for (var list : lists.entrySet()) {
             List<EmbeddingHit> hits = index.search(EmbeddingQuery.of(MODEL, list.getValue()), query, 10);
@@ -147,16 +149,16 @@ class PgEmbeddingIndexTest {
         index.replace(INBOX_1, ALICE, "v", MODEL, List.of(chunk("c0", 1f, 0f, 0f)));
         index.replace(INBOX_2, ALICE, "v", MODEL, List.of(chunk("c0", 0.9f, 0.1f, 0f)));
         index.replace(ARCHIVE_1, ALICE, "v", MODEL, List.of(chunk("c0", 1f, 0f, 0f)));
-        index.replace(new EntityRef("mail", "email.freemail", "INBOX", "7-3"), BOB, "v", MODEL,
+        index.replace(new EntityRef(EntityType.MAIL, "email.freemail", "INBOX", "7-3"), BOB, "v", MODEL,
                 List.of(chunk("c0", 1f, 0f, 0f)));
         index.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", 1f, 0f, 0f)));
 
         List<EmbeddingHit> inbox = index.search(
-                EmbeddingQuery.ofTypes(MODEL, "mail").owner(ALICE).in("email.freemail", "INBOX"), vec(1f, 0f, 0f), 10);
+                EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL).owner(ALICE).in("email.freemail", "INBOX"), vec(1f, 0f, 0f), 10);
         List<EmbeddingHit> allMail = index.search(
-                EmbeddingQuery.ofTypes(MODEL, "mail").owner(ALICE).in("email.freemail"), vec(1f, 0f, 0f), 10);
+                EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL).owner(ALICE).in("email.freemail"), vec(1f, 0f, 0f), 10);
         List<EmbeddingHit> everything = index.search(
-                EmbeddingQuery.ofTypes(MODEL, "mail", "file").owner(ALICE), vec(1f, 0f, 0f), 10);
+                EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL, EntityType.FILE).owner(ALICE), vec(1f, 0f, 0f), 10);
 
         assertThat(inbox).extracting(EmbeddingHit::ref).containsExactly(INBOX_1, INBOX_2);
         assertThat(inbox).allSatisfy(h -> assertThat(h.owner()).isEqualTo(ALICE));
@@ -171,12 +173,12 @@ class PgEmbeddingIndexTest {
                 new EmbeddingChunk("en", 1, "en", Map.of("lang", "en"), vec(1f, 0f, 0f))));
         index.replace(FILE_B, null, "1", MODEL, List.of(
                 new EmbeddingChunk("b0", 0, "b0", Map.of("lang", "de"), vec(1f, 0f, 0f))));
-        index.replace(EntityRef.of("file", "files", "file-c"), BOB, "1", MODEL, List.of(chunk("c0", 1f, 0f, 0f)));
+        index.replace(EntityRef.of(EntityType.FILE, "files", "file-c"), BOB, "1", MODEL, List.of(chunk("c0", 1f, 0f, 0f)));
 
-        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "file").ownerOrShared(ALICE), vec(1f, 0f, 0f), 10))
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).ownerOrShared(ALICE), vec(1f, 0f, 0f), 10))
                 .extracting(h -> h.chunk().id()).containsExactlyInAnyOrder("de", "en", "b0");
         List<EmbeddingHit> german = index.search(
-                EmbeddingQuery.ofTypes(MODEL, "file").ownerOrShared(ALICE).where("lang", "de"), vec(1f, 0f, 0f), 10);
+                EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).ownerOrShared(ALICE).where("lang", "de"), vec(1f, 0f, 0f), 10);
         assertThat(german).extracting(h -> h.chunk().id()).containsExactlyInAnyOrder("de", "b0");
         assertThat(german).filteredOn(h -> h.ref().equals(FILE_B)).allSatisfy(h -> assertThat(h.owner()).isNull());
         assertThat(german).filteredOn(h -> h.chunk().id().equals("de"))
@@ -195,9 +197,9 @@ class PgEmbeddingIndexTest {
         assertThat(index.chunkCount(INBOX_1, "nomic")).isZero();
         assertThat(index.indexedVersion(moved, "nomic")).contains("v1");
         assertThat(index.chunkCount(moved, "other")).isEqualTo(1);
-        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "mail").owner(ALICE).in("email.freemail", "Archive"),
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL).owner(ALICE).in("email.freemail", "Archive"),
                 vec(1f, 0f, 0f), 10)).extracting(h -> h.ref() + "/" + h.chunk().id()).containsExactly(moved + "/c0");
-        assertThatThrownBy(() -> index.relocate(moved, EntityRef.of("file", "files", "x")))
+        assertThatThrownBy(() -> index.relocate(moved, EntityRef.of(EntityType.FILE, "files", "x")))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 
@@ -257,7 +259,7 @@ class PgEmbeddingIndexTest {
         EmbeddingIndex other = new PgEmbeddingIndex(dataSource, new Namespace(namespace.value() + "-other"));
 
         assertThat(other.search(EmbeddingQuery.of(MODEL, Set.of(FILE_A)), vec(1f, 0f, 0f), 10)).isEmpty();
-        assertThat(other.search(EmbeddingQuery.ofTypes(MODEL, "file").anyOwner(), vec(1f, 0f, 0f), 10)).isEmpty();
+        assertThat(other.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).anyOwner(), vec(1f, 0f, 0f), 10)).isEmpty();
         other.delete(FILE_A);
         assertThat(index.chunkCount(FILE_A, MODEL)).isEqualTo(1);
     }
@@ -291,11 +293,11 @@ class PgEmbeddingIndexTest {
         index.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", 1f, 0f, 0f)));
         index.replace(FILE_B, BOB, "1", MODEL, List.of(chunk("b0", 1f, 0f, 0f)));
 
-        assertThatThrownBy(() -> index.search(EmbeddingQuery.ofTypes(MODEL, "file"), vec(1f, 0f, 0f), 10))
+        assertThatThrownBy(() -> index.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE), vec(1f, 0f, 0f), 10))
                 .isInstanceOf(IllegalArgumentException.class);
-        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "file").anyOwner(), vec(1f, 0f, 0f), 10))
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).anyOwner(), vec(1f, 0f, 0f), 10))
                 .extracting(EmbeddingHit::ref).containsExactlyInAnyOrder(FILE_A, FILE_B);
-        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, "file").sharedOnly(), vec(1f, 0f, 0f), 10)).isEmpty();
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).sharedOnly(), vec(1f, 0f, 0f), 10)).isEmpty();
         // A ref list was authorised by whoever built it: no owner needed.
         assertThat(index.search(EmbeddingQuery.of(MODEL, Set.of(FILE_B)), vec(1f, 0f, 0f), 10)).hasSize(1);
     }
@@ -320,6 +322,117 @@ class PgEmbeddingIndexTest {
 
         assertThat(index.search(EmbeddingQuery.of(MODEL, Set.of(FILE_A)), vec(1f, 0f, 0f), 1).get(0).chunk().metadata())
                 .containsExactly(Map.entry("subject", "Rechnung"));
+    }
+
+    @Test
+    void declaredFieldsTakeRangeAndListFilters() {
+        index.declareField(new MetadataField(EntityType.MAIL, "received_at", MetadataField.Kind.TIMESTAMP));
+        index.declareField(new MetadataField(EntityType.MAIL, "size", MetadataField.Kind.NUMBER));
+        index.replace(INBOX_1, ALICE, "v", MODEL, List.of(new EmbeddingChunk("c0", 0, "early",
+                Map.of("received_at", "2026-09-01T08:00:00Z", "size", "9"), vec(1f, 0f, 0f))));
+        index.replace(INBOX_2, ALICE, "v", MODEL, List.of(new EmbeddingChunk("c0", 0, "late",
+                Map.of("received_at", "2026-09-10T08:00:00.5Z", "size", "100"), vec(1f, 0f, 0f))));
+        index.replace(ARCHIVE_1, ALICE, "v", MODEL, List.of(new EmbeddingChunk("c0", 0, "later",
+                Map.of("received_at", "2026-09-20T00:00:00Z", "size", "2000"), vec(1f, 0f, 0f))));
+        EmbeddingQuery mail = EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL).owner(ALICE);
+
+        assertThat(index.search(mail.atLeast("received_at", "2026-09-05T00:00:00Z"), vec(1f, 0f, 0f), 10))
+                .extracting(EmbeddingHit::ref).containsExactlyInAnyOrder(INBOX_2, ARCHIVE_1);
+        assertThat(index.search(mail.between("received_at", "2026-09-01T00:00:00Z", "2026-09-10T08:00:00.500Z"),
+                vec(1f, 0f, 0f), 10)).extracting(EmbeddingHit::ref).containsExactlyInAnyOrder(INBOX_1, INBOX_2);
+        // Numbers compare as numbers: 9 < 100, although "9" > "100" as text.
+        assertThat(index.search(mail.atMost("size", "100"), vec(1f, 0f, 0f), 10))
+                .extracting(EmbeddingHit::ref).containsExactlyInAnyOrder(INBOX_1, INBOX_2);
+        assertThat(index.search(mail.whereIn("size", "9", "2000.0"), vec(1f, 0f, 0f), 10))
+                .extracting(EmbeddingHit::ref).containsExactlyInAnyOrder(INBOX_1, ARCHIVE_1);
+        // A ref list reaches the fields of its refs' types.
+        assertThat(index.search(EmbeddingQuery.of(MODEL, Set.of(INBOX_1, INBOX_2)).atLeast("size", "50"),
+                vec(1f, 0f, 0f), 10)).extracting(EmbeddingHit::ref).containsExactly(INBOX_2);
+        // Stored in the fixed UTC form.
+        assertThat(index.search(EmbeddingQuery.of(MODEL, Set.of(INBOX_2)), vec(1f, 0f, 0f), 1).get(0).chunk().metadata())
+                .containsEntry("received_at", "2026-09-10T08:00:00.500Z");
+    }
+
+    @Test
+    void rangesNeedADeclaredFieldAndValuesMustFitIt() {
+        index.declareField(new MetadataField(EntityType.MAIL, "size", MetadataField.Kind.NUMBER));
+        index.replace(FILE_A, ALICE, "1", MODEL, List.of(new EmbeddingChunk("a0", 0, "a0", Map.of("size", "9"), vec(1f, 0f, 0f))));
+
+        assertThatThrownBy(() -> index.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).owner(ALICE)
+                .atLeast("size", "1"), vec(1f, 0f, 0f), 10)).isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("not declared");
+        assertThatThrownBy(() -> index.replace(INBOX_1, ALICE, "v", MODEL, List.of(new EmbeddingChunk("c0", 0, "x",
+                Map.of("size", "large"), vec(1f, 0f, 0f))))).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> index.declareField(new MetadataField(EntityType.MAIL, "size", MetadataField.Kind.TEXT)))
+                .isInstanceOf(IllegalArgumentException.class);
+        index.declareField(new MetadataField(EntityType.MAIL, "size", MetadataField.Kind.NUMBER));
+        // Declarations hold for the whole table, so other tests' fields may be there too.
+        assertThat(index.fields()).contains(new MetadataField(EntityType.MAIL, "size", MetadataField.Kind.NUMBER));
+        // Equality needs no declaration, on any key.
+        assertThat(index.search(EmbeddingQuery.ofTypes(MODEL, EntityType.FILE).owner(ALICE).where("size", "9"),
+                vec(1f, 0f, 0f), 10)).hasSize(1);
+    }
+
+    @Test
+    void listsWhatIsIndexedWithoutRanking() {
+        index.replace(FILE_A, ALICE, "v1", MODEL, List.of(chunk("a0", 1f, 0f, 0f), chunk("a1", 0f, 1f, 0f)));
+        index.replace(FILE_B, null, "v2", MODEL, List.of(chunk("b0", 1f, 0f, 0f)));
+        index.replace(INBOX_1, ALICE, "v", MODEL, List.of(chunk("c0", 1f, 0f, 0f)));
+        index.replace(FILE_A, ALICE, "v1", "other", List.of(chunk("x0", 1f, 0f, 0f)));
+
+        assertThat(index.list(EmbeddingQuery.of(MODEL, Set.of(FILE_A, FILE_B))))
+                .containsExactly(
+                        new EmbeddingIndex.IndexedEntity(FILE_A, ALICE, MODEL, "v1", 2),
+                        new EmbeddingIndex.IndexedEntity(FILE_B, null, MODEL, "v2", 1));
+        assertThat(index.list(EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL, EntityType.FILE).owner(ALICE)))
+                .extracting(EmbeddingIndex.IndexedEntity::ref).containsExactly(FILE_A, INBOX_1);
+    }
+
+    @Test
+    void chunksAreListedInOrder_searchedByText_andPaged() {
+        index.replace(FILE_B, ALICE, "1", MODEL, List.of(
+                new EmbeddingChunk("b1", 1, "second of b", Map.of(), vec(1f, 0f, 0f)),
+                new EmbeddingChunk("b0", 0, "first of b, 100% sure_", Map.of(), vec(0f, 1f, 0f))));
+        index.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", 1f, 0f, 0f)));
+        EmbeddingQuery both = EmbeddingQuery.of(MODEL, Set.of(FILE_A, FILE_B));
+
+        EmbeddingIndex.ChunkPage all = index.chunks(both, null, 0, 10);
+        assertThat(all.total()).isEqualTo(3);
+        assertThat(all.chunks()).extracting(c -> c.chunk().id()).containsExactly("a0", "b0", "b1");
+        assertThat(all.chunks()).allSatisfy(c -> assertThat(c.chunk().embedding()).isEmpty());
+
+        assertThat(index.chunks(both, "OF B", 0, 10).chunks()).extracting(c -> c.chunk().id()).containsExactly("b0", "b1");
+        assertThat(index.chunks(both, "100%", 0, 10).chunks()).extracting(c -> c.chunk().id()).containsExactly("b0");
+        assertThat(index.chunks(both, "_", 0, 10).total()).as("wildcards are taken literally").isEqualTo(1);
+
+        EmbeddingIndex.ChunkPage second = index.chunks(both, null, 1, 1);
+        assertThat(second.total()).isEqualTo(3);
+        assertThat(second.chunks()).extracting(c -> c.ref()).containsExactly(FILE_B);
+        assertThat(index.chunks(EmbeddingQuery.of(MODEL, Set.of(FILE_B)), null, 0, 10).total()).isEqualTo(2);
+        assertThat(index.chunks(EmbeddingQuery.of(MODEL, Set.of()), null, 0, 10).total()).isZero();
+    }
+
+    @Test
+    void anIndexInAnotherTableIsAnIndexOfItsOwn() throws Exception {
+        String table = "mc_embedding_it_" + UUID.randomUUID().toString().substring(0, 8).replace("-", "");
+        EmbeddingIndex chats = new PgEmbeddingIndex(dataSource, namespace, table);
+        try {
+            chats.replace(FILE_A, ALICE, "1", MODEL, List.of(chunk("a0", 1f, 0f, 0f)));
+            MetadataField only = new MetadataField(EntityType.MAIL, "only_" + table, MetadataField.Kind.NUMBER);
+            chats.declareField(only);
+
+            assertThat(chats.chunkCount(FILE_A, MODEL)).isEqualTo(1);
+            assertThat(index.chunkCount(FILE_A, MODEL)).as("the default table has nothing of it").isZero();
+            assertThat(chats.fields()).contains(only);
+            assertThat(index.fields()).as("fields are declared per table").doesNotContain(only);
+            assertThatThrownBy(() -> new PgEmbeddingIndex(dataSource, namespace, "Robert'); DROP TABLE x;--"))
+                    .isInstanceOf(IllegalArgumentException.class);
+        } finally {
+            try (var c = dataSource.getConnection(); var st = c.createStatement()) {
+                st.execute("DROP TABLE IF EXISTS " + table);
+                st.execute("DROP TABLE IF EXISTS " + table + "_field");
+            }
+        }
     }
 
     private static EmbeddingChunk chunk(String id, float x, float y, float z) {

@@ -8,11 +8,18 @@ import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
-import ai.mindconnect.vectorstore.VectorChunk;
-import ai.mindconnect.vectorstore.VectorStore;
+import ai.mindconnect.vectorstore.embedding.EmbeddingIndex.EmbeddingHit;
+import ai.mindconnect.vectorstore.embedding.EntityRef;
+import ai.mindconnect.vectorstore.embedding.EntityType;
+import ai.mindconnect.vectorstore.embedding.MetadataFilter;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 
@@ -22,12 +29,19 @@ import java.util.Map;
  * the caller scopes — and speak text only; embedding happens inside.
  *
  * <ul>
- *   <li>{@code vector_upsert} — replaces one file's chunks in a store
- *       (delete + insert, so re-ingestion never leaves stale chunks)</li>
- *   <li>{@code vector_search} — embeds the query, returns the top chunks
- *       with score and provenance</li>
- *   <li>{@code vector_delete_file} — removes one file from a store</li>
+ *   <li>{@code vector_upsert} — embeds one file's or document's chunks and
+ *       lists it in a store, replacing what it had (unless the text is the
+ *       same, which is not embedded again)</li>
+ *   <li>{@code vector_search} — embeds the query, returns the top chunks of
+ *       the store's entities with score and provenance, optionally among some
+ *       entries only and by metadata</li>
+ *   <li>{@code vector_delete_file} — takes one file or document off a store</li>
  * </ul>
+ *
+ * <p>A store only lists entities; their chunks live once in the namespace's
+ * embedding index. A {@code file_id} of type {@code file} is a stored file's
+ * id — attached to three chats it is embedded once; of type {@code document}
+ * (the default) it names text that belongs to this store alone.
  */
 public final class VectorTools {
 
@@ -101,6 +115,11 @@ public final class VectorTools {
                             "description", "Lifecycle of a NEWLY created store: global (default), "
                                     + "session (tied to this chat session) or agent."),
                     "file_id", Map.of("type", "string", "description", "Id of the source file/document."),
+                    "name", Map.of("type", "string", "description",
+                            "How hits name the source — a stored file's name, say. Defaults to file_id."),
+                    "type", Map.of("type", "string", "enum", List.of("document", "file"), "description",
+                            "What file_id names: 'file' for a stored file's id (file-…), shared with every "
+                                    + "store that lists it; 'document' (default) for text of this store alone."),
                     "chunks", Map.of("type", "array", "items", chunk)),
                     List.of("store", "file_id", "chunks"));
         }
@@ -128,14 +147,13 @@ public final class VectorTools {
                 titles.add(map.get("title") instanceof String t ? t : "");
             }
             try {
-                List<float[]> vectors = stores.embedFor(namespace, storeName, texts);
-                List<VectorChunk> chunks = new ArrayList<>(texts.size());
+                String name = str(arguments, "name") == null ? fileId : str(arguments, "name");
+                List<VectorStore.TextChunk> chunks = new ArrayList<>(texts.size());
                 for (int i = 0; i < texts.size(); i++) {
                     Map<String, String> metadata = titles.get(i).isBlank()
-                            ? Map.of("file", fileId)
-                            : Map.of("file", fileId, "title", titles.get(i));
-                    chunks.add(new VectorChunk(fileId + ":" + i, fileId, i, texts.get(i),
-                            metadata, vectors.get(i)));
+                            ? Map.of("file", name)
+                            : Map.of("file", name, "title", titles.get(i));
+                    chunks.add(new VectorStore.TextChunk(texts.get(i), metadata));
                 }
                 String scopeArg = str(arguments, "scope");
                 VectorStoreInstance.Scope scope = switch (scopeArg == null ? "global" : scopeArg) {
@@ -162,10 +180,12 @@ public final class VectorTools {
                         && callScope != null && callScope.userId() != null
                         ? callScope.userId().value() : null;
                 VectorStore store = stores.open(namespace, storeName, str(arguments, "template"), scope, scopeRef, owner);
-                store.deleteFile(fileId);   // replace semantics
-                store.upsert(chunks);
-                return "Stored " + chunks.size() + " chunk(s) for file '" + fileId + "' in store '"
-                        + storeName + "' (dimension " + vectors.get(0).length + ").";
+                EntityRef ref = "file".equals(str(arguments, "type"))
+                        ? EntityRef.of(EntityType.FILE, EntityRef.FILE_STORE, fileId)
+                        : store.documentRef(fileId);
+                String storeOwner = store.settings().owner();
+                long stored = store.put(ref, storeOwner == null ? null : UserId.of(storeOwner), version(chunks), chunks);
+                return "Stored " + stored + " chunk(s) for file '" + fileId + "' in store '" + storeName + "'.";
             } catch (RuntimeException e) {
                 return "Error: vector_upsert failed: " + e.getMessage();
             }
@@ -193,7 +213,20 @@ public final class VectorTools {
                             "Vector store name. Omit to search this chat session's upload store "
                                     + "(files the user attached to the conversation)."),
                     "query", Map.of("type", "string", "description", "What to look for."),
-                    "top_k", Map.of("type", "integer", "description", "Max results (default 5).")),
+                    "top_k", Map.of("type", "integer", "description", "Max results (default 5)."),
+                    "entities", Map.of("type", "array", "items", Map.of("type", "object",
+                                    "properties", Map.of(
+                                            "id", Map.of("type", "string"),
+                                            "type", Map.of("type", "string", "description",
+                                                    "file, document, mail, calendar-event, todo, …"),
+                                            "source", Map.of("type", "string"),
+                                            "container", Map.of("type", "string")),
+                                    "required", List.of("id")),
+                            "description", "Search only these entries of the store — files, documents, mail, … "
+                                    + "— as a hit names them: the id, plus type, source or container where the id "
+                                    + "alone is ambiguous. Omit for all."),
+                    "where", Map.of("type", "object", "additionalProperties", Map.of("type", "string"),
+                            "description", "Only chunks whose metadata has these values, e.g. {\"title\": \"Pricing\"}.")),
                     List.of("query"));
         }
 
@@ -218,9 +251,17 @@ public final class VectorTools {
             }
             int topK = clamp(arguments.get("top_k"), 5, 20);
             try {
-                float[] embedded = stores.embedFor(namespace, storeName, List.of(query)).get(0);
-                List<VectorStore.SearchHit> hits = stores.openWith(namespace, stores.settingsFor(namespace, storeName))
-                        .search(embedded, topK);
+                VectorStore store = stores.store(namespace, storeName);
+                Set<EntityRef> within = null;
+                if (arguments.get("entities") instanceof List<?> entities && !entities.isEmpty()) {
+                    within = store.select(entities.stream().map(EntitySelector::of).toList());
+                }
+                List<MetadataFilter> filters = new ArrayList<>();
+                if (arguments.get("where") instanceof Map<?, ?> where) {
+                    where.forEach((k, v) -> filters.add(new MetadataFilter(String.valueOf(k), MetadataFilter.Op.EQ,
+                            List.of(String.valueOf(v)))));
+                }
+                List<EmbeddingHit> hits = store.search(query, topK, within, filters);
                 if (hits.isEmpty()) {
                     return "No results in store '" + storeName + "'. It may be empty — ingest "
                             + "documents first (vector_upsert / the file-ingestion workflow).";
@@ -228,15 +269,15 @@ public final class VectorTools {
                 StringBuilder out = new StringBuilder("Top " + hits.size() + " result(s) from '"
                         + storeName + "':\n");
                 int rank = 1;
-                for (VectorStore.SearchHit hit : hits) {
-                    VectorChunk chunk = hit.chunk();
-                    String title = chunk.metadata().getOrDefault("title", "");
+                for (EmbeddingHit hit : hits) {
+                    String title = hit.chunk().metadata().getOrDefault("title", "");
                     out.append(rank++).append(". [").append(String.format("%.3f", hit.score()))
-                            .append("] ").append(chunk.metadata().getOrDefault("file", chunk.fileId()));
+                            .append("] ").append(hit.chunk().metadata().getOrDefault("file", hit.ref().id()));
                     if (!title.isBlank()) {
                         out.append(" — ").append(title);
                     }
-                    out.append('\n').append(truncate(chunk.text())).append("\n\n");
+                    out.append(" (").append(EntitySelector.describe(hit.ref())).append(')');
+                    out.append('\n').append(truncate(hit.chunk().text())).append("\n\n");
                 }
                 return out.toString().stripTrailing();
             } catch (RuntimeException e) {
@@ -249,7 +290,8 @@ public final class VectorTools {
         @Override public String name() { return "vector_delete_file"; }
 
         @Override public String description() {
-            return "Removes all chunks of one file from a vector store.";
+            return "Takes one file or document off a vector store. A stored file stays searchable "
+                    + "in the other stores and chats that list it.";
         }
 
         @Override public Map<String, Object> parametersSchema() {
@@ -270,8 +312,16 @@ public final class VectorTools {
                 return denied;
             }
             try {
-                stores.openWith(namespace, stores.settingsFor(namespace, storeName)).deleteFile(fileId);
-                return "Removed file '" + fileId + "' from store '" + storeName + "'.";
+                VectorStore store = stores.store(namespace, storeName);
+                int removed = 0;
+                for (EntityRef member : store.members()) {
+                    if (member.id().equals(fileId)) {
+                        store.remove(member);
+                        removed++;
+                    }
+                }
+                return removed == 0 ? "Store '" + storeName + "' does not list '" + fileId + "'."
+                        : "Removed file '" + fileId + "' from store '" + storeName + "'.";
             } catch (RuntimeException e) {
                 return "Error: vector_delete_file failed: " + e.getMessage();
             }
@@ -363,6 +413,22 @@ public final class VectorTools {
     private static String refusal(String storeName) {
         return "Error: store '" + storeName + "' holds another chat's uploads and is not accessible "
                 + "here. Omit 'store' to search the files attached to this chat.";
+    }
+
+    /** What changes when the text does — the same chunks upserted again are not embedded again. */
+    public static String version(List<VectorStore.TextChunk> chunks) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (VectorStore.TextChunk chunk : chunks) {
+                digest.update(chunk.text().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+                digest.update(new java.util.TreeMap<>(chunk.metadata()).toString().getBytes(StandardCharsets.UTF_8));
+                digest.update((byte) 0);
+            }
+            return HexFormat.of().formatHex(digest.digest()).substring(0, 32);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static Map<String, Object> schema(Map<String, Object> properties, List<String> required) {

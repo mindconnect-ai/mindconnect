@@ -151,9 +151,9 @@ have written, rendered by the application's `ObjectMapper`.
 The tables are named `mc_agent_definition`, `mc_agent_session`,
 `mc_conversation`, `mc_message`, `mc_working_memory`, `mc_conversation_summary`,
 `mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`, `mc_llm_price`,
-`mc_workflow`, `mc_workflow_instance`, `mc_file`, `mc_vector_store_template`
-and `mc_vector_store_instance` (plus one `vs_<namespace>__<store>` table per
-pgvector store). The small JDBC layer
+`mc_workflow`, `mc_workflow_instance`, `mc_file`, `mc_vector_store_template`,
+`mc_vector_store_instance` and `mc_vector_store_member`, plus the embedding
+index `mc_embedding` and `mc_embedding_field` when the database has pgvector. The small JDBC layer
 underneath — `Sql`, `Row`, `DocumentTable` — lives in `common/mc-jdbc`; the
 adapters are the `agents/adapter/postgres/*-pg` and
 `workflow/mc-workflow-persistence-pg` modules, the Spring wiring is

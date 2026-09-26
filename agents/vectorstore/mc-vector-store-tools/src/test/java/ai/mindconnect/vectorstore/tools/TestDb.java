@@ -65,10 +65,11 @@ final class TestDb {
         return dataSource(url, NO_VECTOR, NO_VECTOR);
     }
 
-    /** Removes what the vector stores of {@code namespace} keep in the database: registry rows and pgvector tables. */
+    /** Removes what the vector stores of {@code namespace} keep in the database: registry, members, index rows, old tables. */
     static void forget(DataSource dataSource, Namespace namespace) {
         Sql sql = Sql.of(dataSource);
-        for (String table : List.of("mc_vector_store_template", "mc_vector_store_instance")) {
+        for (String table : List.of("mc_vector_store_template", "mc_vector_store_instance",
+                "mc_vector_store_member", "mc_vector_store_index", "mc_embedding", "mc_embedding_chat")) {
             if (sql.scalar("SELECT to_regclass(?)::text", String.class, table) != null) {
                 sql.update("DELETE FROM " + table + " WHERE namespace = ?", namespace.value());
             }
