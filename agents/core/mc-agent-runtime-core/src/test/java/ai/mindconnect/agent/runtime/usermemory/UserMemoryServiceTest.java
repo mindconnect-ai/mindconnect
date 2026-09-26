@@ -93,9 +93,9 @@ class UserMemoryServiceTest {
                 pause();
                 return super.save(entry);
             }
-            @Override public boolean delete(UserId userId, String name) {
+            @Override public boolean delete(UserId userId, ai.mindconnect.agent.AgentId agentId, String name) {
                 pause();
-                return super.delete(userId, name);
+                return super.delete(userId, agentId, name);
             }
         });
         var pool = java.util.concurrent.Executors.newFixedThreadPool(2);
@@ -123,6 +123,38 @@ class UserMemoryServiceTest {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
+    }
+
+    @Test
+    void anAgentsMemoryIsApartFromTheUsersOwnAndFromOtherAgents() {
+        var secretary = ai.mindconnect.agent.AgentId.of("secretary");
+        var coder = ai.mindconnect.agent.AgentId.of("coder");
+        service.write(ALICE, "role", MemoryType.USER, "Head of purchasing", "c", null);
+        service.write(ALICE, secretary, "role", MemoryType.PROJECT, "Books her travel via Egencia", "c", null);
+        service.write(ALICE, coder, "stack", MemoryType.PROJECT, "Java 21", "c", null);
+
+        assertThat(service.read(ALICE, "role")).get().extracting(MemoryEntry::description).isEqualTo("Head of purchasing");
+        assertThat(service.read(ALICE, secretary, "role")).get().extracting(MemoryEntry::description)
+                .isEqualTo("Books her travel via Egencia");
+        assertThat(service.list(ALICE, secretary, MemoryReach.USER)).extracting(MemoryEntry::description)
+                .containsExactly("Head of purchasing");
+        assertThat(service.list(ALICE, secretary, MemoryReach.AGENT)).extracting(MemoryEntry::description)
+                .containsExactly("Books her travel via Egencia");
+        assertThat(service.list(ALICE, secretary, MemoryReach.BOTH)).extracting(MemoryEntry::name)
+                .containsExactlyInAnyOrder("role", "role").hasSize(2);
+        assertThat(service.list(ALICE)).hasSize(3);
+
+        assertThat(service.delete(ALICE, secretary, "role")).isTrue();
+        assertThat(service.read(ALICE, "role")).as("the user's own entry of the same name stays").isPresent();
+    }
+
+    @Test
+    void anAdminSeesEveryUsersEntriesByUser() {
+        service.write(BOB, "b", MemoryType.USER, "d", "c", null);
+        service.write(ALICE, "a", MemoryType.USER, "d", "c", null);
+        service.write(ALICE, ai.mindconnect.agent.AgentId.of("x"), "a", MemoryType.USER, "d", "c", null);
+
+        assertThat(service.listAll()).extracting(e -> e.userId().value()).containsExactly("alice", "alice", "bob");
     }
 
     @Test

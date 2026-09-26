@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
@@ -35,7 +36,7 @@ class FileUserMemoryRepositoryTest {
         assertThat(Files.readString(file)).startsWith("---\nname: preferred-language\n")
                 .contains("type: feedback\n", "source: s1\n")
                 .endsWith("---\n\nAlways answer in German.\n\nWhy: she asked to.\n");
-        assertThat(repo.find(ALICE, "preferred-language")).contains(entry);
+        assertThat(repo.find(ALICE, null, "preferred-language")).contains(entry);
         assertThat(repo.findByUser(ALICE)).containsExactly(entry);
     }
 
@@ -52,8 +53,8 @@ class FileUserMemoryRepositoryTest {
         FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, NS);
         repo.save(entry(ALICE, "role"));
 
-        assertThat(repo.delete(ALICE, "role")).isTrue();
-        assertThat(repo.delete(ALICE, "role")).isFalse();
+        assertThat(repo.delete(ALICE, null, "role")).isTrue();
+        assertThat(repo.delete(ALICE, null, "role")).isFalse();
         assertThat(repo.findByUser(ALICE)).isEmpty();
     }
 
@@ -72,7 +73,7 @@ class FileUserMemoryRepositoryTest {
                 app.mindconnect.ai, via deploy-admin-ui.sh.
                 """);
 
-        assertThat(new FileUserMemoryRepository(dir, NS).find(ALICE, "deploy-target")).get().satisfies(e -> {
+        assertThat(new FileUserMemoryRepository(dir, NS).find(ALICE, null, "deploy-target")).get().satisfies(e -> {
             assertThat(e.type()).isEqualTo(MemoryType.REFERENCE);
             assertThat(e.description()).isEqualTo("Deploys go to the Hetzner box");
             assertThat(e.content()).isEqualTo("app.mindconnect.ai, via deploy-admin-ui.sh.");
@@ -84,6 +85,33 @@ class FileUserMemoryRepositoryTest {
         new FileUserMemoryRepository(dir, NS).save(entry(UserId.of(".."), "role"));
 
         assertThat(dir.resolve("acme/memory/%2E%2E/role.md")).exists();
+    }
+
+    @Test
+    void anAgentsEntriesLieInADirectoryOfTheirOwnAndComeBackWithTheirAgent() {
+        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, NS);
+        AgentId secretary = AgentId.of("00000002-0000-0000-0000-000000000099");
+        repo.save(entry(ALICE, "role"));
+        repo.save(new MemoryEntry(ALICE, secretary, "role", MemoryType.PROJECT, "Travel desk", "c", null, null, null));
+
+        assertThat(dir.resolve("acme/memory/alice%40example.com/agents/" + secretary.value() + "/role.md")).exists();
+        assertThat(repo.find(ALICE, secretary, "role")).get().extracting(MemoryEntry::agentId).isEqualTo(secretary);
+        assertThat(repo.find(ALICE, null, "role")).get().extracting(MemoryEntry::agentId).isNull();
+        assertThat(repo.findByUser(ALICE)).hasSize(2);
+
+        assertThat(repo.delete(ALICE, secretary, "role")).isTrue();
+        assertThat(repo.find(ALICE, null, "role")).isPresent();
+    }
+
+    @Test
+    void findAllReadsEveryUsersDirectoryBackToTheirId() {
+        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, NS);
+        repo.save(entry(ALICE, "a"));
+        repo.save(entry(UserId.of("bob"), "b"));
+        repo.save(entry(UserId.of(".."), "c"));
+
+        assertThat(repo.findAll()).extracting(e -> e.userId().value())
+                .containsExactlyInAnyOrder("alice@example.com", "bob", "..");
     }
 
     private static MemoryEntry entry(UserId user, String name) {
