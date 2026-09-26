@@ -47,6 +47,8 @@ flow running live in the Admin UI.
 - **[Persistence](./persistence.md)** — the storage ports and the file adapters.
 - **[How it compares](./how-it-compares.md)** — positioning vs. code-first
   frameworks.
+- **[vs Dify & n8n](./vs-dify-n8n.md)** — positioning vs. other agent and
+  automation platforms, licences included.
 
 **Configuration & reference**
 

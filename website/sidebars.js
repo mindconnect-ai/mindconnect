@@ -11,6 +11,7 @@ const sidebars = {
       items: [
         'agents/getting-started',
         'agents/how-it-compares',
+        'agents/vs-dify-n8n',
         {
           type: 'category',
           label: 'Admin UI',
