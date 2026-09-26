@@ -136,8 +136,11 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-mcp-proxy`: one server over stdio or streamable HTTP, on the MCP Java SDK
     - `mc-agent-tools-mcp`: the `MultiToolProvider` exposing registered servers' tools
     - `mc-mcp-gateway-admin-ui-rest`: the `/mcp-gateway` admin screen
-  - `vectorstore/` — the knowledge layer: `mc-vector-store` (SPI + memory backend),
-    `mc-vector-store-pgvector`, `mc-vector-store-tools`, `mc-file-store-core` / `mc-file-store`
+  - `vectorstore/` — the knowledge layer: `mc-vector-store` (the `EmbeddingIndex` — one per
+    namespace for everything with text, keyed by `EntityRef`; heap/file implementation),
+    `mc-vector-store-pgvector` (`PgEmbeddingIndex`, one `mc_embedding` table), `mc-vector-store-tools`
+    (named stores = member lists of entity refs, templates, the `vector_*` tools),
+    `mc-file-store-core` / `mc-file-store`
   - `adapter/` — alternative implementations of the core ports; `postgres/mc-*-pg`
     modules store domain objects as JSONB documents via `common/mc-jdbc`
   - `springstarter/` — Spring Boot starters: `mc-agent-starter-runtime` builds the runtime

@@ -8,9 +8,6 @@ import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import io.swagger.v3.oas.annotations.Operation;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
-import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
-import ai.mindconnect.vectorstore.tools.VectorStores;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -112,9 +109,7 @@ public class SessionFilesApiController {
     public ResponseEntity<List<Map<String, Object>>> listAttachments(@PathVariable String sessionId,
                                                                      @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
-        Map<String, Long> chunksByName = new java.util.HashMap<>();
-        sessionFiles.listAttachments(id).forEach((ingestedId, chunks) ->
-                chunksByName.merge(java.nio.file.Path.of(ingestedId).getFileName().toString(), chunks, Long::sum));
+        Map<String, Long> chunksByFile = sessionFiles.listAttachments(id);
         var files = sessionFiles.attachments(id).stream()
                 .map(f -> {
                     Map<String, Object> entry = new java.util.LinkedHashMap<>();
@@ -122,7 +117,7 @@ public class SessionFilesApiController {
                     entry.put("name", f.name());
                     entry.put("mediaType", f.mediaType());
                     entry.put("sizeBytes", f.sizeBytes());
-                    entry.put("chunks", chunksByName.getOrDefault(f.name(), 0L));
+                    entry.put("chunks", chunksByFile.getOrDefault(f.id(), 0L));
                     return entry;
                 })
                 .toList();

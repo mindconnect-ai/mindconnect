@@ -384,4 +384,79 @@ class VectorToolsTest {
         assertThat(tool(new VectorTools.SearchFactory()).execute(Map.of("store", "kb", "query", "finance")))
                 .contains("the finance guide").contains(guide).doesNotContain("secret");
     }
+
+    @Test
+    void searchNarrowsToSomeFilesAndByMetadata() {
+        Tool upsert = tool(new VectorTools.UpsertFactory());
+        Tool search = tool(new VectorTools.SearchFactory());
+        upsert.execute(Map.of("store", "kb", "file_id", "doc1", "chunks", List.of(
+                Map.of("text", "podman is a container engine", "title", "Intro"))));
+        upsert.execute(Map.of("store", "kb", "file_id", "doc2", "chunks", List.of(
+                Map.of("text", "container images and registries", "title", "Images"))));
+
+        assertThat(search.execute(Map.of("store", "kb", "query", "container", "entities", List.of(Map.of("id", "doc2")))))
+                .contains("doc2").doesNotContain("doc1").contains("(document doc2)");
+        assertThat(search.execute(Map.of("store", "kb", "query", "container", "where", Map.of("title", "Intro"))))
+                .contains("doc1").doesNotContain("doc2");
+    }
+
+    @Test
+    void anEntryIsPickedByTypeWhereTheIdAloneIsAmbiguous() {
+        Tool upsert = tool(new VectorTools.UpsertFactory());
+        Tool search = tool(new VectorTools.SearchFactory());
+        upsert.execute(Map.of("store", "kb", "type", "file", "file_id", "x", "chunks", List.of(
+                Map.of("text", "container file"))));
+        upsert.execute(Map.of("store", "kb", "file_id", "x", "chunks", List.of(
+                Map.of("text", "container document"))));
+
+        String both = search.execute(Map.of("store", "kb", "query", "container", "entities", List.of(Map.of("id", "x"))));
+        assertThat(both).contains("(file x)").contains("(document x)");
+        String file = search.execute(Map.of("store", "kb", "query", "container",
+                "entities", List.of(Map.of("id", "x", "type", "file"))));
+        assertThat(file).contains("(file x)").doesNotContain("(document x)");
+    }
+
+    @Test
+    void aStoredFileListedByTwoStoresIsEmbeddedOnce_andStaysWhileOneListsIt() {
+        java.util.concurrent.atomic.AtomicInteger embedded = new java.util.concurrent.atomic.AtomicInteger();
+        env = environment((config, texts) -> {
+            embedded.addAndGet(texts.size());
+            return FAKE_EMBEDDINGS.embed(config, texts);
+        }, FAKE_CONFIGS);
+        Tool upsert = tool(new VectorTools.UpsertFactory());
+        Tool search = tool(new VectorTools.SearchFactory());
+        Tool delete = tool(new VectorTools.DeleteFileFactory());
+        Map<String, Object> chunks = Map.of("type", "file", "file_id", "file-1", "name", "podman.md",
+                "chunks", List.of(Map.of("text", "podman is a container engine")));
+
+        upsert.execute(with(chunks, "store", "pool-a"));
+        upsert.execute(with(chunks, "store", "pool-b"));
+        assertThat(embedded.get()).as("the second store only lists the file").isEqualTo(1);
+
+        assertThat(delete.execute(Map.of("store", "pool-a", "file_id", "file-1"))).contains("Removed");
+        assertThat(search.execute(Map.of("store", "pool-a", "query", "container"))).contains("No results");
+        assertThat(search.execute(Map.of("store", "pool-b", "query", "container")))
+                .contains("podman.md").contains("(file file-1)");
+    }
+
+    @Test
+    void aDocumentLeavesTheIndexWithTheStoreThatHadIt() {
+        Tool upsert = tool(new VectorTools.UpsertFactory());
+        Tool delete = tool(new VectorTools.DeleteFileFactory());
+        upsert.execute(Map.of("store", "kb", "file_id", "notes", "chunks", List.of(Map.of("text", "container notes"))));
+        VectorStore store = stores().store(NS, "kb");
+        var ref = store.documentRef("notes");
+        assertThat(store.indexed(ref)).isTrue();
+
+        delete.execute(Map.of("store", "kb", "file_id", "notes"));
+
+        assertThat(store.indexed(ref)).isFalse();
+        assertThat(store.members()).isEmpty();
+    }
+
+    private static Map<String, Object> with(Map<String, Object> base, String key, Object value) {
+        Map<String, Object> all = new java.util.HashMap<>(base);
+        all.put(key, value);
+        return all;
+    }
 }

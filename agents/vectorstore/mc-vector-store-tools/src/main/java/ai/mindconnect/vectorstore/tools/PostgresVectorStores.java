@@ -2,7 +2,7 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.vectorstore.pgvector.PgVectorBackend;
+import ai.mindconnect.vectorstore.pgvector.PgEmbeddingIndex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,16 +14,14 @@ import java.util.WeakHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
- * The vector stores under Postgres persistence. Every namespace's registry is
- * a {@link PgVectorStoreRegistry}, filled once from the registry files the
- * namespace had before ({@code <baseDir>/<namespace>/vector-stores/templates|instances},
- * which stay). When the vectors live in pgvector too, opening a namespace also
- * moves its {@code memory} stores there ({@link MemoryToPgVector}).
+ * The vector-store registry under Postgres persistence. Every namespace's
+ * registry is a {@link PgVectorStoreRegistry}, filled once from the registry
+ * files the namespace had before ({@code <baseDir>/<namespace>/vector-stores/templates|instances|members},
+ * which stay).
  *
- * <p>Whether they can live in pgvector is {@link #pgvectorAvailable asked} of
- * the database once: a plain {@code postgres} image has no {@code vector}
- * extension, and then the vectors stay on the {@code memory} backend, in files,
- * with one warning that says how to change that.
+ * <p>Whether the index can live in the same database is {@link #pgvectorAvailable asked}
+ * once: a plain {@code postgres} image has no {@code vector} extension, and
+ * then the index stays in files, with one warning that says how to change that.
  */
 final class PostgresVectorStores {
 
@@ -36,20 +34,17 @@ final class PostgresVectorStores {
     private static final Map<DataSource, Boolean> PGVECTOR = Collections.synchronizedMap(new WeakHashMap<>());
 
     /**
-     * Opening a namespace imports and moves; one namespace at a time, JVM-wide, so
-     * that the next one to open it finds the work done instead of doing it again.
+     * Opening a namespace imports; one namespace at a time, JVM-wide, so that
+     * the next one to open it finds the work done instead of doing it again.
      */
     private static final ReentrantLock OPENING = new ReentrantLock();
 
     private final Sql sql;
     private final Path baseDir;
-    /** Null when the vectors are not in pgvector. */
-    private final MemoryToPgVector move;
 
-    PostgresVectorStores(Sql sql, Path baseDir, MemoryToPgVector move) {
+    PostgresVectorStores(Sql sql, Path baseDir) {
         this.sql = sql;
         this.baseDir = baseDir;
-        this.move = move;
     }
 
     /**
@@ -58,14 +53,14 @@ final class PostgresVectorStores {
      * the fix; the answer holds until restart.
      */
     static boolean pgvectorAvailable(DataSource dataSource) {
-        return PGVECTOR.computeIfAbsent(dataSource, ds -> PgVectorBackend.enableExtension(ds)
+        return PGVECTOR.computeIfAbsent(dataSource, ds -> PgEmbeddingIndex.enableExtension(ds)
                 .map(reason -> {
-                    log.warn("Vector stores: the database has no pgvector extension ({}). Templates and "
-                            + "instances are kept in Postgres, but the vectors stay in files under "
-                            + "<data dir>/<namespace>/vector-stores (memory backend). To keep them in Postgres, "
-                            + "install pgvector into the Postgres image and restart; the stores are moved over on "
-                            + "first use. Keep the image's C library (an existing postgres:16-alpine data directory "
-                            + "needs an Alpine build of pgvector — a Debian image changes the text collation).",
+                    log.warn("Vector stores: the database has no pgvector extension ({}). Templates, "
+                            + "instances and members are kept in Postgres, but the embedding index stays in "
+                            + "files under <data dir>/<namespace>/embeddings. To keep it in Postgres, install "
+                            + "pgvector into the Postgres image and restart. Keep the image's C library (an "
+                            + "existing postgres:16-alpine data directory needs an Alpine build of pgvector — a "
+                            + "Debian image changes the text collation).",
                             reason.replaceAll("\\s+", " ").strip());
                     return false;
                 })
@@ -79,15 +74,6 @@ final class PostgresVectorStores {
         try {
             registry.initSchema();
             registry.importFrom(new FileVectorStoreRegistry(baseDir.resolve(namespace.value()).resolve("vector-stores")));
-            if (move != null) {
-                try {
-                    move.move(namespace, registry);
-                } catch (RuntimeException e) {
-                    // The stores keep working where they are; the next start tries again.
-                    log.warn("Vector stores of namespace '{}' could not all be moved to pgvector: {}",
-                            namespace.value(), e.getMessage(), e);
-                }
-            }
         } finally {
             OPENING.unlock();
         }

@@ -95,9 +95,9 @@ class ChatDialogActionUrlsTest {
     @Test
     void removingAnAttachmentKeepsTheRowPlaceholder() throws Exception {
         String documents = json(ChatAttachmentsComponent.node(SESSION,
-                ChatAttachmentsComponent.Kind.DOCUMENTS, FILES, Map.of("a.pdf", 3L)));
+                ChatAttachmentsComponent.Kind.DOCUMENTS, FILES, Map.of("f-1", 3L)));
         String images = json(ChatAttachmentsComponent.node(SESSION,
-                ChatAttachmentsComponent.Kind.IMAGES, FILES, Map.of("a.pdf", 3L)));
+                ChatAttachmentsComponent.Kind.IMAGES, FILES, Map.of("f-1", 3L)));
 
         assertThat(documents).contains("\"url\":\"/chat/api/sessions/" + SESSION_VALUE + "/chat-files?file={id}\"");
         assertThat(documents).doesNotContain("%7Bid%7D");

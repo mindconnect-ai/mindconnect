@@ -16,8 +16,7 @@ class TemplateVersioningTest {
     @Test
     void aSaveAgainstAStaleVersionIsRefused(@TempDir Path dir) {
         FileVectorStoreRegistry registry = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
-        VectorStoreTemplate template = new VectorStoreTemplate("knowledge", "memory", Map.of(),
-                "embeddings", null, Map.of());
+        VectorStoreTemplate template = new VectorStoreTemplate("knowledge", "embeddings", null, Map.of());
 
         VectorStoreTemplate first = registry.saveTemplate(template.withVersion(0L));
         assertThat(first.version()).isEqualTo(1L);

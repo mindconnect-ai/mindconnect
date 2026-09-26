@@ -7,7 +7,6 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import ai.mindconnect.vectorstore.VectorStoreBackend;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -45,10 +44,8 @@ class DefaultVectorStoresEmbedScopeTest {
             @Override public void deleteById(LlmConfigId id) { }
         };
         LlmEmbeddings embeddings = (config, texts) -> texts.stream().map(t -> new float[]{1f}).toList();
-        VectorStoreTemplate template = new VectorStoreTemplate("default", "memory", Map.of(), "embeddings",
-                "file-ingestion", Map.of());
-        DefaultVectorStores stores = new DefaultVectorStores(VectorStoreBackend.discover(), template, dir,
-                embeddings, configs, bound);
+        VectorStoreTemplate template = new VectorStoreTemplate("default", "embeddings", "file-ingestion", Map.of());
+        DefaultVectorStores stores = new DefaultVectorStores(template, dir, embeddings, configs, bound);
 
         List<float[]> vectors = bound.runIn(Scope.of(new Namespace("local")),
                 () -> stores.embedFor(new Namespace("acme"), "docs", List.of("hello")));

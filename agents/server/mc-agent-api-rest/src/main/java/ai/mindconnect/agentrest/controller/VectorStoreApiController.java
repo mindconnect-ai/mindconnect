@@ -5,6 +5,10 @@ import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.auth.VectorStoreAccess;
 import ai.mindconnect.agentrest.service.NotConfiguredException;
 import ai.mindconnect.agentrest.service.VectorStoreService;
+import ai.mindconnect.vectorstore.embedding.MetadataFilter;
+import ai.mindconnect.vectorstore.tools.EntitySelector;
+import ai.mindconnect.vectorstore.tools.IndexDefinition;
+import ai.mindconnect.vectorstore.tools.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -17,6 +21,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,7 +29,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Map;
 
 /**
  * External REST API for vector stores — a thin shell over
@@ -37,15 +41,22 @@ import java.util.Map;
  * filling, searching or deleting it answers 404 — like a store that does not
  * exist. Ingestion takes only a file the caller may read.
  */
-@Tag(name = "Vector Stores", description = "Templates (backend + embedding policy), store "
-        + "instances, document ingestion, chunk upsert and semantic search. A chat's upload "
-        + "store (session-…) answers only to the chat's user. 503 when vector stores are not "
-        + "configured in this application.")
+@Tag(name = "Vector Stores", description = "Templates (embedding policy), stores — named lists "
+        + "of files and documents whose chunks live once in the namespace's embedding index — "
+        + "ingestion, documents, entries and semantic search with entity and metadata filters. "
+        + "A chat's upload store (session-…) answers only to the chat's user. 503 when vector "
+        + "stores are not configured in this application.")
 @RestController
 @RequestMapping("/api/vector-stores")
 public class VectorStoreApiController {
 
-    public record SearchRequest(String query, Integer topK) {}
+    /**
+     * @param entities  only these entries of the store — {@code {"id": …}} plus {@code type},
+     *                  {@code source}, {@code container} where the id alone is ambiguous; omit for all
+     * @param filters   metadata conditions: {@code EQ} on any key; {@code IN}, {@code GTE}, {@code LTE}
+     *                  on keys declared as metadata fields
+     */
+    public record SearchRequest(String query, Integer topK, List<EntitySelector> entities, List<MetadataFilter> filters) {}
 
     public record CreateStoreRequest(String name, String template) {}
 
@@ -53,8 +64,7 @@ public class VectorStoreApiController {
 
     public record IngestResult(String fileId, String summary) {}
 
-    public record UpsertChunkRequest(String id, String fileId, Integer ordinal,
-                                     String text, Map<String, String> metadata) {}
+    public record DocumentRequest(List<VectorStore.TextChunk> chunks) {}
 
     private final VectorStoreService service;
     private final VectorStoreAccess access;
@@ -137,12 +147,45 @@ public class VectorStoreApiController {
 
     /** Removes the store registration. (Data files stay on the backend.) */
     @Operation(summary = "Delete a store registration",
-            description = "Removes the registration; data files stay on the backend.")
+            description = "Removes the store and its list; the chunks of stored files stay in the "
+                    + "embedding index for the other stores that list them.")
     @DeleteMapping("/stores/{name}")
     public ResponseEntity<Void> deleteStore(@PathVariable String name, @CurrentUser UserId caller) {
         requireReachable(name, caller);
         service.deleteStore(name);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Indexes ────────────────────────────────────────────────────────────
+
+    @Operation(summary = "List the indexes",
+            description = "Where the stores' chunks are kept: the built-in 'default' and 'chat-uploads' indexes "
+                    + "and the namespace's own — pgvector tables, in the application's database or one of their "
+                    + "own, or files. Passwords are never returned.")
+    @GetMapping("/indexes")
+    public List<VectorStoreService.IndexInfo> indexes() {
+        return service.indexes();
+    }
+
+    @Operation(summary = "Save an index",
+            description = "Defines an index of this namespace — under a built-in name it moves that index. "
+                    + "The password is stored encrypted; leave it out to keep the stored one. 400 for a "
+                    + "definition that does not check out.")
+    @PostMapping("/indexes")
+    public ResponseEntity<VectorStoreService.IndexInfo> saveIndex(@RequestBody IndexDefinition index) {
+        try {
+            return ResponseEntity.ok(service.saveIndex(index));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
+    }
+
+    @Operation(summary = "Delete an index",
+            description = "Deletes the namespace's definition; a built-in index then follows the server's "
+                    + "settings again. 400 for a built-in index the namespace never redefined.")
+    @DeleteMapping("/indexes/{name}")
+    public ResponseEntity<Void> deleteIndex(@PathVariable String name) {
+        return service.deleteIndex(name) ? ResponseEntity.noContent().build() : ResponseEntity.badRequest().build();
     }
 
     // ── Ingestion & chunks ─────────────────────────────────────────────────
@@ -175,19 +218,42 @@ public class VectorStoreApiController {
         }
     }
 
-    /** Embeds {@code text} and upserts it as a single chunk. */
-    @Operation(summary = "Upsert a single chunk",
-            description = "Embeds the text with the store's embedding config and stores it "
-                    + "as one chunk; id defaults to \"{fileId}:{uuid}\".")
-    @PostMapping("/stores/{name}/chunks")
-    public ResponseEntity<VectorStoreService.UpsertedChunk> upsertChunk(
-            @PathVariable String name, @RequestBody UpsertChunkRequest request, @CurrentUser UserId caller) {
-        if (request.text() == null || request.text().isBlank()) {
+    /** Writes a document of the store, replacing what it had. */
+    @Operation(summary = "Write a document",
+            description = "Embeds the chunks with the store's embedding config and stores them as the "
+                    + "document {id} of this store — text with no file behind it — replacing what the "
+                    + "document had. The same chunks again are not embedded again.")
+    @PutMapping("/stores/{name}/documents/{id}")
+    public ResponseEntity<VectorStoreService.UpsertedDocument> putDocument(
+            @PathVariable String name, @PathVariable String id, @RequestBody DocumentRequest request,
+            @CurrentUser UserId caller) {
+        if (request.chunks() == null || request.chunks().isEmpty()
+                || request.chunks().stream().anyMatch(c -> c.text() == null || c.text().isBlank())) {
             return ResponseEntity.badRequest().build();
         }
         requireReachable(name, caller);
-        return ResponseEntity.ok(service.upsertChunk(name, request.id(), request.fileId(),
-                request.ordinal(), request.text(), request.metadata()));
+        return ResponseEntity.ok(service.upsertDocument(name, id, request.chunks()));
+    }
+
+    /** What the store lists. */
+    @Operation(summary = "List the entries",
+            description = "The files and documents the store lists, with their chunk counts.")
+    @GetMapping("/stores/{name}/entries")
+    public ResponseEntity<List<VectorStoreService.Entry>> entries(@PathVariable String name, @CurrentUser UserId caller) {
+        requireReachable(name, caller);
+        return ResponseEntity.ok(service.entries(name));
+    }
+
+    /** Takes an entry off the store. */
+    @Operation(summary = "Remove an entry",
+            description = "Takes the file or document off the store. A document leaves the index with "
+                    + "it; a stored file stays for the other stores and chats that list it.")
+    @DeleteMapping("/stores/{name}/entries/{entityId}")
+    public ResponseEntity<Void> removeEntry(@PathVariable String name, @PathVariable String entityId,
+                                            @CurrentUser UserId caller) {
+        requireReachable(name, caller);
+        return service.removeEntry(name, entityId) == 0
+                ? ResponseEntity.notFound().build() : ResponseEntity.noContent().build();
     }
 
     // ── Search ─────────────────────────────────────────────────────────────
@@ -195,7 +261,9 @@ public class VectorStoreApiController {
     /** Embeds {@code query} with the store's embedding config and returns the top hits. */
     @Operation(summary = "Semantic search",
             description = "Embeds the query with the store's embedding config and returns "
-                    + "the topK most similar chunks with scores (cosine similarity).")
+                    + "the topK most similar chunks of the store's entries with scores (cosine "
+                    + "similarity) — among the given entities only (id, plus type/source/container where needed), and passing the metadata filters. "
+                    + "A range or list filter on an undeclared key answers 400.")
     @PostMapping("/stores/{name}/search")
     public ResponseEntity<List<VectorStoreService.Hit>> search(@PathVariable String name,
                                                                @RequestBody SearchRequest request,
@@ -205,7 +273,13 @@ public class VectorStoreApiController {
         }
         requireReachable(name, caller);
         int topK = request.topK() == null || request.topK() <= 0 ? 5 : request.topK();
-        return ResponseEntity.ok(service.search(name, request.query(), topK, 0));
+        try {
+            return ResponseEntity.ok(service.search(name, request.query(), topK, 0,
+                    request.entities() == null || request.entities().isEmpty() ? null : request.entities(),
+                    request.filters() == null ? List.of() : request.filters()));
+        } catch (IllegalArgumentException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, e.getMessage());
+        }
     }
 
     /** A 404 for the request when the store is a chat's upload store that is not the caller's. */
