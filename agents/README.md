@@ -196,7 +196,8 @@ travel preferences, say — that no other agent sees: set `scope` to `agent` on
 its memory tools' bindings (`both` gives it the shared memory as well, and
 the model says with each write which one). Users see and delete their
 entries on the profile's **Memory** tab and through `/api/memories`; admins
-see everybody's in the namespace under **Data → Memory**.
+see everybody's in the namespace under **Data → Memory**, and what one agent
+keeps about its users on the **Memory** tab of its page.
 
 Episodic memory — condensed past chats found by similarity — is not built
 yet.
