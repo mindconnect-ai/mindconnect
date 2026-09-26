@@ -37,6 +37,8 @@ public final class UserMemoryComponent {
     public static final String PROFILE_TABLE_ID = "profile-memory-table";
     /** The admin page's table. */
     public static final String ADMIN_TABLE_ID = "admin-memory-table";
+    /** The table on an agent's page: what that agent keeps about its users. */
+    public static final String AGENT_TABLE_ID = "agent-memory-table";
     /** The dialog an entry opens in. */
     public static final String DIALOG_ID = "memory-entry-dialog";
 
@@ -55,6 +57,17 @@ public final class UserMemoryComponent {
      */
     public static UiTable table(String id, String api, List<MemoryEntry> entries,
                                 Function<AgentId, String> agentName, boolean withUser) {
+        return table(id, api, entries, agentName, withUser, "");
+    }
+
+    /**
+     * The same, with {@code actionQuery} (e.g. {@code "?agent=…"}) appended to
+     * the row actions' URLs — so the controller knows which table a delete
+     * redraws.
+     */
+    public static UiTable table(String id, String api, List<MemoryEntry> entries,
+                                Function<AgentId, String> agentName, boolean withUser, String actionQuery) {
+        String query = actionQuery == null ? "" : actionQuery;
         UiTable table = UiTable.of(id, "Memory (" + entries.size() + ")").stackOnMobile(true).icon("brain");
         if (withUser) table.column(UiTable.Column.text("user", "User"));
         table.column(UiTable.Column.text("name", "Name"))
@@ -65,7 +78,7 @@ public final class UserMemoryComponent {
                 .rowAction(UiAction.secondary("view", "View").icon("eye").dispatch("GET", api + "/{id}"))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this memory? The agents will no longer know it.")
-                        .dispatch("DELETE", api + "/{id}"));
+                        .dispatch("DELETE", api + "/{id}" + query));
         for (MemoryEntry entry : entries) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", Row.of(entry).id());

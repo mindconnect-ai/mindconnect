@@ -48,10 +48,13 @@ user's under Data → Memory.
 5. Data → **Memory** (`/admin/memories`).
    **Expected:** the same entries with a User column; typing part of a user id
    into the filter and Enter narrows the table.
-6. `curl http://localhost:9090/api/memories` (with a token when auth is on).
+6. AI → Agents → `secretary` → **Memory** tab.
+   **Expected:** only the secretary's own entry, with the user; `default-chat`'s
+   page has no Memory tab (it works on the shared memory).
+7. `curl http://localhost:9090/api/memories` (with a token when auth is on).
    **Expected:** both entries, the secretary's with `agentId`;
    `?agent=shared` narrows to the shared one.
-7. **Delete** the shared entry on the admin page and confirm.
+8. **Delete** the shared entry on the admin page and confirm.
    **Expected:** "Memory deleted", the table shows one entry, the file is gone.
 
 ## Cleanup

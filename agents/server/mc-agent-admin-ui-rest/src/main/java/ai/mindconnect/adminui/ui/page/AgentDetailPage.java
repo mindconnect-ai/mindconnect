@@ -26,6 +26,7 @@ public final class AgentDetailPage extends AdminPage {
     private final AgentSessionRepository sessionRepository;
     private final String initialSection;
     private final String selectedRowId;
+    private ai.mindconnect.ui.model.UiNode memoryTab;
 
     public AgentDetailPage(AgentDefinition agent, String userId,
                            AgentSessionRepository sessionRepository) {
@@ -42,10 +43,16 @@ public final class AgentDetailPage extends AdminPage {
         this.selectedRowId = selectedRowId;
     }
 
+    /** The "Memory" tab — what this agent keeps about its users; {@code null} leaves it out. */
+    public AgentDetailPage memoryTab(ai.mindconnect.ui.model.UiNode memory) {
+        this.memoryTab = memory;
+        return this;
+    }
+
     @Override
     public UiPage render() {
         var detail = new AgentDetailComponent(agent, userId, sessionRepository,
-                initialSection, selectedRowId);
+                initialSection, selectedRowId).memoryTab(memoryTab);
         return UiPage.of("/admin/agents/" + agent.id().value(), detail.render());
     }
 

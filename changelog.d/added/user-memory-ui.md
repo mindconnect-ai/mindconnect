@@ -3,7 +3,8 @@
   listing the signed-in user's entries — the memory their agents share and
   each agent's own — with the entry in full and a delete per row; admins get
   **Data → Memory** (`/admin/memories`) with every user's entries in the
-  namespace, filterable by user. `GET /api/memories`, `GET` and `DELETE
+  namespace, filterable by user and by memory, and an agent's page gets a
+  **Memory** tab with what that agent keeps about its users. `GET /api/memories`, `GET` and `DELETE
   /api/memories/{name}` (`?agent=` for an agent's own) read and delete the
   caller's own entries; the route is open to every member of the namespace.
   A memory tool's binding takes the setting `scope`: `user` (the default, as
