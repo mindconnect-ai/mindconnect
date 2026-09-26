@@ -51,7 +51,7 @@ class MemoryIndexTest {
     void anAgentThatOnlyReadsIsToldTheMemoryIsReadOnly() {
         String section = index.render(agent("memory_read"), session(ALICE));
 
-        assertThat(section).contains("read-only").doesNotContain("`memory_write`")
+        assertThat(section).contains("read it but not change it").doesNotContain("`memory_write`")
                 .endsWith("No memories saved yet — there is nothing to read.");
     }
 
@@ -80,6 +80,36 @@ class MemoryIndexTest {
 
         assertThat(section.lines().filter(l -> l.startsWith("- m")).count()).isEqualTo(MemoryIndex.MAX_LINES);
         assertThat(section).contains("… and 3 older ones");
+    }
+
+    @Test
+    void anAgentWithItsOwnMemoryListsOnlyItsOwnEntries() {
+        AgentDefinition secretary = agent(List.of(scoped("memory_write", "agent"), scoped("memory_read", "agent")));
+        service.write(ALICE, "role", MemoryType.USER, "Head of purchasing", "c", null);
+        service.write(ALICE, secretary.id(), "travel", MemoryType.PROJECT, "Books via Egencia", "c", null);
+        service.write(ALICE, AgentId.random(), "stack", MemoryType.PROJECT, "Java 21", "c", null);
+
+        String section = index.render(secretary, session(ALICE));
+
+        assertThat(section).contains("memory of your own", "- travel (project): Books via Egencia")
+                .doesNotContain("Head of purchasing").doesNotContain("Java 21");
+    }
+
+    @Test
+    void anAgentWithBothMemoriesSaysWhichEachEntryIsIn() {
+        AgentDefinition secretary = agent(List.of(scoped("memory_write", "both")));
+        service.write(ALICE, "role", MemoryType.USER, "Head of purchasing", "c", null);
+        service.write(ALICE, secretary.id(), "travel", MemoryType.PROJECT, "Books via Egencia", "c", null);
+
+        String section = index.render(secretary, session(ALICE));
+
+        assertThat(section).contains("two persistent memories")
+                .contains("- role (user, user's): Head of purchasing")
+                .contains("- travel (project, yours): Books via Egencia");
+    }
+
+    private static AgentTool scoped(String tool, String scope) {
+        return AgentTool.of(tool, null, java.util.Map.of(MemoryReach.OVERRIDE, scope));
     }
 
     private static AgentSession session(UserId user) {

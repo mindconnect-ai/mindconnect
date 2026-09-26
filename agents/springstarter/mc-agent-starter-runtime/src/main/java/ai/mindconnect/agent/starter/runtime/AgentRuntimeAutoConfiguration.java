@@ -270,6 +270,9 @@ public class AgentRuntimeAutoConfiguration {
     @Bean TodoListService todoListService(AgentRuntime r) { return r.beans().get(TodoListService.class); }
     @Bean DynamicToolActivations dynamicToolActivations(AgentRuntime r) { return r.beans().get(DynamicToolActivations.class); }
     @Bean SkillCatalog skillCatalog(AgentRuntime r) { return r.beans().get(SkillCatalog.class); }
+    @Bean ai.mindconnect.agent.runtime.usermemory.UserMemoryService userMemoryService(AgentRuntime r) {
+        return r.beans().get(ai.mindconnect.agent.runtime.usermemory.UserMemoryService.class);
+    }
     @Bean SkillRepository skillRepository(AgentRuntime r) { return r.beans().get(SkillRepository.class); }
     @Bean AgentDefinitionRepository agentDefinitionRepository(AgentRuntime r) { return r.beans().get(AgentDefinitionRepository.class); }
     @Bean AgentSessionRepository agentSessionRepository(AgentRuntime r) { return r.beans().get(AgentSessionRepository.class); }

@@ -190,6 +190,39 @@ public class ChatUiController {
     }
 
     /**
+     * The agent picker changed: the form is drawn again with the model and
+     * the prompt that go with the pick ({@link
+     * ai.mindconnect.chatui.ui.component.ChatSettingsComponent#valuesFor}), so
+     * the dialog shows what Apply will do instead of the previous agent's
+     * prompt. Nothing is saved.
+     */
+    @PostMapping("/sessions/{sessionId}/settings/agent")
+    public ResponseEntity<UiPatch> settingsAgentPicked(@PathVariable("sessionId") String sessionIdValue,
+                                                       @RequestBody Map<String, Object> raw,
+                                                       @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var session = sessionOpt.get();
+        var body = new FormBody(raw == null ? Map.of() : raw);
+        String agentId = body.str("agentId");
+        AgentDefinition picked = agentId == null || agentId.isBlank() ? null
+                : agentRepository.findById(AgentId.of(agentId)).orElse(null);
+        var effective = agentResolver.resolve(session);
+        AgentId bound = boundAgentId(session);
+        var values = ai.mindconnect.chatui.ui.component.ChatSettingsComponent.valuesFor(picked, bound,
+                new ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values(
+                        effective.llmConfigName(), effective.systemPrompt()),
+                new ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values(
+                        orKeep(body.str("llmConfigName"), effective.llmConfigName()),
+                        orKeep(body.str("systemPrompt"), effective.systemPrompt())));
+        var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
+                sessionId, llmConfigRepository.findAll(), selectableAgents(bound),
+                values.llmConfigName(), picked == null ? null : picked.id(), values.systemPrompt());
+        return ResponseEntity.ok(UiPatch.of().patch(UiPatch.Operation.replace(form.id(), form.render())));
+    }
+
+    /**
      * Applies the dialog: either an agent takes over, or the model and the
      * prompt below it do.
      *

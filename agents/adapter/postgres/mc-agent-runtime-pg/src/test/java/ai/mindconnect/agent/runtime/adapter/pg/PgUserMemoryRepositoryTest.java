@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
@@ -35,7 +36,7 @@ class PgUserMemoryRepositoryTest {
         MemoryEntry second = entry(ALICE, "role", "Head of purchasing");
         repo.save(second);
 
-        assertThat(repo.find(ALICE, "role")).contains(second);
+        assertThat(repo.find(ALICE, null, "role")).contains(second);
         assertThat(repo.findByUser(ALICE)).containsExactly(second);
     }
 
@@ -45,9 +46,9 @@ class PgUserMemoryRepositoryTest {
         repo.save(entry(BOB, "role", "Engineer"));
 
         assertThat(repo.findByUser(BOB)).extracting(MemoryEntry::description).containsExactly("Engineer");
-        assertThat(repo.delete(BOB, "role")).isTrue();
-        assertThat(repo.find(ALICE, "role")).isPresent();
-        assertThat(repo.delete(BOB, "role")).isFalse();
+        assertThat(repo.delete(BOB, null, "role")).isTrue();
+        assertThat(repo.find(ALICE, null, "role")).isPresent();
+        assertThat(repo.delete(BOB, null, "role")).isFalse();
     }
 
     @Test
@@ -56,7 +57,22 @@ class PgUserMemoryRepositoryTest {
 
         PgUserMemoryRepository other = new PgUserMemoryRepository(sql, new Namespace("other")).initSchema();
         assertThat(other.findByUser(ALICE)).isEmpty();
-        assertThat(other.find(ALICE, "role")).isEmpty();
+        assertThat(other.find(ALICE, null, "role")).isEmpty();
+    }
+
+    @Test
+    void anAgentsEntryHasAKeyOfItsOwnBesideTheUsersOfTheSameName() {
+        AgentId secretary = AgentId.of("secretary");
+        repo.save(entry(ALICE, "role", "Buyer"));
+        Instant now = Instant.now().truncatedTo(ChronoUnit.MILLIS);
+        repo.save(new MemoryEntry(ALICE, secretary, "role", MemoryType.PROJECT, "Travel desk", "c", null, now, now));
+
+        assertThat(repo.find(ALICE, secretary, "role")).get().extracting(MemoryEntry::description).isEqualTo("Travel desk");
+        assertThat(repo.find(ALICE, null, "role")).get().extracting(MemoryEntry::description).isEqualTo("Buyer");
+        assertThat(repo.findByUser(ALICE)).hasSize(2);
+        assertThat(repo.findAll()).hasSize(2);
+        assertThat(repo.delete(ALICE, secretary, "role")).isTrue();
+        assertThat(repo.findByUser(ALICE)).singleElement().extracting(MemoryEntry::agentId).isNull();
     }
 
     private static MemoryEntry entry(UserId user, String name, String description) {

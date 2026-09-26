@@ -99,6 +99,8 @@ public class ProfilePage extends AdminPage {
     private final boolean userToolStore;
     /** The zone the user's agents work in — theirs, or the installation's; null leaves the form out. */
     private ZoneId timeZone;
+    /** The "Memory" tab, when the runtime keeps a memory. */
+    private UiNode memoryTab;
 
     /**
      * @param me          who the signed-in user is to a namespace — id and the address they are
@@ -171,6 +173,12 @@ public class ProfilePage extends AdminPage {
      *
      * @param effective the zone the user's agents work in now: theirs, else the installation's
      */
+    /** The "Memory" tab's content — what agents remember about the user; {@code null} leaves the tab out. */
+    public ProfilePage memoryTab(UiNode memory) {
+        this.memoryTab = memory;
+        return this;
+    }
+
     public ProfilePage timeZone(ZoneId effective) {
         this.timeZone = effective;
         return this;
@@ -215,6 +223,7 @@ public class ProfilePage extends AdminPage {
                 .section("profile-tab-tokens", "API tokens", UiStack.of("profile-tokens").gap(12)
                         .child(tokenTable(tokens))
                         .child(help));
+        if (memoryTab != null) page.section("profile-tab-memory", "Memory", memoryTab);
         return UiPage.of("/admin/profile", page);
     }
 

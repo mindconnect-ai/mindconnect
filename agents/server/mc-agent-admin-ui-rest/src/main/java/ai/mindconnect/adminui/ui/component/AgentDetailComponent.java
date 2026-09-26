@@ -38,6 +38,8 @@ public final class AgentDetailComponent implements UiComponent {
     private final AgentSessionRepository sessionRepository;
     private final String initialSection;
     private final String selectedRowId;
+    /** The "Memory" tab — what this agent keeps about its users; null leaves it out. */
+    private UiNode memoryTab;
 
     public AgentDetailComponent(AgentDefinition agent, String userId,
                                  AgentSessionRepository sessionRepository) {
@@ -52,6 +54,12 @@ public final class AgentDetailComponent implements UiComponent {
         this.sessionRepository = sessionRepository;
         this.initialSection = initialSection;
         this.selectedRowId = selectedRowId;
+    }
+
+    /** Adds the "Memory" tab; {@code null} leaves it out. */
+    public AgentDetailComponent memoryTab(UiNode memory) {
+        this.memoryTab = memory;
+        return this;
     }
 
     @Override
@@ -83,6 +91,7 @@ public final class AgentDetailComponent implements UiComponent {
                 .section("details",  "Details", details)
                 .section("tools",    "Tools (" + agent.tools().size() + ")", toolTable)
                 .section("sessions", "Sessions", sessionTable);
+        if (memoryTab != null) section.section("memory", "Memory", memoryTab);
         if (initialSection != null) section.initialSection(initialSection);
 
         return UiStack.of(id() + "-page").child(header).child(section);

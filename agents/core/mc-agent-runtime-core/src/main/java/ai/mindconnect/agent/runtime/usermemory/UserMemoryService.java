@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.usermemory;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 
@@ -12,10 +13,15 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The one way into a user's memory — for the tools today, for an admin page
- * or a REST endpoint later. Keeps the entries small enough to live in a
- * system prompt: a name that is also a file name, a one-line description,
+ * The one way into the users' memory — for the tools, the profile's and the
+ * admin's pages and the REST API. Keeps the entries small enough to live in
+ * a system prompt: a name that is also a file name, a one-line description,
  * a bounded content and a bounded number of entries per user.
+ *
+ * <p>A user's memory has two kinds of entries: their own, which every agent
+ * with the memory tools shares ({@code agentId} {@code null}), and what one
+ * agent keeps about them ({@code agentId} that agent's). Which ones a tool
+ * works on is the binding's {@link MemoryReach}.
  *
  * <p>Thread-safe. Writes and deletes of one user run one at a time: a model
  * may call {@code memory_delete} and {@code memory_write} on the same name in
@@ -31,7 +37,7 @@ public class UserMemoryService {
     public static final int MAX_DESCRIPTION = 200;
     /** Longest content: an entry is a fact, not a document. */
     public static final int MAX_CONTENT = 4_000;
-    /** Most entries a user may have; past it a write asks to clean up first. */
+    /** Most entries a user may have, their own and every agent's together; past it a write asks to clean up first. */
     public static final int MAX_ENTRIES = 200;
 
     /** What a write did: the entry as stored, and whether it is new. */
@@ -44,17 +50,43 @@ public class UserMemoryService {
         this.repository = repository;
     }
 
-    /** The user's entries, most recently changed first. */
+    /** All of the user's entries — their own and every agent's — most recently changed first. */
     public List<MemoryEntry> list(UserId userId) {
+        return repository.findByUser(userId).stream().sorted(RECENT_FIRST).toList();
+    }
+
+    /**
+     * What an agent sees of the user's memory under the given reach: the
+     * user's own entries, the agent's own, or both — most recently changed
+     * first. Without an agent there is no agent memory to see.
+     */
+    public List<MemoryEntry> list(UserId userId, AgentId agentId, MemoryReach reach) {
         return repository.findByUser(userId).stream()
-                .sorted(Comparator.comparing(MemoryEntry::updatedAt).reversed()
-                        .thenComparing(MemoryEntry::name))
+                .filter(e -> e.shared() ? reach.includesShared()
+                        : reach.includesAgent() && e.agentId().equals(agentId))
+                .sorted(RECENT_FIRST)
                 .toList();
     }
 
-    public Optional<MemoryEntry> read(UserId userId, String name) {
-        return repository.find(userId, normaliseName(name));
+    /** Every entry of every user in the namespace, by user and then most recently changed first — for an admin. */
+    public List<MemoryEntry> listAll() {
+        return repository.findAll().stream()
+                .sorted(Comparator.comparing((MemoryEntry e) -> e.userId().value()).thenComparing(RECENT_FIRST))
+                .toList();
     }
+
+    /** An entry of the user's own memory ({@code agentId} {@code null}) or of one agent's. */
+    public Optional<MemoryEntry> read(UserId userId, AgentId agentId, String name) {
+        return repository.find(userId, agentId, normaliseName(name));
+    }
+
+    /** An entry of the user's own memory. */
+    public Optional<MemoryEntry> read(UserId userId, String name) {
+        return read(userId, null, name);
+    }
+
+    private static final Comparator<MemoryEntry> RECENT_FIRST =
+            Comparator.comparing(MemoryEntry::updatedAt).reversed().thenComparing(MemoryEntry::name);
 
     /**
      * Creates the entry, or replaces the one of the same name — keeping when
@@ -63,6 +95,12 @@ public class UserMemoryService {
      */
     public Written write(UserId userId, String name, MemoryType type, String description, String content,
                          SessionId sourceSessionId) {
+        return write(userId, null, name, type, description, content, sourceSessionId);
+    }
+
+    /** The same, in the memory {@code agentId} names — {@code null} for the user's own. */
+    public Written write(UserId userId, AgentId agentId, String name, MemoryType type, String description,
+                         String content, SessionId sourceSessionId) {
         if (userId == null) throw new IllegalArgumentException("a memory needs a user");
         if (type == null) throw new IllegalArgumentException("'type' is required");
         String key = normaliseName(name);
@@ -79,7 +117,7 @@ public class UserMemoryService {
                     + MAX_CONTENT + " — split it, or keep only what will matter later");
         }
         synchronized (lockFor(userId)) {
-            Optional<MemoryEntry> existing = repository.find(userId, key);
+            Optional<MemoryEntry> existing = repository.find(userId, agentId, key);
             if (existing.isEmpty() && repository.findByUser(userId).size() >= MAX_ENTRIES) {
                 throw new IllegalArgumentException("this user already has " + MAX_ENTRIES + " memories — update or "
                         + "delete an outdated one instead of adding another");
@@ -87,16 +125,21 @@ public class UserMemoryService {
             Instant now = Instant.now();
             Instant created = existing.map(MemoryEntry::createdAt).orElse(now);
             MemoryEntry saved = repository.save(
-                    new MemoryEntry(userId, key, type, line, body, sourceSessionId, created, now));
+                    new MemoryEntry(userId, agentId, key, type, line, body, sourceSessionId, created, now));
             return new Written(saved, existing.isEmpty());
         }
     }
 
     /** {@code false} when there was nothing of that name. */
     public boolean delete(UserId userId, String name) {
+        return delete(userId, null, name);
+    }
+
+    /** The same, in the memory {@code agentId} names — {@code null} for the user's own. */
+    public boolean delete(UserId userId, AgentId agentId, String name) {
         String key = normaliseName(name);
         synchronized (lockFor(userId)) {
-            return repository.delete(userId, key);
+            return repository.delete(userId, agentId, key);
         }
     }
 

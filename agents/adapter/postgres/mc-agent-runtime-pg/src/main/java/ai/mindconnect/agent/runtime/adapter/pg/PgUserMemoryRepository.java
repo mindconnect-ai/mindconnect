@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
+import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
@@ -14,10 +15,13 @@ import java.util.Optional;
 
 /**
  * {@link UserMemoryRepository} on Postgres: one row of {@code mc_user_memory}
- * per entry, keyed by {@code (namespace, id)} with the id {@code <user>/<name>}
- * — the name is unique per user, not per namespace. {@code user_id} is a
- * column of its own for listing a user's entries. Bound to one namespace;
- * the namespace purge finds the table by its {@code namespace} column.
+ * per entry, keyed by {@code (namespace, id)}. The id is {@code <user>/<name>}
+ * for the user's own memory and {@code <user>/@<agent>/<name>} for what one
+ * agent keeps about them — a name is kebab-case, so the {@code @} cannot
+ * collide, and the rows written before agents had a memory keep their ids.
+ * {@code user_id} and {@code agent_id} are columns of their own for the
+ * listings. Bound to one namespace; the namespace purge finds the table by
+ * its {@code namespace} column.
  */
 public final class PgUserMemoryRepository implements UserMemoryRepository {
 
@@ -33,8 +37,9 @@ public final class PgUserMemoryRepository implements UserMemoryRepository {
         this.entries = DocumentTable.of(MemoryEntry.class)
                 .table("mc_user_memory")
                 .partitionKey("namespace", "TEXT", e -> namespace.value())
-                .id("id", "TEXT", e -> key(e.userId(), e.name()))
+                .id("id", "TEXT", e -> key(e.userId(), e.agentId(), e.name()))
                 .requiredColumn("user_id", "TEXT", e -> e.userId().value())
+                .column("agent_id", "TEXT", e -> e.agentId() == null ? null : e.agentId().value())
                 .index("namespace", "user_id")
                 .build(sql);
     }
@@ -50,8 +55,13 @@ public final class PgUserMemoryRepository implements UserMemoryRepository {
     }
 
     @Override
-    public Optional<MemoryEntry> find(UserId userId, String name) {
-        return entries.findById(namespace.value(), key(userId, name));
+    public List<MemoryEntry> findAll() {
+        return entries.find("WHERE namespace = ?", namespace.value());
+    }
+
+    @Override
+    public Optional<MemoryEntry> find(UserId userId, AgentId agentId, String name) {
+        return entries.findById(namespace.value(), key(userId, agentId, name));
     }
 
     @Override
@@ -60,11 +70,11 @@ public final class PgUserMemoryRepository implements UserMemoryRepository {
     }
 
     @Override
-    public boolean delete(UserId userId, String name) {
-        return entries.deleteById(namespace.value(), key(userId, name));
+    public boolean delete(UserId userId, AgentId agentId, String name) {
+        return entries.deleteById(namespace.value(), key(userId, agentId, name));
     }
 
-    private static String key(UserId userId, String name) {
-        return userId.value() + "/" + name;
+    private static String key(UserId userId, AgentId agentId, String name) {
+        return agentId == null ? userId.value() + "/" + name : userId.value() + "/@" + agentId.value() + "/" + name;
     }
 }
