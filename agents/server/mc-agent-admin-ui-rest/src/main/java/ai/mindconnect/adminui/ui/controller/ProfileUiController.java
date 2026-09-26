@@ -80,6 +80,8 @@ public class ProfileUiController {
     private final UserToolUiController userToolRows;
     private final Clock clock;
     private final boolean authEnabled;
+    /** The "Memory" tab — what agents remember about the user; null leaves the tab out. */
+    private UserMemoryUiController memoryUi;
     /** Whose zone is what — the users' own, else the installation's ({@code mindconnect.time-zone}). */
     private TimeZones zones;
 
@@ -91,12 +93,14 @@ public class ProfileUiController {
                                org.springframework.beans.factory.ObjectProvider<UserTools> userTools,
                                org.springframework.beans.factory.ObjectProvider<UserToolUiController> userToolRows,
                                org.springframework.beans.factory.ObjectProvider<TimeZones> zones,
+                               org.springframework.beans.factory.ObjectProvider<UserMemoryUiController> memoryUi,
                                @org.springframework.beans.factory.annotation.Value("${mindconnect.auth.enabled:false}")
                                boolean authEnabled) {
         this(tokens, users, namespaces, members, scope, toolVariables.getIfAvailable(),
                 toolConnections.getIfAvailable(), userTools.getIfAvailable(), userToolRows.getIfAvailable(),
                 Clock.systemUTC(), authEnabled);
         timeZones(zones.getIfAvailable());
+        this.memoryUi = memoryUi.getIfAvailable();
     }
 
     ProfileUiController(ApiTokenService tokens, UserService users, NamespaceService namespaces,
@@ -140,7 +144,9 @@ public class ProfileUiController {
                 connectionCards(id), toolConnections != null && toolConnections.available(),
                 userToolRows == null ? List.of() : userToolRows.rows(id),
                 userToolsUi == null ? java.util.Map.of() : userToolsUi.catalogue(),
-                userToolsUi != null && userToolsUi.available()).timeZone(zones.zoneOf(id)).render();
+                userToolsUi != null && userToolsUi.available()).timeZone(zones.zoneOf(id))
+                .memoryTab(memoryUi == null ? null : memoryUi.tab(id).orElse(null))
+                .render();
     }
 
     /**

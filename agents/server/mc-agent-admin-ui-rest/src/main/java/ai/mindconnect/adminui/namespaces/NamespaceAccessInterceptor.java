@@ -63,14 +63,16 @@ public class NamespaceAccessInterceptor implements HandlerInterceptor {
      * this list: a token carries its owner's rights, so a user of a namespace
      * may chat through it but not create an agent in it either. An
      * extension's own API ({@code /api/<id>/**}) opens to users through its
-     * manifest, not through this list.
+     * manifest, not through this list. The one exception is
+     * {@code /api/memories}: it reads and deletes only what agents remember
+     * about the caller, the same entries the profile's "Memory" tab shows.
      */
     static final List<String> OPEN = List.of(
             "/chat", "/admin/api/chat", "/admin/api/sessions", "/admin/api/messages",
             "/admin/profile", "/admin/api/profile",
             "/admin/namespaces", "/admin/api/namespaces",
             "/admin/api/connections", "/admin/oauth", "/admin/api/user-tools", "/admin/api/notifications",
-            "/admin/api/about", "/admin/api/user-stream", "/admin/api/tasks",
+            "/admin/api/about", "/admin/api/user-stream", "/admin/api/tasks", "/api/memories",
             "/admin/logout", "/logout", "/login", "/index.html", "/login.html",
             "/no-access", "/error", "/favicon.ico",
             "/css/", "/js/", "/sui/", "/sui-ext/", "/img/", "/branding/", "/webjars/",

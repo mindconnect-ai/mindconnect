@@ -369,12 +369,14 @@ public final class AdminLayout {
     }
 
     /**
-     * What an agent reads: for now the vector stores. Its own group, one entry
-     * or not, so documents and sources have a home when they arrive.
+     * What an agent reads: the vector stores, and what agents remember about
+     * the users across chats. Its own group, so documents and sources have a
+     * home when they arrive.
      */
     private UiMenuItem dataGroup(String navigate) {
         UiMenuItem data = UiMenuItem.group("nav-group-data", "Data").icon("database");
         data.child(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
+        data.child(navItem("nav-memories", "Memory", "/admin/memories", "brain", navigate));
         return openWhenSelected(data);
     }
 

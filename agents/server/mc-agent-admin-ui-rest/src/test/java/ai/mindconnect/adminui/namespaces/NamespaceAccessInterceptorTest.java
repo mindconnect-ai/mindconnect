@@ -124,7 +124,8 @@ class NamespaceAccessInterceptorTest {
                 "/admin/oauth/authorize/google-mail", "/admin/oauth/callback",
                 "/admin/api/user-tools/new", "/admin/api/user-tools/add/web_search",
                 "/admin/api/user-tools/t-1/toggle", "/admin/api/notifications",
-                "/admin/api/notifications/n-1/dismiss", "/admin/api/notifications/dismiss-all")) {
+                "/admin/api/notifications/n-1/dismiss", "/admin/api/notifications/dismiss-all",
+                "/admin/api/profile/memory/abc", "/api/memories", "/api/memories/role")) {
             assertThat(allowed(path)).as(path).isTrue();
         }
         assertThat(NamespaceAccessInterceptor.isOpen("/admin/oauth-providers"))
@@ -138,6 +139,15 @@ class NamespaceAccessInterceptorTest {
 
         assertThat(call("/api/agents").getStatus()).isEqualTo(403);
         assertThat(call("/v1/responses").getStatus()).isEqualTo(403);
+        assertThat(call("/api/memoriesx").getStatus()).as("only the memory's own route").isEqualTo(403);
+    }
+
+    @Test
+    void theAdminsViewOfEverybodysMemoryIsAnAdminsAlone() throws Exception {
+        signedIn(ALICE);
+
+        assertThat(call("/admin/memories").getStatus()).isEqualTo(403);
+        assertThat(call("/admin/api/memories").getStatus()).isEqualTo(403);
     }
 
     @Test

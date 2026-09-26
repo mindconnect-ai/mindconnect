@@ -22,8 +22,12 @@ public final class MemoryDeleteToolFactory implements ToolFactory {
     @Override
     public boolean isAvailable() { return service != null; }
 
+    /** Which memory the tool works on — the user's own, this agent's, or both; see {@link MemoryReach}. */
+    @Override
+    public java.util.Map<String, Object> overridesSchema() { return MemoryReach.overridesSchema(); }
+
     @Override
     public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new MemoryDeleteTool(service, scope.userId());
+        return new MemoryDeleteTool(service, scope.userId(), scope.agentId(), MemoryReach.of(agentTool));
     }
 }

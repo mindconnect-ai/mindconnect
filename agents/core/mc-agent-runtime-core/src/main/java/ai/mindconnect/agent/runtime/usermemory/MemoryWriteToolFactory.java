@@ -22,8 +22,12 @@ public final class MemoryWriteToolFactory implements ToolFactory {
     @Override
     public boolean isAvailable() { return service != null; }
 
+    /** Which memory the tool works on — the user's own, this agent's, or both; see {@link MemoryReach}. */
+    @Override
+    public java.util.Map<String, Object> overridesSchema() { return MemoryReach.overridesSchema(); }
+
     @Override
     public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new MemoryWriteTool(service, scope.userId(), scope.sessionId());
+        return new MemoryWriteTool(service, scope.userId(), scope.agentId(), scope.sessionId(), MemoryReach.of(agentTool));
     }
 }
