@@ -19,8 +19,10 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  * <ul>
  *   <li>{@code UiPatch} and every other non-page body — only a {@link UiPage}
  *       body is handled, so in-place updates pass through untouched.</li>
- *   <li>Dialog pages ({@code !page.getDialogs().isEmpty()}) — modals render over
- *       the current page and must not carry their own header.</li>
+ *   <li>A page with no node — only dialogs to put over the page that is
+ *       there. A page <i>with</i> a node is wrapped even when it opens a
+ *       dialog: a link that lands on a folder with a file open is still a
+ *       screen, and without the shell the menu was gone once the dialog closed.</li>
  *   <li>Already-wrapped pages — guarded by the {@code admin-layout} root id, so
  *       a controller that delegates to another (which also returns a page)
  *       can't double-wrap.</li>
@@ -59,14 +61,11 @@ public class AdminLayoutAdvice implements ResponseBodyAdvice<Object> {
         if (!(body instanceof UiPage page)) {
             return body;
         }
-        // Don't wrap modals or already-wrapped pages. A modal page carries its
-        // background (already layout-wrapped) as #sui-root and the dialog(s) in
-        // page.dialogs, so re-wrapping would double up the header.
-        if (page.getDialogs() != null && !page.getDialogs().isEmpty()) {
-            return page;
-        }
+        // Nothing to wrap, or wrapped already. Dialogs travel with the page
+        // (AdminLayout.withLayout keeps them), so a page that opens one is
+        // wrapped like any other.
         UiNode root = page.getNode();
-        if (root != null && LAYOUT_ID.equals(root.getId())) {
+        if (root == null || LAYOUT_ID.equals(root.getId())) {
             return page;
         }
         return layoutFactory.current().withLayout(page);
