@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui;
 
+import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiStack;
@@ -54,6 +55,24 @@ class AdminLayoutAdviceTest {
 
         assertThat(out).isInstanceOf(UiPage.class);
         assertThat(((UiPage) out).getNode().getId()).isEqualTo(AdminLayoutAdvice.LAYOUT_ID);
+    }
+
+    @Test
+    void a_page_that_opens_a_dialog_gets_the_shell_and_keeps_the_dialog() {
+        UiPage page = UiPage.of("/admin/office/files", UiStack.of("folder"))
+                .dialog(UiDialog.of("report.pdf", null, UiStack.of("file")));
+
+        UiPage out = (UiPage) advice().beforeBodyWrite(page, null, null, null, null, null);
+
+        assertThat(out.getNode().getId()).isEqualTo(AdminLayoutAdvice.LAYOUT_ID);
+        assertThat(out.getDialogs()).hasSize(1);
+    }
+
+    @Test
+    void only_dialogs_pass_through_untouched() {
+        UiPage page = UiPage.of("/admin/office/files", null).dialog(UiDialog.of("report.pdf", null, UiStack.of("file")));
+
+        assertThat(advice().beforeBodyWrite(page, null, null, null, null, null)).isSameAs(page);
     }
 
     @Test

@@ -40,9 +40,9 @@ public class ExtensionPageAdvice implements ResponseBodyAdvice<Object> {
                                   Class<? extends HttpMessageConverter<?>> converterType,
                                   ServerHttpRequest request, ServerHttpResponse response) {
         if (!(body instanceof UiPage page)) return body;
-        if (page.getDialogs() != null && !page.getDialogs().isEmpty()) return page;
+        // As AdminLayoutAdvice: a page that opens a dialog is still a screen.
         UiNode root = page.getNode();
-        if (root != null && AdminLayoutAdvice.LAYOUT_ID.equals(root.getId())) return page;
+        if (root == null || AdminLayoutAdvice.LAYOUT_ID.equals(root.getId())) return page;
         if (extensions.pageOwner(request.getURI().getPath()).isEmpty()) return page;
         return layoutFactory.current().withLayout(page);
     }
