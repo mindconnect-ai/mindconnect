@@ -82,6 +82,4 @@ The admin UI needs `MINDCONNECT_ENCRYPTION_SECRET_KEY` (16, 24 or 32 chars).
   fragment fails the `changelog` check; label it `no-changelog` when that is
   the right answer. The release assembles the fragments; see
   `changelog.d/README.md`.
-- Manual regression tests live in `agents/doc/manual-tests/`; update a
-  `last-verified` stamp only on a pass.
 - Keep `website/docs/` in step with behaviour you change.

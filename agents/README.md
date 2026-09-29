@@ -79,8 +79,7 @@ server of its own without the tool side noticing.
 | `mc-agent-tools-mcp` | The `MultiToolProvider` that turns every registered server's tools into agent tools |
 | `mc-mcp-gateway-admin-ui-rest` | The `/mcp-gateway` screen, embedded by the admin UI |
 
-Concepts: `mc-sandbox/agents/doc/concepts/21-*`, `22-*`, `23-*`. Manual tests:
-`doc/manual-tests/mcp/`.
+Concepts: `mc-sandbox/agents/doc/concepts/21-*`, `22-*`, `23-*`.
 
 ### Registry — import from a GitHub project
 
@@ -103,8 +102,7 @@ lists workflows it cannot import and says so, instead of dragging the engine in.
 Nothing installs itself: reading a registry is safe, installing one is a decision
 a person makes per entry. Format and configuration:
 [website/docs/agents/registry.md](../website/docs/agents/registry.md), worked
-example: [`doc/registry-example/`](doc/registry-example/). Manual tests:
-`doc/manual-tests/registry/`.
+example: [`doc/registry-example/`](doc/registry-example/).
 
 ### `adapter/` — alternative implementations of the core ports
 
