@@ -125,7 +125,7 @@ kept. Each template names one (`index`), and its stores use it:
 |-------|-------|
 | `default` (built in) | `mc_embedding` — in the application's database when it has pgvector, in a database of its own with `mindconnect.vector-store.url`, else files under `<data dir>/<namespace>/embeddings` |
 | `chat-uploads` (built in) | the same place, table `mc_embedding_chat` (files: `embeddings-chat-uploads`) — the files attached to chats, apart from the rest |
-| your own | a pgvector table in the application's database or in another one (JDBC URL, user, password), or a directory of files |
+| your own | a pgvector table in the application's database — on file persistence the one `mindconnect.vector-store.url` names — or in another one (JDBC URL, user, password), or a directory of files |
 
 A namespace defines its own indexes in the admin UI's **Indexes** tab or
 through `POST /api/vector-stores/indexes`; saving one under a built-in name

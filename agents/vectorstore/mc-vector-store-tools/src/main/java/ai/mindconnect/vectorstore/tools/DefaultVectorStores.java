@@ -192,9 +192,12 @@ public final class DefaultVectorStores implements VectorStores {
      */
     public void purge(Namespace namespace) {
         for (IndexDefinition definition : indexes(namespace)) {
-            if (!definition.pgvector() || definition.url() == null) continue;
+            // The application's own database is cleared by the namespace purge.
+            if (!definition.pgvector() || (definition.url() == null && host.runtimeDb() != null)) continue;
+            DataSource db = database(definition);
+            if (db == null) continue;
             try {
-                Sql.of(dataSource(definition)).update("DELETE FROM " + definition.effectiveTable()
+                Sql.of(db).update("DELETE FROM " + definition.effectiveTable()
                         + " WHERE namespace = ?", namespace.value());
             } catch (RuntimeException e) {
                 log.warn("Index '{}' of namespace '{}' could not be cleared: {}", definition.name(),
@@ -298,7 +301,7 @@ public final class DefaultVectorStores implements VectorStores {
     private Opened openIndex(Namespace namespace, IndexDefinition definition) {
         String fileReason = host.fileReason();
         if (definition.pgvector()) {
-            DataSource db = definition.url() == null ? host.runtimeDb() : dataSource(definition);
+            DataSource db = database(definition);
             if (db == null) {
                 fileReason = "no database for pgvector (file persistence)";
             } else if (!PostgresVectorStores.pgvectorAvailable(db)) {
@@ -306,8 +309,8 @@ public final class DefaultVectorStores implements VectorStores {
                         : "the database has no pgvector extension";
             } else {
                 Sql sql = definition.url() == null && host.runtimeSql() != null ? host.runtimeSql() : Sql.of(db);
-                String where = definition.url() == null ? "the application's database"
-                        : withoutCredentials(definition.url());
+                String where = definition.url() != null ? withoutCredentials(definition.url())
+                        : systemDatabase().orElse("the application's database");
                 return new Opened(definition, new PgEmbeddingIndex(sql, namespace, definition.effectiveTable()),
                         "Postgres (pgvector), " + where + " — table " + definition.effectiveTable());
             }
@@ -315,6 +318,34 @@ public final class DefaultVectorStores implements VectorStores {
         Path dir = fileDirectory(namespace, definition);
         return new Opened(definition, FileEntryStore.index(dir),
                 "Files in " + dir + (fileReason == null ? "" : " — " + fileReason));
+    }
+
+    /**
+     * The database of a pgvector definition: its own URL; without one the
+     * application's database, or — on file persistence — the database the
+     * built-in indexes are configured with ({@code mindconnect.vector-store.url});
+     * null when there is none.
+     */
+    private DataSource database(IndexDefinition definition) {
+        if (definition.url() != null) {
+            return dataSource(definition);
+        }
+        if (host.runtimeDb() != null) {
+            return host.runtimeDb();
+        }
+        IndexDefinition configured = host.builtIn().get(IndexDefinition.DEFAULT);
+        return configured.pgvector() && configured.url() != null ? dataSource(configured) : null;
+    }
+
+    @Override
+    public Optional<String> systemDatabase() {
+        if (host.runtimeDb() != null) {
+            return Optional.of("the application's database");
+        }
+        IndexDefinition configured = host.builtIn().get(IndexDefinition.DEFAULT);
+        return configured.pgvector() && configured.url() != null
+                ? Optional.of("the vector-store database, " + withoutCredentials(configured.url()))
+                : Optional.empty();
     }
 
     private Path fileDirectory(Namespace namespace, IndexDefinition definition) {

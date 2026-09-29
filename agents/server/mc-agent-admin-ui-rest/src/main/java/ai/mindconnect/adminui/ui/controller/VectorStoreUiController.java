@@ -363,6 +363,8 @@ public class VectorStoreUiController {
                         // pgvector, a directory for files.
                         .onChange(UiTrigger.api("POST", BASE + "/indexes/kind-fields", "vs-index-form")))
                 .content(pgvectorGroup(!isNew && !index.pgvector(), isNew ? null : index.table(),
+                        isNew || index.url() == null ? SYSTEM_DATABASE : OWN_DATABASE, stores.systemDatabase()))
+                .content(ownDatabaseGroup((!isNew && !index.pgvector()) || isNew || index.url() == null,
                         isNew ? null : index.url(), isNew ? null : index.user(), !isNew && index.password() != null))
                 .content(fileGroup(isNew || index.pgvector(), isNew ? null : index.directory()))
                 .field(UiField.text("description", "Description", isNew ? null : index.description()).asEditable());
@@ -372,14 +374,33 @@ public class VectorStoreUiController {
         return UiPage.of(BASE + (isNew ? "/indexes/new" : "/indexes/" + index.name() + "/edit"), form);
     }
 
-    private static ai.mindconnect.ui.model.UiFieldGroup pgvectorGroup(boolean hide, String table, String url,
-                                                                     String user, boolean passwordSet) {
+    /** The index uses the database the application has — no URL, user or password to give. */
+    static final String SYSTEM_DATABASE = "system";
+    /** The index names a database of its own by JDBC URL. */
+    static final String OWN_DATABASE = "own";
+
+    private static ai.mindconnect.ui.model.UiFieldGroup pgvectorGroup(boolean hide, String table, String database,
+                                                                     java.util.Optional<String> systemDatabase) {
         var group = ai.mindconnect.ui.model.UiFieldGroup.of("vs-index-pgvector", null)
                 .field(UiField.text("table", "Table", table).asEditable()
                         .hint("e.g. mc_embedding_acme — empty: mc_embedding"))
+                .field(UiField.select("database", "Database", database, List.of(
+                                UiField.Option.of(SYSTEM_DATABASE, "The application's database"),
+                                UiField.Option.of(OWN_DATABASE, "A database of its own (JDBC URL)")))
+                        .asEditable()
+                        .hint(systemDatabase.map(where -> "The application's database is " + where + ".")
+                                .orElse("The application runs without Postgres: an index on its database falls "
+                                        + "back to files — give it a database of its own."))
+                        // Only a database of its own asks for URL, user and password.
+                        .onChange(UiTrigger.api("POST", BASE + "/indexes/kind-fields", "vs-index-form")));
+        return hide ? group.hidden() : group;
+    }
+
+    private static ai.mindconnect.ui.model.UiFieldGroup ownDatabaseGroup(boolean hide, String url, String user,
+                                                                        boolean passwordSet) {
+        var group = ai.mindconnect.ui.model.UiFieldGroup.of("vs-index-own-db", null)
                 .field(UiField.text("url", "JDBC URL", url).asEditable()
-                        .hint("A database of its own, e.g. jdbc:postgresql://db-acme:5432/vectors — empty: "
-                                + "the application's database"))
+                        .hint("e.g. jdbc:postgresql://db-acme:5432/vectors"))
                 .field(UiField.text("user", "DB User", user).asEditable())
                 .field(UiField.password("password", "DB Password", null).asEditable()
                         .hint(passwordSet ? "Set — leave empty to keep it"
@@ -394,17 +415,21 @@ public class VectorStoreUiController {
         return hide ? group.hidden() : group;
     }
 
-    /** The kind select changed: show the fields of the new kind, keeping what was typed. */
+    /** The kind or the database select changed: show the fields that now apply, keeping what was typed. */
     @PostMapping("/indexes/kind-fields")
     public ai.mindconnect.ui.model.UiPatch indexKindFields(@RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         boolean pgvector = !IndexDefinition.FILE.equals(body.str("kind"));
+        String database = OWN_DATABASE.equals(body.str("database")) ? OWN_DATABASE : SYSTEM_DATABASE;
         String name = body.str("name") == null ? null : body.str("name").trim();
         boolean passwordSet = name != null && stores.indexes(scope.namespace()).stream()
                 .anyMatch(i -> i.name().equals(name) && i.password() != null);
         return ai.mindconnect.ui.model.UiPatch.of()
                 .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-pgvector", pgvectorGroup(!pgvector,
-                        body.str("table"), body.str("url"), body.str("user"), passwordSet)))
+                        body.str("table"), database, stores.systemDatabase())))
+                .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-own-db",
+                        ownDatabaseGroup(!pgvector || SYSTEM_DATABASE.equals(database), body.str("url"),
+                                body.str("user"), passwordSet)))
                 .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-file",
                         fileGroup(pgvector, body.str("directory"))));
     }
@@ -417,16 +442,22 @@ public class VectorStoreUiController {
                 .filter(i -> i.name().equals(name)).findFirst().orElse(null);
         String password = body.str("password");
         IndexDefinition index;
-        // The hidden group of the other kind is submitted too; only the chosen kind's fields count.
+        // Hidden groups are submitted too; only the fields of the chosen kind and database count.
         boolean pgvector = !IndexDefinition.FILE.equals(body.str("kind"));
+        boolean ownDatabase = pgvector && OWN_DATABASE.equals(body.str("database"));
         try {
             index = new IndexDefinition(name, body.str("kind"),
-                    pgvector ? body.str("table") : null, pgvector ? body.str("url") : null,
-                    pgvector ? body.str("user") : null,
-                    !pgvector ? null
+                    pgvector ? body.str("table") : null, ownDatabase ? body.str("url") : null,
+                    ownDatabase ? body.str("user") : null,
+                    !ownDatabase ? null
                             : password == null || password.isBlank() ? (previous == null ? null : previous.password())
                             : password,
                     pgvector ? null : body.str("directory"), body.str("description"));
+            if (ownDatabase && index.url() == null) {
+                return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error(
+                        "A database of its own needs a JDBC URL — or choose the application's database.")
+                        .title("Not saved"));
+            }
             stores.saveIndex(scope.namespace(), index);
             // Open it now: a wrong URL or a database without pgvector shows here, not at the next upload.
             stores.indexLocation(scope.namespace(), index.name());
