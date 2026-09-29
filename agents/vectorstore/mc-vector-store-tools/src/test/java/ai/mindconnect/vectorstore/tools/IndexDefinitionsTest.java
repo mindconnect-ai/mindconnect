@@ -108,6 +108,42 @@ class IndexDefinitionsTest {
     }
 
     @Test
+    void onFilePersistence_anIndexWithoutUrlUsesTheConfiguredVectorStoreDatabase() {
+        db = TestDb.requirePostgres();
+        TestDb.forget(db, NS);
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of(
+                "vectorStoreUrl", TestDb.URL, "vectorStoreUser", TestDb.USER,
+                "vectorStorePassword", TestDb.PASSWORD))).orElseThrow();
+        stores.saveIndex(NS, new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
+        stores.registry(NS).saveTemplate(new VectorStoreTemplate("handbooks", "embeddings", null, Map.of()).withIndex("big-kb"));
+
+        VectorStore store = stores.open(NS, "manuals", "handbooks", VectorStoreInstance.Scope.GLOBAL, null);
+        store.put(FILE_1, null, "1", TEXT);
+
+        assertThat(stores.systemDatabase()).contains("the vector-store database, " + TestDb.URL);
+        assertThat(stores.indexLocation(NS, "big-kb"))
+                .isEqualTo("Postgres (pgvector), the vector-store database, " + TestDb.URL + " — table " + OWN_TABLE);
+        assertThat(Sql.of(db).scalar("SELECT count(*) FROM " + OWN_TABLE + " WHERE namespace = ?", Long.class, NS.value()))
+                .isEqualTo(1L);
+    }
+
+    @Test
+    void withoutAnyPostgres_anIndexWithoutUrlFallsBackToFiles_andSaysSo() {
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of())).orElseThrow();
+        stores.saveIndex(NS, new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
+
+        assertThat(stores.systemDatabase()).isEmpty();
+        assertThat(stores.indexLocation(NS, "big-kb")).startsWith("Files in ").endsWith("no database for pgvector (file persistence)");
+    }
+
+    @Test
+    void onPostgresPersistence_theSystemDatabaseIsTheApplications() {
+        db = TestDb.requirePostgres();
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
+        assertThat(stores.systemDatabase()).contains("the application's database");
+    }
+
+    @Test
     void onFilesChatUploadsGetADirectoryOfTheirOwn() {
         DefaultVectorStores stores = new DefaultVectorStores(
                 new VectorStoreTemplate("default", "embeddings", null, Map.of()), dir,

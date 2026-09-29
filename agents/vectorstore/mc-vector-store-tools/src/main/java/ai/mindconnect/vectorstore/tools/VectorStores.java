@@ -71,6 +71,16 @@ public interface VectorStores {
     }
 
     /**
+     * The database a pgvector index without a JDBC URL uses — the
+     * application's own, or else the one the built-in indexes are configured
+     * with — for people; empty when there is none and such an index would
+     * fall back to files.
+     */
+    default Optional<String> systemDatabase() {
+        return Optional.empty();
+    }
+
+    /**
      * Where the namespace's embedding index lives, for people: "Postgres
      * (pgvector) …" or "Files in …", and why when it is not where one might
      * expect it.

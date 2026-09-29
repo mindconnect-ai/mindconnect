@@ -33,8 +33,8 @@ final class TestDb {
 
     static final String URL = System.getenv().getOrDefault(
             "MC_JDBC_TEST_URL", "jdbc:postgresql://localhost:5433/postgres");
-    private static final String USER = System.getenv().getOrDefault("MC_JDBC_TEST_USER", "postgres");
-    private static final String PASSWORD = System.getenv().getOrDefault("MC_JDBC_TEST_PASSWORD", "test");
+    static final String USER = System.getenv().getOrDefault("MC_JDBC_TEST_USER", "postgres");
+    static final String PASSWORD = System.getenv().getOrDefault("MC_JDBC_TEST_PASSWORD", "test");
 
     private static final String NO_VECTOR = "mc_novector";
 
@@ -88,7 +88,16 @@ final class TestDb {
      * vectors) and the data directory — plus whatever {@code strings} add.
      */
     static ToolEnvironment postgresEnvironment(DataSource dataSource, Path dataDir, Map<String, String> strings) {
-        Sql sql = Sql.of(dataSource);
+        return environment(dataSource, dataDir, strings);
+    }
+
+    /** The same on file persistence: no Sql, no DataSource — only what {@code strings} configure. */
+    static ToolEnvironment fileEnvironment(Path dataDir, Map<String, String> strings) {
+        return environment(null, dataDir, strings);
+    }
+
+    private static ToolEnvironment environment(DataSource dataSource, Path dataDir, Map<String, String> strings) {
+        Sql sql = dataSource == null ? null : Sql.of(dataSource);
         LlmEmbeddings embeddings = (config, texts) -> texts.stream()
                 .map(t -> t.contains("container") ? new float[]{1f, 0f, 0f} : new float[]{0f, 0f, 1f})
                 .toList();
@@ -104,8 +113,8 @@ final class TestDb {
         return new ToolEnvironment() {
             @Override @SuppressWarnings("unchecked")
             public <T> Optional<T> get(Class<T> type) {
-                if (type == Sql.class) return Optional.of((T) sql);
-                if (type == DataSource.class) return Optional.of((T) dataSource);
+                if (type == Sql.class) return Optional.ofNullable((T) sql);
+                if (type == DataSource.class) return Optional.ofNullable((T) dataSource);
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) configs);
                 return Optional.empty();

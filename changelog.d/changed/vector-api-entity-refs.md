@@ -10,9 +10,12 @@
   `EmbeddingIndex.declareField` (Postgres keeps a partial index per field).
   Where chunks are kept is the index a template names: the built-in `default`
   (`mc_embedding`) and `chat-uploads` (`mc_embedding_chat` — chat uploads apart
-  from the rest), and indexes a namespace defines itself — another table, a
-  database of its own (JDBC URL, user, encrypted password), or files — in the
-  admin UI's new Indexes tab or `…/api/vector-stores/indexes`. Indexes do not
+  from the rest), and indexes a namespace defines itself — another table in the
+  application's database (on file persistence: the one
+  `mindconnect.vector-store.url` names), a database of its own (JDBC URL, user,
+  encrypted password), or files — in the admin UI's new Indexes tab, where
+  *Database* picks the application's or asks for the URL, or
+  `…/api/vector-stores/indexes`. Indexes do not
   share entries.
   `vector_search` takes `entities` (id, plus type, source, container where
   needed) and `where`; `vector_upsert` a `type` (`file` for a stored file's id)

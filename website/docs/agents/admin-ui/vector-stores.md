@@ -29,10 +29,12 @@ Where the stores' chunks are kept: the built-in `default` (`mc_embedding`) and
 `chat-uploads` (`mc_embedding_chat`) and the namespace's own, each with where it
 actually lives — a pgvector table in the application's database or one of its
 own, or files, and why when a pgvector index fell back to files — and which
-templates use it. **New Index** / **Edit** take a name, the kind, the table, a
-JDBC URL, user and password (stored encrypted, or `${ENV_VAR}`), a directory
-for files, and a description; saving opens the index at once, so a wrong URL
-shows there. Editing a built-in index saves a definition of the namespace under
+templates use it. **New Index** / **Edit** take a name, the kind, the table,
+the **Database** — *The application's database* (nothing more to give; on file
+persistence the one `mindconnect.vector-store.url` names, and the hint says
+which) or *A database of its own* with JDBC URL, user and password (stored
+encrypted, or `${ENV_VAR}`) — a directory for files, and a description; saving
+opens the index at once, so a wrong URL shows there. Editing a built-in index saves a definition of the namespace under
 its name; deleting that goes back to the server's settings.
 
 A store's page names its index and where it lives.
