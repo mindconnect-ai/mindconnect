@@ -5,11 +5,16 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.vectorstore.VectorChunk;
-import ai.mindconnect.vectorstore.VectorStore;
+import ai.mindconnect.vectorstore.embedding.EmbeddingIndex.IndexedEntity;
+import ai.mindconnect.vectorstore.embedding.EntityRef;
+import ai.mindconnect.vectorstore.embedding.MetadataFilter;
 import ai.mindconnect.vectorstore.tools.DirectIngestion;
+import ai.mindconnect.vectorstore.tools.IndexDefinition;
+import ai.mindconnect.vectorstore.tools.EntitySelector;
+import ai.mindconnect.vectorstore.tools.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
+import ai.mindconnect.vectorstore.tools.VectorTools;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import ai.mindconnect.workflow.admin.run.WorkflowRunService;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -26,7 +31,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.Set;
 
 /**
  * The one place vector-store operations live: template and store CRUD, text
@@ -42,11 +47,22 @@ import java.util.UUID;
 @Service
 public class VectorStoreService {
 
-    /** One search result — the chunk's content and score, without the raw embedding. */
-    public record Hit(String id, String fileId, int ordinal, String text,
-                      Map<String, String> metadata, double score) {}
+    /**
+     * One search result — the entity it belongs to, the chunk's content and
+     * score, without the raw embedding.
+     *
+     * @param entityType {@code file} for a stored file, {@code document} for text of this store alone, …
+     * @param entityId   the file's id, the document's id, …
+     */
+    public record Hit(String entityType, String source, String container, String entityId, String chunkId,
+                      int ordinal, String text, Map<String, String> metadata, double score) {}
 
-    public record UpsertedChunk(String id, int dimension) {}
+    /** One entity a store lists, as the index has it. */
+    public record Entry(String entityType, String source, String container, String entityId, String owner,
+                        String version, long chunks) {}
+
+    /** The outcome of writing a document: its id and how many chunks it has now. */
+    public record UpsertedDocument(String id, long chunks) {}
 
     private final ObjectProvider<VectorStores> storesProvider;
     private final ObjectProvider<FileStore> fileStoreProvider;
@@ -92,6 +108,51 @@ public class VectorStoreService {
         stores().registry(scope.namespace()).deleteTemplate(name);
     }
 
+    // ── Indexes ────────────────────────────────────────────────────────────
+
+    /** Where an index lives — its definition without the password, and whether it is the host's built-in one. */
+    public record IndexInfo(IndexDefinition definition, boolean builtIn, String location) {}
+
+    public List<IndexInfo> indexes() {
+        VectorStores vs = stores();
+        return vs.indexes(scope.namespace()).stream()
+                .map(i -> new IndexInfo(i.withPassword(i.password() == null ? null : "***"),
+                        vs.isBuiltIn(scope.namespace(), i.name()), location(vs, i.name())))
+                .toList();
+    }
+
+    /** Saves an index definition; a missing password keeps the one stored under that name. */
+    public IndexInfo saveIndex(IndexDefinition index) {
+        VectorStores vs = stores();
+        if (index.password() == null || "***".equals(index.password())) {
+            String name = index.name();
+            String kept = vs.indexes(scope.namespace()).stream().filter(i -> i.name().equals(name))
+                    .map(IndexDefinition::password).filter(java.util.Objects::nonNull).findFirst().orElse(null);
+            index = index.withPassword(kept);
+        }
+        vs.saveIndex(scope.namespace(), index);
+        return new IndexInfo(index.withPassword(index.password() == null ? null : "***"),
+                false, location(vs, index.name()));
+    }
+
+    /** @return false for a built-in index the namespace did not redefine — there is nothing to delete */
+    public boolean deleteIndex(String name) {
+        VectorStores vs = stores();
+        if (vs.isBuiltIn(scope.namespace(), name)) {
+            return false;
+        }
+        vs.deleteIndex(scope.namespace(), name);
+        return true;
+    }
+
+    private String location(VectorStores vs, String name) {
+        try {
+            return vs.indexLocation(scope.namespace(), name);
+        } catch (RuntimeException e) {
+            return "cannot be opened: " + e.getMessage();
+        }
+    }
+
     // ── Stores ─────────────────────────────────────────────────────────────
 
     public List<VectorStoreInstance> instances() {
@@ -108,35 +169,80 @@ public class VectorStoreService {
         return stores().registry(scope.namespace()).instance(name.trim());
     }
 
+    /**
+     * Deletes the store: its documents leave the index, the stored files it
+     * listed stay there for the other stores and chats that list them.
+     */
     public void deleteStore(String name) {
+        VectorStore store = stores().store(scope.namespace(), name);
+        store.members().forEach(store::remove);
         stores().registry(scope.namespace()).deleteInstance(name);
     }
 
-    // ── Search & chunks ────────────────────────────────────────────────────
+    // ── Search, entries & documents ─────────────────────────────────────────
 
-    /** Embeds {@code query} with the store's embedding config and returns the top hits. */
+    /** Embeds {@code query} with the store's embedding config and returns the top hits among all its entries. */
     public List<Hit> search(String storeName, String query, int topK, double minScore) {
-        VectorStores vs = stores();
-        float[] embedding = vs.embedFor(scope.namespace(), storeName, List.of(query)).get(0);
-        return vs.openWith(scope.namespace(), vs.settingsFor(scope.namespace(), storeName)).search(embedding, topK).stream()
+        return search(storeName, query, topK, minScore, null, List.of());
+    }
+
+    /**
+     * Embeds {@code query} with the store's embedding config and returns the
+     * top hits — among the entries {@code entities} picks only ({@code null}
+     * for all), passing {@code filters}.
+     */
+    public List<Hit> search(String storeName, String query, int topK, double minScore,
+                            List<EntitySelector> entities, List<MetadataFilter> filters) {
+        VectorStore store = stores().store(scope.namespace(), storeName);
+        Set<EntityRef> within = entities == null ? null : store.select(entities);
+        return store.search(query, topK, within, filters).stream()
                 .filter(h -> h.score() >= minScore)
-                .map(h -> new Hit(h.chunk().id(), h.chunk().fileId(), h.chunk().ordinal(),
-                        h.chunk().text(), h.chunk().metadata(), h.score()))
+                .map(h -> new Hit(h.ref().type().value(), h.ref().source(), h.ref().container(), h.ref().id(),
+                        h.chunk().id(), h.chunk().ordinal(), h.chunk().text(), h.chunk().metadata(), h.score()))
                 .toList();
     }
 
-    /** Embeds {@code text} and upserts it as a single chunk. */
-    public UpsertedChunk upsertChunk(String storeName, String id, String fileId,
-                                     Integer ordinal, String text, Map<String, String> metadata) {
-        VectorStores vs = stores();
-        String effectiveFileId = fileId != null && !fileId.isBlank() ? fileId : "api";
-        String effectiveId = id != null && !id.isBlank() ? id
-                : effectiveFileId + ":" + UUID.randomUUID();
-        float[] embedding = vs.embedFor(scope.namespace(), storeName, List.of(text)).get(0);
-        vs.openWith(scope.namespace(), vs.settingsFor(scope.namespace(), storeName)).upsert(List.of(new VectorChunk(
-                effectiveId, effectiveFileId, ordinal != null ? ordinal : 0, text,
-                metadata == null ? Map.of() : metadata, embedding)));
-        return new UpsertedChunk(effectiveId, embedding.length);
+    /** What the store lists, as the index has it. */
+    public List<Entry> entries(String storeName) {
+        return stores().store(scope.namespace(), storeName).entities().stream()
+                .map(VectorStoreService::entry)
+                .toList();
+    }
+
+    private static Entry entry(IndexedEntity e) {
+        return new Entry(e.ref().type().value(), e.ref().source(), e.ref().container(), e.ref().id(),
+                e.owner() == null ? null : e.owner().value(), e.version(), e.chunks());
+    }
+
+    /**
+     * Takes the entries with id {@code entityId} off the store. A document of the
+     * store leaves the index with it; a stored file stays for the other stores
+     * that list it.
+     *
+     * @return how many were removed
+     */
+    public int removeEntry(String storeName, String entityId) {
+        VectorStore store = stores().store(scope.namespace(), storeName);
+        int removed = 0;
+        for (EntityRef ref : store.members()) {
+            if (ref.id().equals(entityId)) {
+                store.remove(ref);
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /**
+     * Writes a document of the store — text with no file behind it — replacing
+     * what the document had; the same chunks again are not embedded again.
+     */
+    public UpsertedDocument upsertDocument(String storeName, String id, List<VectorStore.TextChunk> chunks) {
+        VectorStore store = stores().open(scope.namespace(), storeName, null, VectorStoreInstance.Scope.GLOBAL, null);
+        String owner = store.settings().owner();
+        long stored = store.put(store.documentRef(id), owner == null ? null : UserId.of(owner),
+                VectorTools.version(chunks), chunks);
+        return new UpsertedDocument(id, stored);
     }
 
     // ── Ingestion ──────────────────────────────────────────────────────────
@@ -150,7 +256,22 @@ public class VectorStoreService {
      * upsert) applies. Returns a human-readable summary.
      */
     public String ingestUpload(String storeName, String fileName, InputStream content) throws IOException {
-        VectorStores vs = stores();
+        return ingestUpload(storeName, fileName, null, content, null);
+    }
+
+    /**
+     * Like {@link #ingestUpload(String, String, InputStream)}: with a file
+     * store the upload is kept there first, as {@code uploader}'s file, and
+     * enters the store as that stored file — listed under Files, indexed once,
+     * attachable to chats. Without one it is a document of the store.
+     */
+    public String ingestUpload(String storeName, String fileName, String contentType, InputStream content,
+                               UserId uploader) throws IOException {
+        FileStore fs = fileStoreProvider.getIfAvailable();
+        if (fs != null) {
+            StoredFile stored = fs.save(fileName == null ? "upload.bin" : fileName, contentType, content, uploader);
+            return ingestStoredFile(storeName, stored.id().value(), uploader);
+        }
         String safeName = Path.of(fileName == null ? "upload.bin" : fileName)
                 .getFileName().toString().replaceAll("[^A-Za-z0-9._ -]", "_");
         Path dir = uploadBase.resolve("vector-store-uploads")
@@ -159,18 +280,41 @@ public class VectorStoreService {
         Path target = dir.resolve(safeName);
         Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
 
-        VectorStoreInstance instance = vs.settingsFor(scope.namespace(), storeName);
-        String workflowName = instance.ingestionWorkflow();
+        return ingest(storeName, safeName, target, null);
+    }
+
+    /**
+     * The one ingestion path: a spooled file into the store — as a stored file
+     * when {@code stored} is given (indexed once under its id, only listed when
+     * it is indexed already), else as a document of the store named by the
+     * file name.
+     */
+    private String ingest(String storeName, String safeName, Path target, StoredFile stored) throws IOException {
+        VectorStores vs = stores();
+        VectorStore store = vs.open(scope.namespace(), storeName, null, VectorStoreInstance.Scope.GLOBAL, null);
+        EntityRef ref = stored != null ? EntityRef.file(stored.id()) : store.documentRef(safeName);
+        if (stored != null && store.indexed(ref)) {
+            store.add(ref);
+            return safeName + ": already indexed, now listed in '" + storeName + "'.";
+        }
+        String workflowName = store.settings().ingestionWorkflow();
         if (workflowName != null && !workflowName.isBlank()) {
             var workflow = workflows().findById(workflowName).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + workflowName + "' not found"));
+            Map<String, Object> params = new java.util.HashMap<>();
+            params.put("file", uploadBase.relativize(target).toString());
+            params.put("store", storeName);
+            if (stored != null) {
+                params.put("file_id", stored.id().value());
+            }
             var report = new WorkflowRunService(workflowInstances(), environment.shared()::asMap)
-                    .run(workflow, Map.of("file", uploadBase.relativize(target).toString(),
-                            "store", storeName));
+                    .run(workflow, params);
             return safeName + ": " + summarize(report);
         }
         String text = extractText(uploadBase, target);
-        return DirectIngestion.ingest(vs, scope.namespace(), vs.openWith(scope.namespace(), instance), storeName, safeName, text);
+        String owner = store.settings().owner();
+        return DirectIngestion.ingest(store, ref, owner == null ? null : UserId.of(owner),
+                stored != null ? "1" : VectorTools.version(List.of(new VectorStore.TextChunk(text, Map.of()))), safeName, text);
     }
 
     /**
@@ -184,9 +328,15 @@ public class VectorStoreService {
         if (fs == null) throw new NotConfiguredException("File store");
         StoredFile stored = fs.find(FileId.of(fileId)).filter(file -> file.readableBy(reader)).orElseThrow(() ->
                 new IllegalArgumentException("No such file: " + fileId));
+        String safeName = Path.of(stored.name() == null ? "upload.bin" : stored.name())
+                .getFileName().toString().replaceAll("[^A-Za-z0-9._ -]", "_");
+        Path dir = uploadBase.resolve("vector-store-uploads").resolve(storeName.replaceAll("[^A-Za-z0-9._-]", "-"));
+        Files.createDirectories(dir);
+        Path target = dir.resolve(safeName);
         try (InputStream content = fs.content(stored.id())) {
-            return ingestUpload(storeName, stored.name(), content);
+            Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
         }
+        return ingest(storeName, safeName, target, stored);
     }
 
     /** Human-readable outcome of an ingestion-workflow run. */

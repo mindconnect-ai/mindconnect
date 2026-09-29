@@ -400,8 +400,19 @@ CRUD shapes and are best read in the Swagger UI. One shape worth knowing:
 `GET /api/sessions/{id}/files` lists the attached files with `fileId`,
 `name`, `mediaType`, `sizeBytes` and `chunks` — the searchable chunks an
 ingested file produced, 0 for an image, which goes to the model with the
-next message instead. `DELETE …/files?file=` takes the file's name or its
-ingested id.
+next message instead. `DELETE …/files?file=` takes the file's id or its
+name.
+
+A vector store lists entries — stored files and documents of its own — whose
+chunks live once in the namespace's embedding index.
+`GET /api/vector-stores/stores/{name}/entries` lists them,
+`DELETE …/entries/{entityId}` takes one off, `PUT …/documents/{id}` writes a
+document (`{"chunks": [{"text": …, "metadata": {…}}]}`), and
+`POST …/search` takes `query`, `topK`, and optionally `entities` —
+`{"id": …}` plus `type`, `source` or `container` where the id alone is
+ambiguous — and `filters` — `{"key": …, "op": "EQ"|"IN"|"GTE"|"LTE", "values": […]}`, ranges
+and lists only on metadata fields declared for the entity type (400 otherwise).
+Hits name their entry: `entityType`, `source`, `container`, `entityId`.
 
 A file in the store is its uploader's (`creator` in the file object).
 `GET /api/files` lists the caller's own files; by id, a file answers its

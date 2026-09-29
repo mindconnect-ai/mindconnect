@@ -1,15 +1,18 @@
 package ai.mindconnect.vectorstore.tools;
 
+import ai.mindconnect.vectorstore.embedding.EntityRef;
+
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
 /**
- * One namespace's {@link VectorStoreTemplate}s and {@link VectorStoreInstance}s.
- * Instances are registered on the fly by the tools; templates are managed in
- * the admin UI (or seeded). On files ({@link FileVectorStoreRegistry}) under
- * file persistence, in Postgres ({@link PgVectorStoreRegistry}) under Postgres
- * persistence — {@link VectorStores#registry} hands out the one that applies.
+ * One namespace's {@link VectorStoreTemplate}s and {@link VectorStoreInstance}s,
+ * and which entities each store lists. Instances are registered on the fly by
+ * the tools; templates are managed in the admin UI (or seeded). On files
+ * ({@link FileVectorStoreRegistry}) under file persistence, in Postgres
+ * ({@link PgVectorStoreRegistry}) under Postgres persistence —
+ * {@link VectorStores#registry} hands out the one that applies.
  *
  * <p>A record is found by its {@link #key(String) key}, not by its exact
  * name: {@code Chat Uploads} and {@code chat-uploads} are one template.
@@ -65,5 +68,32 @@ public interface VectorStoreRegistry {
                 .toList();
     }
 
+    /** Removes the instance and its member list; the entities' chunks stay in the index. */
     void deleteInstance(String name);
+
+    // ── indexes ────────────────────────────────────────────────────────────
+
+    /** The index definitions this namespace saved — the built-in ones are the host's, not here. */
+    List<IndexDefinition> indexes();
+
+    Optional<IndexDefinition> index(String name);
+
+    /** Saves the definition, replacing one of the same name. */
+    void saveIndex(IndexDefinition index);
+
+    void deleteIndex(String name);
+
+    // ── members ────────────────────────────────────────────────────────────
+
+    /** The entities the store lists, in the order they were added. Empty for an unknown store. */
+    List<EntityRef> members(String store);
+
+    /** Lists {@code ref} in the store; listing it again changes nothing. */
+    void addMember(String store, EntityRef ref);
+
+    /** Takes {@code ref} off the store's list; not listed is fine. */
+    void removeMember(String store, EntityRef ref);
+
+    /** The names (keys) of the stores that list {@code ref} — whether anything still needs its chunks. */
+    List<String> storesListing(EntityRef ref);
 }

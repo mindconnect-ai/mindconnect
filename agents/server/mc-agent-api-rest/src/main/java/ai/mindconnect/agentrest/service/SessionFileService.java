@@ -10,7 +10,10 @@ import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
+import ai.mindconnect.vectorstore.embedding.EntityRef;
+import ai.mindconnect.vectorstore.embedding.EntityType;
 import ai.mindconnect.vectorstore.tools.DirectIngestion;
+import ai.mindconnect.vectorstore.tools.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
@@ -135,15 +138,27 @@ public class SessionFileService {
         return sessions.findById(sessionId).map(AgentSession::attachedFiles).orElse(List.of());
     }
 
-    /** The session's ingested files: spooled file id → chunk count. Empty when none. */
+    /**
+     * The session's indexed files: the attached file's id → its searchable
+     * chunks. Files attached before 0.9 were indexed as documents named by
+     * their path; they are matched to the attached file by name. Empty when
+     * nothing is indexed.
+     */
     public Map<String, Long> listAttachments(SessionId sessionId) {
         VectorStores stores = storesProvider.getIfAvailable();
         if (stores == null) return Map.of();
         String storeName = "session-" + sessionId.value();
         try {
-            if (stores.registry(scope.namespace()).instance(storeName).isPresent()) {
-                return stores.openWith(scope.namespace(), stores.settingsFor(scope.namespace(), storeName)).listFiles();
+            if (stores.registry(scope.namespace()).instance(storeName).isEmpty()) {
+                return Map.of();
             }
+            List<AttachedFile> attached = attachments(sessionId);
+            Map<String, Long> chunks = new java.util.LinkedHashMap<>();
+            for (var entity : stores.store(scope.namespace(), storeName).entities()) {
+                String fileId = attachedFileOf(entity.ref(), attached).map(AttachedFile::id).orElse(entity.ref().id());
+                chunks.merge(fileId, entity.chunks(), Long::sum);
+            }
+            return chunks;
         } catch (RuntimeException e) {
             // Store unreadable — report "no attachments" rather than break the chat,
             // but say so: an empty list alone looks like data that was never there.
@@ -152,32 +167,45 @@ public class SessionFileService {
         return Map.of();
     }
 
+    /** The attached file an entry of the session's store stands for: by id, or — from before 0.9 — by name. */
+    private static java.util.Optional<AttachedFile> attachedFileOf(EntityRef ref, List<AttachedFile> attached) {
+        return attached.stream()
+                .filter(f -> ref.type().equals(EntityType.FILE)
+                        ? f.id().equals(ref.id())
+                        : f.name().equals(Path.of(ref.id()).getFileName().toString()))
+                .findFirst();
+    }
+
     /**
-     * Detaches a file from the chat, named by its file name or by the id its
-     * chunks were ingested under (the spooled path — what {@link #listAttachments}
-     * keys by). Its chunks leave the session's vector store and the copy in
-     * the session's directory goes with them; an image, never ingested, loses
-     * that copy and its entry on the session. The original in the file store
-     * is untouched.
+     * Detaches a file from the chat, named by its file id or its file name. It
+     * leaves the session's vector store — the chunks of a stored file stay in
+     * the index for the other chats and stores that list it — and the copy in
+     * the session's directory goes with it; an image, never indexed, loses that
+     * copy and its entry on the session. The original in the file store is
+     * untouched.
      */
     public void deleteAttachment(SessionId sessionId, String fileIdOrName) {
-        String fileName = Path.of(fileIdOrName).getFileName().toString();
+        List<AttachedFile> attached = attachments(sessionId);
+        String fileName = attached.stream().filter(f -> f.id().equals(fileIdOrName)).map(AttachedFile::name)
+                .findFirst().orElse(Path.of(fileIdOrName).getFileName().toString());
         VectorStores stores = storesProvider.getIfAvailable();
-        if (stores != null) {
-            String storeName = "session-" + sessionId.value();
-            for (String ingestedId : listAttachments(sessionId).keySet()) {
-                if (!Path.of(ingestedId).getFileName().toString().equals(fileName)) continue;
-                stores.openWith(scope.namespace(), stores.settingsFor(scope.namespace(), storeName)).deleteFile(ingestedId);
-                // A copy spooled under the tools base dir the old way carries
-                // its directory in the key; a bare name is a copy in the
-                // session's directory, removed below — never a file of that
-                // name in the base dir.
-                Path spooled = spoolBase.resolve(ingestedId).normalize();
-                if (ingestedId.startsWith("vector-store-uploads/") && spooled.startsWith(spoolBase)) {
+        String storeName = "session-" + sessionId.value();
+        if (stores != null && stores.registry(scope.namespace()).instance(storeName).isPresent()) {
+            VectorStore store = stores.store(scope.namespace(), storeName);
+            for (EntityRef ref : store.members()) {
+                boolean match = ref.id().equals(fileIdOrName)
+                        || attachedFileOf(ref, attached).map(f -> f.name().equals(fileName)).orElse(false);
+                if (!match) continue;
+                store.remove(ref);
+                // A copy spooled under the tools base dir before 0.9 carries its
+                // directory in the id; a bare name is a copy in the session's
+                // directory, removed below — never a file of that name in the base dir.
+                Path spooled = spoolBase.resolve(ref.id()).normalize();
+                if (ref.id().startsWith("vector-store-uploads/") && spooled.startsWith(spoolBase)) {
                     try {
                         Files.deleteIfExists(spooled);
                     } catch (java.io.IOException ignored) {
-                        // The searchable chunks are gone; a stale spool file is harmless.
+                        // The entry is gone; a stale spool file is harmless.
                     }
                 }
             }
@@ -186,7 +214,7 @@ public class SessionFileService {
             try {
                 Files.deleteIfExists(dir.resolve(fileName));
             } catch (java.io.IOException ignored) {
-                // The record and the chunks are gone; a stale copy is harmless.
+                // The record and the entry are gone; a stale copy is harmless.
             }
         }));
         sessions.update(sessionId, session -> session.withoutAttachedFile(fileName));
@@ -272,18 +300,18 @@ public class SessionFileService {
         }
         String storeName = "session-" + sessionId.value();
         VectorStoreTemplate template = stores.template(scope.namespace(), CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
-            // On the backend of the built-in template: the one the host's settings and persistence chose.
-            VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE,
-                    stores.template(scope.namespace(), VectorStores.DEFAULT_TEMPLATE).orElseThrow().backend(),
-                    Map.of(), "embeddings", "file-ingestion",
+            VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE, "embeddings", "file-ingestion",
                     Map.of("description", "Per-chat-session upload stores (auto-created)"));
             stores.registry(scope.namespace()).saveTemplate(created);
             return created;
         });
         // The store is the chat's user's: the vector tools reach it only on that user's behalf.
-        stores.open(scope.namespace(), storeName, template.name(), VectorStoreInstance.Scope.SESSION, sessionId.value(),
-                session.userId() == null ? null : session.userId().value());
-        VectorStoreInstance instance = stores.settingsFor(scope.namespace(), storeName);
+        VectorStore store = stores.open(scope.namespace(), storeName, template.name(), VectorStoreInstance.Scope.SESSION,
+                sessionId.value(), session.userId() == null ? null : session.userId().value());
+        VectorStoreInstance instance = store.settings();
+        // The stored file is one entity, whichever chats it is attached to: indexed
+        // once, then only listed in the next chat's store.
+        EntityRef ref = EntityRef.file(stored.id());
 
         try {
             // A copy in the session's own directory: the file tools read it
@@ -292,14 +320,16 @@ public class SessionFileService {
             if (copy.isPresent()) {
                 attached = attached.withPath(copy.get().toString());
             }
-            if (instance.ingestionWorkflow() == null || instance.ingestionWorkflow().isBlank()) {
+            if (store.indexed(ref)) {
+                store.add(ref);
+            } else if (instance.ingestionWorkflow() == null || instance.ingestionWorkflow().isBlank()) {
                 // No workflow on the template: the built-in default ingestion —
                 // OpenAI-style 800/400-token chunking straight from the stream.
                 String text;
                 try (InputStream content = fileStore.content(stored.id())) {
                     text = new String(content.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
                 }
-                DirectIngestion.ingest(stores, scope.namespace(), stores.openWith(scope.namespace(), instance), storeName, stored.name(), text);
+                DirectIngestion.ingest(store, ref, session.userId(), "1", stored.name(), text);
             } else {
                 WorkflowDataRepository workflows = workflowsProvider.getIfAvailable();
                 WorkflowInstanceRepository workflowInstances = workflowInstancesProvider.getIfAvailable();
@@ -322,7 +352,7 @@ public class SessionFileService {
                     String file = sessionDir.relativize(copy.get()).toString().replace('\\', '/');
                     ToolCallScope scope = ToolCallScope.ofSession(session.userId(), sessionId, sessionDir.toString());
                     report = scope.runWith(() -> runner.runWithAttributes(workflow,
-                            Map.of("file", file, "store", storeName),
+                            Map.of("file", file, "store", storeName, "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(), scope)));
                 } else {
                     Path dir = spoolBase.resolve("vector-store-uploads").resolve(storeName);
@@ -332,7 +362,8 @@ public class SessionFileService {
                         Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
                     }
                     report = runner.runWithAttributes(workflow,
-                            Map.of("file", spoolBase.relativize(target).toString(), "store", storeName),
+                            Map.of("file", spoolBase.relativize(target).toString(), "store", storeName,
+                                    "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(),
                                     new ToolCallScope(session.userId(), sessionId, null)));
                 }

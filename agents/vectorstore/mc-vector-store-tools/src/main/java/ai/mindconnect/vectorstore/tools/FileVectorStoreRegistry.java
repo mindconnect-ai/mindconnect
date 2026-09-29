@@ -2,6 +2,7 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.filerepo.FileWrites;
 import ai.mindconnect.filerepo.PathLocks;
+import ai.mindconnect.vectorstore.embedding.EntityRef;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -33,14 +34,21 @@ public final class FileVectorStoreRegistry implements VectorStoreRegistry {
     private static final Logger log = LoggerFactory.getLogger(FileVectorStoreRegistry.class);
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .registerModule(new JavaTimeModule())
-            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    private static final com.fasterxml.jackson.core.type.TypeReference<List<EntityRef>> REFS =
+            new com.fasterxml.jackson.core.type.TypeReference<>() {};
 
     private final Path templatesDir;
     private final Path instancesDir;
+    private final Path membersDir;
+    private final Path indexesDir;
 
     public FileVectorStoreRegistry(Path root) {
         this.templatesDir = root.resolve("templates");
         this.instancesDir = root.resolve("instances");
+        this.membersDir = root.resolve("members");
+        this.indexesDir = root.resolve("indexes");
     }
 
     // ── templates ──────────────────────────────────────────────────────────
@@ -122,6 +130,91 @@ public final class FileVectorStoreRegistry implements VectorStoreRegistry {
     @Override
     public void deleteInstance(String name) {
         delete(instancesDir, name);
+        delete(membersDir, name);
+    }
+
+    // ── indexes ────────────────────────────────────────────────────────────
+
+    @Override
+    public List<IndexDefinition> indexes() {
+        return list(indexesDir, IndexDefinition.class);
+    }
+
+    @Override
+    public Optional<IndexDefinition> index(String name) {
+        return read(indexesDir, name, IndexDefinition.class);
+    }
+
+    @Override
+    public void saveIndex(IndexDefinition index) {
+        write(indexesDir, index.name(), index);
+    }
+
+    @Override
+    public void deleteIndex(String name) {
+        delete(indexesDir, name);
+    }
+
+    // ── members ────────────────────────────────────────────────────────────
+
+    @Override
+    public List<EntityRef> members(String store) {
+        return readMembers(fileFor(membersDir, store));
+    }
+
+    @Override
+    public void addMember(String store, EntityRef ref) {
+        Path file = fileFor(membersDir, store);
+        locked(file, () -> {
+            List<EntityRef> members = new ArrayList<>(readMembers(file));
+            if (!members.contains(ref)) {
+                members.add(ref);
+                store(file, members);
+            }
+            return null;
+        });
+    }
+
+    @Override
+    public void removeMember(String store, EntityRef ref) {
+        Path file = fileFor(membersDir, store);
+        locked(file, () -> {
+            List<EntityRef> members = new ArrayList<>(readMembers(file));
+            if (members.remove(ref)) {
+                store(file, members);
+            }
+            return null;
+        });
+    }
+
+    @Override
+    public List<String> storesListing(EntityRef ref) {
+        if (!Files.isDirectory(membersDir)) {
+            return List.of();
+        }
+        List<String> stores = new ArrayList<>();
+        try (var files = Files.list(membersDir)) {
+            for (Path file : files.filter(f -> f.toString().endsWith(".json")).sorted().toList()) {
+                if (readMembers(file).contains(ref)) {
+                    String name = file.getFileName().toString();
+                    stores.add(name.substring(0, name.length() - ".json".length()));
+                }
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        return stores;
+    }
+
+    private static List<EntityRef> readMembers(Path file) {
+        if (!Files.exists(file)) {
+            return List.of();
+        }
+        try {
+            return MAPPER.readValue(file.toFile(), REFS);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Unreadable member list " + file, e);
+        }
     }
 
     // ── file plumbing ──────────────────────────────────────────────────────

@@ -95,7 +95,13 @@ public final class VectorIngestFileTool implements Tool {
                     ? stores.open(namespace, storeName, template, VectorStoreInstance.Scope.GLOBAL, null)
                     : stores.open(namespace, storeName, template, VectorStoreInstance.Scope.SESSION, ownChat.value(),
                             callScope.userId() == null ? null : callScope.userId().value());
-            return DirectIngestion.ingest(stores, namespace, store, storeName, relative, text);
+            // A file on disk is no stored file: it is a document of this store, named by its
+            // path, and embedded again only when its text changed.
+            String owner = store.settings().owner();
+            return DirectIngestion.ingest(store, store.documentRef(relative),
+                    owner == null ? null : ai.mindconnect.agent.UserId.of(owner),
+                    VectorTools.version(java.util.List.of(new VectorStore.TextChunk(text, java.util.Map.of()))),
+                    relative, text);
         } catch (Exception e) {
             return "Error: vector_ingest_file failed for '" + relative + "': " + e.getMessage();
         }

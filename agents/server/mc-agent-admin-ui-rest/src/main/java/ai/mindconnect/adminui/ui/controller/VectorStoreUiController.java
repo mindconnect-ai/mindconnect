@@ -17,7 +17,8 @@ import ai.mindconnect.ui.model.UiTable;
 import ai.mindconnect.ui.model.UiToast;
 import ai.mindconnect.ui.model.UiText;
 import ai.mindconnect.ui.model.UiTrigger;
-import ai.mindconnect.vectorstore.VectorStore;
+import ai.mindconnect.vectorstore.tools.IndexDefinition;
+import ai.mindconnect.vectorstore.tools.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
@@ -31,7 +32,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -62,13 +62,16 @@ public class VectorStoreUiController {
     private final ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService;
     private final ai.mindconnect.agentrest.auth.CurrentUsers currentUsers;
     private final ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess;
+    private final ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions;
 
     public VectorStoreUiController(VectorStores stores, LlmConfigRepository llmConfigs,
                                       ai.mindconnect.filestore.FileStore fileStore,
                                       ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService,
                                       ai.mindconnect.agentrest.auth.CurrentUsers currentUsers,
                                       ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess,
+                                      ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions,
                                       ai.mindconnect.agent.ScopeSupplier scope) {
+        this.sessions = sessions;
         this.stores = stores;
         this.scope = scope;
         this.llmConfigs = llmConfigs;
@@ -89,8 +92,8 @@ public class VectorStoreUiController {
     private UiPage list(String tab) {
         UiTable templates = UiTable.of("vs-templates", null).stackOnMobile(true)
                 .column(UiTable.Column.text("name", "Name"))
-                .column(UiTable.Column.text("backend", "Backend"))
                 .column(UiTable.Column.text("embedding", "Embedding Config"))
+                .column(UiTable.Column.text("index", "Index"))
                 .column(UiTable.Column.text("workflow", "Ingestion Workflow"))
                 .column(UiTable.Column.text("description", "Description"))
                 .rowAction(UiAction.secondary("edit", "Edit").icon("edit")
@@ -102,8 +105,8 @@ public class VectorStoreUiController {
             templates.row(Map.of(
                     "id", t.name(),
                     "name", VectorStores.DEFAULT_TEMPLATE.equals(t.name()) ? t.name() + " (built-in)" : t.name(),
-                    "backend", t.backend(),
                     "embedding", t.embeddingConfig(),
+                    "index", t.effectiveIndex(),
                     "workflow", t.ingestionWorkflow() == null ? "" : t.ingestionWorkflow(),
                     "description", t.metadata().getOrDefault("description", "")));
         }
@@ -111,41 +114,31 @@ public class VectorStoreUiController {
         UiTable instances = UiTable.of("vs-instances", null).stackOnMobile(true)
                 .column(UiTable.Column.text("name", "Name"))
                 .column(UiTable.Column.text("template", "Template"))
-                .column(UiTable.Column.text("backend", "Backend"))
                 .column(UiTable.Column.text("scope", "Scope"))
+                .column(UiTable.Column.text("index", "Index"))
+                .column(UiTable.Column.text("entries", "Entries"))
                 .column(UiTable.Column.text("chunks", "Chunks"))
                 .rowAction(UiAction.secondary("view", "View").icon("show")
                         .dispatch("GET", "/admin/vector-stores/stores/{id}"))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
-                        .confirm("Delete this store registration? (Data files stay on the backend.)")
+                        .confirm("Delete this store? Its documents go with it; stored files stay searchable "
+                                + "in the other stores and chats that list them.")
                         .dispatch("DELETE", "/admin/vector-stores/stores/{id}"));
         ai.mindconnect.agent.UserId caller = currentUsers.require();
-        Set<String> registered = new LinkedHashSet<>();
+        // Opening the index first brings in what the namespace kept before 0.9.
+        stores.index(scope.namespace());
         for (VectorStoreInstance i : stores.registry(scope.namespace()).instances()) {
-            registered.add(i.name());
             // A chat's upload store is its user's: nobody else sees it listed.
             if (!storeAccess.reachable(i, caller)) continue;
+            String[] counts = counts(i);
             instances.row(Map.of(
                     "id", i.name(),
                     "name", i.name(),
                     "template", i.templateName(),
-                    "backend", i.backend(),
                     "scope", i.scope() + (i.scopeRef() == null ? "" : " (" + shortRef(i.scopeRef()) + ")"),
-                    "chunks", chunkCount(i)));
-        }
-        // Stores that physically exist but were never registered (pre-template
-        // era, or created outside the tools) — shown as implicit defaults.
-        for (String discovered : stores.discoverStores(scope.namespace(), 
-                stores.templates(scope.namespace()).get(0).backend(), Map.of())) {
-            if (registered.contains(discovered) || !storeAccess.reachable(discovered, null, caller)) continue;
-            VectorStoreInstance implicit = stores.settingsFor(scope.namespace(), discovered);
-            instances.row(Map.of(
-                    "id", discovered,
-                    "name", discovered + " (unregistered)",
-                    "template", VectorStores.DEFAULT_TEMPLATE,
-                    "backend", implicit.backend(),
-                    "scope", "GLOBAL",
-                    "chunks", chunkCount(implicit)));
+                    "index", stores.indexOf(scope.namespace(), i),
+                    "entries", counts[0],
+                    "chunks", counts[1]));
         }
 
         // The file store (Files API): raw uploads addressed by id, independent
@@ -156,13 +149,18 @@ public class VectorStoreUiController {
                 .column(UiTable.Column.text("type", "Type"))
                 .column(UiTable.Column.text("size", "Size"))
                 .column(UiTable.Column.text("created", "Uploaded"))
+                .column(UiTable.Column.text("used", "Used in"))
+                .rowAction(UiAction.secondary("usage", "Used in…").icon("link")
+                        .onClick(UiTrigger.api("GET", BASE + "/files/{id}/usage")))
                 .rowAction(UiAction.secondary("download", "Download").icon("download")
                         .onClick(ai.mindconnect.ui.model.UiTrigger.openInTab(BASE + "/files/{id}/content")))
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
-                        .confirm("Delete this file from the file store? (Already-ingested chunks stay.)")
+                        .confirm("Delete this file from the file store? The chats and stores that list it keep "
+                                + "their entry until it is removed there.")
                         .dispatch("DELETE", "/admin/vector-stores/files/{id}"));
         // What the Files API gives the caller by id: their own files and those
         // stored before creators were recorded — nobody else's names and ids.
+        FileUsages usages = fileUsages(caller);
         for (ai.mindconnect.filestore.StoredFile f : fileStore.list()) {
             if (!f.readableBy(caller)) continue;
             files.row(Map.of(
@@ -172,7 +170,8 @@ public class VectorStoreUiController {
                     "type", f.contentType() == null ? "" : f.contentType(),
                     "size", readableSize(f.size()),
                     "created", f.createdAt() == null ? "" : f.createdAt().toString()
-                            .replace("T", " ").substring(0, 16)));
+                            .replace("T", " ").substring(0, 16),
+                    "used", usages.summary(f.id().value())));
         }
         var upload = ai.mindconnect.ui.model.UiUpload
                 .of("vs-files-upload", "Upload to file store")
@@ -209,6 +208,8 @@ public class VectorStoreUiController {
         UiSection tabs = UiSection.of("vs-page", null);
         tabs.getSections().add(UiSectionEntry.of("templates", "Templates", templates).icon("database")
                 .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=templates")));
+        tabs.getSections().add(UiSectionEntry.of("indexes", "Indexes", indexesTable()).icon("server")
+                .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=indexes")));
         tabs.getSections().add(UiSectionEntry.of("stores", "Stores", instances).icon("server")
                 .onClick(ai.mindconnect.ui.model.UiTrigger.api("GET", BASE + "/header?tab=stores")));
         tabs.getSections().add(UiSectionEntry.of("files", "Files", filesTab).icon("file")
@@ -236,6 +237,9 @@ public class VectorStoreUiController {
         } else if ("templates".equals(active)) {
             header.action(UiAction.primary("new-template", "New Template").icon("add")
                     .dispatch("GET", "/admin/vector-stores/templates/new"));
+        } else if ("indexes".equals(active)) {
+            header.action(UiAction.primary("new-index", "New Index").icon("add")
+                    .dispatch("GET", "/admin/vector-stores/indexes/new"));
         }
         return header;
     }
@@ -292,6 +296,269 @@ public class VectorStoreUiController {
                 .body(new org.springframework.core.io.InputStreamResource(fileStore.content(file.id())));
     }
 
+    // ── indexes ────────────────────────────────────────────────────────────
+
+    /** Every index the namespace can use: where it lives, which templates name it. */
+    private UiNode indexesTable() {
+        UiTable table = UiTable.of("vs-indexes", null).stackOnMobile(true)
+                .column(UiTable.Column.text("name", "Name"))
+                .column(UiTable.Column.text("where", "Where"))
+                .column(UiTable.Column.text("templates", "Templates"))
+                .column(UiTable.Column.text("description", "Description"))
+                .rowAction(UiAction.secondary("edit", "Edit").icon("edit")
+                        .dispatch("GET", BASE + "/indexes/{id}/edit"))
+                .rowAction(UiAction.danger("delete", "Delete").icon("delete")
+                        .confirm("Delete this index definition? Stores naming it can no longer be searched; a "
+                                + "built-in index goes back to the server's settings. The chunks stay where they are.")
+                        .dispatch("DELETE", BASE + "/indexes/{id}"));
+        try {
+            List<VectorStoreTemplate> templates = stores.templates(scope.namespace());
+            for (IndexDefinition index : stores.indexes(scope.namespace())) {
+                String where;
+                try {
+                    where = stores.indexLocation(scope.namespace(), index.name());
+                } catch (RuntimeException e) {
+                    where = "cannot be opened: " + e.getMessage();
+                }
+                String usedBy = templates.stream().filter(t -> index.name().equals(t.effectiveIndex()))
+                        .map(VectorStoreTemplate::name).collect(java.util.stream.Collectors.joining(", "));
+                boolean builtIn = stores.isBuiltIn(scope.namespace(), index.name());
+                table.row(Map.of(
+                        "id", index.name(),
+                        "name", index.name() + (builtIn ? " (built-in)" : ""),
+                        "where", where,
+                        "templates", usedBy.isEmpty() ? "—" : usedBy,
+                        "description", index.description() == null ? "" : index.description()));
+            }
+        } catch (RuntimeException e) {
+            return UiText.of("vs-indexes", "The indexes cannot be listed: " + e.getMessage()).withCssClass("task-card-body");
+        }
+        return table;
+    }
+
+    @GetMapping("/indexes/new")
+    public UiPage newIndex() {
+        return indexForm(null);
+    }
+
+    /** A built-in index opens as the host defines it; saving it moves it for this namespace. */
+    @GetMapping("/indexes/{name}/edit")
+    public UiPage editIndex(@PathVariable String name) {
+        return indexForm(stores.indexes(scope.namespace()).stream().filter(i -> i.name().equals(name))
+                .findFirst().orElse(null));
+    }
+
+    private UiPage indexForm(IndexDefinition index) {
+        boolean isNew = index == null;
+        boolean builtIn = !isNew && stores.isBuiltIn(scope.namespace(), index.name());
+        UiForm form = UiForm.of("vs-index-form", isNew ? "New Index"
+                        : builtIn ? "Built-in Index: " + index.name() : "Edit Index: " + index.name())
+                .field(UiField.text("name", "Name", isNew ? null : index.name()).asEditable()
+                        .hint(builtIn ? "Saving keeps this name: the namespace's stores of it move to what you set here."
+                                : "Lower case letters, digits, '.', '_' and '-' — what templates name"))
+                .field(UiField.select("kind", "Kind", isNew ? IndexDefinition.PGVECTOR : index.kind(), List.of(
+                        UiField.Option.of(IndexDefinition.PGVECTOR, "Postgres (pgvector)"),
+                        UiField.Option.of(IndexDefinition.FILE, "Files"))).asEditable()
+                        // Switching the kind swaps the fields below: a table and a database for
+                        // pgvector, a directory for files.
+                        .onChange(UiTrigger.api("POST", BASE + "/indexes/kind-fields", "vs-index-form")))
+                .content(pgvectorGroup(!isNew && !index.pgvector(), isNew ? null : index.table(),
+                        isNew ? null : index.url(), isNew ? null : index.user(), !isNew && index.password() != null))
+                .content(fileGroup(isNew || index.pgvector(), isNew ? null : index.directory()))
+                .field(UiField.text("description", "Description", isNew ? null : index.description()).asEditable());
+        form.action(UiAction.primary("save", "Save").icon("save").dispatch("POST", BASE + "/indexes", "vs-index-form"))
+                .action(UiAction.secondary("cancel", "Cancel").icon("cancel").dispatch("GET", BASE))
+                .link(UiLink.of("back", BASE, "← Back to Vector Stores"));
+        return UiPage.of(BASE + (isNew ? "/indexes/new" : "/indexes/" + index.name() + "/edit"), form);
+    }
+
+    private static ai.mindconnect.ui.model.UiFieldGroup pgvectorGroup(boolean hide, String table, String url,
+                                                                     String user, boolean passwordSet) {
+        var group = ai.mindconnect.ui.model.UiFieldGroup.of("vs-index-pgvector", null)
+                .field(UiField.text("table", "Table", table).asEditable()
+                        .hint("e.g. mc_embedding_acme — empty: mc_embedding"))
+                .field(UiField.text("url", "JDBC URL", url).asEditable()
+                        .hint("A database of its own, e.g. jdbc:postgresql://db-acme:5432/vectors — empty: "
+                                + "the application's database"))
+                .field(UiField.text("user", "DB User", user).asEditable())
+                .field(UiField.password("password", "DB Password", null).asEditable()
+                        .hint(passwordSet ? "Set — leave empty to keep it"
+                                : "Stored encrypted; ${ENV_VAR} reads it from the environment"));
+        return hide ? group.hidden() : group;
+    }
+
+    private static ai.mindconnect.ui.model.UiFieldGroup fileGroup(boolean hide, String directory) {
+        var group = ai.mindconnect.ui.model.UiFieldGroup.of("vs-index-file", null)
+                .field(UiField.text("directory", "Directory", directory).asEditable()
+                        .hint("The directory under the namespace's data — empty: embeddings-<name>"));
+        return hide ? group.hidden() : group;
+    }
+
+    /** The kind select changed: show the fields of the new kind, keeping what was typed. */
+    @PostMapping("/indexes/kind-fields")
+    public ai.mindconnect.ui.model.UiPatch indexKindFields(@RequestBody Map<String, Object> raw) {
+        var body = new FormBody(raw);
+        boolean pgvector = !IndexDefinition.FILE.equals(body.str("kind"));
+        String name = body.str("name") == null ? null : body.str("name").trim();
+        boolean passwordSet = name != null && stores.indexes(scope.namespace()).stream()
+                .anyMatch(i -> i.name().equals(name) && i.password() != null);
+        return ai.mindconnect.ui.model.UiPatch.of()
+                .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-pgvector", pgvectorGroup(!pgvector,
+                        body.str("table"), body.str("url"), body.str("user"), passwordSet)))
+                .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-file",
+                        fileGroup(pgvector, body.str("directory"))));
+    }
+
+    @PostMapping("/indexes")
+    public Object saveIndex(@RequestBody Map<String, Object> raw) {
+        var body = new FormBody(raw);
+        String name = body.str("name") == null ? null : body.str("name").trim();
+        IndexDefinition previous = name == null ? null : stores.indexes(scope.namespace()).stream()
+                .filter(i -> i.name().equals(name)).findFirst().orElse(null);
+        String password = body.str("password");
+        IndexDefinition index;
+        // The hidden group of the other kind is submitted too; only the chosen kind's fields count.
+        boolean pgvector = !IndexDefinition.FILE.equals(body.str("kind"));
+        try {
+            index = new IndexDefinition(name, body.str("kind"),
+                    pgvector ? body.str("table") : null, pgvector ? body.str("url") : null,
+                    pgvector ? body.str("user") : null,
+                    !pgvector ? null
+                            : password == null || password.isBlank() ? (previous == null ? null : previous.password())
+                            : password,
+                    pgvector ? null : body.str("directory"), body.str("description"));
+            stores.saveIndex(scope.namespace(), index);
+            // Open it now: a wrong URL or a database without pgvector shows here, not at the next upload.
+            stores.indexLocation(scope.namespace(), index.name());
+        } catch (IllegalArgumentException e) {
+            return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error(e.getMessage()).title("Not saved"));
+        } catch (RuntimeException e) {
+            return list("indexes").toast(UiToast.error("Saved, but it cannot be opened: " + e.getMessage()));
+        }
+        return list("indexes").toast(UiToast.success("Index '" + index.name() + "' saved: "
+                + stores.indexLocation(scope.namespace(), index.name())));
+    }
+
+    @DeleteMapping("/indexes/{name}")
+    public UiPage deleteIndex(@PathVariable String name) {
+        if (stores.isBuiltIn(scope.namespace(), name)) {
+            return list("indexes").toast(UiToast.error("'" + name + "' is built in: it follows the server's settings."));
+        }
+        stores.deleteIndex(scope.namespace(), name);
+        return list("indexes");
+    }
+
+    // ── where a file is used ───────────────────────────────────────────────
+
+    /**
+     * Where the caller's files are used: the caller's chats that have them
+     * attached — images included, which are never indexed — and the stores the
+     * caller can reach that list them. A chat's upload store counts as its chat.
+     */
+    private record FileUsages(Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.runtime.domain.AgentSession>> chats,
+                              Map<String, List<VectorStoreInstance>> stores) {
+
+        String summary(String fileId) {
+            int c = chats.getOrDefault(fileId, new java.util.LinkedHashMap<>()).size();
+            int s = stores.getOrDefault(fileId, List.of()).size();
+            if (c == 0 && s == 0) return "—";
+            List<String> parts = new java.util.ArrayList<>();
+            if (c > 0) parts.add(c + (c == 1 ? " chat" : " chats"));
+            if (s > 0) parts.add(s + (s == 1 ? " store" : " stores"));
+            return String.join(" · ", parts);
+        }
+    }
+
+    private FileUsages fileUsages(ai.mindconnect.agent.UserId caller) {
+        Map<String, java.util.LinkedHashMap<String, ai.mindconnect.agent.runtime.domain.AgentSession>> chats = new java.util.HashMap<>();
+        Map<String, ai.mindconnect.agent.runtime.domain.AgentSession> ownChats = new java.util.HashMap<>();
+        for (var session : sessions.findByUser(caller)) {
+            ownChats.put(session.id().value(), session);
+            for (var attached : session.attachedFiles()) {
+                chats.computeIfAbsent(attached.id(), k -> new java.util.LinkedHashMap<>())
+                        .put(session.id().value(), session);
+            }
+        }
+        Map<String, List<VectorStoreInstance>> inStores = new java.util.HashMap<>();
+        try {
+            var registry = stores.registry(scope.namespace());
+            for (VectorStoreInstance instance : registry.instances()) {
+                if (!storeAccess.reachable(instance, caller)) continue;
+                for (var ref : registry.members(instance.name())) {
+                    if (!ref.type().equals(ai.mindconnect.vectorstore.embedding.EntityType.FILE)) continue;
+                    var chat = instance.scope() == VectorStoreInstance.Scope.SESSION && instance.scopeRef() != null
+                            ? ownChats.get(instance.scopeRef()) : null;
+                    if (chat != null) {
+                        chats.computeIfAbsent(ref.id(), k -> new java.util.LinkedHashMap<>())
+                                .put(chat.id().value(), chat);
+                    } else {
+                        inStores.computeIfAbsent(ref.id(), k -> new java.util.ArrayList<>()).add(instance);
+                    }
+                }
+            }
+        } catch (RuntimeException e) {
+            // Vector stores unreadable: the chats still say where a file is used.
+        }
+        return new FileUsages(chats, inStores);
+    }
+
+    private static final String USAGE_DIALOG = "vs-file-usage-dialog";
+
+    /**
+     * A dialog over the files tab: the file's chats (each opens the chat) and
+     * stores (each opens the store).
+     */
+    @GetMapping("/files/{id}/usage")
+    public ai.mindconnect.ui.model.UiPatch fileUsage(@PathVariable String id) {
+        ai.mindconnect.agent.UserId caller = currentUsers.require();
+        var file = fileStore.find(ai.mindconnect.filestore.FileId.of(id))
+                .filter(f -> f.readableBy(caller)).orElse(null);
+        if (file == null) {
+            return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("There is no file '" + id + "'."));
+        }
+        FileUsages usages = fileUsages(caller);
+
+        UiStack body = UiStack.of("vs-file-usage").gap(16);
+        body.child(UiText.of("vs-file-usage-meta", id + " · " + readableSize(file.size())
+                + (file.contentType() == null ? "" : " · " + file.contentType())).withCssClass("wf-run-meta"));
+
+        var chatsOfFile = usages.chats().getOrDefault(id, new java.util.LinkedHashMap<>()).values();
+        UiTable chats = UiTable.of("vs-file-chats", "Chats (" + chatsOfFile.size() + ")").stackOnMobile(true)
+                .column(UiTable.Column.text("title", "Chat"))
+                .column(UiTable.Column.text("started", "Started"))
+                .rowAction(UiAction.secondary("open", "Open").icon("show").onClick(UiTrigger.go("/chat/sessions/{id}")));
+        for (var chat : chatsOfFile) {
+            chats.row(Map.of(
+                    "id", chat.id().value(),
+                    "title", chat.title() == null || chat.title().isBlank()
+                            ? "Chat " + chat.id().value().substring(0, Math.min(8, chat.id().value().length()))
+                            : chat.title(),
+                    "started", chat.startedAt() == null ? "" : chat.startedAt().toString().replace("T", " ").substring(0, 16)));
+        }
+        body.child(chatsOfFile.isEmpty() ? UiText.of("vs-file-no-chats", "Not attached to any of your chats.") : chats);
+
+        List<VectorStoreInstance> storesOfFile = usages.stores().getOrDefault(id, List.of());
+        UiTable storeTable = UiTable.of("vs-file-stores", "Vector stores (" + storesOfFile.size() + ")").stackOnMobile(true)
+                .column(UiTable.Column.text("name", "Store"))
+                .column(UiTable.Column.text("template", "Template"))
+                .column(UiTable.Column.text("scope", "Scope"))
+                .rowAction(UiAction.secondary("view", "View").icon("show").onClick(UiTrigger.go(BASE + "/stores/{id}")));
+        for (VectorStoreInstance instance : storesOfFile) {
+            storeTable.row(Map.of(
+                    "id", instance.name(),
+                    "name", instance.name(),
+                    "template", instance.templateName() == null ? "" : instance.templateName(),
+                    "scope", instance.scope().toString()));
+        }
+        body.child(storesOfFile.isEmpty() ? UiText.of("vs-file-no-stores", "Not listed in any vector store.") : storeTable);
+
+        ai.mindconnect.ui.model.UiDialog dialog = ai.mindconnect.ui.model.UiDialog.of("Used in: " + file.name(), null, body);
+        dialog.setId(USAGE_DIALOG);
+        return ai.mindconnect.ui.model.UiPatch.of()
+                .patch(ai.mindconnect.ui.model.UiPatch.Operation.remove(USAGE_DIALOG))
+                .patch(ai.mindconnect.ui.model.UiPatch.Operation.append("sui-dialogs", dialog));
+    }
+
     /** Only the uploader deletes a file — the Files API's rule; a file without a creator stays. */
     @DeleteMapping("/files/{id}")
     public UiPage deleteStoredFile(@PathVariable String id) throws java.io.IOException {
@@ -303,11 +570,14 @@ public class VectorStoreUiController {
         return list("files");
     }
 
-    private String chunkCount(VectorStoreInstance instance) {
+    /** How many entries the store lists and how many chunks the index has for them — "?" when it cannot say. */
+    private String[] counts(VectorStoreInstance instance) {
         try {
-            return String.valueOf(stores.openWith(scope.namespace(), instance).chunkCount());
+            var entities = stores.store(scope.namespace(), instance.name()).entities();
+            return new String[]{String.valueOf(entities.size()),
+                    String.valueOf(entities.stream().mapToLong(e -> e.chunks()).sum())};
         } catch (RuntimeException e) {
-            return "?";
+            return new String[]{"?", "?"};
         }
     }
 
@@ -341,8 +611,6 @@ public class VectorStoreUiController {
 
     private UiPage templateForm(VectorStoreTemplate t, boolean builtIn) {
         boolean isNew = t == null || builtIn;
-        List<UiField.Option> backends = List.of(
-                UiField.Option.of("memory", "memory"), UiField.Option.of("pgvector", "pgvector"));
         List<UiField.Option> embeddingOptions = llmConfigs.findAll().stream()
                 .map(c -> UiField.Option.of(c.name(), c.name())).toList();
         UiForm form = UiForm.of("vs-template-form", builtIn ? "Built-in Template: " + t.name()
@@ -355,62 +623,27 @@ public class VectorStoreUiController {
                 // the template was saved since.
                 .field(UiField.hidden("version",
                         isNew || t.version() == null ? "0" : t.version().toString()))
-                .field(UiField.select("backend", "Backend", t == null ? defaultBackend() : t.backend(), backends)
-                        .asEditable()
-                        // Switching the backend swaps the backend-config group below.
-                        .onChange(ai.mindconnect.ui.model.UiTrigger.api("POST",
-                                BASE + "/templates/backend-fields", "vs-template-form")))
                 .field(UiField.select("embeddingConfig", "Embedding Config",
                         t == null ? "embeddings" : t.embeddingConfig(), embeddingOptions)
                         .asEditable()
                         .hint("LlmConfig naming the embedding model — fixed per store at creation; "
-                                + "changing it later never affects existing stores"))
+                                + "changing it later never affects existing stores. Stores on the same "
+                                + "model share the vectors of the files they both list."))
+                .field(UiField.select("index", "Index", t == null ? IndexDefinition.DEFAULT : t.effectiveIndex(),
+                                stores.indexes(scope.namespace()).stream()
+                                        .map(i -> UiField.Option.of(i.name(), i.name())).toList())
+                        .asEditable()
+                        .hint("Where the chunks of this template's stores are kept — see the Indexes tab"))
                 .field(UiField.text("ingestionWorkflow", "Ingestion Workflow",
                         t == null ? "file-ingestion" : t.ingestionWorkflow()).asEditable()
                         .hint("Workflow started by 'Ingest file…' on stores of this template"))
                 .field(UiField.text("description", "Description",
                         t == null || builtIn ? null : t.metadata().get("description")).asEditable());
-        form.content(backendConfigGroup(t == null ? defaultBackend() : t.backend(),
-                t == null ? Map.of() : t.backendConfig()));
         form.action(UiAction.primary("save", builtIn ? "Save as new template" : "Save").icon("save")
                         .dispatch("POST", "/admin/vector-stores/templates", "vs-template-form"))
                 .action(UiAction.secondary("cancel", "Cancel").icon("cancel").dispatch("GET", "/admin/vector-stores"))
                 .link(UiLink.of("back", BASE, "← Back to Vector Stores"));
         return UiPage.of(BASE + (t == null ? "/templates/new" : "/templates/" + t.name() + "/edit"), form);
-    }
-
-    /** What a new template starts on: the built-in template's backend, which follows the host's settings. */
-    private String defaultBackend() {
-        return stores.template(scope.namespace(), VectorStores.DEFAULT_TEMPLATE)
-                .map(VectorStoreTemplate::backend).orElse("memory");
-    }
-
-    /** The backend-specific settings, swapped in place when the dropdown changes. */
-    private static ai.mindconnect.ui.model.UiFieldGroup backendConfigGroup(String backend,
-                                                                           Map<String, String> config) {
-        var group = ai.mindconnect.ui.model.UiFieldGroup.of("vs-backend-cfg",
-                "pgvector".equals(backend) ? "Backend: pgvector" : "Backend: memory");
-        if ("pgvector".equals(backend)) {
-            group.field(UiField.text("url", "JDBC URL", config.get("url")).asEditable()
-                    .hint("e.g. jdbc:postgresql://localhost:5433/postgres — empty: the host's "
-                            + "mindconnect.vector-store.url, or its own database under Postgres persistence"));
-            group.field(UiField.text("user", "DB User", config.get("user")).asEditable());
-            group.field(UiField.password("password", "DB Password", config.get("password")).asEditable());
-        }
-        return group;
-    }
-
-    /** Backend dropdown changed: re-render the config group for the new choice. */
-    @PostMapping("/templates/backend-fields")
-    public ai.mindconnect.ui.model.UiPatch backendFields(@RequestBody Map<String, Object> raw) {
-        var body = new FormBody(raw);
-        Map<String, String> current = new LinkedHashMap<>();
-        putIfPresent(current, "url", body.str("url"));
-        putIfPresent(current, "user", body.str("user"));
-        putIfPresent(current, "password", body.str("password"));
-        return ai.mindconnect.ui.model.UiPatch.of().patch(
-                ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-backend-cfg",
-                        backendConfigGroup(body.str("backend"), current)));
     }
 
     /**
@@ -427,18 +660,13 @@ public class VectorStoreUiController {
         if (refusal != null) {
             return list("templates").toast(UiToast.error(refusal));
         }
-        Map<String, String> backendConfig = new LinkedHashMap<>();
-        putIfPresent(backendConfig, "url", body.str("url"));
-        putIfPresent(backendConfig, "user", body.str("user"));
-        putIfPresent(backendConfig, "password", body.str("password"));
         Map<String, String> metadata = new LinkedHashMap<>();
         putIfPresent(metadata, "description", body.str("description"));
         String templateName = name.trim();
         VectorStoreTemplate template = new VectorStoreTemplate(templateName,
-                body.str("backend") == null ? defaultBackend() : body.str("backend"),
-                backendConfig,
                 body.str("embeddingConfig") == null ? "embeddings" : body.str("embeddingConfig"),
                 body.str("ingestionWorkflow"), metadata)
+                .withIndex(body.str("index"))
                 .withVersion(VersionedForms.version(body));
         try {
             stores.registry(scope.namespace()).saveTemplate(template);
@@ -510,18 +738,33 @@ public class VectorStoreUiController {
     }
 
     @GetMapping("/stores/{name}")
-    public UiPage storeDetail(@PathVariable String name) {
+    public UiPage storeDetail(@PathVariable String name,
+                              @org.springframework.web.bind.annotation.RequestParam(required = false) String tab,
+                              @org.springframework.web.bind.annotation.RequestParam(required = false) String entry) {
         UiPage refused = refuseForeignStore(name);
-        return refused != null ? refused : storeDetail(name, null, null, null);
+        return refused != null ? refused : storeDetail(name, tab, entry, null, null, null);
     }
 
     private UiPage storeDetail(String name, String lastQuery, UiNode searchResult) {
-        return storeDetail(name, lastQuery, searchResult, null);
+        return storeDetail(name, "search", null, lastQuery, searchResult, null);
     }
 
     private UiPage storeDetail(String name, String lastQuery, UiNode searchResult, String message) {
-        VectorStoreInstance instance = stores.settingsFor(scope.namespace(), name);
-        VectorStore store = stores.openWith(scope.namespace(), instance);
+        return storeDetail(name, "entries", null, lastQuery, searchResult, message);
+    }
+
+    private static final int PAGE_SIZE = 20;
+
+    /**
+     * The store: its settings, an upload when it has an ingestion workflow, and
+     * three tabs — the entries it lists, the chunks they were cut into, and a
+     * test search. Entries and chunks search and page on the server; the
+     * search field and the page buttons fetch just their table again.
+     */
+    private UiPage storeDetail(String name, String tab, String entry, String lastQuery, UiNode searchResult,
+                               String message) {
+        VectorStore store = stores.store(scope.namespace(), name);
+        VectorStoreInstance instance = store.settings();
 
         UiStack page = UiStack.of("vs-detail").gap(16);
         // The same header bar as every other detail screen: icon, the store's
@@ -531,8 +774,16 @@ public class VectorStoreUiController {
                 .onClick(UiTrigger.go(BASE)));
         page.child(header);
         page.child(UiText.of("vs-detail-meta", "template " + instance.templateName()
-                + " · backend " + instance.backend() + " · embedding " + instance.embeddingConfig()
+                + " · embedding " + instance.embeddingConfig()
                 + " · scope " + instance.scope()).withCssClass("wf-run-meta"));
+        String indexName = stores.indexOf(scope.namespace(), instance);
+        String location;
+        try {
+            location = stores.indexLocation(scope.namespace(), indexName);
+        } catch (RuntimeException e) {
+            location = "unknown (" + e.getMessage() + ")";
+        }
+        page.child(UiText.of("vs-detail-index", "index " + indexName + " · " + location).withCssClass("wf-run-meta"));
         if (message != null) {
             page.child(UiText.of("vs-ingest-result", message).withCssClass("task-card-body"));
         }
@@ -548,22 +799,7 @@ public class VectorStoreUiController {
                     .uploadTo(BASE + "/stores/" + name + "/upload"));
         }
 
-        UiTable files = UiTable.of("vs-files", "Files").stackOnMobile(true)
-                .column(UiTable.Column.text("file", "File"))
-                .column(UiTable.Column.text("chunks", "Chunks"))
-                .rowAction(UiAction.danger("delete-file", "Delete").icon("delete")
-                        .confirm("Remove this file's chunks from the store?")
-                        // File ids contain slashes (upload paths) — they travel
-                        // URL-encoded in the query, never in the path.
-                        .dispatch("DELETE", "/admin/vector-stores/stores/" + name + "/files?file={id}"));
-        store.listFiles().forEach((fileId, count) ->
-                files.row(Map.of(
-                        "id", java.net.URLEncoder.encode(fileId, java.nio.charset.StandardCharsets.UTF_8),
-                        "file", fileId,
-                        "chunks", String.valueOf(count))));
-        page.child(files);
-
-        UiForm search = UiForm.of("vs-search-form", "Test Search")
+        UiForm search = UiForm.of("vs-search-form", null)
                 .field(UiField.text("query", "Query", lastQuery).asEditable())
                 .field(UiField.number("topK", "Max Results", 5).asEditable()
                         .hint("How many chunks to return (1–50)"))
@@ -571,24 +807,199 @@ public class VectorStoreUiController {
                         .hint("Hide hits below this cosine similarity (0 = show all)"));
         search.action(UiAction.primary("search", "Search").icon("search")
                 .dispatch("POST", "/admin/vector-stores/stores/" + name + "/search", "vs-search-form"));
-        page.child(search);
+        UiStack searchTab = UiStack.of("vs-search-tab").gap(16).child(search);
         if (searchResult != null) {
-            page.child(searchResult);
+            searchTab.child(searchResult);
         }
-
         if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()) {
-            page.child(UiLink.of("ingest", "/workflow-admin/" + instance.ingestionWorkflow() + "/run",
+            searchTab.child(UiLink.of("ingest", "/workflow-admin/" + instance.ingestionWorkflow() + "/run",
                     "→ Ingest file… (workflow " + instance.ingestionWorkflow() + ")"));
         }
+
+        UiSection tabs = UiSection.of("vs-store-tabs", null);
+        tabs.getSections().add(UiSectionEntry.of("entries", "Entries", entriesTable(name, null, 1)).icon("file"));
+        tabs.getSections().add(UiSectionEntry.of("chunks", "Chunks", chunksTable(name, null, entry, 1)).icon("list"));
+        tabs.getSections().add(UiSectionEntry.of("search", "Search", searchTab).icon("search"));
+        tabs.initialSection(tab == null || tab.isBlank() ? "entries" : tab);
+        page.child(tabs);
         return UiPage.of(BASE + "/stores/" + name, page);
     }
 
+    // ── entries tab ────────────────────────────────────────────────────────
+
+    /** What the store lists, filtered by {@code q} (name, id or type), one page of it. */
+    private UiNode entriesTable(String name, String q, int page) {
+        String enc = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
+        UiForm searchForm = UiForm.of("vs-entries-search", null);
+        searchForm.field(UiField.text("q", "", q).asEditable().icon("search")
+                .placeholder("Search name, id or type…")
+                .onChange(UiTrigger.api("POST", BASE + "/stores/" + enc + "/entries/search", "vs-entries-search")));
+        UiTable table = UiTable.of("vs-entries", null).stackOnMobile(true)
+                .headerExtra(searchForm)
+                .column(UiTable.Column.text("file", "Entry"))
+                .column(UiTable.Column.text("type", "Type"))
+                .column(UiTable.Column.text("chunks", "Chunks"))
+                .rowAction(UiAction.secondary("chunks", "Chunks").icon("list")
+                        .onClick(UiTrigger.go(BASE + "/stores/" + enc + "?tab=chunks&entry={id}")))
+                .rowAction(UiAction.danger("delete-file", "Remove").icon("delete")
+                        .confirm("Take this entry off the store? A document goes with it; a stored file "
+                                + "stays searchable in the other stores and chats that list it.")
+                        // Ids may contain slashes (paths of documents from before 0.9) — they
+                        // travel URL-encoded in the query, never in the path.
+                        .dispatch("DELETE", BASE + "/stores/" + enc + "/files?file={id}"));
+        List<Map<String, Object>> rows = new java.util.ArrayList<>();
+        try {
+            String needle = q == null || q.isBlank() ? null : q.toLowerCase(java.util.Locale.ROOT);
+            for (var entity : stores.store(scope.namespace(), name).entities()) {
+                String label = entryName(entity.ref());
+                if (needle != null && !(label + " " + entity.ref().id() + " " + entity.ref().type().value())
+                        .toLowerCase(java.util.Locale.ROOT).contains(needle)) {
+                    continue;
+                }
+                rows.add(Map.of(
+                        "id", java.net.URLEncoder.encode(entity.ref().id(), java.nio.charset.StandardCharsets.UTF_8),
+                        "file", label,
+                        "type", entity.ref().type().value(),
+                        "chunks", String.valueOf(entity.chunks())));
+            }
+        } catch (RuntimeException e) {
+            return UiText.of("vs-entries", "The entries cannot be listed: " + e.getMessage())
+                    .withCssClass("task-card-body");
+        }
+        int pages = Math.max(1, (rows.size() + PAGE_SIZE - 1) / PAGE_SIZE);
+        int current = Math.min(Math.max(page, 1), pages);
+        int from = (current - 1) * PAGE_SIZE;
+        rows.subList(from, Math.min(from + PAGE_SIZE, rows.size())).forEach(table::row);
+        table.paginate(current, PAGE_SIZE, rows.size(), UiTrigger.api("GET",
+                BASE + "/stores/" + enc + "/entries/table?page={page}" + param("q", q)));
+        return table;
+    }
+
+    @GetMapping("/stores/{name}/entries/table")
+    public ai.mindconnect.ui.model.UiPatch entriesPage(@PathVariable String name,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String q,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page) {
+        if (refuseForeignStore(name) != null) {
+            return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("There is no store '" + name + "'."));
+        }
+        return ai.mindconnect.ui.model.UiPatch.of().patch(ai.mindconnect.ui.model.UiPatch.Operation.replace(
+                "vs-entries", entriesTable(name, q, page == null ? 1 : page)));
+    }
+
+    /** The search field: a new search starts on page 1. */
+    @PostMapping("/stores/{name}/entries/search")
+    public ai.mindconnect.ui.model.UiPatch searchEntries(@PathVariable String name, @RequestBody Map<String, Object> raw) {
+        return entriesPage(name, new FormBody(raw).str("q"), 1);
+    }
+
+    // ── chunks tab ─────────────────────────────────────────────────────────
+
     /**
-     * Receives uploaded files and hands each to the shared
-     * {@link ai.mindconnect.agentrest.service.VectorStoreService} ingestion
-     * path — the same one the REST API's ingest endpoint takes (ingestion
-     * workflow when the template names one, direct chunking otherwise).
+     * The chunks of the store's entries — of one entry when {@code entry} names
+     * it — whose text contains {@code q}, one page of them, as the index has them.
      */
+    private UiNode chunksTable(String name, String q, String entry, int page) {
+        String enc = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
+        VectorStore store = stores.store(scope.namespace(), name);
+        List<ai.mindconnect.vectorstore.embedding.EntityRef> members;
+        try {
+            members = store.members();
+        } catch (RuntimeException e) {
+            return UiText.of("vs-chunks", "The chunks cannot be listed: " + e.getMessage()).withCssClass("task-card-body");
+        }
+        List<UiField.Option> entries = new java.util.ArrayList<>();
+        entries.add(UiField.Option.of("", "All entries"));
+        Map<String, String> labels = new java.util.HashMap<>();
+        for (var ref : members) {
+            String label = entryName(ref);
+            labels.put(ref.id(), label);
+            entries.add(UiField.Option.of(ref.id(), label));
+        }
+        String selected = entry == null || entry.isBlank() ? null : entry;
+
+        UiForm searchForm = UiForm.of("vs-chunks-search", null);
+        var searchTrigger = UiTrigger.api("POST", BASE + "/stores/" + enc + "/chunks/search", "vs-chunks-search");
+        searchForm.field(UiField.select("entry", "", selected == null ? "" : selected, entries).asEditable()
+                .onChange(searchTrigger));
+        searchForm.field(UiField.text("q", "", q).asEditable().icon("search")
+                .placeholder("Search the chunks' text…").onChange(searchTrigger));
+        UiTable table = UiTable.of("vs-chunks", null).stackOnMobile(true)
+                .headerExtra(searchForm)
+                .column(UiTable.Column.text("entry", "Entry"))
+                .column(UiTable.Column.number("ordinal", "#"))
+                .column(UiTable.Column.text("meta", "Metadata"))
+                .column(UiTable.Column.text("text", "Text"));
+        EmbeddingIndexPage result;
+        try {
+            var within = selected == null ? null : store.select(List.of(ai.mindconnect.vectorstore.tools.EntitySelector.id(selected)));
+            int current = Math.max(page, 1);
+            var chunkPage = store.chunks(within, q, (current - 1) * PAGE_SIZE, PAGE_SIZE);
+            long pages = Math.max(1, (chunkPage.total() + PAGE_SIZE - 1) / PAGE_SIZE);
+            if (current > pages) {
+                current = (int) pages;
+                chunkPage = store.chunks(within, q, (current - 1) * PAGE_SIZE, PAGE_SIZE);
+            }
+            result = new EmbeddingIndexPage(chunkPage, current);
+        } catch (RuntimeException e) {
+            return UiText.of("vs-chunks", "The chunks cannot be listed: " + e.getMessage()).withCssClass("task-card-body");
+        }
+        for (var chunk : result.chunks().chunks()) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", chunk.ref().type().value() + ":" + chunk.ref().id() + "#" + chunk.chunk().id());
+            row.put("entry", labels.getOrDefault(chunk.ref().id(), chunk.ref().id()));
+            row.put("ordinal", String.valueOf(chunk.chunk().ordinal()));
+            row.put("meta", chunk.chunk().metadata().entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(e -> e.getKey() + ": " + e.getValue())
+                    .collect(java.util.stream.Collectors.joining(" · ")));
+            row.put("text", chunk.chunk().text());
+            table.row(row);
+        }
+        table.paginate(result.page(), PAGE_SIZE, result.chunks().total(), UiTrigger.api("GET",
+                BASE + "/stores/" + enc + "/chunks/table?page={page}" + param("q", q) + param("entry", selected)));
+        return table;
+    }
+
+    private record EmbeddingIndexPage(ai.mindconnect.vectorstore.embedding.EmbeddingIndex.ChunkPage chunks, int page) {}
+
+    @GetMapping("/stores/{name}/chunks/table")
+    public ai.mindconnect.ui.model.UiPatch chunksPage(@PathVariable String name,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String q,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String entry,
+            @org.springframework.web.bind.annotation.RequestParam(required = false) Integer page) {
+        if (refuseForeignStore(name) != null) {
+            return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("There is no store '" + name + "'."));
+        }
+        return ai.mindconnect.ui.model.UiPatch.of().patch(ai.mindconnect.ui.model.UiPatch.Operation.replace(
+                "vs-chunks", chunksTable(name, q, entry, page == null ? 1 : page)));
+    }
+
+    /** The search field and the entry choice: a new search starts on page 1. */
+    @PostMapping("/stores/{name}/chunks/search")
+    public ai.mindconnect.ui.model.UiPatch searchChunks(@PathVariable String name, @RequestBody Map<String, Object> raw) {
+        var body = new FormBody(raw);
+        return chunksPage(name, body.str("q"), body.str("entry"), 1);
+    }
+
+    /** {@code &key=value}, URL-encoded; nothing for an empty value. */
+    private static String param(String key, String value) {
+        return value == null || value.isBlank() ? ""
+                : "&" + key + "=" + java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
+    }
+
+    /** A stored file by its name in the file store; anything else by its id. */
+    private String entryName(ai.mindconnect.vectorstore.embedding.EntityRef ref) {
+        if (ref.type().equals(ai.mindconnect.vectorstore.embedding.EntityType.FILE)) {
+            try {
+                return fileStore.find(ai.mindconnect.filestore.FileId.of(ref.id()))
+                        .map(f -> f.name()).orElse(ref.id() + " (file removed)");
+            } catch (RuntimeException e) {
+                return ref.id();
+            }
+        }
+        return ref.id();
+    }
+
     @PostMapping("/stores/{name}/upload")
     public UiPage upload(@PathVariable String name,
                          @org.springframework.web.bind.annotation.RequestParam("vs-upload")
@@ -599,7 +1010,8 @@ public class VectorStoreUiController {
         for (var file : files) {
             String fileName = file.getOriginalFilename() == null ? "upload.bin" : file.getOriginalFilename();
             try (var content = file.getInputStream()) {
-                message.append(vectorStoreService.ingestUpload(name, fileName, content)).append('\n');
+                message.append(vectorStoreService.ingestUpload(name, fileName, file.getContentType(), content,
+                        currentUsers.require())).append('\n');
             } catch (Exception e) {
                 message.append(fileName).append(": failed — ").append(e.getMessage()).append('\n');
             }
@@ -649,10 +1061,10 @@ public class VectorStoreUiController {
         int rank = 1;
         for (ai.mindconnect.agentrest.service.VectorStoreService.Hit hit : hits) {
             Map<String, Object> row = new LinkedHashMap<>();
-            row.put("id", hit.id());
+            row.put("id", hit.entityId() + "#" + hit.chunkId());
             row.put("rank", String.valueOf(rank++));
             row.put("score", String.format("%.3f", hit.score()));
-            row.put("chunk", hit.fileId() + " #" + hit.ordinal());
+            row.put("chunk", hit.metadata().getOrDefault("file", hit.entityId()) + " #" + hit.ordinal());
             for (String key : metaKeys) {
                 row.put("m-" + key, hit.metadata().getOrDefault(key, ""));
             }
@@ -671,7 +1083,7 @@ public class VectorStoreUiController {
                              @org.springframework.web.bind.annotation.RequestParam("file") String fileId) {
         UiPage refused = refuseForeignStore(name);
         if (refused != null) return refused;
-        stores.openWith(scope.namespace(), stores.settingsFor(scope.namespace(), name)).deleteFile(fileId);
+        vectorStoreService.removeEntry(name, fileId);
         return storeDetail(name, null, (UiNode) null);
     }
 
@@ -679,7 +1091,7 @@ public class VectorStoreUiController {
     public UiPage deleteStore(@PathVariable String name) {
         UiPage refused = refuseForeignStore(name);
         if (refused != null) return refused;
-        stores.registry(scope.namespace()).deleteInstance(name);
+        vectorStoreService.deleteStore(name);
         return list("stores");
     }
 

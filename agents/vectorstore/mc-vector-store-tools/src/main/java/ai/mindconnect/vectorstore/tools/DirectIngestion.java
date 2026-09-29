@@ -1,15 +1,13 @@
 package ai.mindconnect.vectorstore.tools;
 
-import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.vectorstore.VectorChunk;
-import ai.mindconnect.vectorstore.VectorStore;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.vectorstore.embedding.EntityRef;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Workflow-free ingestion: plain text in, embedded chunks in the store out —
+ * Workflow-free ingestion: plain text in, embedded chunks in the index out —
  * {@link DefaultChunker} (OpenAI-style 800/400) instead of a pipeline. The
  * default whenever a store's template names no ingestion workflow; templates
  * that do name one keep the fully customisable workflow path.
@@ -19,24 +17,21 @@ public final class DirectIngestion {
     private DirectIngestion() {}
 
     /**
-     * Replaces {@code fileId}'s chunks in {@code store} with the freshly
-     * chunked and embedded {@code text}. Returns a human-readable summary.
+     * Chunks {@code text} as {@code ref}'s content, embeds it unless the index
+     * already has {@code ref} at {@code version}, and lists {@code ref} in the
+     * store. Returns a human-readable summary.
+     *
+     * @param name what the chunks name as their file — shown with every search hit
      */
-    public static String ingest(VectorStores stores, Namespace namespace, VectorStore store, String storeName,
-                                String fileId, String text) {
+    public static String ingest(VectorStore store, EntityRef ref, UserId owner, String version,
+                                String name, String text) {
         List<String> pieces = DefaultChunker.chunk(text);
         if (pieces.isEmpty()) {
-            return fileId + ": no text content to ingest.";
+            return name + ": no text content to ingest.";
         }
-        List<float[]> vectors = stores.embedFor(namespace, storeName, pieces);
-        List<VectorChunk> chunks = new ArrayList<>(pieces.size());
-        for (int i = 0; i < pieces.size(); i++) {
-            chunks.add(new VectorChunk(fileId + ":" + i, fileId, i, pieces.get(i),
-                    Map.of("file", fileId), vectors.get(i)));
-        }
-        store.deleteFile(fileId);   // replace semantics, like vector_upsert
-        store.upsert(chunks);
-        return "Stored " + chunks.size() + " chunk(s) for file '" + fileId + "' in store '"
-                + storeName + "' (dimension " + vectors.get(0).length + ").";
+        long chunks = store.put(ref, owner, version, pieces.stream()
+                .map(piece -> new VectorStore.TextChunk(piece, Map.of("file", name)))
+                .toList());
+        return "Stored " + chunks + " chunk(s) for file '" + name + "' in store '" + store.name() + "'.";
     }
 }

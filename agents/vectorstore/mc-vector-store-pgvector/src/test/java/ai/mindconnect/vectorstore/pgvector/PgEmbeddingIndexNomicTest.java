@@ -6,6 +6,7 @@ import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex.EmbeddingHit;
 import ai.mindconnect.vectorstore.embedding.EmbeddingQuery;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
+import ai.mindconnect.vectorstore.embedding.EntityType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterAll;
@@ -86,7 +87,7 @@ class PgEmbeddingIndexNomicTest {
     private static final EntityRef MAIL_LUNCH = mail("INBOX", "7-2");
     private static final EntityRef MAIL_CANCEL = mail("Archive", "9-1");
     private static final EntityRef MAIL_BOB = mail("INBOX", "7-3");
-    private static final EntityRef EVENT_REVIEW = new EntityRef("calendar-event", "caldav.home", "work", "ev-1");
+    private static final EntityRef EVENT_REVIEW = new EntityRef(EntityType.CALENDAR_EVENT, "caldav.home", "work", "ev-1");
 
     private static final Map<EntityRef, String> MESSAGES = Map.of(
             MAIL_INVOICE, "Rechnung März: Bitte überweisen Sie 1.200 Euro bis zum 15. April.",
@@ -178,9 +179,9 @@ class PgEmbeddingIndexNomicTest {
     @Test
     void mailOfOneFolder() {
         List<EmbeddingHit> inbox = search("Kündigung",
-                EmbeddingQuery.ofTypes(MODEL, "mail").owner(ALICE).in(MAILBOX, "INBOX"));
+                EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL).owner(ALICE).in(MAILBOX, "INBOX"));
         List<EmbeddingHit> allOfAlice = search("Kündigung",
-                EmbeddingQuery.ofTypes(MODEL, "mail").owner(ALICE).in(MAILBOX));
+                EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL).owner(ALICE).in(MAILBOX));
 
         assertThat(inbox).extracting(EmbeddingHit::ref).containsExactlyInAnyOrder(MAIL_INVOICE, MAIL_LUNCH);
         assertThat(allOfAlice.get(0).ref()).isEqualTo(MAIL_CANCEL);
@@ -191,18 +192,18 @@ class PgEmbeddingIndexNomicTest {
     @Test
     void acrossMailCalendarAndFiles() {
         List<EmbeddingHit> hits = search("Wann wird der Rahmenvertrag geprüft oder gekündigt?",
-                EmbeddingQuery.ofTypes(MODEL, "mail", "calendar-event", "file").ownerOrShared(ALICE));
+                EmbeddingQuery.ofTypes(MODEL, EntityType.MAIL, EntityType.CALENDAR_EVENT, EntityType.FILE).ownerOrShared(ALICE));
 
-        assertThat(hits).extracting(h -> h.ref().type()).containsAnyOf("mail", "calendar-event");
+        assertThat(hits).extracting(h -> h.ref().type()).containsAnyOf(EntityType.MAIL, EntityType.CALENDAR_EVENT);
         assertThat(hits).extracting(EmbeddingHit::ref).doesNotContain(MAIL_BOB);
     }
 
     private static EntityRef file(String name) {
-        return EntityRef.of("file", "files", name);
+        return EntityRef.of(EntityType.FILE, "files", name);
     }
 
     private static EntityRef mail(String folder, String id) {
-        return new EntityRef("mail", MAILBOX, folder, id);
+        return new EntityRef(EntityType.MAIL, MAILBOX, folder, id);
     }
 
     private static Set<EntityRef> pool(String name) {

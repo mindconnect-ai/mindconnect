@@ -40,8 +40,8 @@ class VectorToolsPgVectorTest {
     private static final String PASSWORD = System.getenv().getOrDefault("MC_PGVECTOR_TEST_PASSWORD", "test");
 
     private static final Namespace NS = new Namespace("pgtools");
-    /** The pgvector backend's table for store {@code kb} of this namespace. */
-    private static final String TABLE = "vs_pgtools__kb";
+    /** Where every store's chunks live: the embedding index, one table for all namespaces. */
+    private static final String TABLE = "mc_embedding";
 
     private static final LlmEmbeddings FAKE_EMBEDDINGS = (config, texts) -> texts.stream()
             .map(t -> {
@@ -107,7 +107,7 @@ class VectorToolsPgVectorTest {
                 Map.of("text", "podman is a container engine", "title", "Intro"),
                 Map.of("text", "the finance report shows growth"))));
         assertThat(stored).contains("Stored 2 chunk(s)");
-        assertThat(rowsInTable()).as("the chunks are rows of the namespace's pgvector table").isEqualTo(2);
+        assertThat(rowsInTable()).as("the chunks are rows of the embedding index, under the namespace").isEqualTo(2);
 
         String found = search.execute(Map.of("store", "kb", "query", "how to run a container"));
         assertThat(found).contains("podman").contains("Intro").contains("doc1");
@@ -134,13 +134,14 @@ class VectorToolsPgVectorTest {
 
     private static void dropTable() throws Exception {
         try (Connection c = DriverManager.getConnection(URL, USER, PASSWORD); Statement s = c.createStatement()) {
-            s.execute("DROP TABLE IF EXISTS " + TABLE);
+            s.execute("DELETE FROM " + TABLE + " WHERE namespace = '" + NS.value() + "'");
+            s.execute("DELETE FROM mc_vector_store_member WHERE namespace = '" + NS.value() + "'");
         }
     }
 
     private static long rowsInTable() throws Exception {
         try (Connection c = DriverManager.getConnection(URL, USER, PASSWORD); Statement s = c.createStatement();
-             ResultSet rs = s.executeQuery("SELECT count(*) FROM " + TABLE)) {
+             ResultSet rs = s.executeQuery("SELECT count(*) FROM " + TABLE + " WHERE namespace = '" + NS.value() + "'")) {
             rs.next();
             return rs.getLong(1);
         }

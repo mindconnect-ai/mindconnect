@@ -4,6 +4,8 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.jdbc.Sql;
 import org.junit.jupiter.api.BeforeEach;
+import ai.mindconnect.vectorstore.embedding.EntityRef;
+import ai.mindconnect.vectorstore.embedding.EntityType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -46,8 +48,7 @@ class PgVectorStoreRegistryTest {
     @Test
     void templatesAndInstancesRoundTrip() {
         PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
-        VectorStoreTemplate template = new VectorStoreTemplate("Chat Uploads", "pgvector", Map.of(),
-                "embeddings", null, Map.of("description", "per chat"));
+        VectorStoreTemplate template = new VectorStoreTemplate("Chat Uploads", "embeddings", null, Map.of("description", "per chat"));
 
         VectorStoreTemplate saved = registry.saveTemplate(template.withVersion(0L));
         VectorStoreInstance instance = registry.registerInstance(VectorStoreInstance.fromTemplate(
@@ -66,9 +67,9 @@ class PgVectorStoreRegistryTest {
                 .isInstanceOf(StaleVersionException.class);
         assertThat(registry.saveTemplate(saved).version()).isEqualTo(2L);
 
-        VectorStoreInstance moved = instance.onBackend("memory");
-        registry.saveInstance(moved);
-        assertThat(registry.instance("session-s1")).contains(moved);
+        VectorStoreInstance claimed = instance.asChatStore("s1", "bob");
+        registry.saveInstance(claimed);
+        assertThat(registry.instance("session-s1")).contains(claimed);
 
         registry.deleteInstance("session-s1");
         registry.deleteTemplate("Chat Uploads");
@@ -82,8 +83,8 @@ class PgVectorStoreRegistryTest {
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < 20; i++) {
                 PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
-                VectorStoreInstance candidate = new VectorStoreInstance("session-s1", "chat-uploads", "pgvector",
-                        Map.of(), "embeddings", null, Map.of("attempt", Integer.toString(i)),
+                VectorStoreInstance candidate = new VectorStoreInstance("session-s1", "chat-uploads",
+                        "embeddings", null, Map.of("attempt", Integer.toString(i)),
                         VectorStoreInstance.Scope.SESSION, "s1", "alice", Instant.now());
                 futures.add(pool.submit(() -> registry.registerInstance(candidate)));
             }
@@ -100,8 +101,7 @@ class PgVectorStoreRegistryTest {
     void aNamespaceSeesOnlyItsOwnRecords() {
         PgVectorStoreRegistry acme = new PgVectorStoreRegistry(sql, ACME);
         PgVectorStoreRegistry other = new PgVectorStoreRegistry(sql, OTHER);
-        VectorStoreTemplate template = new VectorStoreTemplate("knowledge", "pgvector", Map.of(),
-                "embeddings", null, Map.of());
+        VectorStoreTemplate template = new VectorStoreTemplate("knowledge", "embeddings", null, Map.of());
 
         acme.saveTemplate(template);
         acme.registerInstance(VectorStoreInstance.fromTemplate("docs", template, VectorStoreInstance.Scope.GLOBAL, null));
@@ -119,13 +119,15 @@ class PgVectorStoreRegistryTest {
     @Test
     void theFilesAreImportedOnce_andStay(@TempDir Path dir) {
         FileVectorStoreRegistry files = new FileVectorStoreRegistry(dir.resolve("vector-stores"));
-        VectorStoreTemplate template = files.saveTemplate(new VectorStoreTemplate("chat-uploads", "memory",
-                Map.of(), "embeddings", "file-ingestion", Map.of()));
+        VectorStoreTemplate template = files.saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", "file-ingestion", Map.of()));
         VectorStoreInstance instance = files.registerInstance(VectorStoreInstance.fromTemplate(
                 "session-s1", template, VectorStoreInstance.Scope.SESSION, "s1", "alice"));
+        EntityRef file = EntityRef.of(EntityType.FILE, EntityRef.FILE_STORE, "file-1");
+        files.addMember("session-s1", file);
         PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
 
         assertThat(registry.importFrom(files)).isEqualTo(2);
+        assertThat(registry.members("session-s1")).containsExactly(file);
 
         assertThat(registry.templates()).containsExactly(template);
         assertThat(registry.instances()).containsExactly(instance);
@@ -133,8 +135,48 @@ class PgVectorStoreRegistryTest {
         assertThat(Files.exists(dir.resolve("vector-stores/templates/chat-uploads.json"))).isTrue();
         assertThat(Files.exists(dir.resolve("vector-stores/instances/session-s1.json"))).isTrue();
 
-        files.saveTemplate(new VectorStoreTemplate("knowledge", "memory", Map.of(), "embeddings", null, Map.of()));
+        files.saveTemplate(new VectorStoreTemplate("knowledge", "embeddings", null, Map.of()));
         assertThat(registry.importFrom(files)).as("the namespace has records now").isZero();
         assertThat(registry.template("knowledge")).isEmpty();
+    }
+
+    @Test
+    void membersAreListedRemovedAndGoWithTheStore() {
+        VectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
+        EntityRef file = EntityRef.of(EntityType.FILE, EntityRef.FILE_STORE, "file-1");
+        EntityRef doc = EntityRef.of(EntityType.DOCUMENT, "kb", "notes.md");
+        registry.registerInstance(VectorStoreInstance.fromTemplate("kb",
+                new VectorStoreTemplate("default", "embeddings", null, Map.of()), VectorStoreInstance.Scope.GLOBAL, null));
+
+        registry.addMember("kb", file);
+        registry.addMember("kb", doc);
+        registry.addMember("kb", file);
+        registry.addMember("session-s1", file);
+
+        assertThat(registry.members("kb")).containsExactly(file, doc);
+        assertThat(registry.members("KB")).as("found by key, like the instance").containsExactly(file, doc);
+        assertThat(registry.storesListing(file)).containsExactlyInAnyOrder("kb", "session-s1");
+
+        registry.removeMember("kb", doc);
+        registry.removeMember("kb", doc);
+        assertThat(registry.members("kb")).containsExactly(file);
+
+        registry.deleteInstance("kb");
+        assertThat(registry.members("kb")).isEmpty();
+        assertThat(registry.storesListing(file)).containsExactly("session-s1");
+    }
+
+    @Test
+    void indexDefinitionsRoundTrip() {
+        VectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
+        IndexDefinition big = new IndexDefinition("big-kb", "pgvector", "mc_embedding_big", null, null, null, null, "large");
+
+        registry.saveIndex(big);
+        registry.saveIndex(big);
+
+        assertThat(registry.indexes()).containsExactly(big);
+        assertThat(registry.index("big-kb")).contains(big);
+        registry.deleteIndex("big-kb");
+        assertThat(registry.indexes()).isEmpty();
     }
 }

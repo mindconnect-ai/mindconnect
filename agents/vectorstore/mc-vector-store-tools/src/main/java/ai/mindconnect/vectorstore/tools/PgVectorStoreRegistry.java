@@ -3,6 +3,8 @@ package ai.mindconnect.vectorstore.tools;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.vectorstore.embedding.EntityRef;
+import ai.mindconnect.vectorstore.embedding.EntityType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,7 +16,8 @@ import java.util.Optional;
  * {@link VectorStoreRegistry} on Postgres: one row of
  * {@code mc_vector_store_template} per template and one of
  * {@code mc_vector_store_instance} per instance, keyed by
- * {@code (namespace, id)} where the id is the name's {@link VectorStoreRegistry#key key}
+ * {@code (namespace, id)} where the id is the name's {@link VectorStoreRegistry#key key},
+ * and one row of {@value #MEMBERS} per entity a store lists
  * — so a name finds the same record it found on files. The name stands beside
  * the document, and an instance's scope too, for {@link #instances(VectorStoreInstance.Scope, String)}.
  *
@@ -26,11 +29,16 @@ public final class PgVectorStoreRegistry implements VectorStoreRegistry {
 
     private static final Logger log = LoggerFactory.getLogger(PgVectorStoreRegistry.class);
 
+    static final String MEMBERS = "mc_vector_store_member";
+
     private final DocumentTable<VectorStoreTemplate> templates;
     private final DocumentTable<VectorStoreInstance> instances;
+    private final DocumentTable<IndexDefinition> indexes;
+    private final Sql sql;
     private final Namespace namespace;
 
     public PgVectorStoreRegistry(Sql sql, Namespace namespace) {
+        this.sql = Objects.requireNonNull(sql, "sql");
         this.namespace = Objects.requireNonNull(namespace, "namespace");
         this.templates = DocumentTable.of(VectorStoreTemplate.class)
                 .table("mc_vector_store_template")
@@ -47,11 +55,28 @@ public final class PgVectorStoreRegistry implements VectorStoreRegistry {
                 .column("scope_ref", "TEXT", VectorStoreInstance::scopeRef)
                 .index("namespace", "scope", "scope_ref")
                 .build(sql);
+        this.indexes = DocumentTable.of(IndexDefinition.class)
+                .table("mc_vector_store_index")
+                .partitionKey("namespace", "TEXT", i -> namespace.value())
+                .id("id", "TEXT", i -> i.name())
+                .build(sql);
     }
 
     public PgVectorStoreRegistry initSchema() {
         templates.createSchema();
         instances.createSchema();
+        indexes.createSchema();
+        sql.execute("CREATE TABLE IF NOT EXISTS " + MEMBERS + " ("
+                + " namespace text NOT NULL,"
+                + " store_id text NOT NULL,"
+                + " entity_type text NOT NULL,"
+                + " source text NOT NULL,"
+                + " container text NOT NULL,"
+                + " entity_id text NOT NULL,"
+                + " added_at timestamptz NOT NULL DEFAULT clock_timestamp(),"
+                + " PRIMARY KEY (namespace, store_id, entity_type, source, container, entity_id));"
+                + " CREATE INDEX IF NOT EXISTS " + MEMBERS + "_entity_idx ON " + MEMBERS
+                + " (namespace, entity_type, source, container, entity_id)");
         return this;
     }
 
@@ -72,6 +97,10 @@ public final class PgVectorStoreRegistry implements VectorStoreRegistry {
         }
         for (VectorStoreInstance instance : source.instances()) {
             if (instances.insert(instance)) copied++;
+            source.members(instance.name()).forEach(ref -> addMember(instance.name(), ref));
+        }
+        for (IndexDefinition index : source.indexes()) {
+            if (indexes.insert(index)) copied++;
         }
         if (copied > 0) {
             log.info("Imported {} vector-store template(s) and instance(s) of namespace '{}' into Postgres",
@@ -146,5 +175,64 @@ public final class PgVectorStoreRegistry implements VectorStoreRegistry {
     @Override
     public void deleteInstance(String name) {
         instances.deleteById(namespace.value(), VectorStoreRegistry.key(name));
+        sql.update("DELETE FROM " + MEMBERS + " WHERE namespace = ? AND store_id = ?",
+                namespace.value(), VectorStoreRegistry.key(name));
+    }
+
+    // ── indexes ────────────────────────────────────────────────────────────
+
+    @Override
+    public List<IndexDefinition> indexes() {
+        return indexes.find("WHERE namespace = ? ORDER BY id", namespace.value());
+    }
+
+    @Override
+    public Optional<IndexDefinition> index(String name) {
+        return indexes.findById(namespace.value(), name);
+    }
+
+    @Override
+    public void saveIndex(IndexDefinition index) {
+        indexes.save(index);
+    }
+
+    @Override
+    public void deleteIndex(String name) {
+        indexes.deleteById(namespace.value(), name);
+    }
+
+    // ── members ────────────────────────────────────────────────────────────
+
+    @Override
+    public List<EntityRef> members(String store) {
+        return sql.query("SELECT entity_type, source, container, entity_id FROM " + MEMBERS
+                        + " WHERE namespace = ? AND store_id = ? ORDER BY added_at, entity_type, source, container, entity_id",
+                row -> new EntityRef(EntityType.of(row.string("entity_type")), row.string("source"),
+                        row.string("container"), row.string("entity_id")),
+                namespace.value(), VectorStoreRegistry.key(store));
+    }
+
+    @Override
+    public void addMember(String store, EntityRef ref) {
+        sql.update("INSERT INTO " + MEMBERS + " (namespace, store_id, entity_type, source, container, entity_id)"
+                        + " VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING",
+                namespace.value(), VectorStoreRegistry.key(store), ref.type().value(), ref.source(),
+                ref.container(), ref.id());
+    }
+
+    @Override
+    public void removeMember(String store, EntityRef ref) {
+        sql.update("DELETE FROM " + MEMBERS + " WHERE namespace = ? AND store_id = ?"
+                        + " AND entity_type = ? AND source = ? AND container = ? AND entity_id = ?",
+                namespace.value(), VectorStoreRegistry.key(store), ref.type().value(), ref.source(),
+                ref.container(), ref.id());
+    }
+
+    @Override
+    public List<String> storesListing(EntityRef ref) {
+        return sql.query("SELECT store_id FROM " + MEMBERS + " WHERE namespace = ?"
+                        + " AND entity_type = ? AND source = ? AND container = ? AND entity_id = ? ORDER BY store_id",
+                row -> row.string("store_id"),
+                namespace.value(), ref.type().value(), ref.source(), ref.container(), ref.id());
     }
 }
