@@ -60,9 +60,6 @@ mc.env
 # Editor harness — runtime-saved workflows (not source)
 workflow/mc-workflow-ui-diagram-app/workflows/
 
-# Manual-test run reports — local records, not part of the repo
-agents/doc/manual-tests/runs/
-
 # Large raw screen recordings — keep extracted GIFs/WebP, not the source video
 *.mov
 *.mp4
