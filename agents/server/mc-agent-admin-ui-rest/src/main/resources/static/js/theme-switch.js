@@ -26,6 +26,9 @@
         { id: "sorbet",   label: "Sorbet",   hint: "Pastels, light" },
         { id: "dark",     label: "Dark",     hint: "The framework's own dark" },
         { id: "amethyst", label: "Amethyst", hint: "Violet on a dark ground" },
+        { id: "vscode-dark",  label: "VS Code Dark",          hint: "The editor's Dark Modern" },
+        { id: "vscode-light", label: "VS Code Light",         hint: "The editor's Light Modern" },
+        { id: "vscode-hc",    label: "VS Code High Contrast", hint: "Outlines on black" },
         { id: "compact",  label: "Compact",  hint: "The default, tighter" },
         { id: "default",  label: "Default",  hint: "The framework's own" },
     ];
