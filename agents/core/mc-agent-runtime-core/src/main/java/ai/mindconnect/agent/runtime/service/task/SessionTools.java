@@ -75,6 +75,25 @@ public final class SessionTools implements ToolDefinitionProvider {
         return toolRegistry.resolveAll(refs, scope());
     }
 
+    /**
+     * The names of the tools this moment offers — the same set
+     * {@link #liveTools()} would resolve, but without resolving any of them.
+     * For everything that needs to KNOW the toolset rather than run it:
+     * validating what a program says it will call, telling a model what its
+     * code can reach. Resolving would connect every MCP server for a
+     * question about names.
+     */
+    public List<String> liveToolNames() {
+        return effectiveRefs().stream()
+                .filter(AgentTool::enabled)
+                .filter(ref -> !InlineAgentTools.RUN_AGENT.equals(ref.name())
+                        && !InlineAgentTools.RUN_AGENTS.equals(ref.name()))
+                .filter(this::offered)
+                .map(AgentTool::name)
+                .distinct()
+                .toList();
+    }
+
     /** The executable tools of this moment — configured plus search-activated. */
     public List<Tool> liveTools() {
         // The inline delegation tools have no registry implementation on

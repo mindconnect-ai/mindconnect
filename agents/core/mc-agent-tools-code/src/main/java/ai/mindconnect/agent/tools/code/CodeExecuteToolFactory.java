@@ -4,6 +4,7 @@ import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
+import ai.mindconnect.agent.tool.ScopedToolInvoker;
 import ai.mindconnect.agent.tool.ToolFactory;
 import ai.mindconnect.agent.tool.workspace.CommandRunner;
 import ai.mindconnect.agent.tool.workspace.WorkspaceProvider;
@@ -49,6 +50,12 @@ public final class CodeExecuteToolFactory implements ToolFactory {
     /** Where commands run when a workspace provider is bound; the containers of this module are then unused. */
     private Optional<WorkspaceProvider> workspaces = Optional.empty();
     private Duration timeout = Duration.ofSeconds(60);
+    /** The host side of tool calls from code; empty means the program cannot make any. */
+    private Optional<ScopedToolInvoker> invoker = Optional.empty();
+    /** The wall clock a run may reach once time spent waiting for the host is not counted. */
+    private Duration toolsTimeout = Duration.ofSeconds(300);
+    /** How often a program's exchange directory is read. */
+    private Duration toolsPoll = Duration.ofMillis(50);
 
     @Override
     public String name() {
@@ -64,6 +71,15 @@ public final class CodeExecuteToolFactory implements ToolFactory {
     public void bind(ToolEnvironment env) {
         this.workspaces = env.get(WorkspaceProvider.class);
         this.timeout = Duration.ofSeconds(longValue(env, "codeExecTimeoutSeconds", 60));
+        // A runtime that binds no invoker simply has no bridge: the tool keeps
+        // its old shape, without the argument and without the paragraph.
+        this.invoker = env.get(ScopedToolInvoker.class);
+        this.toolsTimeout = Duration.ofSeconds(longValue(env, "codeExecToolsTimeoutSeconds", 300));
+        this.toolsPoll = Duration.ofMillis(longValue(env, "codeExecToolsPollMillis", 50));
+        if (invoker.isPresent()) {
+            log.info("code_execute can call this session's tools (ceiling {}s, poll {}ms)",
+                    toolsTimeout.toSeconds(), toolsPoll.toMillis());
+        }
         if (workspaces.isPresent()) {
             log.info("code_execute runs in the bound workspace provider's environments");
             return;
@@ -131,7 +147,8 @@ public final class CodeExecuteToolFactory implements ToolFactory {
         if (workspaces.isPresent()) {
             Optional<CommandRunner> runner = workspaces.get().commands(scope, agentTool);
             if (runner.isPresent()) {
-                return new RemoteCodeExecuteTool(runner.get(), timeout);
+                return new RemoteCodeExecuteTool(runner.get(), timeout,
+                        remoteBridge(agentTool, scope), toolsTimeout, toolsPoll);
             }
         }
         if (service == null) {
@@ -143,7 +160,30 @@ public final class CodeExecuteToolFactory implements ToolFactory {
         String network = agentTool == null ? defaultNetwork
                 : networkOrDefault(String.valueOf(agentTool.overrides().getOrDefault("network", "")), defaultNetwork);
         return new CodeExecuteTool(service, languages, sessionKey(scope), network, mount(agentTool),
-                dirs(scope));
+                dirs(scope), bridge(scope));
+    }
+
+    /** The local bridge, or null when nothing can run a tool for a program. */
+    private CodeExecuteTool.ToolBridge bridge(ToolCallScope scope) {
+        if (invoker.isEmpty() || scope == null || scope.sessionId() == null) {
+            return null;
+        }
+        return new CodeExecuteTool.ToolBridge(invoker.get(), scope, sessionKey(scope),
+                toolsTimeout, toolsPoll);
+    }
+
+    /**
+     * The same for a workspace that lives elsewhere: the exchange is a
+     * directory there instead of here, read through the provider's
+     * {@link ai.mindconnect.agent.tool.workspace.WorkspaceFiles} — the same
+     * code, no second protocol and no new endpoint.
+     */
+    private RemoteCodeExecuteTool.ToolBridge remoteBridge(AgentTool agentTool, ToolCallScope scope) {
+        if (invoker.isEmpty() || workspaces.isEmpty() || scope == null || scope.sessionId() == null) {
+            return null;
+        }
+        return new RemoteCodeExecuteTool.ToolBridge(invoker.get(), scope,
+                roots -> workspaces.get().files(scope, agentTool, roots));
     }
 
     /**

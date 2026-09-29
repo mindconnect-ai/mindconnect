@@ -108,6 +108,34 @@ public final class CodeExecutionService implements AutoCloseable {
      */
     public ExecResult execute(String sessionKey, CodeLanguage language, String network,
                               HostMount mount, SessionDirs dirs, String code) {
+        return execute(sessionKey, language, network, mount, dirs, code, ExecOptions.none());
+    }
+
+    /**
+     * What a single execution may carry beyond its code: environment for the
+     * process, and a budget that stops while the program waits on the host.
+     *
+     * @param env     passed to this exec only, never to the container
+     * @param waiting true while a tool call of the program is being served
+     * @param ceiling the wall clock that holds whatever the waiting says;
+     *                null means the plain execution timeout
+     */
+    public record ExecOptions(Map<String, String> env, java.util.function.BooleanSupplier waiting,
+                              Duration ceiling) {
+
+        public ExecOptions {
+            env = env == null ? Map.of() : Map.copyOf(env);
+        }
+
+        public static ExecOptions none() {
+            return new ExecOptions(Map.of(), null, null);
+        }
+    }
+
+    /** Same, with environment and a budget for this one execution. */
+    public ExecResult execute(String sessionKey, CodeLanguage language, String network,
+                              HostMount mount, SessionDirs dirs, String code, ExecOptions options) {
+        ExecOptions opts = options == null ? ExecOptions.none() : options;
         SessionDirs mounted = dirs == null ? SessionDirs.none() : dirs;
         // The mounts join the key for the same reason the network does: they are
         // fixed when the container starts, so two bindings that disagree about
@@ -117,14 +145,14 @@ public final class CodeExecutionService implements AutoCloseable {
                 + ":" + mounted.key();
         Session session = sessions.computeIfAbsent(key, k -> start(sessionKey, language, network, mount, mounted));
         long begin = System.currentTimeMillis();
-        ContainerCli.Result result = exec(session, language, code);
+        ContainerCli.Result result = exec(session, language, code, opts);
         if (containerGone(result)) {
             // Removed behind our back (manual prune, engine restart) — one retry
             // with a fresh container.
             sessions.remove(key, session);
             session = sessions.computeIfAbsent(key, k -> start(sessionKey, language, network, mount, mounted));
             begin = System.currentTimeMillis();
-            result = exec(session, language, code);
+            result = exec(session, language, code, opts);
         }
         long took = System.currentTimeMillis() - begin;
         session.lastUsedMs = System.currentTimeMillis();
@@ -135,10 +163,31 @@ public final class CodeExecutionService implements AutoCloseable {
         return new ExecResult(result.exitCode(), result.stdout(), result.stderr(), result.timedOut(), took);
     }
 
-    private ContainerCli.Result exec(Session session, CodeLanguage language, String code) {
-        List<String> args = new ArrayList<>(List.of("exec", "-i", session.containerId));
+    private ContainerCli.Result exec(Session session, CodeLanguage language, String code, ExecOptions options) {
+        List<String> args = new ArrayList<>(List.of("exec", "-i"));
+        // Per exec, not per container: two executions in one container may
+        // carry different values, and nothing of this outlives the call.
+        options.env().forEach((name, value) -> {
+            args.add("-e");
+            args.add(name + "=" + value);
+        });
+        args.add(session.containerId);
         args.addAll(language.command());
-        return cli.run(settings.execTimeout(), code, args.toArray(String[]::new));
+        ContainerCli.Budget budget = options.waiting() == null
+                ? ContainerCli.Budget.of(settings.execTimeout())
+                : ContainerCli.Budget.pausedWhile(settings.execTimeout(), options.ceiling(), options.waiting());
+        return cli.run(budget, code, args.toArray(String[]::new));
+    }
+
+    /**
+     * Where {@code /workspace} really is on this machine — the chat's working
+     * directory when it has one, else the session's scratch directory. The
+     * host reads and writes a program's exchange there while the program
+     * knows it by its own path.
+     */
+    public Path workspaceHostDir(String sessionKey, SessionDirs dirs) {
+        SessionDirs mounted = dirs == null ? SessionDirs.none() : dirs;
+        return mounted.workingDir() != null ? mounted.workingDir() : scratchDir(sessionKey);
     }
 
     private Session start(String sessionKey, CodeLanguage language, String network, HostMount mount,

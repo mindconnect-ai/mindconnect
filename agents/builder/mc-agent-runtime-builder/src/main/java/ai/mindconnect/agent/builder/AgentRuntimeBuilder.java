@@ -52,6 +52,8 @@ import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
 import ai.mindconnect.agent.runtime.service.task.SubAgentSupport;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
+import ai.mindconnect.agent.runtime.service.tools.SessionScopedToolInvoker;
+import ai.mindconnect.agent.tool.ScopedToolInvoker;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
@@ -496,6 +498,17 @@ public class AgentRuntimeBuilder {
                 context.require(ToolExecutor.class), context.require(SessionChannels.class),
                 context.require(ToolApprovalRepository.class), context.require(UserChannels.class),
                 context.require(SubAgentSupport.class)));
+        // A tool that lets a program call the agent's other tools asks the
+        // environment for this port while it binds — which is while the
+        // registry is still being built. Hence the supplier: the registry is
+        // resolved when a call arrives, never while the factories bind.
+        if (!beans.has(ScopedToolInvoker.class)) {
+            context.bean(ScopedToolInvoker.class, () -> new SessionScopedToolInvoker(
+                    () -> context.require(ToolRegistry.class), context.require(AgentSessionService.class),
+                    context.require(AgentDefinitionRepository.class),
+                    context.require(DynamicToolActivations.class), context.require(ToolExecutor.class),
+                    context.require(SubAgentSupport.class)));
+        }
         context.bean(SessionTitleWorker.class, () -> new SessionTitleWorker(
                 context.require(AgentSessionService.class), context.require(ConversationManager.class),
                 context.require(AgentTaskRunner.class), context.require(UserChannels.class)));

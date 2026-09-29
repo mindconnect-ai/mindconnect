@@ -84,8 +84,14 @@ public class ToolExecutor {
                     .toList();
     }
 
-    /** Result: text the LLM should see, and the wall-clock duration of the call. */
-    public record Result(String resultText, long durationMs) {}
+    /**
+     * Result: text the LLM should see, the wall-clock duration of the call,
+     * and whether the executor itself considers it a failure — the tool was
+     * unknown, threw, or an advisor said so. A tool that RETURNS an error
+     * text is not failed by this flag; callers that care read the text, as
+     * the tool task does.
+     */
+    public record Result(String resultText, long durationMs, boolean failed) {}
 
     /**
      * Executes a single tool call and returns its result string plus the
@@ -107,7 +113,7 @@ public class ToolExecutor {
             } else {
                 ctx.stream().accept(new StreamEvent.ToolCallResult(tc.name(), inv.text(), durationMs));
             }
-            return new Result(inv.text(), durationMs);
+            return new Result(inv.text(), durationMs, inv.failed());
         }
     }
 
