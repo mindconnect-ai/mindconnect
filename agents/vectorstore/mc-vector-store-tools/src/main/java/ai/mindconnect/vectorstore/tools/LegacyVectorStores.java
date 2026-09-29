@@ -36,9 +36,12 @@ import java.util.stream.Stream;
  * document's id — and the store lists them.
  *
  * <p>A store that already lists something is not looked at again, so running
- * this twice imports nothing twice. The old files and tables are left as they
- * were. A store whose chunks do not share one dimension is skipped with a
- * warning; the rest go on.
+ * this twice imports nothing twice. A store lists its documents only once all
+ * of them are in the index: an import that breaks off leaves the store empty,
+ * and the next start imports it again as a whole. A document whose chunks the
+ * index refuses — no shared dimension, an all-zero vector — is skipped with a
+ * warning, since no later start could import it either; the rest go on. The
+ * old files and tables are left as they were.
  */
 final class LegacyVectorStores {
 
@@ -116,16 +119,29 @@ final class LegacyVectorStores {
         }
         UserId owner = instance.owner() == null ? null : UserId.of(instance.owner());
         String source = VectorStoreRegistry.key(instance.name());
+        List<EntityRef> imported = new ArrayList<>();
         for (Map.Entry<String, List<LegacyChunk>> file : byFile.entrySet()) {
             EntityRef ref = EntityRef.of(EntityType.DOCUMENT, source, file.getKey());
             List<EmbeddingChunk> embedded = file.getValue().stream()
-                    .map(c -> new EmbeddingChunk(c.id(), c.ordinal(), c.text() == null ? "" : c.text(),
+                    .filter(c -> c.text() != null && !c.text().isBlank())
+                    .map(c -> new EmbeddingChunk(c.id(), c.ordinal(), c.text(),
                             c.metadata(), c.embedding()))
                     .toList();
-            index.replace(ref, owner, "imported", embeddingModel, embedded);
-            registry.addMember(instance.name(), ref);
+            if (embedded.isEmpty()) {
+                continue;
+            }
+            try {
+                index.replace(ref, owner, "imported", embeddingModel, embedded);
+            } catch (IllegalArgumentException e) {
+                log.warn("Document '{}' of vector store '{}' was not imported: {}", file.getKey(), instance.name(),
+                        e.getMessage());
+                continue;
+            }
+            imported.add(ref);
         }
-        return byFile.size();
+        // Listed last: a store that lists anything counts as imported.
+        imported.forEach(ref -> registry.addMember(instance.name(), ref));
+        return imported.size();
     }
 
     /**

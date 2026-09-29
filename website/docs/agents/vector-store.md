@@ -154,7 +154,10 @@ Before 0.9 every store had storage of its own: a `<store>.jsonl` file on the
 namespace is first opened, their chunks are read into the index once — as
 documents of their store, the old per-store file id as the document's id — and
 the store lists them. A store that lists something already is not imported
-again; the old files and tables are left in place.
+again; the old files and tables are left in place. The store lists its
+documents only once all of them are in the index, so an import that breaks off
+is repeated whole on the next start; a document the index refuses (an all-zero
+vector, say) is skipped with a warning.
 
 ## Embeddings
 
@@ -182,7 +185,7 @@ All four tools take a `store` name and speak **text only**:
 
 | Tool | Description |
 |------|-------------|
-| `vector_upsert` | Embeds one file's or document's chunks and lists it in the store, replacing what it had — unless the text is the same, which is not embedded again. `type: file` names a stored file by its id (shared with every store that lists it), `document` (default) text of this store alone. |
+| `vector_upsert` | Embeds one file's or document's chunks and lists it in the store, replacing what it had — unless the text is the same, which is not embedded again. `type: file` names a stored file by its id (shared with every store that lists it — once indexed, it is only listed and its text is never replaced), `document` (default) text of this store alone. |
 | `vector_search` | Embeds the query, returns the top chunks of the store's entries with score and provenance — optionally among some `entities` only — by id, plus type, source or container where the id alone is ambiguous, as each hit names its entry — and `where` metadata has given values. |
 | `vector_delete_file` | Takes one file or document off the store. A stored file stays searchable in the other stores and chats that list it. |
 | `vector_ingest_file` | Path in, searchable content out: reads the file (docx/PDF/markdown via the document reader when `mc-agent-tools-document` is present, else plain text), chunks OpenAI-style (800/400) and embeds — the one-call ingestion for workflows (`glob → ForEach → vector_ingest_file`). |
