@@ -155,8 +155,8 @@ mindconnect:
 ```
 
 **`theme`** picks which shipped look the shell opens in (`amethyst` — the
-default —, `clody`, `gipiti`, `sorbet`, `compact`, `dark`, or `default` for the
-framework's bare one). A theme is a class on `<html>` and therefore wins on
+default —, `clody`, `gipiti`, `sorbet`, `vscode-dark`, `vscode-light`,
+`vscode-hc`, `compact`, `dark`, or `default` for the framework's bare one). A theme is a class on `<html>` and therefore wins on
 specificity over a `:root` rule, so a branding stylesheet written as above
 wants `theme: default` underneath it. The theme picker in the header still
 overrides the setting per browser.
