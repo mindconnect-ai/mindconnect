@@ -134,7 +134,7 @@ via `mindconnect.vector-store.embedding-config`). See
 
 | Tool | Description |
 |------|-------------|
-| `vector_upsert` | Embeds a file's or document's chunks and lists it in a store (a stored file is embedded once, whatever stores list it). |
+| `vector_upsert` | Embeds a file's or document's chunks and lists it in a store (a stored file is embedded once, whatever stores list it; once indexed, it is only listed, never replaced). |
 | `vector_search` | Semantic similarity search over a store's entries — optionally among some `entities` (files, documents, mail, …), `where` metadata has given values. |
 | `vector_ingest_file` | Chunks and ingests a whole file. |
 | `vector_delete_file` | Takes a file or document off a store. |

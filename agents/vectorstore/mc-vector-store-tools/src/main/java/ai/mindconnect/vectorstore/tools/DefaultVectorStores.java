@@ -340,9 +340,17 @@ public final class DefaultVectorStores implements VectorStores {
                 });
     }
 
-    /** A JDBC URL as it may be shown: without user or password parameters. */
-    private static String withoutCredentials(String url) {
-        return url.replaceAll("(?i)([?&])(user|password)=[^&]*&?", "$1").replaceAll("[?&]$", "");
+    /** A JDBC URL as it may be shown: without {@code user:password@} and without user or password parameters. */
+    static String withoutCredentials(String url) {
+        String bare = url.replaceFirst("//[^/?#@]*@", "//");
+        int query = bare.indexOf('?');
+        if (query < 0) {
+            return bare;
+        }
+        String kept = java.util.Arrays.stream(bare.substring(query + 1).split("&"))
+                .filter(param -> !param.toLowerCase(java.util.Locale.ROOT).matches("(user|password)(=.*)?"))
+                .collect(java.util.stream.Collectors.joining("&"));
+        return bare.substring(0, query) + (kept.isEmpty() ? "" : "?" + kept);
     }
 
     /** Reads what the namespace kept before 0.9 into the indexes its stores name, once per process. */

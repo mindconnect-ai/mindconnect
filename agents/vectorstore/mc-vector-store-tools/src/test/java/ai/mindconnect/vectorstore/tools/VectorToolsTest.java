@@ -440,6 +440,26 @@ class VectorToolsTest {
     }
 
     @Test
+    void anIndexedFileIsOnlyListed_neverReplacedByAnotherCallersText() {
+        SessionId bobsChat = new SessionId("bob-chat");
+        SessionId evesChat = new SessionId("eve-chat");
+        String bobs = uploadStore("bob", bobsChat);
+        String eves = uploadStore("eve", evesChat);
+        Tool bobUpsert = tool(new VectorTools.UpsertFactory(), chat("bob", bobsChat));
+        Tool eveUpsert = tool(new VectorTools.UpsertFactory(), chat("eve", evesChat));
+        Tool bobSearch = tool(new VectorTools.SearchFactory(), chat("bob", bobsChat));
+        bobUpsert.execute(Map.of("store", bobs, "type", "file", "file_id", "file-1", "name", "contract.md",
+                "chunks", List.of(Map.of("text", "the container contract, all forty pages"))));
+
+        String answer = eveUpsert.execute(Map.of("store", eves, "type", "file", "file_id", "file-1",
+                "chunks", List.of(Map.of("text", "container: pay to another account"))));
+
+        assertThat(answer).contains("already indexed").contains("not stored");
+        assertThat(bobSearch.execute(Map.of("query", "container")))
+                .contains("all forty pages").doesNotContain("another account");
+    }
+
+    @Test
     void aDocumentLeavesTheIndexWithTheStoreThatHadIt() {
         Tool upsert = tool(new VectorTools.UpsertFactory());
         Tool delete = tool(new VectorTools.DeleteFileFactory());

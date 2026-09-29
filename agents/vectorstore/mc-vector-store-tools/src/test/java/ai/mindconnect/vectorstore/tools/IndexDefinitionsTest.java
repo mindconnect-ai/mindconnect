@@ -144,6 +144,19 @@ class IndexDefinitionsTest {
     }
 
     @Test
+    void theLocationShowsNoCredentials() {
+        assertThat(DefaultVectorStores.withoutCredentials(
+                "jdbc:postgresql://db:5432/kb?user=kb&password=s3cret&ssl=true"))
+                .isEqualTo("jdbc:postgresql://db:5432/kb?ssl=true");
+        assertThat(DefaultVectorStores.withoutCredentials("jdbc:postgresql://db/kb?ssl=true&PASSWORD=s3cret&user=kb"))
+                .isEqualTo("jdbc:postgresql://db/kb?ssl=true");
+        assertThat(DefaultVectorStores.withoutCredentials("jdbc:postgresql://kb:s3cret@db:5432/kb"))
+                .isEqualTo("jdbc:postgresql://db:5432/kb");
+        assertThat(DefaultVectorStores.withoutCredentials("jdbc:postgresql://db/kb"))
+                .isEqualTo("jdbc:postgresql://db/kb");
+    }
+
+    @Test
     void definitionsAreChecked() {
         assertThatThrownBy(() -> new IndexDefinition("Bad Name", "pgvector", null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class);

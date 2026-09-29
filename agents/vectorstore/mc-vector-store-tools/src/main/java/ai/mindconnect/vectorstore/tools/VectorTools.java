@@ -30,8 +30,9 @@ import java.util.Map;
  *
  * <ul>
  *   <li>{@code vector_upsert} — embeds one file's or document's chunks and
- *       lists it in a store, replacing what it had (unless the text is the
- *       same, which is not embedded again)</li>
+ *       lists it in a store, replacing what a document had (unless the text is
+ *       the same, which is not embedded again); a stored file that is indexed
+ *       already is only listed</li>
  *   <li>{@code vector_search} — embeds the query, returns the top chunks of
  *       the store's entities with score and provenance, optionally among some
  *       entries only and by metadata</li>
@@ -98,7 +99,9 @@ public final class VectorTools {
         @Override public String description() {
             return "Embeds text chunks and stores them in a vector store, replacing all previous "
                     + "chunks of the same file_id. Chunks are objects with 'text' and an optional "
-                    + "'title' (e.g. the section heading). Use vector_search to retrieve them later.";
+                    + "'title' (e.g. the section heading). Use vector_search to retrieve them later. "
+                    + "A stored file (type 'file') that is indexed already is only listed in the store: "
+                    + "its indexed text is shared with other stores and chats and is not replaced.";
         }
 
         @Override public Map<String, Object> parametersSchema() {
@@ -119,7 +122,8 @@ public final class VectorTools {
                             "How hits name the source — a stored file's name, say. Defaults to file_id."),
                     "type", Map.of("type", "string", "enum", List.of("document", "file"), "description",
                             "What file_id names: 'file' for a stored file's id (file-…), shared with every "
-                                    + "store that lists it; 'document' (default) for text of this store alone."),
+                                    + "store that lists it and never replaced once indexed; 'document' "
+                                    + "(default) for text of this store alone."),
                     "chunks", Map.of("type", "array", "items", chunk)),
                     List.of("store", "file_id", "chunks"));
         }
@@ -183,6 +187,14 @@ public final class VectorTools {
                 EntityRef ref = "file".equals(str(arguments, "type"))
                         ? EntityRef.of(EntityType.FILE, EntityRef.FILE_STORE, fileId)
                         : store.documentRef(fileId);
+                // A stored file is one entry, shared by every store and chat that
+                // lists it, and its text is the file's: once indexed, a call only
+                // lists it here — it never replaces what the others find.
+                if (ref.type().equals(EntityType.FILE) && store.indexed(ref)) {
+                    store.add(ref);
+                    return "File '" + fileId + "' is already indexed — listed in store '" + storeName
+                            + "'; its indexed text stays as it is, the chunks given were not stored.";
+                }
                 String storeOwner = store.settings().owner();
                 long stored = store.put(ref, storeOwner == null ? null : UserId.of(storeOwner), version(chunks), chunks);
                 return "Stored " + stored + " chunk(s) for file '" + fileId + "' in store '" + storeName + "'.";

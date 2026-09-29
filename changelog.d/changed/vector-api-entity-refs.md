@@ -16,7 +16,9 @@
   share entries.
   `vector_search` takes `entities` (id, plus type, source, container where
   needed) and `where`; `vector_upsert` a `type` (`file` for a stored file's id)
-  and a `name`; the seeded `file-ingestion` workflow a `file_id`. REST:
+  and a `name` — a stored file that is indexed already is only listed, its
+  text is never replaced by the chunks a call brings; the seeded
+  `file-ingestion` workflow a `file_id`. REST:
   `…/chunks` is replaced by `PUT …/documents/{id}`, new `GET`/`DELETE
   …/entries`, search takes `entities` and `filters`, hits name their entity.
   Templates and instances lose `backend` and `backendConfig` and gain `index`;
@@ -24,4 +26,5 @@
   page has Entries and Chunks tabs with search and paging; the Files tab says
   where each file is used. On first use of a namespace the stores kept before
   — JSONL files and `vs_*` tables — are imported into their indexes once and
-  left in place.
+  left in place; a store lists its documents only when all of them are in, so
+  an import that breaks off is repeated whole on the next start.
