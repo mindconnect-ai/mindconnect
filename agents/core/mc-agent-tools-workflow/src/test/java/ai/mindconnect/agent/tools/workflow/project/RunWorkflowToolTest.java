@@ -4,6 +4,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tools.workflow.step.ToolInvoker;
@@ -36,6 +37,7 @@ class RunWorkflowToolTest {
     Path project;
 
     private final List<String> toolCalls = new ArrayList<>();
+    private final List<AgentTool> bindings = new ArrayList<>();
 
     @BeforeEach
     void setUp() {
@@ -47,6 +49,12 @@ class RunWorkflowToolTest {
                     return runLocally((String) arguments.get("language"), (String) arguments.get("code"));
                 }
                 return "echo " + arguments;
+            }
+
+            @Override
+            public String call(AgentTool binding, Map<String, Object> arguments, ToolCallScope scope) {
+                bindings.add(binding);
+                return call(binding.name(), arguments);
             }
         });
     }
@@ -62,9 +70,13 @@ class RunWorkflowToolTest {
     }
 
     private Tool tool(List<String> tools, List<String> approval) {
+        return tool(tools.stream().map(name -> new AgentTool(AgentToolId.random(), name, null, Map.of(),
+                true, false, approval.contains(name), null)).toList());
+    }
+
+    private Tool tool(List<AgentTool> callerTools) {
         AgentTool binding = AgentTool.of(ProjectWorkflowFiles.TOOL, null, Map.of(
-                ProjectWorkflowFiles.CALLER_TOOLS, tools,
-                ProjectWorkflowFiles.APPROVAL_TOOLS, approval,
+                ProjectWorkflowFiles.CALLER_TOOLS, callerTools.stream().map(ProjectWorkflowFiles::callerTool).toList(),
                 ProjectWorkflowFiles.CALLER_AGENTS, List.of()));
         ToolCallScope scope = ToolCallScope.ofSession(UserId.of("u"), SessionId.of("s"), project.toString());
         return new RunWorkflowToolFactory().create(binding, scope);
@@ -226,6 +238,79 @@ class RunWorkflowToolTest {
                 """);
         assertThat(run(tool(List.of("code_execute"), List.of()), "boom", Map.of()))
                 .startsWith("Error:").contains("exited with 1").contains("no sections");
+    }
+
+    @Test
+    void toolSteps_runWithTheCallersBinding() throws IOException {
+        workflow("search", """
+                steps:
+                  - tool: vector_search
+                    args: {query: pricing, store: other}
+                    as: hits
+                result: hits
+                """);
+        AgentTool pinned = AgentTool.of("vector_search", null, Map.of("params", Map.of("store", "handbook")));
+        run(tool(List.of(pinned)), "search", Map.of());
+        assertThat(bindings).singleElement()
+                .satisfies(b -> assertThat(b.overrides()).isEqualTo(Map.of("params", Map.of("store", "handbook"))));
+    }
+
+    @Test
+    void structuredArgs_carryValuesWithQuotesAndLineBreaksIntact() throws IOException {
+        workflow("write", """
+                input:
+                  text: string
+                steps:
+                  - tool: file_write
+                    args: {path: out.md, content: "${text}", tags: [a, "${text}"]}
+                    as: done
+                result: done
+                """);
+        String text = "# Title\nShe said \"hi\"\n";
+        assertThat(run(tool(List.of("file_write"), List.of()), "write", Map.of("text", text)))
+                .isEqualTo("echo {path=out.md, content=" + text + ", tags=[a, " + text + "]}");
+    }
+
+    @Test
+    void aWorkflowFileLinkedFromOutsideTheProject_doesNotLoad(@TempDir Path elsewhere) throws IOException {
+        Path secret = Files.writeString(elsewhere.resolve("secret.yaml"), "password: hunter2");
+        Path dir = Files.createDirectories(project.resolve(ProjectWorkflowFiles.DIR));
+        Files.createSymbolicLink(dir.resolve("leak.yaml"), secret);
+
+        Tool tool = tool(List.of(), List.of());
+        assertThat(tool.description()).contains("- leak (does not load: the file is outside the project)")
+                .doesNotContain("hunter2");
+    }
+
+    @Test
+    void pythonCode_changingAListInPlace_handsItBack() throws IOException {
+        Assumptions.assumeTrue(available("python3"), "python3 is not installed");
+        workflow("grow", """
+                input:
+                  items: {type: array, items: {type: string}}
+                steps:
+                  - code: items.append("c")
+                  - set: {out: "${items}"}
+                result: out
+                """);
+        assertThat(run(tool(List.of("code_execute"), List.of()), "grow", Map.of("items", List.of("a", "b"))))
+                .isEqualTo("[a, b, c]");
+    }
+
+    @Test
+    void nodeCode_changingAListInPlace_handsItBack() throws IOException {
+        Assumptions.assumeTrue(available("node"), "node is not installed");
+        workflow("grow", """
+                input:
+                  items: {type: array, items: {type: string}}
+                steps:
+                  - code: items.push("c");
+                    language: node
+                  - set: {out: "${items}"}
+                result: out
+                """);
+        assertThat(run(tool(List.of("code_execute"), List.of()), "grow", Map.of("items", List.of("a", "b"))))
+                .isEqualTo("[a, b, c]");
     }
 
     // -----------------------------------------------------------------------

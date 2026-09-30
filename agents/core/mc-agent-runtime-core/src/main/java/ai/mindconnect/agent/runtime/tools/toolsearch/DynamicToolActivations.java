@@ -123,6 +123,9 @@ public final class DynamicToolActivations {
             // The skill tool follows the agent's skills setting alone (below): a
             // row assigned by hand would carry no names and reach every skill.
             if (SkillTool.NAME.equals(tool.name())) continue;
+            // run_workflow follows the project (below): a row assigned by hand
+            // would carry nothing the caller has, and offer the tool twice.
+            if (ProjectWorkflowFiles.TOOL.equals(tool.name())) continue;
             if (!tool.deferred()) {
                 refs.add(tool);
                 continue;
@@ -162,34 +165,31 @@ public final class DynamicToolActivations {
         return refs;
     }
 
-    /**
-     * {@code run_workflow} when the project the session works in defines
-     * workflows, the way {@code run_agent} follows the project's agents. The
-     * binding carries what the caller may use: a workflow from the project
-     * narrows the caller's tools and agents, it never adds to them. Tools
-     * that need an approval are named separately, since a workflow step has
-     * nobody to ask.
-     */
+    /** What steers the agent's own toolset is not something a workflow step calls. */
     private static final Set<String> NOT_FOR_WORKFLOWS = Set.of(
             ai.mindconnect.agent.runtime.domain.AgentDefinition.TOOL_SEARCH, SkillTool.NAME, "list_agents");
 
+    /**
+     * {@code run_workflow} when the project the session works in defines
+     * workflows, the way {@code run_agent} follows the project's agents. The
+     * binding carries what the caller may use — each of its tools with the
+     * caller's own binding (pins, alias, approval flag), so a step runs a
+     * tool exactly as the caller would — and the agents it may call. A
+     * workflow from the project narrows that, it never adds to it.
+     */
     private AgentTool projectWorkflowTool(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
                                           SessionId sessionId, List<AgentTool> refs) {
         var session = sessionId == null ? null : sessions.findById(sessionId).orElse(null);
         if (session == null || !ProjectWorkflowFiles.present(session.workingDir())) {
             return null;
         }
-        List<String> tools = new ArrayList<>();
-        List<String> approval = new ArrayList<>();
+        List<Map<String, Object>> tools = new ArrayList<>();
         for (AgentTool ref : refs) {
-            // What steers the agent's own toolset is not something a step calls.
             if (!ref.enabled() || NOT_FOR_WORKFLOWS.contains(ref.name())) continue;
-            tools.add(ref.name());
-            if (ref.needsApproval()) approval.add(ref.name());
+            tools.add(ProjectWorkflowFiles.callerTool(ref));
         }
         return AgentTool.of(ProjectWorkflowFiles.TOOL, null, Map.of(
                 ProjectWorkflowFiles.CALLER_TOOLS, List.copyOf(tools),
-                ProjectWorkflowFiles.APPROVAL_TOOLS, List.copyOf(approval),
                 ProjectWorkflowFiles.CALLER_AGENTS, List.copyOf(def.effectiveCallableAgents())));
     }
 

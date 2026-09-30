@@ -79,11 +79,13 @@ class DynamicToolActivationsTest {
     }
 
     @Test
-    void aProjectWithWorkflowsBringsRunWorkflow_carryingWhatTheCallerHas(@TempDir Path project) throws Exception {
+    void aProjectWithWorkflowsBringsRunWorkflow_carryingTheCallersBindings(@TempDir Path project) throws Exception {
         AgentDefinition def = noTools.withTools(List.of(
-                AgentTool.of("file_read"),
+                AgentTool.of("vector_search", null, Map.of("params", Map.of("store", "handbook"))),
                 new AgentTool(AgentToolId.random(), "bash", null, Map.of(), true, false, true, null),
-                new AgentTool(AgentToolId.random(), "web_fetch", null, Map.of(), false, false, false, null)));
+                new AgentTool(AgentToolId.random(), "web_fetch", null, Map.of(), false, false, false, null),
+                // By hand: dropped, the project decides.
+                AgentTool.of(ProjectWorkflowFiles.TOOL)));
         AgentSession session = session(def);
         sessions.update(session.id(), current -> current.withWorkingDir(project.toString()));
         assertThat(activations.effectiveRefs(def, session.id())).extracting(AgentTool::name)
@@ -92,10 +94,14 @@ class DynamicToolActivationsTest {
         Path dir = Files.createDirectories(project.resolve(ProjectWorkflowFiles.DIR));
         Files.writeString(dir.resolve("release.yaml"), "steps: []");
 
-        AgentTool run = activations.effectiveRefs(def, session.id()).stream()
-                .filter(t -> t.name().equals(ProjectWorkflowFiles.TOOL)).findFirst().orElseThrow();
-        // A switched-off tool is not the caller's to hand on.
-        assertThat(run.overrides().get(ProjectWorkflowFiles.CALLER_TOOLS)).isEqualTo(List.of("file_read", "bash"));
-        assertThat(run.overrides().get(ProjectWorkflowFiles.APPROVAL_TOOLS)).isEqualTo(List.of("bash"));
+        List<AgentTool> refs = activations.effectiveRefs(def, session.id());
+        assertThat(refs).extracting(AgentTool::name).filteredOn(ProjectWorkflowFiles.TOOL::equals).hasSize(1);
+        AgentTool run = refs.stream().filter(t -> t.name().equals(ProjectWorkflowFiles.TOOL)).findFirst().orElseThrow();
+        // A switched-off tool is not the caller's to hand on; the others keep their binding.
+        List<AgentTool> callerTools = ((List<?>) run.overrides().get(ProjectWorkflowFiles.CALLER_TOOLS)).stream()
+                .map(ProjectWorkflowFiles::fromCallerTool).toList();
+        assertThat(callerTools).extracting(AgentTool::name).containsExactly("vector_search", "bash");
+        assertThat(callerTools.get(0).overrides()).isEqualTo(Map.of("params", Map.of("store", "handbook")));
+        assertThat(callerTools.get(1).needsApproval()).isTrue();
     }
 }

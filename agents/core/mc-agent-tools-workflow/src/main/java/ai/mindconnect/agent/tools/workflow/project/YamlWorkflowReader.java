@@ -85,10 +85,14 @@ final class YamlWorkflowReader {
             "jump", "jumps",
             "form", "forms");
 
-    /** A {@code lang:} prefix that asks for a script engine other than MiniScript. */
+    /**
+     * A {@code lang:} prefix that asks for a script engine other than
+     * MiniScript — engines are registered in lower case, so {@code Python: …}
+     * is ordinary text. Only checked where an expression is meant: a
+     * {@code set} value and an {@code if} condition.
+     */
     private static final Pattern FOREIGN_SCRIPT = Pattern.compile(
-            "^\\s*(javascript|js|graal\\.js|ecmascript|nashorn|groovy|python|jython|beanshell|bsh)\\s*:",
-            Pattern.CASE_INSENSITIVE);
+            "^\\s*(javascript|js|graal\\.js|ecmascript|nashorn|groovy|python|jython|beanshell|bsh)\\s*:");
 
     private static final Set<String> CONDITION_PREFIXES = Set.of("mini:", "json:");
 
@@ -233,13 +237,14 @@ final class YamlWorkflowReader {
         ToolCallData step = new ToolCallData();
         step.setTool(required(where, "tool", map));
         Object args = map.get("args");
-        if (args instanceof Map<?, ?>) {
-            checkExpressions(where, args);
-            step.setArguments(json(args));
+        if (args instanceof Map<?, ?> values) {
+            // Each value resolves on its own: a variable holding quotes or
+            // line breaks would break JSON it were spliced into.
+            Map<String, Object> copy = new LinkedHashMap<>();
+            values.forEach((k, v) -> copy.put(String.valueOf(k), v));
+            step.setArgumentValues(copy);
         } else if (args != null) {
-            String text = String.valueOf(args);
-            checkExpressions(where, text);
-            step.setArguments(text);
+            step.setArguments(String.valueOf(args));
         }
         if (map.containsKey("failOnError")) {
             step.setFailOnError(Boolean.parseBoolean(String.valueOf(map.get("failOnError"))));
@@ -251,9 +256,7 @@ final class YamlWorkflowReader {
         knownKeys(where, map, Set.of("agent", "name", "as", "message"));
         AgentCallData step = new AgentCallData();
         step.setAgent(required(where, "agent", map));
-        String message = required(where, "message", map);
-        checkExpressions(where, message);
-        step.setMessage(message);
+        step.setMessage(required(where, "message", map));
         return step;
     }
 
@@ -283,11 +286,12 @@ final class YamlWorkflowReader {
         if (baseDir == null) {
             throw new WorkflowFormatException(where + ": 'file' needs the workflow in a directory");
         }
-        Path path = baseDir.resolve(file).normalize();
-        if (!path.startsWith(baseDir)) {
-            throw new WorkflowFormatException(where + ": '" + file + "' is outside the workflow's directory");
-        }
         try {
+            // The real path: a symlink beside the workflow must not read a file elsewhere.
+            Path path = baseDir.resolve(file).toRealPath();
+            if (!path.startsWith(baseDir.toRealPath())) {
+                throw new WorkflowFormatException(where + ": '" + file + "' is outside the workflow's directory");
+            }
             if (Files.size(path) > MAX_CODE_FILE) {
                 throw new WorkflowFormatException(where + ": '" + file + "' is too large to be a step's code");
             }
@@ -389,21 +393,15 @@ final class YamlWorkflowReader {
     // -----------------------------------------------------------------------
 
     /**
-     * Rejects {@code javascript: …} and its kind wherever a string could be
-     * an expression. The engine would take it as a plain string anyway; this
-     * says so while the file is read instead of letting the step do something
-     * the author did not mean.
+     * Rejects {@code javascript: …} and its kind where an expression is meant.
+     * The engine would take it as a plain string anyway; this says so while
+     * the file is read instead of letting the step do something the author
+     * did not mean.
      */
-    private static void checkExpressions(String where, Object value) {
-        if (value instanceof String s) {
-            if (FOREIGN_SCRIPT.matcher(s).find()) {
-                throw new WorkflowFormatException(where + ": '" + s.strip().split(":", 2)[0]
-                        + ":' expressions are not available in a project workflow — use 'mini:' or a code step");
-            }
-        } else if (value instanceof Map<?, ?> map) {
-            map.values().forEach(v -> checkExpressions(where, v));
-        } else if (value instanceof List<?> list) {
-            list.forEach(v -> checkExpressions(where, v));
+    private static void checkExpressions(String where, String value) {
+        if (FOREIGN_SCRIPT.matcher(value).find()) {
+            throw new WorkflowFormatException(where + ": '" + value.strip().split(":", 2)[0]
+                    + ":' expressions are not available in a project workflow — use 'mini:' or a code step");
         }
     }
 

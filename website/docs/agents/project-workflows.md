@@ -60,7 +60,7 @@ steps:
 
 | Step | Does | Keys |
 |---|---|---|
-| `tool: <name>` | calls one of the caller's tools | `args` (mapping or `${var}`), `failOnError` |
+| `tool: <name>` | calls one of the caller's tools | `args` (mapping; each value resolves on its own, and a value that is exactly `${var}` passes the variable as it is, list or map included), `failOnError` |
 | `agent: <name>` | sends a message to an agent the caller may call | `message` |
 | `code: <program>` | runs Python or Node in the sandbox | `language` (`python`, default, or `node`); or `code: {file: step.py}` beside the workflow |
 | `set: {var: value}` | assigns variables | a string is taken as written, anything else keeps its type |
@@ -78,9 +78,10 @@ unknown key is an error, so a typo does not go unnoticed.
 A workflow from a repository was written by whoever wrote the repository, so
 it is held to the agent that runs it:
 
-- **Tools and agents** — only the caller's own, and none its binding makes ask
-  for an approval: a step has nobody to ask. A binding of `run_workflow` made
-  by hand reaches no tool and no agent at all.
+- **Tools and agents** — only the caller's own, each run with the caller's
+  binding (its pinned parameters, alias and container settings), and none that
+  binding makes ask for an approval: a step has nobody to ask. `run_workflow`
+  is bound by the runtime alone; a row added to an agent by hand is ignored.
 - **Code** runs through the caller's `code_execute` — the local podman/docker
   container or the virtual environment — never inside the server. The
   workflow's variables arrive as the program's top-level variables; the ones
@@ -89,8 +90,11 @@ it is held to the agent that runs it:
   back, `let` and `const` stay local, and the code runs synchronously.
 - **Expressions** are `${var}`, `json: …` and [MiniScript](../workflow/miniscript.md)
   in a restricted mode: methods only on strings, numbers, booleans, lists and
-  maps, only their public API, no `getClass`. `javascript:`, `groovy:` and the
-  like are rejected when the file is read.
+  maps, only their public API, no `getClass`. A `javascript:`, `groovy:` or
+  similar expression in a `set` value or an `if` condition is rejected when the
+  file is read; elsewhere such text is just text.
+- **Files** — a workflow file, and a file a code step names, must really be
+  inside the project: a symlink pointing elsewhere does not load.
 - **Not available:** calling another workflow, HTTP from the server, halts and
   forms, and agents defined inline. The server's environment (`env`) is not
   handed in.

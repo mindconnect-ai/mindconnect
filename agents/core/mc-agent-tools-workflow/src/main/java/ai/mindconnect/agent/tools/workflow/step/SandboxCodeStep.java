@@ -47,16 +47,18 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
         String language = cfg.getLanguage() == null ? "python" : cfg.getLanguage();
         CallerLimits limits = getWorkflowContext() == null ? null
                 : getWorkflowContext().getAttribute(CallerLimits.class);
-        if (limits != null) {
-            limits.checkTool(cfg.getName(), TOOL);
-        }
+        // The caller's own code_execute binding: its network and mount settings hold here too.
+        ai.mindconnect.agent.tool.AgentTool binding = limits == null ? null : limits.checkTool(cfg.getName(), TOOL);
         ToolCallScope scope = getWorkflowContext() == null ? null
                 : getWorkflowContext().getAttribute(ToolCallScope.class);
 
         Map<String, Object> inputs = inputs();
         String program = wrap(language, code, json(inputs));
         logDebug("running %s code in the sandbox (%d chars)", language, code.length());
-        String output = ToolInvokers.require().call(TOOL, Map.of("language", language, "code", program), scope);
+        Map<String, Object> arguments = Map.of("language", language, "code", program);
+        String output = binding != null
+                ? ToolInvokers.require().call(binding, arguments, scope)
+                : ToolInvokers.require().call(TOOL, arguments, scope);
 
         Map<String, Object> exported = parse(cfg.getName(), output);
         for (Map.Entry<String, Object> entry : exported.entrySet()) {
@@ -149,12 +151,14 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
     /**
      * The program runs in a namespace of its own, holding the variables; what
      * it leaves there under a name not starting with {@code _} and that is
-     * JSON, new or changed, is returned.
+     * JSON, new or changed, is returned. The namespace gets its own copy of
+     * the variables, so a list changed in place still compares as changed.
      */
     private static final String PYTHON = """
             import base64 as _mc_b64, json as _mc_json
-            _mc_in = _mc_json.loads(_mc_b64.b64decode("@IN@").decode("utf-8"))
-            _mc_ns = dict(_mc_in)
+            _mc_raw = _mc_b64.b64decode("@IN@").decode("utf-8")
+            _mc_in = _mc_json.loads(_mc_raw)
+            _mc_ns = _mc_json.loads(_mc_raw)
             _mc_ns["__name__"] = "__main__"
             exec(compile(_mc_b64.b64decode("@SRC@").decode("utf-8"), "workflow-step", "exec"), _mc_ns)
             _mc_out = {}
@@ -175,15 +179,17 @@ public class SandboxCodeStep extends BaseStepInstance<SandboxCodeData> {
      * usual globals. Top-level {@code var} and plain assignments land on the
      * context and come back; {@code let} and {@code const} stay local, as they
      * do at the top of any script. Synchronous code only: the variables are
-     * read as soon as the program returns.
+     * read as soon as the program returns. As in Python, the context holds
+     * its own copy of the variables.
      */
     private static final String NODE = """
             const _mcVm = require('vm');
             const _mcDec = (s) => Buffer.from(s, 'base64').toString('utf8');
-            const _mcIn = JSON.parse(_mcDec("@IN@"));
+            const _mcRaw = _mcDec("@IN@");
+            const _mcIn = JSON.parse(_mcRaw);
             const _mcGlobals = { console, require, Buffer, process, URL, TextEncoder, TextDecoder,
                 setTimeout, clearTimeout, setInterval, clearInterval };
-            const _mcCtx = Object.assign({}, _mcGlobals, _mcIn);
+            const _mcCtx = Object.assign({}, _mcGlobals, JSON.parse(_mcRaw));
             _mcVm.createContext(_mcCtx);
             _mcVm.runInContext(_mcDec("@SRC@"), _mcCtx, { filename: 'workflow-step' });
             const _mcOut = {};

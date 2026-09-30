@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -42,7 +43,7 @@ final class ProjectWorkflows {
     static List<ProjectWorkflow> list(String workingDir) {
         List<ProjectWorkflow> out = new ArrayList<>();
         for (ProjectWorkflowFiles.WorkflowFile file : ProjectWorkflowFiles.list(workingDir)) {
-            out.add(read(file));
+            out.add(read(workingDir, file));
         }
         return out;
     }
@@ -52,11 +53,16 @@ final class ProjectWorkflows {
         return ProjectWorkflowFiles.list(workingDir).stream()
                 .filter(f -> f.name().equalsIgnoreCase(name.strip()))
                 .findFirst()
-                .map(ProjectWorkflows::read);
+                .map(file -> read(workingDir, file));
     }
 
-    private static ProjectWorkflow read(ProjectWorkflowFiles.WorkflowFile file) {
+    private static ProjectWorkflow read(String workingDir, ProjectWorkflowFiles.WorkflowFile file) {
         try {
+            // A symlink in the project must not make a file outside it a "workflow":
+            // its content would come back in the error the model is shown.
+            if (!file.file().toRealPath().startsWith(Path.of(workingDir).toRealPath())) {
+                return new ProjectWorkflow(file.name(), null, null, "the file is outside the project");
+            }
             if (Files.size(file.file()) > MAX_BYTES) {
                 return new ProjectWorkflow(file.name(), null, null, "the file is too large to be a workflow");
             }

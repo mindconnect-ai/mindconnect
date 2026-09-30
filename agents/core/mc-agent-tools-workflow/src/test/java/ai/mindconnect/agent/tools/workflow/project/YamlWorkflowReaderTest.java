@@ -60,7 +60,8 @@ class YamlWorkflowReaderTest {
         assertThat(wf.getSteps()).hasSize(4);
         ToolCallData tool = (ToolCallData) wf.getSteps().get(0);
         assertThat(tool.getTool()).isEqualTo("document_sections");
-        assertThat(tool.getArguments()).isEqualTo("{\"path\":\"${wordFile}\"}");
+        assertThat(tool.getArgumentValues()).isEqualTo(java.util.Map.of("path", "${wordFile}"));
+        assertThat(tool.getArguments()).isNull();
         assertThat(tool.getAssignResultToVar()).isEqualTo("sectionsJson");
 
         SandboxCodeData code = (SandboxCodeData) wf.getSteps().get(1);
@@ -109,16 +110,30 @@ class YamlWorkflowReaderTest {
     }
 
     @Test
-    void scriptExpressionsOtherThanMini_areRejected() {
+    void scriptExpressionsOtherThanMini_areRejectedWhereAnExpressionIsMeant() {
         assertThatThrownBy(() -> parse("""
                 steps:
                   - set: {x: "javascript: java.lang.System.exit(1)"}
                 """)).hasMessageContaining("'javascript:' expressions are not available");
         assertThatThrownBy(() -> parse("""
                 steps:
-                  - tool: file_read
-                    args: {path: "groovy: 'x'.execute()"}
+                  - if: "groovy: true"
+                    then: []
                 """)).hasMessageContaining("'groovy:'");
+    }
+
+    @Test
+    void textThatStartsLikeALanguage_isJustText() throws Exception {
+        WorkflowData wf = parse("""
+                steps:
+                  - agent: Tutor
+                    message: "Python: explain list comprehensions"
+                  - tool: web_search
+                    args: {query: "JavaScript: closures"}
+                  - set: {title: "Python: a primer"}
+                """);
+        assertThat(((AgentCallData) wf.getSteps().get(0)).getMessage()).startsWith("Python:");
+        assertThat(wf.getSteps()).hasSize(3);
     }
 
     @Test
@@ -153,6 +168,13 @@ class YamlWorkflowReaderTest {
         assertThatThrownBy(() -> YamlWorkflowReader.parse("report", """
                 steps:
                   - code: {file: ../secret.txt}
+                """, wfDir)).hasMessageContaining("outside the workflow's directory");
+
+        // A symlink beside the workflow counts where it points.
+        Files.createSymbolicLink(wfDir.resolve("leak.py"), dir.resolve("secret.txt"));
+        assertThatThrownBy(() -> YamlWorkflowReader.parse("report", """
+                steps:
+                  - code: {file: leak.py}
                 """, wfDir)).hasMessageContaining("outside the workflow's directory");
     }
 }

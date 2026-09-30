@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service.workflows;
 
+import ai.mindconnect.agent.tool.AgentTool;
+import ai.mindconnect.agent.tool.AgentToolId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -8,8 +10,10 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Stream;
 
 /**
@@ -43,17 +47,45 @@ public final class ProjectWorkflowFiles {
     public static final String TOOL = "run_workflow";
 
     /**
-     * The tool binding's overrides: what the caller may use, handed to the
-     * tool the way {@code tool_search} gets its search space, so the factory
-     * needs no definition lookup.
+     * The tool binding's overrides: the caller's tools, each as the binding
+     * it has them with ({@link #callerTool}), handed to the tool the way
+     * {@code tool_search} gets its search space, so the factory needs no
+     * definition lookup.
      */
     public static final String CALLER_TOOLS = "callerTools";
-    /** The caller's tools that need an approval — which a workflow step cannot ask for. */
-    public static final String APPROVAL_TOOLS = "approvalTools";
     /** The agents the caller may call. */
     public static final String CALLER_AGENTS = "callerAgents";
 
     private ProjectWorkflowFiles() {}
+
+    /**
+     * One of the caller's tools as the {@link #CALLER_TOOLS} list carries it:
+     * a plain map, since overrides are data — its name, the binding's
+     * overrides (pins, an alias, container settings), whether it asks for an
+     * approval and its result cap. {@link #fromCallerTool} makes it a binding
+     * again.
+     */
+    public static Map<String, Object> callerTool(AgentTool tool) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("name", tool.name());
+        map.put("overrides", tool.overrides());
+        map.put("needsApproval", tool.needsApproval());
+        if (tool.maxResultChars() != null) map.put("maxResultChars", tool.maxResultChars());
+        return map;
+    }
+
+    /** The binding a {@link #callerTool} map describes; {@code null} for anything else. */
+    @SuppressWarnings("unchecked")
+    public static AgentTool fromCallerTool(Object raw) {
+        if (!(raw instanceof Map<?, ?> map) || !(map.get("name") instanceof String name) || name.isBlank()) {
+            return null;
+        }
+        Map<String, Object> overrides = map.get("overrides") instanceof Map<?, ?> o
+                ? (Map<String, Object>) o : Map.of();
+        Integer maxResultChars = map.get("maxResultChars") instanceof Number n ? n.intValue() : null;
+        return new AgentTool(AgentToolId.random(), name, null, overrides, true, false,
+                Boolean.TRUE.equals(map.get("needsApproval")), maxResultChars);
+    }
 
     /** A workflow file and the name it goes by. */
     public record WorkflowFile(String name, Path file) {}

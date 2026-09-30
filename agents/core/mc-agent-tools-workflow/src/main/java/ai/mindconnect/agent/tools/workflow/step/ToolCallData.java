@@ -22,6 +22,15 @@ public class ToolCallData extends BaseStepData {
     private String arguments;
 
     /**
+     * Alternative to {@link #arguments}: the arguments as a structure, each
+     * string in it resolved on its own ({@code ${var}}, {@code mini:},
+     * {@code json:}). A string that is exactly one {@code ${var}} becomes the
+     * variable's value, list or map included. Nothing is spliced into JSON
+     * text, so a value with quotes or line breaks arrives as it is.
+     */
+    private java.util.Map<String, Object> argumentValues;
+
+    /**
      * Whether a tool result carrying the {@code Error:} convention fails the
      * step (and with it the workflow). Default {@code true} — a failed tool
      * must never masquerade as a successful step (a workflow that "succeeds"
@@ -45,6 +54,15 @@ public class ToolCallData extends BaseStepData {
 
     public void setArguments(String arguments) {
         this.arguments = arguments;
+    }
+
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    public java.util.Map<String, Object> getArgumentValues() {
+        return argumentValues;
+    }
+
+    public void setArgumentValues(java.util.Map<String, Object> argumentValues) {
+        this.argumentValues = argumentValues;
     }
 
     public Boolean getFailOnError() {
