@@ -34,7 +34,11 @@ the **Database** — *The application's database* (nothing more to give; on file
 persistence the one `mindconnect.vector-store.url` names, and the hint says
 which) or *A database of its own* with JDBC URL, user and password (stored
 encrypted, or `${ENV_VAR}`) — a directory for files, and a description; saving
-opens the index at once, so a wrong URL shows there. Editing a built-in index saves a definition of the namespace under
+opens the index at once, so a wrong URL shows there. A database of its own
+that cannot be reached, or has no pgvector, does not fall back to files: the
+row reads `cannot be opened: …` with the reason, and the index is unusable
+until the database is. Only the application's database falls back to files
+(the *Where* column says why). Editing a built-in index saves a definition of the namespace under
 its name; deleting that goes back to the server's settings.
 
 A store's page names its index and where it lives.

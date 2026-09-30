@@ -302,11 +302,16 @@ public final class DefaultVectorStores implements VectorStores {
         String fileReason = host.fileReason();
         if (definition.pgvector()) {
             DataSource db = database(definition);
+            Optional<String> problem = db == null ? Optional.empty() : PostgresVectorStores.pgvectorProblem(db);
             if (db == null) {
                 fileReason = "no database for pgvector (file persistence)";
-            } else if (!PostgresVectorStores.pgvectorAvailable(db)) {
-                fileReason = definition.url() == null ? "the application's Postgres has no pgvector extension"
-                        : "the database has no pgvector extension";
+            } else if (problem.isPresent() && definition.url() != null) {
+                // A database of its own was asked for: no quiet fallback to files, which
+                // would split the index — the definition is unusable until the database is.
+                throw new IllegalStateException("Index '" + definition.name() + "': the database "
+                        + withoutCredentials(definition.url()) + " " + problem.get());
+            } else if (problem.isPresent()) {
+                fileReason = "the application's Postgres " + problem.get();
             } else {
                 Sql sql = definition.url() == null && host.runtimeSql() != null ? host.runtimeSql() : Sql.of(db);
                 String where = definition.url() != null ? withoutCredentials(definition.url())
