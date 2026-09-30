@@ -130,7 +130,7 @@ public class WorkflowApiController {
                                          @RequestParam(defaultValue = "false") boolean persist) {
         WorkflowData wf = service.find(id).orElse(null);
         if (wf == null) return ResponseEntity.notFound().build();
-        return ResponseEntity.ok(toResult(service.run(wf, params, null, persist)));
+        return ResponseEntity.ok(toResult(runContext.call(() -> service.run(wf, params, null, persist))));
     }
 
     /**
@@ -228,7 +228,7 @@ public class WorkflowApiController {
         }
         WorkflowData wf = service.find(snapshot.getWorkflowName()).orElse(null);
         if (wf == null) return ResponseEntity.status(409).build();
-        return ResponseEntity.ok(toResult(service.resume(wf, snapshot, params)));
+        return ResponseEntity.ok(toResult(runContext.call(() -> service.resume(wf, snapshot, params))));
     }
 
     @Operation(summary = "Delete a run instance")

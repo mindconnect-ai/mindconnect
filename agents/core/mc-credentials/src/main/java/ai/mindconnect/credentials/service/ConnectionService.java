@@ -140,26 +140,51 @@ public class ConnectionService {
     /**
      * Replaces just the credentials — a refreshed token, and nothing else.
      * Not {@link #update}: that is the edit form, and a refresh must not touch
-     * a label or a setting somebody changed in between.
+     * a label or a setting somebody changed in between. The stored record is
+     * read again under the user's lock, so a rename that lands while the
+     * token endpoint was being asked is not written over.
      */
     public Connection replaceCredentials(ConnectionId id, UserCredentials credentials) {
-        Connection stored = connections.findById(id).orElseThrow(() ->
-                new IllegalArgumentException("No connection " + id.value()));
-        Connection refreshed = stored.withCredentials(credentials, clock.instant());
-        connections.save(refreshed);
-        return refreshed;
+        Connection owner = connections.findById(id).orElseThrow(() -> noSuch(id));
+        synchronized (lockFor(owner.userId())) {
+            Connection stored = connections.findById(id).orElseThrow(() -> noSuch(id));
+            Connection refreshed = stored.withCredentials(credentials, clock.instant());
+            connections.save(refreshed);
+            return refreshed;
+        }
     }
 
-    /** Replaces the values of an existing connection; a blank secret keeps the stored one. */
+    /**
+     * Replaces the values of an existing connection; a blank secret keeps the
+     * stored one.
+     *
+     * <p>A connection whose credentials the form did not produce — an OAuth
+     * token from a sign-in — keeps them whatever the form says: the form has
+     * no field that could carry a token, so taking it literally would sign the
+     * user out on every rename. Its stored settings stay too, the app
+     * registration it was made through among them, and only what the form
+     * fills in on top of them changes.
+     */
     public Optional<Connection> update(UserId userId, ConnectionId id, String label,
                                        Map<String, String> values, Set<String> secretFields) {
         Objects.requireNonNull(userId, "userId");
         synchronized (lockFor(userId)) {
             return find(userId, id).map(stored -> {
-                Map<String, String> keep = stored.credentials() instanceof FormCreds form ? form.secrets() : Map.of();
-                Split split = Split.of(values, secretFields, keep);
+                UserCredentials credentials;
+                Map<String, String> settings;
+                if (stored.credentials() == null || stored.credentials() instanceof FormCreds) {
+                    Map<String, String> keep = stored.credentials() instanceof FormCreds form
+                            ? form.secrets() : Map.of();
+                    Split split = Split.of(values, secretFields, keep);
+                    credentials = split.credentials();
+                    settings = split.settings();
+                } else {
+                    credentials = stored.credentials();
+                    settings = new LinkedHashMap<>(stored.settings());
+                    settings.putAll(Split.of(values, secretFields, Map.of()).settings());
+                }
                 Connection updated = stored
-                        .withValues(split.credentials(), split.settings(), clock.instant())
+                        .withValues(credentials, settings, clock.instant())
                         .withLabel(label == null || label.isBlank() ? stored.label() : label, clock.instant());
                 connections.save(updated);
                 return updated;
@@ -219,14 +244,22 @@ public class ConnectionService {
      * the list can say why instead of every call failing the same way.
      */
     public void markUnusable(ConnectionId id, ConnectionState state, String detail) {
-        connections.findById(id).ifPresent(stored ->
-                connections.save(stored.withState(state, detail, clock.instant())));
+        connections.findById(id).ifPresent(owner -> {
+            synchronized (lockFor(owner.userId())) {
+                connections.findById(id).ifPresent(stored ->
+                        connections.save(stored.withState(state, detail, clock.instant())));
+            }
+        });
     }
 
     /** Puts a connection back in service — a corrected password, a refreshed token. */
     public void markUsable(ConnectionId id) {
-        connections.findById(id).filter(c -> !c.usable()).ifPresent(stored ->
-                connections.save(stored.withState(ConnectionState.CONNECTED, null, clock.instant())));
+        connections.findById(id).ifPresent(owner -> {
+            synchronized (lockFor(owner.userId())) {
+                connections.findById(id).filter(c -> !c.usable()).ifPresent(stored ->
+                        connections.save(stored.withState(ConnectionState.CONNECTED, null, clock.instant())));
+            }
+        });
     }
 
     // ── internals ───────────────────────────────────────────────────────────
@@ -264,6 +297,10 @@ public class ConnectionService {
     private static Comparator<Connection> defaultFirst() {
         return Comparator.comparing(Connection::isDefault).reversed()
                 .thenComparing(Connection::label, String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private static IllegalArgumentException noSuch(ConnectionId id) {
+        return new IllegalArgumentException("No connection " + id.value());
     }
 
     private Object lockFor(UserId id) {

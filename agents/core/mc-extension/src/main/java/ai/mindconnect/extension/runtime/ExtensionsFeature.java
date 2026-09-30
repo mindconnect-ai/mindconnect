@@ -36,9 +36,9 @@ public final class ExtensionsFeature extends ConfigurableFeature {
 
     @Override
     protected void install(FeatureContext ctx) {
-        // Beneath the operator's tool settings, which the tools feature lays over
-        // its registry: decorators wrap in registration order, and this feature
-        // registers before the tools feature has resolved anything.
+        // Wraps the bean the tools feature registers — the operator's settings
+        // already laid over the classpath's offer — so this is the outermost
+        // layer: a namespace's decision is the last word on a tool.
         ctx.decorate(ToolRegistry.class, registry -> new ExtensionToolRegistry(registry, extensions));
     }
 }

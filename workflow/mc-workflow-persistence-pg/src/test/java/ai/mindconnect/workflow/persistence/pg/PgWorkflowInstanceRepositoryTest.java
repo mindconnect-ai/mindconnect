@@ -1,10 +1,15 @@
 package ai.mindconnect.workflow.persistence.pg;
 
+import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.workflow.persist.FrameSnapshot;
 import ai.mindconnect.workflow.persist.WorkflowInstanceSnapshot;
+import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -12,11 +17,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PgWorkflowInstanceRepositoryTest {
 
+    private Sql sql;
     private PgWorkflowInstanceRepository repo;
+
+    @TempDir
+    Path dataDir;
 
     @BeforeEach
     void setUp() {
-        repo = new PgWorkflowInstanceRepository(TestDb.fresh("mc_workflow_instance"), "test").initSchema();
+        sql = TestDb.fresh("mc_workflow_instance", "mc_workflow_import");
+        repo = new PgWorkflowInstanceRepository(sql, "test").initSchema();
     }
 
     private static WorkflowInstanceSnapshot snapshot(String workflow, long suspendedAt) {
@@ -76,5 +86,55 @@ class PgWorkflowInstanceRepositoryTest {
         assertThat(repo.delete(id)).isTrue();
         assertThat(repo.delete(id)).isFalse();
         assertThat(repo.findAll()).hasSize(1);
+    }
+
+    @Test
+    void onePartitionNeverSeesTheRunsOfAnother() {
+        var other = new PgWorkflowInstanceRepository(sql, "other").initSchema();
+        String mine = repo.save(snapshot("approval", 1_000));
+        String theirs = other.save(snapshot("approval", 2_000));
+
+        assertThat(repo.findAll()).extracting(WorkflowInstanceSnapshot::getInstanceId).containsExactly(mine);
+        assertThat(repo.findByWorkflow("approval")).hasSize(1);
+        assertThat(repo.findById(theirs)).isEmpty();
+        assertThat(repo.delete(theirs)).isFalse();
+        assertThat(other.findById(theirs)).isPresent();
+    }
+
+    // ── the one-time import ─────────────────────────────────────────────────
+
+    @Test
+    void importsTheFilesOnceIntoAnEmptyPartitionAndKeepsThem() throws Exception {
+        var files = new FileWorkflowInstanceRepository(dataDir, "test");
+        String older = files.save(snapshot("approval", 1_000));
+        String newer = files.save(snapshot("ingest", 2_000));
+        Path dir = FileWorkflowInstanceRepository.directory(dataDir, "test");
+        Files.writeString(dir.resolve("broken.json"), "[]");
+
+        assertThat(repo.importFiles(dir)).isEqualTo(2);
+
+        assertThat(repo.findAll()).extracting(WorkflowInstanceSnapshot::getInstanceId).containsExactly(newer, older);
+        assertThat(repo.findById(older).orElseThrow().getRoot().getVariables()).containsEntry("amount", "42");
+        assertThat(files.findById(older)).isPresent();
+
+        // a resumed run is deleted — and does not come back from its file
+        repo.delete(older);
+        repo.delete(newer);
+        assertThat(repo.importFiles(dir)).isZero();
+        assertThat(repo.findAll()).isEmpty();
+    }
+
+    @Test
+    void aPartitionThatAlreadyHasRunsImportsNothingAndOthersImportTheirOwn() {
+        var other = new PgWorkflowInstanceRepository(sql, "other").initSchema();
+        new FileWorkflowInstanceRepository(dataDir, "test").save(snapshot("approval", 1_000));
+        new FileWorkflowInstanceRepository(dataDir, "other").save(snapshot("ingest", 2_000));
+        String own = repo.save(snapshot("own", 3_000));
+
+        assertThat(repo.importFiles(FileWorkflowInstanceRepository.directory(dataDir, "test"))).isZero();
+        assertThat(other.importFiles(FileWorkflowInstanceRepository.directory(dataDir, "other"))).isEqualTo(1);
+
+        assertThat(repo.findAll()).extracting(WorkflowInstanceSnapshot::getInstanceId).containsExactly(own);
+        assertThat(other.findAll()).extracting(WorkflowInstanceSnapshot::getWorkflowName).containsExactly("ingest");
     }
 }

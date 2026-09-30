@@ -19,7 +19,8 @@
         repository, the file-backed store of configured registries, and the
         installers for the two entities this module can see — LLM configs and
         agents. Workflows are installed by mc-agent-tools-workflow, which is
-        the module that has a workflow store.
+        the module that has a workflow store. The Postgres store of configured
+        registries is mc-agent-registry-pg.
     </description>
 
     <dependencies>
@@ -38,6 +39,11 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-repo</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-registry-pg</artifactId>
+            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
@@ -77,6 +83,16 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

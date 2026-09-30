@@ -32,7 +32,12 @@ public final class OfficeTool implements Tool {
 
     private static final Logger log = LoggerFactory.getLogger(OfficeTool.class);
 
-    /** Dates and times as the tools write them: in the server's zone, to the minute. */
+    /**
+     * Dates and times as the tools write them, to the minute — in the zone of
+     * the user the call runs for ({@link ai.mindconnect.agent.tool.TimeZones}),
+     * the same one {@link #instant} reads a time without an offset in, so the
+     * model reads back what it wrote.
+     */
     public static final DateTimeFormatter WHEN = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm", Locale.ROOT);
 
     private final String name;
@@ -169,7 +174,8 @@ public final class OfficeTool implements Tool {
 
     /**
      * A point in time from what a model writes: {@code 2026-09-22} (the start
-     * of that day here), {@code 2026-09-22T14:00} (local), or with an offset.
+     * of that day in {@code zone}), {@code 2026-09-22T14:00} (a local time in
+     * {@code zone} — pass the calling user's), or with an offset.
      */
     public static Instant instant(Map<String, Object> args, String name, ZoneId zone) {
         String value = str(args, name);

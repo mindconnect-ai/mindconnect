@@ -301,6 +301,45 @@
         true
     );
 
+    /* ── The composer empties itself when it sends ─────────────────────────
+     * The textarea stays open while a turn runs (see ChatFormComponent), so
+     * the server can no longer clear it by swapping it out. Nor by
+     * re-rendering it: the renderer keeps the value of the control that has
+     * focus, and after Enter that is the very textarea the text came from.
+     * So the composer clears itself on send.
+     *
+     * This must not happen before the message has been read, and it does
+     * not: the event bus listens on the page's root, below the document,
+     * and collects the form's values synchronously while handling the
+     * event — by the time the event bubbles up to here the text is already
+     * in the request.
+     *
+     * Only a real send clears. While a turn runs Send is disabled and Enter
+     * fires nothing, and what the user types then is kept for after the
+     * turn.
+     */
+    function clearComposer(form) {
+        if (!form || form.classList.contains("chat-form--streaming")) return;
+        const area = form.querySelector("textarea");
+        if (area) area.value = "";
+    }
+
+    // Enter in the textarea: the bus turns it into a submit of the form.
+    document.addEventListener("submit", function (event) {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || !form.classList.contains("chat-form")) return;
+        const send = form.querySelector('[data-action="send"]');
+        if (!send || send.disabled) return;
+        clearComposer(form);
+    });
+
+    // A click on Send itself.
+    document.addEventListener("click", function (event) {
+        const send = event.target.closest && event.target.closest('form.chat-form [data-action="send"]');
+        if (!send || send.disabled) return;
+        clearComposer(send.closest("form.chat-form"));
+    });
+
     // Clicking the scrim closes it, the way any drawer does.
     document.addEventListener(
         "click",

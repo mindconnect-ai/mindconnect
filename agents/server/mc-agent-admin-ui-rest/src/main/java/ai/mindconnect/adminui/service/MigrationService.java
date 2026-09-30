@@ -2,20 +2,19 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
+import ai.mindconnect.agent.runtime.skill.Skill;
+import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.workflow.domain.WorkflowData;
-import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -41,6 +40,14 @@ import java.util.Set;
  * {@code ${ENV_VAR}} placeholders, so a byte-wise diff would flag every config
  * forever. Key values are never shown in the diff, only whether they differ.
  *
+ * <p>A skill is only ever NEW: a stored skill is prose somebody rewrote for
+ * their own house, and the shipped wording has no claim on it, so it is never
+ * compared. Listing a missing one is what brings a deleted skill back — the
+ * seeding does not, it installs only what a namespace never had.
+ *
+ * <p>What is bundled is read through {@link BundledSeeds}, like the start-up
+ * and per-namespace seeding read it.
+ *
  * <p>A pending migration is identified by a stable {@link PendingMigration#id()}
  * derived from its entity type and name, so the UI can round-trip an "apply"
  * request without holding server-side state between calls.
@@ -50,11 +57,8 @@ public class MigrationService {
 
     private static final Logger log = LoggerFactory.getLogger(MigrationService.class);
 
-    /**
-     * Workflows carry {@code @class} type info and legacy shapes a plain mapper
-     * cannot read — same mapper the workflow stores use.
-     */
-    private static final ObjectMapper WORKFLOW_MAPPER = WorkflowObjectMapperFactory.create();
+    /** Workflows carry {@code @class} type info — diffed and merged with the workflow stores' mapper. */
+    private static final ObjectMapper WORKFLOW_MAPPER = BundledSeeds.WORKFLOW_MAPPER;
 
     /** Whether a stored record is absent (NEW) or present-but-different (CHANGED). */
     public enum Status { NEW, CHANGED }
@@ -63,6 +67,7 @@ public class MigrationService {
     public enum EntityType {
         LLM_CONFIG("llm-config", "LLM Configs"),
         AGENT("agent", "Agents"),
+        SKILL("skill", "Skills"),
         WORKFLOW("workflow", "Workflows");
 
         private final String slug;
@@ -104,9 +109,11 @@ public class MigrationService {
 
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentDefinitionRepository;
+    private final SkillRepository skillRepository;
     private final WorkflowDataRepository workflowDataRepository;
     private final ObjectMapper objectMapper;
     private final EncryptionHelper encryption;
+    private final BundledSeeds seeds;
 
     /**
      * @param encryption decrypts stored {@code enc:} keys for the diff; without
@@ -114,14 +121,17 @@ public class MigrationService {
      */
     public MigrationService(LlmConfigRepository llmConfigRepository,
                             AgentDefinitionRepository agentDefinitionRepository,
+                            SkillRepository skillRepository,
                             WorkflowDataRepository workflowDataRepository,
                             ObjectMapper objectMapper,
                             Optional<EncryptionHelper> encryption) {
         this.llmConfigRepository = llmConfigRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
+        this.skillRepository = skillRepository;
         this.workflowDataRepository = workflowDataRepository;
         this.objectMapper = objectMapper;
         this.encryption = encryption.orElseGet(EncryptionHelper::noEncryption);
+        this.seeds = new BundledSeeds(objectMapper);
     }
 
     // ── Read: pending list ──────────────────────────────────────────────────────
@@ -131,32 +141,41 @@ public class MigrationService {
         List<PendingMigration> all = new ArrayList<>();
         all.addAll(pendingLlmConfigs());
         all.addAll(pendingAgents());
+        all.addAll(pendingSkills());
         all.addAll(pendingWorkflows());
         return all;
     }
 
     private List<PendingMigration> pendingLlmConfigs() {
         List<PendingMigration> result = new ArrayList<>();
-        for (Resource resource : scan("classpath*:initial-data/llm-configs/*.json")) {
-            readEach(resource, LlmConfig.class, objectMapper).ifPresent(incoming -> {
-                Optional<LlmConfig> existing = llmConfigRepository.findByName(incoming.name());
-                LlmConfig compared = existing.map(stored -> withStoredKeyIfSame(stored, incoming)).orElse(incoming);
-                pendingFor(EntityType.LLM_CONFIG, incoming.name(), existing.orElse(null), compared, objectMapper)
-                        .ifPresent(result::add);
-            });
+        for (BundledSeeds.Seed<LlmConfig> seed : seeds.llmConfigs()) {
+            LlmConfig incoming = seed.record();
+            Optional<LlmConfig> existing = llmConfigRepository.findByName(incoming.name());
+            LlmConfig compared = existing.map(stored -> withStoredKeyIfSame(stored, incoming)).orElse(incoming);
+            pendingFor(EntityType.LLM_CONFIG, incoming.name(), existing.orElse(null), compared, objectMapper)
+                    .ifPresent(result::add);
         }
         return result;
     }
 
     private List<PendingMigration> pendingAgents() {
         List<PendingMigration> result = new ArrayList<>();
-        for (Resource resource : scan("classpath*:initial-data/agent-definitions/*.json")) {
-            readEach(resource, AgentDefinition.class, objectMapper).ifPresent(incoming -> {
-                Optional<AgentDefinition> existing =
-                        agentDefinitionRepository.findByName(incoming.name());
-                pendingFor(EntityType.AGENT, incoming.name(), existing.orElse(null), incoming, objectMapper)
-                        .ifPresent(result::add);
-            });
+        for (BundledSeeds.Seed<AgentDefinition> seed : seeds.agents()) {
+            AgentDefinition incoming = seed.record();
+            Optional<AgentDefinition> existing = agentDefinitionRepository.findByName(incoming.name());
+            pendingFor(EntityType.AGENT, incoming.name(), existing.orElse(null), incoming, objectMapper)
+                    .ifPresent(result::add);
+        }
+        return result;
+    }
+
+    /** Bundled skills no stored skill carries the name of — NEW only, see the class comment. */
+    private List<PendingMigration> pendingSkills() {
+        List<PendingMigration> result = new ArrayList<>();
+        for (BundledSeeds.Seed<Skill> seed : seeds.skills()) {
+            if (skillRepository.findByName(seed.name()).isEmpty()) {
+                result.add(new PendingMigration(EntityType.SKILL, seed.name(), Status.NEW, List.of()));
+            }
         }
         return result;
     }
@@ -164,18 +183,15 @@ public class MigrationService {
     /**
      * Workflows are stored under a file id, not an in-record name, so the seed's
      * file name (minus {@code .json}) is the identity — the same id
-     * {@code FileCopyInitialDataInstaller} installs it under at startup.
+     * the seeding installs it under.
      */
     private List<PendingMigration> pendingWorkflows() {
         List<PendingMigration> result = new ArrayList<>();
-        for (Resource resource : scan("classpath*:initial-data/workflows/*.json")) {
-            String id = fileId(resource);
-            if (id == null) continue;
-            readEach(resource, WorkflowData.class, WORKFLOW_MAPPER).ifPresent(incoming -> {
-                Optional<WorkflowData> existing = workflowDataRepository.findById(id);
-                pendingFor(EntityType.WORKFLOW, id, existing.orElse(null), incoming, WORKFLOW_MAPPER)
-                        .ifPresent(result::add);
-            });
+        for (BundledSeeds.Seed<WorkflowData> seed : seeds.workflows()) {
+            String id = seed.name();
+            Optional<WorkflowData> existing = workflowDataRepository.findById(id);
+            pendingFor(EntityType.WORKFLOW, id, existing.orElse(null), seed.record(), WORKFLOW_MAPPER)
+                    .ifPresent(result::add);
         }
         return result;
     }
@@ -208,6 +224,7 @@ public class MigrationService {
         return switch (type) {
             case LLM_CONFIG -> applyLlmConfig(name);
             case AGENT -> applyAgent(name);
+            case SKILL -> applySkill(name);
             case WORKFLOW -> applyWorkflow(name);
         };
     }
@@ -234,6 +251,17 @@ public class MigrationService {
         if (incoming.isEmpty()) return false;
         agentDefinitionRepository.save(incoming.get());
         log.info("Applied migration for agent '{}'", name);
+        return true;
+    }
+
+    /** Installs a bundled skill that is missing; a stored one of that name is never replaced. */
+    private boolean applySkill(String name) {
+        if (skillRepository.findByName(name).isPresent()) return false;
+        Optional<Skill> incoming = seeds.skills().stream()
+                .filter(seed -> seed.name().equals(name)).map(BundledSeeds.Seed::record).findFirst();
+        if (incoming.isEmpty()) return false;
+        skillRepository.save(incoming.get());
+        log.info("Applied migration for skill '{}'", name);
         return true;
     }
 
@@ -277,6 +305,7 @@ public class MigrationService {
                             .flatMap(stored -> mergeField(stored, incoming, field, AgentDefinition.class, objectMapper)))
                     .map(merged -> { agentDefinitionRepository.save(merged); return true; })
                     .orElse(false);
+            case SKILL -> false; // only ever NEW: nothing stored to merge into
             case WORKFLOW -> bundledWorkflow(name)
                     .flatMap(incoming -> workflowDataRepository.findById(name)
                             .flatMap(stored -> mergeField(stored, incoming, field, WorkflowData.class, WORKFLOW_MAPPER)))
@@ -309,29 +338,15 @@ public class MigrationService {
     // ── Read: bundled records ───────────────────────────────────────────────────
 
     private Optional<LlmConfig> bundledLlmConfig(String name) {
-        for (Resource resource : scan("classpath*:initial-data/llm-configs/*.json")) {
-            Optional<LlmConfig> incoming = readEach(resource, LlmConfig.class, objectMapper)
-                    .filter(c -> c.name().equals(name));
-            if (incoming.isPresent()) return incoming;
-        }
-        return Optional.empty();
+        return seeds.llmConfig(name);
     }
 
     private Optional<AgentDefinition> bundledAgent(String name) {
-        for (Resource resource : scan("classpath*:initial-data/agent-definitions/*.json")) {
-            Optional<AgentDefinition> incoming = readEach(resource, AgentDefinition.class, objectMapper)
-                    .filter(a -> a.name().equals(name));
-            if (incoming.isPresent()) return incoming;
-        }
-        return Optional.empty();
+        return seeds.agent(name);
     }
 
     private Optional<WorkflowData> bundledWorkflow(String id) {
-        for (Resource resource : scan("classpath*:initial-data/workflows/*.json")) {
-            if (!id.equals(fileId(resource))) continue;
-            return readEach(resource, WorkflowData.class, WORKFLOW_MAPPER);
-        }
-        return Optional.empty();
+        return seeds.workflow(id);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────
@@ -367,23 +382,6 @@ public class MigrationService {
         if (EnvVarResolver.containsPlaceholder(text)) return text;
         if (text.startsWith(EncryptionHelper.ENC)) return "(encrypted)";
         return "••••••••";
-    }
-
-    /** The seed's identity: its file name without the {@code .json} extension. */
-    private static String fileId(Resource resource) {
-        String filename = resource.getFilename();
-        if (filename == null || !filename.endsWith(".json")) return null;
-        return filename.substring(0, filename.length() - ".json".length());
-    }
-
-    private <T> Optional<T> readEach(Resource resource, Class<T> type, ObjectMapper mapper) {
-        try {
-            return Optional.of(mapper.readerFor(type)
-                    .<T>readValue(resource.getInputStream()));
-        } catch (Exception e) {
-            log.warn("Failed to read {} from {}: {}", type.getSimpleName(), resource.getFilename(), e.getMessage());
-            return Optional.empty();
-        }
     }
 
     /**
@@ -429,15 +427,5 @@ public class MigrationService {
     private static String render(JsonNode value) {
         if (value == null) return null;
         return value.isContainerNode() ? value.toPrettyString() : value.asText();
-    }
-
-    private List<Resource> scan(String pattern) {
-        try {
-            PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
-            return List.of(resolver.getResources(pattern));
-        } catch (Exception e) {
-            log.debug("No resources found for pattern {}: {}", pattern, e.getMessage());
-            return List.of();
-        }
     }
 }

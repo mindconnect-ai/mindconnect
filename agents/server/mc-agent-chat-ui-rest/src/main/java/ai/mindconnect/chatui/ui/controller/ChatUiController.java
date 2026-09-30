@@ -125,7 +125,7 @@ public class ChatUiController {
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
         // Headers for the sidebar; only the chat being shown is loaded whole.
         var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)), AgentSession.CHAT);
-        var latest = ChatLanding.pick(sessions, lastShownChat())
+        var latest = ChatLanding.pick(sessions, lastShownChat(), this::written)
                 .flatMap(sessionRepository::findById);
         if (latest.isEmpty()) {
             // A GET does not create anything: a prefetch, a link preview or two
@@ -134,6 +134,16 @@ public class ChatUiController {
             return ResponseEntity.ok(emptyShell());
         }
         return ResponseEntity.ok(shell(latest.get(), sessions));
+    }
+
+    /** Whether somebody wrote in {@code chat}; a store that cannot say counts it as written. */
+    private boolean written(AgentSessionHeader chat) {
+        try {
+            return sessionService.hasMessages(chat.id());
+        } catch (RuntimeException e) {
+            log.debug("Could not tell whether chat {} is empty: {}", chat.id(), e.toString());
+            return true;
+        }
     }
 
     /** What the chat looks like before there is anything to look at. */
@@ -177,6 +187,39 @@ public class ChatUiController {
 
         return ResponseEntity.ok(openDialog(
                 ai.mindconnect.chatui.ui.component.ChatSettingsComponent.TITLE, form));
+    }
+
+    /**
+     * The agent picker changed: the form is drawn again with the model and
+     * the prompt that go with the pick ({@link
+     * ai.mindconnect.chatui.ui.component.ChatSettingsComponent#valuesFor}), so
+     * the dialog shows what Apply will do instead of the previous agent's
+     * prompt. Nothing is saved.
+     */
+    @PostMapping("/sessions/{sessionId}/settings/agent")
+    public ResponseEntity<UiPatch> settingsAgentPicked(@PathVariable("sessionId") String sessionIdValue,
+                                                       @RequestBody Map<String, Object> raw,
+                                                       @AuthenticationPrincipal OidcUser user) {
+        SessionId sessionId = SessionId.of(sessionIdValue);
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
+        var session = sessionOpt.get();
+        var body = new FormBody(raw == null ? Map.of() : raw);
+        String agentId = body.str("agentId");
+        AgentDefinition picked = agentId == null || agentId.isBlank() ? null
+                : agentRepository.findById(AgentId.of(agentId)).orElse(null);
+        var effective = agentResolver.resolve(session);
+        AgentId bound = boundAgentId(session);
+        var values = ai.mindconnect.chatui.ui.component.ChatSettingsComponent.valuesFor(picked, bound,
+                new ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values(
+                        effective.llmConfigName(), effective.systemPrompt()),
+                new ai.mindconnect.chatui.ui.component.ChatSettingsComponent.Values(
+                        orKeep(body.str("llmConfigName"), effective.llmConfigName()),
+                        orKeep(body.str("systemPrompt"), effective.systemPrompt())));
+        var form = new ai.mindconnect.chatui.ui.component.ChatSettingsComponent(
+                sessionId, llmConfigRepository.findAll(), selectableAgents(bound),
+                values.llmConfigName(), picked == null ? null : picked.id(), values.systemPrompt());
+        return ResponseEntity.ok(UiPatch.of().patch(UiPatch.Operation.replace(form.id(), form.render())));
     }
 
     /**
@@ -409,7 +452,8 @@ public class ChatUiController {
                 ai.mindconnect.chatui.service.SessionOwnership.channelOf(session.id())).isPresent();
         var form = new ai.mindconnect.chatui.ui.component.ChatFormComponent(
                         session.id(), agent.id(), streaming)
-                .withModelLabel(agent.llmConfigName())
+                .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
+                        llmConfigRepository, agent.llmConfigName()))
                 .withAttachments(sessionFiles.attachments(session.id()))
                 .withAgentCounts(agent, offeredToolNames())
                 .withWorkingDir(session.workingDir())
@@ -773,11 +817,23 @@ public class ChatUiController {
     @PostMapping("/agents/{agentId}/sessions")
     public ResponseEntity<UiPage> startSession(@PathVariable("agentId") String agentIdValue,
                                                @AuthenticationPrincipal OidcUser user) {
+        return startSession(agentIdValue, user, AgentSession.CHAT);
+    }
+
+    /**
+     * Starts a session of {@code type} with the agent and shows it in the chat —
+     * for a feature that hosts its own conversations in the chat's page, such
+     * as a builder. A type other than {@link AgentSession#CHAT} keeps the
+     * session out of the chat's history and out of what {@code /chat} opens.
+     */
+    public ResponseEntity<UiPage> startSession(String agentIdValue, OidcUser user, String type) {
         AgentId agentId = AgentId.of(agentIdValue);
         String userId = user.getPreferredUsername();
         return agentRepository.findById(agentId)
                 .map(agent -> {
-                    var session = sessionService.openChat(agentId, UserId.of(userId));
+                    var session = type == null || AgentSession.CHAT.equals(type)
+                            ? sessionService.openChat(agentId, UserId.of(userId))
+                            : sessionService.openChatOfType(agentId, UserId.of(userId), type);
                     return ResponseEntity.ok(shell(session,
                             sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
                 })
@@ -1196,6 +1252,8 @@ public class ChatUiController {
         var page = new ChatPage(session, agent, history, memory, handleOpt.isPresent(),
                 (toolCallId, running, in, out) ->
                         buildSubAgentCards(session.id(), toolCallId, running, in, out))
+                .withModelLabel(ai.mindconnect.chatui.ui.component.ModelLabel.of(
+                        llmConfigRepository, agent.llmConfigName()))
                 .withBubbledApprovals(bubbledApprovalCards(session.id()))
                 .withHostLinks(hostLinks)
                 .withOfferedTools(offeredToolNames());
@@ -1604,7 +1662,7 @@ public class ChatUiController {
         // one sat empty below.
         String turnKey = liveNodeKey();
         String pendingId  = "bot-pending-"  + sessionId.value() + "-" + turnKey;
-        String thinkingId = "bot-thinking-" + sessionId.value() + "-" + turnKey;
+        String typingId   = "bot-typing-"   + sessionId.value() + "-" + turnKey;
 
         // The streaming-time page is built once with the pre-turn history;
         // it owns the form / message-list / task-card patch shapes the
@@ -1641,11 +1699,17 @@ public class ChatUiController {
             publishPatch(bus, liveView.headerOnly());
         }
 
-        // 1. Append user message (a typed turn) or just swap the form to
-        //    streaming (an approval resume), add thinking indicator.
-        publishPatch(bus, userParts != null
-                ? liveView.streamStart(userBubble(session, userParts), thinkingId)
-                : liveView.streamResume());
+        // 1. Append user message (a typed turn) and the typing bubble, or
+        //    just swap the form to streaming (an approval resume).
+        if (userParts != null) {
+            publishPatch(bus, liveView.streamStart(userBubble(session, userParts), typingId));
+            // The catch-up frame until the first token replaces it: a client
+            // that opens the page now gets the bubble too — nothing it renders
+            // from history has one.
+            sessionStreams.rememberBubble(channelId, json(liveView.streamTyping(typingId)));
+        } else {
+            publishPatch(bus, liveView.streamResume());
+        }
 
         // 2. Stream tokens + per-task cards.
         StringBuilder cumulativeText = new StringBuilder();
@@ -1689,14 +1753,14 @@ public class ChatUiController {
                 case StreamEvent.Token t -> {
                     cumulativeText.append(t.text());
                     if (!pendingAppended[0]) {
-                        // First token: drop the thinking indicator and append
+                        // First token: drop the typing bubble and append
                         // the streaming bot-reply placeholder BELOW any task
                         // cards that arrived during the thinking phase.
                         // Kept as the catch-up frame: a client that opens the
                         // page mid-turn has no bubble, and every token after
                         // it is a REPLACE that would land nowhere.
                         sessionStreams.rememberBubble(channelId,
-                                publishPatch(bus, liveView.streamFirstToken(pendingId, thinkingId)));
+                                publishPatch(bus, liveView.streamFirstToken(pendingId, typingId)));
                         pendingAppended[0] = true;
                     }
                     // Token patches carry the CUMULATIVE text, so the newest
@@ -1815,7 +1879,7 @@ public class ChatUiController {
                                         ? "Cancelled by user before the tool finished"
                                         : "The turn failed before the tool finished: " + message);
                     }
-                    publishPatch(bus, liveView.streamError(message));
+                    publishPatch(bus, liveView.streamError(message, typingId));
                 } catch (Exception ignored) {}
                 try {
                     bus.publish("error", message);
@@ -1839,7 +1903,7 @@ public class ChatUiController {
                 // streamDone() patch reflects what's actually been persisted
                 // (assistant message, historic task cards, updated tokens).
                 ChatPage finalView = buildChatPage(session, agent);
-                publishPatch(bus, finalView.streamDone());
+                publishPatch(bus, finalView.streamDone(typingId));
                 // After the rebuild, or they would be wiped by it. They sit
                 // below the answer, which is also when they ran.
                 for (var verdict : reviewerVerdicts) {

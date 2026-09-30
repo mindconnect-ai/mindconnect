@@ -9,12 +9,17 @@ The **Migrations** section reconciles the **bundled seed data** on the classpath
 (`initial-data/**`) with what is stored on disk. It does not touch any database
 schema.
 
-At startup the `InitialDataLoader` silently imports only *new* records (see
+Every namespace silently gets the bundled records it never had — the start-up
+namespace at start, every other one on its first use (see
 [Initial data](../initial-data.md)). When a bundled record **changes** in a
 newer version of the app, the stored copy is left alone — this page is where an
-admin reviews and applies those changes.
+admin reviews and applies those changes, in the namespace at hand. It is also
+where a bundled record that was deleted comes back: the seeding does not
+install it again, here it is listed as NEW.
 
-Three entity types are scanned: **LLM configs**, **agents** and **workflows**.
+Four entity types are scanned: **LLM configs**, **agents**, **skills** and
+**workflows**. A skill is only ever NEW — a stored skill is somebody's prose
+and is never compared with the shipped one.
 
 For each pending item the page shows:
 

@@ -25,6 +25,9 @@ mindconnect:
   # The namespace this process runs in: file data under data.base-dir/<namespace>,
   # a namespace key column in Postgres. One process serves one namespace.
   namespace: ${MC_NAMESPACE:local}
+  # The time zone of a user who has none of their own (set on the Admin UI's
+  # profile page) — an IANA id such as Europe/Zurich. Unset: the JVM's zone.
+  time-zone: ${MC_TIME_ZONE:}
   # Authentication of the REST API. Off by default: every request runs as the
   # dev user. On: every request needs a bearer token — a JWT of the issuer
   # below (Keycloak) or a personal API token created in the admin UI, which

@@ -35,7 +35,7 @@ public class JwtUserConverter implements Converter<Jwt, AbstractAuthenticationTo
         }
         recorder.record(UserId.of(name), jwt.getSubject(),
                 jwt.getIssuer() == null ? null : jwt.getIssuer().toString(),
-                jwt.getClaimAsString("name"), jwt.getClaimAsString("email"));
+                jwt.getClaimAsString("name"), VerifiedEmail.of(jwt.getClaimAsString("email"), jwt.getClaims()));
         return new JwtAuthenticationToken(jwt, AuthorityUtils.createAuthorityList("ROLE_USER"), name);
     }
 }

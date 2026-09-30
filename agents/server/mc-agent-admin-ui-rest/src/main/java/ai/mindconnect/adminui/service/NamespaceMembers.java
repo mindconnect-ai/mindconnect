@@ -42,14 +42,22 @@ public class NamespaceMembers {
     /**
      * Puts {@code email} into {@code namespace} in {@code role}, as {@code inviter}.
      *
+     * <p>Whether the caller is an admin is asked first, and a namespace that
+     * does not exist is refused in the same words: otherwise anybody signed in
+     * could learn which namespaces exist, and who is in them, by inviting.
+     *
      * @return the address as it was listed
      * @throws IllegalArgumentException when {@code inviter} does not shape the namespace, the
      *                                  namespace is missing or the open default one, or the
      *                                  address is blank, malformed or already listed
      */
     public Email invite(Namespace namespace, UserId inviter, String email, NamespaceRole role) {
-        NamespaceDefinition ns = namespaces.find(namespace)
-                .orElseThrow(() -> new IllegalArgumentException("No namespace '" + namespace.value() + "'"));
+        NamespaceDefinition ns = namespaces.isAdmin(inviter, namespace)
+                ? namespaces.find(namespace).orElse(null)
+                : null;
+        if (ns == null) {
+            throw new IllegalArgumentException("Only an admin of '" + namespace.value() + "' may invite into it");
+        }
         Email address = address(email);
         if (ns.admins().contains(address) || ns.users().contains(address)) {
             throw new IllegalArgumentException("'" + address + "' is already in '" + namespace.value() + "'");

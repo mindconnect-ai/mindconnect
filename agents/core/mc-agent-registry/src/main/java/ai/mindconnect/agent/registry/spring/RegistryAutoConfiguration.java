@@ -1,6 +1,10 @@
 package ai.mindconnect.agent.registry.spring;
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.StartupScope;
+import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.adapter.github.GitHubRegistryClient;
 import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
@@ -21,9 +25,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 import java.nio.file.Path;
 import java.time.Duration;
@@ -46,6 +52,13 @@ import java.time.Duration;
  * ({@code owner/repo[@ref][:index-path]}) — how a deployment points a fresh
  * installation at its own catalogue without shipping a file.
  *
+ * <p>Where the configured registries live follows
+ * {@code mindconnect.persistence}: files under
+ * {@code <mindconnect.data.base-dir>/<namespace>/system/registries/} by
+ * default, rows of {@code mc_registry_source} on {@code postgres} — routed per
+ * namespace, and without the file store's partition lock. A namespace's first
+ * use on Postgres imports what its files held, once.
+ *
  * <p>Ordered after the persistence starters: the installers are conditional on
  * the repositories those register, and a {@code @ConditionalOnBean} evaluated
  * before them finds nothing — the screen then offers every entry and can
@@ -60,8 +73,10 @@ public class RegistryAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(RegistryAutoConfiguration.class);
 
+    /** The files, bound once to the namespace start-up seeds into. */
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "file", matchIfMissing = true)
     public RegistrySourceRepository registrySourceRepository(
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
             @Value("${mindconnect.registry.default-source:}") String defaultSource,
@@ -75,12 +90,48 @@ public class RegistryAutoConfiguration {
         return repository;
     }
 
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnClass(name = "ai.mindconnect.agent.registry.adapter.pg.PgRegistrySourceRepository")
+    @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
+    static class Postgres {
+
+        /**
+         * One row per registry in {@code mc_registry_source}, on the
+         * persistence starter's {@code Sql}, routed per namespace like the
+         * stores. The first call for a namespace creates the table, imports
+         * the files that namespace kept under
+         * {@code <mindconnect.data.base-dir>/<namespace>/system/registries/}
+         * when it has no row yet — read directly, the file store is never
+         * opened — and then seeds what the file store seeds on every start.
+         */
+        @Bean
+        @ConditionalOnMissingBean(RegistrySourceRepository.class)
+        RegistrySourceRepository pgRegistrySourceRepository(
+                ai.mindconnect.jdbc.Sql mindconnectSql,
+                @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
+                @Value("${mindconnect.registry.default-source:}") String defaultSource,
+                ObjectProvider<ScopeSupplier> scope,
+                @Value("${mindconnect.namespace:local}") String defaultNamespace) {
+            Path storage = Path.of(dataBaseDir);
+            return NamespaceRouted.route(RegistrySourceRepository.class,
+                    scope.getIfAvailable(() -> ScopeSupplier.fixed(new Namespace(defaultNamespace))),
+                    ns -> {
+                        var repository = new ai.mindconnect.agent.registry.adapter.pg.PgRegistrySourceRepository(
+                                mindconnectSql, ns).initSchema();
+                        repository.importFiles(FileRegistrySourceRepository.directory(storage, ns));
+                        InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
+                        seed(repository, defaultSource);
+                        return repository;
+                    });
+        }
+    }
+
     /**
      * Adds the configured default registry unless it is already there. Only
      * ever adds: an operator who deleted it meant to, and a start that puts it
      * back would be a bug report.
      */
-    private void seed(RegistrySourceRepository repository, String defaultSource) {
+    private static void seed(RegistrySourceRepository repository, String defaultSource) {
         if (defaultSource == null || defaultSource.isBlank()) {
             return;
         }
@@ -131,23 +182,28 @@ public class RegistryAutoConfiguration {
      * the workflow tools). A host with no installers at all still gets the
      * service: browsing a registry is useful before anything can be installed,
      * and every entry then reports why it cannot be.
+     *
+     * <p>Built in the start-up scope: the service counts the sources as it
+     * starts, and a store routed per namespace needs a namespace to count in.
      */
     @Bean
     @ConditionalOnMissingBean
     public RegistryService registryService(RegistrySourceRepository sources, RegistryClient client,
-                                           ObjectProvider<RegistryInstaller> installers) {
-        return new RegistryService(sources, client, installers.orderedStream().toList());
+                                           ObjectProvider<RegistryInstaller> installers,
+                                           ObjectProvider<ScopeSupplier> scope,
+                                           @Value("${mindconnect.namespace:local}") String defaultNamespace) {
+        return StartupScope.call(scope.getIfAvailable(), new Namespace(defaultNamespace),
+                () -> new RegistryService(sources, client, installers.orderedStream().toList()));
     }
     /**
      * Where bundled data is seeded: the namespace a fixed scope names — a
      * single-namespace host chose it — and otherwise the installation default,
      * because a thread-bound scope binds nothing at start-up.
      */
-    private static ai.mindconnect.agent.Namespace seedNamespace(
-            ObjectProvider<ScopeSupplier> scope, String defaultNamespace) {
+    private static Namespace seedNamespace(ObjectProvider<ScopeSupplier> scope, String defaultNamespace) {
         ScopeSupplier supplier = scope.getIfAvailable();
-        return supplier == null || supplier instanceof ai.mindconnect.agent.ThreadBoundScope
-                ? new ai.mindconnect.agent.Namespace(defaultNamespace)
+        return supplier == null || supplier instanceof ThreadBoundScope
+                ? new Namespace(defaultNamespace)
                 : supplier.namespace();
     }
 }

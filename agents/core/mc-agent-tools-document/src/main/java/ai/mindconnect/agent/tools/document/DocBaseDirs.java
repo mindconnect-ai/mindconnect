@@ -66,4 +66,28 @@ final class DocBaseDirs {
             return java.util.Map.of("type", "object", "properties", java.util.Map.of("baseDir", baseDir));
         }
     }
+
+    /**
+     * Why {@code target} cannot be read as a document — missing, or no regular
+     * file — or {@code null} when it can. When the workspace does not answer
+     * (a remote one refusing or timing out) it says so rather than "does not
+     * exist", which would send the model off to write the file anew.
+     */
+    static String fileError(WorkspaceFiles files, java.nio.file.Path target, String relative) {
+        java.util.Optional<ai.mindconnect.agent.tool.workspace.WorkspaceEntry> entry;
+        try {
+            entry = files.stat(target);
+        } catch (java.io.IOException e) {
+            return couldNotCheck(relative, e);
+        }
+        if (entry.isEmpty()) return "Error: file does not exist: " + relative;
+        if (!entry.get().regularFile()) return "Error: not a regular file: " + relative;
+        return null;
+    }
+
+    /** The answer when the workspace could not say whether {@code relative} is there. */
+    static String couldNotCheck(String relative, java.io.IOException e) {
+        return "Error: could not check " + relative + " — the workspace did not answer ("
+                + e.getMessage() + "). The file may well exist; do not recreate it, try again later.";
+    }
 }

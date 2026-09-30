@@ -77,28 +77,26 @@ public interface WorkspaceFiles {
 
     // ---- conveniences over stat -------------------------------------------------------------
 
-    default boolean exists(Path path) {
-        try {
-            return stat(path).isPresent();
-        } catch (IOException e) {
-            return false;
-        }
+    /*
+     * These throw instead of answering false when the workspace cannot be asked:
+     * a remote workspace that answers 401 or times out has not said the file is
+     * missing, and a tool that took it for missing would tell the model to write
+     * the file anew over the one that is there.
+     */
+
+    /** Whether anything is at {@code path}; an {@link IOException} when that could not be found out. */
+    default boolean exists(Path path) throws IOException {
+        return stat(path).isPresent();
     }
 
-    default boolean isDirectory(Path path) {
-        try {
-            return stat(path).map(WorkspaceEntry::directory).orElse(false);
-        } catch (IOException e) {
-            return false;
-        }
+    /** Whether {@code path} is a directory; an {@link IOException} when that could not be found out. */
+    default boolean isDirectory(Path path) throws IOException {
+        return stat(path).map(WorkspaceEntry::directory).orElse(false);
     }
 
-    default boolean isRegularFile(Path path) {
-        try {
-            return stat(path).map(WorkspaceEntry::regularFile).orElse(false);
-        } catch (IOException e) {
-            return false;
-        }
+    /** Whether {@code path} is a regular file; an {@link IOException} when that could not be found out. */
+    default boolean isRegularFile(Path path) throws IOException {
+        return stat(path).map(WorkspaceEntry::regularFile).orElse(false);
     }
 
     default long lastModifiedMillis(Path path) {

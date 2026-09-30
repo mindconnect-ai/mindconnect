@@ -122,11 +122,42 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
         return true;
     }
 
+    /**
+     * Where the scope a request was answered in is kept, for the dispatch back
+     * into the servlet that finishes an async request (see {@link
+     * #shouldNotFilterAsyncDispatch}).
+     */
+    static final String SCOPE_ATTRIBUTE = ScopeBindingFilter.class.getName() + ".scope";
+
+    /**
+     * An async request — an SSE stream ending, a {@code DeferredResult} set —
+     * comes back through the servlet once more to be finished, on another
+     * thread, and the interceptors run again there. Skipped here, that thread
+     * had no scope: {@code NamespaceAccessInterceptor} threw "No scope is
+     * bound", Tomcat aborted a response that was nearly done, and a chat that
+     * had answered showed "The connection broke off". The async dispatch binds
+     * the scope the request was answered in, unchanged — nothing is decided
+     * again once the response is under way.
+     */
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false;
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         if (!(scope instanceof ThreadBoundScope bound)) {
             chain.doFilter(request, response);
+            return;
+        }
+        if (isAsyncDispatch(request)) {
+            Object answered = request.getAttribute(SCOPE_ATTRIBUTE);
+            if (answered instanceof Scope was) {
+                bindAndProceed(bound, was, request, response, chain);
+            } else {
+                chain.doFilter(request, response);
+            }
             return;
         }
         UserId user = SecurityCurrentUserResolver.userIdOf(SecurityContextHolder.getContext().getAuthentication())
@@ -176,8 +207,16 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
             }
         }
         response.setHeader(HEADER, namespace.value());
+        Scope answered = Scope.of(namespace, user);
+        request.setAttribute(SCOPE_ATTRIBUTE, answered);
+        bindAndProceed(bound, answered, request, response, chain);
+    }
+
+    private static void bindAndProceed(ThreadBoundScope bound, Scope answered, HttpServletRequest request,
+                                       HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
         try {
-            bound.callIn(Scope.of(namespace, user), () -> {
+            bound.callIn(answered, () -> {
                 chain.doFilter(request, response);
                 return null;
             });

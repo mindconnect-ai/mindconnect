@@ -105,7 +105,11 @@ public class ConnectionUiController {
         }
     }
 
-    /** Saves an edit; a blank secret keeps the stored one. */
+    /**
+     * Saves an edit; a blank secret keeps the stored one. A connection made
+     * by signing in is only renamed — its form has nothing else, and its
+     * token and app registration must survive the save.
+     */
     @PostMapping("/{id}")
     public UiPatch update(@AuthenticationPrincipal OidcUser user, @PathVariable("id") String id,
                           @RequestBody Map<String, Object> raw) {
@@ -120,6 +124,10 @@ public class ConnectionUiController {
             return UiPatch.of().toast(unknownProvider(stored.provider()));
         }
         FormBody body = new FormBody(raw);
+        if (ConnectionsComponent.signedIn(stored)) {
+            Connection saved = service.rename(me, stored.id(), body.str("label")).orElse(stored);
+            return refreshed(me, spec).toast(UiToast.success("Saved.").title(saved.label()));
+        }
         Map<String, String> values = values(spec, raw);
         // A blank secret means "keep the stored one", so it is not missing here.
         List<String> missing = missing(spec, values, secretFields(spec));

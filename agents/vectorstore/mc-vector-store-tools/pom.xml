@@ -42,11 +42,16 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-vector-store</artifactId>
         </dependency>
+        <!-- Under Postgres persistence: the registry in the runtime's database (mc-jdbc), and the
+             vectors there too, on the pgvector backend bound to the runtime's DataSource. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-vector-store-pgvector</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jdbc</artifactId>
         </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
@@ -71,6 +76,11 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-simple</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

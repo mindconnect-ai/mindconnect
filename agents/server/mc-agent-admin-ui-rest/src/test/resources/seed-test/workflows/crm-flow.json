@@ -1,0 +1,13 @@
+{
+  "@class" : "ai.mindconnect.workflow.domain.WorkflowData",
+  "name" : "crm-flow",
+  "assignResultToVar" : null,
+  "resultFrom" : null,
+  "steps" : [ ],
+  "uid" : null,
+  "params" : [ ],
+  "paramDefaults" : { },
+  "subWorkflows" : [ ],
+  "workflowType" : null,
+  "type" : "workflow"
+}

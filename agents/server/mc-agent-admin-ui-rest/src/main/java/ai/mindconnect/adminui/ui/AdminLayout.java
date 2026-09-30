@@ -183,7 +183,12 @@ public final class AdminLayout {
     }
 
     private UiHeader buildHeader() {
-        var header = UiHeader.of(brand.title()).brandHref(brand.href());
+        var header = UiHeader.of(brand.title()).brandHref(brand.href())
+                // One row whatever the width: what does not fit — the task chip,
+                // the bell, the namespace switch, the theme switch js/theme-switch.js
+                // puts among them — goes into a "⋯" menu rather than squeezing
+                // the brand to nothing on a phone.
+                .extrasOverflow(UiHeader.ExtrasOverflow.MENU);
         // No logo is a valid answer: an installation whose mark is the word
         // itself wants the heading alone, not the shipped one as a fallback.
         if (brand.logo() != null) {
@@ -364,12 +369,14 @@ public final class AdminLayout {
     }
 
     /**
-     * What an agent reads: for now the vector stores. Its own group, one entry
-     * or not, so documents and sources have a home when they arrive.
+     * What an agent reads: the vector stores, and what agents remember about
+     * the users across chats. Its own group, so documents and sources have a
+     * home when they arrive.
      */
     private UiMenuItem dataGroup(String navigate) {
         UiMenuItem data = UiMenuItem.group("nav-group-data", "Data").icon("database");
         data.child(navItem("nav-vector-stores", "Vector Stores", "/admin/vector-stores", "database", navigate));
+        data.child(navItem("nav-memories", "Memory", "/admin/memories", "brain", navigate));
         return openWhenSelected(data);
     }
 

@@ -16,7 +16,8 @@
     <packaging>jar</packaging>
     <description>Spring Boot starter: Postgres persistence for the agent runtime — the pooled data source, the
         Persistence the runtime starter builds every store from, and the installation-wide
-        users and API tokens as tables. mindconnect.persistence=postgres switches it on.</description>
+        users and API tokens as tables, and the MCP gateway's registrations. mindconnect.persistence=postgres
+        switches it on.</description>
 
     <dependencies>
         <dependency>
@@ -48,6 +49,15 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-extension-pg</artifactId>
         </dependency>
+        <!-- The MCP gateway's registrations and discovery cache as tables; see PostgresPersistenceConfig.Mcp. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-mcp-gateway-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-registry-pg</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
@@ -63,6 +73,23 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- ApplicationContextRunner: which store the MCP gateway gets is a condition, provable only by a context. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-test</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

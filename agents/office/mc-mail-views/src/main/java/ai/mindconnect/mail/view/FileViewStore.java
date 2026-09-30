@@ -31,12 +31,22 @@ import java.util.function.Supplier;
  * <p>Written to a temporary file and moved over the real one, so a crash
  * mid-write leaves the old file whole. A user's views are dozens, not
  * thousands; one file read per request is nothing beside the mail behind it.
+ *
+ * <p>All of a user's views are one file, so every save and delete is a read,
+ * a change and a write of all of them — held under that file's lock from the
+ * read to the move, and written through a temporary file of its own. Two
+ * saves at once (the agent adding to its list while the person ticks a row)
+ * used to share one {@code .tmp} and each write the file as it had read it,
+ * so one of the two changes was lost.
  */
 public final class FileViewStore implements ViewStore {
 
     private final Supplier<Path> dataDir;
     private final Supplier<Namespace> namespace;
     private final ObjectMapper json;
+    /** One lock per user file: a read-change-write of it is one step. */
+    private final java.util.concurrent.ConcurrentHashMap<Path, java.util.concurrent.locks.ReentrantLock> locks =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     public FileViewStore(Supplier<Path> dataDir, Supplier<Namespace> namespace, ObjectMapper json) {
         this.dataDir = Objects.requireNonNull(dataDir, "dataDir");
@@ -52,15 +62,32 @@ public final class FileViewStore implements ViewStore {
 
     @Override
     public void save(StoredView view) {
-        Map<String, Record> all = read(view.owner());
-        all.put(view.id().value(), Record.of(view));
-        write(view.owner(), all);
+        java.util.concurrent.locks.ReentrantLock lock = lockOf(view.owner());
+        lock.lock();
+        try {
+            Map<String, Record> all = read(view.owner());
+            all.put(view.id().value(), Record.of(view));
+            write(view.owner(), all);
+        } finally {
+            lock.unlock();
+        }
     }
 
     @Override
     public void delete(UserId user, ViewId id) {
-        Map<String, Record> all = read(user);
-        if (all.remove(id.value()) != null) write(user, all);
+        java.util.concurrent.locks.ReentrantLock lock = lockOf(user);
+        lock.lock();
+        try {
+            Map<String, Record> all = read(user);
+            if (all.remove(id.value()) != null) write(user, all);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    private java.util.concurrent.locks.ReentrantLock lockOf(UserId user) {
+        return locks.computeIfAbsent(file(user).toAbsolutePath().normalize(),
+                k -> new java.util.concurrent.locks.ReentrantLock());
     }
 
     @Override
@@ -98,9 +125,10 @@ public final class FileViewStore implements ViewStore {
 
     private void write(UserId user, Map<String, Record> all) {
         Path file = file(user);
+        Path temporary = null;
         try {
             Files.createDirectories(file.getParent());
-            Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
+            temporary = Files.createTempFile(file.getParent(), file.getFileName().toString(), ".tmp");
             Files.writeString(temporary, json.writerWithDefaultPrettyPrinter().writeValueAsString(all),
                     StandardCharsets.UTF_8);
             try {
@@ -109,6 +137,13 @@ public final class FileViewStore implements ViewStore {
                 Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING);
             }
         } catch (IOException e) {
+            if (temporary != null) {
+                try {
+                    Files.deleteIfExists(temporary);
+                } catch (IOException ignored) {
+                    // Only a leftover.
+                }
+            }
             throw new UncheckedIOException("Could not write the mail views of " + user.value(), e);
         }
     }

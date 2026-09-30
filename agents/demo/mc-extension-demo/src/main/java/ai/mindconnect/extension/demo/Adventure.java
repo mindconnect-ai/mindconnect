@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 
 /**
  * A saved game: which scenario, whose, in which session of the runtime, what
@@ -51,9 +50,10 @@ record Adventure(String id, String scenarioId, String scenarioTitle, String sess
         updatedAt = updatedAt == null ? startedAt : updatedAt;
     }
 
+    /** Keyed by the session: one adventure per session, and the state tool finds its adventure without a scan. */
     static Adventure start(Scenario scenario, String sessionId, String userId) {
         Instant now = Instant.now();
-        return new Adventure(UUID.randomUUID().toString(), scenario.id(), scenario.title(), sessionId, userId,
+        return new Adventure(sessionId, scenario.id(), scenario.title(), sessionId, userId,
                 now, now, List.of(), CharacterState.FRESH);
     }
 

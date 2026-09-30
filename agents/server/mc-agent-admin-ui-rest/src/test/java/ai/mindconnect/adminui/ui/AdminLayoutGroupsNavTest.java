@@ -31,7 +31,7 @@ class AdminLayoutGroupsNavTest {
         assertThat(group(items, "nav-group-tools").getChildren()).extracting(UiMenuItem::getId)
                 .containsExactly("nav-tools", "nav-mcp", "nav-workflows");
         assertThat(group(items, "nav-group-data").getChildren()).extracting(UiMenuItem::getId)
-                .containsExactly("nav-vector-stores");
+                .containsExactly("nav-vector-stores", "nav-memories");
     }
 
     @Test

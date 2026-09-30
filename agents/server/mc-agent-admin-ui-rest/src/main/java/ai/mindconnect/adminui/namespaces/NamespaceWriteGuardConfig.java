@@ -4,13 +4,13 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -26,10 +26,14 @@ import org.springframework.context.annotation.Configuration;
  * modules that would all have to learn what a role is.
  *
  * <p>Only where there are namespaces to have roles in: a host that embeds the
- * Admin UI without the namespace starter keeps what it had.
+ * Admin UI without the namespace starter keeps what it had. That is decided at
+ * the write, by a {@link NamespaceWriteGuard#deferred deferred} guard, and not
+ * as a condition on this class: it is found by component scanning, before the
+ * auto-configurations that define {@link NamespaceService} and
+ * {@link ScopeSupplier}, so a {@code @ConditionalOnBean} here never matched and
+ * no store was guarded.
  */
 @Configuration(proxyBeanMethods = false)
-@ConditionalOnBean({NamespaceService.class, ScopeSupplier.class})
 public class NamespaceWriteGuardConfig {
 
     /**
@@ -41,10 +45,10 @@ public class NamespaceWriteGuardConfig {
     static BeanPostProcessor namespaceWriteGuards(ObjectProvider<NamespaceService> namespaces,
                                                   ObjectProvider<ScopeSupplier> scope) {
         return new BeanPostProcessor() {
-            private NamespaceWriteGuard guard;
+            private final NamespaceWriteGuard guard =
+                    NamespaceWriteGuard.deferred(namespaces::getIfAvailable, scope::getIfAvailable);
 
             private NamespaceWriteGuard guard() {
-                if (guard == null) guard = new NamespaceWriteGuard(namespaces.getObject(), scope.getObject());
                 return guard;
             }
 
@@ -52,6 +56,7 @@ public class NamespaceWriteGuardConfig {
             public Object postProcessAfterInitialization(Object bean, String name) throws BeansException {
                 if (bean instanceof GuardedRepositories.Agents
                         || bean instanceof GuardedRepositories.LlmConfigs
+                        || bean instanceof GuardedRepositories.LlmPrices
                         || bean instanceof GuardedRepositories.Skills
                         || bean instanceof GuardedRepositories.Workflows
                         || bean instanceof GuardedRepositories.McpServers) {
@@ -62,6 +67,9 @@ public class NamespaceWriteGuardConfig {
                 }
                 if (bean instanceof LlmConfigRepository configs) {
                     return new GuardedRepositories.LlmConfigs(configs, guard());
+                }
+                if (bean instanceof LlmPriceRepository prices) {
+                    return new GuardedRepositories.LlmPrices(prices, guard());
                 }
                 if (bean instanceof SkillRepository skills) {
                     return new GuardedRepositories.Skills(skills, guard());

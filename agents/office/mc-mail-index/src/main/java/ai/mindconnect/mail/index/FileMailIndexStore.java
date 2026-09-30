@@ -27,12 +27,21 @@ import java.util.stream.Stream;
  * written to a temporary file and moved over the real one. Bound to one
  * namespace, like every file adapter; the router above picks the one for
  * the request.
+ *
+ * <p>Every write has a temporary file of its own, and a change of a window
+ * ({@link #update}) holds that window's lock from the read to the move: two
+ * writers sharing one {@code .tmp} wrote into each other's file, and two
+ * changes that each read the window before the other saved lost one of
+ * them.
  */
 public final class FileMailIndexStore implements MailIndexStore {
 
     private final java.util.function.Supplier<Path> dataDir;
     private final java.util.function.Supplier<String> namespace;
     private final ObjectMapper json;
+    /** One lock per window file; a window is changed by one writer at a time. */
+    private final java.util.concurrent.ConcurrentHashMap<Path, java.util.concurrent.locks.ReentrantLock> locks =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     public FileMailIndexStore(Path dataDir, String namespace) {
         this(() -> dataDir, () -> namespace);
@@ -66,22 +75,69 @@ public final class FileMailIndexStore implements MailIndexStore {
     @Override
     public void save(UserId user, FolderWindow window) {
         Path file = file(user, window.location());
+        java.util.concurrent.locks.ReentrantLock lock = lockOf(file);
+        lock.lock();
         try {
-            Files.createDirectories(file.getParent());
-            Path temporary = file.resolveSibling(file.getFileName() + ".tmp");
-            json.writeValue(temporary.toFile(), window);
-            Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not save the mail index for " + window.location(), e);
+            write(file, window);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public void update(UserId user, Location location, java.util.function.UnaryOperator<FolderWindow> change) {
+        Path file = file(user, location);
+        java.util.concurrent.locks.ReentrantLock lock = lockOf(file);
+        lock.lock();
+        try {
+            Optional<FolderWindow> current = load(user, location);
+            if (current.isEmpty()) return;
+            FolderWindow changed = change.apply(current.get());
+            if (changed != current.get()) write(file, changed);
+        } finally {
+            lock.unlock();
         }
     }
 
     @Override
     public void delete(UserId user, Location location) {
+        Path file = file(user, location);
+        java.util.concurrent.locks.ReentrantLock lock = lockOf(file);
+        lock.lock();
         try {
-            Files.deleteIfExists(file(user, location));
+            Files.deleteIfExists(file);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not delete the mail index for " + location, e);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    /** Into a temporary file of this write's own, then over the real one in one move. */
+    private void write(Path file, FolderWindow window) {
+        Path temporary = null;
+        try {
+            Files.createDirectories(file.getParent());
+            temporary = Files.createTempFile(file.getParent(), file.getFileName().toString(), ".tmp");
+            json.writeValue(temporary.toFile(), window);
+            Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException e) {
+            deleteQuietly(temporary);
+            throw new UncheckedIOException("Could not save the mail index for " + window.location(), e);
+        }
+    }
+
+    private java.util.concurrent.locks.ReentrantLock lockOf(Path file) {
+        return locks.computeIfAbsent(file.toAbsolutePath().normalize(),
+                k -> new java.util.concurrent.locks.ReentrantLock());
+    }
+
+    private static void deleteQuietly(Path file) {
+        if (file == null) return;
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException ignored) {
+            // Only a leftover; the next write does not need it gone.
         }
     }
 

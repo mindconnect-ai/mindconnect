@@ -20,6 +20,10 @@ import ai.mindconnect.agent.runtime.service.UserHome;
 import ai.mindconnect.agent.runtime.service.WorkingDirBrowser;
 import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSection;
+import ai.mindconnect.agent.runtime.usermemory.MemoryIndex;
+import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
+import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoContinuationAdvisor;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListPromptContextProvider;
@@ -43,6 +47,7 @@ import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmGateway;
 import ai.mindconnect.llm.port.out.LlmGatewayRegistry;
 import ai.mindconnect.llm.port.out.LlmRepositoryFactory;
@@ -233,6 +238,9 @@ public class CoreFeature extends ConfigurableFeature {
         ctx.instance(EncryptionHelper.class, encryption);
         ctx.bean(LlmConfigRepository.class, () -> routing(ctx).route(LlmConfigRepository.class,
                 ns -> llmRepositories.apply(ns).llmConfigRepository()));
+        // What the configs cost, per period — its own entity beside the configs, routed the same way.
+        ctx.bean(LlmPriceRepository.class, () -> routing(ctx).route(LlmPriceRepository.class,
+                ns -> llmRepositories.apply(ns).llmPriceRepository()));
         if (encryptionKey != null) {
             // The decorator model: the store stays plain, the key wraps it.
             ctx.decorate(LlmConfigRepository.class, repo -> new EncryptingLlmConfigRepository(repo, encryption));
@@ -305,6 +313,13 @@ public class CoreFeature extends ConfigurableFeature {
         ctx.contribute(PromptContextProvider.class, new LazyTodoPromptContext(ctx));
         ctx.contribute(ToolAdvisor.class, new LazyTodoContinuation(ctx));
 
+        // What agents remember about each user across chats: the memory tools write it, and an agent
+        // that has them sees the index in its system prompt.
+        ctx.bean(UserMemoryRepository.class, () -> routing(ctx).route(UserMemoryRepository.class,
+                ns -> agentRepositories.apply(ns).userMemoryRepository()));
+        ctx.bean(UserMemoryService.class, () -> new UserMemoryService(ctx.require(UserMemoryRepository.class)));
+        ctx.contribute(PromptSection.class, new LazyMemoryIndex(ctx));
+
         // Where a session may work: under workingDirRoot when set, else in the
         // user's own home — under the namespace the current call works in, so
         // every namespace has its own homes (a fixed scope always answers the same).
@@ -352,6 +367,17 @@ public class CoreFeature extends ConfigurableFeature {
                                          ai.mindconnect.agent.runtime.domain.AgentSession session,
                                          ai.mindconnect.agent.AuthenticationInfo auth) {
             delegate().contribute(promptContext, def, session, auth);
+        }
+    }
+
+    /** The memory index, its service resolved on first use — like the todo prompt context. */
+    private static class LazyMemoryIndex implements PromptSection {
+        private final FeatureContext ctx;
+        private volatile PromptSection delegate;
+        LazyMemoryIndex(FeatureContext ctx) { this.ctx = ctx; }
+        @Override public String render(AgentDefinition def, ai.mindconnect.agent.runtime.domain.AgentSession session) {
+            if (delegate == null) delegate = new MemoryIndex(ctx.require(UserMemoryService.class));
+            return delegate.render(def, session);
         }
     }
 

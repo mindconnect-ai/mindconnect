@@ -142,8 +142,43 @@ public record FolderWindow(Location location, List<MailMessage> heads, long tota
         return new FolderWindow(location, kept, total, at, filledTo);
     }
 
-    /** Heads read live below the window, appended; the window grows to where somebody looked. */
-    public FolderWindow extended(List<MailMessage> older, long total, int cap) {
+    /**
+     * True when the provider's newest {@code fetched} and this window cover
+     * the same stretch of time and share not one id — the provider has
+     * renamed the messages, as an IMAP server does when it changes a
+     * folder's UIDVALIDITY. Every id in the window is then a name for
+     * nothing, and {@link #merged} would only replace the newest page of
+     * them.
+     */
+    public boolean renamedBy(List<MailMessage> fetched) {
+        if (fetched.isEmpty() || heads.isEmpty()) return false;
+        Instant oldestFetched = fetched.get(fetched.size() - 1).receivedAt();
+        if (oldestFetched == null) return false;
+        Set<String> ids = new HashSet<>();
+        for (MailMessage m : fetched) ids.add(m.id());
+        int inside = 0;
+        for (MailMessage head : heads) {
+            if (ids.contains(head.id())) return false;
+            if (head.receivedAt() != null && !head.receivedAt().isBefore(oldestFetched)) inside++;
+        }
+        // One head in the stretch could be a message deleted elsewhere while
+        // new ones arrived; the whole page renamed is not that.
+        return inside >= Math.min(fetched.size(), 2);
+    }
+
+    /**
+     * Heads read live from {@code offset} on, appended; the window grows to
+     * where somebody looked.
+     *
+     * <p>Only a page that starts inside the window or right below it: a
+     * head's place in the window is its place in the folder, which is what
+     * {@link #covers} and {@link #page} rely on. A page from further down
+     * appended here would sit at the window's end as if it followed on, and
+     * the next page asked for there would be served from the wrong messages.
+     * So such a page leaves the window as it is.
+     */
+    public FolderWindow extended(int offset, List<MailMessage> older, long total, int cap) {
+        if (offset < 0 || offset > heads.size()) return this;
         if (older.isEmpty()) return new FolderWindow(location, heads, total, syncedAt, filledTo);
         Set<String> have = new HashSet<>();
         for (MailMessage head : heads) have.add(head.id());

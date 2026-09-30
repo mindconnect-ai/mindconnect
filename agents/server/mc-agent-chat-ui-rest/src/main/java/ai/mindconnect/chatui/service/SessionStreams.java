@@ -107,8 +107,9 @@ public class SessionStreams {
      * The patches that put a late joiner's DOM into the running turn's
      * current state: the cards nothing persisted yet can rebuild — a thought
      * still streaming, each as one APPEND carrying the card as it is now —
-     * then the one that CREATES the streaming reply bubble, and the last one
-     * that filled it. Token and thinking patches carry the cumulative text
+     * then the one that puts the assistant's side on screen (the typing
+     * bubble until the first token, from then on the one that CREATES the
+     * streaming reply bubble), and the last one that filled it. Token and thinking patches carry the cumulative text
      * and REPLACE what they fill, so these are the whole state — but a
      * replace lands nowhere if the joiner never saw the append that made
      * its target.
@@ -134,7 +135,11 @@ public class SessionStreams {
 
     private final Map<String, CatchUp> catchUps = new ConcurrentHashMap<>();
 
-    /** The first token's patch — the one that appends the reply bubble. */
+    /**
+     * The patch that shows the assistant's side: the typing bubble at the
+     * start of a turn, replaced by the first token's patch — the one that
+     * swaps it for the reply bubble. Either way the text so far is dropped.
+     */
     public void rememberBubble(String channelId, String patchJson) {
         catchUps.merge(channelId, new CatchUp(new LinkedHashMap<>(), patchJson, null),
                 (c, n) -> new CatchUp(c.cards(), patchJson, null));

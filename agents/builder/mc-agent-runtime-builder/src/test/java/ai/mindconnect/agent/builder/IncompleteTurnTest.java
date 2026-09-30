@@ -67,11 +67,13 @@ class IncompleteTurnTest {
                 .agentDefinition(agent("parallel", List.of(echo(true)), List.of()))
                 .agentDefinition(agent("parent", List.of(), List.of("child")))
                 .agentDefinition(agent("child", List.of(echo(true)), List.of()))
+                .agentDefinition(agent("sequential", List.of(echo(true)), List.of()))
                 .build();
     }
 
     @AfterEach
     void tearDown() {
+        ScriptedLlm.hold = null;
         runtime.close();
     }
 
@@ -194,6 +196,95 @@ class IncompleteTurnTest {
     }
 
     @Test
+    void anAnswerContinuesFromTheLatestGate_evenWhenTheFirstWasAnsweredWithoutAHandle() throws Exception {
+        SessionId session = open("sequential");
+        ChatTurnHandle handle = runtime.chatService().submitChat(session, "go", recorder);
+        String firstCall = handle.outcome().join().pendingApprovals().get(0).callId();
+
+        // The first question answered as a plain answer: nobody takes a handle on what follows.
+        runtime.chatService().answerApproval(session, firstCall, true, ApprovalScope.ONCE);
+        awaitEvents(StreamEvent.ApprovalRequested.class, 2);
+        ToolApproval second = runtime.toolApprovals().openForRoot(session).get(0);
+        assertThat(second.callId()).isNotEqualTo(firstCall);
+
+        List<StreamEvent> continued = new CopyOnWriteArrayList<>();
+        TurnResult done = runtime.approve(session, second.callId(), ApprovalScope.ONCE, continued::add);
+
+        assertThat(done.status()).isEqualTo(TurnStatus.COMPLETED);
+        assertThat(done.text()).isEqualTo("done");
+        assertThat(TestTools.INVOCATIONS).containsExactly("it_echo:one", "it_echo:two");
+        assertThat(continued).as("the continuation starts at the second gate, not the first")
+                .filteredOn(StreamEvent.ToolCallResult.class::isInstance).hasSize(1);
+        assertThat(continued).noneMatch(StreamEvent.ApprovalRequested.class::isInstance);
+    }
+
+    @Test
+    void aQuestionAnsweredWhileItsEventTravelsEndsNoHandle() throws Exception {
+        runtime.close();
+        AnsweringApprovals approvals = new AnsweringApprovals(Thread.currentThread());
+        runtime = AgentRuntimeBuilder.useInMemoryPersistence()
+                .llmConfig(LlmConfig.lmStudio("scripted", "scripted-model", "http://localhost:1"))
+                .install(new ScriptedLlmFeature())
+                .install(new RuntimeFeature() {
+                    @Override public String name() { return "approval-storage"; }
+                    @Override public void configure(FeatureContext ctx) {
+                        ctx.instance(ToolApprovalRepository.class, approvals);
+                    }
+                })
+                .agentDefinition(agent("held", List.of(echo(true)), List.of()))
+                .build();
+        SessionId session = open("held");
+        approvals.answer = call -> runtime.chatService().answerApproval(session, call, true, ApprovalScope.ONCE);
+        ScriptedLlm.hold = new java.util.concurrent.CountDownLatch(1);
+
+        ChatTurnHandle handle;
+        try {
+            handle = runtime.chatService().sendChat(session, "go", recorder);
+        } finally {
+            // The model answers only once the handle listens, so the question reaches it as an event.
+            ScriptedLlm.hold.countDown();
+        }
+        TurnResult result = handle.outcome().get(20, TimeUnit.SECONDS);
+
+        assertThat(approvals.answered).as("the question was answered as the handle read it").isTrue();
+        assertThat(result.status()).as("no INCOMPLETE without a question").isEqualTo(TurnStatus.COMPLETED);
+        assertThat(result.text()).isEqualTo("done");
+        assertThat(TestTools.INVOCATIONS).containsExactly("it_echo:held");
+    }
+
+    /**
+     * Memory, but the first read of the open questions off the caller's thread — the handle
+     * hearing the gate's event — answers the question just before it reads: the answer lands
+     * between the event and the handle's look at it.
+     */
+    static class AnsweringApprovals extends InMemoryToolApprovalRepository {
+        private final Thread caller;
+        private final java.util.concurrent.atomic.AtomicBoolean armed = new java.util.concurrent.atomic.AtomicBoolean();
+        volatile Consumer<String> answer;
+        volatile boolean answered;
+
+        AnsweringApprovals(Thread caller) {
+            this.caller = caller;
+        }
+
+        @Override
+        public boolean saveIfAbsent(ToolApproval approval) {
+            boolean added = super.saveIfAbsent(approval);
+            if (added) armed.set(true);
+            return added;
+        }
+
+        @Override
+        public List<ToolApproval> openForRoot(SessionId rootSessionId) {
+            if (Thread.currentThread() != caller && armed.compareAndSet(true, false)) {
+                for (ToolApproval open : super.openForRoot(rootSessionId)) answer.accept(open.callId());
+                answered = true;
+            }
+            return super.openForRoot(rootSessionId);
+        }
+    }
+
+    @Test
     void anAnswerToNothingContinuesNothing() {
         SessionId session = open("single");
         runtime.send(session, "go", recorder);
@@ -250,6 +341,15 @@ class IncompleteTurnTest {
         return session.id();
     }
 
+    /** Waits until the recorder heard {@code count} events of {@code type}, and the handler past them a moment more. */
+    private void awaitEvents(Class<? extends StreamEvent> type, int count) throws InterruptedException {
+        while (events.stream().filter(type::isInstance).count() < count) {
+            Thread.sleep(10);
+        }
+        // The handle looks at an event after handing it to the recorder.
+        Thread.sleep(200);
+    }
+
     private List<Message> history(SessionId session) {
         var conversation = runtime.sessionService().findSession(session).conversationId();
         return runtime.conversationManager().loadCompleteHistory(conversation).messages();
@@ -280,6 +380,9 @@ class IncompleteTurnTest {
     }
 
     static class ScriptedLlm implements LlmChat {
+        /** When set, the {@code held} agent's first call waits for it. */
+        static volatile java.util.concurrent.CountDownLatch hold;
+
         private final AtomicInteger calls = new AtomicInteger();
 
         @Override
@@ -287,15 +390,33 @@ class IncompleteTurnTest {
                                   Cancellation cancellation, LlmCallListener listener) {
             List<LlmMessage> messages = request.messages();
             LlmMessage last = messages.get(messages.size() - 1);
+            String system = messages.stream().filter(m -> m.role() == MessageRole.SYSTEM)
+                    .map(LlmMessage::content).filter(java.util.Objects::nonNull)
+                    .findFirst().orElse("");
+            // The sequential agent asks twice in one turn: a second call after the first one's result.
+            if (system.contains("ROLE:sequential")
+                    && messages.stream().filter(m -> m.role() == MessageRole.TOOL).count() == 1) {
+                call(handler, 0, "it_echo", "{\"text\":\"two\"}");
+                handler.accept(new LlmStreamChunk.Done(FinishReason.TOOL_CALLS, 1, 1));
+                return;
+            }
             if (last.role() == MessageRole.TOOL) {
                 handler.accept(new LlmStreamChunk.TextDelta("done"));
                 handler.accept(new LlmStreamChunk.Done(FinishReason.STOP, 1, 1));
                 return;
             }
-            String system = messages.stream().filter(m -> m.role() == MessageRole.SYSTEM)
-                    .map(LlmMessage::content).filter(java.util.Objects::nonNull)
-                    .findFirst().orElse("");
-            if (system.contains("ROLE:parallel")) {
+            if (system.contains("ROLE:held") && hold != null) {
+                try {
+                    hold.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+            if (system.contains("ROLE:sequential")) {
+                call(handler, 0, "it_echo", "{\"text\":\"one\"}");
+            } else if (system.contains("ROLE:held")) {
+                call(handler, 0, "it_echo", "{\"text\":\"held\"}");
+            } else if (system.contains("ROLE:parallel")) {
                 call(handler, 0, "it_echo", "{\"text\":\"a\"}");
                 call(handler, 1, "it_echo", "{\"text\":\"b\"}");
             } else if (system.contains("ROLE:parent")) {

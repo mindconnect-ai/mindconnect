@@ -27,6 +27,11 @@ import java.util.function.Function;
  * share — files, memory or Postgres, following the runtime's persistence —
  * seeded from the classpath on start. The workflow tools
  * ({@code mc-agent-tools-workflow}) find the store in their environment.
+ *
+ * <p>On Postgres both stores — definitions and suspended instances — are
+ * tables; nothing is written under the data dir. What an installation kept
+ * there on file persistence is imported into a namespace's tables the first
+ * time the namespace is used, when they have nothing for it yet.
  */
 public class WorkflowsFeature extends ConfigurableFeature {
 
@@ -47,10 +52,12 @@ public class WorkflowsFeature extends ConfigurableFeature {
     @Override
     protected void install(FeatureContext ctx) {
         // The factory per namespace: the persistence setting looked at once, the routing builds the rest.
+        // On Postgres, what the file stores kept under the data dir is imported once per namespace.
         Function<Namespace, WorkflowRepositoryFactory> factories = switch (ctx.persistence()) {
             case Persistence.InMemory m -> ns -> new InMemoryWorkflowRepositoryFactory(m.dataDir(), ns.value());
             case Persistence.File f -> ns -> new FileWorkflowRepositoryFactory(f.dataDir(), ns.value());
-            case Persistence.Postgres p -> ns -> new PgWorkflowRepositoryFactory(ctx.require(ai.mindconnect.jdbc.Sql.class), ns.value());
+            case Persistence.Postgres p -> ns -> new PgWorkflowRepositoryFactory(
+                    ctx.require(ai.mindconnect.jdbc.Sql.class), ns.value(), p.dataDir());
         };
         ctx.bean(WorkflowDataRepository.class, () -> ctx.require(NamespaceRouting.class).route(
                 WorkflowDataRepository.class, ns -> factories.apply(ns).workflowDataRepository()));

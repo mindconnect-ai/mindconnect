@@ -20,7 +20,7 @@ installation-wide: the users and their API tokens.
 
 Each domain module also ships a **repository factory** for its ports —
 `AgentRepositoryFactory` (agent runtime), `MessageRepositoryFactory` (messages),
-`LlmRepositoryFactory` (LLM configs) — with one implementation per backend:
+`LlmRepositoryFactory` (LLM configs and their prices) — with one implementation per backend:
 `FileAgentRepositoryFactory`, `InMemoryAgentRepositoryFactory`,
 `PgAgentRepositoryFactory`, and so on. Whoever assembles a runtime picks the
 factory once for the backend it wants; the repositories come from it.
@@ -40,6 +40,7 @@ matching adapter in `adapter/file`:
 | `TodoListRepository` | Session todo lists | `FileTodoListRepository` | `PgTodoListRepository` |
 | `LlmCallTraceRepository` | LLM request/response traces | `FileLlmCallTraceRepository` | `PgLlmCallTraceRepository` |
 | `LlmConfigRepository` | LLM configs (credentials encrypted) | `FileLlmConfigRepository` | `PgLlmConfigRepository` |
+| `LlmPriceRepository` | LLM prices, one per config, model and period | `FileLlmPriceRepository` | `PgLlmPriceRepository` |
 | `FileStore` | Uploaded files (ports in `mc-file-store-core`) | `FilesystemFileStore` | `PgFileStore` |
 | `WorkflowDataRepository` | Workflow definitions ([workflow area](../workflow/overview.md)) | `FileWorkflowDataRepository` | `PgWorkflowDataRepository` |
 | `WorkflowInstanceRepository` | Suspended workflow runs | `FileWorkflowInstanceRepository` | `PgWorkflowInstanceRepository` |
@@ -126,8 +127,10 @@ What happens on start:
   declares. There is no migration tool and nothing to run by hand; a plain
   Postgres without extensions is enough.
 - The bundled [initial data](./initial-data.md) — agent definitions, LLM
-  configs, example workflows — is seeded into the database exactly as it
-  would be seeded into `data/`, and skipped when already present.
+  configs, skills, example workflows — is seeded into the database exactly as
+  it would be seeded into `data/`: into the start-up namespace at start, into
+  every other namespace on its first use, and only what the namespace never
+  had (`mc_installed_seed` remembers what it had).
 - Uploaded files go to the database as well (`mc_file`, content as
   `bytea`) unless `mindconnect.file-store.backend` names another backend —
   keeping records in Postgres and files on a volume is a valid pairing.
@@ -147,8 +150,10 @@ have written, rendered by the application's `ObjectMapper`.
 
 The tables are named `mc_agent_definition`, `mc_agent_session`,
 `mc_conversation`, `mc_message`, `mc_working_memory`, `mc_conversation_summary`,
-`mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`,
-`mc_workflow`, `mc_workflow_instance` and `mc_file`. The small JDBC layer
+`mc_todo_list`, `mc_llm_call_trace`, `mc_llm_config`, `mc_llm_price`,
+`mc_workflow`, `mc_workflow_instance`, `mc_file`, `mc_vector_store_template`,
+`mc_vector_store_instance` and `mc_vector_store_member`, plus the embedding
+index `mc_embedding` and `mc_embedding_field` when the database has pgvector. The small JDBC layer
 underneath — `Sql`, `Row`, `DocumentTable` — lives in `common/mc-jdbc`; the
 adapters are the `agents/adapter/postgres/*-pg` and
 `workflow/mc-workflow-persistence-pg` modules, the Spring wiring is
@@ -162,10 +167,18 @@ from the columns.
 
 ### What stays on disk
 
-The registry of vector-store templates and instances, and the vectors of the
-`memory` backend are still file-based in Postgres mode. Vectors move to the
-database with the `pgvector` backend (`mindconnect.vector-store.backend=pgvector`),
-which has its own connection settings. The registry is the next candidate.
+The vector stores keep nothing on disk in Postgres mode — as long as the
+database has the pgvector extension. Their registry of templates and instances
+is in `mc_vector_store_template` and `mc_vector_store_instance` (filled once
+per namespace from `vector-stores/templates|instances`), and their vectors are
+in one pgvector table per store, in the application's own database: `pgvector`
+is the default backend there and needs no URL of its own. A plain
+`postgres:16-alpine` has no pgvector; then the vectors stay on the `memory`
+backend in `<data-dir>/<namespace>/vector-stores/*.jsonl`, with a warning at
+start. Install pgvector into the image — for an existing Alpine data directory
+an Alpine build, since a Debian image changes the text collation — and the
+stores move into the database on first use — see
+[Vector stores](./vector-store.md#the-pgvector-backend).
 
 ### Embedding without Spring
 
@@ -179,6 +192,13 @@ There is no automatic migration from `data/` to Postgres. A fresh Postgres
 start seeds the bundled defaults; your own agents, sessions and conversations
 would need to be re-created or copied by a script through the two adapter
 families — both speak the same JSON, so that script is a read-and-save loop.
+
+Workflows are the exception: the first time a namespace is used on Postgres,
+the definitions and suspended runs the file stores kept under
+`<data dir>/<namespace>/workflows` are imported, when `mc_workflow` and
+`mc_workflow_instance` have nothing for the namespace yet. Once — a row in
+`mc_workflow_import` records it, so what is deleted later stays deleted — and
+the files are left where they are.
 
 ### Testing against Postgres
 

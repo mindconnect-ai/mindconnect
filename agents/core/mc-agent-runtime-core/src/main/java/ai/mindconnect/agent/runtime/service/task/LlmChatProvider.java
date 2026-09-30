@@ -10,6 +10,7 @@ import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSections;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.service.prompt.SystemPromptRenderer;
 import ai.mindconnect.agent.runtime.service.round.LlmAnswer;
@@ -85,12 +86,22 @@ public final class LlmChatProvider implements LlmProvider {
     private final TraceContext traceContext;
     private final InstructionFiles instructions;
     private final SkillCatalog skills;
+    private final PromptSections sections;
 
     public LlmChatProvider(LlmChat llmChat, AgentDefinition def, AgentSession session,
                            MemoryStrategy memoryStrategy, PromptRenderer promptRenderer,
                            Consumer<StreamEvent> stream,
                            LlmCallTraceRepository traceRepository, TraceContext traceContext,
                            InstructionFiles instructions, SkillCatalog skills) {
+        this(llmChat, def, session, memoryStrategy, promptRenderer, stream, traceRepository, traceContext,
+                instructions, skills, PromptSections.none());
+    }
+
+    public LlmChatProvider(LlmChat llmChat, AgentDefinition def, AgentSession session,
+                           MemoryStrategy memoryStrategy, PromptRenderer promptRenderer,
+                           Consumer<StreamEvent> stream,
+                           LlmCallTraceRepository traceRepository, TraceContext traceContext,
+                           InstructionFiles instructions, SkillCatalog skills, PromptSections sections) {
         this.llmChat = llmChat;
         this.def = def;
         this.session = session;
@@ -101,6 +112,7 @@ public final class LlmChatProvider implements LlmProvider {
         this.traceContext = traceContext;
         this.instructions = instructions;
         this.skills = skills == null ? SkillCatalog.none() : skills;
+        this.sections = sections == null ? PromptSections.none() : sections;
     }
 
     @Override
@@ -151,7 +163,7 @@ public final class LlmChatProvider implements LlmProvider {
         List<LlmMessage> window = new ArrayList<>();
         window.add(LlmMessage.system(
                 SystemPromptRenderer.render(promptRenderer, memoryStrategy, def, session, auth,
-                        instructions, skills)));
+                        instructions, skills, sections)));
         window.addAll(memoryStrategy.buildWindow(def, session, auth, history));
         return window;
     }

@@ -131,6 +131,41 @@ class SkillInstallerTest {
         assertThat(again.status()).isEqualTo(ImportStatus.SKIPPED);
     }
 
+    /**
+     * The file calling itself something else than the registry used to store it under
+     * the file's name, while exists and remove asked for the entry's: the skill showed
+     * as not installed and could not be removed.
+     */
+    @Test
+    void a_skill_is_stored_exists_and_is_removed_under_the_entry_name() throws Exception {
+        RegistryEntry entry = new RegistryEntry("report", RegistryItemType.SKILL, "Weekly-Report", null, "1.0",
+                "skills/report/SKILL.md", List.of(), null, null, List.of());
+        String markdown = MARKDOWN.replace("name: weekly-report", "name: status-writer");
+
+        ImportedItem item = installer.install(entry, markdown, ImportMode.SKIP_EXISTING);
+
+        assertThat(item.status()).isEqualTo(ImportStatus.IMPORTED);
+        assertThat(item.name()).isEqualTo("weekly-report");
+        assertThat(item.detail()).contains("status-writer");
+        assertThat(repository.findAll()).extracting(Skill::name).containsExactly("weekly-report");
+        assertThat(installer.exists(entry.name())).isTrue();
+
+        assertThat(installer.install(entry, markdown, ImportMode.SKIP_EXISTING).status())
+                .isEqualTo(ImportStatus.SKIPPED);
+        assertThat(installer.remove(entry).status()).isEqualTo(ImportStatus.REMOVED);
+        assertThat(repository.findAll()).isEmpty();
+    }
+
+    @Test
+    void an_entry_name_no_model_could_type_is_refused() {
+        RegistryEntry entry = new RegistryEntry("report", RegistryItemType.SKILL, "Weekly Report", null, "1.0",
+                "skills/report/SKILL.md", List.of(), null, null, List.of());
+
+        assertThatThrownBy(() -> installer.install(entry, MARKDOWN, ImportMode.OVERWRITE))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Weekly Report");
+    }
+
     private static class FakeRepository implements SkillRepository {
 
         private final List<Skill> skills = new ArrayList<>();

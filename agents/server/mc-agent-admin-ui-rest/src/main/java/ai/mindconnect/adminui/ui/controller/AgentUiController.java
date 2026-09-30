@@ -61,6 +61,9 @@ public class AgentUiController {
     private final org.springframework.beans.factory.ObjectProvider<
             ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog;
 
+    /** The "Memory" tab — what the agent keeps about its users; optional like the memory itself. */
+    private final org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi;
+
     public AgentUiController(AgentRegistryService registryService,
                                 AgentDefinitionRepository repository,
                                 AgentSessionRepository sessionRepository,
@@ -69,7 +72,9 @@ public class AgentUiController {
                                 ToolTestService toolTestService,
                                 ObjectMapper objectMapper,
                                 org.springframework.beans.factory.ObjectProvider<
-                                        ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog) {
+                                        ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog,
+                                org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi) {
+        this.memoryUi = memoryUi;
         this.registryService = registryService;
         this.repository = repository;
         this.sessionRepository = sessionRepository;
@@ -115,8 +120,14 @@ public class AgentUiController {
         AgentId id = AgentId.of(idValue);
         String userId = user.getPreferredUsername();
         return registryService.find(id)
-                .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository, section, row).render()))
+                .map(a -> ResponseEntity.ok(new AgentDetailPage(a, userId, sessionRepository, section, row)
+                        .memoryTab(memoryTab(a)).render()))
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private ai.mindconnect.ui.model.UiNode memoryTab(AgentDefinition agent) {
+        MemoryAdminUiController memory = memoryUi.getIfAvailable();
+        return memory == null ? null : memory.agentTab(agent).orElse(null);
     }
 
     @DeleteMapping("/{id}/sessions/{sessionId}")

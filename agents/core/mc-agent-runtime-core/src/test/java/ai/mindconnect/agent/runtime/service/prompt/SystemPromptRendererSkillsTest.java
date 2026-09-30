@@ -93,6 +93,21 @@ class SystemPromptRendererSkillsTest {
     }
 
     @Test
+    void contributedSectionsComeBeforeTheSkillsAndOneThatFailsIsLeftOut() {
+        AgentDefinition def = agent(AgentDefinition.SkillsConfig.ALL);
+        AgentSession session = AgentSession.start(def.id(), UserId.of("alice"), ConversationId.random());
+        PromptSections sections = PromptSections.of(List.of(
+                (d, s) -> "\n\n## Memory\n- role (user): buyer",
+                (d, s) -> { throw new IllegalStateException("store down"); }));
+
+        String prompt = SystemPromptRenderer.render(RENDERER, NO_MEMORY, def, session,
+                AuthenticationInfo.of(session.userId()), InstructionFiles.projectOnly(),
+                catalogWithRelease(), sections);
+
+        assertThat(prompt).startsWith("You are a helpful agent.\n\n## Memory\n- role (user): buyer\n\n## Skills");
+    }
+
+    @Test
     void anAgentWithoutSkillsReadsNothingAboutThem() {
         assertThat(render(agent(AgentDefinition.SkillsConfig.NONE), catalogWithRelease()))
                 .isEqualTo("You are a helpful agent.");

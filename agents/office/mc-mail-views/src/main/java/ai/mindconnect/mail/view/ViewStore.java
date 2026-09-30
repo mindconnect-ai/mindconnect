@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Where views are kept — the port. A file per user is the shipped one; a
- * table is the same interface.
+ * Where views are kept — the port. A file per user, or a row per view in
+ * Postgres ({@link PgViewStore}).
  *
  * <p>Every call is for one user, and a user only ever sees their own: a view
  * of somebody else's mail is not a thing this store can answer.

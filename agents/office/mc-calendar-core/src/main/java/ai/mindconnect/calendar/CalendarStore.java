@@ -35,16 +35,32 @@ public interface CalendarStore extends AutoCloseable {
     /** True when this account may create entries at all. */
     boolean canCreate();
 
-    /** Puts {@code draft} in a calendar and answers with the new entry's id. */
+    /**
+     * Puts {@code draft} in a calendar and answers with the new entry's id.
+     * Its reminders are written as {@link #reminders()} fits them; null ones
+     * leave the entry with the calendar's default.
+     */
     String create(EventDraft draft);
 
     /**
      * Replaces what {@code draft} says of an existing entry — title, time,
      * place, notes, attendees. The caller reads the entry first and changes
-     * only what it means to; the store writes all of it.
+     * only what it means to; the store writes all of it — except the
+     * reminders, which are replaced only when the draft has some (an empty
+     * list removes them) and left as they are when it has null.
      */
     default void update(String calendarId, String eventId, EventDraft draft) {
         throw new CalendarStoreException("This calendar cannot change entries.");
+    }
+
+    /**
+     * What this store does with {@link EventDraft#reminders()}: how many it
+     * writes per entry, how far ahead, and whether extras are refused or
+     * dropped. {@link ReminderSupport#NONE} — the default — writes none, and a
+     * caller that was asked for one says so rather than claiming it was set.
+     */
+    default ReminderSupport reminders() {
+        return ReminderSupport.NONE;
     }
 
     /** Removes an entry; for a meeting the user organised, the provider tells the attendees. */

@@ -8,6 +8,7 @@ import ai.mindconnect.namespace.service.NamespaceService;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * Asks, at the last place before something is written, whether whoever this
@@ -30,12 +31,29 @@ import java.util.Objects;
  */
 public class NamespaceWriteGuard {
 
-    private final NamespaceService namespaces;
-    private final ScopeSupplier scope;
+    private final Supplier<NamespaceService> namespaces;
+    private final Supplier<ScopeSupplier> scope;
 
     public NamespaceWriteGuard(NamespaceService namespaces, ScopeSupplier scope) {
-        this.namespaces = Objects.requireNonNull(namespaces, "namespaces");
-        this.scope = Objects.requireNonNull(scope, "scope");
+        Objects.requireNonNull(namespaces, "namespaces");
+        Objects.requireNonNull(scope, "scope");
+        this.namespaces = () -> namespaces;
+        this.scope = () -> scope;
+    }
+
+    private NamespaceWriteGuard(Supplier<NamespaceService> namespaces, Supplier<ScopeSupplier> scope) {
+        this.namespaces = namespaces;
+        this.scope = scope;
+    }
+
+    /**
+     * A guard that finds the namespace service and the scope at the write,
+     * for a caller built before either exists. While there is neither there
+     * are no namespaces to have roles in, and every write passes.
+     */
+    public static NamespaceWriteGuard deferred(Supplier<NamespaceService> namespaces, Supplier<ScopeSupplier> scope) {
+        return new NamespaceWriteGuard(Objects.requireNonNull(namespaces, "namespaces"),
+                Objects.requireNonNull(scope, "scope"));
     }
 
     /**
@@ -46,6 +64,9 @@ public class NamespaceWriteGuard {
      *                               of the namespace the write would land in
      */
     public void requireAdmin(String what) {
+        NamespaceService namespaces = this.namespaces.get();
+        ScopeSupplier scope = this.scope.get();
+        if (namespaces == null || scope == null) return;
         Scope current = scope.get();
         UserId user = current.user();
         if (user == null) return;

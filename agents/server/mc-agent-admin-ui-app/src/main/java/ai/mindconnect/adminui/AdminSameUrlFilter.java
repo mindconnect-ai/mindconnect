@@ -41,12 +41,16 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
     private static final List<String> LEGACY_SECTIONS = List.of(
             "/admin/agents", "/admin/sessions", "/admin/tools", "/admin/skills",
             "/admin/llm-configs", "/admin/migrations", "/admin/api-explorer", "/admin/profile",
-            "/admin/namespaces");
+            "/admin/namespaces", "/admin/memories");
 
     /** The chat lives under its own prefix: /chat/... → /chat/api/... */
     private static final List<String> CHAT_SECTION = List.of("/chat");
 
-    /** The extensions' manifests: a route one of them names is a same-URL section of its own. */
+    /**
+     * The extensions' manifests: a screen one of them names is a same-URL
+     * section of its own. Its API routes ({@code /api/<id>/**}) are not — a
+     * browser there gets the JSON, never the shell.
+     */
     private final ObjectProvider<ExtensionRegistry> extensions;
 
     public AdminSameUrlFilter(ObjectProvider<ExtensionRegistry> extensions) {
@@ -89,7 +93,7 @@ public class AdminSameUrlFilter extends org.springframework.web.filter.OncePerRe
 
     private boolean extensionRoute(String path) {
         ExtensionRegistry registry = extensions.getIfAvailable();
-        return registry != null && registry.routeOwner(path).isPresent();
+        return registry != null && registry.pageOwner(path).isPresent();
     }
 
     private static boolean matches(String path, List<String> prefixes) {

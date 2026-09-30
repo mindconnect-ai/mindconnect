@@ -17,7 +17,6 @@ import ai.mindconnect.mcp.proxy.McpSessionRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -30,10 +29,10 @@ import java.util.concurrent.atomic.AtomicLong;
  * the proxy over a connection pooled per session.
  *
  * <p>Discovery is cached twice on purpose — in memory for the catalog, which
- * is asked on every tool lookup, and on disk so a restart does not spawn
- * every registered server again. The memory half is keyed on the
- * repository's {@code version()}, so an edited registration takes effect
- * without a restart.
+ * is asked on every tool lookup, and in a {@link McpDiscoveryStore} (files or
+ * a table) so a restart does not spawn every registered server again. The
+ * memory half is keyed on the repository's {@code version()}, so an edited
+ * registration takes effect without a restart.
  *
  * <p>A server that cannot be reached costs its own tools and nothing else:
  * discovery failures are logged and remembered as "no tools" until a
@@ -66,7 +65,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     public LocalMcpGateway(McpServerRepository repository,
                            McpProxy proxy,
                            McpSessionRegistry sessions,
-                           Path storageDir,
+                           McpDiscoveryStore discoveries,
                            Namespace namespace,
                            String containerRuntime,
                            McpStartPolicy startPolicy) {
@@ -74,7 +73,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
         this.namespace = namespace;
         this.proxy = proxy;
         this.sessions = sessions;
-        this.discoveryCache = new McpDiscoveryCache(storageDir, namespace);
+        this.discoveryCache = new McpDiscoveryCache(discoveries);
         // Where containers may not start, no container runtime is looked for.
         String containerBinary = startPolicy.allowDocker()
                 ? ContainerBinary.detect(containerRuntime).orElse(null)
@@ -129,7 +128,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     /**
      * Closes this namespace's pooled connections. The registry is shared by every
      * namespace's gateway and shuts down with the application, not here; the
-     * discovery cache on disk survives.
+     * stored discovery cache survives.
      */
     @Override
     public void close() {
@@ -154,7 +153,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     }
 
     /**
-     * Drops what was discovered for one server, in memory and on disk, and
+     * Drops what was discovered for one server, in memory and in the store, and
      * closes its pooled connections — they still speak to the old image, URL
      * or token. Used by the admin side after a registration changed, and by
      * "Re-read tools".

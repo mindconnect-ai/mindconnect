@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
 import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 
@@ -9,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Reads a text file the way {@code cat -n} shows it: every line numbered,
@@ -96,10 +98,16 @@ public class FileReadTool implements Tool {
         if (target == null) {
             return roots.outsideError(raw);
         }
-        if (!files.exists(target)) {
+        Optional<WorkspaceEntry> entry;
+        try {
+            entry = files.stat(target);
+        } catch (IOException e) {
+            return FileWalks.couldNotCheck(relative, e);
+        }
+        if (entry.isEmpty()) {
             return "Error: file does not exist: " + relative;
         }
-        if (files.isDirectory(target)) {
+        if (entry.get().directory()) {
             return "Error: path is a directory, use file_list instead";
         }
         int offset = Math.max(1, intArg(arguments.get("offset"), 1));

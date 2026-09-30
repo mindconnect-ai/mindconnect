@@ -20,7 +20,6 @@ import ai.mindconnect.mail.view.StoredView;
 import ai.mindconnect.mail.view.ViewId;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -147,20 +146,31 @@ final class MailListTools {
     }
 
     private Tool remove(UserId user, String sessionId) {
+        Map<String, Object> message = object(props(
+                "id", string("The message id."),
+                "folder", string("The folder mail_list gave for it."),
+                "account", string("The account mail_list gave for it (provider.key).")),
+                "id");
         return new OfficeTool(REMOVE,
                 "Take messages out of the list again — \"all the advertising except the two newsletters I "
-                        + "read\". Name their ids; the list on the screen follows at once.",
-                object(props("ids", strings("The message ids to take out.")), "ids"),
+                        + "read\". Pass each as mail_list gave it — id, folder and account — in \"messages\"; the "
+                        + "same id can name different messages in different folders or mailboxes. A bare id in "
+                        + "\"ids\" is enough while only one message in the list has it. The list on the screen "
+                        + "follows at once.",
+                object(props(
+                        "messages", Map.of("type", "array", "items", message,
+                                "description", "The messages to take out."),
+                        "ids", strings("Message ids to take out, when each names only one message in the list."))),
                 args -> {
-                    List<String> ids = OfficeTool.list(args, "ids");
-                    if (ids.isEmpty()) throw new OfficeTool.Refused("Name at least one id to take out.");
+                    List<Wanted> wanted = wanted(args);
+                    if (wanted.isEmpty()) throw new OfficeTool.Refused("Name at least one message to take out.");
                     AgentView list = listOf(user, sessionId);
-                    Set<String> rows = rowsOf(list, ids);
-                    if (rows.isEmpty()) {
+                    Set<MailMessage.Ref> refs = entriesOf(list, wanted);
+                    if (refs.isEmpty()) {
                         throw new OfficeTool.Refused("None of those is in the list. Name the ids the list holds — "
                                 + CURRENT + " shows them — and say so when the person named a message that is not in it.");
                     }
-                    AgentView now = (AgentView) list.without(rows);
+                    AgentView now = list.withoutEntries(refs);
                     views.save(now);
                     current.current(user, now.id());
                     return (list.size() - now.size()) + " taken out, " + now.size() + " left in the list on the "
@@ -289,14 +299,69 @@ final class MailListTools {
         }
     }
 
-    /** The rows the agent means: it names message ids, the list is keyed by rows. */
-    private static Set<String> rowsOf(AgentView list, List<String> ids) {
-        Set<String> wanted = new HashSet<>(ids);
-        Set<String> rows = new LinkedHashSet<>();
-        for (MailMessage.Ref ref : list.entries()) {
-            if (wanted.contains(ref.id()) || wanted.contains(ref.rowId())) rows.add(ref.rowId());
+    /** A message as the agent names it to take it out: the id, and where it lies when it says. */
+    record Wanted(String id, String account, String folder) {
+
+        boolean matches(MailMessage.Ref ref) {
+            if (!ref.id().equals(id) && !ref.rowId().equals(id)) return false;
+            if (account != null && !ref.location().account().equals(account)
+                    && !ref.location().account().endsWith("." + account)) return false;
+            return folder == null || ref.location().folderId().equalsIgnoreCase(folder);
         }
-        return rows;
+
+        String describe() {
+            return id + (folder == null ? "" : " in " + folder) + (account == null ? "" : " of " + account);
+        }
+    }
+
+    /** What {@code messages} and {@code ids} name, in that order. */
+    static List<Wanted> wanted(Map<String, Object> args) {
+        List<Wanted> wanted = new ArrayList<>();
+        Object messages = args == null ? null : args.get("messages");
+        if (messages instanceof List<?> list) {
+            for (Object entry : list) {
+                if (entry instanceof Map<?, ?> m) {
+                    String id = text(m.get("id"));
+                    if (id != null) wanted.add(new Wanted(id, text(m.get("account")), text(m.get("folder"))));
+                } else if (text(entry) != null) {
+                    wanted.add(new Wanted(text(entry), null, null));
+                }
+            }
+        }
+        for (String id : OfficeTool.list(args, "ids")) wanted.add(new Wanted(id, null, null));
+        return wanted;
+    }
+
+    private static String text(Object value) {
+        if (value == null) return null;
+        String text = String.valueOf(value).strip();
+        return text.isEmpty() ? null : text;
+    }
+
+    /**
+     * The entries the agent means. An id is only a name within one folder:
+     * IMAP numbers every folder from 1, and two mailboxes know nothing of
+     * each other's numbers. So a name that fits more than one entry is
+     * refused with the ones it fits, rather than taking all of them out.
+     */
+    static Set<MailMessage.Ref> entriesOf(AgentView list, List<Wanted> wanted) {
+        Set<MailMessage.Ref> refs = new LinkedHashSet<>();
+        for (Wanted one : wanted) {
+            List<MailMessage.Ref> fits = list.entries().stream().filter(one::matches).toList();
+            if (fits.size() > 1) {
+                StringBuilder which = new StringBuilder();
+                for (MailMessage.Ref ref : fits) {
+                    which.append(which.isEmpty() ? "" : "; ").append("id ").append(ref.id())
+                            .append(" · account ").append(ref.location().account())
+                            .append(" · folder ").append(ref.location().folderId());
+                }
+                throw new OfficeTool.Refused("\"" + one.describe() + "\" names " + fits.size()
+                        + " messages in the list: " + which + ". Pass it in \"messages\" with its account and "
+                        + "folder, as mail_list gave them.");
+            }
+            refs.addAll(fits);
+        }
+        return refs;
     }
 
     /** The view id out of a show tool's answer, for the screen; null when the answer names none. */

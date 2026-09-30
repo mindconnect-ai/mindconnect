@@ -42,13 +42,22 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
     }
 
     public FileWorkflowDataRepository(Path baseDir, String partition, JacksonWorkflowSerializer serializer) {
-        this.baseDir = baseDir.resolve(FileWorkflowInstanceRepository.checkPartition(partition)).resolve("workflows");
+        this.baseDir = directory(baseDir, partition);
         this.serializer = serializer;
         try {
             Files.createDirectories(this.baseDir);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot create workflow store dir: " + this.baseDir, e);
         }
+    }
+
+    /**
+     * The directory a repository over {@code baseDir} and {@code partition}
+     * keeps its {@code <id>.json} files in — for a reader that must find them
+     * without creating it, such as the import into another store.
+     */
+    public static Path directory(Path baseDir, String partition) {
+        return baseDir.resolve(FileWorkflowInstanceRepository.checkPartition(partition)).resolve("workflows");
     }
 
     @Override

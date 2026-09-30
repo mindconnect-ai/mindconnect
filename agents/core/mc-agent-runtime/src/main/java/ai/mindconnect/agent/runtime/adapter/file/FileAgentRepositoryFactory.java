@@ -9,6 +9,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.nio.file.Path;
@@ -41,4 +42,5 @@ public class FileAgentRepositoryFactory implements AgentRepositoryFactory {
     @Override public TodoListRepository todoListRepository() { return new FileTodoListRepository(baseDir, namespace); }
     @Override public LlmCallTraceRepository llmCallTraceRepository() { return new FileLlmCallTraceRepository(baseDir, maxTracesPerConversation, namespace); }
     @Override public SkillRepository skillRepository() { return new FileSkillRepository(baseDir, objectMapper, namespace); }
+    @Override public UserMemoryRepository userMemoryRepository() { return new FileUserMemoryRepository(baseDir, namespace); }
 }

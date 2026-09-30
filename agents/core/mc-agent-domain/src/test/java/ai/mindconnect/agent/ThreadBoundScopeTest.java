@@ -2,6 +2,8 @@ package ai.mindconnect.agent;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -137,5 +139,28 @@ class ThreadBoundScopeTest {
             Thread.currentThread().interrupt();
             throw new IllegalStateException(e);
         }
+    }
+    @Test
+    void aBindListenerSeesEachEntryIntoANamespaceWithTheScopeAlreadyBound() throws Exception {
+        ThreadBoundScope scope = ThreadBoundScope.strict();
+        List<String> entries = new ArrayList<>();
+        scope.onBind(entered -> entries.add(entered.namespace().value() + "=" + scope.namespace().value()));
+
+        scope.runIn(ACME, () -> {
+            scope.runIn(ACME, () -> { });              // stays in acme: no new entry
+            scope.runIn(OTHER, () -> { });             // enters other
+        });
+        scope.callIn(ACME, () -> "done");
+
+        assertThat(entries).containsExactly("acme=acme", "other=other", "acme=acme");
+    }
+
+    @Test
+    void aFailingBindListenerFailsTheWorkAndLeavesNothingBound() {
+        ThreadBoundScope scope = ThreadBoundScope.strict();
+        scope.onBind(entered -> { throw new IllegalStateException("broken"); });
+
+        assertThatThrownBy(() -> scope.runIn(ACME, () -> { })).hasMessage("broken");
+        assertThat(scope.isBound()).isFalse();
     }
 }

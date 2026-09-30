@@ -108,6 +108,15 @@ public final class MailIndex {
         }
         if (force || current.syncedAt().plus(ttl).isBefore(now)) {
             MailPage top = mail.list(at.folderId(), 0, PAGE, plain());
+            if (current.renamedBy(top.messages())) {
+                // The provider calls every message differently now — an IMAP
+                // server that changed the folder's UIDVALIDITY. The heads
+                // below the newest page would keep their old names, which
+                // name nothing any more, so the window starts over.
+                FolderWindow filled = fill(mail, at, now);
+                store.save(user, filled);
+                return filled;
+            }
             FolderWindow fresh = current.merged(top.messages(), top.counted() ? top.total() : -1, now);
             store.save(user, fresh);
             return fresh;
@@ -118,8 +127,9 @@ public final class MailIndex {
     /**
      * A page of the folder: from the window when it reaches that far, live
      * from the provider when it does not — and then into the window, which
-     * grows to where somebody looked. With a query the page is a page of
-     * the matches in the window.
+     * grows to where somebody looked, when the page follows on from it. A
+     * page further down is served live and leaves the window alone. With a
+     * query the page is a page of the matches in the window.
      */
     public Slice page(UserId user, MailStore mail, Location at, int offset, int limit, MailQuery query) {
         FolderWindow w = window(user, mail, at, false);
@@ -136,8 +146,8 @@ public final class MailIndex {
             return new Slice(w.page(offset, end - offset), w.total(), w.counted(), w.syncedAt());
         }
         MailPage live = mail.list(at.folderId(), offset, limit, plain());
-        FolderWindow grown = w.extended(live.messages(), live.counted() ? live.total() : w.total(), CAP);
-        store.save(user, grown);
+        FolderWindow grown = w.extended(offset, live.messages(), live.counted() ? live.total() : w.total(), CAP);
+        if (grown != w) store.save(user, grown);
         return new Slice(live.fetched(), live.counted() ? live.total() : -1, live.counted(), live.asOf());
     }
 
@@ -172,19 +182,20 @@ public final class MailIndex {
 
     /** These are gone from the folder — deleted, or moved away. */
     public void removed(UserId user, Location at, Collection<String> ids) {
-        store.load(user, at).ifPresent(w -> store.save(user, w.without(ids)));
+        if (ids == null || ids.isEmpty()) return;
+        store.update(user, at, w -> w.without(ids));
     }
 
     /** A message that arrived in {@code to} — by a move, under its new id — when {@code to} has a window. */
     public void arrived(UserId user, Location to, MailMessage head) {
-        store.load(user, to).ifPresent(w -> store.save(user, w.with(head)));
+        store.update(user, to, w -> w.with(head));
     }
 
     /** Its read flag changed. */
     public void seen(UserId user, Location at, String id, boolean seen) {
-        store.load(user, at).ifPresent(w -> {
+        store.update(user, at, w -> {
             MailMessage head = w.head(id);
-            if (head != null) store.save(user, w.replaced(head.withSeen(seen)));
+            return head == null ? w : w.replaced(head.withSeen(seen));
         });
     }
 

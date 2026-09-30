@@ -67,6 +67,26 @@ public final class ChatSettingsComponent implements UiComponent {
     /** The dialog's heading — what this dialog is now about. */
     public static final String TITLE = "Agent, model & prompt";
 
+    /** What the model and the prompt field hold. */
+    public record Values(String llmConfigName, String systemPrompt) { }
+
+    /**
+     * What the model and the prompt field show once an agent is picked in the
+     * dialog, so they say what Apply will do: a different agent takes over
+     * with its own model and prompt; the chat's current agent shows what the
+     * chat runs on now, its own overrides included; no agent keeps what the
+     * fields hold, since those two then are the chat.
+     *
+     * @param picked    the agent picked, {@code null} for none
+     * @param current   the chat's own values today
+     * @param submitted what the fields held when the pick changed
+     */
+    public static Values valuesFor(AgentDefinition picked, AgentId currentAgentId, Values current, Values submitted) {
+        if (picked == null) return submitted;
+        if (picked.id().equals(currentAgentId)) return current;
+        return new Values(picked.llmConfigName(), picked.systemPrompt());
+    }
+
     @Override
     public UiForm render() {
         return UiForm.of(id(), null)
@@ -98,6 +118,10 @@ public final class ChatSettingsComponent implements UiComponent {
         return UiField.select("agentId", "Agent",
                         currentAgentId == null ? "" : currentAgentId.value(), options)
                 .asEditable()
+                // Picking one redraws the form with that agent's model and prompt,
+                // so the fields below never show a prompt Apply would not use.
+                .onChange(trigger(on(ChatUiController.class)
+                        .settingsAgentPicked(sessionId.value(), null, null), id()))
                 .hint("An agent brings its own prompt, model and tools. Switch to a different "
                         + "one and it takes over; stay on this one and the two fields below "
                         + "override it for this chat alone");

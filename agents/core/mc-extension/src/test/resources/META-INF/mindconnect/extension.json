@@ -14,7 +14,7 @@
     "content": { "agents": [ "test-agent" ] },
     "ui": {
       "menu": [ { "id": "nav-test", "label": "Test", "href": "/admin/test", "icon": "flask", "group": "nav-group-tools" } ],
-      "routes": [ { "path": "/admin/test/**", "roles": [ "ADMIN" ] } ],
+      "routes": [ { "path": "/admin/test-extension/**", "roles": [ "ADMIN" ] } ],
       "assets": [ "test.css" ]
     },
     "rest": [ "/admin/api/test/**" ],

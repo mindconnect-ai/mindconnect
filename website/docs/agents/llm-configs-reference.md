@@ -82,6 +82,13 @@ change its `llmConfigName` instead.
 | `retry` | Optional — automatic retry with backoff |
 | `fallbackModels` | Optional — other configs, by name, to switch to when this one is rate-limited (see [rate limits and fallbacks](./llm-gateway.md#rate-limits-and-fallbacks)) |
 
+What a config **costs** is not part of it: prices are their own entity, one per
+config, model and validity period — a price applies only to calls the config
+served with that model, so a changed `model` (or a `${VAR}` that now resolves
+to another one) never inherits the old model's rates — maintained in the admin UI's
+[Pricing section](./admin-ui/llm-configs.md#pricing) and stored beside the
+configs (`system/llm-prices/`, or `mc_llm_price` on Postgres).
+
 ## Setting API keys
 
 Export the relevant variable before starting the Admin UI or CLI. For example:

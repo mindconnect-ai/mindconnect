@@ -1073,7 +1073,8 @@ public class WorkflowAdminUiController {
 
         // The service persists the instance itself: always on a halt, and on a
         // finished run when the user ticked "keep" — the instance is the record.
-        WorkflowRunService.RunReport report = service.run(data, typed, null, persist);
+        // It runs in the host's context, so its steps act for the signed-in user.
+        WorkflowRunService.RunReport report = runContext.call(() -> service.run(data, typed, null, persist));
         return renderRun(wf, report);
     }
 
@@ -1196,7 +1197,7 @@ public class WorkflowAdminUiController {
                                    WorkflowInstanceSnapshot snapshot, Map<String, Object> params) {
         // The service overwrites the instance in place: same id, new status,
         // full trace — the history entry follows the run automatically.
-        WorkflowRunService.RunReport report = service.resume(data, snapshot, params);
+        WorkflowRunService.RunReport report = runContext.call(() -> service.resume(data, snapshot, params));
         return renderRun(wf, report);
     }
 

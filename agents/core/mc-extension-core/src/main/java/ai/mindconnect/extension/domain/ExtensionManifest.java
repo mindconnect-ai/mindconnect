@@ -182,18 +182,25 @@ public record ExtensionManifest(
          * A sidebar entry the extension contributes. With {@code label} and
          * {@code href} the host renders it — into the group {@code group}
          * names (a shipped one like {@code nav-group-tools}, or a new one
-         * called {@code groupLabel}), for admins of the namespace and, when
-         * {@code roles} names {@code USER}, for its plain users too. Without
-         * them it only declares the id of an entry the jar's own
-         * {@code AdminMenuContribution} registers. Either way, an entry whose
-         * id a switched-off extension declares is left out of the menu.
+         * called {@code groupLabel}, with the icon {@code groupIcon}), for
+         * admins of the namespace and, when {@code roles} names {@code USER},
+         * for its plain users too. Without them it only declares the id of an
+         * entry the jar's own {@code AdminMenuContribution} registers. Either
+         * way, an entry whose id a switched-off extension declares is left out
+         * of the menu.
          */
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record MenuEntry(String id, String label, String href, String icon, String group, String groupLabel,
-                                List<String> roles) {
+                                String groupIcon, List<String> roles) {
             public MenuEntry {
                 Objects.requireNonNull(id, "id");
                 roles = roles == null ? List.of() : List.copyOf(roles);
+            }
+
+            /** An entry that names no icon for its group. */
+            public MenuEntry(String id, String label, String href, String icon, String group, String groupLabel,
+                             List<String> roles) {
+                this(id, label, href, icon, group, groupLabel, null, roles);
             }
 
             /** Whether the host can render this entry itself. */
@@ -232,6 +239,42 @@ public record ExtensionManifest(
                 if (requestPath == null) return false;
                 String prefix = prefix();
                 return requestPath.equals(prefix) || requestPath.startsWith(prefix + "/");
+            }
+
+            /**
+             * The places an extension's routes may lie: its screens under
+             * {@code /admin/<id>} and {@code /ext/<id>}, its REST API under
+             * {@code /api/<id>} — the one home the bearer-token chain
+             * ({@code /api/**}) covers, so scripts can reach it with a token.
+             */
+            public static List<String> homes(ExtensionId id) {
+                return List.of("/admin/" + id.value(), "/ext/" + id.value(), "/api/" + id.value());
+            }
+
+            /**
+             * Whether the route lies where an extension's routes may lie:
+             * under one of its {@linkplain #homes homes}. A route anywhere
+             * else would let a manifest claim a shipped screen or endpoint —
+             * and, switched off, take it down.
+             */
+            public boolean isOwnedBy(ExtensionId id) {
+                String prefix = prefix();
+                for (String home : homes(id)) {
+                    if (prefix.equals(home) || prefix.startsWith(home + "/")) return true;
+                }
+                return false;
+            }
+
+            /**
+             * Whether the route is a REST API rather than a screen: it lies
+             * under {@code /api/}. Such a route answers JSON to scripts, so
+             * the host never hands a browser the SPA shell there and never
+             * wraps what it answers in the admin layout. Roles and the 404 of
+             * a switched-off extension apply to it all the same.
+             */
+            public boolean isApi() {
+                String prefix = prefix();
+                return prefix.equals("/api") || prefix.startsWith("/api/");
             }
 
             /** Whether a plain user of the namespace (not an admin) may open it. */

@@ -68,9 +68,12 @@ class ExtensionRegistryTest {
         var remote = new Extension(new ExtensionManifest(ExtensionId.of("saas"), null, null, null, null,
                 ExtensionRuntime.REMOTE, null, null, null, null), "saas.jar");
 
-        assertThat(new ExtensionRegistry(List.of(remote)).problems())
+        var registry = new ExtensionRegistry(List.of(remote));
+        assertThat(registry.problems())
                 .singleElement().extracting(ExtensionRegistry.Problem::message).asString()
                 .contains("runtime remote");
+        // Reported, not wired: nothing of it reaches the menu, the tools or the routes.
+        assertThat(registry.isEmpty()).isTrue();
     }
 
     @Test

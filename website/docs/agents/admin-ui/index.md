@@ -155,8 +155,8 @@ mindconnect:
 ```
 
 **`theme`** picks which shipped look the shell opens in (`amethyst` — the
-default —, `clody`, `gipiti`, `sorbet`, `compact`, `dark`, or `default` for the
-framework's bare one). A theme is a class on `<html>` and therefore wins on
+default —, `clody`, `gipiti`, `sorbet`, `vscode-dark`, `vscode-light`,
+`vscode-hc`, `compact`, `dark`, or `default` for the framework's bare one). A theme is a class on `<html>` and therefore wins on
 specificity over a `:root` rule, so a branding stylesheet written as above
 wants `theme: default` underneath it. The theme picker in the header still
 overrides the setting per browser.
@@ -226,7 +226,10 @@ directory each.
 
 A namespace holds everything — agents, LLM configs, workflows, skills,
 sessions, files, vector stores — and it says who may do what in it, in two
-lists of **e-mail addresses**:
+lists of **e-mail addresses**. A new namespace is not empty: the first time it
+is used it gets the shipped agents, LLM configs, skills and workflows, and the
+content of every extension that is on there (see
+[Initial data](../initial-data.md)).
 
 | | Admin | User |
 |---|---|---|
@@ -292,7 +295,7 @@ creator. `creator: <address>` is the short form of a single admin.
 It is created the first time somebody arrives under one of that brand's hosts,
 and **never changed from configuration afterwards** — who is in a namespace is
 its admins' business, not that of a file edited later. Somebody listed in it
-lands there on their first sign-in; somebody listed anywhere also gets an empty
+lands there on their first sign-in; somebody listed anywhere also gets a
 namespace of their own, with them as its admin.
 
 ## The main sections
@@ -471,6 +474,19 @@ Spring bean and returning `Notification.Draft`s for whatever is missing right
 now. `NotificationService` handles the collapsing, and `UserSetup` clears what
 a check has stopped reporting. Where no `NotificationRepository` is assembled
 there is no bell and nothing is raised.
+
+## Time zone
+
+Your agents read a time without an offset — "tomorrow at 16:16", a calendar
+entry at `2026-09-25T16:16` — in your time zone, and show times in it; the
+system prompt tells them which one it is. **Account → Time zone** on your
+profile shows it and lets you change it; the next tool call uses the new one.
+
+You rarely have to: the first time your browser is seen, the zone it reports
+becomes yours. It happens once — travelling does not move your calendar
+around, and a zone you chose is never overwritten. Until then (and for work on
+nobody's behalf) the installation's zone applies: `MC_TIME_ZONE`
+(`mindconnect.time-zone`), else the server's.
 
 ## Preferences
 

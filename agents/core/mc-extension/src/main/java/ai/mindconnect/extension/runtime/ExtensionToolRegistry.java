@@ -23,8 +23,9 @@ import java.util.stream.Collectors;
 
 /**
  * A {@link ToolRegistry} that leaves out the tools of extensions switched
- * off in the namespace at hand. Sits beneath the operator's tool settings
- * ({@code OverlayToolRegistry}): a namespace that turned an extension off has
+ * off in the namespace at hand. Wraps the bean the tools feature registers —
+ * the operator's tool settings already laid over the classpath's offer — so
+ * it is the outermost layer: a namespace that turned an extension off has
  * said something about the whole extension, and no tool setting and no
  * agent definition brings one of its tools back.
  *
@@ -33,9 +34,9 @@ import java.util.stream.Collectors;
  * tool no manifest claims is nobody's to hide.
  *
  * <p>The decision is the namespace's, so it is asked per call through the
- * service, whose store is routed by the current scope. Off a bound scope —
- * a warm-up, a start-up routine — there is no namespace to have decided, and
- * nothing is hidden.
+ * service, whose stores are routed by the current scope — once per call,
+ * whatever the number of names. Off a bound scope — a warm-up, a start-up
+ * routine — there is no namespace to have decided, and nothing is hidden.
  */
 public final class ExtensionToolRegistry implements ToolRegistry {
 
@@ -51,7 +52,7 @@ public final class ExtensionToolRegistry implements ToolRegistry {
 
     @Override
     public Optional<Tool> resolve(AgentTool agentTool, ToolCallScope scope) {
-        if (hidden(AliasTool.registryName(agentTool))) {
+        if (ExtensionService.hidden(hiddenPatterns(), AliasTool.registryName(agentTool))) {
             return Optional.empty();
         }
         return delegate.resolve(agentTool, scope);
@@ -59,29 +60,32 @@ public final class ExtensionToolRegistry implements ToolRegistry {
 
     @Override
     public Set<String> knownToolNames() {
+        Set<String> patterns = hiddenPatterns();
         return delegate.knownToolNames().stream()
-                .filter(name -> !hidden(name))
+                .filter(name -> !ExtensionService.hidden(patterns, name))
                 .collect(Collectors.toCollection(TreeSet::new));
     }
 
     @Override
     public Map<String, Set<String>> toolNamesByGroup() {
+        Set<String> patterns = hiddenPatterns();
         Map<String, Set<String>> byGroup = new TreeMap<>();
         delegate.toolNamesByGroup().forEach((group, names) -> {
-            Set<String> kept = names.stream().filter(name -> !hidden(name))
+            Set<String> kept = names.stream().filter(name -> !ExtensionService.hidden(patterns, name))
                     .collect(Collectors.toCollection(TreeSet::new));
             if (!kept.isEmpty()) byGroup.put(group, kept);
         });
         return byGroup;
     }
 
-    private boolean hidden(String toolName) {
+    /** The patterns of the extensions that are off here — one pass over the stores per call. */
+    private Set<String> hiddenPatterns() {
         try {
-            return extensions.hidesTool(toolName);
+            return extensions.hiddenToolPatterns();
         } catch (IllegalStateException noScope) {
             // No namespace bound to this thread: nobody has decided anything here.
-            log.debug("No scope while resolving '{}' — extension decisions not applied", toolName);
-            return false;
+            log.debug("No scope while resolving tools — extension decisions not applied");
+            return Set.of();
         }
     }
 

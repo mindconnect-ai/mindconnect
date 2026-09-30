@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmRepositoryFactory;
 
 import java.nio.file.Path;
@@ -20,5 +21,10 @@ public class FileLlmRepositoryFactory implements LlmRepositoryFactory {
     @Override
     public LlmConfigRepository llmConfigRepository() {
         return new FileLlmConfigRepository(baseDir, namespace);
+    }
+
+    @Override
+    public LlmPriceRepository llmPriceRepository() {
+        return new FileLlmPriceRepository(baseDir, namespace);
     }
 }

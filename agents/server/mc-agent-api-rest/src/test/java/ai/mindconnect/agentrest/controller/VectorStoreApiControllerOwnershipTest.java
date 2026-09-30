@@ -37,6 +37,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -50,7 +51,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class VectorStoreApiControllerOwnershipTest {
 
     private static final VectorStoreTemplate TEMPLATE =
-            new VectorStoreTemplate("default", "memory", Map.of(), "embeddings", null, Map.of());
+            new VectorStoreTemplate("default", "embeddings", null, Map.of());
 
     private final TestCallers callers = new TestCallers();
     private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
@@ -105,21 +106,24 @@ class VectorStoreApiControllerOwnershipTest {
         mvc.perform(get("/api/vector-stores/stores/{name}", alicesStore)).andExpect(status().isNotFound());
         mvc.perform(json(post("/api/vector-stores/stores/{name}/search", alicesStore), "{\"query\":\"salary\"}"))
                 .andExpect(status().isNotFound());
-        mvc.perform(json(post("/api/vector-stores/stores/{name}/chunks", alicesStore), "{\"text\":\"planted\"}"))
+        mvc.perform(json(put("/api/vector-stores/stores/{name}/documents/{id}", alicesStore, "notes"),
+                "{\"chunks\":[{\"text\":\"planted\"}]}"))
                 .andExpect(status().isNotFound());
         mvc.perform(json(post("/api/vector-stores/stores/{name}/ingest", alicesStore), "{\"fileId\":\"file-1\"}"))
                 .andExpect(status().isNotFound());
+        mvc.perform(get("/api/vector-stores/stores/{name}/entries", alicesStore)).andExpect(status().isNotFound());
         mvc.perform(delete("/api/vector-stores/stores/{name}", alicesStore)).andExpect(status().isNotFound());
 
-        verify(service, never()).search(any(), any(), anyInt(), anyDouble());
-        verify(service, never()).upsertChunk(any(), any(), any(), any(), any(), any());
+        verify(service, never()).search(any(), any(), anyInt(), anyDouble(), any(), any());
+        verify(service, never()).upsertDocument(any(), any(), any());
+        verify(service, never()).entries(any());
         verify(service, never()).ingestStoredFile(any(), any(), any());
         verify(service, never()).deleteStore(any());
     }
 
     @Test
     void theChatsUserReachesTheirStoreAndEveryoneReachesAKnowledgeBase() throws Exception {
-        when(service.search(any(), any(), anyInt(), anyDouble())).thenReturn(List.of());
+        when(service.search(any(), any(), anyInt(), anyDouble(), any(), any())).thenReturn(List.of());
 
         callers.actAs("alice");
         mvc.perform(get("/api/vector-stores/stores/{name}", alicesStore)).andExpect(status().isOk());
@@ -133,12 +137,13 @@ class VectorStoreApiControllerOwnershipTest {
 
     @Test
     void aChatStoreNameIsTheChatsUsersEvenBeforeTheStoreIsRegistered() throws Exception {
-        when(service.search(any(), any(), anyInt(), anyDouble())).thenReturn(List.of());
+        when(service.search(any(), any(), anyInt(), anyDouble(), any(), any())).thenReturn(List.of());
         String unregistered = VectorStoreAccess.CHAT_STORE_PREFIX
                 + sessionService.openChat(agent.id(), UserId.of("alice")).id().value();
 
         callers.actAs("bob");
-        mvc.perform(json(post("/api/vector-stores/stores/{name}/chunks", unregistered), "{\"text\":\"planted\"}"))
+        mvc.perform(json(put("/api/vector-stores/stores/{name}/documents/{id}", unregistered, "notes"),
+                "{\"chunks\":[{\"text\":\"planted\"}]}"))
                 .andExpect(status().isNotFound());
         mvc.perform(json(post("/api/vector-stores/stores/{name}/search", "session-no-such-chat"), "{\"query\":\"x\"}"))
                 .andExpect(status().isNotFound());

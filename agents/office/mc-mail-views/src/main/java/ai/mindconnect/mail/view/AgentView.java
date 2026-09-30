@@ -182,6 +182,25 @@ public final class AgentView implements MailListView {
         return new AgentView(id, owner, title, left, state.untick(rowIds), accounts, index);
     }
 
+    /**
+     * The list without exactly these messages — matched on account, folder
+     * and id together. A row id names the account and the id but not the
+     * folder, and IMAP hands out the same UID in every folder, so taking
+     * rows out by row id would take out the namesake in the next folder too.
+     * A tick goes with its row only when no namesake stays.
+     */
+    public AgentView withoutEntries(Collection<MailMessage.Ref> refs) {
+        Set<MailMessage.Ref> out = new HashSet<>(refs);
+        List<MailMessage.Ref> left = entries.stream().filter(ref -> !out.contains(ref)).toList();
+        Set<String> stillThere = new HashSet<>();
+        for (MailMessage.Ref ref : left) stillThere.add(ref.rowId());
+        List<String> unticked = new ArrayList<>();
+        for (MailMessage.Ref ref : refs) {
+            if (!stillThere.contains(ref.rowId())) unticked.add(ref.rowId());
+        }
+        return new AgentView(id, owner, title, left, state.untick(unticked), accounts, index);
+    }
+
     /** Moved rows stay — under their new location and id; the ticks follow. */
     @Override
     public MailListView afterMove(Map<String, MailMessage.Ref> moved) {

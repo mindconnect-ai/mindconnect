@@ -31,9 +31,10 @@ import java.util.function.Predicate;
  *
  * <p>Beside the list, an extension's manifest can open a route to users
  * ({@code "roles": ["USER"]}): a member of the namespace passes there while
- * the extension is on in it. The manifest names the route, so the list does
- * not have to — and a user who is not in the namespace gets no further than
- * before.
+ * the extension is on in it — on its screens and on its REST API under
+ * {@code /api/<id>/} alike, whether the call comes from the browser or with a
+ * token. The manifest names the route, so the list does not have to — and a
+ * user who is not in the namespace gets no further than before.
  *
  * <p>Admins pass untouched, and so does everything on an installation with no
  * namespace service at all.
@@ -48,19 +49,30 @@ public class NamespaceAccessInterceptor implements HandlerInterceptor {
      *   <li>the chat, its API and its stream — what they are here for;</li>
      *   <li>their own account: profile, tokens, their variables, and the
      *       namespaces screen, where they see who they work with and can leave;</li>
+     *   <li>what the profile keeps for them alone: the accounts they attach
+     *       (and the sign-in at a provider that attaches one), the tools they
+     *       add to their own chats, and the notifications behind the bell.
+     *       Each of these controllers acts on the caller's own records only —
+     *       an id that is not theirs is answered like one that does not
+     *       exist;</li>
      *   <li>the shell itself: the SPA, its assets, the About dialog, the live
      *       stream of their own events, signing out.</li>
      * </ul>
      *
      * <p>The REST API ({@code /api/**}, {@code /v1/**}) is deliberately not in
      * this list: a token carries its owner's rights, so a user of a namespace
-     * may chat through it but not create an agent in it either.
+     * may chat through it but not create an agent in it either. An
+     * extension's own API ({@code /api/<id>/**}) opens to users through its
+     * manifest, not through this list. The one exception is
+     * {@code /api/memories}: it reads and deletes only what agents remember
+     * about the caller, the same entries the profile's "Memory" tab shows.
      */
     static final List<String> OPEN = List.of(
             "/chat", "/admin/api/chat", "/admin/api/sessions", "/admin/api/messages",
             "/admin/profile", "/admin/api/profile",
             "/admin/namespaces", "/admin/api/namespaces",
-            "/admin/api/about", "/admin/api/user-stream", "/admin/api/tasks",
+            "/admin/api/connections", "/admin/oauth", "/admin/api/user-tools", "/admin/api/notifications",
+            "/admin/api/about", "/admin/api/user-stream", "/admin/api/tasks", "/api/memories",
             "/admin/logout", "/logout", "/login", "/index.html", "/login.html",
             "/no-access", "/error", "/favicon.ico",
             "/css/", "/js/", "/sui/", "/sui-ext/", "/img/", "/branding/", "/webjars/",

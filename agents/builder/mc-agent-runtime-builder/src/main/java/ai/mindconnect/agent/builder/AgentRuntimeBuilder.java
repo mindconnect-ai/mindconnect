@@ -44,7 +44,11 @@ import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
+import ai.mindconnect.agent.runtime.service.prompt.CurrentTimeSection;
+import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSection;
+import ai.mindconnect.agent.runtime.service.prompt.PromptSections;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
@@ -129,6 +133,8 @@ public class AgentRuntimeBuilder {
     /** null → the default mapper, reading media parts from the runtime's file store. */
     private LlmMessageMapper llmMessageMapper;
     private java.time.Duration taskRetention = java.time.Duration.ZERO;
+    /** Whose local time the prompt states and the tools read; null: the host's bean, else the JVM's zone. */
+    private TimeZones timeZones;
     private boolean built;
 
     private AgentRuntimeBuilder(Persistence persistence) {
@@ -159,8 +165,9 @@ public class AgentRuntimeBuilder {
     /**
      * Every repository in Postgres, over the given (ideally pooled) data
      * source; the tables are created on {@link #build()}. {@code dataDir}
-     * still roots the file-based side channels — workflows, vector-store
-     * files, code-execution scratch — that have no database form.
+     * still roots the file-based side channels — vector-store files,
+     * code-execution scratch — that have no database form; workflows kept
+     * there by file persistence are imported into the tables once.
      */
     public static AgentRuntimeBuilder usePostgres(javax.sql.DataSource dataSource, Path dataDir) {
         return of(Persistence.postgres(dataSource, dataDir)).installFromClasspath();
@@ -174,7 +181,7 @@ public class AgentRuntimeBuilder {
     /**
      * Purely in-memory persistence — nothing survives {@link AgentRuntime#close()}.
      * The simplest possible setup for tests and short-lived embeddings. File-rooted
-     * side channels (vector store files, workflow definitions, code-exec scratch)
+     * side channels (vector store files, suspended workflow instances, code-exec scratch)
      * still use a temp directory when their optional modules are present.
      */
     public static AgentRuntimeBuilder useInMemoryPersistence() {
@@ -257,6 +264,18 @@ public class AgentRuntimeBuilder {
     public AgentRuntimeBuilder beanFallback(java.util.function.Function<Class<?>, java.util.Optional<?>> fallback) {
         requireNotBuilt();
         beans.fallback(fallback);
+        return this;
+    }
+
+    /**
+     * The zone each user lives in: what the system prompt states the time in,
+     * and what the Office tools read a time without an offset in. Unset, the
+     * runtime asks the host ({@link #beanFallback}) for a {@link TimeZones} on
+     * first use, and takes the JVM's zone when there is none.
+     */
+    public AgentRuntimeBuilder timeZones(TimeZones zones) {
+        requireNotBuilt();
+        this.timeZones = zones;
         return this;
     }
 
@@ -389,7 +408,7 @@ public class AgentRuntimeBuilder {
         return runtime;
     }
 
-    /** What every feature may rely on before anything else: the namespace, the mapper, the Sql. */
+    /** What every feature may rely on before anything else: the namespace, the mapper, the Sql and its DataSource. */
     private void registerCoreSettings() {
         context.bean(Namespace.class, () -> new Namespace(namespaceName));
         // Where this runtime works — one namespace for its whole life.
@@ -404,8 +423,11 @@ public class AgentRuntimeBuilder {
             // the documents in the database are the JSON the file store writes.
             context.bean(ai.mindconnect.jdbc.Sql.class, () -> ai.mindconnect.jdbc.Sql.of(
                     postgres.dataSource(), new ai.mindconnect.jdbc.Json(objectMapper)));
+            // The pool itself, for what runs its own JDBC on the same database — the pgvector tables.
+            context.bean(javax.sql.DataSource.class, postgres::dataSource);
         }
         context.bean(ToolEnvironment.class, () -> new BeansToolEnvironment(beans, context::properties));
+        if (timeZones != null) context.instance(TimeZones.class, timeZones);
     }
 
     /**
@@ -415,11 +437,22 @@ public class AgentRuntimeBuilder {
      */
     private void registerCore() {
         context.bean(TokenCounters.class, TokenCounterRegistry::new);
+        // Whose local time: asked of the beans on first use, not now — a host's resolver
+        // (the users' zones) is found through the bean fallback once the host is up.
+        TimeZones zones = new LazyTimeZones(() -> context.find(TimeZones.class).orElse(null));
         context.bean(PromptRenderer.class, () -> {
             List<PromptContextProvider> providers = new ArrayList<>(List.of(
-                    new CurrentDateProvider(), new AgentMetadataProvider(), new AgentToolsProvider()));
+                    new CurrentDateProvider(java.time.Clock.systemUTC(), zones),
+                    new AgentMetadataProvider(), new AgentToolsProvider()));
             providers.addAll(beans.all(PromptContextProvider.class));
             return new PebblePromptRenderer(providers);
+        });
+        // The sections the features add to every system prompt, in contribution order,
+        // then the date and time — last, as it is the part that changes every minute.
+        context.bean(PromptSections.class, () -> {
+            List<PromptSection> sections = new ArrayList<>(beans.all(PromptSection.class));
+            sections.add(new CurrentTimeSection(java.time.Clock.systemUTC(), zones));
+            return PromptSections.of(sections);
         });
         context.bean(AgentTaskRunner.class, () -> {
             String defaultConfig = features.find(CoreFeature.class).map(CoreFeature::defaultLlmConfigName).orElse(null);
@@ -488,7 +521,7 @@ public class AgentRuntimeBuilder {
                 context.require(LlmCallTraceRepository.class), context.require(SessionChannels.class),
                 context.require(AgentTaskRunner.class), context.require(WorkingMemoryRepository.class),
                 context.require(InstructionFiles.class), context.require(SkillCatalog.class),
-                context.require(SubAgentSupport.class)));
+                context.require(SubAgentSupport.class), context.require(PromptSections.class)));
         context.bean(ToolCallWorker.class, () -> new ToolCallWorker(
                 context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
@@ -506,7 +539,7 @@ public class AgentRuntimeBuilder {
                 context.require(SessionChannels.class), context.require(UserChannels.class),
                 context.require(TaskQueue.class), context.require(ToolApprovalRepository.class),
                 context.require(InstructionFiles.class), context.require(SkillCatalog.class),
-                context.require(ScopeSupplier.class)));
+                context.require(ScopeSupplier.class), context.require(PromptSections.class)));
 
         // The features' start hooks (schema, seeds) ran before this one: hooks run in registration order.
         context.onStart(() -> {
@@ -526,6 +559,34 @@ public class AgentRuntimeBuilder {
 
     /** A registry that knows no tool: every resolve is empty, every listing blank. */
     private static final ToolRegistry NO_TOOLS = (agentTool, scope) -> Optional.empty();
+
+    /**
+     * The {@link TimeZones} the beans have, looked up on first use and kept
+     * once found: the prompt asks every round, and a lookup through the host
+     * container each time would cost more than the answer. None there (yet):
+     * the JVM's zone, and the next call looks again — a call that came before
+     * the host was up must not decide for the life of the process.
+     */
+    static final class LazyTimeZones implements TimeZones {
+
+        private final java.util.function.Supplier<TimeZones> lookup;
+        private volatile TimeZones resolved;
+
+        LazyTimeZones(java.util.function.Supplier<TimeZones> lookup) {
+            this.lookup = lookup;
+        }
+
+        @Override
+        public java.time.ZoneId zoneOf(ai.mindconnect.agent.UserId user) {
+            TimeZones zones = resolved;
+            if (zones == null) {
+                zones = lookup.get();
+                if (zones == null) return TimeZones.system().zoneOf(user);
+                resolved = zones;
+            }
+            return zones.zoneOf(user);
+        }
+    }
 
     /** Value of the {@code taskRetention} property that means "keep finished task trees for the life of the process". */
     public static final String KEEP_FOREVER = "keep";

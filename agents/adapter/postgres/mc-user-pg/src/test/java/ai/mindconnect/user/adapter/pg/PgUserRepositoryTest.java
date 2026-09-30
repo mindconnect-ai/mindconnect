@@ -55,6 +55,18 @@ class PgUserRepositoryTest {
     }
 
     @Test
+    void theTimeZoneSurvivesTheRoundTrip() {
+        User alice = user("alice").withTimeZone("America/New_York");
+        repo.save(alice);
+
+        assertThat(repo.findById(alice.id())).contains(alice);
+        assertThat(repo.findById(alice.id())).get().extracting(User::timeZone).isEqualTo("America/New_York");
+
+        repo.save(alice.withTimeZone(null));
+        assertThat(repo.findById(alice.id())).get().extracting(User::timeZone).isNull();
+    }
+
+    @Test
     void initSchemaIsIdempotent() {
         repo.save(user("alice"));
         new PgUserRepository(Sql.of(TestDb.require())).initSchema();

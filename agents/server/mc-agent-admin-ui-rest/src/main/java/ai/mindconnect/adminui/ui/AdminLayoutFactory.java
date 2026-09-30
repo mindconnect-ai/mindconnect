@@ -133,13 +133,35 @@ public class AdminLayoutFactory {
         layout.brand(currentBrand());
         boolean admin = shapesCurrentNamespace();
         layout.chatOnly(!admin);
-        ExtensionService known = extensions.getIfAvailable();
-        layout.contributions(visible(distinct(contributions.orderedStream()
+        layout.contributions(menuEntries(contributions.orderedStream()
                 .flatMap(contribution -> contribution.entries(admin).stream())
-                .toList()), known == null ? id -> false : known::hidesMenuEntry));
+                .toList(), admin));
         notificationBell().ifPresent(layout::notifications);
         namespaceSwitch().ifPresent(layout::namespaces);
         return layout;
+    }
+
+    /**
+     * The sidebar entries: what the beans contributed, then what the enabled
+     * extensions' manifests declare — in that order, so a bean's entry wins
+     * over a manifest's with the same id — without the entries of extensions
+     * switched off here. The extensions are listed once for both; off a
+     * bound scope there is no namespace to have decided, and the beans'
+     * entries stand as contributed.
+     */
+    private List<AdminMenuContribution.Entry> menuEntries(List<AdminMenuContribution.Entry> fromBeans, boolean admin) {
+        ExtensionService known = extensions.getIfAvailable();
+        if (known == null) return distinct(fromBeans);
+        List<ExtensionService.Status> statuses;
+        try {
+            statuses = known.list();
+        } catch (IllegalStateException noScope) {
+            return distinct(fromBeans);
+        }
+        List<AdminMenuContribution.Entry> all = new ArrayList<>(fromBeans);
+        all.addAll(ExtensionMenuContribution.entries(statuses, admin));
+        java.util.Set<String> hidden = ExtensionService.hiddenMenuEntries(statuses);
+        return visible(distinct(all), hidden::contains);
     }
 
     /**

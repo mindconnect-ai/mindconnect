@@ -7,8 +7,9 @@ import java.util.List;
  * One message as the tools hand it to the model: the header fields worth
  * deciding on, and — when it was read in full — its text.
  *
- * @param id          how a later call names this message: the IMAP UID, or the
- *                    message number on POP3, which has no UIDs a folder can look up
+ * @param id          how a later call names this message: the IMAP UID behind the
+ *                    folder's UIDVALIDITY, or the message number on POP3, which has
+ *                    no UIDs a folder can look up
  * @param location    where it lies — the account and the folder, as the store that read it knows them
  * @param subject     never null; an empty subject becomes "(no subject)"
  * @param from        the sender, as written

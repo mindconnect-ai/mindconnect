@@ -372,4 +372,44 @@ class ScopeBindingFilterTest {
         guarded.doFilter(new MockHttpServletRequest("GET", "/admin/agents"), denied, freshChain());
         assertThat(denied.getStatus()).as("the app itself is still refused").isEqualTo(403);
     }
+
+    @Test
+    void theAsyncDispatchThatFinishesAStreamWorksInTheScopeTheRequestWasAnsweredIn() throws Exception {
+        namespaces.create("acme", null, UserId.of("david"));
+        signIn("david");
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/chat-api/sessions/s1/turns");
+        request.setAttribute(NamespacePathFilter.ATTRIBUTE, ACME);
+        run(request);
+        assertThat(seen.get()).isEqualTo(Scope.of(ACME, UserId.of("david")));
+
+        // The stream ends on another thread: Spring dispatches the request back
+        // into the servlet, and the interceptors there ask for the namespace.
+        seen.set(null);
+        SecurityContextHolder.clearContext();
+        request.setDispatcherType(jakarta.servlet.DispatcherType.ASYNC);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        filter.doFilter(request, response, freshChain());
+
+        assertThat(seen.get()).as("bound, and the same scope as the answer")
+                .isEqualTo(Scope.of(ACME, UserId.of("david")));
+        assertThat(bound.isBound()).isFalse();
+    }
+
+    @Test
+    void anAsyncDispatchWithNothingAnsweredBeforeBindsNothing() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/admin/api/stream");
+        request.setDispatcherType(jakarta.servlet.DispatcherType.ASYNC);
+
+        java.util.concurrent.atomic.AtomicBoolean ranBound = new java.util.concurrent.atomic.AtomicBoolean(true);
+        MockFilterChain unbound = new MockFilterChain(new jakarta.servlet.http.HttpServlet() {
+            @Override
+            protected void service(jakarta.servlet.http.HttpServletRequest req, jakarta.servlet.http.HttpServletResponse res) {
+                ranBound.set(bound.isBound());
+            }
+        });
+
+        filter.doFilter(request, new MockHttpServletResponse(), unbound);
+
+        assertThat(ranBound.get()).as("the chain ran, unbound").isFalse();
+    }
 }

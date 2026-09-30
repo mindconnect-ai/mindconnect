@@ -305,6 +305,38 @@ class SessionDirectoriesTest {
         assertThat(remote.resolve("deck")).doesNotExist();
     }
 
+    @Test
+    void a_workspaces_internals_are_neither_listed_opened_nor_zipped_when_asked_for_by_path() throws Exception {
+        Path remote = Files.createDirectories(work.resolve("remote"));
+        Files.createDirectories(remote.resolve(".home/.ssh"));
+        Files.writeString(remote.resolve(".home/.bashrc"), "internal");
+        Files.writeString(remote.resolve(".home/.ssh/id_ed25519"), "key");
+        Files.createDirectories(remote.resolve(".mc"));
+        Files.writeString(remote.resolve(".mc/state.json"), "{}");
+        Files.createDirectories(remote.resolve("deck/.home"));
+        Files.writeString(remote.resolve("deck/.home/notes.md"), "the session's own");
+        var workspace = ai.mindconnect.agent.tool.workspace.WorkspaceFiles.local(
+                ai.mindconnect.agent.tool.FileRoots.of(remote));
+        SessionDirectories dirs = new SessionDirectories(List.of(), java.util.Map.of("/workspace", workspace));
+
+        for (String internal : List.of(".home", ".home/.ssh", "/.mc", "deck/../.home", "./.mc")) {
+            assertThat(dirs.list("/workspace", internal)).as("list %s", internal).isEmpty();
+            assertThat(dirs.archive("/workspace", internal)).as("archive %s", internal).isEmpty();
+        }
+        assertThat(dirs.open("/workspace", ".home/.bashrc")).isEmpty();
+        assertThat(dirs.open("/workspace", ".home/.ssh/id_ed25519")).isEmpty();
+        assertThat(dirs.open("/workspace", "deck/../.mc/state.json")).isEmpty();
+
+        assertThat(dirs.list("/workspace", "deck").orElseThrow().entries())
+                .as("only the root's folders of that name are the environment's")
+                .extracting(SessionDirectories.Entry::path).containsExactly("deck/.home");
+        assertThat(dirs.list("/workspace", "deck/.home")).isPresent();
+        assertThat(new String(dirs.open("/workspace", "deck/.home/notes.md").orElseThrow().stream().readAllBytes()))
+                .isEqualTo("the session's own");
+        assertThat(unzip(dirs.archive("/workspace", "deck").orElseThrow()).keySet())
+                .containsExactly("deck/", "deck/.home/", "deck/.home/notes.md");
+    }
+
     /** The zip's entries in order, each with its content as text. */
     private static java.util.Map<String, String> unzip(SessionDirectories.Archive archive) throws Exception {
         var bytes = new java.io.ByteArrayOutputStream();

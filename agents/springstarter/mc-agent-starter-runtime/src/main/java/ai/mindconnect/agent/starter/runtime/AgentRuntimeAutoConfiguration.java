@@ -46,6 +46,7 @@ import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.MessageRepository;
@@ -168,7 +169,8 @@ public class AgentRuntimeAutoConfiguration {
                 .property("codeExecCpus", env.getProperty("mindconnect.code-exec.cpus", "1"))
                 .property("codeExecTimeoutSeconds", env.getProperty("mindconnect.code-exec.timeout-seconds", "60"))
                 .property("codeExecIdleSeconds", env.getProperty("mindconnect.code-exec.idle-seconds", "600"))
-                .property("vectorStoreBackend", env.getProperty("mindconnect.vector-store.backend", "memory"))
+                // Unset: memory — or, under Postgres persistence, pgvector when the database has it.
+                .property("vectorStoreBackend", env.getProperty("mindconnect.vector-store.backend", ""))
                 .property("vectorStoreUrl", env.getProperty("mindconnect.vector-store.url", ""))
                 .property("vectorStoreUser", env.getProperty("mindconnect.vector-store.user", ""))
                 .property("vectorStorePassword", env.getProperty("mindconnect.vector-store.password", ""))
@@ -268,6 +270,9 @@ public class AgentRuntimeAutoConfiguration {
     @Bean TodoListService todoListService(AgentRuntime r) { return r.beans().get(TodoListService.class); }
     @Bean DynamicToolActivations dynamicToolActivations(AgentRuntime r) { return r.beans().get(DynamicToolActivations.class); }
     @Bean SkillCatalog skillCatalog(AgentRuntime r) { return r.beans().get(SkillCatalog.class); }
+    @Bean ai.mindconnect.agent.runtime.usermemory.UserMemoryService userMemoryService(AgentRuntime r) {
+        return r.beans().get(ai.mindconnect.agent.runtime.usermemory.UserMemoryService.class);
+    }
     @Bean SkillRepository skillRepository(AgentRuntime r) { return r.beans().get(SkillRepository.class); }
     @Bean AgentDefinitionRepository agentDefinitionRepository(AgentRuntime r) { return r.beans().get(AgentDefinitionRepository.class); }
     @Bean AgentSessionRepository agentSessionRepository(AgentRuntime r) { return r.beans().get(AgentSessionRepository.class); }
@@ -277,6 +282,7 @@ public class AgentRuntimeAutoConfiguration {
     @Bean TodoListRepository todoListRepository(AgentRuntime r) { return r.beans().get(TodoListRepository.class); }
     @Bean ToolRegistry toolRegistry(AgentRuntime r) { return r.beans().get(ToolRegistry.class); }
     @Bean LlmConfigRepository llmConfigRepository(AgentRuntime r) { return r.beans().get(LlmConfigRepository.class); }
+    @Bean LlmPriceRepository llmPriceRepository(AgentRuntime r) { return r.beans().get(LlmPriceRepository.class); }
     @Bean LlmEmbeddings llmEmbeddings(AgentRuntime r) { return r.beans().get(LlmEmbeddings.class); }
     @Bean LlmTranscription llmTranscription(AgentRuntime r) { return r.beans().get(LlmTranscription.class); }
     /** The routing chat by its class too: the config test service asks for the concrete type. */

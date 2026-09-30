@@ -81,6 +81,10 @@ public class ToolsFeature extends ConfigurableFeature {
             ctx.require(ToolRegistryRef.class).set(effective);   // tool_search reads the effective one
             return effective;
         });
+        // Whatever another feature lays over the registry (an extension's decorator, say) applies to
+        // the bean, not to what the factory above handed the ref — so once the runtime is up, the
+        // ref follows the resolved bean, decorators and all. Before that it holds the undecorated one.
+        ctx.onStart(() -> ctx.require(ToolRegistryRef.class).set(ctx.require(ToolRegistry.class)));
         // The user's own tools are the layer below the agent's list. Absent on a
         // host that keeps none, and then nothing changes for anybody.
         ctx.bean(DynamicToolActivations.class, () -> new DynamicToolActivations(

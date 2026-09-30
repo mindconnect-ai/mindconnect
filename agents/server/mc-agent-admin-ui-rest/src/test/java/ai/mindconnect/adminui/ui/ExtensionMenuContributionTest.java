@@ -70,4 +70,32 @@ class ExtensionMenuContributionTest {
         assertThat(entries.get(1).children()).extracting(AdminMenuContribution.Entry::id)
                 .containsExactly("nav-demo", "nav-demo-2");
     }
+
+    @Test
+    void a_new_group_takes_the_icon_the_first_entry_names_for_it() {
+        var first = new ExtensionManifest.Ui.MenuEntry("nav-office-email", "Email", "/admin/office/email", "mail",
+                "nav-office", "Office", null, null);
+        var second = new ExtensionManifest.Ui.MenuEntry("nav-office-files", "Files", "/admin/office/files", "folder",
+                "nav-office", "Office", "briefcase", null);
+        var third = new ExtensionManifest.Ui.MenuEntry("nav-office-todos", "Todos", "/admin/office/todos", "check",
+                "nav-office", "Office", "list", null);
+
+        var entries = ExtensionMenuContribution.entries(List.of(
+                status("office", true, first, second), status("office-extra", true, third)), true);
+
+        assertThat(entries).singleElement().satisfies(group -> {
+            assertThat(group.isGroup()).isTrue();
+            assertThat(group.icon()).isEqualTo("briefcase");
+            assertThat(group.children()).hasSize(3);
+        });
+    }
+
+    @Test
+    void a_group_no_entry_names_an_icon_for_has_none() {
+        var entries = ExtensionMenuContribution.entries(List.of(
+                status("acme-crm", true, entry("nav-acme", "Acme", "/admin/acme", "nav-acme-group", "Acme", null))),
+                true);
+
+        assertThat(entries).singleElement().satisfies(group -> assertThat(group.icon()).isNull());
+    }
 }

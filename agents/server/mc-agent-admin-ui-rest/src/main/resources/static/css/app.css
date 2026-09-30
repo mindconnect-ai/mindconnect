@@ -191,32 +191,10 @@ body {
     box-shadow: 0 1px 3px rgba(0,0,0,.15);
 }
 
-/* Streaming state: the composer becomes a status row — thinking indicator
-   left, a real Stop button right — with the same card footprint as the
-   idle form, so the swap doesn't jump. */
-.chat-form--streaming {
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    min-height: 56px;
-    padding: 12px 16px;
-    background: var(--sui-color-surface);
-    border: 1px solid var(--sui-color-border);
-    border-radius: var(--sui-radius-lg);
-}
-.chat-thinking {
-    color: var(--sui-color-text-muted);
-    font-style: italic;
-    font-size: var(--sui-text-md, 14px);
-}
-.chat-thinking::after {
-    content: "";
-    display: inline-block;
-    width: 1.5em;
-    text-align: left;
-    margin-left: 2px;
-    animation: sui-thinking-dots 1.4s infinite steps(4, end);
-}
+/* Streaming state: the same form with its textarea still open — the next
+   message can be typed while the reply is written. Only the footer differs
+   (Stop and a disabled Send); the chat module's chat-ui.css lays it out. The
+   typing bubble in the conversation is styled there too. */
 
 /* ── Working-memory + traces: master-detail grid ───────────────────────── */
 
@@ -386,30 +364,6 @@ body {
     border-bottom-left-radius: 4px;
 }
 
-/* Pending bot reply while waiting for the first LLM token. The text reads
-   "AI is thinking" and a row of three dots fades in/out next to it. The
-   thinking class is set by the server on the pending bot-message; it's
-   replaced (without the class) as soon as a token arrives, so the
-   animation disappears once the real reply starts streaming. */
-.bot-message--thinking {
-    color: var(--sui-color-text-muted);
-    font-style: italic;
-}
-.bot-message--thinking p::after {
-    content: "";
-    display: inline-block;
-    width: 1.5em;
-    text-align: left;
-    margin-left: 2px;
-    animation: sui-thinking-dots 1.4s infinite steps(4, end);
-}
-@keyframes sui-thinking-dots {
-    0%   { content: ""; }
-    25%  { content: "."; }
-    50%  { content: ".."; }
-    75%  { content: "..."; }
-    100% { content: ""; }
-}
 .chat-container .sui-list-item {
     border-bottom: none;
     padding: 4px 20px;
@@ -951,3 +905,28 @@ body {
 .session-files-frame { width: 100%; border: 1px solid var(--sui-color-border); border-radius: 6px; background: #fff; }
 .session-files-image img { display: block; max-width: 100%; max-height: 65vh; margin: 0 auto; object-fit: contain; }
 .session-files-editor textarea { min-height: 55vh; width: 100%; font-family: var(--sui-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace); font-size: 13px; white-space: pre; tab-size: 4; }
+
+/* ── Row buttons on a stacked table (workaround, semantic-ui ≤ 0.4.2) ─────────
+   Under 640px a table with stackOnMobile becomes one card per row, and
+   semantic-ui keeps the row's buttons on one right-aligned, unwrapping line
+   (.sui-table-row-actions: white-space nowrap, justify-content flex-end). Four
+   buttons on a connection card (Edit, Test, Make default, Remove) ran out of
+   the card on the left, the first ones cut off. Here they wrap, right-aligned,
+   with a gap instead of each button's left margin so a wrapped line starts at
+   the edge. Remove once semantic-ui wraps them itself.
+
+   The same at any width: between a phone and a desktop the table is not
+   stacked yet, and one line of four buttons made it wider than its card
+   (712px in 696px at 760px wide) — the last button cut off. Allowed to
+   wrap, the cell takes what the other columns leave. */
+.sui-table-row-actions { white-space: normal; }
+.sui-table-row-actions > * { margin-block: 3px; }
+@media (max-width: 640px) {
+    .sui-table--stack .sui-table-row-actions {
+        flex-wrap: wrap;
+        row-gap: 8px;
+        column-gap: 8px;
+        white-space: normal;
+    }
+    .sui-table--stack .sui-table-row-actions > * + * { margin-left: 0; }
+}

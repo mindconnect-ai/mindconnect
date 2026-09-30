@@ -10,8 +10,8 @@ import java.util.Optional;
 /**
  * The game master's way of saving the game: called after a turn that changed
  * something, it writes the character's state into the adventure that belongs
- * to the session the tool was resolved for. The adventure is found by the
- * session, so the model never handles ids.
+ * to the session the tool was resolved for. Adventures are keyed by their
+ * session, so the model never handles ids and the lookup is one read.
  */
 final class StateTool implements Tool {
 
@@ -49,8 +49,8 @@ final class StateTool implements Tool {
 
     @Override
     public String execute(Map<String, Object> arguments) {
-        Optional<Adventure> current = sessionId == null ? Optional.empty()
-                : adventures.all().stream().filter(a -> sessionId.equals(a.sessionId())).findFirst();
+        // Adventures are keyed by their session, so the one of this session is one lookup.
+        Optional<Adventure> current = sessionId == null ? Optional.empty() : adventures.find(sessionId);
         if (current.isEmpty()) {
             return "No adventure is running in this session; nothing saved.";
         }

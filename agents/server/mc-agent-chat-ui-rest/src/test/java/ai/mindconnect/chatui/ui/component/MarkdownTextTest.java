@@ -121,6 +121,51 @@ class MarkdownTextTest {
                 .isEqualTo("```\r\n<div>\r\n```\r\n&lt;p>");
     }
 
+    /**
+     * marked lets a code span run over a single line break. Paired line by line,
+     * the closing backtick on the second line opened a "span" that swallowed the
+     * tag after it — which marked renders as HTML.
+     */
+    @Test
+    void aCodeSpanOverALineBreakPairsLikeMarkedDoes() {
+        assertThat(MarkdownText.safe("`a\nb` <img src=x onerror=alert(1)> `c`"))
+                .isEqualTo("`a\nb` &lt;img src=x onerror=alert(1)> `c`");
+        assertThat(MarkdownText.safe("text `a\r\nb` <img src=x onerror=alert(1)> `<c>`"))
+                .isEqualTo("text `a\r\nb` &lt;img src=x onerror=alert(1)> `<c>`");
+    }
+
+    /** A blank line ends the paragraph: a backtick before it does not pair with one after it. */
+    @Test
+    void aCodeSpanDoesNotRunOverABlankLine() {
+        assertThat(MarkdownText.safe("`a\n\nb <img src=x onerror=alert(1)> `c`"))
+                .isEqualTo("`a\n\nb &lt;img src=x onerror=alert(1)> `c`");
+    }
+
+    /** A heading is a block of its own; a code span cannot start in it and end in the next line. */
+    @Test
+    void aCodeSpanDoesNotRunOutOfAHeading() {
+        assertThat(MarkdownText.safe("# `\n` a ` <img src=x onerror=alert(1)> `"))
+                .isEqualTo("# `\n` a ` &lt;img src=x onerror=alert(1)> `");
+        assertThat(MarkdownText.safe("# x `\n<img src=x onerror=alert(1)> `"))
+                .isEqualTo("# x `\n&lt;img src=x onerror=alert(1)> `");
+    }
+
+    /** A span that runs over a line break keeps its tags escaped anyway — at worst they show as {@code &lt;}. */
+    @Test
+    void aMultiLineCodeSpanIsEscapedInside() {
+        assertThat(MarkdownText.safe("`<a\nb>`")).isEqualTo("`&lt;a\nb>`");
+    }
+
+    /** A table splits a row into cells before it looks for code spans: a span never pairs across cells. */
+    @Test
+    void aTableRowIsEscapedCellByCell() {
+        String table = "| a | b |\n| --- | --- |\n| `x | ` a ` <img src=x onerror=alert(1)> ` |";
+        assertThat(MarkdownText.safe(table))
+                .isEqualTo("| a | b |\n| --- | --- |\n| `x | ` a ` &lt;img src=x onerror=alert(1)> ` |");
+        assertThat(MarkdownText.safe("| `<b>` |\n|---|\n| `<i>` |"))
+                .isEqualTo("| `<b>` |\n|---|\n| `<i>` |");
+    }
+
     /** A document's name is the user's (or a tool's) text too. */
     @Test
     void attachmentNamesInTheBubbleAreEscaped() {

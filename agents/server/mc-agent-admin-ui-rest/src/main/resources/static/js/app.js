@@ -111,7 +111,8 @@ window.mc = {
  * or "errored" with its page still attached did not finish: the server went
  * away (a restart, a crash) and took the running turn with it. The client
  * registers that internally and would otherwise say nothing, leaving the
- * composer on "AI is thinking" for good and a half-streamed reply frozen.
+ * typing bubble up and the composer on Stop for good, and a half-streamed
+ * reply frozen.
  *
  * This is a notice, deliberately not an automatic re-fetch of the page. A
  * re-fetch would re-attach the stream, and a connection that keeps dropping —

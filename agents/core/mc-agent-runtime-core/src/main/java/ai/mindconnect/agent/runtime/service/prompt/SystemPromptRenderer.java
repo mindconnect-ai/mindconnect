@@ -13,7 +13,8 @@ import ai.mindconnect.agent.AuthenticationInfo;
  * the memory strategy's optional addendum (e.g. compressed conversation
  * summaries), then the sections the runtime adds itself — where the session
  * works, the user's standing instructions, what the project asks of an agent
- * working there, which skills it can load, and which files are attached to
+ * working there, what the features add ({@link PromptSection}s, e.g. the
+ * user's memory), which skills it can load, and which files are attached to
  * the chat.
  */
 public final class SystemPromptRenderer {
@@ -37,11 +38,24 @@ public final class SystemPromptRenderer {
                                 AuthenticationInfo auth,
                                 InstructionFiles instructions,
                                 SkillCatalog skills) {
+        return render(renderer, strategy, def, session, auth, instructions, skills, PromptSections.none());
+    }
+
+    /** With the sections the features contributed, after the user's and the project's instructions. */
+    public static String render(PromptRenderer renderer,
+                                MemoryStrategy strategy,
+                                AgentDefinition def,
+                                AgentSession session,
+                                AuthenticationInfo auth,
+                                InstructionFiles instructions,
+                                SkillCatalog skills,
+                                PromptSections sections) {
         String rendered = renderer.render(def.systemPrompt(), def, session, auth);
         String addendum = strategy.systemPromptAddendum(def, session);
         String prompt = (addendum == null || addendum.isEmpty()) ? rendered : rendered + addendum;
         return prompt + workingDirSection(session)
                 + instructions.userSection(session) + instructions.projectSection(session)
+                + (sections == null ? "" : sections.render(def, session))
                 + (skills == null ? "" : skills.promptSection(def, session))
                 + attachedFilesSection(session);
     }

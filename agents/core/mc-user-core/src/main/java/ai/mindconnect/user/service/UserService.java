@@ -7,8 +7,10 @@ import ai.mindconnect.user.domain.User;
 import ai.mindconnect.user.port.out.UserRepository;
 
 import java.time.Clock;
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -72,7 +74,8 @@ public class UserService {
                 existing.createdAt(),
                 existing.lastLoginAt(),
                 existing.activeNamespace(),
-                existing.environment());
+                existing.environment(),
+                existing.timeZone());
         boolean changed = !merged.equals(existing);
         boolean stale = existing.lastLoginAt() == null
                 || Duration.between(existing.lastLoginAt(), now).compareTo(LOGIN_RESOLUTION) >= 0;
@@ -81,7 +84,7 @@ public class UserService {
         }
         User updated = new User(id, merged.subject(), merged.issuer(), merged.displayName(), merged.email(),
                 merged.createdAt() != null ? merged.createdAt() : now, now, merged.activeNamespace(),
-                merged.environment());
+                merged.environment(), merged.timeZone());
         users.save(updated);
         return updated;
     }
@@ -171,6 +174,76 @@ public class UserService {
     /** The variables {@code id} keeps for themselves, as stored — empty for a user the installation does not know. */
     public Map<String, String> environment(UserId id) {
         return users.findById(id).map(User::environment).orElse(Map.of());
+    }
+
+    /**
+     * Sets the time zone {@code id} lives in — an IANA id such as
+     * {@code Europe/Zurich}, stored as {@link ZoneId#getId()} normalises it —
+     * or forgets it for {@code null} or blank, so the installation's default
+     * applies again. A user the installation has not seen sign in yet gets a
+     * record for it.
+     *
+     * @throws IllegalArgumentException when {@code timeZone} is not a zone id
+     */
+    public User setTimeZone(UserId id, String timeZone) {
+        Objects.requireNonNull(id, "id");
+        String zone = timeZone == null || timeZone.isBlank() ? null : zoneId(timeZone);
+        synchronized (lockFor(id)) {
+            User existing = users.findById(id).orElse(null);
+            if (existing == null) {
+                Instant now = clock.instant();
+                User created = new User(id, null, null, null, null, now, now, null, null, zone);
+                users.save(created);
+                return created;
+            }
+            if (Objects.equals(zone, existing.timeZone())) return existing;
+            User updated = existing.withTimeZone(zone);
+            users.save(updated);
+            return updated;
+        }
+    }
+
+    /**
+     * Takes the zone the user's browser reports as theirs — once: a user who
+     * has a zone keeps it, whether they chose it or a browser reported it
+     * first. A zone that is no zone id is ignored. A user without a record is
+     * left alone; the sign-in creates it.
+     *
+     * @return the zone the user has now, if any
+     */
+    public Optional<String> adoptTimeZone(UserId id, String browserZone) {
+        Objects.requireNonNull(id, "id");
+        synchronized (lockFor(id)) {
+            User existing = users.findById(id).orElse(null);
+            if (existing == null) return Optional.empty();
+            if (existing.timeZone() != null) return Optional.of(existing.timeZone());
+            String zone;
+            try {
+                zone = zoneId(browserZone);
+            } catch (IllegalArgumentException e) {
+                return Optional.empty();
+            }
+            users.save(existing.withTimeZone(zone));
+            return Optional.of(zone);
+        }
+    }
+
+    /** The zone {@code id} chose or their browser reported, if any. */
+    public Optional<String> timeZone(UserId id) {
+        return users.findById(id).map(User::timeZone);
+    }
+
+    /** {@code value} as a zone id, normalised; refused with the reason when it is none. */
+    static String zoneId(String value) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException("A time zone is an id such as Europe/Zurich.");
+        }
+        try {
+            return ZoneId.of(value.strip()).getId();
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException("\"" + value.strip() + "\" is not a time zone. Use an id such as "
+                    + "Europe/Zurich or America/New_York.");
+        }
     }
 
     private Object lockFor(UserId id) {

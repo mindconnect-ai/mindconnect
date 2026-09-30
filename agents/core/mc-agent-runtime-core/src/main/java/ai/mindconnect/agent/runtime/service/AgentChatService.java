@@ -113,6 +113,7 @@ public class AgentChatService {
     private record PendingTitle(TaskRecord turn, CompletableFuture<String> outcome) {}
     private final ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions;
     private final ai.mindconnect.agent.runtime.skill.SkillCatalog skills;
+    private final ai.mindconnect.agent.runtime.service.prompt.PromptSections promptSections;
 
     public AgentChatService(AgentSessionService sessionService,
                             AgentDefinitionRepository definitionRepository,
@@ -144,6 +145,29 @@ public class AgentChatService {
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
                             ai.mindconnect.agent.runtime.skill.SkillCatalog skills,
                             ScopeSupplier scope) {
+        this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
+                workingMemoryRepository, promptRenderer, sessionChannels, userChannels,
+                queue, approvalStore, instructions, skills, scope,
+                ai.mindconnect.agent.runtime.service.prompt.PromptSections.none());
+    }
+
+    /** With the prompt sections the features contributed, for the working-memory view. */
+    public AgentChatService(AgentSessionService sessionService,
+                            AgentDefinitionRepository definitionRepository,
+                            ConversationManager conversationManager,
+                            MemoryStrategyFactory memoryStrategyFactory,
+                            WorkingMemoryRepository workingMemoryRepository,
+                            PromptRenderer promptRenderer,
+                            SessionChannels sessionChannels,
+                            UserChannels userChannels,
+                            TaskQueue queue,
+                            ToolApprovalRepository approvalStore,
+                            ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
+                            ai.mindconnect.agent.runtime.skill.SkillCatalog skills,
+                            ScopeSupplier scope,
+                            ai.mindconnect.agent.runtime.service.prompt.PromptSections promptSections) {
+        this.promptSections = promptSections == null
+                ? ai.mindconnect.agent.runtime.service.prompt.PromptSections.none() : promptSections;
         this.sessionService = sessionService;
         this.definitionRepository = definitionRepository;
         this.conversationManager = conversationManager;
@@ -330,11 +354,18 @@ public class AgentChatService {
             if (event.value() instanceof StreamEvent.Done) {
                 doneHandedOver.complete(null);
             }
-            if (event.value() instanceof StreamEvent.ApprovalRequested asked && !outcome.isDone()
-                    // a replayed question that was answered meanwhile asks nothing any more
-                    && approvalStore.find(sessionId, asked.callId()).isPresent()) {
-                resumeCursors.put(sessionId, event.seq());
-                outcome.complete(TurnResult.incomplete(turnId, approvalStore.openForRoot(sessionId)));
+            if (event.value() instanceof StreamEvent.ApprovalRequested asked) {
+                // One read decides: a question answered meanwhile — replayed, or answered
+                // while this event travelled — asks nothing any more, and the turn goes on.
+                List<ToolApproval> open = approvalStore.openForRoot(sessionId);
+                if (open.stream().anyMatch(a -> a.callId().equals(asked.callId()))) {
+                    // Every open gate moves the cursor, also one this handle's outcome is
+                    // already past: a later gate of the same turn is where the answer's
+                    // handle continues, not the first one. A handle that replays an older
+                    // gate never moves it back.
+                    resumeCursors.merge(sessionId, event.seq(), Math::max);
+                    outcome.complete(TurnResult.incomplete(turnId, open));
+                }
             }
         });
         if (stopAtGate) {
@@ -693,7 +724,7 @@ public class AgentChatService {
         AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
         return WorkingMemoryBuilder.build(promptRenderer, memoryStrategyFactory.create(def),
-                def, session, auth, instructions, skills);
+                def, session, auth, instructions, skills, promptSections);
     }
 
     /**
@@ -714,7 +745,7 @@ public class AgentChatService {
         if (!result.isEmpty()) {
             try {
                 WorkingMemory stats = WorkingMemoryBuilder.build(promptRenderer, strategy, def, session,
-                        auth, instructions, skills);
+                        auth, instructions, skills, promptSections);
                 workingMemoryRepository.save(session.id(), auth, stats);
             } catch (Exception e) {
                 log.warn("Failed to save working memory after compression: {}", e.getMessage());

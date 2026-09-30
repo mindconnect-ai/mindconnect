@@ -7,6 +7,11 @@ import ai.mindconnect.workflow.persistence.file.SnapshotSerializer;
 import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 
 import javax.sql.DataSource;
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +25,10 @@ import java.util.UUID;
  * <p>Written through the same {@link SnapshotSerializer} as the file store,
  * so the check that every variable survives a JSON round trip — the whole
  * point of a snapshot — runs here too, and refuses the save the same way.
+ *
+ * <p>The runs an installation kept in files are not lost on the move:
+ * {@link #importFiles} reads what the file store wrote, once, into a
+ * partition that has no row yet.
  */
 public final class PgWorkflowInstanceRepository implements WorkflowInstanceRepository {
 
@@ -57,10 +66,44 @@ public final class PgWorkflowInstanceRepository implements WorkflowInstanceRepos
         this.partition = partition;
     }
 
-    /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}). */
+    /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}), the import marker's included. */
     public PgWorkflowInstanceRepository initSchema() {
         sql.execute(DDL);
+        sql.execute(WorkflowFileImport.DDL);
         return this;
+    }
+
+    /**
+     * Imports the snapshots a file store kept in {@code directory} — one JSON
+     * file each, as {@code FileWorkflowInstanceRepository} writes them — when
+     * this partition has no row yet. Once: after the first look the files
+     * are not read again, so a run resumed and deleted here does not come
+     * back from its file on the next start. The files stay where they are.
+     *
+     * <p>A file that is not a snapshot, or not one that could be saved, is
+     * skipped with a warning rather than holding up the start.
+     *
+     * @return how many instances were imported
+     */
+    public int importFiles(Path directory) {
+        return WorkflowFileImport.once(sql, partition, "mc_workflow_instance", directory,
+                (file, name) -> {
+                    WorkflowInstanceSnapshot snapshot = serializer.fromJson(read(file));
+                    if (snapshot.getInstanceId() == null || snapshot.getInstanceId().isBlank()) {
+                        snapshot.setInstanceId(name);
+                    }
+                    serializer.toJson(snapshot);   // refuses it here, before the transaction sees it
+                    return snapshot;
+                },
+                (tx, snapshot) -> new PgWorkflowInstanceRepository(tx, partition, serializer).save(snapshot));
+    }
+
+    private static String read(Path file) {
+        try {
+            return Files.readString(file, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot read " + file, e);
+        }
     }
 
     @Override

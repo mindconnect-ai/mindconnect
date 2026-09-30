@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -28,6 +29,8 @@ public class UserRecorder {
     private final UserService users;
     private final Clock clock;
     private final Map<UserId, Instant> recent = new ConcurrentHashMap<>();
+    /** Users known to have a time zone — the browser's report is not looked at again for them in this process. */
+    private final Set<UserId> zoned = ConcurrentHashMap.newKeySet();
 
     public UserRecorder(UserService users) {
         this(users, Clock.systemUTC());
@@ -52,4 +55,26 @@ public class UserRecorder {
             log.warn("Could not record the sign-in of {}: {}", id, e.toString());
         }
     }
+
+    /**
+     * The zone the user's browser reports ({@code Intl.DateTimeFormat().resolvedOptions().timeZone},
+     * sent as the {@value #TIME_ZONE_COOKIE} cookie), stored as theirs the first
+     * time it is seen — see {@link UserService#adoptTimeZone}. Once a user has a
+     * zone, whether chosen or adopted, this is a set lookup: no store is read
+     * again for them in this process. Call it after {@link #record}, which
+     * creates the record the zone goes into.
+     */
+    public void offerTimeZone(UserId id, String browserZone) {
+        if (id == null || zoned.contains(id)) return;
+        // Not a zone this JVM knows: nothing to store, and no reason to read the store for it.
+        if (ai.mindconnect.agent.tool.TimeZones.parse(browserZone).isEmpty()) return;
+        try {
+            if (users.adoptTimeZone(id, browserZone).isPresent()) zoned.add(id);
+        } catch (RuntimeException e) {
+            log.warn("Could not store the time zone of {}: {}", id, e.toString());
+        }
+    }
+
+    /** The cookie the Admin UI's shell writes the browser's time zone into. */
+    public static final String TIME_ZONE_COOKIE = "mc-time-zone";
 }

@@ -27,7 +27,7 @@ import static ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT;
  * almost every streaming event translates into a patch against either
  * the list's root id ({@code msg-list-{sid}}) — for full refreshes
  * after a turn — or against individual item ids inside the list
- * (bot-pending placeholder, task cards, thinking indicator).
+ * (bot-pending placeholder, task cards, thinking cards).
  *
  * <p>Patch shapes follow the renderer contract:
  * <ul>
@@ -380,25 +380,29 @@ public final class MessageListComponent implements UiComponent {
     }
 
     /**
-     * APPEND an "AI is thinking …" placeholder shown between the user
-     * message and the first incoming token. Removed via
-     * {@link #removeThinking(String)} when the stream begins.
+     * The typing bubble: an assistant-side bubble holding nothing but three
+     * dots that pulse one after another, the way a messenger shows that the
+     * other side is typing. It stands in for the reply between the user's
+     * message and the first token, and goes when the reply starts.
+     *
+     * <p>It is a {@link ai.mindconnect.ui.model.UiSpinner} underneath —
+     * which is what it is, a busy indicator, and what gives it
+     * {@code role="status"} and its accessible name — dressed as the dots by
+     * the chat stylesheet ({@code .chat-typing}), which also keeps them still
+     * for a reader who asked for reduced motion. The row around it carries
+     * the id, so a REMOVE takes the whole row.
+     *
+     * <p>It is not a list item. The page puts it after the list, in the
+     * scroll pane, so it stays at the bottom of the conversation — where the
+     * reply will appear — however many cards a tool call appends above it
+     * while the model is working (see {@code ChatPage#streamStart}).
      */
-    public UiPatch.Operation appendThinking(String thinkingId, String agentName) {
-        var wrapper = UiList.of("thinking-wrapper-" + thinkingId, null);
-        wrapper.item(UiList.Item.of(thinkingId, agentName)
-                .content(UiMarkdown.of(thinkingId + "-md", "AI is thinking")
-                        .<UiMarkdown>withCssClass("bot-message bot-message--thinking")));
-        return UiPatch.Operation.append(id(), wrapper);
-    }
-
-    /**
-     * REMOVE the thinking indicator together with its wrapping {@code <li>}.
-     * Targets the wrapper id ({@code thinking-wrapper-{thinkingId}}) so
-     * the renderer's REMOVE path drops the surrounding list item.
-     */
-    public UiPatch.Operation removeThinking(String thinkingId) {
-        return UiPatch.Operation.remove("thinking-wrapper-" + thinkingId);
+    public static ai.mindconnect.ui.model.UiNode typingIndicator(String typingId) {
+        var dots = new ai.mindconnect.ui.model.UiSpinner();
+        dots.setTitle("The assistant is typing");
+        return ai.mindconnect.ui.model.UiStack.of(typingId)
+                .child(dots.withCssClass("chat-typing"))
+                .withCssClass("chat-typing-row");
     }
 
     /**

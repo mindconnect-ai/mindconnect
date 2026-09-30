@@ -36,32 +36,29 @@ public class McAgentWorkflowStepsAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(McAgentWorkflowStepsAutoConfiguration.class);
 
-    /** userId that agent-call sessions are opened under — visible in the sessions list. */
-    private static final String WORKFLOW_USER = "workflow";
+    /** The user a run on nobody's behalf calls agents and tools as. */
+    private static final String WORKFLOW_USER = WorkflowAgentCalls.WORKFLOW_USER;
 
+    /**
+     * @param timeout how long an agent-call step waits for the agent's answer
+     *                ({@code mindconnect.workflow.agent-call-timeout}, ISO-8601, default ten minutes)
+     */
     @Bean
     AgentInvoker workflowAgentInvoker(AgentSessionService sessionService,
                                       AgentChatService chatService,
-                                      AgentDefinitionRepository definitionRepository) {
+                                      AgentDefinitionRepository definitionRepository,
+                                      @org.springframework.beans.factory.annotation.Value(
+                                              "${mindconnect.workflow.agent-call-timeout:PT10M}")
+                                      java.time.Duration timeout) {
+        WorkflowAgentCalls calls = new WorkflowAgentCalls(
+                name -> definitionRepository.findByName(name).map(AgentDefinition::id),
+                (agent, user) -> sessionService.openChatOfType(agent, user, WorkflowAgentCalls.SESSION_TYPE).id(),
+                (session, message) -> chatService.submitChat(session, message, event -> { }),
+                timeout);
         AgentInvoker invoker = new AgentInvoker() {
             @Override
             public String call(String agentName, String message) {
-                AgentDefinition def = definitionRepository.findByName(agentName)
-                        .orElseThrow(() -> new IllegalArgumentException(
-                                "No agent named '" + agentName + "'"));
-                AgentSession session = sessionService.openChat(def.id(), UserId.of(WORKFLOW_USER));
-                ChatTurnHandle handle = chatService.submitChat(session.id(), message, event -> { });
-                try {
-                    return handle.result().get();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    handle.cancel();
-                    throw new RuntimeException("Agent call to '" + agentName + "' was interrupted", e);
-                } catch (ExecutionException e) {
-                    Throwable cause = e.getCause() != null ? e.getCause() : e;
-                    throw new RuntimeException(
-                            "Agent call to '" + agentName + "' failed: " + cause.getMessage(), cause);
-                }
+                return calls.call(agentName, message);
             }
 
             @Override

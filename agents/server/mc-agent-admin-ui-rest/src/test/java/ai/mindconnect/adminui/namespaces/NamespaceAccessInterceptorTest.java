@@ -116,11 +116,38 @@ class NamespaceAccessInterceptorTest {
     }
 
     @Test
+    void whatTheProfileKeepsForTheUserAloneStaysOpen() throws Exception {
+        signedIn(ALICE);
+
+        for (String path : List.of("/admin/api/connections/imap/new", "/admin/api/connections/c-1/edit",
+                "/admin/api/connections/add/imap", "/admin/api/connections/c-1/test",
+                "/admin/oauth/authorize/google-mail", "/admin/oauth/callback",
+                "/admin/api/user-tools/new", "/admin/api/user-tools/add/web_search",
+                "/admin/api/user-tools/t-1/toggle", "/admin/api/notifications",
+                "/admin/api/notifications/n-1/dismiss", "/admin/api/notifications/dismiss-all",
+                "/admin/api/profile/memory/abc", "/api/memories", "/api/memories/role")) {
+            assertThat(allowed(path)).as(path).isTrue();
+        }
+        assertThat(NamespaceAccessInterceptor.isOpen("/admin/oauth-providers"))
+                .as("only the sign-in's own two routes, not a screen that merely starts with the name")
+                .isFalse();
+    }
+
+    @Test
     void theRestApiIsNotOpenEither_aTokenCarriesItsOwnersRights() throws Exception {
         signedIn(ALICE);
 
         assertThat(call("/api/agents").getStatus()).isEqualTo(403);
         assertThat(call("/v1/responses").getStatus()).isEqualTo(403);
+        assertThat(call("/api/memoriesx").getStatus()).as("only the memory's own route").isEqualTo(403);
+    }
+
+    @Test
+    void theAdminsViewOfEverybodysMemoryIsAnAdminsAlone() throws Exception {
+        signedIn(ALICE);
+
+        assertThat(call("/admin/memories").getStatus()).isEqualTo(403);
+        assertThat(call("/admin/api/memories").getStatus()).isEqualTo(403);
     }
 
     @Test
@@ -170,5 +197,21 @@ class NamespaceAccessInterceptorTest {
         assertThat(NamespaceAccessInterceptor.isOpen("/chatter"))
                 .as("a screen that merely starts with an open name is not open").isFalse();
         assertThat(NamespaceAccessInterceptor.isOpen("/admin/api/namespaces-secret")).isFalse();
+    }
+
+    @Test
+    void a_route_an_extension_s_manifest_opens_to_users_is_open_to_a_user() throws Exception {
+        // Alice is a plain user of ACME (see the fixture); the predicate stands for the manifests' say.
+        signedIn(ALICE);
+        var withExtensions = new NamespaceAccessInterceptor(namespaces, ScopeSupplier.fixed(Scope.of(ACME, DAVID)),
+                path -> path.startsWith("/admin/acme-crm/"));
+
+        var response = new MockHttpServletResponse();
+        assertThat(withExtensions.preHandle(new MockHttpServletRequest("GET", "/admin/acme-crm/dialogs/new"),
+                response, new Object())).isTrue();
+        var refused = new MockHttpServletResponse();
+        assertThat(withExtensions.preHandle(new MockHttpServletRequest("GET", "/admin/other-ext/page"),
+                refused, new Object())).isFalse();
+        assertThat(refused.getStatus()).isEqualTo(403);
     }
 }

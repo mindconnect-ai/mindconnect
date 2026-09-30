@@ -494,6 +494,12 @@ public class AgentSessionService {
         return conversationManager.loadHistory(session.conversationId(), new PageRequest(0, LOAD_ALL));
     }
 
+    /** Whether anything was written in the session yet — one message read, not the conversation. */
+    public boolean hasMessages(SessionId sessionId) {
+        AgentSession session = findSession(sessionId);
+        return !conversationManager.loadHistory(session.conversationId(), new PageRequest(0, 1)).isEmpty();
+    }
+
     /**
      * Permanently deletes a session and all its associated data (working
      * memory snapshot, conversation summaries). Conversation messages

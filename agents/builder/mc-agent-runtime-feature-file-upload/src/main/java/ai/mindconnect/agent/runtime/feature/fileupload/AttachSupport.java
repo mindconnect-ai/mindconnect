@@ -113,8 +113,7 @@ public class AttachSupport {
             String storeName = "session-" + sessionId.value();
             var template = stores.template(namespace, "chat-uploads").orElseGet(() -> {
                 var created = new ai.mindconnect.vectorstore.tools.VectorStoreTemplate(
-                        "chat-uploads", environment.getOrDefault("vectorStoreBackend", "memory"),
-                        Map.of(), environment.getOrDefault("vectorStoreEmbeddingConfig", "embeddings"),
+                        "chat-uploads", environment.getOrDefault("vectorStoreEmbeddingConfig", "embeddings"),
                         null, Map.of("description", "Per-chat-session upload stores (auto-created)"));
                 stores.registry(namespace).saveTemplate(created);
                 return created;
@@ -135,16 +134,22 @@ public class AttachSupport {
                 }
                 attached = attached.withPath(copy.get().toString());
             }
+            // The stored file is one entity, whichever chats it is attached to:
+            // indexed once, then only listed in another chat's store.
+            var ref = ai.mindconnect.vectorstore.embedding.EntityRef.file(stored.id());
             String message;
-            if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()
+            if (store.indexed(ref)) {
+                store.add(ref);
+                message = stored.name() + " attached — already indexed, not embedded again.";
+            } else if (instance.ingestionWorkflow() != null && !instance.ingestionWorkflow().isBlank()
                     && workflowModulesPresent()) {
                 message = WorkflowIngestion.run(environment, stores, instance, stored, fileStore, beans,
                         session, copy.orElse(null));
             } else {
                 String text = new String(fileStore.content(stored.id()).readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
-                message = ai.mindconnect.vectorstore.tools.DirectIngestion.ingest(
-                        stores, namespace, store, storeName, stored.name(), text);
+                message = ai.mindconnect.vectorstore.tools.DirectIngestion.ingest(store, ref,
+                        session.userId(), "1", stored.name(), text);
             }
 
             activations.activate(sessionId, attached.isPdf()
@@ -200,7 +205,7 @@ public class AttachSupport {
                 var scope = ai.mindconnect.agent.tool.ToolCallScope.ofSession(
                         chat.userId(), chat.id(), copyInSessionDir.getParent().toString());
                 report = scope.runWith(() -> runner.runWithAttributes(workflow,
-                        Map.of("file", stored.name(), "store", instance.name()),
+                        Map.of("file", stored.name(), "store", instance.name(), "file_id", stored.id().value()),
                         Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(), scope)));
             } else {
                 java.nio.file.Path base = java.nio.file.Path.of(
@@ -213,7 +218,8 @@ public class AttachSupport {
                             java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
                 report = runner.runWithAttributes(workflow,
-                        Map.of("file", base.relativize(target).toString(), "store", instance.name()),
+                        Map.of("file", base.relativize(target).toString(), "store", instance.name(),
+                                "file_id", stored.id().value()),
                         Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(),
                                 new ai.mindconnect.agent.tool.ToolCallScope(chat.userId(), chat.id(), null)));
             }

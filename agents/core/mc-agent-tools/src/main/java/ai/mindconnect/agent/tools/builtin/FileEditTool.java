@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.tools.builtin;
 
 import ai.mindconnect.agent.tool.FileRoots;
+import ai.mindconnect.agent.tool.workspace.WorkspaceEntry;
 import ai.mindconnect.agent.tool.workspace.WorkspaceFiles;
 import ai.mindconnect.agent.tool.Tool;
 
@@ -10,6 +11,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Changes one passage of a file: the text in {@code old_string} becomes
@@ -113,10 +115,16 @@ public class FileEditTool implements Tool {
         if (target == null) {
             return roots.outsideError(raw);
         }
-        if (!files.exists(target)) {
+        Optional<WorkspaceEntry> entry;
+        try {
+            entry = files.stat(target);
+        } catch (IOException e) {
+            return FileWalks.couldNotCheck(relative, e);
+        }
+        if (entry.isEmpty()) {
             return "Error: file does not exist: " + relative + " — use file_write to create a file.";
         }
-        if (files.isDirectory(target)) {
+        if (entry.get().directory()) {
             return "Error: path is a directory: " + relative;
         }
         if (FileWalks.isBinary(files, target)) {

@@ -412,7 +412,7 @@ public record LlmConfig(
                 id,
                 settings.resolve(name),
                 provider,
-                settings.resolve(model),
+                resolvedModel(secrets),
                 settings.resolve(baseUrl),
                 secrets.resolve(apiKey),
                 defaultTemperature,
@@ -427,6 +427,19 @@ public record LlmConfig(
                 capabilities,
                 fallbackModels,
                 version);
+    }
+
+    /**
+     * The model a call through this config asks for: {@code model} with its
+     * {@code ${VAR}} / {@code ${VAR:default}} placeholders expanded from
+     * {@code env}'s {@linkplain EnvVarResolver#shared() shared} sources — the
+     * expansion {@link #resolved(EnvVarResolver)} does, on its own, for a
+     * caller that needs the model but not the key (the price dialog).
+     *
+     * @throws IllegalStateException if a placeholder has no default and no source has the variable
+     */
+    public String resolvedModel(EnvVarResolver env) {
+        return env.shared().resolve(model);
     }
 
     /**

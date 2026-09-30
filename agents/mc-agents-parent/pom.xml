@@ -339,6 +339,11 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-registry-pg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-registry-admin-ui-rest</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -360,6 +365,11 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-mcp-gateway-local</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-mcp-gateway-pg</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -21,18 +21,25 @@ import ai.mindconnect.agent.SessionId;
  * The chat-input form at the bottom of a {@code ChatPage} — a single
  * textarea plus a context-sensitive Send / Stop button.
  *
- * <p>The component has two visual states:
+ * <p>The component has two visual states, and the textarea is editable in
+ * both:
  * <ul>
- *   <li><b>idle</b> — textarea is editable, button is a primary "Send" that
- *       posts to the streaming chat endpoint.</li>
- *   <li><b>streaming</b> — textarea is read-only, button is a danger "Stop"
- *       that cancels the in-flight turn via DELETE on the chat endpoint.</li>
+ *   <li><b>idle</b> — the full composer: "+", microphone, directory, model
+ *       and a primary "Send" that posts to the chat endpoint.</li>
+ *   <li><b>streaming</b> — the same form with the textarea still open, so the
+ *       next message can be typed while the reply is being written; the
+ *       footer holds "Stop", which cancels the running turn, and a disabled
+ *       "Send". Sending while a turn runs is not supported yet, so nothing in
+ *       this state starts a second turn — not the button, not Enter (see
+ *       {@link #streamingForm()}).</li>
  * </ul>
  *
- * <p>The form id is stable across both states so a REPLACE patch can
- * morph the body without losing the surrounding DOM context; the
- * textarea's id is also stable so {@code ignoreActiveValue} on the
- * morpher preserves anything the user has already typed.
+ * <p>The form id and the textarea are the same in both states. The switch
+ * between them is a MERGE ({@link #toStreaming()}, {@link #toIdle()}) that
+ * swaps the form's class, footer and extras but never its fields, so what the
+ * user has typed survives it whether or not the textarea has focus — a
+ * REPLACE only keeps the value of the focused control. {@link #reset()} is the
+ * REPLACE that empties the field on purpose.
  */
 public final class ChatFormComponent implements UiComponent {
 
@@ -180,26 +187,60 @@ public final class ChatFormComponent implements UiComponent {
     // ── Patch operations ───────────────────────────────────────────────────
 
     /**
-     * REPLACE that resets the form to its idle state (Send button,
-     * editable textarea, no buffered text). Used after a turn completes
-     * — both on the streaming and the non-streaming path.
+     * REPLACE that resets the form to its idle state with an EMPTY textarea.
+     * For the one path that submitted the text and waited for the answer
+     * (the non-streaming {@code POST /chat}); a streaming turn ends with
+     * {@link #toIdle()}, which keeps whatever was typed meanwhile.
      */
     public UiPatch.Operation reset() {
         return UiPatch.Operation.replace(id(), idleForm());
     }
 
     /**
-     * REPLACE that swaps the Send button for a Stop button and locks the
-     * textarea as read-only. Used at the start of a streaming turn.
+     * MERGE into the streaming state: Stop and a disabled Send in the
+     * footer, the idle extras gone. The fields are not part of the merge, so
+     * the textarea stays open and keeps its text and its focus. Used at the
+     * start of a streaming turn.
      */
     public UiPatch.Operation toStreaming() {
-        return UiPatch.Operation.replace(id(), streamingForm());
+        return mergeInto(streamingForm());
     }
 
-    /** Alias for {@link #reset()}, named after the visual state for callers
-     *  that prefer the {@code idle/streaming} vocabulary. */
+    /**
+     * MERGE back into the idle state at the end of a streaming turn. Like
+     * {@link #toStreaming()} it leaves the fields alone, so a message typed
+     * during the turn is still in the textarea afterwards, ready to send.
+     */
     public UiPatch.Operation toIdle() {
-        return reset();
+        return mergeInto(idleForm());
+    }
+
+    /**
+     * A MERGE that turns the rendered form into {@code target}, fields
+     * excepted. Every other part the two states differ in is named, empty
+     * lists included — a merge only writes what it carries, so a part left
+     * out would keep the other state's value.
+     *
+     * <p>The nodes go in as JSON trees, each written as a node of its own.
+     * The attributes are a {@code Map<String, Object>}, and a node that is
+     * only an {@code Object} to Jackson is written without its {@code type}
+     * — the client then has no renderer for it and dumps it as JSON.
+     */
+    private UiPatch.Operation mergeInto(UiForm target) {
+        var attributes = new java.util.LinkedHashMap<String, Object>();
+        attributes.put("cssClass", target.getCssClass());
+        attributes.put("content", trees(target.getContent()));
+        attributes.put("actions", trees(target.getActions()));
+        return UiPatch.Operation.merge(id(), attributes);
+    }
+
+    private static java.util.List<com.fasterxml.jackson.databind.JsonNode> trees(
+            java.util.List<? extends ai.mindconnect.ui.model.UiNode> nodes) {
+        if (nodes == null) return java.util.List.of();
+        return nodes.stream()
+                .map(n -> (com.fasterxml.jackson.databind.JsonNode)
+                        ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER.valueToTree(n))
+                .toList();
     }
 
     // ── Internal builders ──────────────────────────────────────────────────
@@ -275,21 +316,31 @@ public final class ChatFormComponent implements UiComponent {
     }
 
     /**
-     * The composer's streaming state: the textarea gives way to a status
-     * row — thinking indicator on the left, a prominent Stop button on the
-     * right. Same node id as the idle form, so the two REPLACE into each
-     * other. Cancel goes through the generic stream-registry endpoint keyed
-     * by the same channelId the client uses for re-mount detection.
+     * The composer's streaming state: the same form and the same textarea as
+     * the idle one, so typing goes on while the reply is written. What
+     * changes is the footer: a prominent Stop, which cancels the turn through
+     * the generic stream-registry endpoint keyed by the channelId the client
+     * uses for re-mount detection, and Send — disabled and without a trigger.
+     *
+     * <p>That Send is also what keeps Enter from doing anything. The textarea
+     * still submits on Enter, and a submitted form fires its primary action;
+     * a Send with nothing to fire makes that a no-op, and the text stays
+     * where it is. Without a primary action the form would pick the first
+     * action it has — Stop.
+     *
+     * <p>The "+", the microphone, the directory and the model are left out as
+     * before: nothing about the chat changes while a turn runs.
      */
-    private ai.mindconnect.ui.model.UiNode streamingForm() {
+    private UiForm streamingForm() {
         String channelId = ai.mindconnect.chatui.service.SessionOwnership.channelOf(sessionId);
-        var row = ai.mindconnect.ui.model.UiStack.of(id());
-        row.direction(ai.mindconnect.ui.model.UiStack.Direction.HORIZONTAL);
-        row.withCssClass("chat-form chat-form--streaming");
-        row.child(ai.mindconnect.ui.model.UiText.of(id() + ":thinking", "AI is thinking")
-                .withCssClass("chat-thinking"));
-        row.child(UiAction.danger("stop", "Stop").icon("stop")
-                .onClick(trigger(on(StreamController.class).cancel(channelId, null))));
-        return row;
+        return UiForm.of(id(), null)
+                .field(messageField(null))
+                .action(UiAction.icon("stop", "Stop").icon("stop")
+                        .style(UiAction.Style.DANGER)
+                        .onClick(trigger(on(StreamController.class).cancel(channelId, null))))
+                .action(UiAction.icon("send", "Send").icon("send")
+                        .style(UiAction.Style.PRIMARY)
+                        .disabled("Send is available again when the reply is finished"))
+                .<UiForm>withCssClass("chat-form chat-form--streaming");
     }
 }

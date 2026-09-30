@@ -8,4 +8,7 @@ package ai.mindconnect.llm.port.out;
 public interface LlmRepositoryFactory {
 
     LlmConfigRepository llmConfigRepository();
+
+    /** The price periods of the LLM configs, in the same backend and namespace. */
+    LlmPriceRepository llmPriceRepository();
 }

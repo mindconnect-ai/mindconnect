@@ -48,6 +48,11 @@ mindconnect:
   # default namespace stays open to every signed-in user, which is what a
   # single-user installation and the dev mode work with.
   namespace-admins: ${MC_NAMESPACE_ADMINS:}
+  # The time zone of a user who has none of their own yet — an IANA id such as
+  # Europe/Zurich. A user's own zone comes from their browser the first time it
+  # is seen, or from their profile page; this is only what applies before that
+  # (and to work on nobody's behalf). Unset: the JVM's zone.
+  time-zone: ${MC_TIME_ZONE:}
   postgres:
     url: ${MC_POSTGRES_URL:jdbc:postgresql://localhost:5432/mindconnect}
     username: ${MC_POSTGRES_USER:}
@@ -101,8 +106,9 @@ mindconnect:
     # The browser tab's icon; unset it follows the logo.
     # favicon: /branding/favicon.png
     # The look the shell opens in: amethyst (default), clody, gipiti, sorbet,
-    # compact, dark, or "default" for the framework's bare one. The theme
-    # picker in the header still overrides it per browser.
+    # vscode-dark, vscode-light, vscode-hc, compact, dark, or "default" for
+    # the framework's bare one. The theme picker in the header still overrides
+    # it per browser.
     # theme: amethyst
     # Stylesheets linked after every shipped one, so their rules win. Either
     # bundled with the app, dropped into assets-dir, or on a server elsewhere.

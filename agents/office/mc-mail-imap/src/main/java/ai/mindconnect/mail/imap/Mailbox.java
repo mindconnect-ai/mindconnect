@@ -42,7 +42,10 @@ import java.util.Objects;
  *
  * <p>Everything here speaks in the {@code id} of {@link MailMessage}: the
  * IMAP UID, which survives other messages being deleted, or the message number
- * on POP3, which does not — see {@link #find}.
+ * on POP3, which does not — see {@link #find}. An IMAP id carries the folder's
+ * UIDVALIDITY in front of the UID ({@code 1712345678-42}): a server that
+ * renumbers a folder says so by changing it, and an id from before then must
+ * name nothing rather than whichever message has that UID now.
  */
 public final class Mailbox implements AutoCloseable {
 
@@ -249,14 +252,7 @@ public final class Mailbox implements AutoCloseable {
         try {
             Message[] found = folder.search(new jakarta.mail.search.MessageIDTerm(messageIdHeader.strip()));
             if (found.length == 0) return 0;
-            Folder target = store.getFolder(targetName.strip());
-            if (folder instanceof org.eclipse.angus.mail.imap.IMAPFolder imap) {
-                imap.moveMessages(found, target);
-            } else {
-                folder.copyMessages(found, target);
-                for (Message message : found) message.setFlag(Flags.Flag.DELETED, true);
-                folder.expunge();
-            }
+            transfer(found, store.getFolder(targetName.strip()));
             return found.length;
         } catch (MessagingException e) {
             throw new MailAccessException("Could not bring that message back: " + e.getMessage(), e);
@@ -322,13 +318,17 @@ public final class Mailbox implements AutoCloseable {
         try {
             List<Message> found = new ArrayList<>(ids.size());
             if (!account.isPop3() && folder instanceof UIDFolder uids) {
+                long validity = uids.getUIDValidity();
                 long[] wanted = new long[ids.size()];
                 int at = 0;
                 for (String id : ids) {
                     try {
-                        wanted[at++] = Long.parseLong(id.strip());
+                        Uid uid = Uid.parse(id);
+                        // From before the folder was renumbered: names nothing now.
+                        if (uid.isStale(validity)) continue;
+                        wanted[at++] = uid.uid();
                     } catch (NumberFormatException e) {
-                        at--; // Not an id at all; the rest still answer.
+                        // Not an id at all; the rest still answer.
                     }
                 }
                 for (Message message : uids.getMessagesByUID(Arrays.copyOf(wanted, at))) {
@@ -446,7 +446,7 @@ public final class Mailbox implements AutoCloseable {
                 folder.close(true);
             } else {
                 message.setFlag(Flags.Flag.DELETED, true);
-                folder.expunge();
+                expungeOnly(new Message[] {message});
             }
             return subject == null ? "(no subject)" : subject;
         } catch (MessagingException e) {
@@ -460,7 +460,7 @@ public final class Mailbox implements AutoCloseable {
     /**
      * Moves one message to another folder of the same mailbox. IMAP MOVE where
      * the server has it, copy-then-expunge where it does not; either way the
-     * message is in one place afterwards.
+     * message is in one place afterwards — see {@link #transfer}.
      *
      * <p>The message has a new UID in the target folder. A server with UIDPLUS
      * (RFC 4315) says which in its {@code COPYUID} answer, and that is what a
@@ -486,24 +486,92 @@ public final class Mailbox implements AutoCloseable {
                 throw new MailAccessException("The message is already in " + folderName() + ".");
             }
             String subject = message.getSubject();
-            Message[] one = {message};
-            String newUid = null;
-            if (folder instanceof org.eclipse.angus.mail.imap.IMAPFolder imap) {
-                // MOVE when the server has it, COPY+DELETE+EXPUNGE when not; the
-                // UID variant hands back COPYUID where the server supports UIDPLUS.
-                org.eclipse.angus.mail.imap.AppendUID[] answered = imap.moveUIDMessages(one, target);
-                if (answered != null && answered.length > 0 && answered[0] != null) {
-                    newUid = String.valueOf(answered[0].uid);
-                }
-            } else {
-                folder.copyMessages(one, target);
-                message.setFlag(Flags.Flag.DELETED, true);
-                folder.expunge();
-            }
+            String newUid = transfer(new Message[] {message}, target)[0];
             return new Moved(subject == null ? "(no subject)" : subject, newUid);
         } catch (MessagingException e) {
             throw new MailAccessException("Could not move that message: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Takes messages of this folder to {@code target}, the best way the
+     * server allows, and says what they are called there — null for each
+     * one the server did not say.
+     *
+     * <p>Angus only ever sends what it is told to: its {@code moveUIDMessages}
+     * throws on a server without MOVE (RFC 6851) or without UIDPLUS
+     * (RFC 4315), and does not fall back to anything. So the capabilities
+     * decide here. MOVE with UIDPLUS answers the new UIDs; MOVE alone moves
+     * without them; without MOVE the messages are copied (with COPYUID where
+     * there is UIDPLUS), flagged deleted and expunged — see
+     * {@link #expungeOnly} for why that expunge touches nothing else.
+     */
+    private String[] transfer(Message[] messages, Folder target) throws MessagingException {
+        String[] newUids = new String[messages.length];
+        org.eclipse.angus.mail.imap.AppendUID[] answered = null;
+        if (folder instanceof org.eclipse.angus.mail.imap.IMAPFolder imap) {
+            boolean move = hasCapability("MOVE");
+            boolean uidPlus = hasCapability("UIDPLUS");
+            if (move && uidPlus) {
+                answered = imap.moveUIDMessages(messages, target);
+            } else if (move) {
+                imap.moveMessages(messages, target);
+            } else {
+                if (uidPlus) {
+                    answered = imap.copyUIDMessages(messages, target);
+                } else {
+                    imap.copyMessages(messages, target);
+                }
+                folder.setFlags(messages, new Flags(Flags.Flag.DELETED), true);
+                expungeOnly(messages);
+            }
+        } else {
+            folder.copyMessages(messages, target);
+            folder.setFlags(messages, new Flags(Flags.Flag.DELETED), true);
+            expungeOnly(messages);
+        }
+        if (answered != null) {
+            for (int i = 0; i < newUids.length && i < answered.length; i++) {
+                if (answered[i] != null) newUids[i] = uidRef(answered[i].uidvalidity, answered[i].uid);
+            }
+        }
+        return newUids;
+    }
+
+    /**
+     * Expunges these messages and no others. A plain EXPUNGE removes every
+     * message flagged deleted in the folder — including ones another client
+     * flagged and meant to keep until it expunged itself.
+     *
+     * <p>With UIDPLUS that is {@code UID EXPUNGE} of exactly these. Without
+     * it the others flagged deleted are unflagged for the moment of the
+     * EXPUNGE and flagged again after it; a client that flags one in that
+     * moment loses the race, which is still far narrower than taking all of
+     * them every time.
+     */
+    private void expungeOnly(Message[] messages) throws MessagingException {
+        if (folder instanceof org.eclipse.angus.mail.imap.IMAPFolder imap && hasCapability("UIDPLUS")) {
+            imap.expunge(messages);
+            return;
+        }
+        java.util.Set<Integer> ours = new java.util.HashSet<>();
+        for (Message message : messages) ours.add(message.getMessageNumber());
+        List<Message> spared = new ArrayList<>();
+        for (Message flagged : folder.search(new FlagTerm(new Flags(Flags.Flag.DELETED), true))) {
+            if (!ours.contains(flagged.getMessageNumber())) spared.add(flagged);
+        }
+        Message[] others = spared.toArray(new Message[0]);
+        if (others.length > 0) folder.setFlags(others, new Flags(Flags.Flag.DELETED), false);
+        try {
+            folder.expunge();
+        } finally {
+            if (others.length > 0) folder.setFlags(others, new Flags(Flags.Flag.DELETED), true);
+        }
+    }
+
+    /** Whether the IMAP server announced {@code capability}; false for anything that is not IMAP. */
+    private boolean hasCapability(String capability) throws MessagingException {
+        return store instanceof org.eclipse.angus.mail.imap.IMAPStore imap && imap.hasCapability(capability);
     }
 
     /**
@@ -527,7 +595,13 @@ public final class Mailbox implements AutoCloseable {
             if (!(folder instanceof UIDFolder uids)) {
                 return folder.getMessage(number(id));
             }
-            Message message = uids.getMessageByUID(Long.parseLong(id.strip()));
+            Uid uid = Uid.parse(id);
+            if (uid.isStale(uids.getUIDValidity())) {
+                throw new NoSuchMessageException("Message " + id + " was listed before the server renumbered "
+                        + folderName() + " (its UIDVALIDITY changed), so that id names nothing any more. "
+                        + "List the folder again for the ids it has now.");
+            }
+            Message message = uids.getMessageByUID(uid.uid());
             if (message == null) {
                 throw new NoSuchMessageException("There is no message " + id + " in " + folderName()
                         + " any more — it may have been moved or deleted.");
@@ -543,6 +617,33 @@ public final class Mailbox implements AutoCloseable {
 
     private static int number(String id) {
         return Integer.parseInt(id.strip());
+    }
+
+    /**
+     * An IMAP id as written: {@code <uidvalidity>-<uid>}, or a bare UID as
+     * ids were written before they carried the validity — which is then
+     * taken on trust, as it always was.
+     *
+     * @param validity the folder's UIDVALIDITY when the id was handed out; -1 when the id does not say
+     */
+    record Uid(long validity, long uid) {
+
+        static Uid parse(String id) {
+            String text = id.strip();
+            int dash = text.indexOf('-');
+            if (dash < 0) return new Uid(-1, Long.parseLong(text));
+            return new Uid(Long.parseLong(text.substring(0, dash)), Long.parseLong(text.substring(dash + 1)));
+        }
+
+        /** True when the id was handed out under another UIDVALIDITY than the folder has now. */
+        boolean isStale(long current) {
+            return validity >= 0 && validity != current;
+        }
+    }
+
+    /** How an IMAP message is named: the UIDVALIDITY it was seen under, then its UID. */
+    static String uidRef(long validity, long uid) {
+        return validity + "-" + uid;
     }
 
     private Message[] search(boolean unseenOnly, String from, String subject, Instant since, Instant before)
@@ -637,7 +738,7 @@ public final class Mailbox implements AutoCloseable {
 
     private String idOf(Message message) throws MessagingException {
         if (!account.isPop3() && folder instanceof UIDFolder uids) {
-            return String.valueOf(uids.getUID(message));
+            return uidRef(uids.getUIDValidity(), uids.getUID(message));
         }
         return String.valueOf(message.getMessageNumber());
     }
