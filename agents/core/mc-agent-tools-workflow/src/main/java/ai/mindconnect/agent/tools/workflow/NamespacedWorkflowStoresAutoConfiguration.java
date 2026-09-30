@@ -4,6 +4,8 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
+import ai.mindconnect.agent.UserId;
+import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
@@ -21,6 +23,7 @@ import org.springframework.context.annotation.Configuration;
 
 import javax.sql.DataSource;
 import java.nio.file.Path;
+import java.util.Optional;
 
 /**
  * Workflows live in a namespace like everything else of the agents area. The
@@ -31,9 +34,10 @@ import java.nio.file.Path;
  * the host's {@link ScopeSupplier}. It runs ahead of the workflow area's
  * own configurations, whose beans then back off.
  *
- * <p>The same seam carries the request's scope onto the thread a workflow
- * run is streamed from: the admin UI asks for a {@code RunThreadContext}
- * and this configuration answers with the scope's, when the host has one.
+ * <p>The same seam carries the request into a workflow run, on the request
+ * thread or the one the run is streamed from: the admin UI asks for a
+ * {@code RunThreadContext} and this configuration answers with the scope's
+ * namespace and the request's user as the run's {@code ToolCallScope}.
  */
 @AutoConfiguration(
         afterName = {
@@ -115,14 +119,33 @@ public class NamespacedWorkflowStoresAutoConfiguration {
             return new ai.mindconnect.workflow.admin.service.WorkflowAdminService(store, instances, vars.shared()::asMap);
         }
 
-        /** A streamed run works in the namespace of the request that started it. */
+        /**
+         * A run started from the admin screens or the REST API works in the namespace of the
+         * request that started it, and its tool and agent steps act for the request's user —
+         * their mail, their connections — not for the workflow user, who has none. A
+         * {@link ToolCallScope} already bound to the thread wins; a request without a user
+         * starts a run on nobody's behalf, as before.
+         */
         @Bean
         @ConditionalOnMissingBean
         ai.mindconnect.workflow.admin.run.RunThreadContext workflowRunThreadContext(ScopeSupplier scope) {
-            if (scope instanceof ThreadBoundScope bound) {
-                return body -> bound.isBound() ? bound.wrap(body) : body;
-            }
-            return ai.mindconnect.workflow.admin.run.RunThreadContext.NONE;
+            return body -> {
+                boolean bound = scope instanceof ThreadBoundScope threadBound && threadBound.isBound();
+                Runnable inNamespace = bound ? ((ThreadBoundScope) scope).wrap(body) : body;
+                Optional<ToolCallScope> caller = ToolCallScope.current()
+                        .or(() -> userOf(scope, bound).map(ToolCallScope::detached));
+                if (caller.isEmpty()) return inNamespace;
+                return () -> caller.get().runWith(() -> {
+                    inNamespace.run();
+                    return null;
+                });
+            };
+        }
+
+        /** The request's user; an unbound thread has none, whatever a fallback scope says. */
+        private static Optional<UserId> userOf(ScopeSupplier scope, boolean bound) {
+            if (scope instanceof ThreadBoundScope && !bound) return Optional.empty();
+            return scope.get().userIfAny();
         }
     }
 }
