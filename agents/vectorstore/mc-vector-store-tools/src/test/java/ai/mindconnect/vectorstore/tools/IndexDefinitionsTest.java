@@ -144,6 +144,42 @@ class IndexDefinitionsTest {
     }
 
     @Test
+    void anOwnDatabaseThatCannotBeReachedMakesTheIndexUnavailable_notFiles() {
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of())).orElseThrow();
+        stores.saveIndex(NS, new IndexDefinition("far-kb", "pgvector", OWN_TABLE,
+                "jdbc:postgresql://localhost:1/nowhere?user=x&password=y", null, null, null, null));
+
+        assertThatThrownBy(() -> stores.indexLocation(NS, "far-kb"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Index 'far-kb': the database jdbc:postgresql://localhost:1/nowhere cannot be reached (")
+                .satisfies(e -> assertThat(e.getMessage()).doesNotContain("password=y").doesNotContain("pgvector extension"));
+        assertThatThrownBy(() -> stores.index(NS, "far-kb")).isInstanceOf(IllegalStateException.class);
+        assertThat(dir.resolve(NS.value()).resolve("embeddings-far-kb")).as("no quiet fallback to files").doesNotExist();
+    }
+
+    @Test
+    void anOwnDatabaseWithoutPgvectorMakesTheIndexUnavailable_andSaysSo() {
+        db = TestDb.requirePostgres();
+        String url = TestDb.withoutPgvectorUrl();
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of())).orElseThrow();
+        stores.saveIndex(NS, new IndexDefinition("plain-kb", "pgvector", OWN_TABLE, url,
+                TestDb.NO_VECTOR_USER, TestDb.NO_VECTOR_USER, null, null));
+
+        assertThatThrownBy(() -> stores.indexLocation(NS, "plain-kb"))
+                .hasMessageContaining("Index 'plain-kb': the database " + url + " has no pgvector extension (");
+    }
+
+    @Test
+    void theApplicationsDatabaseThatCannotBeReachedFallsBackToFiles_andSaysWhy() {
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of(
+                "vectorStoreUrl", "jdbc:postgresql://localhost:1/nowhere"))).orElseThrow();
+        stores.saveIndex(NS, new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
+
+        assertThat(stores.indexLocation(NS, "big-kb")).startsWith("Files in ")
+                .contains("— the application's Postgres cannot be reached (");
+    }
+
+    @Test
     void onFilesChatUploadsGetADirectoryOfTheirOwn() {
         DefaultVectorStores stores = new DefaultVectorStores(
                 new VectorStoreTemplate("default", "embeddings", null, Map.of()), dir,

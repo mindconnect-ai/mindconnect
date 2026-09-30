@@ -66,7 +66,7 @@ class PostgresVectorStoresTest {
         assertThat(Sql.of(db).scalar("SELECT count(*) FROM mc_vector_store_instance WHERE namespace = ? AND name = 'kb'",
                 Long.class, NS.value())).isEqualTo(1L);
         assertThat(stores.registry(NS).members("kb")).containsExactly(store.documentRef("doc1"));
-        assertThat(stores.indexLocation(NS)).startsWith("Files in ").endsWith("pgvs-choice/embeddings — the application's Postgres has no pgvector extension");
+        assertThat(stores.indexLocation(NS)).startsWith("Files in ").contains("pgvs-choice/embeddings — the application's Postgres has no pgvector extension (");
     }
 
     @Test

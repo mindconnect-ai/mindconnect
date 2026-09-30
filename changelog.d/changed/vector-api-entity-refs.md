@@ -15,7 +15,9 @@
   `mindconnect.vector-store.url` names), a database of its own (JDBC URL, user,
   encrypted password), or files — in the admin UI's new Indexes tab, where
   *Database* picks the application's or asks for the URL, or
-  `…/api/vector-stores/indexes`. Indexes do not
+  `…/api/vector-stores/indexes`. A database of its own that cannot be reached
+  or has no pgvector makes its index unavailable, with the reason, instead of
+  quietly falling back to files. Indexes do not
   share entries.
   `vector_search` takes `entities` (id, plus type, source, container where
   needed) and `where`; `vector_upsert` a `type` (`file` for a stored file's id)

@@ -51,6 +51,15 @@ final class TestDb {
         return ds;
     }
 
+    /** The JDBC URL of {@link #withoutPgvector()}, for an index definition naming that database. */
+    static String withoutPgvectorUrl() {
+        withoutPgvector();
+        return URL.substring(0, URL.lastIndexOf('/') + 1) + NO_VECTOR;
+    }
+
+    /** The user of {@link #withoutPgvector()} — its password is the same. */
+    static final String NO_VECTOR_USER = NO_VECTOR;
+
     /** A database without the {@code vector} extension, and a user that may not create it. */
     static DataSource withoutPgvector() {
         Sql admin = Sql.of(requirePostgres());
