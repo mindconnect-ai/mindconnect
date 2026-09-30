@@ -44,6 +44,40 @@ public final class ChatShellComponent implements UiComponent {
     private java.util.Set<SessionId> running = java.util.Set.of();
     private java.util.Set<SessionId> waiting = java.util.Set.of();
     private java.util.Set<SessionId> unseen = java.util.Set.of();
+    private History history = History.CHAT;
+
+    /**
+     * Where the history drawer leads: its title, the entry that starts a new
+     * conversation, and the link of each row. The chat's own is {@link #CHAT};
+     * a feature that hosts conversations of its own type in this page — a
+     * builder — hands in one that starts and opens conversations on its own
+     * URLs, so the drawer never leads out of the feature.
+     *
+     * @param title    the drawer's heading
+     * @param newLabel the first entry's label
+     * @param newChat  what the first entry does
+     * @param href     the link of a conversation's row, by session id
+     */
+    public record History(String title, String newLabel, ai.mindconnect.ui.model.UiTrigger newChat,
+                          java.util.function.Function<SessionId, String> href) {
+        /** The chat's own: "New chat" starts one, a row opens {@code /chat/sessions/{id}}. */
+        public static final History CHAT = new History("Chats", "New chat",
+                trigger(on(ChatUiController.class).createSession(null)),
+                id -> "/chat/sessions/" + id.value());
+
+        public History {
+            java.util.Objects.requireNonNull(title, "title");
+            java.util.Objects.requireNonNull(newLabel, "newLabel");
+            java.util.Objects.requireNonNull(newChat, "newChat");
+            java.util.Objects.requireNonNull(href, "href");
+        }
+    }
+
+    /** The drawer's links, when the page is not the chat's own — see {@link History}. */
+    public ChatShellComponent withHistory(History history) {
+        this.history = history == null ? History.CHAT : history;
+        return this;
+    }
 
     public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
                               String agentName, UiNode content) {
@@ -121,7 +155,7 @@ public final class ChatShellComponent implements UiComponent {
 
     /** New chat on top, then the conversations, newest first. */
     private UiMenu menu() {
-        var menu = UiMenu.of(MENU_ID, "Chats");
+        var menu = UiMenu.of(MENU_ID, history.title());
         menu.side(UiMenu.Side.LEFT);
         // Collapsible and open by default: the history is the point of the
         // sidebar, but a wide conversation should be able to reclaim it.
@@ -132,15 +166,14 @@ public final class ChatShellComponent implements UiComponent {
         menu.mode(UiMenu.Mode.OVERLAY);
         menu.state(UiMenu.State.HIDDEN);
         menu.toggle(true);
-        menu.item(UiMenuItem.of("chat-new", "New chat").icon("add")
-                .onClick(trigger(on(ChatUiController.class).createSession(null))));
+        menu.item(UiMenuItem.of("chat-new", history.newLabel()).icon("add").onClick(history.newChat()));
         menu.item(UiMenuItem.divider());
 
         SessionId activeId = active == null ? null : active.id();
         for (AgentSessionHeader s : sessions) {
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
             String badge = badge(s, waiting, running, unseen);
-            menu.item(UiMenuItem.link("chat-" + s.id().value(), label, "/chat/sessions/" + s.id().value())
+            menu.item(UiMenuItem.link("chat-" + s.id().value(), label, history.href().apply(s.id()))
                     .icon(iconFor(s))
                     .badge(badge)
                     .selected(s.id().equals(activeId)));
