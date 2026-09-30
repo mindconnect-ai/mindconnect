@@ -333,11 +333,15 @@ public class BaseStepContainerInstance<T extends StepContainerData>
     // Variable assignment
     // -----------------------------------------------------------------------
 
+    /**
+     * Stores a step's result. The result is data — an HTTP body, a tool's or an
+     * agent's answer, a script's return value — so it is never evaluated again:
+     * a web page reading {@code mini: …} must not run as a script.
+     */
     private void assignResultToVariable(StepData stepData, Object result) {
         String varName = stepData.getAssignResultToVar();
         if (varName != null && !varName.isBlank()) {
-            VariableScope.Variable var = variableScope.assignValue(varName, result,
-                    workflowContext.getExpressionResolver());
+            VariableScope.Variable var = variableScope.assignValue(varName, result, null);
             logDebug("assigned result to var: %s", var.toShortString());
         }
     }

@@ -26,17 +26,21 @@ public class CallWorkflowStep extends BaseStepContainerInstance<CallWorkflowData
 
     @Override
     public void execute() throws Exception {
-        // Map parameters from calling scope into this workflow's scope
+        // Map parameters from calling scope into this workflow's scope. A named
+        // variable is passed on as the data it holds; only the definition's own
+        // text is evaluated as an expression.
         for (var entry : getConfig().getAssignParams().entrySet()) {
             Object value;
             VariableScope.Variable v = getVariableScope().getVariable(entry.getValue());
             if (v != null) {
                 value = v.getValue();
+            } else if (getExpressionResolver() != null
+                    && getExpressionResolver().containsExpression(entry.getValue())) {
+                value = getExpressionResolver().eval(getVariableScope(), entry.getValue());
             } else {
-                value = getStringVariableReplacer().replaceVars(entry.getValue(),
-                        getVariableScope()::getVariableValue);
+                value = entry.getValue();
             }
-            getVariableScope().assignValue(entry.getKey(), value, getExpressionResolver());
+            getVariableScope().assignValue(entry.getKey(), value, null);
         }
 
         super.execute();
