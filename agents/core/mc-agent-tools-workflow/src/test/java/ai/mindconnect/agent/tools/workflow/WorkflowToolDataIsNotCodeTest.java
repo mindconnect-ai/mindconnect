@@ -112,4 +112,26 @@ class WorkflowToolDataIsNotCodeTest {
                 .isEqualTo(String.valueOf(PAYLOAD.length()));
     }
 
+    /**
+     * {@code ${…}} inside a script expression used to be pasted into the script's text
+     * before it ran, so a value closing the string literal became code. A script reads
+     * variables by name; {@code ${…}} is substitution for plain text only.
+     */
+    @Test
+    void aPlaceholderInsideAScriptDoesNotPasteTheValueIntoTheCode() {
+        AssignVariablesData quote = new AssignVariablesData();
+        quote.setName("quote");
+        quote.getVariableAssignments().add(new VariableAssignment("quoted", "mini: \"${text}\""));
+        WorkflowData wf = new WorkflowData();
+        wf.setName("quoting");
+        wf.setResultFrom("quoted");
+        wf.addSteps(quote);
+        wf.setParams(Schema.object().prop("text", Schema.string()).require("text"));
+        repository.save("quoting", wf);
+
+        String breakout = "\" + \"x\".getClass().getName() + \"";
+
+        assertThat(tool("quoting").execute(Map.of("text", breakout)))
+                .doesNotContain("java.lang.String");
+    }
 }
