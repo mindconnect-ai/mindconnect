@@ -42,6 +42,7 @@ const sidebars = {
               ],
             },
             'agents/skills',
+            'agents/project-workflows',
             'agents/memory',
             'agents/prompt-renderer',
             'agents/vector-store',

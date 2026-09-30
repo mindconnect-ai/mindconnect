@@ -7,9 +7,15 @@ import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
+import ai.mindconnect.agent.tool.AgentToolId;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -70,5 +76,26 @@ class DynamicToolActivationsTest {
         activations.activate(session.id(), List.of("bash", "file_read"));
 
         assertThat(activations.effectiveRefs(noTools, session.id())).isEmpty();
+    }
+
+    @Test
+    void aProjectWithWorkflowsBringsRunWorkflow_carryingWhatTheCallerHas(@TempDir Path project) throws Exception {
+        AgentDefinition def = noTools.withTools(List.of(
+                AgentTool.of("file_read"),
+                new AgentTool(AgentToolId.random(), "bash", null, Map.of(), true, false, true, null),
+                new AgentTool(AgentToolId.random(), "web_fetch", null, Map.of(), false, false, false, null)));
+        AgentSession session = session(def);
+        sessions.update(session.id(), current -> current.withWorkingDir(project.toString()));
+        assertThat(activations.effectiveRefs(def, session.id())).extracting(AgentTool::name)
+                .doesNotContain(ProjectWorkflowFiles.TOOL);
+
+        Path dir = Files.createDirectories(project.resolve(ProjectWorkflowFiles.DIR));
+        Files.writeString(dir.resolve("release.yaml"), "steps: []");
+
+        AgentTool run = activations.effectiveRefs(def, session.id()).stream()
+                .filter(t -> t.name().equals(ProjectWorkflowFiles.TOOL)).findFirst().orElseThrow();
+        // A switched-off tool is not the caller's to hand on.
+        assertThat(run.overrides().get(ProjectWorkflowFiles.CALLER_TOOLS)).isEqualTo(List.of("file_read", "bash"));
+        assertThat(run.overrides().get(ProjectWorkflowFiles.APPROVAL_TOOLS)).isEqualTo(List.of("bash"));
     }
 }

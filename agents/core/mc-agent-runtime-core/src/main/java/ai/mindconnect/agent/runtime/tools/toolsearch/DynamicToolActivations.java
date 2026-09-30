@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.tools.toolsearch;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.skill.SkillTool;
 import ai.mindconnect.agent.runtime.skill.SkillToolFactory;
@@ -154,7 +155,42 @@ public final class DynamicToolActivations {
             refs.add(AgentTool.of(SkillTool.NAME, null, Map.of(
                     SkillToolFactory.NAMES, List.copyOf(skillsConfig.names()))));
         }
+        AgentTool workflows = projectWorkflowTool(def, sessionId, refs);
+        if (workflows != null) {
+            refs.add(workflows);
+        }
         return refs;
+    }
+
+    /**
+     * {@code run_workflow} when the project the session works in defines
+     * workflows, the way {@code run_agent} follows the project's agents. The
+     * binding carries what the caller may use: a workflow from the project
+     * narrows the caller's tools and agents, it never adds to them. Tools
+     * that need an approval are named separately, since a workflow step has
+     * nobody to ask.
+     */
+    private static final Set<String> NOT_FOR_WORKFLOWS = Set.of(
+            ai.mindconnect.agent.runtime.domain.AgentDefinition.TOOL_SEARCH, SkillTool.NAME, "list_agents");
+
+    private AgentTool projectWorkflowTool(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
+                                          SessionId sessionId, List<AgentTool> refs) {
+        var session = sessionId == null ? null : sessions.findById(sessionId).orElse(null);
+        if (session == null || !ProjectWorkflowFiles.present(session.workingDir())) {
+            return null;
+        }
+        List<String> tools = new ArrayList<>();
+        List<String> approval = new ArrayList<>();
+        for (AgentTool ref : refs) {
+            // What steers the agent's own toolset is not something a step calls.
+            if (!ref.enabled() || NOT_FOR_WORKFLOWS.contains(ref.name())) continue;
+            tools.add(ref.name());
+            if (ref.needsApproval()) approval.add(ref.name());
+        }
+        return AgentTool.of(ProjectWorkflowFiles.TOOL, null, Map.of(
+                ProjectWorkflowFiles.CALLER_TOOLS, List.copyOf(tools),
+                ProjectWorkflowFiles.APPROVAL_TOOLS, List.copyOf(approval),
+                ProjectWorkflowFiles.CALLER_AGENTS, List.copyOf(def.effectiveCallableAgents())));
     }
 
     /**

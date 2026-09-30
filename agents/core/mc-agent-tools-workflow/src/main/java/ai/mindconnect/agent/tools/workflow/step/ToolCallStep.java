@@ -24,6 +24,13 @@ public class ToolCallStep extends BaseStepInstance<ToolCallData> {
             throw new IllegalArgumentException("tool-call step '" + cfg.getName() + "': no tool configured");
         }
 
+        // A workflow from a project may only use what the agent that started it has.
+        CallerLimits limits = getWorkflowContext() == null ? null
+                : getWorkflowContext().getAttribute(CallerLimits.class);
+        if (limits != null) {
+            limits.checkTool(cfg.getName(), cfg.getTool().trim());
+        }
+
         Map<String, Object> arguments = parseArguments(cfg);
 
         logDebug("calling tool '%s'", cfg.getTool());
