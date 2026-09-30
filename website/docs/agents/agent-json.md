@@ -53,7 +53,7 @@ The format of a file in
 | `systemPrompt` | string | The agent's role and instructions. Supports template vars like `{{ current_date }}`. |
 | `welcomeMessage` | string? | Optional greeting shown when a session starts. |
 | `llmConfigName` | string | Which [LLM config](./llm-config-json.md) to use (e.g. `agent-default`). |
-| `maxIterations` | int | Max tool-loop rounds per turn. |
+| `maxIterations` | int | Max tool-loop rounds per turn (0 means the default of 10). When the cap hits, a note lands in the chat and the agent answers without tools. |
 | `status` | enum | `DRAFT`, `ACTIVE` (usable) or `DEPRECATED`. |
 | `memoryConfig` | object | Working-memory strategy (see below). |
 | `skills` | object? | Optional: `{ "mode": "SPECIFIC", "names": ["weekly-report", …] }` — which [skills](./skills.md) the agent may load. `mode` is `ALL` (the default, also when the field is absent: every skill the installation, the user and the project have), `SPECIFIC` (only `names`) or `NONE` (no `skill` tool, nothing about skills in the prompt). |

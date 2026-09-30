@@ -51,6 +51,12 @@ public final class AgentLoop {
         this(round, messages, maxRounds, published, List.of());
     }
 
+    /*
+     * maxRounds counts rounds in which the model's tool calls RUN: the
+     * (maxRounds + 1)th request is refused with an error result per call and
+     * the turn ends INCOMPLETE:MAX_ROUNDS, for the worker to force an answer.
+     */
+
     /**
      * @param advisors turn-level policy around each round (reviewer chain,
      *                 tool-result compression) — in list order, first advisor
@@ -134,11 +140,19 @@ public final class AgentLoop {
                             TurnOutcome.IncompleteReason.MAX_OUTPUT_TOKENS, total, modelRounds + 1);
                 }
                 case CALLS_REQUESTED -> {
-                    if (++modelRounds >= maxRounds) {
+                    if (modelRounds >= maxRounds) {
                         log.info("turn {} hit the round cap of {}", requestId, maxRounds);
+                        // The calls the model just asked for are persisted and
+                        // must not stay open: a tool call without a result is a
+                        // history no provider accepts, and the forced answer
+                        // that follows would fail on it. Close each with an
+                        // error that says why — the model reads it, and the
+                        // fold sees a finished call, never one to run later.
+                        record(conversationId, history, refusedResults(history, maxRounds));
                         return TurnOutcome.incomplete(
                                 TurnOutcome.IncompleteReason.MAX_ROUNDS, total, modelRounds);
                     }
+                    modelRounds++;
                 }
                 case TOOLS_ADVANCED -> { }
                 case WAITING_FOR_TOOLS -> {
@@ -147,6 +161,17 @@ public final class AgentLoop {
                 }
             }
         }
+    }
+
+    /** An error result for every call still open in the episode: the cap refused them. */
+    private static List<TurnMessage> refusedResults(List<Message> history, int maxRounds) {
+        List<TurnMessage> results = new ArrayList<>();
+        for (ToolCalls.Call call : ToolCalls.of(ToolCalls.episode(history)).open()) {
+            results.add(TurnMessage.toolResult(call.callId(), call.name(),
+                    "Error: not executed — this turn reached the agent's round cap of "
+                            + maxRounds + " tool-call rounds (Max Iterations).", true));
+        }
+        return results;
     }
 
     /** Append, then announce. A failing announcer does not cost the round. */

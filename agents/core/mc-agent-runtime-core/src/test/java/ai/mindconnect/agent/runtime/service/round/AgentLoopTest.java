@@ -205,14 +205,20 @@ class AgentLoopTest {
         f.executor.finishes("c1", "ok");
         f.executor.finishes("c2", "ok");
 
-        // roundsSoFar = 1 (an earlier attempt already turned once): the cap of
-        // 2 is hit after ONE more model round — the history knows the calls,
-        // only the count must come from outside.
-        TurnOutcome outcome = tightLoop.run("req1", conversationId, sessionId, new Cancellation(), 1, Usage.ZERO);
+        // roundsSoFar = 2 (earlier attempts already ran two rounds of tools):
+        // the cap of 2 refuses the very next request — the history knows the
+        // calls, only the count must come from outside.
+        TurnOutcome outcome = tightLoop.run("req1", conversationId, sessionId, new Cancellation(), 2, Usage.ZERO);
 
         assertThat(outcome.status()).isEqualTo(TurnOutcome.Status.INCOMPLETE);
         assertThat(outcome.incompleteReason()).isEqualTo(TurnOutcome.IncompleteReason.MAX_ROUNDS);
         assertThat(f.llm.calls).isEqualTo(1);
+        // The refused call is closed with an error result, not left open.
+        List<Message> stored = f.log.load(conversationId);
+        Message last = stored.get(stored.size() - 1);
+        assertThat(last.type()).isEqualTo(MessageType.TOOL_RESULT);
+        assertThat(last.content()).contains("round cap of 2");
+        assertThat(ToolCalls.of(ToolCalls.episode(stored)).allDone()).isTrue();
     }
 
     @Test
