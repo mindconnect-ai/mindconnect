@@ -584,6 +584,12 @@ public class ChatUiController {
 
     private UiPage shell(AgentSession session,
                          List<? extends AgentSessionHeader> sessions) {
+        return shell(session, sessions, ai.mindconnect.chatui.ui.component.ChatShellComponent.History.CHAT);
+    }
+
+    private UiPage shell(AgentSession session,
+                         List<? extends AgentSessionHeader> sessions,
+                         ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
         var seen = rememberShown(session.id());
         var agent = agentResolver.resolve(session);
         var chat = buildChatPage(session, agent);
@@ -591,6 +597,7 @@ public class ChatUiController {
                 sessions, session, agent.name(), chat.renderContent(), agentIcons())
                 .withActivity(runningSessions(sessions), waitingSessions(sessions))
                 .withUnseen(seen.unseen(sessions))
+                .withHistory(history)
                 .render();
         var page = UiPage.of("/chat/sessions/" + session.id().value(), appShell);
         // A reload during a live turn reattaches instead of showing a dead form.
@@ -827,6 +834,17 @@ public class ChatUiController {
      * session out of the chat's history and out of what {@code /chat} opens.
      */
     public ResponseEntity<UiPage> startSession(String agentIdValue, OidcUser user, String type) {
+        return startSession(agentIdValue, user, type,
+                ai.mindconnect.chatui.ui.component.ChatShellComponent.History.CHAT);
+    }
+
+    /**
+     * As {@link #startSession(String, OidcUser, String)}, with the history
+     * drawer leading where the feature says — its own URLs for a new
+     * conversation and for each row, so the drawer never leaves the feature.
+     */
+    public ResponseEntity<UiPage> startSession(String agentIdValue, OidcUser user, String type,
+                                               ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
         AgentId agentId = AgentId.of(agentIdValue);
         String userId = user.getPreferredUsername();
         return agentRepository.findById(agentId)
@@ -834,10 +852,25 @@ public class ChatUiController {
                     var session = type == null || AgentSession.CHAT.equals(type)
                             ? sessionService.openChat(agentId, UserId.of(userId))
                             : sessionService.openChatOfType(agentId, UserId.of(userId), type);
-                    return ResponseEntity.ok(shell(session,
-                            sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
+                    return ResponseEntity.ok(shell(session, historyOf(UserId.of(userId), session), history));
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * The conversations the drawer lists beside this one: the chat's own for a
+     * chat; for a session of another type, the user's conversations of that
+     * type with the same agent — a builder's drawer shows that builder's
+     * conversations, not the chats and not the other builder's.
+     */
+    private List<? extends AgentSessionHeader> historyOf(UserId userId, AgentSession session) {
+        if (session.isOfType(AgentSession.CHAT)) {
+            return sessionRepository.findHeadersByUser(userId, AgentSession.CHAT);
+        }
+        return sessionRepository.findHeadersByUser(userId, session.type()).stream()
+                .filter(h -> h.parentSessionId() == null
+                        && java.util.Objects.equals(h.agentDefinitionId(), session.agentDefinitionId()))
+                .toList();
     }
 
     /** {@code kind=images} narrows the attach dialog to pictures. */
@@ -1226,10 +1259,21 @@ public class ChatUiController {
     @GetMapping("/sessions/{sessionId}")
     public ResponseEntity<UiPage> getSession(@PathVariable("sessionId") String sessionIdValue,
                                              @AuthenticationPrincipal OidcUser user) {
+        return getSession(sessionIdValue, user, ai.mindconnect.chatui.ui.component.ChatShellComponent.History.CHAT);
+    }
+
+    /**
+     * Shows a session with the history drawer leading where the feature says
+     * — for a feature that hosts conversations of its own type in this page,
+     * such as a builder. The drawer lists the user's conversations of the
+     * session's type with the same agent.
+     */
+    public ResponseEntity<UiPage> getSession(String sessionIdValue, OidcUser user,
+                                             ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
         SessionId sessionId = SessionId.of(sessionIdValue);
         return ownedSession(sessionId, user)
                 .map(session -> ResponseEntity.ok(shell(session,
-                        sessionRepository.findHeadersByUser(UserId.of(userId(user)), AgentSession.CHAT))))
+                        historyOf(UserId.of(userId(user)), session), history)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
