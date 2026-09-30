@@ -24,6 +24,12 @@ public class ToolCallStep extends BaseStepInstance<ToolCallData> {
             throw new IllegalArgumentException("tool-call step '" + cfg.getName() + "': no tool configured");
         }
 
+        // A workflow from a project may only use what the agent that started it has.
+        CallerLimits limits = getWorkflowContext() == null ? null
+                : getWorkflowContext().getAttribute(CallerLimits.class);
+        ai.mindconnect.agent.tool.AgentTool binding = limits == null ? null
+                : limits.checkTool(cfg.getName(), cfg.getTool().trim());
+
         Map<String, Object> arguments = parseArguments(cfg);
 
         logDebug("calling tool '%s'", cfg.getTool());
@@ -31,7 +37,9 @@ public class ToolCallStep extends BaseStepInstance<ToolCallData> {
         // tool, a chat upload); a run started for nobody in particular has none.
         ToolCallScope scope = getWorkflowContext() == null ? null
                 : getWorkflowContext().getAttribute(ToolCallScope.class);
-        String result = ToolInvokers.require().call(cfg.getTool().trim(), arguments, scope);
+        String result = binding != null
+                ? ToolInvokers.require().call(binding, arguments, scope)
+                : ToolInvokers.require().call(cfg.getTool().trim(), arguments, scope);
         // Tools report failure as text by convention ("Error: …"). A failed
         // tool must FAIL the step — a workflow that reports success while its
         // tool errored is a silent lie (ingestion once "succeeded" with zero
@@ -45,11 +53,39 @@ public class ToolCallStep extends BaseStepInstance<ToolCallData> {
         setResult(result);
     }
 
+    /**
+     * Resolves every string in a nested map/list on its own. A string that is
+     * exactly one {@code ${var}} yields the variable's value unflattened.
+     */
+    private Object resolveDeep(Object value) {
+        if (value instanceof String s) {
+            java.util.regex.Matcher single = SINGLE_VAR.matcher(s.trim());
+            if (single.matches()) {
+                return getVariableScope().getVariableValue(single.group(1));
+            }
+            return resolveExpression(s);
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> out = new java.util.LinkedHashMap<>();
+            map.forEach((k, v) -> out.put(String.valueOf(k), resolveDeep(v)));
+            return out;
+        }
+        if (value instanceof java.util.List<?> list) {
+            return list.stream().map(this::resolveDeep).toList();
+        }
+        return value;
+    }
+
     /** Matches an arguments value that is exactly one variable reference, e.g. {@code ${writeArgs}}. */
     private static final java.util.regex.Pattern SINGLE_VAR =
             java.util.regex.Pattern.compile("\\$\\{([A-Za-z_][A-Za-z0-9_]*)}");
 
     private Map<String, Object> parseArguments(ToolCallData cfg) {
+        if (cfg.getArgumentValues() != null) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> resolved = (Map<String, Object>) resolveDeep(cfg.getArgumentValues());
+            return resolved;
+        }
         String raw = cfg.getArguments();
         if (raw == null || raw.isBlank()) {
             return Map.of();

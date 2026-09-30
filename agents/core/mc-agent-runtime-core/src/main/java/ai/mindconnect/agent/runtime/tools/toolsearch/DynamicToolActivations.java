@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.tools.toolsearch;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.skill.SkillTool;
 import ai.mindconnect.agent.runtime.skill.SkillToolFactory;
@@ -62,8 +63,11 @@ public final class DynamicToolActivations {
      */
     public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
                                          SessionId sessionId, UserId userId, boolean mainAgent) {
-        List<AgentTool> refs = effectiveRefs(def, sessionId);
-        return mainAgent ? userTools.apply(userId, def.id(), refs) : refs;
+        List<AgentTool> refs = configuredRefs(def, sessionId);
+        // The project's workflows get what the caller ends up with — after the
+        // user switched tools off or made them ask first, never before.
+        return withProjectWorkflows(def, sessionId,
+                mainAgent ? userTools.apply(userId, def.id(), refs) : refs);
     }
 
     /** Marks {@code toolNames} usable for {@code sessionId}, persisted on the session. */
@@ -115,6 +119,12 @@ public final class DynamicToolActivations {
      * for cannot be found, activated or offered.
      */
     public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
+        return withProjectWorkflows(def, sessionId, configuredRefs(def, sessionId));
+    }
+
+    /** {@link #effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition, SessionId)} without {@code run_workflow}. */
+    private List<AgentTool> configuredRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
+                                           SessionId sessionId) {
         Set<String> activated = activated(sessionId);
         List<AgentTool> refs = new ArrayList<>();
         List<String> deferredNames = new ArrayList<>();
@@ -155,6 +165,54 @@ public final class DynamicToolActivations {
                     SkillToolFactory.NAMES, List.copyOf(skillsConfig.names()))));
         }
         return refs;
+    }
+
+    /**
+     * {@code refs} with {@code run_workflow} when the project defines
+     * workflows — built from {@code refs} as they finally stand, so it hands on
+     * exactly what the caller has. A {@code run_workflow} row already among
+     * them, from the definition or the user's own roster, is dropped: the
+     * project decides, and the tool is offered once.
+     */
+    private List<AgentTool> withProjectWorkflows(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
+                                                 SessionId sessionId, List<AgentTool> refs) {
+        List<AgentTool> out = new ArrayList<>(refs.size() + 1);
+        for (AgentTool ref : refs) {
+            if (!ProjectWorkflowFiles.TOOL.equals(ref.name())) out.add(ref);
+        }
+        AgentTool workflows = projectWorkflowTool(def, sessionId, out);
+        if (workflows != null) {
+            out.add(workflows);
+        }
+        return out;
+    }
+
+    /** What steers the agent's own toolset is not something a workflow step calls. */
+    private static final Set<String> NOT_FOR_WORKFLOWS = Set.of(
+            ai.mindconnect.agent.runtime.domain.AgentDefinition.TOOL_SEARCH, SkillTool.NAME, "list_agents");
+
+    /**
+     * {@code run_workflow} when the project the session works in defines
+     * workflows, the way {@code run_agent} follows the project's agents. The
+     * binding carries what the caller may use — each of its tools with the
+     * caller's own binding (pins, alias, approval flag), so a step runs a
+     * tool exactly as the caller would — and the agents it may call. A
+     * workflow from the project narrows that, it never adds to it.
+     */
+    private AgentTool projectWorkflowTool(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
+                                          SessionId sessionId, List<AgentTool> refs) {
+        var session = sessionId == null ? null : sessions.findById(sessionId).orElse(null);
+        if (session == null || !ProjectWorkflowFiles.present(session.workingDir())) {
+            return null;
+        }
+        List<Map<String, Object>> tools = new ArrayList<>();
+        for (AgentTool ref : refs) {
+            if (!ref.enabled() || NOT_FOR_WORKFLOWS.contains(ref.name())) continue;
+            tools.add(ProjectWorkflowFiles.callerTool(ref));
+        }
+        return AgentTool.of(ProjectWorkflowFiles.TOOL, null, Map.of(
+                ProjectWorkflowFiles.CALLER_TOOLS, List.copyOf(tools),
+                ProjectWorkflowFiles.CALLER_AGENTS, List.copyOf(def.effectiveCallableAgents())));
     }
 
     /**

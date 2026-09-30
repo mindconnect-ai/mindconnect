@@ -69,6 +69,11 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
         <dependency>
+            <!-- the workflows a project keeps in .mindconnect/workflows/*.yaml -->
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
         </dependency>

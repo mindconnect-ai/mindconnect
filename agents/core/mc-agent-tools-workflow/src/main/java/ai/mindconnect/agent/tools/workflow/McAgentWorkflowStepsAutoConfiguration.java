@@ -124,10 +124,16 @@ public class McAgentWorkflowStepsAutoConfiguration {
             @Override
             public String call(String toolName, java.util.Map<String, Object> arguments,
                                ToolCallScope scope) {
+                return call(AgentTool.of(toolName), arguments, scope);
+            }
+
+            @Override
+            public String call(AgentTool agentTool, java.util.Map<String, Object> arguments,
+                               ToolCallScope scope) {
+                String toolName = agentTool.name();
                 // The scope the run was started with; else one bound to this
                 // thread — an upload being ingested, so a file tool lands in the
                 // session's directories; else the workflow user, who owns no chat.
-                var agentTool = AgentTool.of(toolName);
                 ToolCallScope effective = scope != null ? scope
                         : ToolCallScope.current().orElseGet(() -> ToolCallScope.detached(UserId.of(WORKFLOW_USER)));
                 Tool tool = toolRegistry
