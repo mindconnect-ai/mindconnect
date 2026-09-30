@@ -81,8 +81,12 @@ public final class AgentTurnWorker implements TaskWorker {
     public static final String RUN = "run";
     public static final String PARENT_TURN_ID = "parentTurnId";
 
-    /** Hard cap on tool-calling rounds within a single turn (as before). */
-    static final int MAX_ROUNDS = 10;
+    /**
+     * The round cap when an agent definition carries none: the agent's
+     * {@code maxIterations} is the cap, this is only the fallback for a
+     * definition that has 0 there.
+     */
+    static final int DEFAULT_MAX_ROUNDS = 10;
     /** Hard cap on sub-agent recursion. Prevents runaway delegation chains. */
     public static final int MAX_DEPTH = 5;
 
@@ -343,8 +347,9 @@ public final class AgentTurnWorker implements TaskWorker {
         // rewrites an ANSWERED outcome before persistence.
         ReviewerAdvisor reviewer = new ReviewerAdvisor(agentTaskRunner, conversationManager,
                 def, session, userMessage.orElse(null), stream);
+        int maxRounds = roundCap(def);
         AgentLoop loop = new AgentLoop(new AgentRound(llm, tools, executor), messageLog,
-                MAX_ROUNDS, message -> { }, List.of(reviewer));
+                maxRounds, message -> { }, List.of(reviewer));
 
         int roundsSoFar = roundsSoFar(ctx);
         TurnOutcome outcome = loop.run(turnId.value(), conversationId, session.id(),
@@ -384,6 +389,13 @@ public final class AgentTurnWorker implements TaskWorker {
         }
         if (outcome.status() == TurnOutcome.Status.INCOMPLETE
                 && outcome.incompleteReason() == TurnOutcome.IncompleteReason.MAX_ROUNDS) {
+            // Say why, before the forced answer: without this note the agent
+            // announces its next tool call and "just stops", and nobody — the
+            // user or the model next turn — knows the cap did it.
+            messageLog.append(conversationId, TurnMessage.assistant(
+                    "⚠️ *Round cap reached: this turn used all " + maxRounds
+                            + " tool-call rounds the agent allows (Max Iterations). Answering now "
+                            + "without tools — ask me to continue, or raise the agent's Max Iterations.*"));
             // The old loop's last-round rule, kept: out of rounds means "answer
             // now, without tools" — not "end with no answer at all".
             ForcedAnswer forced = forceFinalAnswer(llm, messageLog, turnId, conversationId,
@@ -403,6 +415,11 @@ public final class AgentTurnWorker implements TaskWorker {
     }
 
     // ── post-loop pieces ────────────────────────────────────────────────────
+
+    /** The agent's {@code maxIterations}, or the default for a definition without one. */
+    static int roundCap(AgentDefinition def) {
+        return def.maxIterations() > 0 ? def.maxIterations() : DEFAULT_MAX_ROUNDS;
+    }
 
     /** Out of rounds: one last model call without tools — answer now, reviewed like any answer. */
     /** The forced answer and what that extra model call cost. */

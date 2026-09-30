@@ -32,7 +32,10 @@ The agent form lets you set:
   **Welcome Message**.
 - **LLM Config** — which model it uses, picked from your
   [LLM Configs](./llm-configs.md) (e.g. `agent-default`, `claude-default`).
-- **Max Iterations** — the tool-loop budget per turn.
+- **Max Iterations** — the tool-loop budget per turn: how many times the model
+  may ask for tools before it has to answer. When the cap hits, the chat says so
+  and the agent answers without tools; raise it for agents that build, test and
+  fix in one go (the workflow builder, deep research).
 - **Skills** — which [skills](../skills.md) the agent may load: all, specific
   ones (a checkbox per skill appears), or none.
 - **Callable Agents** — the roster of agents this one may hand work to, a
