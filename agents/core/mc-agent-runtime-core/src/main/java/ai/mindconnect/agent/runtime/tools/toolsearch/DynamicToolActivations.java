@@ -63,8 +63,11 @@ public final class DynamicToolActivations {
      */
     public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
                                          SessionId sessionId, UserId userId, boolean mainAgent) {
-        List<AgentTool> refs = effectiveRefs(def, sessionId);
-        return mainAgent ? userTools.apply(userId, def.id(), refs) : refs;
+        List<AgentTool> refs = configuredRefs(def, sessionId);
+        // The project's workflows get what the caller ends up with — after the
+        // user switched tools off or made them ask first, never before.
+        return withProjectWorkflows(def, sessionId,
+                mainAgent ? userTools.apply(userId, def.id(), refs) : refs);
     }
 
     /** Marks {@code toolNames} usable for {@code sessionId}, persisted on the session. */
@@ -116,6 +119,12 @@ public final class DynamicToolActivations {
      * for cannot be found, activated or offered.
      */
     public List<AgentTool> effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
+        return withProjectWorkflows(def, sessionId, configuredRefs(def, sessionId));
+    }
+
+    /** {@link #effectiveRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition, SessionId)} without {@code run_workflow}. */
+    private List<AgentTool> configuredRefs(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
+                                           SessionId sessionId) {
         Set<String> activated = activated(sessionId);
         List<AgentTool> refs = new ArrayList<>();
         List<String> deferredNames = new ArrayList<>();
@@ -123,9 +132,6 @@ public final class DynamicToolActivations {
             // The skill tool follows the agent's skills setting alone (below): a
             // row assigned by hand would carry no names and reach every skill.
             if (SkillTool.NAME.equals(tool.name())) continue;
-            // run_workflow follows the project (below): a row assigned by hand
-            // would carry nothing the caller has, and offer the tool twice.
-            if (ProjectWorkflowFiles.TOOL.equals(tool.name())) continue;
             if (!tool.deferred()) {
                 refs.add(tool);
                 continue;
@@ -158,11 +164,27 @@ public final class DynamicToolActivations {
             refs.add(AgentTool.of(SkillTool.NAME, null, Map.of(
                     SkillToolFactory.NAMES, List.copyOf(skillsConfig.names()))));
         }
-        AgentTool workflows = projectWorkflowTool(def, sessionId, refs);
-        if (workflows != null) {
-            refs.add(workflows);
-        }
         return refs;
+    }
+
+    /**
+     * {@code refs} with {@code run_workflow} when the project defines
+     * workflows — built from {@code refs} as they finally stand, so it hands on
+     * exactly what the caller has. A {@code run_workflow} row already among
+     * them, from the definition or the user's own roster, is dropped: the
+     * project decides, and the tool is offered once.
+     */
+    private List<AgentTool> withProjectWorkflows(ai.mindconnect.agent.runtime.domain.AgentDefinition def,
+                                                 SessionId sessionId, List<AgentTool> refs) {
+        List<AgentTool> out = new ArrayList<>(refs.size() + 1);
+        for (AgentTool ref : refs) {
+            if (!ProjectWorkflowFiles.TOOL.equals(ref.name())) out.add(ref);
+        }
+        AgentTool workflows = projectWorkflowTool(def, sessionId, out);
+        if (workflows != null) {
+            out.add(workflows);
+        }
+        return out;
     }
 
     /** What steers the agent's own toolset is not something a workflow step calls. */

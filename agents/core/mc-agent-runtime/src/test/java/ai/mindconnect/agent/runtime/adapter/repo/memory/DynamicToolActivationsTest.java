@@ -104,4 +104,37 @@ class DynamicToolActivationsTest {
         assertThat(callerTools.get(0).overrides()).isEqualTo(Map.of("params", Map.of("store", "handbook")));
         assertThat(callerTools.get(1).needsApproval()).isTrue();
     }
+
+    @Test
+    void runWorkflowCarriesWhatTheUsersOwnRosterLeaves(@TempDir Path project) throws Exception {
+        // The user switched bash off, made file_write ask first, and added run_workflow by hand.
+        ai.mindconnect.agent.tool.UserToolRoster roster = (userId, agentId, refs) -> {
+            List<AgentTool> out = new java.util.ArrayList<>();
+            for (AgentTool ref : refs) {
+                if (ref.name().equals("bash")) continue;
+                out.add(ref.name().equals("file_write")
+                        ? new AgentTool(ref.id(), ref.name(), null, ref.overrides(), true, false, true, null)
+                        : ref);
+            }
+            out.add(AgentTool.of(ProjectWorkflowFiles.TOOL));
+            return out;
+        };
+        DynamicToolActivations withRoster = new DynamicToolActivations(sessions,
+                ai.mindconnect.agent.runtime.skill.SkillCatalog.none(), roster);
+        AgentDefinition def = noTools.withTools(List.of(AgentTool.of("bash"), AgentTool.of("file_write")));
+        AgentSession session = session(def);
+        sessions.update(session.id(), current -> current.withWorkingDir(project.toString()));
+        Files.writeString(Files.createDirectories(project.resolve(ProjectWorkflowFiles.DIR)).resolve("x.yaml"),
+                "steps: []");
+
+        List<AgentTool> refs = withRoster.effectiveRefs(def, session.id(), UserId.of("u"), true);
+
+        assertThat(refs).extracting(AgentTool::name).filteredOn(ProjectWorkflowFiles.TOOL::equals).hasSize(1);
+        AgentTool run = refs.stream().filter(t -> t.name().equals(ProjectWorkflowFiles.TOOL)).findFirst().orElseThrow();
+        assertThat(run.overrides()).containsKey(ProjectWorkflowFiles.CALLER_TOOLS);
+        List<AgentTool> callerTools = ((List<?>) run.overrides().get(ProjectWorkflowFiles.CALLER_TOOLS)).stream()
+                .map(ProjectWorkflowFiles::fromCallerTool).toList();
+        assertThat(callerTools).extracting(AgentTool::name).containsExactly("file_write");
+        assertThat(callerTools.get(0).needsApproval()).isTrue();
+    }
 }
