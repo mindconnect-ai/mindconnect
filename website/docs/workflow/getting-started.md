@@ -90,6 +90,19 @@ var result = new WorkflowExecutorService(new DefaultWorkflowContextFactory())
 MiniScript is a small, JSON-friendly expression language — see the
 [MiniScript reference](./miniscript.md) for its full syntax.
 
+### Only the definition is code
+
+Script expressions are evaluated only where the workflow definition itself
+contains them. Everything that arrives at run time is data and is stored as
+given: input parameters (including a model's arguments when the workflow runs
+as an agent tool), resume parameters, and step results such as an HTTP body or
+a tool's or agent's answer. An input `"mini: 1 + 1"` stays that string.
+
+Inside a script, read variables by name (`mini: name.length()`), not through
+`${name}`: a `${…}` placeholder in a script expression is left alone rather
+than pasted into the script's text, where a value containing a quote would
+turn into code. `${…}` is for plain text such as `"Hello ${name}!"`.
+
 ### Other languages (Groovy, BeanShell, Jython)
 
 For Groovy, JavaScript, BeanShell or Jython, add that language module **plus**

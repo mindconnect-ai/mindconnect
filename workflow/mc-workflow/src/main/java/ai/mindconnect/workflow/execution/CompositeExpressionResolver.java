@@ -66,14 +66,20 @@ public class CompositeExpressionResolver implements ExpressionResolver {
         return expression;
     }
 
+    /**
+     * Evaluates with the first resolver that claims the expression, or else
+     * substitutes {@code ${…}} placeholders. A claimed expression is handed over
+     * as written: pasting variable values into its text would turn a value that
+     * closes a string literal into code — the resolver reads variables through
+     * the scope instead.
+     */
     @Override
     public Object eval(VariableScope variableScope, String expressionString) {
-        var resolvedExpression = stringVariableReplacer.replaceVars(expressionString, variableScope::getVariableValue);
         for (ExpressionResolver r : resolvers) {
             if (r.containsExpression(expressionString)) {
-                return r.eval(variableScope, resolvedExpression);
+                return r.eval(variableScope, expressionString);
             }
         }
-        return resolvedExpression;
+        return stringVariableReplacer.replaceVars(expressionString, variableScope::getVariableValue);
     }
 }

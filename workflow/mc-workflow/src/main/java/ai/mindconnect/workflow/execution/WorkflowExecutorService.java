@@ -87,7 +87,7 @@ public class WorkflowExecutorService {
         instance.init(workflowData, null, context);
         // Add all environment vars to scope
         Map<String, String> env = new LinkedHashMap<>(environment.get());
-        instance.getVariableScope().assignValue("env", env, context.getExpressionResolver());
+        instance.getVariableScope().assignValue("env", env, null);
         instance.assignParams(params);
         injectBuiltins(instance);
         return run(instance);
