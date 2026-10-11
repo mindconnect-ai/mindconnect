@@ -27,7 +27,7 @@ so in the PR body; do not refactor it.
 the code must be: hexagonal (engine free of Jackson, Spring and UI; ports in
 the core, adapters outside), one responsibility per class, short methods
 (aim under 30 lines) and classes (aim under 300), named after the pattern
-they implement (Registry, Factory, Codec, Renderer, Policy, Resolver,
+they implement (Registry, Factory, Converter, Renderer, Policy, Resolver,
 Walker, Instance, Definition), singular class names, and javadoc that says
 what and why in one paragraph without project history.
 
@@ -173,12 +173,12 @@ that do not depend on the answer.
 6. `HaltException`, `StepExecutionException`: `@Data @Builder` mutable
    exceptions → immutable constructors. (WF-27)
 7. Small renames with no meaning change: `execution/JsonMapper` →
-   `JsonCodec` (clashes with Jackson's `JsonMapper`), `HttpStepException`
+   `JsonConverter` (clashes with Jackson's `JsonMapper`), `HttpStepException`
    → `HttpCallException`, `MultipleExceptionsException` →
    `ParallelExecutionException`, `WorkflowAdminService` →
    `WorkflowAdminFacade`, `WorkflowRunService` → `WorkflowRunner`,
    `WorkflowExecutorService` → `WorkflowExecutor`, `StepJsonMapper` →
-   `StepJsonCodec`, `WorkflowShapes` → `WorkflowShape` (enum),
+   `StepJsonConverter`, `WorkflowShapes` → `WorkflowShape` (enum),
    `WorkflowSamples` → `SampleWorkflowCatalog`, `WorkflowInputs` →
    `RunInputPreparer`, `StepNames` → `UniqueStepNamer`, `ParamCoercion` →
    `ParamValueCoercer`, `ParamFormFields` → `SchemaFieldFactory`,

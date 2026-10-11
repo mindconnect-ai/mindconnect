@@ -42,7 +42,7 @@ questions in review.md §6, then write the conventions into `CLAUDE.md` and
   Spring wiring (Q-04). No `adapter` package inside `-core`.
 - One word for persistence (Q-03) and one for the driving side (Q-02).
 - Class names: singular, named after the role (Registry, Catalog, Resolver,
-  Policy, Codec, Renderer, Factory, Repository, Adapter, Strategy, Worker).
+  Policy, Converter, Renderer, Factory, Repository, Adapter, Strategy, Worker).
   No plural, no Helper/Util/Support/Commons/Holder, `Service` only for an
   application service with one use case family.
 - One constructor per class (Q-01). Overloads only for a real second caller.
@@ -229,7 +229,7 @@ want a manual test session each (`agents/doc/manual-tests`).
 | WF-13, WF-14, WF-24 | `StepTree` walker; `StepTypeRegistry` with one `StepType` descriptor; adding a step type touches the registry and the step. |
 | WF-07, WF-06, WF-09 | `ScriptLanguageConfigurer` base; typed `ScriptExecutor` field; one expression evaluator for leaf and container steps. |
 | SV-02 | One `AttachmentIngestion` (after Q-17). |
-| SV-21 | `StreamEventFrameCodec` shared by server and CLI (after Q-17). |
+| SV-21 | `StreamEventFrameConverter` shared by server and CLI (after Q-17). |
 | SV-15 | One seeding path (after Q-20). |
 | SV-26 | One upload-limit advice. |
 | TQ-01, TQ-11 | `mc-taskqueue-demo-ui`; stateless board renderer. |

@@ -16,7 +16,7 @@ The maintainer's criteria for 1.0:
 - **Simple.** Short methods, classes not too big, every method named for what
   it does.
 - **Named after known patterns.** Strategy, Factory, Repository, Adapter,
-  Builder, Visitor, Policy, Registry, Provider, Resolver, Renderer, Codec.
+  Builder, Visitor, Policy, Registry, Provider, Resolver, Renderer, Converter.
   **No plural class names.** No vague suffixes (Helper, Util, Support, Commons,
   Holder, catch-all Service).
 - **Little javadoc.** The code speaks; a comment says *why*, never *what*,
@@ -71,7 +71,7 @@ tables in section 4 give the file-level evidence.
 | ID | Pattern | Evidence | Proposal |
 |---|---|---|---|
 | X-01 | **Javadoc tells history, not contract.** Essays of 15–60 lines on records and interfaces; "concept 16, step 5", "§5.2 of the concept", "Etappe 1a", "it used to live on …", "the email_… tools are gone". A 1.0 reader has none of those documents. | RT-11, GW-28, TL-29, WF-21, TQ-08, CM-12, SV-24 | One paragraph of *what and why* per type; move rationale and history to `agents/doc/`, `workflow/doc/` or the docs site; delete every concept number. Add a javadoc lint (orphaned blocks, blocks between `@Override` and method). |
-| X-02 | **Plural class names hide what a class is.** `SessionTools`, `ToolCalls`, `LlmPrices`, `MailTools`, `VectorStores`, `WorkflowShapes`, `AtomicFiles`, `ActiveStreams` … ~120 names. Most are a Registry, Catalog, Resolver, Codec, Policy or a static bag that should be one of those. | Section 5 | Rename to the pattern the class implements. Rule for CLAUDE.md: a class name is singular and names its role. |
+| X-02 | **Plural class names hide what a class is.** `SessionTools`, `ToolCalls`, `LlmPrices`, `MailTools`, `VectorStores`, `WorkflowShapes`, `AtomicFiles`, `ActiveStreams` … ~120 names. Most are a Registry, Catalog, Resolver, Converter, Policy or a static bag that should be one of those. | Section 5 | Rename to the pattern the class implements. Rule for CLAUDE.md: a class name is singular and names its role. |
 | X-03 | **Inline fully qualified names instead of imports.** `java.util.Map<String, java.util.Set<String>>`, `ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions`. ~1,600 lines. | RT-12, GW-19, TQ-10, SV-25 | One mechanical sweep per area (IDE "optimize imports"), no other change in the same PR. |
 | X-04 | **Telescoping constructors with only the fullest one used.** Nine runtime classes, `ProfilePage` (5), `AdminLayout` (4), `NamespaceService` (7), `ScopeBindingFilter` (3), 13 tool classes with three constructors each (two test-only). | RT-04, TL-09, GW-08, SV-18, SV-28 | One constructor per class before 1.0 freezes the API. Tests build the full argument list. |
 | X-05 | **Error handling for impossible cases.** `try { prettyJson = mapper.writeValueAsString(nodeJustBuilt) } catch (Exception ignored) {}`, "should be unreachable" branches, serialising a `Map<String,Object>` guarded by a catch. 364 broad catches in total; many are legitimate (tool execution), many are not. | GW-26, RT-26 | Remove the catches on code that cannot fail; let the rest propagate or narrow the type. |
@@ -235,7 +235,7 @@ fat UI controllers that are the application layer.
 | SV-18 | `adminui/ui/page/ProfilePage.java:115–176` (5 ctors, 17 fields), `public static` factories :237–553; same in `NamespacesPage:142–213`, `AdminLayout:84–118` | simplicity | A parameter bag and a utility bag at once. | `ProfileModel` record + `ProfilePage(ProfileModel)`; `ApiTokenFormComponent`, `NamespaceInviteFormComponent`, `EnvironmentFormComponent`. | M / low |
 | SV-19 | `chat-ui-rest/.../page/ChatPage.java:44`, `adminui/ui/AdminPage.java` | consistency | Admin pages extend `AdminPage`; `ChatPage`, `NamespacesPage`, `DungeonPage` do not; `AdminPage` javadoc cites chat methods. | One base (or none) with the same contract in both modules. | S / low |
 | SV-20 | `registry-admin-ui-rest/RegistryBrowseView.java:45` (+4 `*View`); `chatui/ui/component/MarkdownText`, `ModelLabel`, `Thoughts`, `ToolCallHistory` | naming | `*View` here, `*Component`/`*Page` everywhere else; some without suffix. | `RegistryBrowseComponent`, …; `ThoughtsComponent`, `ToolCallHistoryComponent`. | S / low |
-| SV-21 | `cli/agentclient/RemoteAgentClient.decodeFrame` (:177–283) vs `agentrest/dto/StreamEventFrame.from` (:41–120) | duplication | Hand-decoding of what the other side hand-encodes; both switch over every `StreamEvent` kind. | `StreamEventFrameCodec` in a small `mc-agent-api-dto` module. See Q-17. | S / low |
+| SV-21 | `cli/agentclient/RemoteAgentClient.decodeFrame` (:177–283) vs `agentrest/dto/StreamEventFrame.from` (:41–120) | duplication | Hand-decoding of what the other side hand-encodes; both switch over every `StreamEvent` kind. | `StreamEventFrameConverter` in a small `mc-agent-api-dto` module. See Q-17. | S / low |
 | SV-22 | `ChatUiController.sendPatch` (:2385), orphaned javadoc at `ChatUiController:118–124, 611–632, 682–692`; `AdminSameUrlFilter:41` (`LEGACY_SECTIONS`) | dead code | No caller; comments whose methods moved; a migration the filter waits for. | Delete; finish the migration. See Q-21. | S / low |
 | SV-23 | `AgentFormComponent.render` (:73, 138 lines), `ToolFormComponent:113` (76-line `if`), `StreamEventFrame:42` (78-line switch) | simplicity | Long render methods. | One private method per field group. | S / low |
 | SV-24 | `BrandingProperties:11` (58-line block), `StreamEvents:15` (36), `SecurityConfig:54` (35), `NamespaceOnboarding:20` (32); `AgentClient:4–9` ("no longer extends…"), `ChatUiController:644–650` ("It used to live on…"), `VectorStoreUiController:196–209` | javadoc | History and essays; 40–46 % comment share in `StreamBus`, `MessageListComponent`, `ChatFormComponent`, `ChatPage`. | Contract in one sentence; rationale to `agents/doc/`. | S / low |
@@ -280,7 +280,7 @@ consumers and each walks it by hand; adding a step type touches twelve files.
 | WF-26 | `WorkflowAdminUiController:94–97, 111, 617, 831` | hexagonal | Controller news up `RunStore`, `StepFormBuilder`, `WorkflowMutator`; per-process state (`lastRunInputs`, `liveRuns`); an executor never shut down. | Inject; a bean with `@PreDestroy`. | S / low |
 | WF-27 | `execution/HaltException`, `StepExecutionException` (`@Data @Builder` mutable exceptions), `HttpStepException`, `MultipleExceptionsException` | naming | Mutable exceptions; names off the pattern. | Immutable; `HttpCallException`, `ParallelExecutionException`. | S / low |
 | WF-28 | `execution/WorkflowDefinitionRegistry` vs `persistence.port.WorkflowDataRepository` | consistency | Two ports answer "workflow by id" with different verbs; the only registry reads classpath JSON, so an admin-saved workflow cannot be called; `putWorkflowDefinition` unused. | `RepositoryWorkflowDefinitionRegistry` (read-only adapter over the repository); drop `put`. See Q-26. | S / med |
-| WF-29 | `execution/JsonMapper` | naming | Clashes with Jackson's `JsonMapper`. | `JsonCodec`. | S / low |
+| WF-29 | `execution/JsonMapper` | naming | Clashes with Jackson's `JsonMapper`. | `JsonConverter`. | S / low |
 | WF-30 | `WorkflowAdminService`, `WorkflowRunService`, `WorkflowExecutorService` | naming | "Service" means facade, runner and executor. | `WorkflowAdminFacade`, `WorkflowRunner`, `WorkflowExecutor`. | S / low |
 
 ### 4.6 taskqueue (TQ) and common (CM)
@@ -354,10 +354,10 @@ other change; IDE refactoring, then build and test the area.
 `SubAgentSupport` → `DelegationPolicy`, `UserPaths` → `SelfUserPathPolicy`, `VersionedForms` → `FormVersionPolicy`,
 `FileWalks` → `FileWalkPolicy` + `TextDecoding`.
 
-**Codec / Mapper / Renderer**
-`ApprovalNotifications` → `ApprovalDecisionCodec`, `ProtocolParts` → `ProtocolPartMapper`,
-`InputParts` → `InputPartMapper`, `StreamEvents` → `ResponsesStreamEncoder`, `McpRegistrationJson` → `McpRegistrationCodec`,
-`StepJsonMapper` → `StepJsonCodec`, `JsonMapper` (workflow) → `JsonCodec`, `RunInstanceJson` → `StepInstanceJsonRenderer`,
+**Converter / Mapper / Renderer**
+`ApprovalNotifications` → `ApprovalDecisionConverter`, `ProtocolParts` → `ProtocolPartMapper`,
+`InputParts` → `InputPartMapper`, `StreamEvents` → `ResponsesStreamEncoder`, `McpRegistrationJson` → `McpRegistrationConverter`,
+`StepJsonMapper` → `StepJsonConverter`, `JsonMapper` (workflow) → `JsonConverter`, `RunInstanceJson` → `StepInstanceJsonRenderer`,
 `SummaryWindowMessages` → `SummaryRowRenderer`, `RegistryNotes` → `RegistryNoteRenderer`,
 `StepMapper` → `StepFormMapper`, `TraceRedaction` → `TraceRedactor`.
 
