@@ -164,8 +164,15 @@ per area, one commit per rename, IDE refactoring only, tests untouched. The
 list is review.md §5; the order inside an area is: ports first (they appear
 in the most signatures), then services, then adapters, then UI.
 
-The public-API renames need the maintainer's yes: the workflow `Data` /
-`Step` / `Instance` vocabulary (WF-20, Q-24), `ConversationManager` (Q-02),
+The workflow vocabulary is decided (WF-20): `…StepDefinition` for what the
+user writes, `…StepInstance` for what runs, `WorkflowDefinition` /
+`WorkflowInstance` at the top, the same Definition : Instance pair the agents
+area uses. It lands in three PRs in this order: stable JSON type ids instead
+of `Id.CLASS` (with a reader for the old class names), `getType()` as a
+constant per step, then the rename itself (executors first, definitions
+second, so that no name ever changes meaning).
+
+The remaining public-API renames need the maintainer's yes: `ConversationManager` (Q-02),
 `Repository` vs `Store` (Q-03), `AuthenticationInfo`, the protocol API
 interfaces (`Sessions`, `Files`, …), `WorkspaceFiles`.
 
