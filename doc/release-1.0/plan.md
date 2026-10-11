@@ -167,9 +167,10 @@ in the most signatures), then services, then adapters, then UI.
 The workflow vocabulary is decided (WF-20): `…StepDefinition` for what the
 user writes, `…StepInstance` for what runs, `WorkflowDefinition` /
 `WorkflowInstance` at the top, the same Definition : Instance pair the agents
-area uses. It lands in three PRs in this order: stable JSON type ids instead
-of `Id.CLASS` (with a reader for the old class names), `getType()` as a
-constant per step, then the rename itself (executors first, definitions
+area uses. It lands in three PRs in this order: short JSON type aliases instead
+of `Id.CLASS`, resolved through the core `StepTypeRegistry` by a
+`StepTypeIdResolver` in `mc-workflow-jackson` (with a pre-pass for the old
+`@class` values), `getType()` as the alias from the registry, then the rename itself (executors first, definitions
 second, so that no name ever changes meaning).
 
 The remaining public-API renames need the maintainer's yes: `ConversationManager` (Q-02),
