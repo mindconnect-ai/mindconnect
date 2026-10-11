@@ -13,7 +13,15 @@ public class AgentCallStep extends BaseStepInstance<AgentCallData> {
     @Override
     public void execute() {
         AgentCallData cfg = getConfig();
+        // A workflow from a project may only call the agents the agent that
+        // started it may call — and never write an agent definition.
+        CallerLimits limits = getWorkflowContext() == null ? null
+                : getWorkflowContext().getAttribute(CallerLimits.class);
         String agentName;
+        if (limits != null && cfg.getAgentSpec() != null && !cfg.getAgentSpec().isEmpty()) {
+            throw new IllegalStateException("agent-call step '" + cfg.getName()
+                    + "': a project workflow cannot define an agent inline");
+        }
         if (cfg.getAgentSpec() != null && !cfg.getAgentSpec().isEmpty()) {
             // Inline agent: resolve ${...} in every string of the spec, then
             // upsert by name — idempotent, a ForEach reuses one definition.
@@ -30,6 +38,10 @@ public class AgentCallStep extends BaseStepInstance<AgentCallData> {
         String message = resolveString(cfg.getMessage());
         if (message == null || message.isBlank()) {
             throw new IllegalArgumentException("agent-call step '" + cfg.getName() + "': no message configured");
+        }
+
+        if (limits != null) {
+            limits.checkAgent(cfg.getName(), agentName);
         }
 
         logDebug("calling agent '%s'", agentName);

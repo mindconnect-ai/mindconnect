@@ -70,9 +70,16 @@ import java.util.stream.*;
 public class    MiniScriptEngine extends AbstractScriptEngine {
 
     private final MiniScriptEngineFactory factory;
+    /** Method calls only on the plain value types, see {@link MiniScriptEngineFactory#restricted()}. */
+    private final boolean restricted;
 
     MiniScriptEngine(MiniScriptEngineFactory factory) {
+        this(factory, false);
+    }
+
+    MiniScriptEngine(MiniScriptEngineFactory factory, boolean restricted) {
         this.factory = factory;
+        this.restricted = restricted;
     }
 
     // -----------------------------------------------------------------------
@@ -84,7 +91,7 @@ public class    MiniScriptEngine extends AbstractScriptEngine {
         try {
             List<Token> tokens = new Lexer(script).tokenize();
             Node ast = new Parser(tokens).parse();
-            return new Evaluator(ctx).eval(ast);
+            return new Evaluator(ctx, restricted).eval(ast);
         } catch (ScriptException e) {
             throw e;
         } catch (Exception e) {
@@ -556,8 +563,14 @@ public class    MiniScriptEngine extends AbstractScriptEngine {
 
     static class Evaluator {
         private final ScriptContext ctx;
+        private final boolean restricted;
 
-        Evaluator(ScriptContext ctx) { this.ctx = ctx; }
+        Evaluator(ScriptContext ctx) { this(ctx, false); }
+
+        Evaluator(ScriptContext ctx, boolean restricted) {
+            this.ctx = ctx;
+            this.restricted = restricted;
+        }
 
         Object eval(Node node) throws ScriptException {
             return switch (node) {
@@ -785,6 +798,7 @@ public class    MiniScriptEngine extends AbstractScriptEngine {
         // ── reflection ────────────────────────────────────────────────────
 
         private Object invoke(Object target, String methodName, Object[] args) throws ScriptException {
+            if (restricted) return invokeRestricted(target, methodName, args);
             Class<?> clazz = target.getClass();
 
             Method found = findMethod(clazz, methodName, args.length);
@@ -804,6 +818,60 @@ public class    MiniScriptEngine extends AbstractScriptEngine {
             } catch (Exception e) {
                 throw new ScriptException("Error calling " + methodName + ": " + e.getMessage());
             }
+        }
+
+        /** Methods of the value types a restricted script still may not call. */
+        private static final Set<String> DENIED_METHODS = Set.of("getClass", "wait", "notify", "notifyAll");
+
+        /**
+         * A call in a restricted script: the method is looked up on the public
+         * API of the value's type — {@code List}, not {@code ArrayList} — so
+         * nothing an implementation adds, and nothing private, is reachable.
+         * Anything that is not such a value cannot be called at all.
+         */
+        private Object invokeRestricted(Object target, String methodName, Object[] args) throws ScriptException {
+            Class<?> api = restrictedApi(target);
+            if (api == null)
+                throw new ScriptException("Method calls are not allowed on " + target.getClass().getSimpleName()
+                        + " here: only on strings, numbers, booleans, lists, sets and maps");
+            Method found = findPublicMethod(api, methodName, args.length);
+            if (found == null && args.length == 0) found = findPublicMethod(api, toGetter("get", methodName), 0);
+            if (found == null && args.length == 0) found = findPublicMethod(api, toGetter("is",  methodName), 0);
+            if (found == null)
+                throw new ScriptException(String.format("Method not found: %s.%s(%d arg%s)",
+                        api.getSimpleName(), methodName, args.length, args.length == 1 ? "" : "s"));
+            try {
+                return found.invoke(target, coerceArgs(found, args));
+            } catch (InvocationTargetException e) {
+                Throwable cause = e.getCause();
+                throw new ScriptException(cause != null ? cause.getMessage() : e.getMessage());
+            } catch (Exception e) {
+                throw new ScriptException("Error calling " + methodName + ": " + e.getMessage());
+            }
+        }
+
+        /** The type whose public methods a restricted script may call on {@code target}; null for none. */
+        private static Class<?> restrictedApi(Object target) {
+            if (target instanceof String)                  return String.class;
+            if (target instanceof Boolean)                 return Boolean.class;
+            if (target instanceof Character)               return Character.class;
+            if (target instanceof java.math.BigDecimal)    return java.math.BigDecimal.class;
+            if (target instanceof java.math.BigInteger)    return java.math.BigInteger.class;
+            if (target instanceof Integer || target instanceof Long || target instanceof Double
+                    || target instanceof Float || target instanceof Short || target instanceof Byte)
+                return target.getClass();
+            if (target instanceof List<?>)                 return List.class;
+            if (target instanceof Set<?>)                  return Set.class;
+            if (target instanceof Map<?, ?>)               return Map.class;
+            if (target instanceof Map.Entry<?, ?>)         return Map.Entry.class;
+            return null;
+        }
+
+        private static Method findPublicMethod(Class<?> api, String name, int argCount) {
+            if (DENIED_METHODS.contains(name)) return null;
+            for (Method m : api.getMethods())
+                if (m.getName().equals(name) && m.getParameterCount() == argCount) return m;
+            return null;
         }
 
         private Method findMethod(Class<?> clazz, String name, int argCount) {

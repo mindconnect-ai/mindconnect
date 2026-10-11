@@ -20,6 +20,39 @@ import java.util.List;
  */
 public class MiniScriptEngineFactory implements ScriptEngineFactory {
 
+    /**
+     * Whether the engines this factory makes may call only the plain value
+     * types' public methods — see {@link #restricted()}.
+     */
+    private final boolean restricted;
+
+    /** A factory whose engines may call any method on any object they reach. */
+    public MiniScriptEngineFactory() {
+        this(false);
+    }
+
+    private MiniScriptEngineFactory(boolean restricted) {
+        this.restricted = restricted;
+    }
+
+    /**
+     * A factory for scripts nobody vetted — a workflow a project brings with
+     * it, a value a model produced. Its engines call methods only on strings,
+     * numbers, booleans, characters, lists, sets and maps, and only through
+     * the public API of those types; {@code getClass}, {@code wait} and
+     * {@code notify} are not part of it. The unrestricted engine reaches any
+     * class through {@code "x".getClass().forName(...)}, and with it the
+     * process the script runs in.
+     */
+    public static MiniScriptEngineFactory restricted() {
+        return new MiniScriptEngineFactory(true);
+    }
+
+    /** Whether this factory's engines are {@link #restricted()}. */
+    public boolean isRestricted() {
+        return restricted;
+    }
+
     @Override public String  getEngineName()      { return "MiniScript"; }
     @Override public String  getEngineVersion()   { return "1.0"; }
     @Override public String  getLanguageName()    { return "miniscript"; }
@@ -57,6 +90,6 @@ public class MiniScriptEngineFactory implements ScriptEngineFactory {
 
     @Override
     public ScriptEngine getScriptEngine() {
-        return new MiniScriptEngine(this);
+        return new MiniScriptEngine(this, restricted);
     }
 }

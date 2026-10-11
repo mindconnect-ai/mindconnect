@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.tools.workflow.step;
 
+import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 
 import java.util.Map;
@@ -30,6 +31,16 @@ public interface ToolInvoker {
      */
     default String call(String toolName, Map<String, Object> arguments, ToolCallScope scope) {
         return call(toolName, arguments);
+    }
+
+    /**
+     * Resolves and executes the tool as {@code binding} configures it — its
+     * pins, alias and settings — on behalf of {@code scope}. What a project
+     * workflow's steps use, so they run a tool exactly as their caller would.
+     * The default ignores everything but the name; the host overrides it.
+     */
+    default String call(AgentTool binding, Map<String, Object> arguments, ToolCallScope scope) {
+        return call(binding.name(), arguments, scope);
     }
 
     /** The registry's current tool names — used by editors for a picker. */
