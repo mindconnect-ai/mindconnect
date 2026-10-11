@@ -83,3 +83,25 @@ The admin UI needs `MINDCONNECT_ENCRYPTION_SECRET_KEY` (16, 24 or 32 chars).
   the right answer. The release assembles the fragments; see
   `changelog.d/README.md`.
 - Keep `website/docs/` in step with behaviour you change.
+
+## Code conventions
+
+The full list is the "Code Conventions" section of `CLAUDE.md`; the short
+form:
+
+- Think before coding; ask when two readings lead to different code.
+  Minimum code, surgical changes, one topic per PR, a check for every step.
+- Hexagonal per module pair: domain and ports in `-core`, adapters in the
+  sibling or `adapter/postgres/`, Spring wiring only in `springstarter/`.
+  No framework in a `-core` module or an engine. Controllers are thin.
+- One responsibility per class; ~300 lines per class and ~50 per method are
+  a reason to look. Class names are singular and name the pattern
+  (Registry, Resolver, Policy, Factory, Repository, Converter, Renderer…);
+  no `Helper`, `Util`, `Support`, `Holder`, `Manager`. Converter means both
+  directions. Definition : Instance for configured vs running.
+- One constructor per class. Imports, never inline fully qualified names.
+  No copy-paste between sibling modules.
+- Javadoc says why, one paragraph, present tense, no history, no design
+  note references, no restating the signature.
+- SLF4J only; one injected `ObjectMapper`; exceptions keep their cause; no
+  literal control characters in source.
