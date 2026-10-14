@@ -56,7 +56,13 @@ deploy/
 mc.env
 **/.env.docker
 .env.docker
-.claude
+
+# Claude Code harness: skills, agents, hooks and shared settings are part of the
+# repository (.claude/). Only what is local to one machine or one clone stays out.
+.claude/settings.local.json
+.claude/launch.json
+.claude/worktrees/
+.claude/screenshot/
 # Editor harness — runtime-saved workflows (not source)
 workflow/mc-workflow-ui-diagram-app/workflows/
 
@@ -82,7 +88,9 @@ semantic-ui/editor/mc-sui-editor/src/main/sui/
 
 # Local launcher scripts for the admin UI — kept out until they are documented
 # and linked from the README; an unreferenced entry point helps nobody.
-/scripts/
+# scripts/verify.sh (the one check hook, human and CI run) is the exception.
+/scripts/*
+!/scripts/verify.sh
 
 # Marketing drafts: the LinkedIn post, its kit and its screenshots. Written
 # here because that is where the app is, published from somewhere else.

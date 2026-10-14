@@ -1,0 +1,25 @@
+{
+  "_comment": "Template. after-branch-creation.sh writes .claude/launch.json from it: {{ROOT}} = clone path, {{SLUG}} = branch slug, {{PORT}} = 9100 + cksum(slug) % 400 (main: 9090), {{PORT_API}} = {{PORT}} + 1000. launch.json is git-ignored; edit this file to change what every clone gets.",
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin-ui-{{SLUG}}",
+      "runtimeExecutable": "{{ROOT}}/agents/server/mc-agent-admin-ui-app/start.sh",
+      "runtimeArgs": [
+        "-Dspring-boot.run.arguments=--server.port={{PORT}} --mindconnect.auth.enabled=false --mindconnect.persistence=file --mindconnect.data.base-dir=data-preview-{{PORT}}"
+      ],
+      "port": {{PORT}},
+      "autoPort": false
+    },
+    {
+      "name": "api-{{SLUG}}",
+      "runtimeExecutable": "mvn",
+      "runtimeArgs": [
+        "-f", "{{ROOT}}/agents/server/mc-agent-api-app/pom.xml", "spring-boot:run",
+        "-Dspring-boot.run.arguments=--server.port={{PORT_API}} --mindconnect.persistence=file --mindconnect.data.base-dir=data-preview-{{PORT_API}}"
+      ],
+      "port": {{PORT_API}},
+      "autoPort": false
+    }
+  ]
+}

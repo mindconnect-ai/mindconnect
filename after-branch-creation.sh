@@ -77,3 +77,25 @@ fi
 if version=$(cd "$root" && mvn -q -ntp help:evaluate -Dexpression=project.version -DforceStdout 2>/dev/null); then
     echo "version: $version"
 fi
+
+# ---------------------------------------------------------------------------
+# Preview servers for this clone: .claude/launch.json from .claude/launch.template.json.
+#
+# The port is derived from the branch slug, so the same branch gets the same
+# port on every machine and two branches practically never collide; nobody
+# keeps a list. main keeps 9090. The file is git-ignored; the template is not.
+template="$root/.claude/launch.template.json"
+if [ -f "$template" ]; then
+    if [ -n "$sha1" ]; then
+        slug=${sha1#-}
+        port=$((9100 + $(printf '%s' "$slug" | cksum | cut -d' ' -f1) % 400))
+    else
+        slug=main
+        port=9090
+    fi
+    port_api=$((port + 1000))
+    sed -e "s|{{ROOT}}|$root|g" -e "s|{{SLUG}}|$slug|g" \
+        -e "s|{{PORT_API}}|$port_api|g" -e "s|{{PORT}}|$port|g" \
+        "$template" > "$root/.claude/launch.json"
+    echo "written: .claude/launch.json  ->  admin-ui on $port, api on $port_api"
+fi
