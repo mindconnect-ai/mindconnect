@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The rules the build enforces mechanically (doc/agent/quality-catalog.md, D-rules).
+  Everything here is a rule from the Code Conventions in CLAUDE.md that a tool can
+  decide; what needs judgement is left to the reviewers. Existing violations are
+  frozen in pmd-baseline.properties and worked off in tidy branches.
+-->
+<ruleset name="mindconnect"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+    <description>Mechanically checkable part of the mindconnect code conventions</description>
+
+    <!-- D3: size. "A class above ~300 lines and a method above ~50 lines are a reason
+         to look, not a hard limit" — here they are the baseline boundary: what is
+         above today stays listed, nothing new may cross. -->
+    <rule ref="category/java/design.xml/NcssCount">
+        <properties>
+            <property name="methodReportLevel" value="50"/>
+            <property name="classReportLevel" value="300"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/design.xml/CyclomaticComplexity">
+        <properties>
+            <property name="methodReportLevel" value="12"/>
+            <property name="classReportLevel" value="80"/>
+        </properties>
+    </rule>
+    <!-- Aligned with the ArchUnit constructor rule: more than 7 parameters. -->
+    <rule ref="category/java/design.xml/ExcessiveParameterList">
+        <properties><property name="minimum" value="8"/></properties>
+    </rule>
+    <rule ref="category/java/design.xml/TooManyFields">
+        <properties><property name="maxfields" value="10"/></properties>
+    </rule>
+
+    <!-- D7: errors keep their cause; nothing is swallowed silently. -->
+    <rule ref="category/java/errorprone.xml/EmptyCatchBlock">
+        <properties><property name="allowCommentedBlocks" value="true"/></properties>
+    </rule>
+    <rule ref="category/java/errorprone.xml/AvoidCatchingThrowable"/>
+    <rule ref="category/java/errorprone.xml/AvoidCatchingNPE"/>
+    <rule ref="category/java/bestpractices.xml/PreserveStackTrace"/>
+    <rule ref="category/java/bestpractices.xml/AvoidReassigningCatchVariables"/>
+    <rule ref="category/java/errorprone.xml/ReturnEmptyCollectionRatherThanNull"/>
+
+    <!-- D4: names say what a thing is for. -->
+    <rule ref="category/java/codestyle.xml/MethodNamingConventions">
+        <properties>
+            <!-- no process*, handle*, do* bags; the suffix digit is the "result2" smell -->
+            <property name="methodPattern" value="(?!(process|handle|do)[A-Z])[a-z][a-zA-Z0-9]*[a-zA-Z]"/>
+            <property name="staticPattern" value="(?!(process|handle|do)[A-Z])[a-z][a-zA-Z0-9]*[a-zA-Z]"/>
+            <property name="nativePattern" value="[a-z][a-zA-Z0-9]*"/>
+            <property name="junit3TestPattern" value="test[A-Z0-9][a-zA-Z0-9]*"/>
+            <property name="junit4TestPattern" value="[a-z][a-zA-Z0-9]*"/>
+            <property name="junit5TestPattern" value="[a-z][a-zA-Z0-9_]*"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/codestyle.xml/ClassNamingConventions">
+        <properties>
+            <!-- No Helper, Util(s), Support, Commons, Holder, Manager (CLAUDE.md). -->
+            <property name="classPattern" value="(?!.*(Helper|Utils?|Support|Commons|Holder|Manager)$)[A-Z][a-zA-Z0-9]*"/>
+            <property name="abstractClassPattern" value="(?!.*(Helper|Utils?|Support|Commons|Holder|Manager)$)[A-Z][a-zA-Z0-9]*"/>
+            <property name="interfacePattern" value="(?!.*(Helper|Utils?|Support|Commons|Holder|Manager)$)[A-Z][a-zA-Z0-9]*"/>
+            <property name="enumPattern" value="[A-Z][a-zA-Z0-9]*"/>
+            <property name="annotationPattern" value="[A-Z][a-zA-Z0-9]*"/>
+            <property name="utilityClassPattern" value="(?!.*(Helper|Utils?|Support|Commons|Holder|Manager)$)[A-Z][a-zA-Z0-9]*"/>
+            <property name="testClassPattern" value="^(Test.*|.*Tests?|.*IT)$"/>
+        </properties>
+    </rule>
+
+    <!-- D5: comments say why. The size rule catches the essay; the content is the reviewer's. -->
+    <rule ref="category/java/documentation.xml/CommentSize">
+        <properties>
+            <property name="maxLines" value="25"/>
+            <property name="maxLineLength" value="130"/>
+        </properties>
+    </rule>
+
+    <!-- Logging and style lines of the conventions that a tool can see. -->
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateMethod"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <rule ref="category/java/codestyle.xml/UnnecessaryFullyQualifiedName"/>
+    <rule ref="category/java/codestyle.xml/UnnecessaryImport"/>
+</ruleset>

@@ -44,6 +44,9 @@ jobs:
           filters: |
             parents:
               - 'mc-java-parent/**'
+              - 'common/mc-arch-rules/**'
+              - 'scripts/**'
+              - '.github/scripts/**'
             common:
               - 'common/**'
             taskqueue:
@@ -150,8 +153,23 @@ jobs:
           mvn -B -ntp -N -f mc-java-parent/pom.xml install
           mvn -B -ntp -f workflow/pom.xml clean install -DskipTests
 
+      # The area reactor now also runs the sensors: PMD against the frozen
+      # baseline on every module (verify phase), the Jacoco report, and the
+      # area's ArchUnit rules against their frozen store (the *-arch-tests
+      # module, last in the reactor). What scripts/verify.sh checks locally
+      # is exactly what fails here.
       - name: Build & test ${{ matrix.area }}
         run: mvn -B -ntp -f ${{ matrix.area }}/pom.xml clean install
+
+      # D6: no module may lose @Test methods against the base branch, and no
+      # @Disabled without a reason. D5 (advisory): files that are a third
+      # comment lines are listed, not failed.
+      - name: Test count and comment ratio (vs base)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=200 origin "${{ github.base_ref }}"
+          .github/scripts/test-count.sh "origin/${{ github.base_ref }}"
+          .github/scripts/javadoc-ratio.sh || true
 
   # 3) A stable status check that is always green when nothing needed building,
   #    so branch protection can require "build-result" regardless of paths.

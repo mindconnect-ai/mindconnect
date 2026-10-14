@@ -220,6 +220,11 @@ mvn -Prelease deploy
 ## Running Tests
 
 ```bash
+# The one check: compile, tests, PMD against the frozen baseline, Jacoco, and the
+# area's ArchUnit rules. What is green here is green in CI. Run it before "done".
+./scripts/verify.sh <module-path> [<module-path>...]
+./scripts/verify.sh --area taskqueue
+
 # All tests for a module
 mvn -f <module-path>/pom.xml test
 

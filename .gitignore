@@ -91,6 +91,7 @@ semantic-ui/editor/mc-sui-editor/src/main/sui/
 # scripts/verify.sh (the one check hook, human and CI run) is the exception.
 /scripts/*
 !/scripts/verify.sh
+!/scripts/baseline.sh
 
 # Marketing drafts: the LinkedIn post, its kit and its screenshots. Written
 # here because that is where the app is, published from somewhere else.

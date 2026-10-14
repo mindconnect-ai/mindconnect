@@ -30,6 +30,7 @@ documentation lives in `website/docs/`.
 ```bash
 mvn clean install -DskipTests          # everything, from the root aggregator
 mvn -f agents/pom.xml clean install    # one area, incl. its parent
+./scripts/verify.sh <module>...        # the one check: tests, PMD baseline, Jacoco, ArchUnit
 mvn -f <module>/pom.xml test           # one module
 mvn -f <module>/pom.xml test -Dtest=<Class>#<method>
 ```

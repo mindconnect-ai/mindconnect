@@ -21,6 +21,7 @@
 
     <modules>
         <!-- the area parent itself, so this area builds standalone -->
+        <module>../common/mc-arch-rules</module>
         <module>mc-agents-parent</module>
         <!-- shared modules pulled in so this area builds standalone -->
         <module>../common/mc-common</module>
@@ -112,6 +113,7 @@
         <module>server/mc-agent-admin-ui-rest</module>
         <module>server/mc-agent-admin-ui-app</module>
         <module>client/mc-agent-cli</module>
+        <module>mc-agents-arch-tests</module>
     </modules>
 
 </project>

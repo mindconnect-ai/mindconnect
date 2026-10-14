@@ -1,0 +1,10 @@
+#
+#Wed Oct 14 12:20:38 CEST 2026
+Conventions\:\ SLF4J\ everywhere,\ never\ java.util.logging=36fb2450-9f11-4764-aba9-e8aa058a3fa7
+Conventions\:\ one\ constructor\ per\ class=08d8b87e-3959-477a-8926-8af9cf56e6bf
+D1\:\ -core\ modules\ and\ engines\ know\ no\ framework=ec5a2e6b-252a-4857-a010-8ec434be7b2e
+D1\:\ @Component,\ @Configuration,\ @RestController\ ...\ only\ in\ starters,\ apps,\ rest/ui\ modules\ and\ demos=2d64bb1d-6fcd-4347-9ffd-a578bb29c865
+D1\:\ a\ -core\ module\ holds\ domain\ and\ ports,\ adapters\ live\ in\ the\ sibling=6e409788-e9f7-4d6c-80a3-d520064f8d91
+D2\:\ an\ adapter\ does\ not\ import\ another\ module's\ adapter=29000533-fc64-4dc5-a9ba-8fe42df7223a
+D2\:\ domain\ <-\ port\ <-\ service\ <-\ adapter=16bf93a1-f98e-4f02-941e-8ed2ca42edc9
+D3\:\ a\ constructor\ takes\ at\ most\ 7\ parameters=7bda6e28-4a85-4a4b-890e-98583afe911b

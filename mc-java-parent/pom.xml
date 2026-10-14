@@ -56,6 +56,17 @@
         <!-- Spring Boot is consumed as a BOM (version management only), not as a parent.
              Modules stay Spring-free unless they declare a Spring starter themselves. -->
         <spring-boot.version>3.5.13</spring-boot.version>
+        <!-- Sensors: the checks the build runs on every module (see doc/agent/).
+             Versions here; the executions sit in the `sensors` profile below. -->
+        <archunit.version>1.5.1</archunit.version>
+        <pmd-plugin.version>3.28.0</pmd-plugin.version>
+        <jacoco.version>0.8.15</jacoco.version>
+        <!-- The baseline refresh (scripts/baseline.sh) passes -Dpmd.failOnViolation=false to collect reports. -->
+        <pmd.failOnViolation>true</pmd.failOnViolation>
+        <!-- The refresh also clears this, because pmd:check writes its report AFTER removing
+             the excluded violations: a report collected with the baseline in force would
+             only hold what the baseline does not already list. -->
+        <pmd.excludeFromFailureFile>${maven.multiModuleProjectDirectory}/mc-java-parent/pmd-baseline.properties</pmd.excludeFromFailureFile>
     </properties>
 
     <dependencyManagement>
@@ -86,6 +97,12 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>
@@ -124,6 +141,30 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-pmd-plugin</artifactId>
+                    <version>${pmd-plugin.version}</version>
+                    <configuration>
+                        <rulesets>
+                            <ruleset>${maven.multiModuleProjectDirectory}/mc-java-parent/pmd-ruleset.xml</ruleset>
+                        </rulesets>
+                        <!-- The frozen state: classes and rules that violate today and are
+                             worked off in tidy branches. A new violation anywhere else fails
+                             the build. Lines are removed, never added, outside a baseline refresh. -->
+                        <excludeFromFailureFile>${pmd.excludeFromFailureFile}</excludeFromFailureFile>
+                        <failOnViolation>${pmd.failOnViolation}</failOnViolation>
+                        <printFailingErrors>true</printFailingErrors>
+                        <includeTests>false</includeTests>
+                        <linkXRef>false</linkXRef>
+                        <analysisCache>false</analysisCache>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.jacoco</groupId>
+                    <artifactId>jacoco-maven-plugin</artifactId>
+                    <version>${jacoco.version}</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -164,6 +205,48 @@
         SNAPSHOTs are not published (Central hosts releases only).
     -->
     <profiles>
+        <!-- Sensors: PMD against the frozen baseline and a Jacoco report, on every
+             module, in every build inside this repository. Activated by the presence
+             of the ruleset, so a project that merely inherits this parent from Maven
+             Central is not affected. Skip for one build with -Dpmd.skip -Djacoco.skip. -->
+        <profile>
+            <id>sensors</id>
+            <activation>
+                <file>
+                    <exists>${maven.multiModuleProjectDirectory}/mc-java-parent/pmd-ruleset.xml</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-pmd-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>pmd-check</id>
+                                <phase>verify</phase>
+                                <goals><goal>check</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>jacoco-agent</id>
+                                <goals><goal>prepare-agent</goal></goals>
+                            </execution>
+                            <execution>
+                                <id>jacoco-report</id>
+                                <phase>test</phase>
+                                <goals><goal>report</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>release</id>
             <build>
