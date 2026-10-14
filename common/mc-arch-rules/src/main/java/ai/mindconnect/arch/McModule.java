@@ -49,7 +49,7 @@ public final class McModule {
 
     /** Where Spring wiring may live: starters, deployable apps, REST and UI libraries, demos. */
     public static boolean mayCarrySpringWiring(String artifactId) {
-        return artifactId.startsWith("mc-agent-starter-")
+        return artifactId.contains("-starter")
             || artifactId.endsWith("-app")
             || artifactId.endsWith("-rest")
             || artifactId.contains("-demo")

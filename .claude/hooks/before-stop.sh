@@ -11,6 +11,12 @@ input=$(cat)
 modules=$(touched_modules)
 if [ -z "$modules" ]; then exit 0; fi
 
+# Nothing changed since the last green run: do not verify the same state again
+# (a chat-only turn on a long branch would otherwise pay for the full check).
+marker=.claude/.verified
+fingerprint=$( { git rev-parse HEAD; git diff; git diff --cached; git ls-files --others --exclude-standard; } | shasum | cut -d' ' -f1 )
+if [ -f "$marker" ] && [ "$(cat "$marker")" = "$fingerprint" ]; then exit 0; fi
+
 fail=""
 log=$(mktemp)
 if ! ./scripts/verify.sh $modules >"$log" 2>&1; then
@@ -51,4 +57,5 @@ Update $progress before you stop: Status, Next (one sentence a fresh session can
 fi
 
 if [ -n "$fail" ]; then printf '%s\n' "$fail" >&2; exit 2; fi
+printf '%s' "$fingerprint" > "$marker"
 exit 0

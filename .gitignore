@@ -62,6 +62,7 @@ mc.env
 .claude/settings.local.json
 .claude/launch.json
 .claude/worktrees/
+.claude/.verified
 .claude/screenshot/
 # Editor harness — runtime-saved workflows (not source)
 workflow/mc-workflow-ui-diagram-app/workflows/
