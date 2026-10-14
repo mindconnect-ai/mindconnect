@@ -79,7 +79,7 @@ server of its own without the tool side noticing.
 | `mc-agent-tools-mcp` | The `MultiToolProvider` that turns every registered server's tools into agent tools |
 | `mc-mcp-gateway-admin-ui-rest` | The `/mcp-gateway` screen, embedded by the admin UI |
 
-Concepts: `mc-sandbox/agents/doc/concepts/21-*`, `22-*`, `23-*`.
+Decisions: [doc/decisions](../doc/decisions/) (tool identity: 0001).
 
 ### Registry — import from a GitHub project
 

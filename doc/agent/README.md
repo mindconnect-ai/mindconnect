@@ -4,15 +4,13 @@ The guides and the numbers behind the Claude Code harness in `.claude/`.
 
 | File | Content | Read by |
 | --- | --- | --- |
-| `architecture.md` | the architecture as it is: areas, the core/adapter seam, the patterns with their names (typed ids, `NamespaceRouted`, `RuntimeFeature`, installers) | `/refine`, the architecture reviewer, every plan |
+| `architecture.md` | the architecture as it is: areas, layout, the core/adapter seam, the patterns with their names (typed ids, `NamespaceRouted`, `RuntimeFeature`, installers) | `/refine`, the architecture reviewer, every plan |
+| `conventions.md` | the Code Conventions as the maintainer wrote them; the prose behind the catalog's numbers | reviewers, humans |
 | `quality-catalog.md` | the numbered rules: D-rules the build enforces, I-rules the reviewers judge | reviewers, `/tidy`, humans adding a rule |
 | `naming.md` | good and bad names from this repository, as examples | the readability reviewer, `/tidy` |
 | `testing.md` | how tests are written here, characterization tests, what is not mocked | the test reviewer, `/refine` |
 | `review-policy.yml` | paths that always need a human reviewer, paths where evidence is enough | `/inspect` |
 | `baseline.md` | the measured state: violations per rule and module, largest classes, open gaps; rewritten by the ratchet | the weekly review |
-
-Until these files exist, the rules are the "Code Conventions" section of
-`CLAUDE.md`. They move here, and `CLAUDE.md` imports them, in a later step.
 
 There is deliberately no code formatter in the build. `.editorconfig` carries
 the shared settings; whether a formatter is needed is decided after the first

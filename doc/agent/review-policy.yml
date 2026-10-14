@@ -1,0 +1,46 @@
+# Who reviews what. Read by /inspect to name the risk tier in the PR body.
+# Paths are globs relative to the repository root. The first tier that matches wins.
+#
+# always-human: a human reads the full diff before merge, whatever the reviewers say.
+# evidence:     a human reads the SPEC, the evidence block and the public-API diff;
+#               the reviewer agents cover the rest.
+# light:        the reviewer agents suffice; a human samples.
+
+always-human:
+  - agents/server/mc-agent-security/**
+  - agents/core/mc-credentials/**
+  - agents/adapter/postgres/mc-credentials-pg/**
+  - agents/core/mc-user-core/**
+  - agents/core/mc-user/**
+  - agents/adapter/postgres/mc-user-pg/**
+  - agents/core/mc-agent-runtime-core/src/main/java/ai/mindconnect/agent/runtime/service/approval/**
+  - agents/core/mc-agent-tools/src/main/java/ai/mindconnect/agent/tools/builtin/BashTool.java
+  - agents/core/mc-agent-tools/src/main/java/ai/mindconnect/agent/tools/builtin/ToolPaths.java
+  - agents/core/mc-agent-tools-code/**
+  - agents/core/mc-agent-tools-virtual-env/**
+  - agents/adapter/postgres/**/*.sql
+  - common/mc-jdbc/**
+  - .github/workflows/**
+  - mc-java-parent/pom.xml
+  - mc-java-parent/pmd-ruleset.xml
+  - common/mc-arch-rules/**
+  - doc/agent/review-policy.yml
+
+evidence:
+  - "**/*-core/**"
+  - taskqueue/mc-task-queue/**
+  - workflow/mc-workflow/**
+  - common/**
+  - agents/springstarter/**
+  - agents/builder/**
+
+light:
+  - "**/server/*-rest/**"
+  - "**/server/*-app/**"
+  - agents/client/**
+  - "**/demo/**"
+  - "**/*-demo*/**"
+  - website/**
+  - "**/src/test/**"
+  - changelog.d/**
+  - doc/specs/**

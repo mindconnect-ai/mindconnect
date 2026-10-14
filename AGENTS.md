@@ -1,108 +1,72 @@
-# AGENTS.md
+# mindconnect
 
-Mindconnect: a Maven monorepo for building LLM-powered agents. Java 21, Spring
-Boot 3.5 in the deployable apps, plain Java in the libraries. Packages are all
-under `ai.mindconnect.*`.
+Maven monorepo for building LLM-powered agents. Java 21; the deployable apps use
+Spring Boot 3.5, the libraries are plain Java. Packages: `ai.mindconnect.*`.
 
-## Layout
-
-Four areas, each self-contained and usable without the others; only `common/`
-is a shared dependency.
+Four areas, each usable without the others; only `common/` is shared:
 
 | Area | What it is |
 |------|------------|
-| `common/` | Dependency-light shared libraries: domain primitives, JSON-Schema subset, file manager, web scraper, path accessor, MiniScript, initial-data seeding |
-| `taskqueue/` | Dependency-free task queue: virtual-thread workers, suspend/resume, retries, cron, optional Postgres store |
-| `workflow/` | Small workflow engine, embeddable as a library: typed steps, scoped variables, script steps, persistence, admin UI |
-| `agents/` | The agent runtime: turn loop, tool dispatch, sub-agents, approvals, LLM gateway, vector store, REST and admin UI apps |
+| `common/` | dependency-light shared libraries (domain primitives, JSON-Schema subset, files, web scraping, MiniScript, seeding) |
+| `taskqueue/` | dependency-free task queue: virtual-thread workers, suspend/resume, retries, cron, optional Postgres store |
+| `workflow/` | small workflow engine, embeddable as a library: typed steps, scoped variables, script steps, admin UI |
+| `agents/` | the agent runtime: turn loop, tool dispatch, sub-agents, approvals, LLM gateway, vector store, REST and admin UI apps |
 
 `agents/` splits along a core/adapter seam: `-core` modules hold domain and
-ports, their siblings hold the implementations. `core/` are libraries,
-`mcp/` the MCP gateway and its tool provider, `adapter/postgres/` alternative
-stores, `springstarter/` the Boot starters, `server/` the deployable apps,
-`client/` the CLI.
+ports, their siblings the adapters. Each area has a README; read it before
+working there. How the areas fit, the seams and the patterns with a name:
+`doc/agent/architecture.md`. Decisions that would otherwise be made again:
+`doc/decisions/`.
 
-Each area has its own README; read it before working in that area. Deeper
-documentation lives in `website/docs/`.
+## Hard rules
 
-## Build and test
+- Everything that lands in the repository is English: code, comments, javadoc,
+  docs, commit messages, PR titles and bodies. Conversation can be German.
+- No framework in a `-core` module or an engine; Spring wiring only in
+  `springstarter/`, an `-app`, `-rest` or `-ui` module. Controllers are thin.
+- One responsibility per class; a name says what the thing is for (no
+  `Helper`, `Util`, `Manager`); one constructor per class; Javadoc says why,
+  never what or history. The full conventions: `doc/agent/conventions.md`,
+  numbered as D1–D9 (build) and I1–I8 (review) in `doc/agent/quality-catalog.md`.
+- Surgical changes: touch only what the task needs, match the surrounding
+  style, one topic per PR. Something you notice outside the task goes into
+  `doc/known-gaps.md`, not into the diff.
+- A failing test is fixed in the code, never deleted or disabled. Test sources
+  stay untouched by a rename, move or split.
+- Before you say "done": `./scripts/verify.sh <module>...` is green for every
+  module you touched. It runs what CI runs.
+- A user-facing change needs a changelog fragment `changelog.d/<section>/<branch-slug>.md`
+  (`added`, `changed`, `deprecated`, `removed`, `fixed`, `security`), never an edit
+  of `CHANGELOG.md`; refactorings, tests, docs and build plumbing need none
+  (label the PR `no-changelog`). See `changelog.d/README.md`.
+- Do **not** add a `Co-Authored-By` trailer to commits.
+- Keep `website/docs/` in step with behaviour you change.
+
+## Build and verify
 
 ```bash
-mvn clean install -DskipTests          # everything, from the root aggregator
-mvn -f agents/pom.xml clean install    # one area, incl. its parent
 ./scripts/verify.sh <module>...        # the one check: tests, PMD baseline, Jacoco, ArchUnit
 mvn -f <module>/pom.xml test           # one module
 mvn -f <module>/pom.xml test -Dtest=<Class>#<method>
+mvn -f agents/pom.xml clean install    # one area, incl. its parent
+mvn clean install -DskipTests          # everything, from the root aggregator
 ```
 
-Build parent POMs and core modules before what depends on them. After changing
-a shared module, rebuild it before its dependents.
+Build parent POMs and core modules before what depends on them; after changing
+a shared module, rebuild it before its dependents. Some tests skip themselves
+without their service (pgvector Postgres on 5433, an LM Studio model): a green
+run may mean "skipped", read the `Tests run:` and `Skipped:` counts.
 
-Some tests skip themselves when their service is absent: pgvector Postgres on
-5433, an LM Studio model. A green run may mean "skipped" — read the
-`Tests run:` and `Skipped:` counts, do not trust the exit code alone.
+## Branch, run
 
-## Working on a branch
-
-Run this once after creating or checking out a branch:
-
-```bash
-./after-branch-creation.sh
-```
-
-It writes the git-ignored `.mvn/maven.config`, so every build in this checkout
-installs as `0.x.y-<branch>-SNAPSHOT` and parallel branches never overwrite
-each other in the shared `~/.m2`. Re-run it after pulling a version bump.
-
-## Running the apps
+Run `./after-branch-creation.sh` once per clone: builds install as
+`0.x.y-<branch>-SNAPSHOT` and `.claude/launch.json` gets this clone's preview
+servers on their own ports. Secrets live in `mc.env` (copy of `mc.env.example`).
 
 ```bash
-mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run   # port 9090
+mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run   # admin UI, port 9090
 mvn -f agents/server/mc-agent-api-app/pom.xml spring-boot:run        # REST + SSE
 mvn -f agents/client/mc-agent-cli/pom.xml spring-boot:run            # CLI
 ```
 
 The admin UI needs `MINDCONNECT_ENCRYPTION_SECRET_KEY` (16, 24 or 32 chars).
-
-## Conventions
-
-- **Everything that lands in the repository is English**: code, comments,
-  javadoc, documentation, commit messages, PR titles and bodies, issue
-  replies. This is an open source project.
-- Parent POMs own dependency versions and plugin config. Do not declare a
-  version in a module POM when the parent can.
-- Do **not** add a `Co-Authored-By` trailer to commits.
-- **A user-facing change needs a changelog fragment**, not an edit of
-  `CHANGELOG.md`: a file `changelog.d/<section>/<branch-slug>.md` (section
-  `added`, `changed`, `deprecated`, `removed`, `fixed` or `security`) holding
-  the bullet, e.g. `changelog.d/fixed/cancel-tool-cards.md` with
-  `- **agents:** **what is different.** explanation…`. User-facing: a new
-  endpoint, a changed behaviour, a fixed bug someone may have been living
-  with. Refactorings, tests, docs and build plumbing do not. Write it for a
-  reader deciding whether to upgrade. A PR touching shipped Java without a
-  fragment fails the `changelog` check; label it `no-changelog` when that is
-  the right answer. The release assembles the fragments; see
-  `changelog.d/README.md`.
-- Keep `website/docs/` in step with behaviour you change.
-
-## Code conventions
-
-The full list is the "Code Conventions" section of `CLAUDE.md`; the short
-form:
-
-- Think before coding; ask when two readings lead to different code.
-  Minimum code, surgical changes, one topic per PR, a check for every step.
-- Hexagonal per module pair: domain and ports in `-core`, adapters in the
-  sibling or `adapter/postgres/`, Spring wiring only in `springstarter/`.
-  No framework in a `-core` module or an engine. Controllers are thin.
-- One responsibility per class; ~300 lines per class and ~50 per method are
-  a reason to look. Class names are singular and name the pattern
-  (Registry, Resolver, Policy, Factory, Repository, Converter, Renderer…);
-  no `Helper`, `Util`, `Support`, `Holder`, `Manager`. Converter means both
-  directions. Definition : Instance for configured vs running.
-- One constructor per class. Imports, never inline fully qualified names.
-  No copy-paste between sibling modules.
-- Javadoc says why, one paragraph, present tense, no history, no design
-  note references, no restating the signature.
-- SLF4J only; one injected `ObjectMapper`; exceptions keep their cause; no
-  literal control characters in source.
