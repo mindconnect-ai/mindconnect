@@ -1,5 +1,3 @@
-ai.mindconnect.agent.registry.spring.RegistryAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-agent-registry)
-ai.mindconnect.agent.registry.spring.RegistryAutoConfiguration$Postgres is not in a starter, app, rest, ui or demo module (module mc-agent-registry)
 ai.mindconnect.agent.security.MindconnectSecurityAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-agent-security)
 ai.mindconnect.agent.security.MindconnectSecurityAutoConfiguration$BearerOpenApi is not in a starter, app, rest, ui or demo module (module mc-agent-security)
 ai.mindconnect.agent.tools.virtualenv.OnBehalfJwksController is not in a starter, app, rest, ui or demo module (module mc-agent-tools-virtual-env)
@@ -15,6 +13,4 @@ ai.mindconnect.cli.CliStateStore is not in a starter, app, rest, ui or demo modu
 ai.mindconnect.cli.InitialDataLoader is not in a starter, app, rest, ui or demo module (module mc-agent-cli)
 ai.mindconnect.cli.agentclient.LocalClientFactory is not in a starter, app, rest, ui or demo module (module mc-agent-cli)
 ai.mindconnect.cli.agentclient.RemoteClientFactory is not in a starter, app, rest, ui or demo module (module mc-agent-cli)
-ai.mindconnect.extension.spring.ExtensionAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-extension)
-ai.mindconnect.extension.spring.ExtensionAutoConfiguration$Postgres is not in a starter, app, rest, ui or demo module (module mc-extension)
 ai.mindconnect.mcp.gateway.local.McpGatewayAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-mcp-gateway-local)

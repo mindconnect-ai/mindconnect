@@ -1,4 +1,4 @@
-package ai.mindconnect.extension.spring;
+package ai.mindconnect.agent.starter.extension;
 
 import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.Namespace;
@@ -10,15 +10,20 @@ import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.extension.adapter.classpath.ClasspathAudit;
 import ai.mindconnect.extension.adapter.classpath.ClasspathManifests;
 import ai.mindconnect.extension.adapter.classpath.ContributionChecker;
+import ai.mindconnect.extension.adapter.classpath.ExtensionAudit;
 import ai.mindconnect.extension.adapter.file.FileBrandActivationRepository;
 import ai.mindconnect.extension.adapter.file.FileExtensionActivationRepository;
 import ai.mindconnect.extension.adapter.file.FileInstalledSeedRepository;
+import ai.mindconnect.extension.adapter.pg.PgBrandActivationRepository;
+import ai.mindconnect.extension.adapter.pg.PgExtensionActivationRepository;
+import ai.mindconnect.extension.adapter.pg.PgInstalledSeedRepository;
 import ai.mindconnect.extension.domain.ExtensionRegistry;
 import ai.mindconnect.extension.port.out.BrandActivationRepository;
 import ai.mindconnect.extension.port.out.ExtensionActivationRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.runtime.ExtensionsFeature;
 import ai.mindconnect.extension.service.ExtensionService;
+import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.service.NamespaceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -136,35 +140,33 @@ public class ExtensionAutoConfiguration {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(name = "ai.mindconnect.extension.adapter.pg.PgExtensionActivationRepository")
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
     static class Postgres {
         /** One row per decision in {@code mc_extension_activation}, on the persistence starter's {@code Sql}. */
         @Bean
         @ConditionalOnMissingBean(ExtensionActivationRepository.class)
-        ExtensionActivationRepository pgExtensionActivationRepository(ai.mindconnect.jdbc.Sql mindconnectSql,
+        ExtensionActivationRepository pgExtensionActivationRepository(Sql mindconnectSql,
                                                                       ObjectProvider<ScopeSupplier> scope) {
             return NamespaceRouted.route(ExtensionActivationRepository.class, scope.getIfAvailable(ScopeSupplier::local),
-                    ns -> new ai.mindconnect.extension.adapter.pg.PgExtensionActivationRepository(mindconnectSql, ns)
-                            .initSchema());
+                    ns -> new PgExtensionActivationRepository(mindconnectSql, ns).initSchema());
         }
 
         /** One row per bundled record a namespace got once, in {@code mc_installed_seed}. */
         @Bean
         @ConditionalOnMissingBean(InstalledSeedRepository.class)
-        InstalledSeedRepository pgInstalledSeedRepository(ai.mindconnect.jdbc.Sql mindconnectSql,
+        InstalledSeedRepository pgInstalledSeedRepository(Sql mindconnectSql,
                                                            ObjectProvider<ScopeSupplier> scope) {
             // The table is shared (the namespace is a column): create it once here, not on each namespace's first call.
-            new ai.mindconnect.extension.adapter.pg.PgInstalledSeedRepository(mindconnectSql, Namespace.DEFAULT).initSchema();
+            new PgInstalledSeedRepository(mindconnectSql, Namespace.DEFAULT).initSchema();
             return NamespaceRouted.route(InstalledSeedRepository.class, scope.getIfAvailable(ScopeSupplier::local),
-                    ns -> new ai.mindconnect.extension.adapter.pg.PgInstalledSeedRepository(mindconnectSql, ns));
+                    ns -> new PgInstalledSeedRepository(mindconnectSql, ns));
         }
 
         /** One row per brand decision in {@code mc_extension_brand_activation}. */
         @Bean
         @ConditionalOnMissingBean(BrandActivationRepository.class)
-        BrandActivationRepository pgBrandActivationRepository(ai.mindconnect.jdbc.Sql mindconnectSql) {
-            return new ai.mindconnect.extension.adapter.pg.PgBrandActivationRepository(mindconnectSql).initSchema();
+        BrandActivationRepository pgBrandActivationRepository(Sql mindconnectSql) {
+            return new PgBrandActivationRepository(mindconnectSql).initSchema();
         }
     }
 

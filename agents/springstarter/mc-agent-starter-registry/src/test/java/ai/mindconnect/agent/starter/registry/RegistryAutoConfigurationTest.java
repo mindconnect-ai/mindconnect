@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.registry.spring;
+package ai.mindconnect.agent.starter.registry;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;

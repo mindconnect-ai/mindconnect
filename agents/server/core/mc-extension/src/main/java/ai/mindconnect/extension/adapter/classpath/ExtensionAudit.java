@@ -1,6 +1,4 @@
-package ai.mindconnect.extension.spring;
-
-import ai.mindconnect.extension.adapter.classpath.ClasspathAudit;
+package ai.mindconnect.extension.adapter.classpath;
 
 import java.util.List;
 

@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Bean;
  * say so.
  */
 @AutoConfiguration
-@AutoConfigureAfter(name = "ai.mindconnect.agent.registry.spring.RegistryAutoConfiguration")
+@AutoConfigureAfter(name = "ai.mindconnect.agent.starter.registry.RegistryAutoConfiguration")
 public class RegistryAdminAutoConfiguration {
 
     @Bean

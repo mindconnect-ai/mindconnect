@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.registry.spring;
+package ai.mindconnect.agent.starter.registry;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.NamespaceRouted;
@@ -11,6 +11,7 @@ import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
 import ai.mindconnect.agent.registry.adapter.installer.AgentDefinitionInstaller;
 import ai.mindconnect.agent.registry.adapter.installer.LlmConfigInstaller;
 import ai.mindconnect.agent.registry.adapter.installer.SkillInstaller;
+import ai.mindconnect.agent.registry.adapter.pg.PgRegistrySourceRepository;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.port.out.RegistryClient;
 import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
@@ -18,6 +19,7 @@ import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.agent.registry.service.RegistryService;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,7 +27,6 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -91,7 +92,6 @@ public class RegistryAutoConfiguration {
     }
 
     @Configuration(proxyBeanMethods = false)
-    @ConditionalOnClass(name = "ai.mindconnect.agent.registry.adapter.pg.PgRegistrySourceRepository")
     @ConditionalOnProperty(name = "mindconnect.persistence", havingValue = "postgres")
     static class Postgres {
 
@@ -107,7 +107,7 @@ public class RegistryAutoConfiguration {
         @Bean
         @ConditionalOnMissingBean(RegistrySourceRepository.class)
         RegistrySourceRepository pgRegistrySourceRepository(
-                ai.mindconnect.jdbc.Sql mindconnectSql,
+                Sql mindconnectSql,
                 @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
                 @Value("${mindconnect.registry.default-source:}") String defaultSource,
                 ObjectProvider<ScopeSupplier> scope,
@@ -116,8 +116,7 @@ public class RegistryAutoConfiguration {
             return NamespaceRouted.route(RegistrySourceRepository.class,
                     scope.getIfAvailable(() -> ScopeSupplier.fixed(new Namespace(defaultNamespace))),
                     ns -> {
-                        var repository = new ai.mindconnect.agent.registry.adapter.pg.PgRegistrySourceRepository(
-                                mindconnectSql, ns).initSchema();
+                        var repository = new PgRegistrySourceRepository(mindconnectSql, ns).initSchema();
                         repository.importFiles(FileRegistrySourceRepository.directory(storage, ns));
                         InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
                         seed(repository, defaultSource);

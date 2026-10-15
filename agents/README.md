@@ -162,8 +162,11 @@ Embedding without Spring: `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)`
 |--------|---------|
 | `mc-agent-starter-file` | File persistence, the default — every repository, the LLM-config store and the file store under `mindconnect.data.base-dir` |
 | `mc-agent-starter-postgres` | `mindconnect.persistence=postgres` — every repository over one pooled `DataSource`, tables created on start |
+| `mc-agent-starter-registry` | The registry for a server — the store of configured registries (file or Postgres, seeded from `initial-data/registries/` and `mindconnect.registry.default-source`), the GitHub client, the installers and the `RegistryService` |
+| `mc-agent-starter-extension` | The extensions of an installation — the manifests on the classpath, the start-up audit, a namespace's and a brand's decisions (file or Postgres), the `ExtensionService` |
 
-An app adds both; the property picks.
+An app adds both persistence starters; the property picks. `mc-agent-registry` and `mc-extension`
+are plain libraries — a Spring Boot server gets their wiring from the two starters.
 
 ### `server/` — what runs
 

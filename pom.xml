@@ -123,6 +123,8 @@
         <module>agents/springstarter/mc-agent-starter-postgres</module>
         <module>agents/springstarter/mc-agent-starter-namespace</module>
         <module>agents/springstarter/mc-agent-starter-runtime</module>
+        <module>agents/springstarter/mc-agent-starter-registry</module>
+        <module>agents/springstarter/mc-agent-starter-extension</module>
         <module>agents/server/core/mc-credentials</module>
         <module>agents/core/mc-message-repository-core</module>
         <module>agents/core/mc-message-repository</module>

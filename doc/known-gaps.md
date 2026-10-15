@@ -16,7 +16,7 @@ and the rule it violates.
   Found 2026-10-14 by the ArchUnit baseline, recounted 2026-10-15. Size: small. Rule: SLF4J.
 - [ ] **agents/server/core/mc-user-core** `StoredUserToolRoster` sits in an `adapter` package inside a `-core` module.
   Found 2026-10-14 by the ArchUnit baseline. Size: small. Rule: D1.
-- [ ] **agents (libraries)** A dozen Spring wiring classes in library modules: `RegistryAutoConfiguration` (mc-agent-registry), `MindconnectSecurityAutoConfiguration` (mc-agent-security), `VirtualEnvToolsAutoConfiguration` and `OnBehalfJwksController` (mc-agent-tools-virtual-env), `McAgentWorkflowStepsAutoConfiguration`, `NamespacedWorkflowStoresAutoConfiguration` and `WorkflowRegistryAutoConfiguration` (mc-agent-tools-workflow), `ExtensionAutoConfiguration` (mc-extension), `McpGatewayAutoConfiguration` (mc-mcp-gateway-local); conventions put wiring in `springstarter/`.
+- [ ] **agents (libraries)** Spring wiring classes in library modules: `MindconnectSecurityAutoConfiguration` (mc-agent-security), `VirtualEnvToolsAutoConfiguration` and `OnBehalfJwksController` (mc-agent-tools-virtual-env), `McAgentWorkflowStepsAutoConfiguration`, `NamespacedWorkflowStoresAutoConfiguration` and `WorkflowRegistryAutoConfiguration` (mc-agent-tools-workflow), `McpGatewayAutoConfiguration` (mc-mcp-gateway-local); conventions put wiring in `springstarter/`.
   Found 2026-10-14 by the ArchUnit baseline, recounted 2026-10-15. Size: one wave. Rule: D1.
 - [ ] **agents/server/ui/mc-agent-chat-ui-rest** `ChatUiController` has 2494 lines (2026-10-15), 83 methods, 20 fields: routing, page building, four dialogs, session-agent management and helpers in one class.
   Found 2026-10-14 by the baseline (classes over 300 lines). Size: large. Rule: D3, one responsibility.

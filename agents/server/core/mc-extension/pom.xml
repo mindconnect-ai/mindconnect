@@ -19,9 +19,8 @@
         META-INF/mindconnect/extension.json on the classpath, the audit that
         names the jars bringing tools without one, the file and in-memory
         stores of a namespace's activation decisions, the tool-registry overlay
-        that hides a switched-off extension's tools, and the Spring
-        auto-configuration that wires it all. The Postgres store is
-        mc-extension-pg.
+        that hides a switched-off extension's tools. The Postgres store is
+        mc-extension-pg, the Spring wiring mc-agent-starter-extension.
     </description>
 
     <dependencies>
@@ -50,11 +49,6 @@
             <artifactId>mc-namespace-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-extension-pg</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
@@ -65,11 +59,6 @@
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-autoconfigure</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>

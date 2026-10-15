@@ -78,7 +78,11 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-registry</artifactId>
+            <artifactId>mc-agent-starter-registry</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-extension</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

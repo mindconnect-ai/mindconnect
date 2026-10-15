@@ -20,7 +20,8 @@
         installers for the two entities this module can see — LLM configs and
         agents. Workflows are installed by mc-agent-registry-workflow, so that
         this module does not drag in the workflow engine. The Postgres store of
-        configured registries is mc-agent-registry-pg.
+        configured registries is mc-agent-registry-pg, the Spring wiring
+        mc-agent-starter-registry.
     </description>
 
     <dependencies>
@@ -39,11 +40,6 @@
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-file-repo</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-registry-pg</artifactId>
-            <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
@@ -71,11 +67,6 @@
             <artifactId>slf4j-api</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-autoconfigure</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
@@ -83,16 +74,6 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

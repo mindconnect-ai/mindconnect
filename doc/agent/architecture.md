@@ -135,7 +135,9 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
   - `springstarter/` — Spring Boot starters: `mc-agent-starter-runtime` builds the runtime
     from the features and exports its beans; `mc-agent-starter-file` (default) and
     `mc-agent-starter-postgres` supply the `Persistence` (`mindconnect.persistence` picks)
-    plus users and tokens; `mc-agent-starter-namespace` the per-request scope
+    plus users and tokens; `mc-agent-starter-namespace` the per-request scope;
+    `mc-agent-starter-registry` and `mc-agent-starter-extension` wire the registry and the
+    extensions (the libraries under `server/core` carry no Spring)
   - `builder/mc-agent-runtime-builder` + `demo/mc-agent-simple-demo` — Spring-free
     embedding facade and runnable examples. The builder assembles a core plus installed
     `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); the
