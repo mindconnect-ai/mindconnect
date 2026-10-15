@@ -4,38 +4,25 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Single observation of one provider call. Emitted to the {@link
- * ai.mindconnect.llm.port.in.LlmCallListener} a caller passes to
- * {@code chatStreaming(...)}, regardless of whether the call succeeded.
- *
- * <p>The event is deliberately provider-agnostic in its <em>shape</em> but
- * provider-specific in its <em>contents</em>: {@link #requestJson} holds
- * the verbatim wire request body, {@link #responseEvents} the verbatim
- * SSE event blocks the provider sent. That's what you want when the
- * provider rejects a request with a cryptic 400 or returns a tool call
- * you can't interpret. {@link #response} is the runtime's <em>own</em>
- * reconstruction of the final assistant message — text + tool calls
- * reassembled from the streamed deltas — for quick human reading.
- *
- * <p>Fields {@code promptTokens}, {@code completionTokens}, and
- * {@code finishReason} may be {@code 0} / {@code null} when the call
- * failed before usage was reported, or when the provider didn't supply
- * the data. The listener implementation must not assume they are present.
+ * One observation of a provider call, reported to the
+ * {@link ai.mindconnect.llm.port.in.LlmCallListener} whether the call succeeded or
+ * not. It carries the verbatim wire request and the verbatim SSE blocks because
+ * that is what explains a cryptic 400 or an uninterpretable tool call;
+ * {@link #response} is the runtime's own reconstruction for quick reading. Token
+ * counts and the finish reason are 0 or null when the call failed before usage was
+ * reported, so a listener must not rely on them.
  */
 public record LlmCallEvent(
-        /** When the adapter started building the HTTP request. */
         Instant startedAt,
-        /** Wall-clock duration from start to last byte (or to error). */
+        /** From the start to the last byte, or to the error. */
         long durationMs,
-        /** The {@code llm-config} the request was routed against. */
+        /** The config the request was routed against, by name; an alias stays an alias here. */
         String llmConfigName,
-        /** Resolved provider model name (e.g. {@code gpt-5.4-mini}). */
+        /** The model the provider was asked for, placeholders resolved. */
         String modelName,
-        /** Prompt tokens reported by the provider, or 0 if unknown. */
+        /** Zero when the call failed before the provider reported usage. */
         int promptTokens,
-        /** Completion tokens reported by the provider, or 0 if unknown. */
         int completionTokens,
-        /** Provider-reported finish reason ({@code stop}, {@code tool_calls}, …) or {@code null}. */
         String finishReason,
         /**
          * The request body the adapter sent, provider-specific JSON — with
@@ -50,34 +37,17 @@ public record LlmCallEvent(
          * by the SSE spec. Empty for failed calls (see {@link #errorBody}).
          */
         List<String> responseEvents,
-        /**
-         * Reconstructed final assistant message — text + tool calls — built
-         * by the adapter from the streamed deltas. Provider-agnostic shape;
-         * makes the response readable at a glance. {@code null} if the call
-         * failed before any chunks arrived.
-         */
+        /** What the model said, reassembled from the deltas; {@code null} when nothing arrived before the call failed. */
         ResponseSummary response,
-        /** HTTP status if the call failed, otherwise {@code null}. */
+        /** The HTTP status and the provider's body when the call failed, else {@code null}. */
         Integer errorStatus,
-        /** Provider error body if the call failed, otherwise {@code null}. */
         String errorBody
 ) {
 
     /**
-     * Compact, provider-agnostic view of what the model actually said.
-     * Built from the streamed deltas, not from a separate response body —
-     * the streaming API has no other source of truth.
+     * What the model actually said, in one provider-agnostic shape. Built
+     * from the streamed deltas, since the streaming API has no other source
+     * of truth; {@code text} is {@code null} when the model only called tools.
      */
-    public record ResponseSummary(
-            /**
-             * Accumulated assistant text. {@code null} if the model only
-             * emitted tool calls (no prose).
-             */
-            String text,
-            /**
-             * Tool calls the model requested, fully reassembled from
-             * streamed deltas. Empty list if none.
-             */
-            List<ToolCall> toolCalls
-    ) {}
+    public record ResponseSummary(String text, List<ToolCall> toolCalls) {}
 }

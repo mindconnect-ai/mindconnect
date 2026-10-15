@@ -10,7 +10,7 @@ runs on, as a plain JSON API under `/api`. It is what the desktop chat client
 talks to, and what your own front end would talk to.
 
 ```bash
-mvn -f agents/server/mc-agent-api-app/pom.xml spring-boot:run
+mvn -f agents/server/app/mc-agent-api-app/pom.xml spring-boot:run
 ```
 
 Interactive documentation ships with the server: **http://localhost:8080/swagger-ui.html**,

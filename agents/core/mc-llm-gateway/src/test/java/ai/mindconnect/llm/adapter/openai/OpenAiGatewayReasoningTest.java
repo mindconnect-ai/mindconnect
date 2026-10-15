@@ -2,6 +2,8 @@ package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
+import ai.mindconnect.llm.adapter.ToolCallBuilder;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -11,7 +13,6 @@ import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.domain.ToolDefinition;
 import ai.mindconnect.llm.port.in.LlmCallListener;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class OpenAiGatewayReasoningTest {
 
     private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final OpenAiCompatibleGateway gateway =
-            new OpenAiCompatibleGateway(new OkHttpClient(), new ObjectMapper(), encryption);
+            new OpenAiCompatibleGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
 
     private LlmConfig config(Map<String, Object> additionalParams) {
         return new LlmConfig(LlmConfigId.random(), "local", LlmProvider.LM_STUDIO,
@@ -99,14 +100,14 @@ class OpenAiGatewayReasoningTest {
 
     @Test
     void onlyGpt56AndLaterRefuseToolsWithReasoning() {
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.6")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.6-luna")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.10-mini")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-6")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.5")).isFalse();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5-mini")).isFalse();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-4o")).isFalse();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("o3")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.6")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.6-luna")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.10-mini")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-6")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.5")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5-mini")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-4o")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("o3")).isFalse();
     }
 
     @Test
@@ -231,7 +232,7 @@ class OpenAiGatewayReasoningTest {
 
     private List<LlmStreamChunk> parse(String... payloads) {
         List<LlmStreamChunk> chunks = new ArrayList<>();
-        Map<Integer, AbstractOpenAiGateway.OpenAiToolCallBuilder> builders = new TreeMap<>();
+        Map<Integer, ToolCallBuilder> builders = new TreeMap<>();
         ThinkTagSplitter splitter = new ThinkTagSplitter();
         for (String payload : payloads) {
             gateway.parseOpenAiDelta(payload, builders, splitter, chunks::add);

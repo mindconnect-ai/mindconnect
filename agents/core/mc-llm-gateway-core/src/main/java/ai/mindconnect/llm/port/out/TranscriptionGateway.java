@@ -4,6 +4,8 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 
+import java.util.function.Consumer;
+
 /**
  * Adapter port to a provider's speech-to-text endpoint — what
  * {@link ai.mindconnect.llm.port.in.LlmTranscription} routes to once the
@@ -33,7 +35,7 @@ public interface TranscriptionGateway {
      * at all.
      */
     default TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
-                                           java.util.function.Consumer<String> onDelta) {
+                                           Consumer<String> onDelta) {
         TranscriptionResult result = transcribe(config, request);
         if (onDelta != null && result.text() != null && !result.text().isEmpty()) {
             onDelta.accept(result.text());

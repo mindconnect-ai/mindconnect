@@ -2,6 +2,7 @@ package ai.mindconnect.llm.port.out;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.llm.domain.FinishReason;
+import ai.mindconnect.llm.domain.LlmCallEvent;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.domain.LlmResponse;
@@ -9,10 +10,7 @@ import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.domain.ToolCall;
 import ai.mindconnect.llm.port.in.LlmCallListener;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
 import java.util.function.Consumer;
 
 /**
@@ -23,21 +21,12 @@ import java.util.function.Consumer;
 public interface LlmGateway {
 
     /**
-     * Streams a chat completion. The handler receives chunks in arrival order
-     * and the stream always ends with exactly one {@link LlmStreamChunk.Done}.
-     * <p>
-     * If {@code cancellation.isCancelled()} flips during the call (typically
-     * because the caller invoked {@link Cancellation#cancel()} from another
-     * thread), the gateway aborts the underlying HTTP connection and returns
-     * promptly. The handler may receive a partial Text/ToolCall delta but
-     * is not guaranteed a {@code Done}.
-     * <p>
-     * The {@code listener} is invoked exactly once after the call ends
-     * (successfully or with an error) with the verbatim provider wire bodies.
-     * The adapter is expected to capture the JSON it sent, accumulate the
-     * raw response (or capture the error body), and fire the event from a
-     * {@code finally} block. Listener exceptions must be swallowed — a
-     * broken trace must never tear down the actual chat.
+     * Streams a chat completion: chunks arrive in order and a completed stream ends
+     * with exactly one {@link LlmStreamChunk.Done}. When the cancellation flips, the
+     * gateway aborts the connection and returns promptly, so the handler may see a
+     * partial delta and no {@code Done}. The listener is invoked exactly once after
+     * the call ends, successfully or not, with the verbatim wire bodies; its
+     * exceptions are swallowed, because a broken trace must never tear down the chat.
      */
     void chatStreaming(LlmConfig config, LlmRequest request,
                        Consumer<LlmStreamChunk> handler,
@@ -45,34 +34,31 @@ public interface LlmGateway {
                        LlmCallListener listener);
 
     /**
-     * Blocking request/response wrapper around {@link #chatStreaming}.
-     * Streams the call on the caller's thread, accumulates every
-     * {@link LlmStreamChunk.TextDelta} into one string and every
-     * {@link LlmStreamChunk.ToolCallDelta} into a list of completed
-     * {@link ToolCall}s, then returns once the {@link LlmStreamChunk.Done}
-     * frame arrives.
+     * Blocking request/response wrapper around {@link #chatStreaming}: streams
+     * the call on the caller's thread, joins every {@link LlmStreamChunk.TextDelta}
+     * into one string and returns once the {@link LlmStreamChunk.Done} frame
+     * arrives. The tool calls are the ones the adapter reassembled for its
+     * {@link LlmCallEvent} — parsed there, with the runtime's JSON mapper, so
+     * this port needs none of its own. Thinking blocks are dropped; only the
+     * streaming tool loop replays them.
      *
-     * <p>Default-implemented so providers can opt out by overriding only
-     * when they have a cheaper truly-non-streaming endpoint. Cancellation
-     * and listener semantics match {@link #chatStreaming}.
+     * <p>Default-implemented so a provider overrides it only when it has a
+     * cheaper, truly non-streaming endpoint. Cancellation and listener
+     * semantics match {@link #chatStreaming}.
      */
     default LlmResponse chat(LlmConfig config, LlmRequest request,
                               Cancellation cancellation,
                               LlmCallListener listener) {
         StringBuilder text = new StringBuilder();
-        Map<Integer, ToolCallAccumulator> tools = new TreeMap<>();
         FinishReason[] finish = { null };
         int[] inputTokens  = { 0 };
         int[] outputTokens = { 0 };
+        LlmCallEvent[] call = { null };
 
         chatStreaming(config, request, chunk -> {
             switch (chunk) {
                 case LlmStreamChunk.TextDelta td -> text.append(td.text());
-                case LlmStreamChunk.ToolCallDelta tcd -> tools
-                        .computeIfAbsent(tcd.index(), i -> new ToolCallAccumulator())
-                        .feed(tcd);
-                // Non-streaming aggregation path (probes/tests) drops thinking
-                // blocks — only the streaming tool loop needs them for replay.
+                case LlmStreamChunk.ToolCallDelta ignored -> { }
                 case LlmStreamChunk.ThinkingDelta ignored -> { }
                 case LlmStreamChunk.Done done -> {
                     finish[0] = done.finishReason();
@@ -80,15 +66,14 @@ public interface LlmGateway {
                     outputTokens[0] = done.outputTokens();
                 }
             }
-        }, cancellation, listener);
+        }, cancellation, event -> {
+            call[0] = event;
+            if (listener != null) listener.onCall(event);
+        });
 
-        List<ToolCall> toolCalls = new ArrayList<>(tools.size());
-        for (ToolCallAccumulator acc : tools.values()) {
-            ToolCall built = acc.build();
-            if (built != null) toolCalls.add(built);
-        }
-        return new LlmResponse(text.toString(), List.copyOf(toolCalls),
-                finish[0], inputTokens[0], outputTokens[0]);
+        List<ToolCall> toolCalls = call[0] == null || call[0].response() == null
+                ? List.of() : List.copyOf(call[0].response().toolCalls());
+        return new LlmResponse(text.toString(), toolCalls, finish[0], inputTokens[0], outputTokens[0]);
     }
 
     /**
@@ -101,47 +86,4 @@ public interface LlmGateway {
         return chat(config, request, Cancellation.none(), LlmCallListener.NOOP);
     }
 
-    /**
-     * Internal helper for {@link #chat}: stitches the streamed
-     * {@link LlmStreamChunk.ToolCallDelta} fragments (id / name appear on
-     * the first delta, arguments arrive as JSON-fragment chunks) back
-     * into a single {@link ToolCall}. Per-provider streaming oddities are
-     * already normalised at the chunk layer, so this naive concatenation
-     * is enough.
-     */
-    final class ToolCallAccumulator {
-        private String id;
-        private String name;
-        private final StringBuilder argsJson = new StringBuilder();
-
-        void feed(LlmStreamChunk.ToolCallDelta d) {
-            if (d.id() != null && !d.id().isEmpty()) this.id = d.id();
-            if (d.name() != null && !d.name().isEmpty()) this.name = d.name();
-            if (d.argumentsFragment() != null) this.argsJson.append(d.argumentsFragment());
-        }
-
-        ToolCall build() {
-            if (id == null && name == null && argsJson.isEmpty()) return null;
-            // Arguments are a JSON object string at this layer — callers
-            // that need a typed Map<String,Object> parse it themselves
-            // (same contract as the streaming-handler exposes today).
-            return new ToolCall(id, name, parseArgs(argsJson.toString()));
-        }
-
-        private static Map<String, Object> parseArgs(String json) {
-            // Empty fragment OR pure whitespace → empty map. We parse on a
-            // best-effort basis to keep this default-implementation cheap;
-            // a malformed-arguments call surfaces as "tool with empty
-            // args" which the caller can then re-issue or fail.
-            if (json == null || json.isBlank()) return Map.of();
-            try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> parsed = new com.fasterxml.jackson.databind.ObjectMapper()
-                        .readValue(json, Map.class);
-                return parsed == null ? Map.of() : parsed;
-            } catch (Exception e) {
-                return Map.of();
-            }
-        }
-    }
 }

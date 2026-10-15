@@ -5,11 +5,9 @@ import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.domain.LlmPriceId;
-import ai.mindconnect.llm.domain.LlmPrices;
+import ai.mindconnect.llm.domain.LlmPriceList;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -25,9 +23,7 @@ public class FileLlmPriceRepository implements LlmPriceRepository {
 
     private final Documents<LlmPriceId, LlmPrice> prices;
 
-    public FileLlmPriceRepository(Path storageDir, Namespace namespace) {
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    public FileLlmPriceRepository(Path storageDir, ObjectMapper objectMapper, Namespace namespace) {
         this.prices = Documents.of(LlmPrice.class)
                 .path((LlmPriceId id) -> DIR + "/" + id.value() + ".json")
                 .build(FileRepo.open(storageDir, namespace.value()), objectMapper);
@@ -50,7 +46,7 @@ public class FileLlmPriceRepository implements LlmPriceRepository {
 
     @Override
     public List<LlmPrice> findAll() {
-        return prices.findAll(DIR).stream().sorted(LlmPrices.CHRONOLOGICAL).toList();
+        return prices.findAll(DIR).stream().sorted(LlmPriceList.CHRONOLOGICAL).toList();
     }
 
     @Override

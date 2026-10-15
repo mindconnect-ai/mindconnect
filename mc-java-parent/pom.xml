@@ -56,6 +56,8 @@
         <!-- Spring Boot is consumed as a BOM (version management only), not as a parent.
              Modules stay Spring-free unless they declare a Spring starter themselves. -->
         <spring-boot.version>3.5.13</spring-boot.version>
+        <!-- ArchUnit for the per-area arch-tests modules (common/mc-arch-rules). -->
+        <archunit.version>1.5.1</archunit.version>
     </properties>
 
     <dependencyManagement>
@@ -86,6 +88,12 @@
                 <groupId>org.assertj</groupId>
                 <artifactId>assertj-core</artifactId>
                 <version>${assertj.version}</version>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.tngtech.archunit</groupId>
+                <artifactId>archunit-junit5</artifactId>
+                <version>${archunit.version}</version>
                 <scope>test</scope>
             </dependency>
         </dependencies>

@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.common.StaleVersionException;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -19,7 +20,7 @@ class LlmConfigVersioningTest {
 
     @Test
     void theFileStoreChecksVersions(@TempDir Path dir) {
-        versionsAreChecked(new FileLlmConfigRepository(dir, new Namespace("test")));
+        versionsAreChecked(new FileLlmConfigRepository(dir, TestJson.MAPPER, new Namespace("test")));
     }
 
     @Test

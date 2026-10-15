@@ -1,7 +1,6 @@
 package ai.mindconnect.llm.domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,37 +15,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 
 /**
- * What one model costs through one LLM config during one period: a rate per
- * million input, output and (optionally) cached input tokens, in one currency.
- *
- * <p>A price belongs to a <em>concrete</em> config, by name, <em>and</em> to a
- * model, by the name the call reports ({@code gpt-5.4-mini},
- * {@code claude-sonnet-4-6}). A config's model changes over time — it is
- * edited, or it is a {@code ${OPENAI_MODEL:gpt-5.4-mini}} placeholder whose
- * variable changes — and a price must never price the calls of another
- * model. So one config carries prices for as many models as it has served,
- * and a call is priced by its (config, model) pair only. The model is kept
- * as typed, stripped, and matched ignoring case ({@link #isFor}).
- *
- * <p>Each (config, model) pair has as many of these as its rates changed.
- * The periods are days in UTC, half-open: {@code validFrom} is the first day
- * the price applies, {@code validTo} the first day it no longer does, and a
- * missing {@code validTo} means "until further notice". Periods of one pair
- * must not overlap — {@link #overlaps} says whether two do, the service that
- * saves them refuses it.
- *
- * <p>An alias has no price of its own: its calls are served by the config it
- * points at and cost what that one costs.
- *
- * <p>A stored price without a model — written before prices named one —
- * still reads: it prices <em>any</em> model of its config ({@link #anyModel}),
- * behind a price that names the call's model, and the first one read is
- * logged. A new price always names its model; the service refuses one
- * without.
- *
- * <p>Separate from {@link LlmConfig} on purpose: a config says how to call a
- * model, a price what a call cost at the time — and a corrected price must
- * be able to apply to calls long made.
+ * What one model costs through one LLM config during one period, as a rate per
+ * million input, output and cached input tokens. A price is keyed by the (config,
+ * model) pair because a config's model changes over time and a price must never
+ * price another model's calls; the periods of one pair are half-open UTC days that
+ * never overlap. A price stored before prices named their model prices any model of
+ * its config, behind one that names it. Separate from {@link LlmConfig} on purpose:
+ * a corrected price must apply to calls long made.
  *
  * @param id                    unique per period
  * @param configName            the concrete LLM config it prices
@@ -135,9 +110,18 @@ public record LlmPrice(
     }
 
     /** True for a price stored before prices named their model: it prices any model of its config. */
-    @JsonIgnore
     public boolean anyModel() {
         return model == null;
+    }
+
+    /** The name a model is shown and grouped under; a price without one prices any model. */
+    public String modelLabel() {
+        return anyModel() ? "any model" : model;
+    }
+
+    /** The period as people read it: {@code 2026-01-01 – 2026-07-01} or {@code 2026-07-01 – open}. */
+    public String period() {
+        return validFrom + " – " + (validTo == null ? "open" : validTo.toString());
     }
 
     /**

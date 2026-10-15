@@ -1,8 +1,9 @@
 package ai.mindconnect.llm.port.in;
 
-
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
+
+import java.util.function.Consumer;
 
 /**
  * Turns recorded speech into text. The counterpart of {@link LlmChat} for
@@ -38,7 +39,7 @@ public interface LlmTranscription {
      * end. Nothing about the caller's code changes with the model.
      */
     default TranscriptionResult transcribe(String configName, TranscriptionRequest request,
-                                           java.util.function.Consumer<String> onDelta) {
+                                           Consumer<String> onDelta) {
         TranscriptionResult result = transcribe(configName, request);
         if (onDelta != null && result.text() != null && !result.text().isEmpty()) {
             onDelta.accept(result.text());

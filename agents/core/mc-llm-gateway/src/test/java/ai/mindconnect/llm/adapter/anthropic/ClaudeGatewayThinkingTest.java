@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.anthropic;
 
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmProvider;
@@ -27,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ClaudeGatewayThinkingTest {
 
     private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = TestJson.MAPPER;
     private final ClaudeGateway gateway =
             new ClaudeGateway(new OkHttpClient(), mapper, encryption);
 

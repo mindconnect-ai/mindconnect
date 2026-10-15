@@ -20,9 +20,11 @@ carry the implementations.
 | `mc-llm-gateway` | The gateway implementation: provider adapters, routing, retry/throttle decorators. |
 | `mc-message-repository-core` | Conversations, participants and messages as plain domain types, their ports, and the `ConversationService` use case. |
 | `mc-message-repository` | File-backed and in-memory implementations of those ports. |
-| `mc-credentials` | User credentials store: OAuth2 tokens + API keys, encrypted at rest, with auto-refresh and a vendor OAuth handler SPI. |
+| `mc-file-store-core` | The file store's ports: `FileStore`, `StoredFile`, the `FileStoreBackend` SPI — the runtime core depends on them. |
+| `mc-file-store` | The filesystem backend of the file store. |
+| `mc-agent-tool-spi` | What a tool *is*: `Tool`, `ToolFactory`, `MultiToolProvider`, `ToolRegistry`, `ToolEnvironment` + the ServiceLoader registry — see [creating a tool](./creating-a-tool.md). |
 
-## `core/` — protocol
+## `responses-api/` — the protocol a client talks to an agent with
 
 | Module | Purpose |
 |--------|---------|
@@ -30,11 +32,10 @@ carry the implementations.
 | `mc-agent-protocol-mc-runtime` | The protocol surface implemented against the Mindconnect runtime. |
 | `mc-agent-protocol-openai` | The same surface implemented against the real OpenAI Responses + Conversations API. |
 
-## `core/` — tools
+## `tools/core/` — the built-in tool providers
 
 | Module | Purpose |
 |--------|---------|
-| `mc-agent-tool-spi` | What a tool *is*: `Tool`, `ToolFactory`, `MultiToolProvider`, `ToolRegistry`, `ToolEnvironment` + the ServiceLoader registry — see [creating a tool](./creating-a-tool.md). |
 | `mc-agent-tools` | Lightweight built-ins: filesystem, workspace, bash. |
 | `mc-agent-tools-code` | `code_execute` — snippets in disposable docker/podman containers. |
 | `mc-agent-tools-document` | PDF/Word/text tools via Tika + PDFBox + POI. |
@@ -42,7 +43,13 @@ carry the implementations.
 | `mc-agent-tools-web-browser` | Headless-Chromium fetching (Playwright) for JS-rendered sites — separate module because of the ~150 MB Chromium download. |
 | `mc-agent-tools-workflow` | Persisted workflows as agent tools — one tool per workflow, parameters from its input schema. |
 
-## `mcp/` — MCP servers as registered tools
+## `tools/vector/` — the knowledge tools
+
+| Module | Purpose |
+|--------|---------|
+| `mc-vector-store-tools` | The `knowledge` tool group: `vector_upsert/search/delete_file/ingest_file` over the stores in `vectorstore/` |
+
+## `tools/mcp/` — MCP servers as registered tools
 
 | Module | Purpose |
 |--------|---------|
@@ -50,7 +57,6 @@ carry the implementations.
 | `mc-mcp-gateway-local` | The in-process gateway: registrations on disk, discovery cache, Docker MCP catalog. |
 | `mc-mcp-proxy` | One server over stdio or streamable HTTP, on the official MCP Java SDK. |
 | `mc-agent-tools-mcp` | The `MultiToolProvider` that exposes every registered server's tools as agent tools. |
-| `mc-mcp-gateway-admin-ui-rest` | The *MCP Servers* screen, embedded by the admin UI. |
 
 ## `vectorstore/` — the knowledge layer
 
@@ -58,9 +64,6 @@ carry the implementations.
 |--------|---------|
 | `mc-vector-store` | Vector-store SPI + built-in file-persisted `memory` backend |
 | `mc-vector-store-pgvector` | pgvector backend (one table per store, HNSW index) |
-| `mc-vector-store-tools` | The `knowledge` tool group: `vector_upsert/search/delete_file/ingest_file` |
-| `mc-file-store-core` | The file store's ports: `FileStore`, `StoredFile`, the `FileStoreBackend` SPI |
-| `mc-file-store` | The filesystem backend |
 
 See [vector store & file store](./vector-store.md).
 
@@ -83,6 +86,8 @@ tables, typed rows, transactions — no ORM). See [Persistence](./persistence.md
 | `mc-agent-starter-runtime` | Builds the runtime for a Spring Boot application from the same features the embedded builder installs, configured from the `mindconnect.*` properties, and exports its beans; the persistence starters supply the `Persistence`, the namespace starter the scope. |
 | `mc-agent-starter-file` | File persistence, the default: every repository port, the LLM-config store and the file store under `mindconnect.data.base-dir`. |
 | `mc-agent-starter-postgres` | `mindconnect.persistence=postgres`: every port from one pooled `DataSource`, tables created on start. |
+| `mc-agent-starter-registry` | The registry for a server: the store of configured registries (file or Postgres, seeded from `initial-data/registries/` and `mindconnect.registry.default-source`), the GitHub client, the installers and the `RegistryService`. |
+| `mc-agent-starter-extension` | The extensions of an installation: the manifests on the classpath, the start-up audit, a namespace's and a brand's decisions (file or Postgres), the `ExtensionService`. |
 
 An app has both on the classpath; the property picks. The runtime's own
 Spring wiring (`DefaultAgentRuntimeConfig`) still lives in `mc-agent-runtime`
@@ -99,14 +104,29 @@ next step.
 | `mc-agent-runtime-feature-namespace` | The namespace of the current call instead of one for the runtime's life: a thread-bound scope, every repository routed to the namespace's adapter, tasks that carry their scope. Installed explicitly by a host that binds the scope — the Spring starter does. |
 | `mc-agent-simple-demo` | Runnable embedding examples: a minimal chat, and a chat with an attached file searched through the session's vector store. |
 
-## `server/` — deployable Spring Boot services
+## `server/` — what runs
+
+`app/` holds the Spring Boot applications, `rest/` and `ui/` the libraries they embed, `core/` the
+installation around the runtime: users, namespaces, credentials, registries and extensions as plain
+Java, with their Postgres adapters under `adapter/`.
 
 | Module | Purpose |
 |--------|---------|
-| `mc-agent-api-rest` | The REST controllers and DTOs as a library (no Boot main) |
-| `mc-agent-api-app` | Agent server (REST, streaming via SSE) — embeds `mc-agent-api-rest` |
-| `mc-agent-admin-ui-rest` | The [Admin UI](./admin-ui/index.md) itself as an embeddable library: controllers serving UiNode JSON under `/admin/api/**`, pages, components, SPA assets |
-| `mc-agent-admin-ui-app` | Admin UI Spring Boot application |
+| `app/mc-agent-api-app` | Agent server (REST, streaming via SSE) — embeds `mc-agent-api-rest` |
+| `app/mc-agent-admin-ui-app` | Admin UI Spring Boot application |
+| `rest/mc-agent-api-rest` | The REST controllers and DTOs as a library (no Boot main) |
+| `rest/mc-agent-api-responses-rest` | The OpenAI Responses API shape over the runtime |
+| `ui/mc-agent-admin-ui-rest` | The [Admin UI](./admin-ui/index.md) itself as an embeddable library: controllers serving UiNode JSON under `/admin/api/**`, pages, components, SPA assets |
+| `ui/mc-agent-chat-ui-rest` | The chat screens, embedded by the admin UI |
+| `ui/mc-agent-registry-admin-ui-rest` | The *Registry* screen, embedded by the admin UI. |
+| `ui/mc-mcp-gateway-admin-ui-rest` | The *MCP Servers* screen, embedded by the admin UI. |
+| `core/mc-agent-security` | Login and API-token security shared by both applications. |
+| `core/mc-user-core` / `mc-user` | The users of an installation and their API tokens: domain, ports and services, with file and in-memory adapters. |
+| `core/mc-namespace-core` / `mc-namespace` | The namespaces of an installation and who belongs to them, with file and in-memory adapters. |
+| `core/mc-credentials` | User credentials store: OAuth2 tokens + API keys, encrypted at rest, with auto-refresh and a vendor OAuth handler SPI. |
+| `core/mc-agent-registry-core` / `mc-agent-registry` | Importing LLM configs, agents, workflows and packages from a registry: a GitHub project with an index. |
+| `core/mc-agent-registry-workflow` | The registry's workflow installer, a module of its own so the registry does not drag in the workflow engine. |
+| `core/mc-extension-core` / `mc-extension` | What an extension is: manifest, API routes, menu contributions, content per namespace, and its adapters. |
 
 ## `client/`
 

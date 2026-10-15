@@ -1,27 +1,21 @@
 package ai.mindconnect.llm.adapter.gemini;
 
-import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.LlmHttpErrors;
-import ai.mindconnect.llm.adapter.TraceRedaction;
+import ai.mindconnect.llm.adapter.SseBlockReader;
+import ai.mindconnect.llm.adapter.SseStreamingGateway;
+import ai.mindconnect.llm.adapter.StreamDelta;
 import ai.mindconnect.llm.domain.*;
-import ai.mindconnect.llm.port.in.LlmCallListener;
-import ai.mindconnect.llm.port.out.LlmGateway;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -43,18 +37,11 @@ import java.util.function.Consumer;
  *       and {@code usageMetadata} on each chunk (last non-empty value wins).</li>
  * </ul>
  */
-public class GeminiGateway implements LlmGateway {
+public class GeminiGateway extends SseStreamingGateway {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiGateway.class);
-    private static final Logger wire = LoggerFactory.getLogger("ai.mindconnect.llm.wire");
     private static final MediaType JSON = MediaType.get("application/json");
 
-
-    private final OkHttpClient httpClient;
-    private final ObjectMapper objectMapper;
-    private final EncryptionHelper encryption;
-    private final EnvVarResolver env;
-    private final ObjectWriter prettyWriter;
 
     /** Placeholders resolve from the process environment alone — the library and desktop case. */
     public GeminiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
@@ -64,169 +51,39 @@ public class GeminiGateway implements LlmGateway {
     /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
     public GeminiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
                          EnvVarResolver env) {
-        this.httpClient = httpClient;
-        this.objectMapper = objectMapper;
-        this.encryption = encryption;
-        this.env = env;
-        this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
+        super("Gemini", httpClient, objectMapper, encryption, env);
     }
 
     @Override
-    public void chatStreaming(LlmConfig config, LlmRequest request,
-                              Consumer<LlmStreamChunk> handler,
-                              Cancellation cancellation,
-                              LlmCallListener listener) {
-        config = config.resolved(env, encryption);
-        int msgCount = request.messages() == null ? 0 : request.messages().size();
-        int toolCount = request.tools() == null ? 0 : request.tools().size();
-        log.debug("Gemini stream → model={} messages={} tools={}", config.model(), msgCount, toolCount);
-        long start = System.currentTimeMillis();
-        Instant startedAt = Instant.ofEpochMilli(start);
-
-        // Trace capture buffers — populated as the stream progresses.
-        String prettyRequestJson = null;
-        List<String> responseEvents = new ArrayList<>();
-        StringBuilder assistantText = new StringBuilder();
-        // Gemini sends tool calls atomically (not delta-fragmented), so we
-        // collect fully-built ToolCalls directly instead of using a builder.
-        List<ToolCall> capturedToolCalls = new ArrayList<>();
-        Integer errorStatus = null;
-        String errorBody = null;
-
-        String body;
-        try {
-            ObjectNode requestNode = buildRequestNode(config, request);
-            try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
-            logWireRequest(requestNode);
-            body = objectMapper.writeValueAsString(requestNode);
-        } catch (IOException e) {
-            fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                    responseEvents, null, 0, 0, null, null, e.getMessage());
-            throw new RuntimeException("Failed to build Gemini request", e);
-        }
-
-        String baseUrl = LlmProvider.GOOGLE_GEMINI.baseUrlOr(config.baseUrl());
-        String url = baseUrl + "/v1beta/models/" + config.model()
+    protected Request httpRequest(LlmConfig config, String body) {
+        String url = LlmProvider.GOOGLE_GEMINI.baseUrlOr(config.baseUrl()) + "/v1beta/models/" + config.model()
                 + ":streamGenerateContent?alt=sse&key=" + config.apiKey();
-
-        Request httpRequest = new Request.Builder()
-                .url(url)
-                .post(RequestBody.create(body, JSON))
-                .build();
-
-        Call call = httpClient.newCall(httpRequest);
-        cancellation.registerAbort(call::cancel);
-
-        int inputTokens = 0;
-        int outputTokens = 0;
-        FinishReason finish = FinishReason.STOP;
-        StringBuilder debugAccumulatedText = wire.isDebugEnabled() ? new StringBuilder() : null;
-        int textTokenCount = 0;
-        boolean cancelledClean = false;
-
-        try (Response response = call.execute()) {
-            if (!response.isSuccessful()) {
-                errorStatus = response.code();
-                errorBody = response.body() != null ? response.body().string() : "(no body)";
-                LlmHttpErrors.logHttpError(log, "Gemini", config, errorStatus,
-                        response.header("retry-after"), errorBody);
-                // Transient errors (rate limit / overloaded) are typed so the
-                // generic RetryingLlmGateway can back off and retry.
-                if (LlmTransientException.isTransient(errorStatus)) {
-                    long retryAfterMillis = LlmTransientException.parseRetryAfterMillis(
-                            response.header("retry-after"));
-                    throw new LlmTransientException(errorStatus, retryAfterMillis,
-                            LlmHttpErrors.transientMessage("Gemini", config, errorStatus,
-                                    retryAfterMillis));
-                }
-                throw new RuntimeException("Gemini stream error: " + errorStatus);
-            }
-
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(response.body().byteStream()))) {
-
-                StringBuilder block = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (cancellation.isCancelled()) { cancelledClean = true; break; }
-                    if (line.isEmpty()) {
-                        if (block.length() > 0) {
-                            String blockText = block.toString();
-                            responseEvents.add(blockText);
-                            String dataLine = extractDataLine(blockText);
-                            if (dataLine != null) {
-                                GeminiParsed p = parseGeminiData(dataLine, capturedToolCalls, handler);
-                                if (p.text != null) {
-                                    assistantText.append(p.text);
-                                    if (debugAccumulatedText != null) debugAccumulatedText.append(p.text);
-                                    textTokenCount += p.textDeltas;
-                                }
-                                if (p.finishReason != null) finish = p.finishReason;
-                                if (p.inputTokens > 0) inputTokens = p.inputTokens;
-                                if (p.outputTokens > 0) outputTokens = p.outputTokens;
-                            }
-                            block.setLength(0);
-                        }
-                        continue;
-                    }
-                    if (block.length() > 0) block.append('\n');
-                    block.append(line);
-                }
-                if (block.length() > 0 && !cancelledClean) {
-                    responseEvents.add(block.toString());
-                }
-            }
-        } catch (IOException e) {
-            if (call.isCanceled()) {
-                log.debug("Gemini stream cancelled by caller after {}ms", System.currentTimeMillis() - start);
-                cancelledClean = true;
-            } else {
-                fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                        responseEvents, summary(assistantText, capturedToolCalls),
-                        inputTokens, outputTokens,
-                        finish != null ? finish.name() : null, errorStatus,
-                        errorBody != null ? errorBody : e.getMessage());
-                throw new RuntimeException("Failed to stream from Gemini", e);
-            }
-        } catch (RuntimeException e) {
-            fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                    responseEvents, summary(assistantText, capturedToolCalls),
-                    inputTokens, outputTokens,
-                    finish != null ? finish.name() : null, errorStatus, errorBody);
-            throw e;
-        }
-
-        fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                responseEvents, summary(assistantText, capturedToolCalls),
-                inputTokens, outputTokens,
-                finish != null ? finish.name() : null, null, null);
-
-        if (cancelledClean) {
-            log.debug("Gemini stream cancelled by caller after {}ms", System.currentTimeMillis() - start);
-            return;
-        }
-
-        if (debugAccumulatedText != null && debugAccumulatedText.length() > 0) {
-            wire.debug("← stream response (accumulated, {} text tokens):\n{}", textTokenCount, debugAccumulatedText);
-        }
-        log.debug("Gemini stream ← finish={} text-tokens={} in={}t out={}t {}ms",
-                finish, textTokenCount, inputTokens, outputTokens, System.currentTimeMillis() - start);
-
-        handler.accept(new LlmStreamChunk.Done(finish, inputTokens, outputTokens));
+        return new Request.Builder().url(url).post(RequestBody.create(body, JSON)).build();
     }
 
-    private static String extractDataLine(String block) {
-        for (String line : block.split("\n")) {
-            if (line.startsWith("data: ")) return line.substring(6).trim();
-        }
-        return null;
+    @Override
+    protected Stream newStream() {
+        return new GeminiStream();
     }
 
-    private record GeminiParsed(
-            String text, int textDeltas, FinishReason finishReason,
-            int inputTokens, int outputTokens) {}
+    /** One generateContent stream. Gemini sends a tool call whole, so the calls are collected, not built. */
+    private final class GeminiStream extends Stream {
+        private final List<ToolCall> captured = new ArrayList<>();
 
-    private GeminiParsed parseGeminiData(String data, List<ToolCall> capturedToolCalls,
+        @Override
+        protected StreamDelta parse(String block, Consumer<LlmStreamChunk> handler) {
+            String dataLine = SseBlockReader.dataLine(block);
+            if (dataLine == null) return StreamDelta.NONE;
+            return parseGeminiData(dataLine, captured, handler);
+        }
+
+        @Override
+        protected List<ToolCall> toolCalls() {
+            return new ArrayList<>(captured);
+        }
+    }
+
+    private StreamDelta parseGeminiData(String data, List<ToolCall> capturedToolCalls,
                                           Consumer<LlmStreamChunk> handler) {
         try {
             JsonNode root = objectMapper.readTree(data);
@@ -284,41 +141,11 @@ public class GeminiGateway implements LlmGateway {
                 inputTokens = usage.path("promptTokenCount").asInt(0);
                 outputTokens = usage.path("candidatesTokenCount").asInt(0);
             }
-            return new GeminiParsed(textAcc.length() > 0 ? textAcc.toString() : null,
-                    textDeltas, finish, inputTokens, outputTokens);
+            return new StreamDelta(textAcc.length() > 0 ? textAcc.toString() : null,
+                    textDeltas, finish, inputTokens, outputTokens, false);
         } catch (Exception e) {
             log.warn("Failed to parse Gemini event: {} — payload: {}", e.getMessage(), data);
-            return new GeminiParsed(null, 0, null, 0, 0);
-        }
-    }
-
-    private LlmCallEvent.ResponseSummary summary(StringBuilder assistantText, List<ToolCall> toolCalls) {
-        String text = assistantText.length() == 0 ? null : assistantText.toString();
-        if (text == null && toolCalls.isEmpty()) return null;
-        return new LlmCallEvent.ResponseSummary(text, new ArrayList<>(toolCalls));
-    }
-
-    /** See {@code AbstractOpenAiGateway#fireListener} — same contract. */
-    private void fireListener(LlmCallListener listener,
-                               Instant startedAt, long start,
-                               LlmConfig config, LlmRequest request,
-                               String requestJson,
-                               List<String> responseEvents,
-                               LlmCallEvent.ResponseSummary response,
-                               int promptTokens, int completionTokens,
-                               String finishReason,
-                               Integer errorStatus, String errorBody) {
-        if (listener == null) return;
-        long durationMs = System.currentTimeMillis() - start;
-        try {
-            listener.onCall(new LlmCallEvent(
-                    startedAt, durationMs,
-                    request.configName(), config.model(),
-                    promptTokens, completionTokens, finishReason,
-                    requestJson, responseEvents, response,
-                    errorStatus, errorBody));
-        } catch (Exception e) {
-            log.warn("LlmCallListener threw — swallowing to keep chat alive: {}", e.getMessage());
+            return StreamDelta.NONE;
         }
     }
 
@@ -333,29 +160,8 @@ public class GeminiGateway implements LlmGateway {
         };
     }
 
-    private void logWireRequest(ObjectNode requestNode) {
-        if (!wire.isDebugEnabled()) return;
-        try {
-            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)));
-        } catch (Exception e) {
-            wire.debug("→ stream request: <serialise failed: {}>", e.getMessage());
-        }
-    }
-
-    /**
-     * Builds the Gemini generateContent request body.
-     * <p>
-     * Key differences from OpenAI:
-     * <ul>
-     *   <li>SYSTEM messages become the top-level {@code systemInstruction} field.</li>
-     *   <li>ASSISTANT role maps to {@code model}.</li>
-     *   <li>TOOL results become {@code user} turns with {@code functionResponse} parts.</li>
-     *   <li>ASSISTANT tool calls become {@code model} turns with {@code functionCall} parts.</li>
-     *   <li>Tool definitions use {@code functionDeclarations} under a {@code tools} wrapper.</li>
-     * </ul>
-     */
-    // package-private for testing the wire JSON without a live HTTP call
-    ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
+    @Override
+    protected ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
         ObjectNode root = objectMapper.createObjectNode();
 
         // Generation config

@@ -1,15 +1,16 @@
 package ai.mindconnect.llm.adapter.lmstudio;
 
+import ai.mindconnect.llm.adapter.ModelListing;
+import ai.mindconnect.llm.adapter.ModelListingReader;
+import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -34,80 +35,38 @@ public class LmStudioModelCatalog {
     private static final Logger log = LoggerFactory.getLogger(LmStudioModelCatalog.class);
 
     /** Where LM Studio serves by default. */
-    public static final String DEFAULT_BASE_URL = ai.mindconnect.llm.domain.LlmProvider.LM_STUDIO.defaultBaseUrl();
+    public static final String DEFAULT_BASE_URL = LlmProvider.LM_STUDIO.defaultBaseUrl();
 
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(2);
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(5);
+    private final ModelListingReader reader;
 
-    private final OkHttpClient httpClient;
-    private final ObjectMapper objectMapper;
-
-    /**
-     * @param httpClient a client to derive from — the catalog shortens its
-     *                   timeouts but shares its connection pool
-     */
     public LmStudioModelCatalog(OkHttpClient httpClient, ObjectMapper objectMapper) {
-        this.httpClient = httpClient.newBuilder()
-                .connectTimeout(CONNECT_TIMEOUT)
-                .readTimeout(READ_TIMEOUT)
-                .callTimeout(READ_TIMEOUT.plus(CONNECT_TIMEOUT))
-                .build();
-        this.objectMapper = objectMapper;
-    }
-
-    public LmStudioModelCatalog() {
-        this(new OkHttpClient(), new ObjectMapper());
-    }
-
-    /**
-     * The outcome of asking one LM Studio instance for its models. Either
-     * {@link #models()} is filled, or {@link #error()} says why not — an
-     * unreachable server is an expected answer, not an exception.
-     */
-    public record Catalog(String baseUrl, List<LmStudioModel> models, String error) {
-
-        public boolean available() {
-            return error == null;
-        }
-
-        /** The model with this id, or null when LM Studio does not list it. */
-        public LmStudioModel find(String id) {
-            if (id == null) return null;
-            return models.stream().filter(m -> id.equals(m.id())).findFirst().orElse(null);
-        }
+        this.reader = new ModelListingReader(httpClient, objectMapper);
     }
 
     /**
      * Lists the models of the LM Studio instance at {@code baseUrl} (blank
      * means {@link #DEFAULT_BASE_URL}). Never throws: a server that is down,
-     * too old, or answering something else yields a {@link Catalog} with an
+     * too old, or answering something else yields a {@link ModelListing} with an
      * error message. A server that cannot be reached at all is reported after
      * the first attempt; only an answer that is not the v0 listing (404 from a
      * newer LM Studio, an unexpected body) makes it try v1.
      */
-    public Catalog fetch(String baseUrl) {
+    public ModelListing<LmStudioModel> fetch(String baseUrl) {
         String base = normalise(baseUrl);
         String v0Error;
         try {
-            return new Catalog(base, parseV0(get(base + "/api/v0/models")), null);
-        } catch (Unreachable e) {
-            return new Catalog(base, List.of(), e.getMessage());
+            return new ModelListing<>(base, parseV0(get(base + "/api/v0/models")), null);
+        } catch (ModelListingReader.Unreachable e) {
+            return new ModelListing<>(base, List.of(), e.getMessage());
         } catch (IOException e) {
             v0Error = e.getMessage();
             log.debug("LM Studio /api/v0/models at {} failed ({}), trying /api/v1/models", base, v0Error);
         }
         try {
-            return new Catalog(base, parseV1(get(base + "/api/v1/models")), null);
+            return new ModelListing<>(base, parseV1(get(base + "/api/v1/models")), null);
         } catch (IOException e) {
             log.debug("LM Studio /api/v1/models at {} failed ({})", base, e.getMessage());
-            return new Catalog(base, List.of(), v0Error + "; " + e.getMessage());
-        }
-    }
-
-    /** No HTTP conversation at all — nothing listens, or the connection timed out. */
-    private static final class Unreachable extends IOException {
-        Unreachable(String message, Throwable cause) {
-            super(message, cause);
+            return new ModelListing<>(base, List.of(), v0Error + "; " + e.getMessage());
         }
     }
 
@@ -115,10 +74,7 @@ public class LmStudioModelCatalog {
         String base = baseUrl == null || baseUrl.isBlank() ? DEFAULT_BASE_URL : baseUrl.trim();
         // A host typed without a scheme — "my-mac:1234" — means http; LM Studio speaks nothing else locally.
         if (!base.matches("(?i)https?://.*")) base = "http://" + base;
-        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        // Configs sometimes carry the OpenAI prefix; the native API lives next to it.
-        if (base.endsWith("/v1")) base = base.substring(0, base.length() - 3);
-        return base;
+        return ModelListingReader.withoutApiPath(base);
     }
 
     private JsonNode get(String url) throws IOException {
@@ -127,21 +83,9 @@ public class LmStudioModelCatalog {
             request = new Request.Builder().url(url).get().build();
         } catch (IllegalArgumentException e) {
             // Half a URL, typed into the form as we speak: no server there yet.
-            throw new Unreachable("Not a URL: " + url, e);
+            throw new ModelListingReader.Unreachable("Not a URL: " + url, e);
         }
-        Response response;
-        try {
-            response = httpClient.newCall(request).execute();
-        } catch (IOException e) {
-            throw new Unreachable(e.getMessage() == null ? url + " unreachable" : e.getMessage(), e);
-        }
-        try (response) {
-            if (!response.isSuccessful()) {
-                throw new IOException("HTTP " + response.code() + " from " + url);
-            }
-            if (response.body() == null) throw new IOException("Empty response from " + url);
-            return objectMapper.readTree(response.body().byteStream());
-        }
+        return reader.read(request);
     }
 
     /** {@code /api/v0/models}: flat objects with {@code id}, {@code type}, {@code state}. */
@@ -158,8 +102,8 @@ public class LmStudioModelCatalog {
             models.add(new LmStudioModel(
                     id, id, kind,
                     "loaded".equals(m.path("state").asText("")),
-                    intOrNull(m.path("max_context_length")),
-                    intOrNull(m.path("loaded_context_length")),
+                    ModelListingReader.intOrNull(m.path("max_context_length")),
+                    ModelListingReader.intOrNull(m.path("loaded_context_length")),
                     toolUse,
                     kind == LmStudioModel.Kind.VLM));
         }
@@ -178,7 +122,7 @@ public class LmStudioModelCatalog {
             boolean vision = caps.path("vision").asBoolean(false);
             Integer loadedContext = null;
             for (JsonNode inst : m.path("loaded_instances")) {
-                Integer ctx = intOrNull(inst.path("config").path("context_length"));
+                Integer ctx = ModelListingReader.intOrNull(inst.path("config").path("context_length"));
                 if (ctx != null && (loadedContext == null || ctx > loadedContext)) loadedContext = ctx;
             }
             boolean loaded = m.path("loaded_instances").size() > 0;
@@ -191,7 +135,7 @@ public class LmStudioModelCatalog {
                     m.path("display_name").asText(id),
                     kind,
                     loaded,
-                    intOrNull(m.path("max_context_length")),
+                    ModelListingReader.intOrNull(m.path("max_context_length")),
                     loadedContext,
                     caps.path("trained_for_tool_use").asBoolean(false),
                     vision));
@@ -199,7 +143,4 @@ public class LmStudioModelCatalog {
         return models;
     }
 
-    private static Integer intOrNull(JsonNode node) {
-        return node.isNumber() ? node.asInt() : null;
-    }
 }

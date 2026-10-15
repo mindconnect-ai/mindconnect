@@ -2,7 +2,7 @@ package ai.mindconnect.llm;
 
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
+import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import org.junit.jupiter.api.Test;

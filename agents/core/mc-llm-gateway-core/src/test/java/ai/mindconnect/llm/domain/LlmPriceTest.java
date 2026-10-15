@@ -47,7 +47,7 @@ class LlmPriceTest {
         @Test
         void aMomentIsReadAsItsUtcDay() {
             // 23:30 in UTC on June 30th is already July 1st in Berlin — the UTC day decides.
-            assertThat(LlmPrices.priceAt(List.of(h1, open), "claude", SONNET, Instant.parse("2026-06-30T23:30:00Z")))
+            assertThat(new LlmPriceList(List.of(h1, open)).priceAt("claude", SONNET, Instant.parse("2026-06-30T23:30:00Z")))
                     .contains(h1);
         }
 
@@ -57,10 +57,10 @@ class LlmPriceTest {
                     BigDecimal.ONE, BigDecimal.TEN, null);
             List<LlmPrice> all = List.of(h1, open, gpt);
 
-            assertThat(LlmPrices.priceAt(all, "claude", SONNET, Instant.parse("2026-03-01T10:00:00Z"))).contains(h1);
-            assertThat(LlmPrices.priceAt(all, "claude", SONNET, Instant.parse("2026-07-01T00:00:00Z"))).contains(open);
-            assertThat(LlmPrices.priceAt(all, "claude", SONNET, Instant.parse("2025-03-01T10:00:00Z"))).isEmpty();
-            assertThat(LlmPrices.priceAt(all, "nobody", SONNET, Instant.parse("2026-03-01T10:00:00Z"))).isEmpty();
+            assertThat(new LlmPriceList(all).priceAt("claude", SONNET, Instant.parse("2026-03-01T10:00:00Z"))).contains(h1);
+            assertThat(new LlmPriceList(all).priceAt("claude", SONNET, Instant.parse("2026-07-01T00:00:00Z"))).contains(open);
+            assertThat(new LlmPriceList(all).priceAt("claude", SONNET, Instant.parse("2025-03-01T10:00:00Z"))).isEmpty();
+            assertThat(new LlmPriceList(all).priceAt("nobody", SONNET, Instant.parse("2026-03-01T10:00:00Z"))).isEmpty();
         }
     }
 
@@ -101,8 +101,8 @@ class LlmPriceTest {
             LlmPrice otherConfig = LlmPrice.of("gpt", "gpt-5.4-mini", LocalDate.parse("2026-01-01"), null, "USD",
                     BigDecimal.ONE, BigDecimal.ONE, null);
 
-            assertThat(LlmPrices.overlapping(List.of(stored, otherConfig), edited)).isEmpty();
-            assertThat(LlmPrices.overlapping(List.of(stored), price("2026-05-01", null, "1", "1", null)))
+            assertThat(new LlmPriceList(List.of(stored, otherConfig)).overlapping(edited)).isEmpty();
+            assertThat(new LlmPriceList(List.of(stored)).overlapping(price("2026-05-01", null, "1", "1", null)))
                     .containsExactly(stored);
         }
     }
@@ -191,16 +191,16 @@ class LlmPriceTest {
         void priceAtAnswersOnlyForTheModelOfTheCall() {
             List<LlmPrice> all = List.of(luna, bonsai);
 
-            assertThat(LlmPrices.priceAt(all, "openai-default", "gpt-5.6-luna", day)).contains(luna);
-            assertThat(LlmPrices.priceAt(all, "openai-default", "bonsai-27b", day)).contains(bonsai);
-            assertThat(LlmPrices.priceAt(all, "openai-default", "gpt-5.4-mini", day)).isEmpty();
-            assertThat(LlmPrices.priceAt(all, "openai-default", null, day)).isEmpty();
-            assertThat(LlmPrices.priceAt(all, "other", "bonsai-27b", day)).isEmpty();
+            assertThat(new LlmPriceList(all).priceAt("openai-default", "gpt-5.6-luna", day)).contains(luna);
+            assertThat(new LlmPriceList(all).priceAt("openai-default", "bonsai-27b", day)).contains(bonsai);
+            assertThat(new LlmPriceList(all).priceAt("openai-default", "gpt-5.4-mini", day)).isEmpty();
+            assertThat(new LlmPriceList(all).priceAt("openai-default", null, day)).isEmpty();
+            assertThat(new LlmPriceList(all).priceAt("other", "bonsai-27b", day)).isEmpty();
         }
 
         @Test
         void theModelMatchesIgnoringCase() {
-            assertThat(LlmPrices.priceAt(List.of(luna), "openai-default", "GPT-5.6-Luna", day)).contains(luna);
+            assertThat(new LlmPriceList(List.of(luna)).priceAt("openai-default", "GPT-5.6-Luna", day)).contains(luna);
             assertThat(luna.isFor(" gpt-5.6-LUNA ")).isTrue();
         }
 
@@ -209,8 +209,8 @@ class LlmPriceTest {
             LlmPrice lunaLater = LlmPrice.of("openai-default", "GPT-5.6-LUNA", LocalDate.parse("2026-06-01"), null,
                     "USD", BigDecimal.ONE, BigDecimal.ONE, null);
 
-            assertThat(LlmPrices.overlapping(List.of(luna), bonsai)).isEmpty();
-            assertThat(LlmPrices.overlapping(List.of(luna, bonsai), lunaLater)).containsExactly(luna);
+            assertThat(new LlmPriceList(List.of(luna)).overlapping(bonsai)).isEmpty();
+            assertThat(new LlmPriceList(List.of(luna, bonsai)).overlapping(lunaLater)).containsExactly(luna);
         }
 
         @Test
@@ -219,11 +219,11 @@ class LlmPriceTest {
                     LocalDate.parse("2026-01-01"), null, "USD", BigDecimal.ONE, BigDecimal.ONE, null);
 
             assertThat(legacy.anyModel()).isTrue();
-            assertThat(LlmPrices.priceAt(List.of(legacy, luna), "openai-default", "gpt-5.6-luna", day))
+            assertThat(new LlmPriceList(List.of(legacy, luna)).priceAt("openai-default", "gpt-5.6-luna", day))
                     .contains(luna);
-            assertThat(LlmPrices.priceAt(List.of(legacy, luna), "openai-default", "bonsai-27b", day))
+            assertThat(new LlmPriceList(List.of(legacy, luna)).priceAt("openai-default", "bonsai-27b", day))
                     .contains(legacy);
-            assertThat(LlmPrices.overlapping(List.of(legacy), luna)).isEmpty();
+            assertThat(new LlmPriceList(List.of(legacy)).overlapping(luna)).isEmpty();
         }
 
         @Test
@@ -233,11 +233,11 @@ class LlmPriceTest {
             LlmPrice legacy = new LlmPrice(LlmPriceId.random(), "openai-default", null,
                     LocalDate.parse("2024-01-01"), null, "USD", BigDecimal.ONE, BigDecimal.ONE, null);
 
-            var groups = LlmPrices.byModel(List.of(luna, legacy, bonsai, lunaUpper));
+            var groups = new LlmPriceList(List.of(luna, legacy, bonsai, lunaUpper)).byModel();
 
             assertThat(groups.keySet()).containsExactly("bonsai-27b", "gpt-5.6-luna", null);
             assertThat(groups.get("gpt-5.6-luna")).containsExactly(lunaUpper, luna);
-            assertThat(LlmPrices.modelLabel(legacy)).isEqualTo("any model");
+            assertThat(legacy.modelLabel()).isEqualTo("any model");
         }
     }
 }

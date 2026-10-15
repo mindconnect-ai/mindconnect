@@ -21,6 +21,7 @@
 
     <modules>
         <!-- the area parent itself, so this area builds standalone -->
+        <module>../common/mc-arch-rules</module>
         <module>mc-agents-parent</module>
         <!-- shared modules pulled in so this area builds standalone -->
         <module>../common/mc-common</module>
@@ -31,9 +32,9 @@
         <module>core/mc-agent-domain</module>
         <module>vectorstore/mc-vector-store</module>
         <module>vectorstore/mc-vector-store-pgvector</module>
-        <module>vectorstore/mc-vector-store-tools</module>
-        <module>vectorstore/mc-file-store-core</module>
-        <module>vectorstore/mc-file-store</module>
+        <module>tools/vector/mc-vector-store-tools</module>
+        <module>core/mc-file-store-core</module>
+        <module>core/mc-file-store</module>
         <module>builder/mc-agent-runtime-feature-core</module>
         <module>builder/mc-agent-runtime-feature-skills</module>
         <module>builder/mc-agent-runtime-feature-tools</module>
@@ -47,71 +48,75 @@
         <module>demo/mc-agent-simple-demo</module>
         <module>demo/mc-extension-demo</module>
 
-        <module>core/mc-agent-protocol</module>
-        <module>core/mc-agent-protocol-openai</module>
-        <module>core/mc-agent-protocol-mc-runtime</module>
+        <module>responses-api/mc-agent-protocol</module>
+        <module>responses-api/mc-agent-protocol-openai</module>
+        <module>responses-api/mc-agent-protocol-mc-runtime</module>
         <module>core/mc-llm-gateway-core</module>
         <module>core/mc-llm-gateway</module>
         <module>adapter/postgres/mc-llm-gateway-pg</module>
         <module>adapter/postgres/mc-message-repository-pg</module>
         <module>adapter/postgres/mc-agent-runtime-pg</module>
         <module>adapter/postgres/mc-file-store-pg</module>
-        <module>core/mc-user-core</module>
-        <module>core/mc-user</module>
+        <module>server/core/mc-user-core</module>
+        <module>server/core/mc-user</module>
         <module>adapter/postgres/mc-user-pg</module>
         <module>adapter/postgres/mc-credentials-pg</module>
-        <module>core/mc-namespace-core</module>
-        <module>core/mc-namespace</module>
+        <module>server/core/mc-namespace-core</module>
+        <module>server/core/mc-namespace</module>
         <module>adapter/postgres/mc-namespace-pg</module>
-        <module>core/mc-extension-core</module>
+        <module>server/core/mc-extension-core</module>
         <module>adapter/postgres/mc-extension-pg</module>
-        <module>core/mc-extension</module>
+        <module>server/core/mc-extension</module>
         <module>springstarter/mc-agent-starter-file</module>
         <module>springstarter/mc-agent-starter-postgres</module>
         <module>springstarter/mc-agent-starter-namespace</module>
         <module>springstarter/mc-agent-starter-runtime</module>
-        <module>core/mc-credentials</module>
+        <module>springstarter/mc-agent-starter-registry</module>
+        <module>springstarter/mc-agent-starter-extension</module>
+        <module>server/core/mc-credentials</module>
         <module>core/mc-message-repository-core</module>
         <module>core/mc-message-repository</module>
         <module>core/mc-agent-tool-spi</module>
         <module>core/mc-agent-runtime-core</module>
         <module>core/mc-agent-memory-strategies</module>
         <module>core/mc-agent-runtime</module>
-        <module>core/mc-agent-tools</module>
-        <module>core/mc-agent-tools-code</module>
-        <module>core/mc-agent-tools-virtual-env</module>
-        <module>core/mc-agent-tools-document</module>
-        <module>core/mc-agent-tools-web</module>
+        <module>tools/core/mc-agent-tools</module>
+        <module>tools/core/mc-agent-tools-code</module>
+        <module>tools/core/mc-agent-tools-virtual-env</module>
+        <module>tools/core/mc-agent-tools-document</module>
+        <module>tools/core/mc-agent-tools-web</module>
 
         <!-- Office: one port per kind of thing, one module per provider. -->
-        <module>office/mc-mail-core</module>
-        <module>office/mc-mail-imap</module>
-        <module>office/mc-mail-views</module>
-        <module>office/mc-mail-index</module>
-        <module>office/mc-agent-tools-mail</module>
-        <module>office/mc-calendar-core</module>
-        <module>office/mc-calendar-caldav</module>
-        <module>office/mc-agent-tools-calendar</module>
-        <module>core/mc-agent-tools-web-browser</module>
-        <module>core/mc-agent-tools-workflow</module>
-        <module>core/mc-agent-registry-core</module>
+        <module>tools/office/mc-mail-core</module>
+        <module>tools/office/mc-mail-imap</module>
+        <module>tools/office/mc-mail-views</module>
+        <module>tools/office/mc-mail-index</module>
+        <module>tools/office/mc-agent-tools-mail</module>
+        <module>tools/office/mc-calendar-core</module>
+        <module>tools/office/mc-calendar-caldav</module>
+        <module>tools/office/mc-agent-tools-calendar</module>
+        <module>tools/core/mc-agent-tools-web-browser</module>
+        <module>tools/core/mc-agent-tools-workflow</module>
+        <module>server/core/mc-agent-registry-core</module>
         <module>adapter/postgres/mc-agent-registry-pg</module>
-        <module>core/mc-agent-registry</module>
-        <module>mcp/mc-mcp-proxy</module>
-        <module>mcp/mc-mcp-gateway-core</module>
-        <module>mcp/mc-mcp-gateway-local</module>
+        <module>server/core/mc-agent-registry</module>
+        <module>server/core/mc-agent-registry-workflow</module>
+        <module>tools/mcp/mc-mcp-proxy</module>
+        <module>tools/mcp/mc-mcp-gateway-core</module>
+        <module>tools/mcp/mc-mcp-gateway-local</module>
         <module>adapter/postgres/mc-mcp-gateway-pg</module>
-        <module>mcp/mc-agent-tools-mcp</module>
-        <module>mcp/mc-mcp-gateway-admin-ui-rest</module>
-        <module>server/mc-agent-api-rest</module>
-        <module>server/mc-agent-security</module>
-        <module>server/mc-agent-api-responses-rest</module>
-        <module>server/mc-agent-api-app</module>
-        <module>server/mc-agent-chat-ui-rest</module>
-        <module>server/mc-agent-registry-admin-ui-rest</module>
-        <module>server/mc-agent-admin-ui-rest</module>
-        <module>server/mc-agent-admin-ui-app</module>
+        <module>tools/mcp/mc-agent-tools-mcp</module>
+        <module>server/ui/mc-mcp-gateway-admin-ui-rest</module>
+        <module>server/rest/mc-agent-api-rest</module>
+        <module>server/core/mc-agent-security</module>
+        <module>server/rest/mc-agent-api-responses-rest</module>
+        <module>server/app/mc-agent-api-app</module>
+        <module>server/ui/mc-agent-chat-ui-rest</module>
+        <module>server/ui/mc-agent-registry-admin-ui-rest</module>
+        <module>server/ui/mc-agent-admin-ui-rest</module>
+        <module>server/app/mc-agent-admin-ui-app</module>
         <module>client/mc-agent-cli</module>
+        <module>mc-agents-arch-tests</module>
     </modules>
 
 </project>

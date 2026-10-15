@@ -9,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RetryConfigTest {
 
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper = TestJson.MAPPER;
 
     /** Reads a config file as the file store does. */
     private LlmConfig read(String json) throws Exception {

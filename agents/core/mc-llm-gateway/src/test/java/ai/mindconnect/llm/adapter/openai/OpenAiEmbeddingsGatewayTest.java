@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.LlmConfig;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class OpenAiEmbeddingsGatewayTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = TestJson.MAPPER;
 
     private HttpServer server;
     private final AtomicReference<JsonNode> lastRequest = new AtomicReference<>();

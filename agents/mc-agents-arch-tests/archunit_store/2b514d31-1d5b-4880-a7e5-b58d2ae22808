@@ -1,0 +1,6 @@
+Class <ai.mindconnect.agent.runtime.feature.fileupload.AttachSupport> has name matching '.*(Helper|Util|Utils|Support|Commons|Holder|Manager)' in (AttachSupport.java:0)
+Class <ai.mindconnect.agent.runtime.service.task.SubAgentSupport> has name matching '.*(Helper|Util|Utils|Support|Commons|Holder|Manager)' in (SubAgentSupport.java:0)
+Class <ai.mindconnect.agent.tools.browser.PlaywrightHolder> has name matching '.*(Helper|Util|Utils|Support|Commons|Holder|Manager)' in (PlaywrightHolder.java:0)
+Class <ai.mindconnect.calendar.ReminderSupport> has name matching '.*(Helper|Util|Utils|Support|Commons|Holder|Manager)' in (ReminderSupport.java:0)
+Class <ai.mindconnect.chatui.ui.SessionUiCommons> has name matching '.*(Helper|Util|Utils|Support|Commons|Holder|Manager)' in (SessionUiCommons.java:0)
+Class <ai.mindconnect.message.port.in.ConversationManager> has name matching '.*(Helper|Util|Utils|Support|Commons|Holder|Manager)' in (ConversationManager.java:0)

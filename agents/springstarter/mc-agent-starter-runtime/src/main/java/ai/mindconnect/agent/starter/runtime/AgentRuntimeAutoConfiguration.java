@@ -101,10 +101,9 @@ import java.util.Optional;
                 "ai.mindconnect.agent.starter.file.FilePersistenceAutoConfiguration",
                 "ai.mindconnect.agent.starter.postgres.PostgresPersistenceConfig"},
         beforeName = {
-                "ai.mindconnect.agent.registry.spring.RegistryAutoConfiguration",
+                "ai.mindconnect.agent.starter.registry.RegistryAutoConfiguration",
                 "ai.mindconnect.agent.tools.workflow.NamespacedWorkflowStoresAutoConfiguration",
                 "ai.mindconnect.agent.tools.workflow.McAgentWorkflowStepsAutoConfiguration",
-                "ai.mindconnect.agent.tools.workflow.registry.WorkflowRegistryAutoConfiguration",
                 "ai.mindconnect.mcp.gateway.local.McpGatewayAutoConfiguration"})
 public class AgentRuntimeAutoConfiguration {
 

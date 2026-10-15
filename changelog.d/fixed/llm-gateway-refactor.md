@@ -1,0 +1,1 @@
+- **agents:** **an embedding or speech-to-text config without a base URL now reaches its provider.** The chat gateways fell back to the provider's default endpoint when a config left the base URL empty; the embeddings and transcription gateways sent the request to a null URL and failed. They now fall back the same way.

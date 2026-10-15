@@ -1,0 +1,91 @@
+package ai.mindconnect.llm.service;
+
+import ai.mindconnect.common.Cancellation;
+import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmRequest;
+import ai.mindconnect.llm.domain.LlmStreamChunk;
+import ai.mindconnect.llm.domain.LlmTransientException;
+import ai.mindconnect.llm.domain.RetryConfig;
+import ai.mindconnect.llm.port.in.LlmCallListener;
+import ai.mindconnect.llm.port.out.LlmGateway;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+
+/**
+ * Retries a call that failed with an {@link LlmTransientException} with exponential
+ * backoff from {@link RetryConfig#baseBackoffMillis()}, capped by
+ * {@link RetryConfig#maxAttempts()}; a positive {@code Retry-After} from the server
+ * wins over the computed delay. A retry is only safe while no chunk has reached the
+ * caller's handler, otherwise a partial response would be duplicated, so a one-way
+ * latch commits the call at the first chunk and a later transient error is rethrown.
+ */
+public class RetryingLlmGateway implements LlmGateway {
+
+    private static final Logger log = LoggerFactory.getLogger(RetryingLlmGateway.class);
+
+    private final LlmGateway delegate;
+
+    public RetryingLlmGateway(LlmGateway delegate) {
+        this.delegate = delegate;
+    }
+
+    @Override
+    public void chatStreaming(LlmConfig config, LlmRequest request,
+                              Consumer<LlmStreamChunk> handler,
+                              Cancellation cancellation,
+                              LlmCallListener listener) {
+        // No retry policy on the config (null) → no retry at all: a single
+        // attempt, transient errors propagate immediately. Retry only happens
+        // when a config explicitly opts in with an enabled policy.
+        RetryConfig policy = config.retry();
+        int maxAttempts = (policy != null && policy.enabled()) ? policy.maxAttempts() : 1;
+
+        int attempt = 0;
+        while (true) {
+            attempt++;
+            // Latch: flips the first time we forward a chunk for THIS attempt.
+            // Once any attempt has streamed content we must not retry.
+            AtomicBoolean committed = new AtomicBoolean(false);
+            Consumer<LlmStreamChunk> guarded = chunk -> {
+                committed.set(true);
+                handler.accept(chunk);
+            };
+
+            try {
+                delegate.chatStreaming(config, request, guarded, cancellation, listener);
+                return; // completed (possibly after streaming) — done
+            } catch (LlmTransientException te) {
+                if (committed.get() || attempt >= maxAttempts || cancellation.isCancelled()) {
+                    // Out of attempts is the state an admin needs to see by
+                    // itself: it is the moment the call either falls back to
+                    // another model or fails outright.
+                    if (!committed.get() && !cancellation.isCancelled() && maxAttempts > 1) {
+                        log.warn("LLM {} exhausted after {} attempt(s) for config '{}' (model {}) — no attempt left",
+                                te.status() == 429 ? "rate limit (HTTP 429)" : "transient error HTTP " + te.status(),
+                                maxAttempts, config.name(), config.model());
+                    }
+                    throw te;
+                }
+                long backoff = policy.backoffForAttempt(attempt, te.retryAfterMillis());
+                log.warn("LLM {} for config '{}' (model {}), attempt {}/{} — retrying in {} ms ({})",
+                        te.status() == 429 ? "rate limit (HTTP 429)" : "transient error HTTP " + te.status(),
+                        config.name(), config.model(), attempt, maxAttempts, backoff,
+                        te.retryAfterMillis() > 0 ? "provider Retry-After" : "exponential backoff");
+                sleep(backoff, te.status());
+            }
+        }
+    }
+
+    private static void sleep(long millis, int status) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new LlmTransientException(status, 0,
+                    "Interrupted while backing off after HTTP " + status);
+        }
+    }
+}

@@ -2,7 +2,7 @@
 
 What a tool IS and how it gets bound — extracted from `mc-agent-runtime` so
 the tool modules stop depending on an entire agent runtime to implement one
-interface. Concept: [15-module-split](../../doc/architecture/concepts/15-module-split.md).
+interface. Decision: [0004 core/adapter module pairs](../../../doc/decisions/0004-core-adapter-module-pairs.md).
 
 Everything lives in one package, `ai.mindconnect.agent.tool`:
 

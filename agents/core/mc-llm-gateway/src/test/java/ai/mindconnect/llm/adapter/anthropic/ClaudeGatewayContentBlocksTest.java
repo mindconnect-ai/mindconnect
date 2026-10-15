@@ -2,13 +2,13 @@ package ai.mindconnect.llm.adapter.anthropic;
 
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmContent;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.LlmRequest;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +22,7 @@ class ClaudeGatewayContentBlocksTest {
 
     private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final ClaudeGateway gateway =
-            new ClaudeGateway(new OkHttpClient(), new ObjectMapper(), encryption);
+            new ClaudeGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
 
     private final LlmConfig config = new LlmConfig(LlmConfigId.random(), "claude", LlmProvider.ANTHROPIC,
             "claude-sonnet-4-6", "https://api.anthropic.com", "sk-test", 0.7, 8192, Map.of(), 200_000,

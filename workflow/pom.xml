@@ -22,6 +22,7 @@
 
     <modules>
         <!-- the area parent itself, so this area builds standalone -->
+        <module>../common/mc-arch-rules</module>
         <module>mc-workflow-parent</module>
         <!-- common libs consumed by mc-workflow -->
         <module>../common/mc-pathaccessor</module>
@@ -66,6 +67,7 @@
         <!-- Embeddable semantic-ui workflow admin + its standalone app -->
         <module>mc-workflow-admin-rest</module>
         <module>mc-workflow-admin-app</module>
+        <module>mc-workflow-arch-tests</module>
     </modules>
 
 </project>

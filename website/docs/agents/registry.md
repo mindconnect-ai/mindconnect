@@ -286,4 +286,4 @@ The import screen says this above the buttons, once, before the click.
 Installers are contributed by the module that owns the entity, so an installation
 that has no workflow engine simply has no workflow installer — its registry then
 lists workflows it cannot import, and says so, instead of dragging the engine in
-as a dependency. The workflow installer lives in `mc-agent-tools-workflow`.
+as a dependency. The workflow installer is `mc-agent-registry-workflow`, a module of its own.

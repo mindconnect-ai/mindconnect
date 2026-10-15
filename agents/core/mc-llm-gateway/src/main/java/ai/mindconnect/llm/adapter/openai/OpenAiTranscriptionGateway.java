@@ -1,6 +1,8 @@
 package ai.mindconnect.llm.adapter.openai;
 
+import ai.mindconnect.llm.adapter.LlmHttpError;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmParameterMap;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 import ai.mindconnect.llm.port.out.TranscriptionGateway;
@@ -8,6 +10,7 @@ import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.Call;
 import okhttp3.MediaType;
 import okhttp3.MultipartBody;
 import okhttp3.OkHttpClient;
@@ -21,6 +24,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -42,7 +46,6 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAiTranscriptionGateway.class);
     private static final MediaType OCTET_STREAM = MediaType.get("application/octet-stream");
-    private static final int MAX_ERROR_BODY = 500;
 
     /**
      * How long one transcription may take. The shared client deliberately has
@@ -90,34 +93,25 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
                                           Consumer<String> onDelta) {
         LlmConfig cfg = config.resolved(env, encryption);
-        String responseFormat = param(cfg, "response_format", "json");
-        String stream = param(cfg, "stream", "auto");
+        String baseUrl = cfg.provider().baseUrlOr(cfg.baseUrl());
+        LlmParameterMap params = LlmParameterMap.of(cfg, null);
+        String responseFormat = param(params, "response_format", "json");
+        String stream = param(params, "stream", "auto");
         boolean askForStream = onDelta != null
                 && !"off".equalsIgnoreCase(stream) && !"false".equalsIgnoreCase(stream);
 
         long start = System.currentTimeMillis();
-        Request.Builder http = new Request.Builder()
-                .url(cfg.baseUrl() + "/v1/audio/transcriptions")
-                .post(multipartBody(cfg, request, responseFormat, askForStream));
-        // A local server usually takes no key; sending an empty bearer breaks some of them.
-        if (cfg.apiKey() != null && !cfg.apiKey().isBlank()) {
-            http.header("Authorization", "Bearer " + cfg.apiKey());
-        }
-
-        try (Response response = call(http.build()).execute()) {
+        try (Response response = call(cfg, request, responseFormat, askForStream).execute()) {
             if (!response.isSuccessful()) {
-                String payload = response.body() != null ? response.body().string() : "";
                 // Not every endpoint that speaks this API knows the stream
                 // field. One that rejects it says 400 — worth asking again
                 // without it before giving up, since the field was our idea,
                 // not the caller's. A config can skip this with stream=off.
                 if (askForStream && response.code() == 400) {
-                    log.debug("Endpoint {} refused the stream field; asking again without it",
-                            cfg.baseUrl());
+                    log.debug("Endpoint {} refused the stream field; asking again without it", baseUrl);
                     return transcribeWithoutStream(cfg, request, responseFormat, onDelta);
                 }
-                throw new IllegalStateException("Transcription call failed (" + response.code()
-                        + "): " + truncate(payload));
+                throw failed(response);
             }
             TranscriptionResult result = streamed(response)
                     ? readStream(response, onDelta)
@@ -127,7 +121,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
                     result.text().length(), streamed(response) ? ", streamed" : "");
             return result;
         } catch (IOException e) {
-            throw new IllegalStateException("Transcription call to " + cfg.baseUrl() + " failed: "
+            throw new IllegalStateException("Transcription call to " + baseUrl + " failed: "
                     + e.getMessage(), e);
         }
     }
@@ -135,32 +129,29 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     /** The same call once more, this time as a plain batch request. */
     private TranscriptionResult transcribeWithoutStream(LlmConfig cfg, TranscriptionRequest request,
                                                         String responseFormat,
-                                                        Consumer<String> onDelta) {
-        Request.Builder http = new Request.Builder()
-                .url(cfg.baseUrl() + "/v1/audio/transcriptions")
-                .post(multipartBody(cfg, request, responseFormat, false));
-        if (cfg.apiKey() != null && !cfg.apiKey().isBlank()) {
-            http.header("Authorization", "Bearer " + cfg.apiKey());
-        }
-        try (Response response = call(http.build()).execute()) {
-            if (!response.isSuccessful()) {
-                String payload = response.body() != null ? response.body().string() : "";
-                throw new IllegalStateException("Transcription call failed (" + response.code()
-                        + "): " + truncate(payload));
-            }
+                                                        Consumer<String> onDelta) throws IOException {
+        try (Response response = call(cfg, request, responseFormat, false).execute()) {
+            if (!response.isSuccessful()) throw failed(response);
             return readWhole(response, responseFormat, onDelta);
-        } catch (IOException e) {
-            throw new IllegalStateException("Transcription call to " + cfg.baseUrl() + " failed: "
-                    + e.getMessage(), e);
         }
     }
 
     /** One call with this adapter's own deadline on the shared client. */
-    private okhttp3.Call call(Request request) {
-        return httpClient.newBuilder()
-                .callTimeout(CALL_TIMEOUT)
-                .build()
-                .newCall(request);
+    private Call call(LlmConfig cfg, TranscriptionRequest request, String responseFormat, boolean askForStream) {
+        Request.Builder http = new Request.Builder()
+                .url(cfg.provider().baseUrlOr(cfg.baseUrl()) + "/v1/audio/transcriptions")
+                .post(multipartBody(cfg, request, responseFormat, askForStream));
+        // A local server usually takes no key; sending an empty bearer breaks some of them.
+        if (cfg.apiKey() != null && !cfg.apiKey().isBlank()) {
+            http.header("Authorization", "Bearer " + cfg.apiKey());
+        }
+        return httpClient.newBuilder().callTimeout(CALL_TIMEOUT).build().newCall(http.build());
+    }
+
+    private static IllegalStateException failed(Response response) throws IOException {
+        String payload = response.body() != null ? response.body().string() : "";
+        return new IllegalStateException("Transcription call failed (" + response.code() + "): "
+                + LlmHttpError.compact(payload));
     }
 
     /** The request body. Package-private so a test can read the parts back. */
@@ -187,24 +178,22 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
         fields.put("model", cfg.model());
         fields.put("response_format", responseFormat);
 
-        String language = firstNonBlank(request.language(), param(cfg, "language", null));
+        LlmParameterMap params = LlmParameterMap.of(cfg, null);
+        String language = firstNonBlank(request.language(), params.text("language"));
         if (language != null) fields.put("language", language);
 
-        String prompt = firstNonBlank(request.prompt(), param(cfg, "prompt", null));
+        String prompt = firstNonBlank(request.prompt(), params.text("prompt"));
         if (prompt != null) fields.put("prompt", prompt);
 
-        String temperature = param(cfg, "temperature", null);
+        String temperature = params.text("temperature");
         if (temperature != null) fields.put("temperature", temperature);
 
         return fields;
     }
 
-    /** Reads a string from the config's additional parameters, or {@code fallback}. */
-    private static String param(LlmConfig cfg, String key, String fallback) {
-        Object value = cfg.additionalParams() == null ? null : cfg.additionalParams().get(key);
-        if (value == null) return fallback;
-        String text = String.valueOf(value);
-        return text.isBlank() ? fallback : text;
+    private static String param(LlmParameterMap params, String key, String fallback) {
+        String value = params.text(key);
+        return value != null ? value : fallback;
     }
 
     private static String firstNonBlank(String first, String second) {
@@ -215,7 +204,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     /** Did the provider answer with an event stream rather than one document? */
     private static boolean streamed(Response response) {
         String type = response.header("content-type");
-        return type != null && type.toLowerCase(java.util.Locale.ROOT).startsWith("text/event-stream");
+        return type != null && type.toLowerCase(Locale.ROOT).startsWith("text/event-stream");
     }
 
     /**
@@ -286,9 +275,5 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
             log.warn("Could not parse the transcription response as JSON; using the raw body");
             return TranscriptionResult.of(payload.trim());
         }
-    }
-
-    private static String truncate(String text) {
-        return text.length() > MAX_ERROR_BODY ? text.substring(0, MAX_ERROR_BODY) + "…" : text;
     }
 }

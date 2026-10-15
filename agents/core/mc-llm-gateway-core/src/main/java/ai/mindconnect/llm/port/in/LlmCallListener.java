@@ -3,21 +3,12 @@ package ai.mindconnect.llm.port.in;
 import ai.mindconnect.llm.domain.LlmCallEvent;
 
 /**
- * Callback invoked once per provider call after the adapter has finished
- * (successfully or not). Passed by the caller into {@code chatStreaming(...)}
- * — the gateway has no knowledge of who the listener is or what it does
- * with the event.
- *
- * <p>Implementations:
- * <ul>
- *   <li>are called from the gateway's worker thread — long-running work
- *       (DB writes, HTTP pushes) should be queued, not done inline;</li>
- *   <li>must <em>not</em> throw — the adapter wraps the call in a
- *       try/catch and swallows any exception (a broken trace must never
- *       break the actual chat).</li>
- * </ul>
- *
- * <p>Use {@link #NOOP} for callers that don't care about tracing.
+ * Called once per provider call after the adapter has finished, successfully or
+ * not; the gateway knows nothing about what the listener does with the event. It
+ * runs on the gateway's worker thread, so long-running work such as database writes
+ * should be queued, and it must not throw: the adapter swallows the exception,
+ * because a broken trace must never break the chat. {@link #NOOP} is for callers
+ * that do not trace.
  */
 @FunctionalInterface
 public interface LlmCallListener {

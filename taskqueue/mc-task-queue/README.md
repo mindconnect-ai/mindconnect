@@ -3,8 +3,8 @@
 Task queue ports with a local virtual-thread implementation — deliberately
 agent-agnostic, which is why it lives in its own `taskqueue/` tree rather than
 under `agents/`: agent turns today, workflow runs and ingestion jobs tomorrow,
-a remote queue and a dispatcher UI as siblings. Concepts: [11-task-queue](../../agents/doc/architecture/concepts/11-task-queue.md),
-[12-streams-and-tasks](../../agents/doc/architecture/concepts/12-streams-and-tasks.md).
+a remote queue and a dispatcher UI as siblings. The decisions behind the
+design are recorded in [doc/decisions](../../doc/decisions/).
 
 Ships TWO independent packages in one jar (often used together, never
 coupled — neither imports the other, so a later split is a `git mv`):

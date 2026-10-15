@@ -5,7 +5,7 @@ import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.domain.LlmPriceId;
-import ai.mindconnect.llm.domain.LlmPrices;
+import ai.mindconnect.llm.domain.LlmPriceList;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
 
 import javax.sql.DataSource;
@@ -65,13 +65,13 @@ public final class PgLlmPriceRepository implements LlmPriceRepository {
     @Override
     public List<LlmPrice> findByConfigName(String configName) {
         return prices.find("WHERE namespace = ? AND config_name = ?", namespace.value(), configName).stream()
-                .sorted(LlmPrices.CHRONOLOGICAL).toList();
+                .sorted(LlmPriceList.CHRONOLOGICAL).toList();
     }
 
     @Override
     public List<LlmPrice> findAll() {
         return prices.find("WHERE namespace = ?", namespace.value()).stream()
-                .sorted(LlmPrices.CHRONOLOGICAL).toList();
+                .sorted(LlmPriceList.CHRONOLOGICAL).toList();
     }
 
     @Override

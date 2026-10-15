@@ -1,29 +1,22 @@
 package ai.mindconnect.llm.adapter.anthropic;
 
-import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.LlmHttpErrors;
-import ai.mindconnect.llm.adapter.TraceRedaction;
+import ai.mindconnect.llm.adapter.SseBlockReader;
+import ai.mindconnect.llm.adapter.SseStreamingGateway;
+import ai.mindconnect.llm.adapter.StreamDelta;
+import ai.mindconnect.llm.adapter.ToolCallBuilder;
 import ai.mindconnect.llm.domain.*;
-import ai.mindconnect.llm.port.in.LlmCallListener;
-import ai.mindconnect.llm.port.out.LlmGateway;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -42,19 +35,12 @@ import java.util.function.Consumer;
  *       for the finish reason and token usage.</li>
  * </ul>
  */
-public class ClaudeGateway implements LlmGateway {
+public class ClaudeGateway extends SseStreamingGateway {
 
     private static final Logger log = LoggerFactory.getLogger(ClaudeGateway.class);
-    private static final Logger wire = LoggerFactory.getLogger("ai.mindconnect.llm.wire");
 
     private static final String ANTHROPIC_VERSION = "2023-06-01";
     private static final MediaType JSON = MediaType.get("application/json");
-
-    private final OkHttpClient httpClient;
-    private final ObjectMapper objectMapper;
-    private final EncryptionHelper encryption;
-    private final EnvVarResolver env;
-    private final ObjectWriter prettyWriter;
 
     /** Placeholders resolve from the process environment alone — the library and desktop case. */
     public ClaudeGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption) {
@@ -64,188 +50,45 @@ public class ClaudeGateway implements LlmGateway {
     /** @param env where {@code ${VAR}} placeholders in a config resolve from — on a server, the user's, the namespace's and the process's variables in that order */
     public ClaudeGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
                          EnvVarResolver env) {
-        this.httpClient = httpClient;
-        this.objectMapper = objectMapper;
-        this.encryption = encryption;
-        this.env = env;
-        this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
+        super("Anthropic", httpClient, objectMapper, encryption, env);
     }
 
     @Override
-    public void chatStreaming(LlmConfig config, LlmRequest request,
-                              Consumer<LlmStreamChunk> handler,
-                              Cancellation cancellation,
-                              LlmCallListener listener) {
-        config = config.resolved(env, encryption);
-        int msgCount = request.messages() == null ? 0 : request.messages().size();
-        int toolCount = request.tools() == null ? 0 : request.tools().size();
-        log.debug("Claude stream → model={} messages={} tools={}", config.model(), msgCount, toolCount);
-        long start = System.currentTimeMillis();
-        Instant startedAt = Instant.ofEpochMilli(start);
-
-        // Trace capture buffers — populated as the stream progresses.
-        String prettyRequestJson = null;
-        List<String> responseEvents = new ArrayList<>();
-        StringBuilder assistantText = new StringBuilder();
-        Map<Integer, ClaudeToolCallBuilder> toolCallBuilders = new TreeMap<>();
-        Integer errorStatus = null;
-        String errorBody = null;
-
-        String body;
-        try {
-            ObjectNode requestNode = buildRequestNode(config, request);
-            try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
-            logWireRequest(requestNode);
-            body = objectMapper.writeValueAsString(requestNode);
-        } catch (IOException e) {
-            fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                    responseEvents, null, 0, 0, null, null, e.getMessage());
-            throw new RuntimeException("Failed to build Anthropic request", e);
-        }
-
-        String baseUrl = LlmProvider.ANTHROPIC.baseUrlOr(config.baseUrl());
-
-        Request httpRequest = new Request.Builder()
-                .url(baseUrl + "/v1/messages")
+    protected Request httpRequest(LlmConfig config, String body) {
+        return new Request.Builder()
+                .url(LlmProvider.ANTHROPIC.baseUrlOr(config.baseUrl()) + "/v1/messages")
                 .header("x-api-key", config.apiKey())
                 .header("anthropic-version", ANTHROPIC_VERSION)
                 .header("content-type", "application/json")
                 .post(RequestBody.create(body, JSON))
                 .build();
-
-        // Anthropic streams multiple content blocks; we track the current block type by index.
-        List<String> blockTypes = new ArrayList<>();
-        int inputTokens = 0;
-        int outputTokens = 0;
-        FinishReason finish = FinishReason.STOP;
-        StringBuilder debugAccumulatedText = wire.isDebugEnabled() ? new StringBuilder() : null;
-        int textTokenCount = 0;
-        boolean cancelledClean = false;
-
-        Call call = httpClient.newCall(httpRequest);
-        cancellation.registerAbort(call::cancel);
-
-        try (Response response = call.execute()) {
-            if (!response.isSuccessful()) {
-                errorStatus = response.code();
-                errorBody = response.body() != null ? response.body().string() : "(no body)";
-                LlmHttpErrors.logHttpError(log, "Anthropic", config, errorStatus,
-                        response.header("retry-after"), errorBody);
-                fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                        responseEvents, null, 0, 0, null, errorStatus, errorBody);
-                // Transient errors (rate limit / overloaded) are surfaced as a
-                // typed exception so the generic RetryingLlmGateway can back off
-                // and retry; everything else fails fast.
-                if (LlmTransientException.isTransient(errorStatus)) {
-                    long retryAfterMillis = LlmTransientException.parseRetryAfterMillis(
-                            response.header("retry-after"));
-                    throw new LlmTransientException(errorStatus, retryAfterMillis,
-                            LlmHttpErrors.transientMessage("Anthropic", config, errorStatus,
-                                    retryAfterMillis));
-                }
-                throw new RuntimeException("Anthropic stream error: " + errorStatus);
-            }
-
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(response.body().byteStream()))) {
-
-                // SSE block accumulator — Anthropic events are
-                // "event: …\ndata: …\n\n", so we collect lines until a blank
-                // line and store/parse the block as one trace entry.
-                StringBuilder block = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (cancellation.isCancelled()) { cancelledClean = true; break; }
-                    if (line.isEmpty()) {
-                        if (block.length() > 0) {
-                            String blockText = block.toString();
-                            responseEvents.add(blockText);
-                            String eventType = extractEventType(blockText);
-                            String dataLine = extractDataLine(blockText);
-                            if (dataLine != null) {
-                                ClaudeParsed p = parseClaudeEvent(eventType, dataLine,
-                                        toolCallBuilders, handler, blockTypes);
-                                if (p.text != null) {
-                                    assistantText.append(p.text);
-                                    if (debugAccumulatedText != null) debugAccumulatedText.append(p.text);
-                                    textTokenCount += p.textDeltas;
-                                }
-                                if (p.finishReason != null) finish = p.finishReason;
-                                if (p.inputTokens > 0) inputTokens = p.inputTokens;
-                                if (p.outputTokens > 0) outputTokens = p.outputTokens;
-                            }
-                            block.setLength(0);
-                        }
-                        continue;
-                    }
-                    if (block.length() > 0) block.append('\n');
-                    block.append(line);
-                }
-                // Flush any trailing block missing its blank line.
-                if (block.length() > 0 && !cancelledClean) {
-                    responseEvents.add(block.toString());
-                }
-            }
-        } catch (IOException e) {
-            if (cancellation.isCancelled()) {
-                log.debug("Claude stream cancelled by caller after {}ms", System.currentTimeMillis() - start);
-                cancelledClean = true;
-            } else {
-                fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                        responseEvents, summary(assistantText, toolCallBuilders),
-                        inputTokens, outputTokens,
-                        finish != null ? finish.name() : null, errorStatus,
-                        errorBody != null ? errorBody : e.getMessage());
-                throw new RuntimeException("Failed to stream from Anthropic", e);
-            }
-        } catch (RuntimeException e) {
-            fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                    responseEvents, summary(assistantText, toolCallBuilders),
-                    inputTokens, outputTokens,
-                    finish != null ? finish.name() : null, errorStatus, errorBody);
-            throw e;
-        }
-
-        fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                responseEvents, summary(assistantText, toolCallBuilders),
-                inputTokens, outputTokens,
-                finish != null ? finish.name() : null, null, null);
-
-        if (cancelledClean) {
-            log.debug("Claude stream cancelled by caller after {}ms", System.currentTimeMillis() - start);
-            return;
-        }
-
-        if (debugAccumulatedText != null && debugAccumulatedText.length() > 0) {
-            wire.debug("← stream response (accumulated, {} text tokens):\n{}", textTokenCount, debugAccumulatedText);
-        }
-        log.debug("Claude stream ← finish={} text-tokens={} in={}t out={}t {}ms",
-                finish, textTokenCount, inputTokens, outputTokens, System.currentTimeMillis() - start);
-
-        handler.accept(new LlmStreamChunk.Done(finish, inputTokens, outputTokens));
     }
 
-    private static String extractEventType(String block) {
-        for (String line : block.split("\n")) {
-            if (line.startsWith("event: ")) return line.substring(7).trim();
-        }
-        return "";
+    @Override
+    protected Stream newStream() {
+        return new ClaudeStream();
     }
 
-    private static String extractDataLine(String block) {
-        for (String line : block.split("\n")) {
-            if (line.startsWith("data: ")) return line.substring(6).trim();
+    /** One Messages stream: its tool-call builders and the type of each content block, known from its start event. */
+    private final class ClaudeStream extends Stream {
+        private final Map<Integer, ToolCallBuilder> builders = new TreeMap<>();
+        private final List<String> blockTypes = new ArrayList<>();
+
+        @Override
+        protected StreamDelta parse(String block, Consumer<LlmStreamChunk> handler) {
+            String dataLine = SseBlockReader.dataLine(block);
+            if (dataLine == null) return StreamDelta.NONE;
+            return parseClaudeEvent(SseBlockReader.eventType(block), dataLine, builders, handler, blockTypes);
         }
-        return null;
+
+        @Override
+        protected List<ToolCall> toolCalls() {
+            return ToolCallBuilder.buildAll(builders.values(), objectMapper);
+        }
     }
 
-    /** Per-event parse result. */
-    private record ClaudeParsed(
-            String text, int textDeltas, FinishReason finishReason,
-            int inputTokens, int outputTokens) {}
-
-    private ClaudeParsed parseClaudeEvent(String eventType, String data,
-                                           Map<Integer, ClaudeToolCallBuilder> builders,
+    private StreamDelta parseClaudeEvent(String eventType, String data,
+                                           Map<Integer, ToolCallBuilder> builders,
                                            Consumer<LlmStreamChunk> handler,
                                            List<String> blockTypes) {
         try {
@@ -260,7 +103,7 @@ public class ClaudeGateway implements LlmGateway {
                         String id = root.path("content_block").path("id").asText(null);
                         String name = root.path("content_block").path("name").asText(null);
                         handler.accept(new LlmStreamChunk.ToolCallDelta(index, id, name, null));
-                        builders.computeIfAbsent(index, i -> new ClaudeToolCallBuilder()).feed(id, name, null);
+                        builders.computeIfAbsent(index, i -> new ToolCallBuilder()).feed(id, name, null);
                     } else if ("thinking".equals(blockType) || "redacted_thinking".equals(blockType)) {
                         // redacted_thinking carries its encrypted payload on the
                         // start event; plain thinking accumulates via deltas.
@@ -276,12 +119,12 @@ public class ClaudeGateway implements LlmGateway {
                         String text = delta.path("text").asText("");
                         if (!text.isEmpty()) {
                             handler.accept(new LlmStreamChunk.TextDelta(text));
-                            return new ClaudeParsed(text, 1, null, 0, 0);
+                            return new StreamDelta(text, 1, null, 0, 0, false);
                         }
                     } else if ("input_json_delta".equals(deltaType)) {
                         String argsFrag = delta.path("partial_json").asText(null);
                         handler.accept(new LlmStreamChunk.ToolCallDelta(index, null, null, argsFrag));
-                        builders.computeIfAbsent(index, i -> new ClaudeToolCallBuilder()).feed(null, null, argsFrag);
+                        builders.computeIfAbsent(index, i -> new ToolCallBuilder()).feed(null, null, argsFrag);
                     } else if ("thinking_delta".equals(deltaType)) {
                         String thoughtFrag = delta.path("thinking").asText(null);
                         handler.accept(new LlmStreamChunk.ThinkingDelta(index, null, thoughtFrag, null, null));
@@ -296,80 +139,19 @@ public class ClaudeGateway implements LlmGateway {
                     FinishReason finish = stopReason != null ? parseFinishReason(stopReason) : null;
                     JsonNode usage = root.path("usage");
                     int outputTokens = usage.isObject() ? usage.path("output_tokens").asInt(0) : 0;
-                    return new ClaudeParsed(null, 0, finish, 0, outputTokens);
+                    return new StreamDelta(null, 0, finish, 0, outputTokens, false);
                 }
                 case "message_start" -> {
                     JsonNode usage = root.path("message").path("usage");
                     int inputTokens = usage.isObject() ? usage.path("input_tokens").asInt(0) : 0;
-                    return new ClaudeParsed(null, 0, null, inputTokens, 0);
+                    return new StreamDelta(null, 0, null, inputTokens, 0, false);
                 }
                 default -> { /* ping, error, etc. — ignore */ }
             }
         } catch (Exception e) {
             log.warn("Failed to parse Claude event: {} — payload: {}", e.getMessage(), data);
         }
-        return new ClaudeParsed(null, 0, null, 0, 0);
-    }
-
-    private LlmCallEvent.ResponseSummary summary(StringBuilder assistantText,
-                                                  Map<Integer, ClaudeToolCallBuilder> builders) {
-        String text = assistantText.length() == 0 ? null : assistantText.toString();
-        List<ToolCall> toolCalls = new ArrayList<>();
-        for (ClaudeToolCallBuilder b : builders.values()) {
-            ToolCall built = b.build(objectMapper);
-            if (built != null) toolCalls.add(built);
-        }
-        if (text == null && toolCalls.isEmpty()) return null;
-        return new LlmCallEvent.ResponseSummary(text, toolCalls);
-    }
-
-    /** Reassembles a Claude tool call across content_block_start + delta events. */
-    private static final class ClaudeToolCallBuilder {
-        private String id;
-        private String name;
-        private final StringBuilder argsJson = new StringBuilder();
-
-        void feed(String id, String name, String argsFrag) {
-            if (id != null) this.id = id;
-            if (name != null) this.name = name;
-            if (argsFrag != null) this.argsJson.append(argsFrag);
-        }
-
-        ToolCall build(ObjectMapper mapper) {
-            if (id == null || name == null) return null;
-            try {
-                Map<String, Object> args = argsJson.isEmpty()
-                        ? new HashMap<>()
-                        : mapper.readValue(argsJson.toString(), new TypeReference<>() {});
-                return new ToolCall(id, name, args);
-            } catch (Exception e) {
-                return new ToolCall(id, name, new HashMap<>());
-            }
-        }
-    }
-
-    /** See {@code AbstractOpenAiGateway#fireListener} — same contract. */
-    private void fireListener(LlmCallListener listener,
-                               Instant startedAt, long start,
-                               LlmConfig config, LlmRequest request,
-                               String requestJson,
-                               List<String> responseEvents,
-                               LlmCallEvent.ResponseSummary response,
-                               int promptTokens, int completionTokens,
-                               String finishReason,
-                               Integer errorStatus, String errorBody) {
-        if (listener == null) return;
-        long durationMs = System.currentTimeMillis() - start;
-        try {
-            listener.onCall(new LlmCallEvent(
-                    startedAt, durationMs,
-                    request.configName(), config.model(),
-                    promptTokens, completionTokens, finishReason,
-                    requestJson, responseEvents, response,
-                    errorStatus, errorBody));
-        } catch (Exception e) {
-            log.warn("LlmCallListener threw — swallowing to keep chat alive: {}", e.getMessage());
-        }
+        return StreamDelta.NONE;
     }
 
     private static FinishReason parseFinishReason(String raw) {
@@ -381,28 +163,8 @@ public class ClaudeGateway implements LlmGateway {
         };
     }
 
-    private void logWireRequest(ObjectNode requestNode) {
-        if (!wire.isDebugEnabled()) return;
-        try {
-            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)));
-        } catch (Exception e) {
-            wire.debug("→ stream request: <serialise failed: {}>", e.getMessage());
-        }
-    }
-
-    /**
-     * Builds the Anthropic Messages API request body.
-     * <p>
-     * Key differences from the OpenAI wire format:
-     * <ul>
-     *   <li>{@code system} is a top-level string extracted from the first SYSTEM message.</li>
-     *   <li>TOOL role messages are converted to {@code user} messages with a
-     *       {@code tool_result} content block.</li>
-     *   <li>ASSISTANT messages that contain tool calls use a {@code tool_use} content block.</li>
-     * </ul>
-     */
-    // package-private for testing the wire JSON without a live HTTP call
-    ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
+    @Override
+    protected ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", config.model());
         root.put("stream", true);
@@ -412,19 +174,19 @@ public class ClaudeGateway implements LlmGateway {
         // thinking: "adaptive" | "disabled" (default: omit → no thinking)
         // thinkingDisplay: "summarized" | "omitted" (default omitted by the API)
         // effort: low | medium | high | xhigh | max
-        Map<String, Object> params = LlmParams.merge(config, request);
-        String thinking = LlmParams.string(params, "thinking");
+        LlmParameterMap params = LlmParameterMap.of(config, request);
+        String thinking = params.text("thinking");
         boolean thinkingEnabled = "adaptive".equalsIgnoreCase(thinking);
         if (thinkingEnabled) {
             ObjectNode thinkingNode = root.putObject("thinking");
             thinkingNode.put("type", "adaptive");
-            String display = LlmParams.string(params, "thinkingDisplay");
+            String display = params.text("thinkingDisplay");
             if (display != null) thinkingNode.put("display", display);
         } else if ("disabled".equalsIgnoreCase(thinking)) {
             root.putObject("thinking").put("type", "disabled");
         }
 
-        String effort = LlmParams.string(params, "effort");
+        String effort = params.text("effort");
         if (effort != null) {
             root.putObject("output_config").put("effort", effort);
         }

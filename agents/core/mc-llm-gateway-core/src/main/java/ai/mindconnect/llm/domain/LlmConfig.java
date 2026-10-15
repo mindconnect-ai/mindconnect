@@ -1,9 +1,9 @@
 package ai.mindconnect.llm.domain;
 
 import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.env.EnvVarResolver;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -13,6 +13,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+/**
+ * Lenient on unknown fields, so a config written by a newer or an older
+ * version still loads — a removed field must never brick the store, whatever
+ * mapper the host hands the file repository.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record LlmConfig(
         LlmConfigId id,
         String name,
@@ -69,23 +75,13 @@ public record LlmConfig(
          */
         Set<LlmCapability> capabilities,
         /**
-         * Other configs, <em>by name</em>, to try in order when this one is
-         * rate-limited — a provider answering HTTP 429 (rate limit) or 529
-         * (overloaded) after this config's own {@link #retry} policy is
-         * exhausted. Empty (the default) means <em>no fallback</em>: the
-         * transient error propagates to the caller.
-         *
-         * <p>Followed by {@code ai.mindconnect.llm.service.RoutingLlmChatService}:
-         * the first name that still answers serves the request. A fallback may
-         * name an alias (it is resolved like any other name) and may point at a
-         * different provider entirely — that is the point, a second vendor is
-         * not affected by the first one's limit. Only the config the request
-         * actually routed to is consulted, so fallback lists are not chained
-         * recursively; a name that no config carries is skipped with a warning.
-         *
-         * <p>A fallback is only taken while nothing has streamed yet — once the
-         * first chunk reached the caller, switching models would duplicate a
-         * partial answer, so the error propagates instead.
+         * Other configs, by name, to try in order when the provider still answers
+         * HTTP 429 or 529 after this config's own {@link #retry} policy; empty means
+         * the transient error propagates. A fallback may be an alias or another
+         * provider entirely, which is the point: a second vendor is not affected by
+         * the first one's limit. Lists are not chained, only the config the request
+         * routed to is consulted, and a fallback is taken only while nothing has
+         * streamed yet, since switching models mid-answer would duplicate a partial reply.
          */
         List<String> fallbackModels,
         /**
@@ -115,13 +111,15 @@ public record LlmConfig(
     }
 
     /**
-     * Normalises the type ({@code null} reads as CHAT) and keeps a declared
-     * capability set as an unmodifiable copy in declaration order, so JSON
-     * and UI show a stable sequence. {@code null} stays {@code null}: not
-     * declared is a state of its own.
+     * Normalises what a stored or hand-written config may leave out: the type
+     * ({@code null} reads as CHAT), the parameter map, the fallback list. A
+     * declared capability set is kept as an unmodifiable copy in declaration
+     * order, so JSON and UI show a stable sequence; {@code null} stays
+     * {@code null}, since not declared is a state of its own.
      */
     public LlmConfig {
         if (type == null) type = LlmConfigType.CHAT;
+        if (additionalParams == null) additionalParams = Map.of();
         if (capabilities != null) {
             capabilities = capabilities.isEmpty() ? Set.of()
                     : Collections.unmodifiableSet(EnumSet.copyOf(capabilities));
@@ -145,7 +143,7 @@ public record LlmConfig(
     }
 
     /** Has this config declared its capabilities itself, rather than leaving them to the provider? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean declaresCapabilities() {
         return capabilities != null;
     }
@@ -155,56 +153,28 @@ public record LlmConfig(
      * is one, else the provider's default, else (no provider — an alias)
      * nothing. What the runtime asks through {@link #supports}.
      */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public Set<LlmCapability> effectiveCapabilities() {
         if (capabilities != null) return capabilities;
         return provider != null ? provider.defaultCapabilities() : Set.of();
     }
 
     /** Does this config — declared or by its provider's default — have the given capability? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean supports(LlmCapability capability) {
         return effectiveCapabilities().contains(capability);
     }
 
     /** Convenience: is this an embedding model? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean isEmbedding() {
         return type == LlmConfigType.EMBEDDING;
     }
 
     /** Convenience: is this a speech-to-text model? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean isSpeechToText() {
         return type == LlmConfigType.SPEECH_TO_TEXT;
-    }
-
-    /** Jackson deserialisation — trailing fields default for old persisted configs. */
-    @JsonCreator
-    public static LlmConfig fromJson(
-            @JsonProperty("id")                   String id,
-            @JsonProperty("name")                 String name,
-            @JsonProperty("provider")             LlmProvider provider,
-            @JsonProperty("model")                String model,
-            @JsonProperty("baseUrl")              String baseUrl,
-            @JsonProperty("apiKey")               String apiKey,
-            @JsonProperty("defaultTemperature")   double defaultTemperature,
-            @JsonProperty("maxOutputTokens")     int maxOutputTokens,
-            @JsonProperty("additionalParams")     Map<String, Object> additionalParams,
-            @JsonProperty("contextWindowTokens")  Integer contextWindowTokens,
-            @JsonProperty("isAlias")              boolean isAlias,
-            @JsonProperty("delegatesTo")          String delegatesTo,
-            @JsonProperty("retry")                RetryConfig retry,
-            @JsonProperty("rateLimit")            RateLimitConfig rateLimit,
-            @JsonProperty("type")                 LlmConfigType type,
-            @JsonProperty("capabilities")         Set<LlmCapability> capabilities,
-            @JsonProperty("fallbackModels")       List<String> fallbackModels,
-            @JsonProperty("version")              Long version) {
-        return new LlmConfig(new LlmConfigId(id), name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens,
-                additionalParams != null ? additionalParams : Map.of(),
-                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities,
-                fallbackModels, version);
     }
 
     /**
@@ -371,7 +341,7 @@ public record LlmConfig(
     }
 
     /** Does this config name at least one other config to fall back to on a rate limit? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean hasFallbackModels() {
         return fallbackModels != null && !fallbackModels.isEmpty();
     }
@@ -444,10 +414,9 @@ public record LlmConfig(
 
     /**
      * Convenience: resolves placeholders from the process environment, then
-     * decrypts the API key via the given
-     * {@link ai.mindconnect.common.util.encryption.EncryptionHelper}.
+     * decrypts the API key via the given {@link EncryptionHelper}.
      */
-    public LlmConfig resolved(ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
+    public LlmConfig resolved(EncryptionHelper encryption) {
         return resolved(EnvVarResolver.system(), encryption);
     }
 
@@ -457,7 +426,7 @@ public record LlmConfig(
      * {@link EnvVarResolver} they were built with.
      */
     public LlmConfig resolved(EnvVarResolver env,
-                              ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
+                              EncryptionHelper encryption) {
         LlmConfig r = resolved(env);
         return r.withApiKey(encryption.resolve(r.apiKey()));
     }

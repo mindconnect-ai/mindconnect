@@ -45,18 +45,10 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-namespace-pg</artifactId>
         </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-extension-pg</artifactId>
-        </dependency>
         <!-- The MCP gateway's registrations and discovery cache as tables; see PostgresPersistenceConfig.Mcp. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-mcp-gateway-pg</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-registry-pg</artifactId>
         </dependency>
         <dependency>
             <groupId>com.zaxxer</groupId>

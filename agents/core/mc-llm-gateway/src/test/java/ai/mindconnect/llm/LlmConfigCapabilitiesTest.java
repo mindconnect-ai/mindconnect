@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class LlmConfigCapabilitiesTest {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = TestJson.MAPPER;
 
     private static LlmConfig config(LlmProvider provider, Set<LlmCapability> capabilities) {
         return new LlmConfig(LlmConfigId.random(), "test", provider,

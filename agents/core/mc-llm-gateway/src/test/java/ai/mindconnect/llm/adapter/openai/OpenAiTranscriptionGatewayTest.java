@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
@@ -30,7 +31,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class OpenAiTranscriptionGatewayTest {
 
-    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final ObjectMapper MAPPER = TestJson.MAPPER;
     private static final byte[] AUDIO = "not really audio".getBytes(StandardCharsets.UTF_8);
 
     private HttpServer server;

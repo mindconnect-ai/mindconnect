@@ -109,6 +109,16 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-starter-registry</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-starter-extension</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-file-store-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -335,6 +345,11 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-registry</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-registry-workflow</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

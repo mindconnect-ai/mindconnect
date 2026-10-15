@@ -6,13 +6,11 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
-import org.springframework.stereotype.Component;
 
 /**
  * OpenAI-compatible chat-completions adapter (works with LM Studio, Ollama,
  * Groq, Mistral, vLLM, OpenAI itself, …).
  */
-@Component
 public class OpenAiCompatibleGateway extends AbstractOpenAiGateway {
 
     /** Placeholders resolve from the process environment alone — the library and desktop case. */
