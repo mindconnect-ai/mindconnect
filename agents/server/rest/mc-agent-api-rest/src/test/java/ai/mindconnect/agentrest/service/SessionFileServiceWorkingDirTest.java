@@ -62,7 +62,7 @@ class SessionFileServiceWorkingDirTest {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) mock(LlmEmbeddings.class));
                 if (type == LlmConfigRepository.class) return Optional.of((T) mock(LlmConfigRepository.class));
-                if (type == Namespace.class) return Optional.of((T) new Namespace("test"));
+                if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(new Namespace("test")));
                 return Optional.empty();
             }
 

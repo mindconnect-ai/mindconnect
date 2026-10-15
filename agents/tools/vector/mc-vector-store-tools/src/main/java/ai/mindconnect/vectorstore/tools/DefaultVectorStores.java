@@ -157,10 +157,8 @@ public final class DefaultVectorStores implements VectorStores {
                 env.get(EncryptionHelper.class).orElse(null));
         return Optional.of(new DefaultVectorStores(defaultTemplate, registries,
                 new LegacyVectorStores(baseDir, runtimeDb), host, embeddings, configs,
-                // The host's scope, else a namespace it fixed, else the default one.
-                env.get(ScopeSupplier.class)
-                        .or(() -> env.get(Namespace.class).map(ScopeSupplier::fixed))
-                        .orElseGet(ScopeSupplier::local)));
+                // The host's scope, else the default namespace.
+                env.get(ScopeSupplier.class).orElseGet(ScopeSupplier::local)));
     }
 
     /** The two built-in definitions of the given kind: the default table, and chat uploads apart from it. */

@@ -422,9 +422,8 @@ public class AgentRuntimeBuilder {
         return runtime;
     }
 
-    /** What every feature may rely on before anything else: the namespace and its scope, the mapper, the Sql and its DataSource. */
+    /** What every feature may rely on before anything else: the scope, the mapper, the Sql and its DataSource. */
     private void registerCoreSettings() {
-        context.bean(Namespace.class, () -> new Namespace(namespaceName));
         // Where this runtime works — one namespace for its whole life, or the one the host's scope
         // names per call. Every adapter asks it per call.
         ScopeSupplier workingScope = scope != null ? scope : ScopeSupplier.fixed(new Namespace(namespaceName));

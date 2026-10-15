@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.runtime.feature.core;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.adapter.pg.PgAgentRepositoryFactory;
@@ -339,9 +338,6 @@ public class CoreFeature extends ConfigurableFeature {
         return ctx.require(ai.mindconnect.jdbc.Sql.class);
     }
 
-    private static Namespace namespace(FeatureContext ctx) {
-        return ctx.require(Namespace.class);
-    }
     /** The todo prompt context, its service resolved on first use — contributions are instances, beans are lazy. */
     private static class LazyTodoPromptContext implements PromptContextProvider {
         private final FeatureContext ctx;
