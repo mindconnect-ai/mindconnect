@@ -3,6 +3,7 @@ package ai.mindconnect.llm.domain;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -12,6 +13,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 
+/**
+ * Lenient on unknown fields, so a config written by a newer or an older
+ * version still loads — a removed field must never brick the store, whatever
+ * mapper the host hands the file repository.
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record LlmConfig(
         LlmConfigId id,
         String name,
