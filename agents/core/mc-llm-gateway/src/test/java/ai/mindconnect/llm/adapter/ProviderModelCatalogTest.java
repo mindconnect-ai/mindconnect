@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.adapter;
 
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,8 +14,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Reading a provider's model list: the three answer shapes and what they mean. */
 class ProviderModelCatalogTest {
 
-    private final ProviderModelCatalog catalog = new ProviderModelCatalog(new OkHttpClient(), new ObjectMapper());
-    private final ObjectMapper json = new ObjectMapper();
+    private final ProviderModelCatalog catalog = new ProviderModelCatalog(new OkHttpClient(), TestJson.MAPPER);
+    private final ObjectMapper json = TestJson.MAPPER;
 
     private com.fasterxml.jackson.databind.JsonNode parse(String body) throws Exception {
         return json.readTree(body);

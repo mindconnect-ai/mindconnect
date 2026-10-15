@@ -138,7 +138,7 @@ public abstract class SseStreamingGateway implements LlmGateway {
             if (!response.isSuccessful()) {
                 errorStatus = response.code();
                 errorBody = response.body() != null ? response.body().string() : "(no body)";
-                throw LlmHttpErrors.failure(log, provider, config, errorStatus,
+                throw LlmHttpError.failure(log, provider, config, errorStatus,
                         response.header("retry-after"), errorBody);
             }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body().byteStream()))) {

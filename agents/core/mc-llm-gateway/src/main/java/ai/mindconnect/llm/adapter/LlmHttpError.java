@@ -22,12 +22,12 @@ import org.slf4j.Logger;
  * (which quota, per minute or per day) — but flattened to one line and
  * truncated, so a rate limit costs one readable log entry, not a page.
  */
-public final class LlmHttpErrors {
+public final class LlmHttpError {
 
     /** How much of the provider's error body reaches the log. */
     static final int MAX_BODY_CHARS = 500;
 
-    private LlmHttpErrors() {
+    private LlmHttpError() {
     }
 
     /**

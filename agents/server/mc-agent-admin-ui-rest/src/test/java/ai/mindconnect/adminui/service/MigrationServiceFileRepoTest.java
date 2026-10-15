@@ -43,13 +43,13 @@ class MigrationServiceFileRepoTest {
     private MigrationService service;
 
     private void wire(Path dir, Optional<EncryptionHelper> encryption) {
-        repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, new Namespace("test")), ENCRYPTION);
+        ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+        repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, json, new Namespace("test")), ENCRYPTION);
         service = new MigrationService(repo,
                 new InMemoryAgentDefinitionRepository(), new InMemorySkillRepository(), new InMemoryWorkflowDataRepository(),
-                new ObjectMapper().registerModule(new JavaTimeModule())
-                        .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
-                        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES),
-                encryption);
+                json, encryption);
     }
 
     private static LlmConfig stored(String model, String apiKey) {

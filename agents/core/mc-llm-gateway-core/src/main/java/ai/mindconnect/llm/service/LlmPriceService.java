@@ -3,7 +3,7 @@ package ai.mindconnect.llm.service;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.domain.LlmPriceId;
-import ai.mindconnect.llm.domain.LlmPrices;
+import ai.mindconnect.llm.domain.LlmPriceList;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
 
@@ -64,10 +64,10 @@ public class LlmPriceService {
             throw new IllegalArgumentException("'" + config.name() + "' is an alias: it uses the prices of '"
                     + config.delegatesTo() + "', its target. Set the price there.");
         }
-        List<LlmPrice> clashes = LlmPrices.overlapping(prices.findByConfigName(price.configName()), price);
+        List<LlmPrice> clashes = new LlmPriceList(prices.findByConfigName(price.configName())).overlapping(price);
         if (!clashes.isEmpty()) {
-            throw new IllegalArgumentException("The period " + LlmPrices.period(price)
-                    + " overlaps " + clashes.stream().map(LlmPrices::period)
+            throw new IllegalArgumentException("The period " + price.period()
+                    + " overlaps " + clashes.stream().map(LlmPrice::period)
                     .collect(Collectors.joining(", ")) + " of " + price.model() + " on '" + price.configName()
                     + "'. Periods of one model must not overlap — end the earlier one on the day the next starts.");
         }

@@ -1,8 +1,8 @@
 package ai.mindconnect.llm.adapter.openai;
 
-import ai.mindconnect.llm.adapter.LlmHttpErrors;
+import ai.mindconnect.llm.adapter.LlmHttpError;
 import ai.mindconnect.llm.domain.LlmConfig;
-import ai.mindconnect.llm.domain.LlmParams;
+import ai.mindconnect.llm.domain.LlmParameterMap;
 import ai.mindconnect.llm.domain.TranscriptionRequest;
 import ai.mindconnect.llm.domain.TranscriptionResult;
 import ai.mindconnect.llm.port.out.TranscriptionGateway;
@@ -93,7 +93,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
                                           Consumer<String> onDelta) {
         LlmConfig cfg = config.resolved(env, encryption);
-        Map<String, Object> params = LlmParams.merge(cfg, null);
+        LlmParameterMap params = LlmParameterMap.of(cfg, null);
         String responseFormat = param(params, "response_format", "json");
         String stream = param(params, "stream", "auto");
         boolean askForStream = onDelta != null
@@ -151,7 +151,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     private static IllegalStateException failed(Response response) throws IOException {
         String payload = response.body() != null ? response.body().string() : "";
         return new IllegalStateException("Transcription call failed (" + response.code() + "): "
-                + LlmHttpErrors.compact(payload));
+                + LlmHttpError.compact(payload));
     }
 
     /** The request body. Package-private so a test can read the parts back. */
@@ -178,21 +178,21 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
         fields.put("model", cfg.model());
         fields.put("response_format", responseFormat);
 
-        Map<String, Object> params = LlmParams.merge(cfg, null);
-        String language = firstNonBlank(request.language(), LlmParams.string(params, "language"));
+        LlmParameterMap params = LlmParameterMap.of(cfg, null);
+        String language = firstNonBlank(request.language(), params.text("language"));
         if (language != null) fields.put("language", language);
 
-        String prompt = firstNonBlank(request.prompt(), LlmParams.string(params, "prompt"));
+        String prompt = firstNonBlank(request.prompt(), params.text("prompt"));
         if (prompt != null) fields.put("prompt", prompt);
 
-        String temperature = LlmParams.string(params, "temperature");
+        String temperature = params.text("temperature");
         if (temperature != null) fields.put("temperature", temperature);
 
         return fields;
     }
 
-    private static String param(Map<String, Object> params, String key, String fallback) {
-        String value = LlmParams.string(params, key);
+    private static String param(LlmParameterMap params, String key, String fallback) {
+        String value = params.text(key);
         return value != null ? value : fallback;
     }
 

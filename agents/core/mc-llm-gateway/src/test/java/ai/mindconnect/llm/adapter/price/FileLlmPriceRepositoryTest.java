@@ -1,10 +1,12 @@
 package ai.mindconnect.llm.adapter.price;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.file.FileLlmPriceRepository;
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepositoryContract;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -16,12 +18,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class FileLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
 
+    private static final ObjectMapper JSON = TestJson.MAPPER;
+
     @TempDir
     Path dir;
 
     @Override
     protected LlmPriceRepository repository() {
-        return new FileLlmPriceRepository(dir, new Namespace("test"));
+        return new FileLlmPriceRepository(dir, JSON, new Namespace("test"));
     }
 
     @Test
@@ -33,7 +37,7 @@ class FileLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
         assertThat(file).exists();
         assertThat(Files.readString(file)).contains("\"validFrom\":\"2026-01-01\"").contains("\"validTo\":\"2026-07-01\"")
                 .contains("\"model\":\"" + MODEL + "\"");
-        assertThat(new FileLlmPriceRepository(dir, new Namespace("other")).findAll()).isEmpty();
+        assertThat(new FileLlmPriceRepository(dir, JSON, new Namespace("other")).findAll()).isEmpty();
     }
 
     @Test

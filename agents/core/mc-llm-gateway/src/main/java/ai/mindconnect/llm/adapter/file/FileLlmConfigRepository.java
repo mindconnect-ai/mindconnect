@@ -7,9 +7,7 @@ import ai.mindconnect.filerepo.FileRepo;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import java.nio.file.Path;
 import java.util.List;
@@ -27,11 +25,7 @@ public class FileLlmConfigRepository implements LlmConfigRepository {
 
     private final Documents<LlmConfigId, LlmConfig> configs;
 
-    public FileLlmConfigRepository(Path storageDir, Namespace namespace) {
-        // Lenient on unknown fields so configs written by newer (or older)
-        // versions still load — removed fields must never brick the store.
-        ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule())
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    public FileLlmConfigRepository(Path storageDir, ObjectMapper objectMapper, Namespace namespace) {
         this.configs = Documents.of(LlmConfig.class)
                 .path((LlmConfigId id) -> DIR + "/" + id.value() + ".json")
                 .build(FileRepo.open(storageDir, namespace.value()), objectMapper);

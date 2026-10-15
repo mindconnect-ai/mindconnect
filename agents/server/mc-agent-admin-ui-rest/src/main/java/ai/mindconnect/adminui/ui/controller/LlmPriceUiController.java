@@ -153,7 +153,7 @@ public class LlmPriceUiController {
         if (stored.isEmpty()) return ResponseEntity.ok(refreshed(c).toast(gone()));
         prices.delete(stored.get().id());
         return ResponseEntity.ok(refreshed(c).toast(UiToast.success("The period "
-                + ai.mindconnect.llm.domain.LlmPrices.period(stored.get()) + " is gone.").title("Price removed")));
+                + stored.get().period() + " is gone.").title("Price removed")));
     }
 
     @PostMapping("/prices/dialog/close")
@@ -177,7 +177,7 @@ public class LlmPriceUiController {
                     rate(draft.cachedInput(), "Cached input"));
             prices.save(price);
             return refreshed(config).toast(UiToast.success("The period "
-                    + ai.mindconnect.llm.domain.LlmPrices.period(price) + " of " + price.model() + " is saved.")
+                    + price.period() + " of " + price.model() + " is saved.")
                     .title(isNew ? "Price added" : "Price saved"));
         } catch (IllegalArgumentException e) {
             return dialog(title, LlmPricingComponent.form(config, draft, target, isNew, e.getMessage()));

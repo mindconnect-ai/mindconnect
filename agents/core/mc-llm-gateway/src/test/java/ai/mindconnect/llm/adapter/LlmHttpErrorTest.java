@@ -15,7 +15,7 @@ class LlmHttpErrorsTest {
 
     @Test
     void aRateLimitMessageNamesTheConfigTheModelAndTheWait() {
-        String message = LlmHttpErrors.transientMessage("Anthropic", CLAUDE, 429, 20_000);
+        String message = LlmHttpError.transientMessage("Anthropic", CLAUDE, 429, 20_000);
 
         assertThat(message)
                 .contains("rate limit (HTTP 429)")
@@ -26,25 +26,25 @@ class LlmHttpErrorsTest {
 
     @Test
     void aMissingRetryAfterIsSaidSoRatherThanShownAsZero() {
-        assertThat(LlmHttpErrors.transientMessage("Anthropic", CLAUDE, 429, 0))
+        assertThat(LlmHttpError.transientMessage("Anthropic", CLAUDE, 429, 0))
                 .contains("no Retry-After hint")
                 .doesNotContain("0 ms");
     }
 
     @Test
     void anOverloadedProviderIsNotCalledARateLimit() {
-        assertThat(LlmHttpErrors.transientMessage("Anthropic", CLAUDE, 529, 0))
+        assertThat(LlmHttpError.transientMessage("Anthropic", CLAUDE, 529, 0))
                 .contains("overloaded (HTTP 529)");
     }
 
     @Test
     void theProviderBodyIsFlattenedToOneLineAndBounded() {
-        assertThat(LlmHttpErrors.compact("{\n  \"error\": \"rate_limit\"\n}"))
+        assertThat(LlmHttpError.compact("{\n  \"error\": \"rate_limit\"\n}"))
                 .isEqualTo("{ \"error\": \"rate_limit\" }");
-        assertThat(LlmHttpErrors.compact(null)).isEqualTo("(no body)");
+        assertThat(LlmHttpError.compact(null)).isEqualTo("(no body)");
 
-        String long_ = "x".repeat(LlmHttpErrors.MAX_BODY_CHARS + 50);
-        assertThat(LlmHttpErrors.compact(long_))
+        String long_ = "x".repeat(LlmHttpError.MAX_BODY_CHARS + 50);
+        assertThat(LlmHttpError.compact(long_))
                 .hasSizeLessThan(long_.length())
                 .endsWith("chars)");
     }
@@ -55,7 +55,7 @@ class LlmHttpErrorsTest {
                 .withFallbackModels(List.of("gpt-default", "gemini-default"));
         RecordingLogger log = new RecordingLogger();
 
-        LlmHttpErrors.logHttpError(log, "Anthropic", config, 429, "10", "{\"error\":\"slow down\"}");
+        LlmHttpError.logHttpError(log, "Anthropic", config, 429, "10", "{\"error\":\"slow down\"}");
 
         assertThat(log.rendered())
                 .contains("LLM RATE LIMIT (HTTP 429)")
@@ -68,7 +68,7 @@ class LlmHttpErrorsTest {
     void aConfigWithoutFallbacksSaysThatTooBecauseThatIsTheFixableCase() {
         RecordingLogger log = new RecordingLogger();
 
-        LlmHttpErrors.logHttpError(log, "Anthropic",
+        LlmHttpError.logHttpError(log, "Anthropic",
                 CLAUDE.withRetry(new RetryConfig(true, RetryConfig.DEFAULT_MAX_ATTEMPTS,
                         RetryConfig.DEFAULT_BASE_BACKOFF_MILLIS, RetryConfig.DEFAULT_MAX_BACKOFF_MILLIS)), 429, null, "");
 

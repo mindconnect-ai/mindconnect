@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.FinishReason;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
@@ -13,7 +14,6 @@ import ai.mindconnect.llm.domain.ThinkingBlock;
 import ai.mindconnect.llm.domain.ToolCall;
 import ai.mindconnect.llm.domain.ToolDefinition;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +34,7 @@ class OpenAiResponsesGatewayTest {
 
     private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final OpenAiResponsesGateway gateway =
-            new OpenAiResponsesGateway(new OkHttpClient(), new ObjectMapper(), encryption);
+            new OpenAiResponsesGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
 
     private LlmConfig config(String model, Map<String, Object> params) {
         return new LlmConfig(LlmConfigId.random(), "openai", LlmProvider.OPENAI,

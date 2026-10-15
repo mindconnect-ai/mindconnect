@@ -12,7 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** How {@code fallbackModels} is normalised and how it travels through JSON. */
 class LlmConfigFallbackModelsTest {
 
-    private final ObjectMapper json = new ObjectMapper();
+    private final ObjectMapper json = TestJson.MAPPER;
 
     @Test
     void aConfigWithoutFallbacksHasAnEmptyListRatherThanNull() {

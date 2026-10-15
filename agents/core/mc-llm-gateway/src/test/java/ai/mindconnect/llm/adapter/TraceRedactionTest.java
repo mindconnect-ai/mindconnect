@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.adapter;
 
+import ai.mindconnect.llm.TestJson;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -14,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class TraceRedactionTest {
 
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = TestJson.MAPPER;
     private static final String PAYLOAD = "QUJD".repeat(600); // 2,400 base64 chars
 
     @Test

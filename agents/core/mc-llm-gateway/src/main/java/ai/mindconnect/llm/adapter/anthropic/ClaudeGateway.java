@@ -174,19 +174,19 @@ public class ClaudeGateway extends SseStreamingGateway {
         // thinking: "adaptive" | "disabled" (default: omit → no thinking)
         // thinkingDisplay: "summarized" | "omitted" (default omitted by the API)
         // effort: low | medium | high | xhigh | max
-        Map<String, Object> params = LlmParams.merge(config, request);
-        String thinking = LlmParams.string(params, "thinking");
+        LlmParameterMap params = LlmParameterMap.of(config, request);
+        String thinking = params.text("thinking");
         boolean thinkingEnabled = "adaptive".equalsIgnoreCase(thinking);
         if (thinkingEnabled) {
             ObjectNode thinkingNode = root.putObject("thinking");
             thinkingNode.put("type", "adaptive");
-            String display = LlmParams.string(params, "thinkingDisplay");
+            String display = params.text("thinkingDisplay");
             if (display != null) thinkingNode.put("display", display);
         } else if ("disabled".equalsIgnoreCase(thinking)) {
             root.putObject("thinking").put("type", "disabled");
         }
 
-        String effort = LlmParams.string(params, "effort");
+        String effort = params.text("effort");
         if (effort != null) {
             root.putObject("output_config").put("effort", effort);
         }

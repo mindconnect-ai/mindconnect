@@ -1,35 +1,35 @@
 package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.adapter.LiveChatGatewayContract;
-import ai.mindconnect.llm.adapter.LiveModels;
+import ai.mindconnect.llm.adapter.LiveTestEnvironment;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.port.out.LlmGateway;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.condition.EnabledIf;
 
 import java.util.Map;
 
 /**
  * {@link OpenAiResponsesGateway} against api.openai.com over the Responses API —
- * see {@link LiveModels}. Reasoning stays low so the answer fits the token budget.
+ * see {@link LiveTestEnvironment}. Reasoning stays low so the answer fits the token budget.
  */
 @EnabledIf("enabled")
 class OpenAiResponsesGatewayLiveTest extends LiveChatGatewayContract {
 
     static boolean enabled() {
-        return LiveModels.enabled("OPENAI_API_KEY");
+        return LiveTestEnvironment.enabled("OPENAI_API_KEY");
     }
 
     @Override
     protected LlmGateway gateway() {
-        return new OpenAiResponsesGateway(httpClient(), new ObjectMapper(), EncryptionHelper.noEncryption());
+        return new OpenAiResponsesGateway(httpClient(), TestJson.MAPPER, EncryptionHelper.noEncryption());
     }
 
     @Override
     protected LlmConfig config() {
-        return config(LlmProvider.OPENAI, LiveModels.openAiModel(), LiveModels.apiKey("OPENAI_API_KEY"),
+        return config(LlmProvider.OPENAI, LiveTestEnvironment.openAiModel(), LiveTestEnvironment.apiKey("OPENAI_API_KEY"),
                 Map.of("reasoning_effort", "low"));
     }
 }

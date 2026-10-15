@@ -217,7 +217,7 @@ public class CoreFeature extends ConfigurableFeature {
                 agentRepositories = ns -> new InMemoryAgentRepositoryFactory(maxTracesPerConversation);
             }
             case Persistence.File f -> {
-                llmRepositories = ns -> new FileLlmRepositoryFactory(f.dataDir(), ns);
+                llmRepositories = ns -> new FileLlmRepositoryFactory(f.dataDir(), ctx.objectMapper(), ns);
                 messageRepositories = ns -> new FileMessageRepositoryFactory(f.dataDir(), ctx.objectMapper(), ns);
                 agentRepositories = ns -> new FileAgentRepositoryFactory(f.dataDir(), ctx.objectMapper(), ns, maxTracesPerConversation);
             }

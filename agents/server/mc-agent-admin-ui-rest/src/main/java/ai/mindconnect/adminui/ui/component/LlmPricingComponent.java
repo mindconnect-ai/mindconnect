@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmPrice;
-import ai.mindconnect.llm.domain.LlmPrices;
+import ai.mindconnect.llm.domain.LlmPriceList;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -88,10 +88,10 @@ public final class LlmPricingComponent {
                         .dispatch("DELETE", api + "/{id}"))
                 .action(UiAction.primary(ID + "-add", "Add price…").icon("add")
                         .dispatch("GET", api + "/new"));
-        for (LlmPrice price : LlmPrices.byModel(prices).values().stream().flatMap(List::stream).toList()) {
+        for (LlmPrice price : new LlmPriceList(prices).byModel().values().stream().flatMap(List::stream).toList()) {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("id", price.id().value());
-            row.put("model", LlmPrices.modelLabel(price));
+            row.put("model", price.modelLabel());
             row.put("validFrom", price.validFrom().toString());
             row.put("validTo", price.validTo() == null ? "open" : price.validTo().toString());
             row.put("currency", price.currency());

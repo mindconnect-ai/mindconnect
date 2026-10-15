@@ -54,9 +54,7 @@ and the rule it violates.
 - [ ] **agents/server/mc-agent-admin-ui-app** The seeded `initial-data/llm-configs/gemini-default.json` defaults its model to `${GEMINI_MODEL:gemini-2.0-flash}`, which Google no longer serves (HTTP 404 on `generateContent`); a fresh installation without `GEMINI_MODEL` gets a config that cannot answer. Google's 404 names `gemini-3.8-flash` as the successor; the live tests use `gemini-3.5-flash`, because the alias `gemini-flash-latest` answered 503 under load.
   Found 2026-10-15 in chore/llm-gateway-refactor by the agent, running the new `GeminiGatewayLiveTest`. Size: small. Rule: –.
 
-- [ ] **agents/core/mc-llm-gateway-core** `LlmPrices` is a plural for a static bag of rules over price periods — the very example `conventions.md` gives — and its `modelLabel` and `period` render strings for the admin UI from the domain; `LlmPriceList` with the two renderers next to `LlmPricingComponent` would say what it is. Eleven callers in the gateway, Postgres and admin-UI modules plus `LlmPriceTest` follow the rename. The same smell in the adapter module: `LlmParams`, `LlmHttpErrors`, `OpenAiModels`.
-  Found 2026-10-15 in chore/llm-gateway-refactor by the maintainer, reading the tidy-inspect report. Size: one wave. Rule: Classes (named after its pattern, in the singular).
-
 ## Closed
 
-(none yet)
+- [x] **agents/core/mc-llm-gateway-core** `LlmPrices` is a plural for a static bag of rules over price periods — the very example `conventions.md` gives — and its `modelLabel` and `period` render strings for the admin UI from the domain; `LlmPriceList` with the two renderers next to `LlmPricingComponent` would say what it is. Eleven callers in the gateway, Postgres and admin-UI modules plus `LlmPriceTest` follow the rename. The same smell in the adapter module: `LlmParams`, `LlmHttpErrors`, `OpenAiModels`.
+  Found 2026-10-15 in chore/llm-gateway-refactor by the maintainer, reading the tidy-inspect report. Size: one wave. Rule: Classes (named after its pattern, in the singular). Closed 2026-10-15 in chore/llm-gateway-refactor: `LlmPriceList` holds the rules, `LlmPrice` renders its own label and period; `LlmParams` is `LlmParameterMap`, `LlmHttpErrors` is `LlmHttpError`.

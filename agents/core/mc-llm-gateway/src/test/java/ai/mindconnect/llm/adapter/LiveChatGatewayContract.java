@@ -30,7 +30,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * What every chat gateway does against its real provider: streams a reply,
  * streams a tool call, tells the listener about a rejected key, and stops
  * when the caller cancels. A subclass names the gateway and the config and
- * gates itself on {@link LiveModels}. Live models can answer off-script; a
+ * gates itself on {@link LiveTestEnvironment}. Live models can answer off-script; a
  * rare red run means that, not a broken adapter.
  */
 public abstract class LiveChatGatewayContract {

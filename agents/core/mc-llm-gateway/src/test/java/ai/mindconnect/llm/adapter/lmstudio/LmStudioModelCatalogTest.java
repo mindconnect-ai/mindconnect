@@ -1,8 +1,8 @@
 package ai.mindconnect.llm.adapter.lmstudio;
 
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfigType;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.AfterEach;
@@ -64,7 +64,7 @@ class LmStudioModelCatalogTest {
     void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.start();
-        catalog = new LmStudioModelCatalog(new OkHttpClient(), new ObjectMapper());
+        catalog = new LmStudioModelCatalog(new OkHttpClient(), TestJson.MAPPER);
     }
 
     @AfterEach
@@ -203,7 +203,7 @@ class LmStudioModelCatalogTest {
 
     @Test
     void halfATypedUrlIsAnUnreachableServer_notAnException() {
-        var catalog = new LmStudioModelCatalog(new OkHttpClient(), new ObjectMapper());
+        var catalog = new LmStudioModelCatalog(new OkHttpClient(), TestJson.MAPPER);
 
         var result = catalog.fetch("dbeise:not a port");
 

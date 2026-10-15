@@ -257,8 +257,8 @@ abstract class AbstractOpenAiGateway extends SseStreamingGateway {
         // which rejects it on a model that does not reason (HTTP 400), so there
         // it goes only with its reasoning models. Azure names deployments, not
         // models, so nothing can be told from the name and the field is sent.
-        Map<String, Object> params = LlmParams.merge(config, request);
-        String reasoningEffort = LlmParams.string(params, "reasoning_effort");
+        LlmParameterMap params = LlmParameterMap.of(config, request);
+        String reasoningEffort = params.text("reasoning_effort");
         boolean effortAccepted = !OPENAI_ITSELF.contains(config.provider()) || reasoning;
         // From gpt-5.6 on, OpenAI refuses function tools together with reasoning
         // on Chat Completions (HTTP 400) — and those models reason by default,

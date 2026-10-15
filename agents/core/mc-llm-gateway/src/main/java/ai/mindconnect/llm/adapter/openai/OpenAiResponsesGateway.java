@@ -4,7 +4,7 @@ import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.LlmCallEventBuilder;
-import ai.mindconnect.llm.adapter.LlmHttpErrors;
+import ai.mindconnect.llm.adapter.LlmHttpError;
 import ai.mindconnect.llm.adapter.LlmWireLog;
 import ai.mindconnect.llm.adapter.SseBlockReader;
 import ai.mindconnect.llm.adapter.ToolCallBuilder;
@@ -12,7 +12,7 @@ import ai.mindconnect.llm.domain.FinishReason;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmContent;
 import ai.mindconnect.llm.domain.LlmMessage;
-import ai.mindconnect.llm.domain.LlmParams;
+import ai.mindconnect.llm.domain.LlmParameterMap;
 import ai.mindconnect.llm.domain.LlmRequest;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.domain.LlmTransientException;
@@ -173,7 +173,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
                         && errorBody.toLowerCase(Locale.ROOT).contains("summar")) {
                     throw new SummaryRefused();
                 }
-                throw LlmHttpErrors.failure(log, "OpenAI Responses", config, errorStatus,
+                throw LlmHttpError.failure(log, "OpenAI Responses", config, errorStatus,
                         response.header("retry-after"), errorBody);
             }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body().byteStream()))) {
@@ -239,7 +239,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
     /** Whether the request asks for a summary nobody configured — the default the gateway may drop. */
     static boolean defaultSummaryRequested(LlmConfig config, LlmRequest request) {
         return OpenAiModelPolicy.isReasoningModel(config.model())
-                && LlmParams.string(LlmParams.merge(config, request), "reasoning_summary") == null;
+                && LlmParameterMap.of(config, request).text("reasoning_summary") == null;
     }
 
     /**
@@ -261,13 +261,13 @@ public class OpenAiResponsesGateway implements LlmGateway {
         if (maxTokens > 0) root.put("max_output_tokens", maxTokens);
 
         if (reasoning) {
-            Map<String, Object> params = LlmParams.merge(config, request);
+            LlmParameterMap params = LlmParameterMap.of(config, request);
             ObjectNode reasoningNode = root.putObject("reasoning");
-            String effort = LlmParams.string(params, "reasoning_effort");
+            String effort = params.text("reasoning_effort");
             if (effort != null) reasoningNode.put("effort", effort);
             // A readable summary of the reasoning, shown in the chat as the thought —
             // "none" for an organization OpenAI refuses summaries to.
-            String summary = LlmParams.string(params, "reasoning_summary");
+            String summary = params.text("reasoning_summary");
             if (summary == null) summary = omitDefaultSummary ? "none" : "auto";
             if (!"none".equals(summary)) reasoningNode.put("summary", summary);
             // What the model thought must go back with its tool calls; with

@@ -2,7 +2,7 @@ package ai.mindconnect.llm.port.out;
 
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.domain.LlmPriceId;
-import ai.mindconnect.llm.domain.LlmPrices;
+import ai.mindconnect.llm.domain.LlmPriceList;
 
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +38,6 @@ public interface LlmPriceRepository {
      * config first.
      */
     default Optional<LlmPrice> priceAt(String configName, String model, Instant at) {
-        return LlmPrices.priceAt(findByConfigName(configName), configName, model, at);
+        return new LlmPriceList(findByConfigName(configName)).priceAt(configName, model, at);
     }
 }

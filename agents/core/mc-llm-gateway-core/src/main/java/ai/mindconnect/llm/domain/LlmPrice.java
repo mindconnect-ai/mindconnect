@@ -1,7 +1,6 @@
 package ai.mindconnect.llm.domain;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -135,9 +134,18 @@ public record LlmPrice(
     }
 
     /** True for a price stored before prices named their model: it prices any model of its config. */
-    @JsonIgnore
     public boolean anyModel() {
         return model == null;
+    }
+
+    /** The name a model is shown and grouped under; a price without one prices any model. */
+    public String modelLabel() {
+        return anyModel() ? "any model" : model;
+    }
+
+    /** The period as people read it: {@code 2026-01-01 – 2026-07-01} or {@code 2026-07-01 – open}. */
+    public String period() {
+        return validFrom + " – " + (validTo == null ? "open" : validTo.toString());
     }
 
     /**

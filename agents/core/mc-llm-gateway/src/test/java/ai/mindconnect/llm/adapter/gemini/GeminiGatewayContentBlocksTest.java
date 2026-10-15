@@ -2,13 +2,13 @@ package ai.mindconnect.llm.adapter.gemini;
 
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.TestJson;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmContent;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.LlmRequest;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +22,7 @@ class GeminiGatewayContentBlocksTest {
 
     private final EncryptionHelper encryption = new EncryptionHelper("0123456789abcdef");
     private final GeminiGateway gateway =
-            new GeminiGateway(new OkHttpClient(), new ObjectMapper(), encryption);
+            new GeminiGateway(new OkHttpClient(), TestJson.MAPPER, encryption);
 
     private final LlmConfig config = new LlmConfig(LlmConfigId.random(), "gemini",
             LlmProvider.GOOGLE_GEMINI, "gemini-2.0-flash", "https://generativelanguage.googleapis.com",

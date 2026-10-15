@@ -18,9 +18,9 @@ import ai.mindconnect.common.util.McEnv;
  * provider's key; the others stay skipped, so a key for one vendor is enough
  * to check one adapter.
  */
-public final class LiveModels {
+public final class LiveTestEnvironment {
 
-    private LiveModels() { }
+    private LiveTestEnvironment() { }
 
     /** Whether the tests of the provider behind {@code apiKeyVariable} run. */
     public static boolean enabled(String apiKeyVariable) {
