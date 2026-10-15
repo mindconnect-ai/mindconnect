@@ -56,7 +56,6 @@ public class VectorStoreUiController {
 
     private final VectorStores stores;
     /** Where the request works — every store call names the namespace. */
-    private final ai.mindconnect.agent.ScopeSupplier scope;
     private final LlmConfigRepository llmConfigs;
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService;
@@ -69,11 +68,9 @@ public class VectorStoreUiController {
                                       ai.mindconnect.agentrest.service.VectorStoreService vectorStoreService,
                                       ai.mindconnect.agentrest.auth.CurrentUsers currentUsers,
                                       ai.mindconnect.agentrest.auth.VectorStoreAccess storeAccess,
-                                      ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions,
-                                      ai.mindconnect.agent.ScopeSupplier scope) {
+                                      ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions) {
         this.sessions = sessions;
         this.stores = stores;
-        this.scope = scope;
         this.llmConfigs = llmConfigs;
         this.fileStore = fileStore;
         this.vectorStoreService = vectorStoreService;
@@ -101,7 +98,7 @@ public class VectorStoreUiController {
                 .rowAction(UiAction.danger("delete", "Delete").icon("delete")
                         .confirm("Delete this template? Existing stores keep their copied settings.")
                         .dispatch("DELETE", "/admin/vector-stores/templates/{id}"));
-        for (VectorStoreTemplate t : stores.templates(scope.namespace())) {
+        for (VectorStoreTemplate t : stores.templates()) {
             templates.row(Map.of(
                     "id", t.name(),
                     "name", VectorStores.DEFAULT_TEMPLATE.equals(t.name()) ? t.name() + " (built-in)" : t.name(),
@@ -126,8 +123,8 @@ public class VectorStoreUiController {
                         .dispatch("DELETE", "/admin/vector-stores/stores/{id}"));
         ai.mindconnect.agent.UserId caller = currentUsers.require();
         // Opening the index first brings in what the namespace kept before 0.9.
-        stores.index(scope.namespace());
-        for (VectorStoreInstance i : stores.registry(scope.namespace()).instances()) {
+        stores.index();
+        for (VectorStoreInstance i : stores.registry().instances()) {
             // A chat's upload store is its user's: nobody else sees it listed.
             if (!storeAccess.reachable(i, caller)) continue;
             String[] counts = counts(i);
@@ -136,7 +133,7 @@ public class VectorStoreUiController {
                     "name", i.name(),
                     "template", i.templateName(),
                     "scope", i.scope() + (i.scopeRef() == null ? "" : " (" + shortRef(i.scopeRef()) + ")"),
-                    "index", stores.indexOf(scope.namespace(), i),
+                    "index", stores.indexOf(i),
                     "entries", counts[0],
                     "chunks", counts[1]));
         }
@@ -312,17 +309,17 @@ public class VectorStoreUiController {
                                 + "built-in index goes back to the server's settings. The chunks stay where they are.")
                         .dispatch("DELETE", BASE + "/indexes/{id}"));
         try {
-            List<VectorStoreTemplate> templates = stores.templates(scope.namespace());
-            for (IndexDefinition index : stores.indexes(scope.namespace())) {
+            List<VectorStoreTemplate> templates = stores.templates();
+            for (IndexDefinition index : stores.indexes()) {
                 String where;
                 try {
-                    where = stores.indexLocation(scope.namespace(), index.name());
+                    where = stores.indexLocation(index.name());
                 } catch (RuntimeException e) {
                     where = "cannot be opened: " + e.getMessage();
                 }
                 String usedBy = templates.stream().filter(t -> index.name().equals(t.effectiveIndex()))
                         .map(VectorStoreTemplate::name).collect(java.util.stream.Collectors.joining(", "));
-                boolean builtIn = stores.isBuiltIn(scope.namespace(), index.name());
+                boolean builtIn = stores.isBuiltIn(index.name());
                 table.row(Map.of(
                         "id", index.name(),
                         "name", index.name() + (builtIn ? " (built-in)" : ""),
@@ -344,13 +341,13 @@ public class VectorStoreUiController {
     /** A built-in index opens as the host defines it; saving it moves it for this namespace. */
     @GetMapping("/indexes/{name}/edit")
     public UiPage editIndex(@PathVariable String name) {
-        return indexForm(stores.indexes(scope.namespace()).stream().filter(i -> i.name().equals(name))
+        return indexForm(stores.indexes().stream().filter(i -> i.name().equals(name))
                 .findFirst().orElse(null));
     }
 
     private UiPage indexForm(IndexDefinition index) {
         boolean isNew = index == null;
-        boolean builtIn = !isNew && stores.isBuiltIn(scope.namespace(), index.name());
+        boolean builtIn = !isNew && stores.isBuiltIn(index.name());
         UiForm form = UiForm.of("vs-index-form", isNew ? "New Index"
                         : builtIn ? "Built-in Index: " + index.name() : "Edit Index: " + index.name())
                 .field(UiField.text("name", "Name", isNew ? null : index.name()).asEditable()
@@ -422,7 +419,7 @@ public class VectorStoreUiController {
         boolean pgvector = !IndexDefinition.FILE.equals(body.str("kind"));
         String database = OWN_DATABASE.equals(body.str("database")) ? OWN_DATABASE : SYSTEM_DATABASE;
         String name = body.str("name") == null ? null : body.str("name").trim();
-        boolean passwordSet = name != null && stores.indexes(scope.namespace()).stream()
+        boolean passwordSet = name != null && stores.indexes().stream()
                 .anyMatch(i -> i.name().equals(name) && i.password() != null);
         return ai.mindconnect.ui.model.UiPatch.of()
                 .patch(ai.mindconnect.ui.model.UiPatch.Operation.replace("vs-index-pgvector", pgvectorGroup(!pgvector,
@@ -438,7 +435,7 @@ public class VectorStoreUiController {
     public Object saveIndex(@RequestBody Map<String, Object> raw) {
         var body = new FormBody(raw);
         String name = body.str("name") == null ? null : body.str("name").trim();
-        IndexDefinition previous = name == null ? null : stores.indexes(scope.namespace()).stream()
+        IndexDefinition previous = name == null ? null : stores.indexes().stream()
                 .filter(i -> i.name().equals(name)).findFirst().orElse(null);
         String password = body.str("password");
         IndexDefinition index;
@@ -458,24 +455,24 @@ public class VectorStoreUiController {
                         "A database of its own needs a JDBC URL — or choose the application's database.")
                         .title("Not saved"));
             }
-            stores.saveIndex(scope.namespace(), index);
+            stores.saveIndex(index);
             // Open it now: a wrong URL or a database without pgvector shows here, not at the next upload.
-            stores.indexLocation(scope.namespace(), index.name());
+            stores.indexLocation(index.name());
         } catch (IllegalArgumentException e) {
             return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error(e.getMessage()).title("Not saved"));
         } catch (RuntimeException e) {
             return list("indexes").toast(UiToast.error("Saved, but it cannot be opened: " + e.getMessage()));
         }
         return list("indexes").toast(UiToast.success("Index '" + index.name() + "' saved: "
-                + stores.indexLocation(scope.namespace(), index.name())));
+                + stores.indexLocation(index.name())));
     }
 
     @DeleteMapping("/indexes/{name}")
     public UiPage deleteIndex(@PathVariable String name) {
-        if (stores.isBuiltIn(scope.namespace(), name)) {
+        if (stores.isBuiltIn(name)) {
             return list("indexes").toast(UiToast.error("'" + name + "' is built in: it follows the server's settings."));
         }
-        stores.deleteIndex(scope.namespace(), name);
+        stores.deleteIndex(name);
         return list("indexes");
     }
 
@@ -512,7 +509,7 @@ public class VectorStoreUiController {
         }
         Map<String, List<VectorStoreInstance>> inStores = new java.util.HashMap<>();
         try {
-            var registry = stores.registry(scope.namespace());
+            var registry = stores.registry();
             for (VectorStoreInstance instance : registry.instances()) {
                 if (!storeAccess.reachable(instance, caller)) continue;
                 for (var ref : registry.members(instance.name())) {
@@ -604,7 +601,7 @@ public class VectorStoreUiController {
     /** How many entries the store lists and how many chunks the index has for them — "?" when it cannot say. */
     private String[] counts(VectorStoreInstance instance) {
         try {
-            var entities = stores.store(scope.namespace(), instance.name()).entities();
+            var entities = stores.store(instance.name()).entities();
             return new String[]{String.valueOf(entities.size()),
                     String.valueOf(entities.stream().mapToLong(e -> e.chunks()).sum())};
         } catch (RuntimeException e) {
@@ -631,9 +628,9 @@ public class VectorStoreUiController {
     @GetMapping("/templates/{name}/edit")
     public UiPage editTemplate(@PathVariable String name) {
         if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
-            return templateForm(stores.template(scope.namespace(), name).orElse(null), true);
+            return templateForm(stores.template(name).orElse(null), true);
         }
-        return templateForm(stores.registry(scope.namespace()).template(name).orElse(null), false);
+        return templateForm(stores.registry().template(name).orElse(null), false);
     }
 
     private static final String BUILT_IN_NOTE = "'" + VectorStores.DEFAULT_TEMPLATE
@@ -661,7 +658,7 @@ public class VectorStoreUiController {
                                 + "changing it later never affects existing stores. Stores on the same "
                                 + "model share the vectors of the files they both list."))
                 .field(UiField.select("index", "Index", t == null ? IndexDefinition.DEFAULT : t.effectiveIndex(),
-                                stores.indexes(scope.namespace()).stream()
+                                stores.indexes().stream()
                                         .map(i -> UiField.Option.of(i.name(), i.name())).toList())
                         .asEditable()
                         .hint("Where the chunks of this template's stores are kept — see the Indexes tab"))
@@ -700,7 +697,7 @@ public class VectorStoreUiController {
                 .withIndex(body.str("index"))
                 .withVersion(VersionedForms.version(body));
         try {
-            stores.registry(scope.namespace()).saveTemplate(template);
+            stores.registry().saveTemplate(template);
         } catch (StaleVersionException e) {
             if (e.expectedVersion() == 0) {
                 return ai.mindconnect.ui.model.UiPatch.of().toast(UiToast.error("A template named '"
@@ -711,7 +708,7 @@ public class VectorStoreUiController {
                 return VersionedForms.changedMeanwhile("Template '" + templateName + "'");
             }
             // Nothing stored under this name: the edit renamed the template — a new one.
-            stores.registry(scope.namespace()).saveTemplate(template.withVersion(0L));
+            stores.registry().saveTemplate(template.withVersion(0L));
         }
         return list("templates").toast(UiToast.success("Template '" + templateName + "' saved."));
     }
@@ -732,7 +729,7 @@ public class VectorStoreUiController {
         if (VectorStores.DEFAULT_TEMPLATE.equals(name)) {
             return list("templates").toast(UiToast.error(BUILT_IN_NOTE));
         }
-        stores.registry(scope.namespace()).deleteTemplate(name);
+        stores.registry().deleteTemplate(name);
         return list("templates");
     }
 
@@ -740,7 +737,7 @@ public class VectorStoreUiController {
 
     @GetMapping("/stores/new")
     public UiPage newStore() {
-        List<UiField.Option> templateOptions = stores.templates(scope.namespace()).stream()
+        List<UiField.Option> templateOptions = stores.templates().stream()
                 .map(t -> UiField.Option.of(t.name(), t.name())).toList();
         UiForm form = UiForm.of("vs-store-form", "New Store")
                 .field(UiField.text("name", "Name", null).asEditable()
@@ -763,7 +760,7 @@ public class VectorStoreUiController {
             return list("stores").toast(UiToast.error(ai.mindconnect.agentrest.auth.VectorStoreAccess.RESERVED_NAME));
         }
         if (name != null && !name.isBlank()) {
-            stores.open(scope.namespace(), name.trim(), body.str("template"), VectorStoreInstance.Scope.GLOBAL, null);
+            stores.open(name.trim(), body.str("template"), VectorStoreInstance.Scope.GLOBAL, null);
         }
         return list("stores");
     }
@@ -794,7 +791,7 @@ public class VectorStoreUiController {
      */
     private UiPage storeDetail(String name, String tab, String entry, String lastQuery, UiNode searchResult,
                                String message) {
-        VectorStore store = stores.store(scope.namespace(), name);
+        VectorStore store = stores.store(name);
         VectorStoreInstance instance = store.settings();
 
         UiStack page = UiStack.of("vs-detail").gap(16);
@@ -807,10 +804,10 @@ public class VectorStoreUiController {
         page.child(UiText.of("vs-detail-meta", "template " + instance.templateName()
                 + " · embedding " + instance.embeddingConfig()
                 + " · scope " + instance.scope()).withCssClass("wf-run-meta"));
-        String indexName = stores.indexOf(scope.namespace(), instance);
+        String indexName = stores.indexOf(instance);
         String location;
         try {
-            location = stores.indexLocation(scope.namespace(), indexName);
+            location = stores.indexLocation(indexName);
         } catch (RuntimeException e) {
             location = "unknown (" + e.getMessage() + ")";
         }
@@ -881,7 +878,7 @@ public class VectorStoreUiController {
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
         try {
             String needle = q == null || q.isBlank() ? null : q.toLowerCase(java.util.Locale.ROOT);
-            for (var entity : stores.store(scope.namespace(), name).entities()) {
+            for (var entity : stores.store(name).entities()) {
                 String label = entryName(entity.ref());
                 if (needle != null && !(label + " " + entity.ref().id() + " " + entity.ref().type().value())
                         .toLowerCase(java.util.Locale.ROOT).contains(needle)) {
@@ -931,7 +928,7 @@ public class VectorStoreUiController {
      */
     private UiNode chunksTable(String name, String q, String entry, int page) {
         String enc = java.net.URLEncoder.encode(name, java.nio.charset.StandardCharsets.UTF_8);
-        VectorStore store = stores.store(scope.namespace(), name);
+        VectorStore store = stores.store(name);
         List<ai.mindconnect.vectorstore.embedding.EntityRef> members;
         try {
             members = store.members();
@@ -1131,7 +1128,7 @@ public class VectorStoreUiController {
      * another user's chat upload store; null when the caller may reach it.
      */
     private UiPage refuseForeignStore(String name) {
-        if (storeAccess.reachable(name, stores.registry(scope.namespace()).instance(name).orElse(null), currentUsers.require())) {
+        if (storeAccess.reachable(name, stores.registry().instance(name).orElse(null), currentUsers.require())) {
             return null;
         }
         return list("stores").toast(UiToast.error("There is no store '" + name + "'."));

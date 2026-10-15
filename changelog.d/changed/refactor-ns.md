@@ -9,3 +9,6 @@
   `mc-namespace-core` (`ai.mindconnect.namespace.service`, `…namespace.port.out`).
   The in-memory adapters take the scope too and keep one store per namespace
   (`PerNamespace`); a test that builds one passes `ScopeSupplier.local()`.
+  `VectorStores` names no namespace any more: its methods work in the namespace of
+  the call, and `PgEmbeddingIndex` and `PgVectorStoreRegistry` take a
+  `ScopeSupplier` instead of a `Namespace`.

@@ -72,11 +72,11 @@ class SessionFileServiceWorkingDirTest {
             }
         }).orElseThrow();
         // Direct ingestion — no workflow engine; an empty file needs no embeddings either.
-        stores.registry(Namespace.DEFAULT).saveTemplate(new VectorStoreTemplate(SessionFileService.CHAT_UPLOADS_TEMPLATE,
+        stores.registry().saveTemplate(new VectorStoreTemplate(SessionFileService.CHAT_UPLOADS_TEMPLATE,
                 "embeddings", null, Map.of()));
         service = new SessionFileService(files, provider(stores), provider(null), sessions,
                 provider(null), provider(null), temp.resolve("tools").toString(), provider(home),
-                ai.mindconnect.agent.ScopeSupplier.local(), provider(null));
+                provider(null));
     }
 
     @Test

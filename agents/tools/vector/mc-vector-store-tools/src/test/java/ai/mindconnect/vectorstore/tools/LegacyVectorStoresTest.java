@@ -41,23 +41,23 @@ class LegacyVectorStoresTest {
                         + "\"metadata\":{},\"embedding\":[0.0,0.0,1.0]}\n");
         DataSource db = TestDb.requirePostgres();
         TestDb.forget(db, NS);
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir,
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir,
                 Map.of("vectorStoreBackend", "file"))).orElseThrow();
 
-        VectorStore store = stores.store(NS, "session-s1");
+        VectorStore store = stores.store("session-s1");
 
         assertThat(store.members()).containsExactlyInAnyOrder(
                 EntityRef.of(EntityType.DOCUMENT, "session-s1", "uploads/a.md"),
                 EntityRef.of(EntityType.DOCUMENT, "session-s1", "b.md"));
         assertThat(store.search("container", 1)).extracting(h -> h.ref().id()).containsExactly("uploads/a.md");
-        assertThat(stores.registry(NS).instance("session-s1").orElseThrow().scope())
+        assertThat(stores.registry().instance("session-s1").orElseThrow().scope())
                 .as("a session- store is a chat's").isEqualTo(VectorStoreInstance.Scope.SESSION);
         assertThat(file).exists();
 
         // A second runtime of the same process finds the work done.
-        VectorStores again = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir,
+        VectorStores again = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir,
                 Map.of("vectorStoreBackend", "file"))).orElseThrow();
-        assertThat(again.store(NS, "session-s1").members()).hasSize(2);
+        assertThat(again.store("session-s1").members()).hasSize(2);
     }
 
     @Test
@@ -69,9 +69,9 @@ class LegacyVectorStoresTest {
                 + " content text NOT NULL, metadata jsonb NOT NULL DEFAULT '{}', embedding vector(3) NOT NULL)");
         sql.update("INSERT INTO vs_legacy_vs__kb VALUES ('doc1:0', 'doc1', 0, 'podman is a container engine',"
                 + " '{\"title\":\"Intro\"}', '[1,0,0]')");
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir, Map.of())).orElseThrow();
 
-        VectorStore store = stores.store(NS, "kb");
+        VectorStore store = stores.store("kb");
 
         assertThat(store.members()).containsExactly(EntityRef.of(EntityType.DOCUMENT, "kb", "doc1"));
         assertThat(store.search("container", 1).get(0).chunk().metadata()).containsEntry("title", "Intro");

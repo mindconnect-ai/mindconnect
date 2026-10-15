@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.pgvector;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.vectorstore.embedding.EmbeddingChunk;
 import ai.mindconnect.vectorstore.embedding.EmbeddingIndex.EmbeddingHit;
@@ -109,7 +110,7 @@ class PgEmbeddingIndexNomicTest {
         dataSource.setUser(DB_USER);
         dataSource.setPassword(DB_PASSWORD);
         namespace = new Namespace("it-nomic-" + UUID.randomUUID().toString().substring(0, 8));
-        index = new PgEmbeddingIndex(dataSource, namespace);
+        index = new PgEmbeddingIndex(dataSource, ScopeSupplier.fixed(namespace));
 
         for (var pool : POOLS.values()) {
             for (var file : pool.entrySet()) {

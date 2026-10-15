@@ -1,6 +1,5 @@
 package ai.mindconnect.agentrest.service;
 
-import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
@@ -70,7 +69,6 @@ public class VectorStoreService {
     private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path uploadBase;
     /** Where a call works — every store call names the namespace. */
-    private final ScopeSupplier scope;
     private final ai.mindconnect.common.env.EnvVarResolver environment;
 
     public VectorStoreService(ObjectProvider<VectorStores> storesProvider,
@@ -79,10 +77,8 @@ public class VectorStoreService {
                               ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}")
                               String toolsBaseDir,
-                              ScopeSupplier scope,
                               ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
         this.storesProvider = storesProvider;
-        this.scope = scope;
         this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStoreProvider = fileStoreProvider;
         this.workflowsProvider = workflowsProvider;
@@ -93,19 +89,19 @@ public class VectorStoreService {
     // ── Templates ──────────────────────────────────────────────────────────
 
     public List<VectorStoreTemplate> templates() {
-        return stores().templates(scope.namespace());
+        return stores().templates();
     }
 
     public Optional<VectorStoreTemplate> template(String name) {
-        return stores().template(scope.namespace(), name);
+        return stores().template(name);
     }
 
     public void saveTemplate(VectorStoreTemplate template) {
-        stores().registry(scope.namespace()).saveTemplate(template);
+        stores().registry().saveTemplate(template);
     }
 
     public void deleteTemplate(String name) {
-        stores().registry(scope.namespace()).deleteTemplate(name);
+        stores().registry().deleteTemplate(name);
     }
 
     // ── Indexes ────────────────────────────────────────────────────────────
@@ -115,9 +111,9 @@ public class VectorStoreService {
 
     public List<IndexInfo> indexes() {
         VectorStores vs = stores();
-        return vs.indexes(scope.namespace()).stream()
+        return vs.indexes().stream()
                 .map(i -> new IndexInfo(i.withPassword(i.password() == null ? null : "***"),
-                        vs.isBuiltIn(scope.namespace(), i.name()), location(vs, i.name())))
+                        vs.isBuiltIn(i.name()), location(vs, i.name())))
                 .toList();
     }
 
@@ -126,11 +122,11 @@ public class VectorStoreService {
         VectorStores vs = stores();
         if (index.password() == null || "***".equals(index.password())) {
             String name = index.name();
-            String kept = vs.indexes(scope.namespace()).stream().filter(i -> i.name().equals(name))
+            String kept = vs.indexes().stream().filter(i -> i.name().equals(name))
                     .map(IndexDefinition::password).filter(java.util.Objects::nonNull).findFirst().orElse(null);
             index = index.withPassword(kept);
         }
-        vs.saveIndex(scope.namespace(), index);
+        vs.saveIndex(index);
         return new IndexInfo(index.withPassword(index.password() == null ? null : "***"),
                 false, location(vs, index.name()));
     }
@@ -138,16 +134,16 @@ public class VectorStoreService {
     /** @return false for a built-in index the namespace did not redefine — there is nothing to delete */
     public boolean deleteIndex(String name) {
         VectorStores vs = stores();
-        if (vs.isBuiltIn(scope.namespace(), name)) {
+        if (vs.isBuiltIn(name)) {
             return false;
         }
-        vs.deleteIndex(scope.namespace(), name);
+        vs.deleteIndex(name);
         return true;
     }
 
     private String location(VectorStores vs, String name) {
         try {
-            return vs.indexLocation(scope.namespace(), name);
+            return vs.indexLocation(name);
         } catch (RuntimeException e) {
             return "cannot be opened: " + e.getMessage();
         }
@@ -156,17 +152,17 @@ public class VectorStoreService {
     // ── Stores ─────────────────────────────────────────────────────────────
 
     public List<VectorStoreInstance> instances() {
-        return stores().registry(scope.namespace()).instances();
+        return stores().registry().instances();
     }
 
     public Optional<VectorStoreInstance> instance(String name) {
-        return stores().registry(scope.namespace()).instance(name);
+        return stores().registry().instance(name);
     }
 
     /** Registers (and creates on first use) a GLOBAL store from a template. */
     public Optional<VectorStoreInstance> createStore(String name, String template) {
-        stores().open(scope.namespace(), name.trim(), template, VectorStoreInstance.Scope.GLOBAL, null);
-        return stores().registry(scope.namespace()).instance(name.trim());
+        stores().open(name.trim(), template, VectorStoreInstance.Scope.GLOBAL, null);
+        return stores().registry().instance(name.trim());
     }
 
     /**
@@ -174,9 +170,9 @@ public class VectorStoreService {
      * listed stay there for the other stores and chats that list them.
      */
     public void deleteStore(String name) {
-        VectorStore store = stores().store(scope.namespace(), name);
+        VectorStore store = stores().store(name);
         store.members().forEach(store::remove);
-        stores().registry(scope.namespace()).deleteInstance(name);
+        stores().registry().deleteInstance(name);
     }
 
     // ── Search, entries & documents ─────────────────────────────────────────
@@ -193,7 +189,7 @@ public class VectorStoreService {
      */
     public List<Hit> search(String storeName, String query, int topK, double minScore,
                             List<EntitySelector> entities, List<MetadataFilter> filters) {
-        VectorStore store = stores().store(scope.namespace(), storeName);
+        VectorStore store = stores().store(storeName);
         Set<EntityRef> within = entities == null ? null : store.select(entities);
         return store.search(query, topK, within, filters).stream()
                 .filter(h -> h.score() >= minScore)
@@ -204,7 +200,7 @@ public class VectorStoreService {
 
     /** What the store lists, as the index has it. */
     public List<Entry> entries(String storeName) {
-        return stores().store(scope.namespace(), storeName).entities().stream()
+        return stores().store(storeName).entities().stream()
                 .map(VectorStoreService::entry)
                 .toList();
     }
@@ -222,7 +218,7 @@ public class VectorStoreService {
      * @return how many were removed
      */
     public int removeEntry(String storeName, String entityId) {
-        VectorStore store = stores().store(scope.namespace(), storeName);
+        VectorStore store = stores().store(storeName);
         int removed = 0;
         for (EntityRef ref : store.members()) {
             if (ref.id().equals(entityId)) {
@@ -238,7 +234,7 @@ public class VectorStoreService {
      * what the document had; the same chunks again are not embedded again.
      */
     public UpsertedDocument upsertDocument(String storeName, String id, List<VectorStore.TextChunk> chunks) {
-        VectorStore store = stores().open(scope.namespace(), storeName, null, VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore store = stores().open(storeName, null, VectorStoreInstance.Scope.GLOBAL, null);
         String owner = store.settings().owner();
         long stored = store.put(store.documentRef(id), owner == null ? null : UserId.of(owner),
                 VectorTools.version(chunks), chunks);
@@ -291,7 +287,7 @@ public class VectorStoreService {
      */
     private String ingest(String storeName, String safeName, Path target, StoredFile stored) throws IOException {
         VectorStores vs = stores();
-        VectorStore store = vs.open(scope.namespace(), storeName, null, VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore store = vs.open(storeName, null, VectorStoreInstance.Scope.GLOBAL, null);
         EntityRef ref = stored != null ? EntityRef.file(stored.id()) : store.documentRef(safeName);
         if (stored != null && store.indexed(ref)) {
             store.add(ref);

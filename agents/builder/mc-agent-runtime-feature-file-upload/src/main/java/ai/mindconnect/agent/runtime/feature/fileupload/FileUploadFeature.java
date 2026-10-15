@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.runtime.feature.fileupload;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.Persistence;
@@ -64,7 +63,6 @@ public class FileUploadFeature implements RuntimeFeature {
                 ctx.require(VectorStores.class),
                 ctx.runtime().beans(),
                 ctx.require(FileStore.class),
-                ctx.require(Namespace.class),
                 ctx.require(UserHome.class)));
     }
 

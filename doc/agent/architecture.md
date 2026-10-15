@@ -70,10 +70,9 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       …) lives in the module that owns its entity. Every entity is addressed by such a record
       — `record XId(String value) implements EntityId` — never by a bare `UUID` or `String`;
       in JSON an id is its plain value. Ids, domain objects, ports and services carry no
-      namespace: persistence adapters (File, Pg, the file-store backends) take the
-      `ScopeSupplier` in their constructor and ask it on every call for the namespace to work
-      in — one adapter serves every namespace (the vector-store backends are still bound to one
-      namespace each) (`Scope` =
+      namespace: persistence adapters (File, Pg, the file-store backends, `VectorStores`) take
+      the `ScopeSupplier` in their constructor and ask it on every call for the namespace to
+      work in — one adapter serves every namespace (`Scope` =
       namespace + optional `UserId` + host attributes; a library embeds with `ScopeSupplier.fixed`,
       a server binds a `ThreadBoundScope` per request and per queued task via `ScopeTaskAdvisor`;
       `mindconnect.namespace` is only the fallback while not every entry point binds). Work a

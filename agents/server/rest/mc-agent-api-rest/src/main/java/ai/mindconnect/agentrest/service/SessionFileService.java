@@ -1,6 +1,5 @@
 package ai.mindconnect.agentrest.service;
 
-import ai.mindconnect.agent.ScopeSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -67,7 +66,6 @@ public class SessionFileService {
     private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path spoolBase;
     /** Where a call works — every store call names the namespace. */
-    private final ScopeSupplier scope;
     private final ai.mindconnect.common.env.EnvVarResolver environment;
     /** Where a session's own directory is; unconfigured means the spool under the tools base dir. */
     private final ai.mindconnect.agent.runtime.service.UserHome userHome;
@@ -80,9 +78,7 @@ public class SessionFileService {
                               ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
                               ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome,
-                              ScopeSupplier scope,
                               ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
-        this.scope = scope;
         this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStore = fileStore;
         this.storesProvider = storesProvider;
@@ -149,12 +145,12 @@ public class SessionFileService {
         if (stores == null) return Map.of();
         String storeName = "session-" + sessionId.value();
         try {
-            if (stores.registry(scope.namespace()).instance(storeName).isEmpty()) {
+            if (stores.registry().instance(storeName).isEmpty()) {
                 return Map.of();
             }
             List<AttachedFile> attached = attachments(sessionId);
             Map<String, Long> chunks = new java.util.LinkedHashMap<>();
-            for (var entity : stores.store(scope.namespace(), storeName).entities()) {
+            for (var entity : stores.store(storeName).entities()) {
                 String fileId = attachedFileOf(entity.ref(), attached).map(AttachedFile::id).orElse(entity.ref().id());
                 chunks.merge(fileId, entity.chunks(), Long::sum);
             }
@@ -190,8 +186,8 @@ public class SessionFileService {
                 .findFirst().orElse(Path.of(fileIdOrName).getFileName().toString());
         VectorStores stores = storesProvider.getIfAvailable();
         String storeName = "session-" + sessionId.value();
-        if (stores != null && stores.registry(scope.namespace()).instance(storeName).isPresent()) {
-            VectorStore store = stores.store(scope.namespace(), storeName);
+        if (stores != null && stores.registry().instance(storeName).isPresent()) {
+            VectorStore store = stores.store(storeName);
             for (EntityRef ref : store.members()) {
                 boolean match = ref.id().equals(fileIdOrName)
                         || attachedFileOf(ref, attached).map(f -> f.name().equals(fileName)).orElse(false);
@@ -299,14 +295,14 @@ public class SessionFileService {
                     stored.name() + ": vector stores are not configured in this application.");
         }
         String storeName = "session-" + sessionId.value();
-        VectorStoreTemplate template = stores.template(scope.namespace(), CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
+        VectorStoreTemplate template = stores.template(CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
             VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE, "embeddings", "file-ingestion",
                     Map.of("description", "Per-chat-session upload stores (auto-created)"));
-            stores.registry(scope.namespace()).saveTemplate(created);
+            stores.registry().saveTemplate(created);
             return created;
         });
         // The store is the chat's user's: the vector tools reach it only on that user's behalf.
-        VectorStore store = stores.open(scope.namespace(), storeName, template.name(), VectorStoreInstance.Scope.SESSION,
+        VectorStore store = stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION,
                 sessionId.value(), session.userId() == null ? null : session.userId().value());
         VectorStoreInstance instance = store.settings();
         // The stored file is one entity, whichever chats it is attached to: indexed
