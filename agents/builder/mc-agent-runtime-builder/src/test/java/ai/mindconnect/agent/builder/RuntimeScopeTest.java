@@ -3,7 +3,6 @@ package ai.mindconnect.agent.builder;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -12,6 +11,7 @@ import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.taskqueue.TaskAdvisor;
 import org.junit.jupiter.api.Test;
 
@@ -30,7 +30,7 @@ class RuntimeScopeTest {
 
     @Test
     void repositoriesFollowTheBoundNamespace() throws Exception {
-        ThreadBoundScope scope = ThreadBoundScope.withFallback(Scope.of(Namespace.DEFAULT));
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.withFallback(Scope.of(Namespace.DEFAULT));
         AgentRuntimeBuilder builder = AgentRuntimeBuilder.of(Persistence.inMemory())
                 .scope(scope)
                 .install(new ToolsFeature());
@@ -61,7 +61,7 @@ class RuntimeScopeTest {
     @Test
     void strictRefusesAnUnboundCall() throws Exception {
         AgentRuntimeBuilder builder = AgentRuntimeBuilder.of(Persistence.inMemory())
-                .scope(ThreadBoundScope.strict());
+                .scope(ThreadBoundScopeSupplier.strict());
         try (AgentRuntime runtime = builder.build()) {
             assertThatThrownBy(() -> runtime.agentDefinitions().findByName("x")).isInstanceOf(Exception.class);
         }

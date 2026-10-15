@@ -1,9 +1,7 @@
 package ai.mindconnect.agent.starter.runtime;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.StartupScope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.feature.Persistence;
@@ -49,6 +47,8 @@ import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.llm.service.RoutingLlmChatService;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.MessageRepository;
+import ai.mindconnect.namespace.service.StartupScope;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.taskqueue.TaskQueue;
 import ai.mindconnect.taskqueue.local.LocalTaskQueue;
 import ai.mindconnect.vectorstore.tools.VectorStores;
@@ -82,7 +82,7 @@ import java.util.Optional;
  * {@link LlmConfigRepository}, {@link ToolRegistry}, … as before.
  *
  * <p>What the application contributes: a {@link Persistence} (from its
- * persistence starter), the {@link ThreadBoundScope} its request filter binds
+ * persistence starter), the {@link ThreadBoundScopeSupplier} its request filter binds
  * (from the namespace or persistence starter — then the runtime works in the
  * namespace of the call), its {@link ObjectMapper}, any {@link RuntimeFeature}
  * beans (installed, replacing a shipped feature of the same name) and any
@@ -114,7 +114,7 @@ public class AgentRuntimeAutoConfiguration {
                               ObjectMapper objectMapper,
                               Environment env,
                               ApplicationContext context,
-                              ObjectProvider<ThreadBoundScope> boundScope,
+                              ObjectProvider<ThreadBoundScopeSupplier> boundScope,
                               ObjectProvider<EnvVarResolver> envVarResolver,
                               ObjectProvider<RuntimeFeature> features,
                               ObjectProvider<AgentRuntimeCustomizer> customizers) {
@@ -177,7 +177,7 @@ public class AgentRuntimeAutoConfiguration {
                         persistence instanceof Persistence.Postgres ? "postgres" : "filesystem"));
 
         // The server works in the namespace of the call: the scope its filter binds, which every store asks.
-        ThreadBoundScope scope = boundScope.getIfAvailable();
+        ThreadBoundScopeSupplier scope = boundScope.getIfAvailable();
         if (scope != null) builder.scope(scope);
 
         // The application's own features and last words.
@@ -195,7 +195,7 @@ public class AgentRuntimeAutoConfiguration {
 
     /** The tools bind their providers once the context is up — not while it is still refreshing. */
     @Bean
-    ApplicationListener<ContextRefreshedEvent> toolWarmUp(AgentRuntime runtime, ObjectProvider<ThreadBoundScope> boundScope,
+    ApplicationListener<ContextRefreshedEvent> toolWarmUp(AgentRuntime runtime, ObjectProvider<ThreadBoundScopeSupplier> boundScope,
                                                           Environment env) {
         Namespace startup = new Namespace(env.getProperty("mindconnect.namespace", "local"));
         return event -> StartupScope.run(boundScope.getIfAvailable(), startup,
@@ -247,7 +247,7 @@ public class AgentRuntimeAutoConfiguration {
     /**
      * The scope the runtime works in, for the application's own beans to inject.
      * Only when nothing else declares one: with the namespace starter present its
-     * {@link ThreadBoundScope} is both this bean and the runtime's.
+     * {@link ThreadBoundScopeSupplier} is both this bean and the runtime's.
      */
     @Bean
     @ConditionalOnMissingBean(ScopeSupplier.class)

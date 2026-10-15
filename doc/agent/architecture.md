@@ -74,11 +74,11 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       the `ScopeSupplier` in their constructor and ask it on every call for the namespace to
       work in — one adapter serves every namespace (`Scope` =
       namespace + optional `UserId` + host attributes; a library embeds with `ScopeSupplier.fixed`,
-      a server binds a `ThreadBoundScope` per request and per queued task via `ScopeTaskAdvisor`;
+      a server binds a `ThreadBoundScopeSupplier` per request and per queued task via `ScopeTaskAdvisor`;
       `mindconnect.namespace` is only the fallback while not every entry point binds). Work a
       namespace needs once per process — the Admin UI's seeding of `initial-data/**` into every
       namespace, see `NamespaceSeeding` — is a `NamespaceFirstUse` (`mc-namespace-core`)
-      registered with `ThreadBoundScope.onBind`, so requests, tasks and start-up routines all
+      registered with `ThreadBoundScopeSupplier.onBind`, so requests, tasks and start-up routines all
       trigger it
     - `mc-agent-runtime-core` / `mc-agent-runtime` (packages `ai.mindconnect.agent.runtime.*`):
       execution engine (turn loop, tool dispatch, sub-agent calls, approvals) / its adapters
@@ -212,9 +212,9 @@ the thing to grep for.
   it on every call for the namespace (`Scope` = namespace + optional `UserId` + host
   attributes); one adapter serves every namespace — an in-memory one keeps its entries in a
   `PerNamespace`. A library embeds with
-  `ScopeSupplier.fixed`; a server binds a `ThreadBoundScope` per request and per queued task
-  via `ScopeTaskAdvisor`. Work a namespace needs once per process is a `NamespaceFirstUse`
-  (`mc-namespace-core`) registered with `ThreadBoundScope.onBind` (example: `NamespaceSeeding`);
+  `ScopeSupplier.fixed`; a server binds a `ThreadBoundScopeSupplier` (`mc-namespace-core`) per request and per queued task
+  via `ScopeTaskAdvisor`, which resumes a task through `ScopeSupplier.callIn` and so knows no thread binding. Work a namespace needs once per process is a `NamespaceFirstUse`
+  (`mc-namespace-core`) registered with `ThreadBoundScopeSupplier.onBind` (example: `NamespaceSeeding`);
   what a store does when a namespace is deleted is a `NamespacePurge` there. Decision: [0007](../decisions/0007-scope-supplier-per-call.md).
 - **Runtime features.** `AgentRuntimeBuilder` assembles a core plus installed
   `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); each

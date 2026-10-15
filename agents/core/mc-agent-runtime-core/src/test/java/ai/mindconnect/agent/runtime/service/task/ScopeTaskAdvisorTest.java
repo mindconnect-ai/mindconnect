@@ -3,8 +3,8 @@ package ai.mindconnect.agent.runtime.service.task;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskNotification;
 import ai.mindconnect.taskqueue.TaskOutcome;
@@ -24,7 +24,7 @@ class ScopeTaskAdvisorTest {
     private static final Namespace ACME = new Namespace("acme");
     private static final UserId DAVID = UserId.of("david");
 
-    private final ThreadBoundScope bound = ThreadBoundScope.strict();
+    private final ThreadBoundScopeSupplier bound = ThreadBoundScopeSupplier.strict();
 
     @Test
     void stampsTheSubmittersNamespaceAndUser() {

@@ -2,7 +2,6 @@ package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.StartupScope;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpGateway;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -10,6 +9,7 @@ import ai.mindconnect.mcp.proxy.McpProxy;
 import ai.mindconnect.mcp.proxy.McpSessionRegistry;
 import ai.mindconnect.mcp.proxy.SdkMcpProxy;
 import ai.mindconnect.namespace.port.out.NamespacePurge;
+import ai.mindconnect.namespace.service.StartupScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;

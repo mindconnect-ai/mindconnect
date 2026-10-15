@@ -5,10 +5,10 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
 import ai.mindconnect.agent.runtime.usermemory.MemoryType;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -53,7 +53,7 @@ class FileUserMemoryRepositoryTest {
 
     @Test
     void oneRepositoryWorksInTheNamespaceBoundToTheCall() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, scope);
         Namespace other = new Namespace("other");
 

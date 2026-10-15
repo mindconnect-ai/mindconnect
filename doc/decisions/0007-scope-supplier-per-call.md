@@ -16,8 +16,9 @@ resolves `<dataDir>/<namespace>/…` per call (`Documents`/`RecordLog` build on 
 `Supplier<FileRepo>`), a Postgres adapter matches its `namespace` column, an
 in-memory adapter keeps its entries in a `PerNamespace`. The workflow area, which
 knows no namespace, takes a `Supplier<String>` partition. `AgentRuntimeBuilder`
-holds the scope: `ScopeSupplier.fixed` for a library, the host's `ThreadBoundScope`
-(`scope(…)`) for a server, bound per request and per queued task (`ScopeTaskAdvisor`).
+holds the scope: `ScopeSupplier.fixed` for a library, the host's `ThreadBoundScopeSupplier`
+(`mc-namespace-core`, `scope(…)`) for a server, bound per request; a queued task
+resumes in its scope through `ScopeSupplier.callIn` (`ScopeTaskAdvisor`).
 
 ## Consequences
 A new adapter takes a `ScopeSupplier`, never a `Namespace`, and never asks it in

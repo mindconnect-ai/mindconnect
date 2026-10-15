@@ -2,8 +2,6 @@ package ai.mindconnect.agent.starter.registry;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.StartupScope;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.adapter.github.GitHubRegistryClient;
 import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
@@ -21,6 +19,8 @@ import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
+import ai.mindconnect.namespace.service.StartupScope;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -123,7 +123,7 @@ public class RegistryAutoConfiguration {
                 seed(repository, defaultSource);
             };
             PgRegistrySourceRepository repository = new PgRegistrySourceRepository(mindconnectSql, current).initSchema();
-            if (current instanceof ThreadBoundScope bound) {
+            if (current instanceof ThreadBoundScopeSupplier bound) {
                 bound.onBind(new NamespaceFirstUse("Registry sources", prepare));
             } else {
                 prepare.accept(current.namespace());

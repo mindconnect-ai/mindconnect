@@ -1,4 +1,7 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.namespace.service;
+
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.Scope;
 
 import org.junit.jupiter.api.Test;
 
@@ -9,14 +12,14 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class ThreadBoundScopeTest {
+class ThreadBoundScopeSupplierTest {
 
     private static final Scope ACME = Scope.of(new Namespace("acme"));
     private static final Scope OTHER = Scope.of(new Namespace("other"));
 
     @Test
     void strictFailsWhenNothingIsBound() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
 
         assertThatThrownBy(scope::get)
                 .isInstanceOf(IllegalStateException.class)
@@ -25,7 +28,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void fallbackAnswersWhenNothingIsBound() {
-        ThreadBoundScope scope = ThreadBoundScope.withFallback(Scope.local());
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.withFallback(Scope.local());
 
         assertThat(scope.get()).isEqualTo(Scope.local());
         assertThat(scope.namespace()).isEqualTo(Namespace.DEFAULT);
@@ -34,7 +37,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void runInBindsForTheBodyAndRestoresAfter() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
 
         Scope seen = scope.runIn(ACME, () -> {
             assertThat(scope.isBound()).isTrue();
@@ -47,7 +50,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void nestedRunInRestoresTheOuterBinding() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
 
         scope.runIn(ACME, () -> {
             scope.runIn(OTHER, () -> assertThat(scope.get()).isEqualTo(OTHER));
@@ -57,7 +60,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void bindingIsRestoredEvenWhenTheBodyThrows() {
-        ThreadBoundScope scope = ThreadBoundScope.withFallback(Scope.local());
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.withFallback(Scope.local());
 
         assertThatThrownBy(() -> scope.runIn(ACME, () -> {
             throw new IllegalArgumentException("boom");
@@ -68,7 +71,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void aThreadStartedWhileBoundInheritsTheBinding() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         AtomicReference<Scope> seenOnChild = new AtomicReference<>();
 
         scope.runIn(ACME, () -> join(Thread.ofVirtual().start(() -> seenOnChild.set(scope.get()))));
@@ -78,7 +81,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void aThreadStartedBeforeTheBindingStaysUnbound() throws Exception {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
         pool.submit(() -> { }).get();                                    // the pool thread exists, unbound
         AtomicReference<Boolean> boundOnPool = new AtomicReference<>();
@@ -97,7 +100,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void aPerTaskExecutorInheritsFromTheSubmittingThread() throws Exception {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         java.util.concurrent.ExecutorService perTask = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
         AtomicReference<Scope> seen = new AtomicReference<>();
 
@@ -114,7 +117,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void wrapCarriesTheBindingAcrossAThreadHop() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         AtomicReference<Scope> seenOnOtherThread = new AtomicReference<>();
 
         scope.runIn(ACME, () -> join(Thread.ofVirtual().start(scope.wrap(() -> seenOnOtherThread.set(scope.get())))));
@@ -124,7 +127,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void callInLetsCheckedExceptionsThrough() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
 
         assertThatThrownBy(() -> scope.callIn(ACME, () -> {
             throw new java.io.IOException("disk");
@@ -142,7 +145,7 @@ class ThreadBoundScopeTest {
     }
     @Test
     void aBindListenerSeesEachEntryIntoANamespaceWithTheScopeAlreadyBound() throws Exception {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         List<String> entries = new ArrayList<>();
         scope.onBind(entered -> entries.add(entered.namespace().value() + "=" + scope.namespace().value()));
 
@@ -157,7 +160,7 @@ class ThreadBoundScopeTest {
 
     @Test
     void aFailingBindListenerFailsTheWorkAndLeavesNothingBound() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         scope.onBind(entered -> { throw new IllegalStateException("broken"); });
 
         assertThatThrownBy(() -> scope.runIn(ACME, () -> { })).hasMessage("broken");

@@ -3,12 +3,12 @@ package ai.mindconnect.agent.starter.registry;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.agent.registry.service.RegistryService;
 import ai.mindconnect.jdbc.Sql;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -59,7 +59,7 @@ class RegistryAutoConfigurationTest {
         sql.execute("DROP TABLE IF EXISTS mc_registry_source");
         writeRegistryFile("local", "acme-agents", "acme", "agents");
         writeRegistryFile("team", "team-catalog", "team", "catalog");
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
 
         runner().withPropertyValues(
                         "mindconnect.persistence=postgres",
@@ -86,7 +86,7 @@ class RegistryAutoConfigurationTest {
         }
     }
 
-    private static List<String> owners(ThreadBoundScope scope, RegistrySourceRepository sources, String namespace) {
+    private static List<String> owners(ThreadBoundScopeSupplier scope, RegistrySourceRepository sources, String namespace) {
         return scope.runIn(Scope.of(new Namespace(namespace)),
                 () -> sources.findAll().stream().map(RegistrySource::owner).toList());
     }

@@ -40,7 +40,7 @@ method:
 
 | Good, from the code | Why it works |
 | --- | --- |
-| `ThreadBoundScope` | says what it is and where it lives: the scope bound to the thread |
+| `ThreadBoundScopeSupplier` | says what it is: the port it implements, and where its answer lives — the thread |
 | `TaskStore`, `JdbcTaskStore`, `InMemoryTaskStore` | the port and its adapters, one noun |
 | `CronExpression`, `TaskSchedule` | the thing itself, not `ScheduleInfo` or `CronData` |
 | `ToolCallWorker`, `PromptRenderer`, `LlmMessageMapper` | the pattern names the responsibility |

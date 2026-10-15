@@ -1,4 +1,7 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.namespace.service;
+
+import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.ScopeSupplier;
 
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -31,29 +34,29 @@ import java.util.function.Supplier;
  * its entry points covered runs {@linkplain #strict() strict}.
  *
  * <p>Whoever has to know when work enters a namespace — to prepare it once,
- * the first time it is used after start (see {@code NamespaceFirstUse}) —
+ * the first time it is used after start (see {@link NamespaceFirstUse}) —
  * registers with {@link #onBind}. Every entry point binds through here, so
  * that one hook sees requests, queued tasks and start-up routines alike.
  */
-public class ThreadBoundScope implements ScopeSupplier {
+public class ThreadBoundScopeSupplier implements ScopeSupplier {
 
     private final ThreadLocal<Scope> bound = new InheritableThreadLocal<>();
     private final Scope fallback;
     private final List<Consumer<Scope>> bindListeners = new CopyOnWriteArrayList<>();
 
-    private ThreadBoundScope(Scope fallback) {
+    private ThreadBoundScopeSupplier(Scope fallback) {
         this.fallback = fallback;
     }
 
     /** Unbound threads fail. The end state of every server. */
-    public static ThreadBoundScope strict() {
-        return new ThreadBoundScope(null);
+    public static ThreadBoundScopeSupplier strict() {
+        return new ThreadBoundScopeSupplier(null);
     }
 
     /** Unbound threads work in {@code fallback}. For hosts whose entry points do not all bind yet. */
-    public static ThreadBoundScope withFallback(Scope fallback) {
+    public static ThreadBoundScopeSupplier withFallback(Scope fallback) {
         if (fallback == null) throw new IllegalArgumentException("fallback must not be null");
-        return new ThreadBoundScope(fallback);
+        return new ThreadBoundScopeSupplier(fallback);
     }
 
     @Override
@@ -63,6 +66,11 @@ public class ThreadBoundScope implements ScopeSupplier {
         if (fallback != null) return fallback;
         throw new IllegalStateException("No scope is bound to thread '" + Thread.currentThread().getName()
                 + "' — the entry point (request filter, task advisor, start-up routine) did not bind one");
+    }
+
+    @Override
+    public boolean bindsPerThread() {
+        return true;
     }
 
     /** Whether the current thread has an explicit binding (the fallback does not count). */
@@ -84,6 +92,7 @@ public class ThreadBoundScope implements ScopeSupplier {
     }
 
     /** {@link #runIn(Scope, Supplier)} for a body without a result. */
+    @Override
     public void runIn(Scope scope, Runnable body) {
         runIn(scope, () -> {
             body.run();
@@ -92,6 +101,7 @@ public class ThreadBoundScope implements ScopeSupplier {
     }
 
     /** {@link #runIn(Scope, Supplier)} for a body that throws — the task advisor's shape. */
+    @Override
     public <T> T callIn(Scope scope, Callable<T> body) throws Exception {
         if (scope == null) throw new IllegalArgumentException("scope must not be null");
         Scope before = bound.get();
@@ -139,6 +149,6 @@ public class ThreadBoundScope implements ScopeSupplier {
 
     @Override
     public String toString() {
-        return "ThreadBoundScope[" + (fallback == null ? "strict" : "fallback=" + fallback) + "]";
+        return "ThreadBoundScopeSupplier[" + (fallback == null ? "strict" : "fallback=" + fallback) + "]";
     }
 }

@@ -1,11 +1,15 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.namespace.service;
+
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.ScopeSupplier;
 
 import java.util.function.Supplier;
 
 /**
  * Runs start-up work in the installation's default namespace.
  *
- * <p>A server's scope is {@link ThreadBoundScope#strict() strict}: a thread
+ * <p>A server's scope is {@link ThreadBoundScopeSupplier#strict() strict}: a thread
  * that touches a store without a bound scope fails, because on a server that
  * silence is a leak between namespaces. Requests bind through the namespace
  * filter and tasks through the runtime's advisor, but the threads that run
@@ -30,7 +34,7 @@ public class StartupScope {
     }
 
     public static <T> T call(ScopeSupplier scope, Namespace defaultNamespace, Supplier<T> body) {
-        if (scope instanceof ThreadBoundScope bound && !bound.isBound()) {
+        if (scope instanceof ThreadBoundScopeSupplier bound && !bound.isBound()) {
             return bound.runIn(Scope.of(defaultNamespace), body);
         }
         return body.get();

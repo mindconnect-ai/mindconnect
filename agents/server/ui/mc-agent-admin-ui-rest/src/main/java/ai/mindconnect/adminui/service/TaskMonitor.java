@@ -8,7 +8,6 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
@@ -16,6 +15,7 @@ import ai.mindconnect.channel.Channel;
 import ai.mindconnect.channel.ChannelRegistry;
 import ai.mindconnect.channel.Subscription;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.taskqueue.TaskListener;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
@@ -313,7 +313,7 @@ public class TaskMonitor implements TaskListener {
      */
     private <T> Optional<T> inScopeOf(TaskRecord task, Map<ai.mindconnect.agent.Namespace, Boolean> existing,
                                       java.util.function.Supplier<Optional<T>> body) {
-        if (scope instanceof ThreadBoundScope bound) {
+        if (scope instanceof ThreadBoundScopeSupplier bound) {
             Optional<ai.mindconnect.agent.Scope> stamped = ScopeTaskAdvisor.scopeIfAny(task);
             if (stamped.isEmpty()) return body.get();
             if (!existing.computeIfAbsent(stamped.get().namespace(), this::exists)) return Optional.empty();

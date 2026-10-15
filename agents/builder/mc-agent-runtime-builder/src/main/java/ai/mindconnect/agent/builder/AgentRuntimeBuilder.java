@@ -3,7 +3,6 @@ package ai.mindconnect.agent.builder;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.memory.strategy.DefaultMemoryStrategyFactory;
 import ai.mindconnect.agent.runtime.adapter.filestore.FileStorePartContentReader;
 import ai.mindconnect.agent.runtime.adapter.llm.LlmToolResultSummarizer;
@@ -298,7 +297,7 @@ public class AgentRuntimeBuilder {
     /**
      * Who says which namespace a call works in, instead of the one {@link #namespace}
      * for the runtime's life. Every queued task carries the scope it was submitted in;
-     * a {@link ThreadBoundScope} — a server's, bound per request — is bound to it again
+     * a {@code ThreadBoundScopeSupplier} — a server's, bound per request — is bound to it again
      * on every delivery, retry and wake-up.
      */
     public AgentRuntimeBuilder scope(ScopeSupplier scope) {

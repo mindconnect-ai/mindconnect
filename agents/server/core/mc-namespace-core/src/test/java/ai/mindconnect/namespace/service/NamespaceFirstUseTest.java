@@ -2,7 +2,6 @@ package ai.mindconnect.namespace.service;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ThreadBoundScope;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -20,7 +19,7 @@ class NamespaceFirstUseTest {
 
     @Test
     void the_work_runs_once_per_namespace_on_its_first_binding() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         List<String> ran = new CopyOnWriteArrayList<>();
         scope.onBind(new NamespaceFirstUse("test", ns -> ran.add(ns.value() + " bound=" + scope.namespace().value())));
 
@@ -34,7 +33,7 @@ class NamespaceFirstUseTest {
 
     @Test
     void work_that_binds_its_namespace_again_does_not_start_over() {
-        ThreadBoundScope scope = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
         AtomicInteger runs = new AtomicInteger();
         scope.onBind(new NamespaceFirstUse("test", ns -> {
             runs.incrementAndGet();

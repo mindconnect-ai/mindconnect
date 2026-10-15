@@ -3,9 +3,9 @@ package ai.mindconnect.agent.starter.workflow;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolCallScope;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.workflow.admin.run.RunThreadContext;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,7 @@ class WorkflowRunThreadContextTest {
     private static final Namespace NS = new Namespace("team");
     private static final UserId DAVID = UserId.of("david");
 
-    private final ThreadBoundScope scope = ThreadBoundScope.strict();
+    private final ThreadBoundScopeSupplier scope = ThreadBoundScopeSupplier.strict();
     private final RunThreadContext context =
             new NamespacedWorkflowStoresAutoConfiguration.AdminRuns().workflowRunThreadContext(scope);
 
@@ -74,7 +74,7 @@ class WorkflowRunThreadContextTest {
 
     @Test
     void anUnboundThreadIsNobodyEvenWithAFallbackScope() {
-        ThreadBoundScope withFallback = ThreadBoundScope.withFallback(Scope.of(NS, DAVID));
+        ThreadBoundScopeSupplier withFallback = ThreadBoundScopeSupplier.withFallback(Scope.of(NS, DAVID));
         RunThreadContext unbound =
                 new NamespacedWorkflowStoresAutoConfiguration.AdminRuns().workflowRunThreadContext(withFallback);
 

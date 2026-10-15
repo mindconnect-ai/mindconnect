@@ -2,11 +2,11 @@ package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -30,7 +30,7 @@ class DefaultVectorStoresEmbedScopeTest {
 
     @Test
     void theConfigIsLookedUpInTheNamespaceOfTheCall() throws Exception {
-        ThreadBoundScope bound = ThreadBoundScope.strict();
+        ThreadBoundScopeSupplier bound = ThreadBoundScopeSupplier.strict();
         AtomicReference<Namespace> lookedUpIn = new AtomicReference<>();
         LlmConfigRepository configs = new LlmConfigRepository() {
             @Override public Optional<LlmConfig> findById(LlmConfigId id) { return Optional.empty(); }

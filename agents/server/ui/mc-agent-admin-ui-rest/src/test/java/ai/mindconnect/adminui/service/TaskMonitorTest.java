@@ -15,13 +15,13 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.TaskSubmission;
@@ -156,7 +156,7 @@ class TaskMonitorTest {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
                 .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
                 .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        var scope = ThreadBoundScope.strict();
+        var scope = ThreadBoundScopeSupplier.strict();
         var sessions = new FileAgentSessionRepository(data, mapper, scope);
         var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
         definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",

@@ -9,13 +9,13 @@ import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.namespace.adapter.env.EncryptingNamespaceRepository;
 import ai.mindconnect.namespace.adapter.env.NamespaceEnvVarResolver;
 import ai.mindconnect.namespace.port.out.NamespacePurge;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.user.adapter.env.UserEnvVarResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ai.mindconnect.user.port.out.UserRepository;
 import java.util.ArrayList;
 import java.util.List;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.namespace.adapter.file.FileNamespacePurge;
 import ai.mindconnect.namespace.adapter.file.FileNamespaceRepository;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
@@ -41,7 +41,7 @@ import java.nio.file.Path;
 
 /**
  * Namespaces for a server: where the namespace of a request comes from, who
- * may work in which, and the {@link ThreadBoundScope} every store reads.
+ * may work in which, and the {@link ThreadBoundScopeSupplier} every store reads.
  *
  * <p>Auto-configured ahead of the persistence starters so that the scope
  * supplier defined here is the one they route by. The namespace repository
@@ -73,11 +73,11 @@ public class NamespaceAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(ScopeSupplier.class)
-    ThreadBoundScope scopeSupplier() {
+    ThreadBoundScopeSupplier scopeSupplier() {
         // Strict: a thread that works unbound is a bug, not a request for the default namespace.
         // Requests bind through the namespace filter, tasks through the runtime's advisor, start-up
         // routines explicitly in mindconnect.namespace (see the runtime starter and the seed loaders).
-        return ThreadBoundScope.strict();
+        return ThreadBoundScopeSupplier.strict();
     }
 
     /** The namespaces of the installation under {@code <mindconnect.data.base-dir>/system/namespaces}. */

@@ -3,7 +3,6 @@ package ai.mindconnect.agent.runtime.service.task;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.taskqueue.TaskAdvisor;
 import ai.mindconnect.taskqueue.TaskContext;
@@ -44,8 +43,8 @@ public final class ScopeTaskAdvisor implements TaskAdvisor {
     private final ScopeSupplier scope;
 
     /**
-     * @param scope whose scope a submission is stamped with — and, when it is a
-     *              {@link ThreadBoundScope}, what an execution is bound to
+     * @param scope whose scope a submission is stamped with, and what an
+     *              execution runs in again ({@link ScopeSupplier#callIn})
      */
     public ScopeTaskAdvisor(ScopeSupplier scope) {
         this.scope = Objects.requireNonNull(scope, "scope");
@@ -64,20 +63,16 @@ public final class ScopeTaskAdvisor implements TaskAdvisor {
 
     @Override
     public TaskOutcome aroundExecute(TaskContext ctx, Execution chain) throws Exception {
-        if (!(scope instanceof ThreadBoundScope bound)) return chain.proceed(ctx);
-        return bound.callIn(scopeOf(ctx), () -> chain.proceed(ctx));
+        if (!scope.bindsPerThread()) return chain.proceed(ctx);
+        Scope submitted = scopeIfAny(ctx.task()).orElseThrow(() -> new IllegalStateException("Task "
+                + ctx.task().id() + " (" + ctx.task().type() + ") carries no namespace — it was submitted past the scope advisor"));
+        return scope.callIn(submitted, () -> chain.proceed(ctx));
     }
 
     /** Right inside the MDC advisor: everything that touches a store runs bound. */
     @Override
     public int order() {
         return Integer.MIN_VALUE + 2;
-    }
-
-    /** The scope a task was submitted in, read back from its payload. */
-    public static Scope scopeOf(TaskContext ctx) {
-        return scopeIfAny(ctx.task()).orElseThrow(() -> new IllegalStateException("Task " + ctx.task().id()
-                + " (" + ctx.task().type() + ") carries no namespace — it was submitted past the scope advisor"));
     }
 
     /** The scope a task record carries, if it was stamped — a monitor reading tasks of every namespace asks this. */

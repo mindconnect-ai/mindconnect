@@ -1,10 +1,10 @@
 package ai.mindconnect.agent.starter.workflow;
 
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.common.env.EnvVarResolver;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
@@ -120,8 +120,8 @@ public class NamespacedWorkflowStoresAutoConfiguration {
         @ConditionalOnMissingBean
         ai.mindconnect.workflow.admin.run.RunThreadContext workflowRunThreadContext(ScopeSupplier scope) {
             return body -> {
-                boolean bound = scope instanceof ThreadBoundScope threadBound && threadBound.isBound();
-                Runnable inNamespace = bound ? ((ThreadBoundScope) scope).wrap(body) : body;
+                boolean bound = scope instanceof ThreadBoundScopeSupplier threadBound && threadBound.isBound();
+                Runnable inNamespace = bound ? ((ThreadBoundScopeSupplier) scope).wrap(body) : body;
                 Optional<ToolCallScope> caller = ToolCallScope.current()
                         .or(() -> userOf(scope, bound).map(ToolCallScope::detached));
                 if (caller.isEmpty()) return inNamespace;
@@ -134,7 +134,7 @@ public class NamespacedWorkflowStoresAutoConfiguration {
 
         /** The request's user; an unbound thread has none, whatever a fallback scope says. */
         private static Optional<UserId> userOf(ScopeSupplier scope, boolean bound) {
-            if (scope instanceof ThreadBoundScope && !bound) return Optional.empty();
+            if (scope instanceof ThreadBoundScopeSupplier && !bound) return Optional.empty();
             return scope.get().userIfAny();
         }
     }

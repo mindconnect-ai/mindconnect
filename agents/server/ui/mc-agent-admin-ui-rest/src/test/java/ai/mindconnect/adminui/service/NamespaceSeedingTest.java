@@ -5,7 +5,6 @@ import ai.mindconnect.adminui.namespaces.NamespaceWriteGuard;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
@@ -27,6 +26,7 @@ import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.workflow.persistence.memory.InMemoryWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -49,7 +49,7 @@ import java.util.function.Supplier;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The per-namespace seeding, end to end through a {@link ThreadBoundScope}
+ * The per-namespace seeding, end to end through a {@link ThreadBoundScopeSupplier}
  * and an in-memory store per namespace: binding a namespace is what triggers it, as a
  * request does. The seeds are {@code seed-test/} on the test classpath: an
  * LLM config and an agent of the host, and two agents, a skill and a
@@ -75,7 +75,7 @@ class NamespaceSeedingTest {
     private final Map<Namespace, InMemoryInstalledSeedRepository> ledgers = new ConcurrentHashMap<>();
     private final Map<Namespace, InMemoryExtensionActivationRepository> decisions = new ConcurrentHashMap<>();
 
-    private ThreadBoundScope scope;
+    private ThreadBoundScopeSupplier scope;
     private NamespaceSeeding seeding;
     private final AtomicInteger runs = new AtomicInteger();
     private NamespaceService namespaces;
@@ -104,7 +104,7 @@ class NamespaceSeedingTest {
 
     /** A new process: fresh scope, fresh seeding — the stored data stays. */
     private void restart() {
-        scope = ThreadBoundScope.strict();
+        scope = ThreadBoundScopeSupplier.strict();
         // Guarded as the admin app guards them: "plain-user" is an admin of nothing but the open default.
         NamespaceWriteGuard guard = new NamespaceWriteGuard(
                 new NamespaceService(new InMemoryNamespaceRepository(), LOCAL), scope);

@@ -2,10 +2,10 @@ package ai.mindconnect.agent.starter.namespace;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import jakarta.servlet.ServletException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +29,7 @@ class ScopeBindingFilterTest {
 
     private static final Namespace ACME = new Namespace("acme");
 
-    private final ThreadBoundScope bound = ThreadBoundScope.strict();
+    private final ThreadBoundScopeSupplier bound = ThreadBoundScopeSupplier.strict();
     private final NamespaceService namespaces = new NamespaceService(new InMemoryNamespaceRepository(), Namespace.DEFAULT);
     private final ScopeBindingFilter filter = new ScopeBindingFilter(bound, namespaces);
     private final AtomicReference<Scope> seen = new AtomicReference<>();

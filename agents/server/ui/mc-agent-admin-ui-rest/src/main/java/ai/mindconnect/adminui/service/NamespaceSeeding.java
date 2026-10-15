@@ -3,7 +3,6 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
@@ -11,6 +10,7 @@ import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -26,7 +26,7 @@ import java.util.Optional;
  * Gives every namespace the bundled content it should have — the first time
  * the namespace is used after start, once per namespace and process.
  *
- * <p>The seam is the {@link ThreadBoundScope}: every entry point binds the
+ * <p>The seam is the {@link ThreadBoundScopeSupplier}: every entry point binds the
  * namespace it works in there (the request filter, for admins and plain users
  * alike; the task advisor; the start-up routines), and this registers a
  * {@link NamespaceFirstUse} with it once every bean exists. The first binding
@@ -79,7 +79,7 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
     /** Hooks into the scope once every bean is there — a binding before would find repositories half built. */
     @Override
     public void afterSingletonsInstantiated() {
-        if (scope.getIfAvailable() instanceof ThreadBoundScope bound) {
+        if (scope.getIfAvailable() instanceof ThreadBoundScopeSupplier bound) {
             bound.onBind(entered -> ensure(entered.namespace()));
         }
     }
@@ -128,7 +128,7 @@ public class NamespaceSeeding implements SmartInitializingSingleton {
             log.debug("Namespace '{}' does not exist (any more) — nothing to seed", namespace.value());
             return;
         }
-        ranHere.set(scope.getIfAvailable() instanceof ThreadBoundScope bound
+        ranHere.set(scope.getIfAvailable() instanceof ThreadBoundScopeSupplier bound
                 // Same namespace: no new entry, so this does not trigger the seeding again.
                 ? bound.runIn(Scope.of(namespace), () -> seeder.installMissing(namespace))
                 : seeder.installMissing(namespace));

@@ -2,7 +2,6 @@ package ai.mindconnect.namespace.service;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ThreadBoundScope;
 
 import java.util.Map;
 import java.util.Objects;
@@ -15,7 +14,7 @@ import java.util.function.Consumer;
  * is used after start — and never again in this process, so what every later
  * request pays is one lookup.
  *
- * <p>Registered with {@link ThreadBoundScope#onBind}, it runs on the thread
+ * <p>Registered with {@link ThreadBoundScopeSupplier#onBind}, it runs on the thread
  * that entered the namespace, with the namespace already bound, before that
  * thread's own work: a request, a queued task, a start-up routine alike. A
  * second thread entering the same namespace meanwhile waits for it to finish,

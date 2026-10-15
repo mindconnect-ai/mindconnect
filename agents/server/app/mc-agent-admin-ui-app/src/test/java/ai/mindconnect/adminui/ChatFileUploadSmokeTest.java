@@ -7,9 +7,9 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agentrest.service.SessionFileService;
 import ai.mindconnect.agent.Scope;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.chatui.service.SessionOwnership;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -84,7 +84,7 @@ class ChatFileUploadSmokeTest {
     @Autowired AgentSessionRepository sessions;
     @Autowired AgentSessionService sessionService;
     @Autowired SessionFileService sessionFiles;
-    @Autowired ThreadBoundScope scope;
+    @Autowired ThreadBoundScopeSupplier scope;
 
     /** True when LM Studio answers and has a loaded embeddings model. */
     static boolean embeddingsUp() {
