@@ -51,6 +51,12 @@ and the rule it violates.
 - [ ] **agents/core/mc-agent-runtime-core** `LlmChatProvider.toAnswer` drops the assistant text of a round that also carries tool calls; only the final answer is persisted as `CHAT`, intermediate text is gone after a reload. Carry the text in the `TOOL_CALL` message and render it in the assembler.
   Found 2026-10-14 in mc-sandbox claude-todos.md. Size: one wave. Rule: –.
 
+- [ ] **agents/server/mc-agent-admin-ui-app** The seeded `initial-data/llm-configs/gemini-default.json` defaults its model to `${GEMINI_MODEL:gemini-2.0-flash}`, which Google no longer serves (HTTP 404 on `generateContent`); a fresh installation without `GEMINI_MODEL` gets a config that cannot answer. Google's 404 names `gemini-3.8-flash` as the successor; the live tests use `gemini-3.5-flash`, because the alias `gemini-flash-latest` answered 503 under load.
+  Found 2026-10-15 in chore/llm-gateway-refactor by the agent, running the new `GeminiGatewayLiveTest`. Size: small. Rule: –.
+
+- [ ] **agents/core/mc-llm-gateway-core** `LlmPrices` is a plural for a static bag of rules over price periods — the very example `conventions.md` gives — and its `modelLabel` and `period` render strings for the admin UI from the domain; `LlmPriceList` with the two renderers next to `LlmPricingComponent` would say what it is. Eleven callers in the gateway, Postgres and admin-UI modules plus `LlmPriceTest` follow the rename. The same smell in the adapter module: `LlmParams`, `LlmHttpErrors`, `OpenAiModels`.
+  Found 2026-10-15 in chore/llm-gateway-refactor by the maintainer, reading the tidy-inspect report. Size: one wave. Rule: Classes (named after its pattern, in the singular).
+
 ## Closed
 
 (none yet)

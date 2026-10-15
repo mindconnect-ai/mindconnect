@@ -59,7 +59,10 @@ mvn clean install -DskipTests          # everything, from the root aggregator
 Build parent POMs and core modules before what depends on them; after changing
 a shared module, rebuild it before its dependents. Some tests skip themselves
 without their service (pgvector Postgres on 5433, an LM Studio model): a green
-run may mean "skipped", read the `Tests run:` and `Skipped:` counts.
+run may mean "skipped", read the `Tests run:` and `Skipped:` counts. The
+`*LiveTest` classes of `mc-llm-gateway` call the real providers and run only
+with `LLM_TEST=true` and the provider's key (`OPENAI_API_KEY`,
+`ANTHROPIC_API_KEY`, `GEMINI_API_KEY`) in `mc.env` or the environment.
 
 ## Branch, run
 
