@@ -2,8 +2,8 @@ package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
+import ai.mindconnect.agent.usermemory.MemoryEntry;
+import ai.mindconnect.agent.usermemory.UserMemoryService;
 import ai.mindconnect.agentrest.auth.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

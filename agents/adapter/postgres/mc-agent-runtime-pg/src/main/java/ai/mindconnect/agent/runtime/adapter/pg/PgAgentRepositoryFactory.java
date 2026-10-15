@@ -9,7 +9,6 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
 import ai.mindconnect.jdbc.Sql;
 
 /** The agent runtime's repositories as Postgres tables in the namespace the scope names per call; each is created with its schema. */
@@ -38,5 +37,4 @@ public class PgAgentRepositoryFactory implements AgentRepositoryFactory {
     @Override public TodoListRepository todoListRepository() { return new PgTodoListRepository(sql, scope).initSchema(); }
     @Override public LlmCallTraceRepository llmCallTraceRepository() { return new PgLlmCallTraceRepository(sql, maxTracesPerConversation, scope).initSchema(); }
     @Override public SkillRepository skillRepository() { return new PgSkillRepository(sql, scope).initSchema(); }
-    @Override public UserMemoryRepository userMemoryRepository() { return new PgUserMemoryRepository(sql, scope).initSchema(); }
 }

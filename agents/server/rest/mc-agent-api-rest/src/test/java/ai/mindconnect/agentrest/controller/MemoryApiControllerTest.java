@@ -3,10 +3,10 @@ package ai.mindconnect.agentrest.controller;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryUserMemoryRepository;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
-import ai.mindconnect.agent.runtime.usermemory.MemoryType;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
+import ai.mindconnect.agent.usermemory.adapter.memory.InMemoryUserMemoryRepository;
+import ai.mindconnect.agent.usermemory.MemoryEntry;
+import ai.mindconnect.agent.usermemory.MemoryType;
+import ai.mindconnect.agent.usermemory.UserMemoryService;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.server.ResponseStatusException;
 

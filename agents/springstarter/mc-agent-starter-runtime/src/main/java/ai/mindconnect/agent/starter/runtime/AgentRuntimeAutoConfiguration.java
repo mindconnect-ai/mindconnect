@@ -38,6 +38,8 @@ import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolRepository;
+import ai.mindconnect.agent.usermemory.UserMemoryService;
+import ai.mindconnect.agent.usermemory.feature.UserMemoryFeature;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.in.LlmEmbeddings;
@@ -140,6 +142,7 @@ public class AgentRuntimeAutoConfiguration {
         Optional.ofNullable(blankToNull(env.getProperty("mindconnect.agent.instructions.user-dir"))).ifPresent(core::instructionsUserDir);
 
         // The shipped features, configured from the same properties the Spring runtime always read.
+        builder.install(new UserMemoryFeature());   // what agents remember about each user
         builder.install(new SkillsFeature().userDir(env.getProperty("mindconnect.agent.skills.user-dir", "")));
         ToolsFeature tools = new ToolsFeature().deferred();   // bound once the context is up, see below
         String disabled = env.getProperty("mindconnect.tools.disabled", "");
@@ -268,8 +271,8 @@ public class AgentRuntimeAutoConfiguration {
     @Bean TodoListService todoListService(AgentRuntime r) { return r.beans().get(TodoListService.class); }
     @Bean DynamicToolActivations dynamicToolActivations(AgentRuntime r) { return r.beans().get(DynamicToolActivations.class); }
     @Bean SkillCatalog skillCatalog(AgentRuntime r) { return r.beans().get(SkillCatalog.class); }
-    @Bean ai.mindconnect.agent.runtime.usermemory.UserMemoryService userMemoryService(AgentRuntime r) {
-        return r.beans().get(ai.mindconnect.agent.runtime.usermemory.UserMemoryService.class);
+    @Bean UserMemoryService userMemoryService(AgentRuntime r) {
+        return r.beans().get(UserMemoryService.class);
     }
     @Bean SkillRepository skillRepository(AgentRuntime r) { return r.beans().get(SkillRepository.class); }
     @Bean AgentDefinitionRepository agentDefinitionRepository(AgentRuntime r) { return r.beans().get(AgentDefinitionRepository.class); }

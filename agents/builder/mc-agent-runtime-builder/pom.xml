@@ -118,6 +118,10 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-feature-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user-memory</artifactId>
+        </dependency>
         <!-- The optional features: on the compile classpath so the builder can name them, but a client
              gets the ones it puts on its own classpath — use…() installs whatever it finds there. -->
         <dependency>

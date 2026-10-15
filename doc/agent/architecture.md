@@ -145,7 +145,12 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     embedding facade and runnable examples. The builder assembles a core plus installed
     `Feature`s (the kernel `common/mc-kernel`, package `ai.mindconnect.kernel`); the
     shipped features live one per module in `builder/mc-agent-runtime-feature-*`
-    (core = LLM + messages + agents, always installed; skills, tools, workflows, file-upload, transcription, subagents, taskqueue, namespace)
+    (core = LLM + messages + agents, always installed; skills, tools, workflows, file-upload, transcription, subagents, taskqueue)
+  - `features/<name>/` — a capability with data of its own, extracted from the runtime core:
+    `mc-<name>-core` (domain, port, service, its tools, its prompt section), `mc-<name>` (file and
+    in-memory stores and the `Feature` that picks the store and wires the rest), `mc-<name>-pg`.
+    The runtime core knows none of them; a feature hooks in through the core's interfaces
+    (`PromptSection`, `ToolAdvisor`, …) and the kernel's `contribute`. First: `user-memory`
   - `server/` — what runs: the Spring Boot apps, their REST and UI libraries, and the
     installation around the runtime
     - `app/`: `mc-agent-api-app` (agent server, streaming via SSE), `mc-agent-admin-ui-app`

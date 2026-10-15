@@ -1,0 +1,3 @@
+ai.mindconnect.agent.usermemory.MemoryWriteToolFactory
+ai.mindconnect.agent.usermemory.MemoryReadToolFactory
+ai.mindconnect.agent.usermemory.MemoryDeleteToolFactory

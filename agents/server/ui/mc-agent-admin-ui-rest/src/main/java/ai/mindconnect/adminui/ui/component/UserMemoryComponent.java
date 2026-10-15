@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
+import ai.mindconnect.agent.usermemory.MemoryEntry;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiDetail;

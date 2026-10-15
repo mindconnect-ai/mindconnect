@@ -4,7 +4,6 @@ import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepositor
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
 
 /**
  * Creates the agent runtime's repositories for one persistence backend —
@@ -28,7 +27,4 @@ public interface AgentRepositoryFactory {
     LlmCallTraceRepository llmCallTraceRepository();
 
     SkillRepository skillRepository();
-
-    /** What agents remember about each user across chats. */
-    UserMemoryRepository userMemoryRepository();
 }

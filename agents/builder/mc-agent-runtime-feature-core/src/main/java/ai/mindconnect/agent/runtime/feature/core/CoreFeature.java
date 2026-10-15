@@ -19,10 +19,6 @@ import ai.mindconnect.agent.runtime.service.UserHome;
 import ai.mindconnect.agent.runtime.service.WorkingDirBrowser;
 import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
-import ai.mindconnect.agent.runtime.service.prompt.PromptSection;
-import ai.mindconnect.agent.runtime.usermemory.MemoryIndex;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.tools.todo.TodoContinuationAdvisor;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListPromptContextProvider;
@@ -285,11 +281,6 @@ public class CoreFeature extends ConfigurableFeature {
         ctx.contribute(PromptContextProvider.class, new LazyTodoPromptContext(ctx));
         ctx.contribute(ToolAdvisor.class, new LazyTodoContinuation(ctx));
 
-        // What agents remember about each user across chats: the memory tools write it, and an agent
-        // that has them sees the index in its system prompt.
-        ctx.bean(UserMemoryRepository.class, () -> ctx.require(AgentRepositoryFactory.class).userMemoryRepository());
-        ctx.bean(UserMemoryService.class, () -> new UserMemoryService(ctx.require(UserMemoryRepository.class)));
-        ctx.contribute(PromptSection.class, new LazyMemoryIndex(ctx));
 
         // Where a session may work: under workingDirRoot when set, else in the
         // user's own home — under the namespace the current call works in, so
@@ -335,17 +326,6 @@ public class CoreFeature extends ConfigurableFeature {
                                          ai.mindconnect.agent.runtime.domain.AgentSession session,
                                          ai.mindconnect.agent.AuthenticationInfo auth) {
             delegate().contribute(promptContext, def, session, auth);
-        }
-    }
-
-    /** The memory index, its service resolved on first use — like the todo prompt context. */
-    private static class LazyMemoryIndex implements PromptSection {
-        private final FeatureContext ctx;
-        private volatile PromptSection delegate;
-        LazyMemoryIndex(FeatureContext ctx) { this.ctx = ctx; }
-        @Override public String render(AgentDefinition def, ai.mindconnect.agent.runtime.domain.AgentSession session) {
-            if (delegate == null) delegate = new MemoryIndex(ctx.require(UserMemoryService.class));
-            return delegate.render(def, session);
         }
     }
 

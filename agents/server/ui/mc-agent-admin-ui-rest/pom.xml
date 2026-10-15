@@ -22,6 +22,15 @@
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user-memory-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-user-memory</artifactId>
+            <scope>test</scope>
+        </dependency>
         <!-- Agent platform — REST controllers + WebSocket + core server -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

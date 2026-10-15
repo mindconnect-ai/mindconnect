@@ -35,6 +35,9 @@
         <module>tools/vector/mc-vector-store-tools</module>
         <module>core/mc-file-store-core</module>
         <module>core/mc-file-store</module>
+        <module>features/user-memory/mc-user-memory-core</module>
+        <module>features/user-memory/mc-user-memory-pg</module>
+        <module>features/user-memory/mc-user-memory</module>
         <module>builder/mc-agent-runtime-feature-core</module>
         <module>builder/mc-agent-runtime-feature-skills</module>
         <module>builder/mc-agent-runtime-feature-tools</module>

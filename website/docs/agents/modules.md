@@ -95,6 +95,12 @@ Spring wiring (`DefaultAgentRuntimeConfig`) still lives in `mc-agent-runtime`
 and is imported by the apps — moving it into a starter of its own is the
 next step.
 
+## `features/` — capabilities with data of their own
+
+| Module | Purpose |
+|--------|---------|
+| `mc-user-memory-core`, `mc-user-memory`, `mc-user-memory-pg` | What agents remember about each user across chats: the entries, `UserMemoryService`, the `memory_read`/`memory_write`/`memory_delete` tools and the memory index in the system prompt (`-core`); the file and in-memory stores and `UserMemoryFeature` (`mc-user-memory`); the Postgres store (`-pg`). |
+
 ## `builder/` & `demo/` — embedding
 
 | Module | Purpose |
