@@ -1,15 +1,17 @@
 package ai.mindconnect.agent.runtime.feature.skills;
 
-import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.kernel.FeatureContext;
 import ai.mindconnect.kernel.ConfigurableFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
+import ai.mindconnect.agent.runtime.port.out.AgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.skill.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Stored skills and the catalog an agent with skills switched on loads from:
@@ -61,11 +63,16 @@ public class SkillsFeature extends ConfigurableFeature {
         return "skills";
     }
 
+    /** The skill store comes from the core's {@code AgentRepositoryFactory}. */
+    @Override
+    public Set<Class<? extends Feature>> dependsOn() {
+        return Set.of(CoreFeature.class);
+    }
+
     @Override
     protected void install(FeatureContext ctx) {
         if (userDir != null) ctx.property("skillsUserDir", userDir);
-        ctx.bean(SkillRepository.class, () -> ctx.kernel().feature(CoreFeature.class)
-                .agentRepositories(ctx.require(ScopeSupplier.class)).skillRepository());
+        ctx.bean(SkillRepository.class, () -> ctx.require(AgentRepositoryFactory.class).skillRepository());
         ctx.bean(SkillCatalog.class, () -> SkillCatalog.of(
                 ctx.require(SkillRepository.class), ctx.property("skillsUserDir").orElse("")));
         ctx.onStart(() -> {
