@@ -18,6 +18,4 @@ ai.mindconnect.cli.agentclient.LocalClientFactory is not in a starter, app, rest
 ai.mindconnect.cli.agentclient.RemoteClientFactory is not in a starter, app, rest, ui or demo module (module mc-agent-cli)
 ai.mindconnect.extension.spring.ExtensionAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-extension)
 ai.mindconnect.extension.spring.ExtensionAutoConfiguration$Postgres is not in a starter, app, rest, ui or demo module (module mc-extension)
-ai.mindconnect.llm.adapter.openai.OpenAiCompatibleConfig is not in a starter, app, rest, ui or demo module (module mc-llm-gateway)
-ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway is not in a starter, app, rest, ui or demo module (module mc-llm-gateway)
 ai.mindconnect.mcp.gateway.local.McpGatewayAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-mcp-gateway-local)
