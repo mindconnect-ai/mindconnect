@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
+import ai.mindconnect.llm.adapter.ModelListing;
 import ai.mindconnect.llm.adapter.ProviderModelCatalog;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.ui.model.UiField;
@@ -21,7 +22,7 @@ class LlmConfigFormProviderModelsTest {
 
     private static final String FORM = "llm-config-new";
 
-    private static final ProviderModelCatalog.Catalog MISTRAL = new ProviderModelCatalog.Catalog(
+    private static final ModelListing<ProviderModelCatalog.Model> MISTRAL = new ModelListing<>(
             "https://api.mistral.ai",
             List.of(ProviderModelCatalog.Model.of("mistral-large-latest", "mistral-large-latest", null),
                     ProviderModelCatalog.Model.of("mistral-embed", "mistral-embed", LlmConfigType.EMBEDDING)),
@@ -42,7 +43,7 @@ class LlmConfigFormProviderModelsTest {
     void aListedProviderGetsADropdownAndKeepsItsApiKeyField() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "MISTRAL",
                 "mistral-large-latest", null, "${MISTRAL_API_KEY}", FORM, null,
-                ModelChoices.of(MISTRAL));
+                ModelChoices.ofRemote(MISTRAL));
 
         UiField model = field(group, "model");
         assertThat(model.getFieldType()).isEqualTo(UiField.FieldType.SELECT);
@@ -57,7 +58,7 @@ class LlmConfigFormProviderModelsTest {
     @Test
     void anEmbeddingConfigSeesTheEmbeddingModelsAndTheUnclassifiedOnes() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "EMBEDDING", "MISTRAL",
-                null, null, "k", FORM, null, ModelChoices.of(MISTRAL));
+                null, null, "k", FORM, null, ModelChoices.ofRemote(MISTRAL));
 
         assertThat(optionValues(field(group, "model")))
                 .as("a listing that does not say what a model is must not hide it")
@@ -67,7 +68,7 @@ class LlmConfigFormProviderModelsTest {
     @Test
     void aStoredModelTheProviderNoLongerListsStaysSelectable() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "MISTRAL",
-                "mistral-medium-2312", null, "k", FORM, null, ModelChoices.of(MISTRAL));
+                "mistral-medium-2312", null, "k", FORM, null, ModelChoices.ofRemote(MISTRAL));
 
         UiField model = field(group, "model");
         assertThat(model.getValue()).isEqualTo("mistral-medium-2312");
@@ -77,11 +78,11 @@ class LlmConfigFormProviderModelsTest {
 
     @Test
     void aListingThatFailedLeavesATextFieldCarryingTheReason() {
-        var refused = ProviderModelCatalog.Catalog.unavailable("https://api.mistral.ai",
+        ModelListing<ProviderModelCatalog.Model> refused = ModelListing.unavailable("https://api.mistral.ai",
                 "HTTP 401 — the API key is not accepted");
 
         UiField model = field(LlmConfigFormComponent.baseGroup(false, "CHAT", "MISTRAL",
-                "mistral-large-latest", null, "wrong", FORM, null, ModelChoices.of(refused)), "model");
+                "mistral-large-latest", null, "wrong", FORM, null, ModelChoices.ofRemote(refused)), "model");
 
         assertThat(model.getFieldType()).isEqualTo(UiField.FieldType.TEXT);
         assertThat(model.getValue()).isEqualTo("mistral-large-latest");
@@ -91,7 +92,7 @@ class LlmConfigFormProviderModelsTest {
     @Test
     void theKeyFieldReloadsTheListBecauseTheListingNeedsIt() {
         UiField apiKey = field(LlmConfigFormComponent.baseGroup(false, "CHAT", "MISTRAL",
-                null, null, null, FORM, null, ModelChoices.of(MISTRAL)), "apiKey");
+                null, null, null, FORM, null, ModelChoices.ofRemote(MISTRAL)), "apiKey");
 
         assertThat(apiKey.getOnChange()).isNotNull();
         assertThat(apiKey.getOnChange().getUrl()).contains("/field-groups");

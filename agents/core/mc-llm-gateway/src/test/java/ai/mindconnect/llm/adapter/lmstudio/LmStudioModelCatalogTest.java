@@ -101,7 +101,7 @@ class LmStudioModelCatalogTest {
         assertThat(result.available()).isTrue();
         assertThat(result.models()).hasSize(3);
 
-        LmStudioModel gptOss = result.find("openai/gpt-oss-120b");
+        LmStudioModel gptOss = result.find(m -> m.id().equals("openai/gpt-oss-120b"));
         assertThat(gptOss.kind()).isEqualTo(LmStudioModel.Kind.LLM);
         assertThat(gptOss.loaded()).isTrue();
         assertThat(gptOss.maxContextLength()).isEqualTo(131072);
@@ -111,13 +111,13 @@ class LmStudioModelCatalogTest {
         assertThat(gptOss.appliesTo(LlmConfigType.CHAT)).isTrue();
         assertThat(gptOss.appliesTo(LlmConfigType.EMBEDDING)).isFalse();
 
-        LmStudioModel gemma = result.find("google/gemma-4-e4b");
+        LmStudioModel gemma = result.find(m -> m.id().equals("google/gemma-4-e4b"));
         assertThat(gemma.kind()).isEqualTo(LmStudioModel.Kind.VLM);
         assertThat(gemma.loaded()).isFalse();
         assertThat(gemma.effectiveContextLength()).as("not loaded: the maximum").isEqualTo(131072);
         assertThat(gemma.capabilities()).containsExactlyInAnyOrder(LlmCapability.TOOL_CALLING, LlmCapability.VISION);
 
-        LmStudioModel nomic = result.find("text-embedding-nomic-embed-text-v1.5");
+        LmStudioModel nomic = result.find(m -> m.id().equals("text-embedding-nomic-embed-text-v1.5"));
         assertThat(nomic.kind()).isEqualTo(LmStudioModel.Kind.EMBEDDING);
         assertThat(nomic.appliesTo(LlmConfigType.EMBEDDING)).isTrue();
         assertThat(nomic.appliesTo(LlmConfigType.CHAT)).isFalse();
@@ -134,19 +134,19 @@ class LmStudioModelCatalogTest {
         assertThat(result.available()).isTrue();
         assertThat(requestedPaths).containsExactly("/api/v0/models", "/api/v1/models");
 
-        LmStudioModel gptOss = result.find("openai/gpt-oss-120b");
+        LmStudioModel gptOss = result.find(m -> m.id().equals("openai/gpt-oss-120b"));
         assertThat(gptOss.displayName()).isEqualTo("GPT-OSS 120B");
         assertThat(gptOss.loaded()).isTrue();
         assertThat(gptOss.loadedContextLength()).isEqualTo(32768);
         assertThat(gptOss.maxContextLength()).isEqualTo(131072);
         assertThat(gptOss.toolUse()).isTrue();
 
-        LmStudioModel gemma = result.find("google/gemma-4-e4b");
+        LmStudioModel gemma = result.find(m -> m.id().equals("google/gemma-4-e4b"));
         assertThat(gemma.kind()).as("v1 says llm + vision, which is a VLM").isEqualTo(LmStudioModel.Kind.VLM);
         assertThat(gemma.loaded()).isFalse();
         assertThat(gemma.loadedContextLength()).isNull();
 
-        assertThat(result.find("text-embedding-nomic-embed-text-v1.5").kind())
+        assertThat(result.find(m -> m.id().equals("text-embedding-nomic-embed-text-v1.5")).kind())
                 .isEqualTo(LmStudioModel.Kind.EMBEDDING);
     }
 
@@ -159,7 +159,7 @@ class LmStudioModelCatalogTest {
         assertThat(result.available()).isFalse();
         assertThat(result.models()).isEmpty();
         assertThat(result.error()).contains("HTTP 500").contains("/api/v0/models").contains("/api/v1/models");
-        assertThat(result.find("anything")).isNull();
+        assertThat(result.find(m -> m.id().equals("anything"))).isNull();
     }
 
     @Test

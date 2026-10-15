@@ -159,10 +159,8 @@ ai.mindconnect.extension.service.ExtensionService has 2 constructors
 ai.mindconnect.extension.service.ExtensionService$Status has 2 constructors
 ai.mindconnect.filestore.StoredFile has 2 constructors
 ai.mindconnect.filestore.adapter.pg.PgFileStore has 2 constructors
-ai.mindconnect.llm.adapter.ProviderModelCatalog has 2 constructors
 ai.mindconnect.llm.adapter.anthropic.ClaudeGateway has 2 constructors
 ai.mindconnect.llm.adapter.gemini.GeminiGateway has 2 constructors
-ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog has 2 constructors
 ai.mindconnect.llm.adapter.openai.AzureOpenAiGateway has 2 constructors
 ai.mindconnect.llm.adapter.openai.OpenAiCompatibleGateway has 2 constructors
 ai.mindconnect.llm.adapter.openai.OpenAiEmbeddingsGateway has 2 constructors

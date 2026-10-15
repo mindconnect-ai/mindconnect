@@ -12,6 +12,7 @@ import ai.mindconnect.adminui.ui.page.LlmConfigDetailPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigFormPage;
 import ai.mindconnect.adminui.ui.page.LlmConfigListPage;
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
+import ai.mindconnect.llm.adapter.ModelListing;
 import ai.mindconnect.llm.adapter.ProviderModelCatalog;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
@@ -94,7 +95,8 @@ public class LlmConfigUiController {
                           LlmConfigTestService testService,
                           EncryptionHelper encryption,
                           LmStudioModelCatalog lmStudio) {
-        this(repository, testService, encryption, EnvVarResolver.system(), lmStudio, new ProviderModelCatalog());
+        this(repository, testService, encryption, EnvVarResolver.system(), lmStudio,
+                new ProviderModelCatalog(new OkHttpClient(), new ObjectMapper()));
     }
 
     LlmConfigUiController(LlmConfigRepository repository,
@@ -191,9 +193,9 @@ public class LlmConfigUiController {
         boolean contextEmpty = body.numOrNull("contextWindowTokens") == null;
         String pickedId = null;
         if (!isAlias && provider == LlmProvider.LM_STUDIO) {
-            LmStudioModelCatalog.Catalog catalog = lmStudio.fetch(baseUrl);
-            choices = ModelChoices.of(catalog);
-            LmStudioModel picked = catalog.find(model);
+            ModelListing<LmStudioModel> catalog = lmStudio.fetch(baseUrl);
+            choices = ModelChoices.ofLmStudio(catalog);
+            LmStudioModel picked = catalog.find(m -> m.id().equals(model));
             if (picked != null) {
                 pickedId = picked.id();
                 if (modelPicked || contextEmpty) {
@@ -201,10 +203,10 @@ public class LlmConfigUiController {
                 }
             }
         } else if (!isAlias && ProviderModelCatalog.supports(provider)) {
-            ProviderModelCatalog.Catalog catalog =
+            ModelListing<ProviderModelCatalog.Model> catalog =
                     providerModels.fetch(probeConfig(provider, baseUrl, apiKey, config));
-            choices = ModelChoices.of(catalog);
-            ProviderModelCatalog.Model picked = catalog.find(model);
+            choices = ModelChoices.ofRemote(catalog);
+            ProviderModelCatalog.Model picked = catalog.find(m -> m.id().equals(model));
             if (picked != null) {
                 pickedId = picked.id();
                 if (modelPicked || contextEmpty) {
@@ -390,10 +392,10 @@ public class LlmConfigUiController {
     private ModelChoices modelChoicesFor(LlmConfig config) {
         if (config.isAlias()) return ModelChoices.none();
         if (config.provider() == LlmProvider.LM_STUDIO) {
-            return ModelChoices.of(lmStudio.fetch(config.baseUrl()));
+            return ModelChoices.ofLmStudio(lmStudio.fetch(config.baseUrl()));
         }
         if (!ProviderModelCatalog.supports(config.provider())) return ModelChoices.none();
-        return ModelChoices.of(providerModels.fetch(probeConfig(config.provider(),
+        return ModelChoices.ofRemote(providerModels.fetch(probeConfig(config.provider(),
                 config.baseUrl(), config.apiKey(), config)));
     }
 

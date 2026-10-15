@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.adminui.ui.component.LlmConfigFormComponent.ModelChoices;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
-import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
+import ai.mindconnect.llm.adapter.ModelListing;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigType;
@@ -36,9 +36,9 @@ class LlmConfigFormLmStudioTest {
             "text-embedding-nomic-embed-text-v1.5", "text-embedding-nomic-embed-text-v1.5",
             LmStudioModel.Kind.EMBEDDING, true, 2048, 2048, false, false);
 
-    private static final LmStudioModelCatalog.Catalog CATALOG = new LmStudioModelCatalog.Catalog(
+    private static final ModelListing<LmStudioModel> CATALOG = new ModelListing<>(
             "http://localhost:1234", List.of(GPT_OSS, GEMMA, NOMIC), null);
-    private static final LmStudioModelCatalog.Catalog DOWN = new LmStudioModelCatalog.Catalog(
+    private static final ModelListing<LmStudioModel> DOWN = new ModelListing<>(
             "http://localhost:1234", List.of(), "Failed to connect to localhost/127.0.0.1:1234");
 
     private static UiField field(UiFieldGroup group, String id) {
@@ -55,7 +55,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void lmStudioGetsADropdownOfChatModelsAndNoKeyField() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "LM_STUDIO",
-                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, ModelChoices.of(CATALOG));
+                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, ModelChoices.ofLmStudio(CATALOG));
 
         UiField model = field(group, "model");
         assertThat(model.getFieldType()).isEqualTo(UiField.FieldType.SELECT);
@@ -74,7 +74,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void anEmbeddingConfigSeesOnlyEmbeddingModels() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "EMBEDDING", "LM_STUDIO",
-                null, null, null, FORM, null, ModelChoices.of(CATALOG));
+                null, null, null, FORM, null, ModelChoices.ofLmStudio(CATALOG));
 
         UiField model = field(group, "model");
         assertThat(optionValues(model)).containsExactly("", "text-embedding-nomic-embed-text-v1.5");
@@ -87,7 +87,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void aStoredModelTheServerNoLongerHasStaysSelectable() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "LM_STUDIO",
-                "qwen/qwen3-32b", "http://localhost:1234", null, FORM, null, ModelChoices.of(CATALOG));
+                "qwen/qwen3-32b", "http://localhost:1234", null, FORM, null, ModelChoices.ofLmStudio(CATALOG));
 
         UiField model = field(group, "model");
         assertThat(model.getValue()).isEqualTo("qwen/qwen3-32b");
@@ -99,7 +99,7 @@ class LlmConfigFormLmStudioTest {
     @Test
     void whenLmStudioIsDownTheModelIsATextFieldWithTheReason() {
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "LM_STUDIO",
-                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, ModelChoices.of(DOWN));
+                "openai/gpt-oss-120b", "http://localhost:1234", null, FORM, null, ModelChoices.ofLmStudio(DOWN));
 
         UiField model = field(group, "model");
         assertThat(model.getFieldType()).isEqualTo(UiField.FieldType.TEXT);
@@ -150,7 +150,7 @@ class LlmConfigFormLmStudioTest {
         // A dropdown is a matter of the catalog, the key field a matter of the
         // provider: every provider but LM Studio keeps its key, dropdown or not.
         UiFieldGroup group = LlmConfigFormComponent.baseGroup(false, "CHAT", "OLLAMA",
-                "llama3", null, null, FORM, null, ModelChoices.of(CATALOG));
+                "llama3", null, null, FORM, null, ModelChoices.ofLmStudio(CATALOG));
 
         assertThat(field(group, "apiKey")).isNotNull();
         assertThat(field(group, "baseUrl").getValue())
@@ -199,7 +199,7 @@ class LlmConfigFormLmStudioTest {
         var mapper = new ObjectMapper();
 
         String withCatalog = mapper.writeValueAsString(
-                new LlmConfigFormComponent(config, List.of(config), ModelChoices.of(CATALOG)).render());
+                new LlmConfigFormComponent(config, List.of(config), ModelChoices.ofLmStudio(CATALOG)).render());
         String withoutCatalog = mapper.writeValueAsString(
                 new LlmConfigFormComponent(config, List.of(config)).render());
 

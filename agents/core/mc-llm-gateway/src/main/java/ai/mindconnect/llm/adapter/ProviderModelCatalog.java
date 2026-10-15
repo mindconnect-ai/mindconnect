@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
-import okhttp3.Response;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * <em>deployment</em>, which is the customer's own name for a model.
  *
  * <p>Never throws: an unreachable host, a wrong key or an endpoint that does
- * not exist comes back as a {@link Catalog} carrying the reason, and the form
+ * not exist comes back as a {@link ModelListing} carrying the reason, and the form
  * falls back to a text field. Timeouts are short because the call sits inside a
  * form round-trip, and answers are cached briefly so that typing in the form
  * does not re-ask the provider on every keystroke.
@@ -53,27 +52,14 @@ public class ProviderModelCatalog {
 
     private static final Logger log = LoggerFactory.getLogger(ProviderModelCatalog.class);
 
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(8);
-
     /** How long an answer is reused. Long enough for one form session, short enough to stay honest. */
     static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
-    private final OkHttpClient httpClient;
-    private final ObjectMapper objectMapper;
+    private final ModelListingReader reader;
     private final ConcurrentHashMap<String, Cached> cache = new ConcurrentHashMap<>();
 
     public ProviderModelCatalog(OkHttpClient httpClient, ObjectMapper objectMapper) {
-        this.httpClient = httpClient.newBuilder()
-                .connectTimeout(CONNECT_TIMEOUT)
-                .readTimeout(READ_TIMEOUT)
-                .callTimeout(READ_TIMEOUT.plus(CONNECT_TIMEOUT))
-                .build();
-        this.objectMapper = objectMapper;
-    }
-
-    public ProviderModelCatalog() {
-        this(new OkHttpClient(), new ObjectMapper());
+        this.reader = new ModelListingReader(httpClient, objectMapper);
     }
 
     /**
@@ -95,34 +81,6 @@ public class ProviderModelCatalog {
         /** Does this model fit a config of the given type? An unclassified model fits any. */
         public boolean appliesTo(LlmConfigType configType) {
             return type == null || type == configType;
-        }
-    }
-
-    /**
-     * What one provider answered. Either {@link #models()} is filled or
-     * {@link #error()} says why not — a provider that cannot be asked is an
-     * expected outcome, not a failure of the form.
-     */
-    public record Catalog(String baseUrl, List<Model> models, String error) {
-
-        public boolean available() {
-            return error == null;
-        }
-
-        /** An answer that could not be had, with the reason to show in the form. */
-        public static Catalog unavailable(String baseUrl, String error) {
-            return new Catalog(baseUrl, List.of(), error);
-        }
-
-        /** The models that fit a config of this type, in the order the provider listed them. */
-        public List<Model> forType(LlmConfigType type) {
-            return models.stream().filter(m -> m.appliesTo(type)).toList();
-        }
-
-        /** The listed model with this id, or {@code null}. */
-        public Model find(String id) {
-            if (id == null) return null;
-            return models.stream().filter(m -> id.equals(m.id())).findFirst().orElse(null);
         }
     }
 
@@ -150,20 +108,20 @@ public class ProviderModelCatalog {
      * {@code apiKey} is already resolved ({@link LlmConfig#resolved}) — this
      * sends it as it stands.
      */
-    public Catalog fetch(LlmConfig config) {
+    public ModelListing<Model> fetch(LlmConfig config) {
         if (config == null || !supports(config.provider())) {
-            return Catalog.unavailable(null, "This provider does not publish a model list");
+            return ModelListing.unavailable(null, "This provider does not publish a model list");
         }
         LlmProvider provider = config.provider();
         String baseUrl = normalise(provider.baseUrlOr(config.baseUrl()));
         if (baseUrl == null || HttpUrl.parse(baseUrl) == null) {
             // "localhost:11434" or "api.mistral.ai" typed without a scheme —
             // OkHttp would throw on it, and the form should say why instead.
-            return Catalog.unavailable(baseUrl, "not a URL — it has to start with http:// or https://");
+            return ModelListing.unavailable(baseUrl, "not a URL — it has to start with http:// or https://");
         }
         String apiKey = config.apiKey();
         if (needsApiKey(provider) && (apiKey == null || apiKey.isBlank())) {
-            return Catalog.unavailable(baseUrl, "no API key yet");
+            return ModelListing.unavailable(baseUrl, "no API key yet");
         }
 
         String cacheKey = provider.name() + "|" + baseUrl + "|"
@@ -171,30 +129,30 @@ public class ProviderModelCatalog {
         Cached cached = cache.get(cacheKey);
         if (cached != null && !cached.isExpired()) return cached.catalog();
 
-        Catalog catalog = ask(provider, baseUrl, apiKey);
+        ModelListing<Model> catalog = ask(provider, baseUrl, apiKey);
         cache.put(cacheKey, new Cached(catalog, System.currentTimeMillis() + CACHE_TTL.toMillis()));
         return catalog;
     }
 
-    private Catalog ask(LlmProvider provider, String baseUrl, String apiKey) {
+    private ModelListing<Model> ask(LlmProvider provider, String baseUrl, String apiKey) {
         try {
             return switch (provider) {
-                case ANTHROPIC -> new Catalog(baseUrl,
-                        parseAnthropic(get(anthropicRequest(baseUrl, apiKey))), null);
-                case GOOGLE_GEMINI -> new Catalog(baseUrl,
-                        parseGemini(get(geminiRequest(baseUrl, apiKey))), null);
-                default -> new Catalog(baseUrl,
-                        parseOpenAi(get(openAiRequest(baseUrl, apiKey))), null);
+                case ANTHROPIC -> new ModelListing<>(baseUrl,
+                        parseAnthropic(reader.read(anthropicRequest(baseUrl, apiKey))), null);
+                case GOOGLE_GEMINI -> new ModelListing<>(baseUrl,
+                        parseGemini(reader.read(geminiRequest(baseUrl, apiKey))), null);
+                default -> new ModelListing<>(baseUrl,
+                        parseOpenAi(reader.read(openAiRequest(baseUrl, apiKey))), null);
             };
         } catch (IOException e) {
             String reason = redact(e.getMessage(), apiKey);
             log.debug("Model listing for {} at {} failed: {}", provider, baseUrl, reason);
-            return Catalog.unavailable(baseUrl, reason);
+            return ModelListing.unavailable(baseUrl, reason);
         } catch (IllegalArgumentException e) {
             // The URL was checked in fetch, so this is a header OkHttp refuses —
             // a key with a line break pasted in. Its message may quote the key.
             log.debug("Model listing for {} at {} could not be requested", provider, baseUrl);
-            return Catalog.unavailable(baseUrl,
+            return ModelListing.unavailable(baseUrl,
                     "the request could not be built — does the API key contain a line break or a stray character?");
         }
     }
@@ -208,11 +166,6 @@ public class ProviderModelCatalog {
         if (message == null) return "request failed";
         if (apiKey == null || apiKey.isBlank()) return message;
         return message.replace(apiKey, "***");
-    }
-
-    /** A request URL as it may be shown: without its query, which is where Gemini puts the key. */
-    static String shown(HttpUrl url) {
-        return url.newBuilder().query(null).build().toString();
     }
 
     private static Request openAiRequest(String baseUrl, String apiKey) {
@@ -247,8 +200,8 @@ public class ProviderModelCatalog {
             if (id == null || id.isBlank() || fitsNoConfigType(id)) continue;
             // OpenRouter is the one that says more: a display name and the window.
             String name = m.path("name").asText(null);
-            Integer context = intOrNull(m.path("context_length"));
-            if (context == null) context = intOrNull(m.path("context_window"));
+            Integer context = ModelListingReader.intOrNull(m.path("context_length"));
+            if (context == null) context = ModelListingReader.intOrNull(m.path("context_window"));
             models.add(new Model(id, label(id, name, context), typeOf(id), context));
         }
         models.sort(java.util.Comparator.comparing(Model::id));
@@ -292,7 +245,7 @@ public class ProviderModelCatalog {
                 embedding |= "embedContent".equals(value) || "embedText".equals(value);
             }
             LlmConfigType type = chat ? LlmConfigType.CHAT : embedding ? LlmConfigType.EMBEDDING : null;
-            Integer context = intOrNull(m.path("inputTokenLimit"));
+            Integer context = ModelListingReader.intOrNull(m.path("inputTokenLimit"));
             models.add(new Model(id, label(id, m.path("displayName").asText(null), context),
                     type, context));
         }
@@ -341,41 +294,13 @@ public class ProviderModelCatalog {
         return label.toString();
     }
 
-    /** Strips a trailing slash and an accidental {@code /v1}, which the adapters append themselves. */
+    /** The base URL as typed, trimmed and without the API path. */
     static String normalise(String baseUrl) {
         if (baseUrl == null) return null;
-        String base = baseUrl.trim();
-        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        if (base.endsWith("/v1")) base = base.substring(0, base.length() - 3);
-        return base;
+        return ModelListingReader.withoutApiPath(baseUrl.trim());
     }
 
-    private JsonNode get(Request request) throws IOException {
-        Response response;
-        try {
-            response = httpClient.newCall(request).execute();
-        } catch (IOException | IllegalArgumentException e) {
-            throw new IOException(e.getMessage() == null
-                    ? shown(request.url()) + " unreachable" : e.getMessage(), e);
-        }
-        try (response) {
-            if (!response.isSuccessful()) {
-                throw new IOException(switch (response.code()) {
-                    case 401, 403 -> "HTTP " + response.code() + " — the API key is not accepted";
-                    case 404 -> "HTTP 404 — this endpoint serves no model list";
-                    default -> "HTTP " + response.code() + " from " + shown(request.url());
-                });
-            }
-            if (response.body() == null) throw new IOException("Empty answer from " + shown(request.url()));
-            return objectMapper.readTree(response.body().byteStream());
-        }
-    }
-
-    private static Integer intOrNull(JsonNode node) {
-        return node.isNumber() ? node.asInt() : null;
-    }
-
-    private record Cached(Catalog catalog, long expiresAtMillis) {
+    private record Cached(ModelListing<Model> catalog, long expiresAtMillis) {
         boolean isExpired() {
             return System.currentTimeMillis() > expiresAtMillis;
         }

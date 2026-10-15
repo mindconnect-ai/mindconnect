@@ -1,9 +1,9 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.chatui.ui.UiComponent;
+import ai.mindconnect.llm.adapter.ModelListing;
 import ai.mindconnect.llm.adapter.ProviderModelCatalog;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModel;
-import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
 import ai.mindconnect.llm.domain.LlmCapability;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigType;
@@ -63,18 +63,18 @@ public final class LlmConfigFormComponent implements UiComponent {
      * the form for a provider nobody can ask (Azure OpenAI), for alias mode,
      * and for a provider that has not been picked yet.
      */
-    public record ModelChoices(LmStudioModelCatalog.Catalog lmStudio,
-                               ProviderModelCatalog.Catalog remote) {
+    public record ModelChoices(ModelListing<LmStudioModel> lmStudio,
+                               ModelListing<ProviderModelCatalog.Model> remote) {
 
         public static ModelChoices none() {
             return new ModelChoices(null, null);
         }
 
-        public static ModelChoices of(LmStudioModelCatalog.Catalog lmStudio) {
+        public static ModelChoices ofLmStudio(ModelListing<LmStudioModel> lmStudio) {
             return new ModelChoices(lmStudio, null);
         }
 
-        public static ModelChoices of(ProviderModelCatalog.Catalog remote) {
+        public static ModelChoices ofRemote(ModelListing<ProviderModelCatalog.Model> remote) {
             return new ModelChoices(null, remote);
         }
 
@@ -511,7 +511,7 @@ public final class LlmConfigFormComponent implements UiComponent {
         return UiField.Option.of(model, model + " (" + why + ")");
     }
 
-    private static UiField lmStudioModelField(String model, LmStudioModelCatalog.Catalog lmStudio,
+    private static UiField lmStudioModelField(String model, ModelListing<LmStudioModel> lmStudio,
                                               LlmConfigType type, String swapUrl, String formId) {
         if (!lmStudio.available()) {
             return UiField.text("model", "Model", model)
@@ -541,7 +541,7 @@ public final class LlmConfigFormComponent implements UiComponent {
                 .onChange(UiTrigger.api("POST", swapUrl + "&reason=model", formId));
     }
 
-    private static UiField remoteModelField(String model, ProviderModelCatalog.Catalog catalog,
+    private static UiField remoteModelField(String model, ModelListing<ProviderModelCatalog.Model> catalog,
                                             LlmConfigType type, String swapUrl, String formId) {
         boolean hasModel = model != null && !model.isBlank();
         if (!catalog.available()) {
@@ -554,7 +554,8 @@ public final class LlmConfigFormComponent implements UiComponent {
         List<UiField.Option> options = new ArrayList<>();
         options.add(UiField.Option.of("", "— pick a model —"));
         boolean listed = false;
-        for (ProviderModelCatalog.Model m : catalog.forType(type)) {
+        for (ProviderModelCatalog.Model m : catalog.models()) {
+            if (!m.appliesTo(type)) continue;
             options.add(UiField.Option.of(m.id(), m.label()));
             listed |= m.id().equals(model);
         }

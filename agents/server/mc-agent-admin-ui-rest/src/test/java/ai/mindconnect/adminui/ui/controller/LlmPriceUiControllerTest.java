@@ -10,6 +10,7 @@ import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.service.LlmPriceService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -36,7 +37,7 @@ class LlmPriceUiControllerTest {
     private final LlmPriceUiController controller = new LlmPriceUiController(configs, service, clock,
             EnvVarResolver.none());
     private final LlmConfigUiController configController = new LlmConfigUiController(configs, null,
-            EncryptionHelper.noEncryption(), new LmStudioModelCatalog()).withPrices(service);
+            EncryptionHelper.noEncryption(), new LmStudioModelCatalog(new OkHttpClient(), new ObjectMapper())).withPrices(service);
 
     private LlmConfig claude;
     private LlmConfig alias;

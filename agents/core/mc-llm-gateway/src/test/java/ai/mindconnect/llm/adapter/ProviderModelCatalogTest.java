@@ -3,6 +3,7 @@ package ai.mindconnect.llm.adapter;
 import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -12,7 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** Reading a provider's model list: the three answer shapes and what they mean. */
 class ProviderModelCatalogTest {
 
-    private final ProviderModelCatalog catalog = new ProviderModelCatalog();
+    private final ProviderModelCatalog catalog = new ProviderModelCatalog(new OkHttpClient(), new ObjectMapper());
     private final ObjectMapper json = new ObjectMapper();
 
     private com.fasterxml.jackson.databind.JsonNode parse(String body) throws Exception {
@@ -30,8 +31,8 @@ class ProviderModelCatalogTest {
 
         assertThat(models).extracting(ProviderModelCatalog.Model::id)
                 .containsExactly("gpt-4o", "text-embedding-3-small", "whisper-1");
-        var forChat = new ProviderModelCatalog.Catalog("https://api.openai.com", models, null)
-                .forType(LlmConfigType.CHAT);
+        var forChat = new ModelListing<>("https://api.openai.com", models, null)
+                .models().stream().filter(m -> m.appliesTo(LlmConfigType.CHAT)).toList();
         assertThat(forChat).extracting(ProviderModelCatalog.Model::id)
                 .as("an embedding and a transcription model are not chat models")
                 .containsExactly("gpt-4o");
@@ -175,7 +176,7 @@ class ProviderModelCatalogTest {
     void theKeyIsCutFromWhatAnErrorSays() {
         assertThat(ProviderModelCatalog.redact("failed for ...?key=AIzaSECRET", "AIzaSECRET"))
                 .isEqualTo("failed for ...?key=***");
-        assertThat(ProviderModelCatalog.shown(okhttp3.HttpUrl.get(
+        assertThat(ModelListingReader.shown(okhttp3.HttpUrl.get(
                 "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=AIzaSECRET")))
                 .isEqualTo("https://generativelanguage.googleapis.com/v1beta/models");
     }
