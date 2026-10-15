@@ -215,7 +215,7 @@ the thing to grep for.
   `ScopeSupplier.fixed`; a server binds a `ThreadBoundScope` per request and per queued task
   via `ScopeTaskAdvisor`. Work a namespace needs once per process is a `NamespaceFirstUse`
   (`mc-namespace-core`) registered with `ThreadBoundScope.onBind` (example: `NamespaceSeeding`);
-  what a store does when a namespace is deleted is a `NamespacePurge` there.
+  what a store does when a namespace is deleted is a `NamespacePurge` there. Decision: [0007](../decisions/0007-scope-supplier-per-call.md).
 - **Runtime features.** `AgentRuntimeBuilder` assembles a core plus installed
   `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); each
   shipped feature is one module under `builder/mc-agent-runtime-feature-*`. The Spring

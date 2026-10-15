@@ -6,23 +6,21 @@ would otherwise decide again, differently.
 File name: `NNNN-short-slug.md`, numbered in order of creation, never renumbered.
 
 ```markdown
-# 0003: Namespace lives at the adapter, not in the id
+# 0007: Repository adapters ask the ScopeSupplier for the namespace on every call
 
-Status: accepted · 2026-10-02 · Concept: mc-sandbox/concepts/26-runtime-pro-namespace.md
+Status: accepted · 2026-10-15 · Supersedes 0003
+
+## Context
+Ids, domain objects, ports and services carry no namespace, so the namespace
+has to reach the adapter.
 
 ## Decision
-Ids, domain objects, ports and services carry no namespace. A persistence
-adapter is bound to one namespace in its constructor; `NamespaceRouted`
-picks the adapter for the namespace the `ScopeSupplier` names.
-
-## Why
-A namespace in every id leaks tenancy into every signature and every test.
-Binding it at the adapter keeps the core unaware and lets a library embed
-with `ScopeSupplier.fixed`.
+A persistence adapter takes the `ScopeSupplier` in its constructor and asks it
+on every call: one instance serves every namespace.
 
 ## Consequences
-New persistence adapters take the namespace as a constructor argument.
-A type that needs the namespace at runtime asks the `ScopeSupplier`.
+A new adapter takes a `ScopeSupplier`, never a `Namespace`; code that needs one
+namespace passes `ScopeSupplier.fixed(namespace)`.
 ```
 
 Rules:
