@@ -27,12 +27,14 @@
 
     <modules>
         <!-- shared module pulled in so this area builds standalone (demo apps scrape) -->
+        <module>../common/mc-arch-rules</module>
         <module>../common/mc-webscraper</module>
         <module>mc-task-queue</module>
         <module>mc-task-queue-schedule</module>
         <module>mc-task-queue-jdbc</module>
         <module>mc-taskqueue-demo-app</module>
         <module>mc-taskqueue-cluster-demo</module>
+        <module>mc-task-queue-arch-tests</module>
     </modules>
 
 </project>

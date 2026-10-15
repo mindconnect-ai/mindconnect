@@ -56,7 +56,12 @@ deploy/
 mc.env
 **/.env.docker
 .env.docker
-.claude
+
+# Claude Code harness: skills and shared settings are part of the repository
+# (.claude/). Only what is local to one machine or one clone stays out.
+.claude/settings.local.json
+.claude/worktrees/
+.claude/screenshot/
 # Editor harness — runtime-saved workflows (not source)
 workflow/mc-workflow-ui-diagram-app/workflows/
 

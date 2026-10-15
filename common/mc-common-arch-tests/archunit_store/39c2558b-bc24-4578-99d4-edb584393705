@@ -1,0 +1,1 @@
+Method <ai.mindconnect.common.util.encryption.EncryptionHelper.doCrypto(int, [B, [B)> has name matching '(process|handle|do)[A-Z].*' in (EncryptionHelper.java:146)

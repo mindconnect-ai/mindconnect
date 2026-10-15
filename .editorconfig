@@ -1,0 +1,26 @@
+# Shared editor settings. IntelliJ, VS Code and the coding agents read this;
+# there is no formatter in the build on purpose (see doc/agent/README.md).
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+[*.java]
+ij_java_imports_layout = java.**,|,jakarta.**,javax.**,|,org.**,com.**,|,*,|,ai.mindconnect.**,|,$*
+ij_java_class_count_to_use_import_on_demand = 999
+ij_java_names_count_to_use_import_on_demand = 999
+
+[*.{json,yml,yaml,xml,md,js,mjs,ts,tsx,css,html}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+[Makefile]
+indent_style = tab

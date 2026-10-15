@@ -67,6 +67,7 @@
         <module>common/mc-file-manager</module>
         <module>common/mc-webscraper</module>
         <module>common/mc-initial-data</module>
+        <module>common/mc-arch-rules</module>
         <module>common/mc-common</module>
         <module>common/mc-jdbc</module>
         <module>common/mc-file-repo</module>
@@ -167,6 +168,10 @@
         <module>agents/server/mc-agent-api-responses-rest</module>
         <module>agents/server/mc-agent-admin-ui-app</module>
         <module>agents/client/mc-agent-cli</module>
+        <module>common/mc-common-arch-tests</module>
+        <module>taskqueue/mc-task-queue-arch-tests</module>
+        <module>workflow/mc-workflow-arch-tests</module>
+        <module>agents/mc-agents-arch-tests</module>
     </modules>
 
     <build>

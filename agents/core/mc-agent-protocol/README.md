@@ -3,9 +3,7 @@
 The agent protocol vocabulary — **pure types, zero runtime dependencies (JDK only)**.
 Every transport (in-memory, HTTP, SSE, WebSocket) and the runtime core speak these
 exact objects; serialization lives in transport modules, never here.
-Concepts: [07](../../doc/architecture/concepts/07-responses-protocol.md),
-[08](../../doc/architecture/concepts/08-sub-agents.md),
-[09](../../doc/architecture/concepts/09-conversations.md).
+The decisions behind the protocol are recorded in [doc/decisions](../../../doc/decisions/).
 
 ## Surface
 
