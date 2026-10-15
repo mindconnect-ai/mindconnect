@@ -99,3 +99,6 @@ semantic-ui/editor/mc-sui-editor/src/main/sui/
 
 # preview servers of parallel clones write their data next to the checkout
 data-preview-*/
+
+# Personal working notes, never committed
+working/
