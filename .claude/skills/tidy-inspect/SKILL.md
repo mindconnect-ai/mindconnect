@@ -1,6 +1,6 @@
 ---
-name: smells
-description: Read-only check of one module or package against doc/agent/conventions.md — duplicates, names, responsibilities, Javadoc, defensive redundancy, reinvented patterns — reported as a table, nothing changed. Use before /tidy to see what a module has, or to review a module quickly.
+name: tidy-inspect
+description: Read-only check of one module or package against doc/agent/conventions.md — duplicates, names, responsibilities, Javadoc, defensive redundancy, reinvented patterns — reported as a table, nothing changed. The report of one run is what /tidy takes a topic from.
 ---
 Check `$ARGUMENTS` (a module directory, a package directory inside one, or a
 class) against `doc/agent/conventions.md`. Read-only: no file changes, no

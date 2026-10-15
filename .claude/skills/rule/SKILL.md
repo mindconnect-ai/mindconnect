@@ -18,7 +18,7 @@ Add or change the criterion described in `$ARGUMENTS`.
    `conventions.md`. A rule text is the key into the frozen stores; changing an
    existing text means refreezing all four areas.
 3. If the criterion is a matter of judgement, it stays a line in
-   `conventions.md`, and `/smells` and `/tidy` apply it through that page.
+   `conventions.md`, and `/tidy-inspect` and `/tidy` apply it through that page.
    Nothing else needs changing.
 4. Freeze and verify. For a new or changed ArchUnit rule:
    `mvn -q -f common/mc-arch-rules/pom.xml install`, then in each of

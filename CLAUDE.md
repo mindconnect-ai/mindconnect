@@ -6,7 +6,7 @@
 
 - `.claude/` is committed: shared permissions in `settings.json` and the
   repository skills: `/verify` (tests and ArchUnit of the touched modules),
-  `/smells` (check a module, read-only), `/tidy` (clean up one module,
+  `/tidy-inspect` (check a module, read-only), `/tidy` (clean up one module,
   behaviour unchanged), `/gap` (record a finding), `/rule` (add or sharpen a
   convention), `/adr` (record a decision). Cross-repository skills
   (branch clones, merge to `next`, todos) live outside this repository.

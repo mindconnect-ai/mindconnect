@@ -1,8 +1,8 @@
 # Code conventions
 
 The rules every change follows, by a person or an agent, with examples from
-this repository. Match them in new code; `/tidy` moves existing code towards
-them, one module at a time, `/smells` reports without changing anything. The
+this repository. Match them in new code; `/tidy-inspect` reports where existing code
+misses them, `/tidy` moves it towards them one topic at a time. The
 lines a tool can decide are ArchUnit rules (see the last section); the rest is
 judgement. `/rule` adds or sharpens a line here.
 

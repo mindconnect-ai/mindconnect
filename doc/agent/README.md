@@ -16,9 +16,9 @@ parts:
 2. **One conventions page plus the map.** `conventions.md` says how code is
    written here, with examples; `architecture.md` says what already exists, so
    an agent can look left and right; `../decisions/` holds what was decided.
-3. **Skills.** `/verify` runs the tests and ArchUnit of the touched modules; `/smells <module>` checks a module against the conventions and
-   reports, read-only; `/tidy <module>` cleans one module or package up without
-   changing behaviour, one topic per commit; `/gap` records a finding outside
+3. **Skills.** `/verify` runs the tests and ArchUnit of the touched modules; `/tidy-inspect <module>` checks a module against the conventions and
+   reports, read-only; `/tidy <module> <topic>` applies one of its findings
+   without changing behaviour, in the working tree; `/gap` records a finding outside
    the scope in `../known-gaps.md`; `/rule` adds or sharpens a criterion, as an
    ArchUnit rule when a tool can decide it; `/adr` records a decision.
 
