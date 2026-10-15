@@ -54,6 +54,8 @@ and the rule it violates.
   Found 2026-10-15 in chore/llm-gateway-refactor by the agent, running the new `GeminiGatewayLiveTest`. Size: small. Rule: –.
 - [ ] **agents/tools/core/mc-agent-tools-workflow** `RunWorkflowToolTest.anInputThatIsMiniScript_cannotReachAClass` fails on `next`: it expects a `mini:` input to be evaluated and refused with "Method not found", but since inputs are stored as data (58290de8) the text comes back verbatim; either the test or the guard it documents is stale.
   Found 2026-10-15 in chore/refactor-core by the agent, on the branch and on its base commit a920c763 with freshly built dependencies. Size: small. Rule: Logging, style, tests.
+- [ ] **agents/server/core/mc-credentials** The module is named after its payload, not its thing: the aggregate is `Connection` (a user's link to an external service, with `ConnectionRepository`, `ConnectionService`, `OAuthConnections`), the credentials are one facet of it; `mc-connection` and `mc-connection-pg` with package `ai.mindconnect.connection` would say what it is. Four users (`mc-agent-starter-file`, `mc-agent-admin-ui-rest`, `mc-agent-security`, the PG module), the docs and the ArchUnit store entries naming the package follow the rename.
+  Found 2026-10-15 in chore/refactor-core by the maintainer. Size: one wave. Rule: Classes (named after what it is for).
 
 ## Closed
 
