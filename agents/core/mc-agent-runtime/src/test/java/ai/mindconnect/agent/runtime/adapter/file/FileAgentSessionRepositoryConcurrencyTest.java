@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.message.domain.ConversationId;
@@ -37,7 +38,7 @@ class FileAgentSessionRepositoryConcurrencyTest {
 
     @Test
     void readsWhileUpdatingNeverSeeAHalfWrittenSession(@TempDir Path dir) throws Exception {
-        FileAgentSessionRepository repo = new FileAgentSessionRepository(dir, MAPPER, new Namespace("test"));
+        FileAgentSessionRepository repo = new FileAgentSessionRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test")));
         AgentSession session = repo.create(newSession());
 
         AtomicBoolean writing = new AtomicBoolean(true);
@@ -74,7 +75,7 @@ class FileAgentSessionRepositoryConcurrencyTest {
 
     @Test
     void concurrentUpdatesOfOneSessionAllLand(@TempDir Path dir) throws Exception {
-        FileAgentSessionRepository repo = new FileAgentSessionRepository(dir, MAPPER, new Namespace("test"));
+        FileAgentSessionRepository repo = new FileAgentSessionRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test")));
         AgentSession session = repo.create(newSession());
 
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {

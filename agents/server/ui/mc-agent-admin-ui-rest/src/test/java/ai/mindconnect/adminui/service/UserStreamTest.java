@@ -10,6 +10,7 @@ import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.message.domain.ChatTurnId;
@@ -84,11 +85,11 @@ class UserStreamTest {
             }
             return TaskOutcome.done("ok");
         });
-        var definitions = new InMemoryAgentDefinitionRepository();
+        var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
         definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
                 "assistants", "bot", "prompt", null, "cfg", 5, null,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
-        var sessions = new InMemoryAgentSessionRepository();
+        var sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
         sessions.create(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"), ConversationId.random(),
                 "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
                 null, null, null, null, null, null, null));

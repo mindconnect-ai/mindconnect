@@ -1,6 +1,7 @@
 package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryUserMemoryRepository;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
@@ -19,7 +20,7 @@ class MemoryApiControllerTest {
     private static final UserId BOB = UserId.of("bob");
     private static final AgentId SECRETARY = AgentId.of("secretary");
 
-    private final UserMemoryService memory = new UserMemoryService(new InMemoryUserMemoryRepository());
+    private final UserMemoryService memory = new UserMemoryService(new InMemoryUserMemoryRepository(ScopeSupplier.local()));
     private final MemoryApiController controller = new MemoryApiController(memory);
 
     @Test

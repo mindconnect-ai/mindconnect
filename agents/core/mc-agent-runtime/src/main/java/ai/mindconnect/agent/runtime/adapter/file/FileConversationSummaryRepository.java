@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.filerepo.FileRepo;
@@ -8,7 +8,6 @@ import ai.mindconnect.filerepo.FileRepoException;
 import ai.mindconnect.filerepo.RecordLog;
 import ai.mindconnect.message.domain.ConversationId;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,14 +29,13 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
 
     private final RecordLog<ConversationId, ConversationSummary> summaries;
 
-    public FileConversationSummaryRepository(Path baseDir, Namespace namespace) {
-        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    public FileConversationSummaryRepository(Path baseDir, ObjectMapper mapper, ScopeSupplier scope) {
         this.summaries = RecordLog.of(ConversationSummary.class)
                 .dir((ConversationId conversation) -> "conversations/" + conversation.value() + "/summaries")
                 .key(ConversationSummary::fromSequenceNum)
                 .id(s -> s.id().value())
                 .prettyPrint()
-                .build(FileRepo.open(baseDir, namespace.value()), mapper);
+                .build(() -> FileRepo.open(baseDir, scope.namespace().value()), mapper);
     }
 
     @Override

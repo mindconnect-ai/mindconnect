@@ -1,6 +1,7 @@
 package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -42,7 +43,7 @@ class FilesApiControllerOwnershipTest {
 
     @BeforeEach
     void setUp() {
-        store = new FilesystemFileStore(dir, new Namespace("test"));
+        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
         mvc = MockMvcBuilders.standaloneSetup(new FilesApiController(store))
                 .setCustomArgumentResolvers(callers.resolver()).build();
     }

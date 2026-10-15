@@ -1,6 +1,7 @@
 package ai.mindconnect.message.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.Sql;
@@ -40,10 +41,10 @@ class PgNamespaceIsolationTest {
 
     @Test
     void conversationsAndMessagesOfAnotherNamespaceAreInvisible() {
-        var conversationsA = new PgConversationRepository(sql, A).initSchema();
-        var conversationsB = new PgConversationRepository(sql, B).initSchema();
-        var messagesA = new PgMessageRepository(sql, A).initSchema();
-        var messagesB = new PgMessageRepository(sql, B).initSchema();
+        var conversationsA = new PgConversationRepository(sql, ScopeSupplier.fixed(A)).initSchema();
+        var conversationsB = new PgConversationRepository(sql, ScopeSupplier.fixed(B)).initSchema();
+        var messagesA = new PgMessageRepository(sql, ScopeSupplier.fixed(A)).initSchema();
+        var messagesB = new PgMessageRepository(sql, ScopeSupplier.fixed(B)).initSchema();
 
         ConversationId id = ConversationId.random();
         Conversation conversation = Conversation.create(id, "topic", ConversationType.USER_AGENT,

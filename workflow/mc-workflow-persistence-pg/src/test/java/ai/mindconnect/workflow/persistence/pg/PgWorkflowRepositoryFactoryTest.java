@@ -26,7 +26,7 @@ class PgWorkflowRepositoryFactoryTest {
     }
 
     private void writeWithFiles(String partition) {
-        var files = new FileWorkflowRepositoryFactory(dataDir, partition);
+        var files = new FileWorkflowRepositoryFactory(dataDir, () -> partition);
         WorkflowData wf = new WorkflowData();
         wf.setName("approval");
         files.workflowDataRepository().save("approval", wf);
@@ -40,7 +40,7 @@ class PgWorkflowRepositoryFactoryTest {
     void importsTheDefinitionsAndTheRunsTheFileStoresKept() {
         writeWithFiles("acme");
 
-        var factory = new PgWorkflowRepositoryFactory(sql, "acme", dataDir);
+        var factory = new PgWorkflowRepositoryFactory(sql, () -> "acme", dataDir);
 
         assertThat(factory.workflowDataRepository().listIds()).containsExactly("approval");
         assertThat(factory.workflowInstanceRepository().findByWorkflow("approval")).hasSize(1);
@@ -53,7 +53,7 @@ class PgWorkflowRepositoryFactoryTest {
     void withoutADataDirectoryNothingIsImported() {
         writeWithFiles("acme");
 
-        var factory = new PgWorkflowRepositoryFactory(sql, "acme");
+        var factory = new PgWorkflowRepositoryFactory(sql, () -> "acme");
 
         assertThat(factory.workflowDataRepository().listIds()).isEmpty();
         assertThat(factory.workflowInstanceRepository().findAll()).isEmpty();
@@ -63,7 +63,7 @@ class PgWorkflowRepositoryFactoryTest {
     void anotherPartitionImportsOnlyItsOwnFiles() {
         writeWithFiles("acme");
 
-        var factory = new PgWorkflowRepositoryFactory(sql, "globex", dataDir);
+        var factory = new PgWorkflowRepositoryFactory(sql, () -> "globex", dataDir);
 
         assertThat(factory.workflowDataRepository().listIds()).isEmpty();
         assertThat(factory.workflowInstanceRepository().findAll()).isEmpty();

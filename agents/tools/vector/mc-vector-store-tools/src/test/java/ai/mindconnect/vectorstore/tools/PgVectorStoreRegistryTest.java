@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.StaleVersionException;
 import ai.mindconnect.jdbc.Sql;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,14 +41,14 @@ class PgVectorStoreRegistryTest {
     void setUp() {
         db = TestDb.requirePostgres();
         sql = Sql.of(db);
-        new PgVectorStoreRegistry(sql, ACME).initSchema();
+        new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME)).initSchema();
         TestDb.forget(db, ACME);
         TestDb.forget(db, OTHER);
     }
 
     @Test
     void templatesAndInstancesRoundTrip() {
-        PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
+        PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME));
         VectorStoreTemplate template = new VectorStoreTemplate("Chat Uploads", "embeddings", null, Map.of("description", "per chat"));
 
         VectorStoreTemplate saved = registry.saveTemplate(template.withVersion(0L));
@@ -82,7 +83,7 @@ class PgVectorStoreRegistryTest {
         List<Future<VectorStoreInstance>> futures = new ArrayList<>();
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
             for (int i = 0; i < 20; i++) {
-                PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
+                PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME));
                 VectorStoreInstance candidate = new VectorStoreInstance("session-s1", "chat-uploads",
                         "embeddings", null, Map.of("attempt", Integer.toString(i)),
                         VectorStoreInstance.Scope.SESSION, "s1", "alice", Instant.now());
@@ -94,13 +95,13 @@ class PgVectorStoreRegistryTest {
         for (Future<VectorStoreInstance> future : futures) {
             assertThat(future.get()).isEqualTo(first);
         }
-        assertThat(new PgVectorStoreRegistry(sql, ACME).instances()).containsExactly(first);
+        assertThat(new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME)).instances()).containsExactly(first);
     }
 
     @Test
     void aNamespaceSeesOnlyItsOwnRecords() {
-        PgVectorStoreRegistry acme = new PgVectorStoreRegistry(sql, ACME);
-        PgVectorStoreRegistry other = new PgVectorStoreRegistry(sql, OTHER);
+        PgVectorStoreRegistry acme = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME));
+        PgVectorStoreRegistry other = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(OTHER));
         VectorStoreTemplate template = new VectorStoreTemplate("knowledge", "embeddings", null, Map.of());
 
         acme.saveTemplate(template);
@@ -124,14 +125,14 @@ class PgVectorStoreRegistryTest {
                 "session-s1", template, VectorStoreInstance.Scope.SESSION, "s1", "alice"));
         EntityRef file = EntityRef.of(EntityType.FILE, EntityRef.FILE_STORE, "file-1");
         files.addMember("session-s1", file);
-        PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
+        PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME));
 
         assertThat(registry.importFrom(files)).isEqualTo(2);
         assertThat(registry.members("session-s1")).containsExactly(file);
 
         assertThat(registry.templates()).containsExactly(template);
         assertThat(registry.instances()).containsExactly(instance);
-        assertThat(new PgVectorStoreRegistry(sql, OTHER).instances()).isEmpty();
+        assertThat(new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(OTHER)).instances()).isEmpty();
         assertThat(Files.exists(dir.resolve("vector-stores/templates/chat-uploads.json"))).isTrue();
         assertThat(Files.exists(dir.resolve("vector-stores/instances/session-s1.json"))).isTrue();
 
@@ -142,7 +143,7 @@ class PgVectorStoreRegistryTest {
 
     @Test
     void membersAreListedRemovedAndGoWithTheStore() {
-        VectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
+        VectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME));
         EntityRef file = EntityRef.of(EntityType.FILE, EntityRef.FILE_STORE, "file-1");
         EntityRef doc = EntityRef.of(EntityType.DOCUMENT, "kb", "notes.md");
         registry.registerInstance(VectorStoreInstance.fromTemplate("kb",
@@ -168,7 +169,7 @@ class PgVectorStoreRegistryTest {
 
     @Test
     void indexDefinitionsRoundTrip() {
-        VectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ACME);
+        VectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(ACME));
         IndexDefinition big = new IndexDefinition("big-kb", "pgvector", "mc_embedding_big", null, null, null, null, "large");
 
         registry.saveIndex(big);

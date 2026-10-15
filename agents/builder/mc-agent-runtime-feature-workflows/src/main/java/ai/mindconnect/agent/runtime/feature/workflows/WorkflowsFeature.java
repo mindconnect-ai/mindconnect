@@ -1,9 +1,8 @@
 package ai.mindconnect.agent.runtime.feature.workflows;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
@@ -21,6 +20,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Persisted workflows as tools: the workflow store the runtime and its tools
@@ -51,18 +51,16 @@ public class WorkflowsFeature extends ConfigurableFeature {
 
     @Override
     protected void install(FeatureContext ctx) {
-        // The factory per namespace: the persistence setting looked at once, the routing builds the rest.
-        // On Postgres, what the file stores kept under the data dir is imported once per namespace.
-        Function<Namespace, WorkflowRepositoryFactory> factories = switch (ctx.persistence()) {
-            case Persistence.InMemory m -> ns -> new InMemoryWorkflowRepositoryFactory(m.dataDir(), ns.value());
-            case Persistence.File f -> ns -> new FileWorkflowRepositoryFactory(f.dataDir(), ns.value());
-            case Persistence.Postgres p -> ns -> new PgWorkflowRepositoryFactory(
-                    ctx.require(ai.mindconnect.jdbc.Sql.class), ns.value(), p.dataDir());
+        // The factory: the persistence setting looked at once; the partition is the namespace the scope names per call.
+        // On Postgres, what the file stores kept under the data dir is imported once per namespace found there.
+        Function<Supplier<String>, WorkflowRepositoryFactory> factories = switch (ctx.persistence()) {
+            case Persistence.InMemory m -> partition -> new InMemoryWorkflowRepositoryFactory(m.dataDir(), partition);
+            case Persistence.File f -> partition -> new FileWorkflowRepositoryFactory(f.dataDir(), partition);
+            case Persistence.Postgres p -> partition -> new PgWorkflowRepositoryFactory(
+                    ctx.require(ai.mindconnect.jdbc.Sql.class), partition, p.dataDir());
         };
-        ctx.bean(WorkflowDataRepository.class, () -> ctx.require(NamespaceRouting.class).route(
-                WorkflowDataRepository.class, ns -> factories.apply(ns).workflowDataRepository()));
-        ctx.bean(WorkflowInstanceRepository.class, () -> ctx.require(NamespaceRouting.class).route(
-                WorkflowInstanceRepository.class, ns -> factories.apply(ns).workflowInstanceRepository()));
+        ctx.bean(WorkflowDataRepository.class, () -> factories.apply(partition(ctx)).workflowDataRepository());
+        ctx.bean(WorkflowInstanceRepository.class, () -> factories.apply(partition(ctx)).workflowInstanceRepository());
         ctx.onStart(() -> {
             if (resources.isEmpty()) return;
             var store = ctx.require(WorkflowDataRepository.class);
@@ -87,5 +85,11 @@ public class WorkflowsFeature extends ConfigurableFeature {
             throw new IllegalArgumentException("Classpath resource not found: " + resource);
         }
         return in;
+    }
+
+    /** The namespace of the current call, as the workflow area's neutral partition. */
+    private static Supplier<String> partition(FeatureContext ctx) {
+        ScopeSupplier scope = ctx.require(ScopeSupplier.class);
+        return () -> scope.namespace().value();
     }
 }

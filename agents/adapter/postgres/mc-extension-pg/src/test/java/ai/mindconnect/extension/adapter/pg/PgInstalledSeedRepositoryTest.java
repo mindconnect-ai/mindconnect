@@ -1,6 +1,7 @@
 package ai.mindconnect.extension.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.extension.domain.InstalledSeed;
 import ai.mindconnect.jdbc.Sql;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,8 +21,8 @@ class PgInstalledSeedRepositoryTest {
     void setUp() {
         sql = Sql.of(TestDb.require());
         sql.execute("DROP TABLE IF EXISTS mc_installed_seed");
-        acme = new PgInstalledSeedRepository(sql, new Namespace("acme")).initSchema();
-        other = new PgInstalledSeedRepository(sql, new Namespace("other")).initSchema();
+        acme = new PgInstalledSeedRepository(sql, ScopeSupplier.fixed(new Namespace("acme"))).initSchema();
+        other = new PgInstalledSeedRepository(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
     }
 
     @Test
@@ -51,7 +52,7 @@ class PgInstalledSeedRepositoryTest {
         sql.update("DELETE FROM mc_installed_seed WHERE namespace = ?", "acme");
 
         assertThat(acme.all()).isEmpty();
-        assertThat(new PgInstalledSeedRepository(sql, new Namespace("other")).keys())
+        assertThat(new PgInstalledSeedRepository(sql, ScopeSupplier.fixed(new Namespace("other"))).keys())
                 .containsExactly("agent:email-assistant");
     }
 }

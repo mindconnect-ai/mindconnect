@@ -41,6 +41,12 @@
             <artifactId>mc-initial-data</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- the namespace purge the auto-configuration contributes -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-namespace-core</artifactId>
+            <optional>true</optional>
+        </dependency>
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>

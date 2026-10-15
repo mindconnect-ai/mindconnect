@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -21,7 +22,7 @@ class SessionToolsDelegationTest {
 
     private static final ToolRegistry NO_TOOLS = (agentTool, scope) -> Optional.empty();
 
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
+    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
     private final AgentDefinition orchestrator = AgentDefinition.create("orchestrator", "o", "You delegate.", null, "llm")
             .withCallableAgents(List.of("researcher"));
     private final AgentSession session = sessions.create(AgentSession.start(orchestrator.id(), UserId.of("u"), ConversationId.random()));

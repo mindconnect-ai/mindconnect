@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.message.domain.ConversationId;
@@ -17,7 +18,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SessionsByUserTest {
 
-    private final InMemoryAgentSessionRepository repo = new InMemoryAgentSessionRepository();
+    private final InMemoryAgentSessionRepository repo = new InMemoryAgentSessionRepository(ScopeSupplier.local());
 
     private AgentSession save(String user, Instant startedAt, SessionId parent) {
         var base = AgentSession.startSubAgent(AgentId.random(), UserId.of(user), ConversationId.random(),

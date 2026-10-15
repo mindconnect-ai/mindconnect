@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.filerepo.FileRepo;
 import ai.mindconnect.filerepo.RecordLog;
@@ -9,13 +9,14 @@ import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.port.out.MessageRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.IntFunction;
 import java.util.function.UnaryOperator;
-import java.util.logging.Logger;
 
 /**
  * Stores messages under:
@@ -30,18 +31,17 @@ import java.util.logging.Logger;
  */
 public class FileMessageRepository implements MessageRepository {
 
-    private static final Logger log = Logger.getLogger(FileMessageRepository.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(FileMessageRepository.class);
 
     private final RecordLog<ConversationId, Message> messages;
 
-    public FileMessageRepository(Path messageStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        FileRepo repo = FileRepo.open(messageStorageDir, namespace.value());
+    public FileMessageRepository(Path messageStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
         this.messages = RecordLog.of(Message.class)
                 .dir((ConversationId conversation) -> "conversations/" + conversation.value() + "/messages")
                 .key(Message::sequenceNum)
                 .id(m -> m.id().value())
-                .build(repo, objectMapper);
-        log.info("MessageRepository storage: " + repo.resolve("conversations"));
+                .build(() -> FileRepo.open(messageStorageDir, scope.namespace().value()), objectMapper);
+        log.info("MessageRepository storage: {}", messageStorageDir.resolve("<namespace>").resolve("conversations"));
     }
 
     @Override

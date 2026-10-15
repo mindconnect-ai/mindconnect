@@ -1,6 +1,7 @@
 package ai.mindconnect.filestore.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStoreBackend;
@@ -33,7 +34,7 @@ class PgFileStoreTest {
     void setUp() {
         sql = Sql.of(requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_file");
-        store = new PgFileStore(sql, NS).initSchema();
+        store = new PgFileStore(sql, ScopeSupplier.fixed(NS)).initSchema();
     }
 
     @Test
@@ -66,7 +67,7 @@ class PgFileStoreTest {
                                             now(), decode('01', 'hex'));
                 """);
 
-        PgFileStore upgraded = new PgFileStore(sql, NS).initSchema();
+        PgFileStore upgraded = new PgFileStore(sql, ScopeSupplier.fixed(NS)).initSchema();
 
         assertThat(upgraded.find(FileId.of("file-0123456789abcdef0123"))).get()
                 .extracting(StoredFile::name, StoredFile::creator).containsExactly("old.txt", null);
@@ -106,7 +107,7 @@ class PgFileStoreTest {
 
     @Test
     void aStoreBoundToAnotherNamespaceSeesNothing() throws IOException {
-        PgFileStore other = new PgFileStore(sql, new Namespace("other")).initSchema();
+        PgFileStore other = new PgFileStore(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
         StoredFile file = store.save("report.pdf", "application/pdf", new ByteArrayInputStream(new byte[] {1, 2}));
 
         assertThat(other.find(file.id())).isEmpty();
@@ -120,27 +121,25 @@ class PgFileStoreTest {
     }
 
     @Test
-    void theBackendIsDiscoverableByTypeAndBoundToTheConfiguredNamespace() throws IOException {
+    void theBackendIsDiscoverableByTypeAndWorksInTheNamespaceOfItsScope() throws IOException {
         assertThat(FileStoreBackend.byType("postgres")).isPresent();
         StoredFile mine = store.save("notes.txt", "text/plain", new ByteArrayInputStream(new byte[] {1}));
 
         var opened = FileStoreBackend.byType("postgres").orElseThrow().open(Map.of(
-                "url", url(), "user", user(), "password", password(), "namespace", "another"));
+                "url", url(), "user", user(), "password", password()), ScopeSupplier.fixed(new Namespace("another")));
         assertThat(opened).isInstanceOf(PgFileStore.class);
         assertThat(opened.list()).isEmpty();
 
         var sameNamespace = FileStoreBackend.byType("postgres").orElseThrow().open(Map.of(
-                "url", url(), "user", user(), "password", password(), "namespace", NS.value()));
+                "url", url(), "user", user(), "password", password()), ScopeSupplier.fixed(NS));
         assertThat(sameNamespace.list()).containsExactly(mine);
     }
 
     @Test
-    void theBackendRefusesAMissingOrBlankNamespace() {
+    void theBackendRefusesAMissingScope() {
         var backend = FileStoreBackend.byType("postgres").orElseThrow();
-        assertThatThrownBy(() -> backend.open(Map.of("url", url(), "user", user(), "password", password())))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("namespace");
-        assertThatThrownBy(() -> backend.open(Map.of("url", url(), "namespace", " ")))
-                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("namespace");
+        assertThatThrownBy(() -> backend.open(Map.of("url", url(), "user", user(), "password", password()), null))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("scope");
     }
 
     private static String url() { return System.getenv().getOrDefault("MC_JDBC_TEST_URL", "jdbc:postgresql://localhost:5433/postgres"); }

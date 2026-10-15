@@ -1,6 +1,6 @@
 # 0003: The namespace is bound at the adapter, not carried in the id
 
-Status: accepted · 2026-09-11 · Concept: mc-sandbox/agents/doc/concepts/26-runtime-pro-namespace.md (supersedes the id-carries-namespace idea in 24)
+Status: superseded by 0007 · 2026-09-11 · Concept: mc-sandbox/agents/doc/concepts/26-runtime-pro-namespace.md (supersedes the id-carries-namespace idea in 24)
 
 ## Decision
 Ids, domain objects, ports and services carry no namespace. A persistence

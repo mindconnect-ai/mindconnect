@@ -2,6 +2,7 @@ package ai.mindconnect.agentrest.service;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -53,7 +54,7 @@ class SessionFileServiceWorkingDirTest {
 
     @BeforeEach
     void setUp() {
-        sessions = new InMemoryAgentSessionRepository();
+        sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
         home = UserHome.of(temp.resolve("home").resolve("{user}").toString());
         files = new StubFileStore();
         VectorStores stores = VectorStores.fromEnvironment(new ToolEnvironment() {
@@ -61,7 +62,7 @@ class SessionFileServiceWorkingDirTest {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) mock(LlmEmbeddings.class));
                 if (type == LlmConfigRepository.class) return Optional.of((T) mock(LlmConfigRepository.class));
-                if (type == Namespace.class) return Optional.of((T) new Namespace("test"));
+                if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(new Namespace("test")));
                 return Optional.empty();
             }
 
@@ -71,11 +72,11 @@ class SessionFileServiceWorkingDirTest {
             }
         }).orElseThrow();
         // Direct ingestion — no workflow engine; an empty file needs no embeddings either.
-        stores.registry(Namespace.DEFAULT).saveTemplate(new VectorStoreTemplate(SessionFileService.CHAT_UPLOADS_TEMPLATE,
+        stores.registry().saveTemplate(new VectorStoreTemplate(SessionFileService.CHAT_UPLOADS_TEMPLATE,
                 "embeddings", null, Map.of()));
         service = new SessionFileService(files, provider(stores), provider(null), sessions,
-                provider(null), provider(null), temp.resolve("tools").toString(), provider(home),
-                ai.mindconnect.agent.ScopeSupplier.local(), provider(null));
+                provider(null), temp.resolve("tools").toString(), provider(home),
+                provider(null));
     }
 
     @Test

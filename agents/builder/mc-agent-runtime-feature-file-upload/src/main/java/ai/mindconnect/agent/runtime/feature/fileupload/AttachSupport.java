@@ -37,8 +37,6 @@ public class AttachSupport {
     private final ai.mindconnect.vectorstore.tools.VectorStores stores;
     /** The host's workflow store when it has one (Postgres); null means the file store under {@code <dataBaseDir>/<namespace>/workflows}. */
     private final RuntimeBeans beans;   // where the workflow store is, when the workflows feature is installed
-    /** The namespace the runtime's stores are bound to; the fallback workflow store opens in it too. */
-    private final ai.mindconnect.agent.Namespace namespace;
     private final ai.mindconnect.agent.runtime.service.UserHome userHome;
 
     private AttachSupport(Map<String, String> environment, DynamicToolActivations activations,
@@ -46,7 +44,6 @@ public class AttachSupport {
                           ai.mindconnect.filestore.FileStore fileStore,
                           ai.mindconnect.vectorstore.tools.VectorStores stores,
                           RuntimeBeans beans,
-                          ai.mindconnect.agent.Namespace namespace,
                           ai.mindconnect.agent.runtime.service.UserHome userHome) {
         this.userHome = userHome;
         this.environment = environment;
@@ -55,7 +52,6 @@ public class AttachSupport {
         this.fileStore = fileStore;
         this.stores = stores;
         this.beans = beans;
-        this.namespace = namespace;
     }
 
     /** The attach path over the runtime's file store and vector stores. */
@@ -65,9 +61,8 @@ public class AttachSupport {
                                        ai.mindconnect.vectorstore.tools.VectorStores stores,
                                        RuntimeBeans beans,
                                        ai.mindconnect.filestore.FileStore fileStore,
-                                       ai.mindconnect.agent.Namespace namespace,
                                        ai.mindconnect.agent.runtime.service.UserHome userHome) {
-        return new AttachSupport(environment, activations, sessions, fileStore, stores, beans, namespace, userHome);
+        return new AttachSupport(environment, activations, sessions, fileStore, stores, beans, userHome);
     }
 
     public String attach(SessionId sessionId, String fileName, InputStream content) {
@@ -111,18 +106,18 @@ public class AttachSupport {
         }
         try {
             String storeName = "session-" + sessionId.value();
-            var template = stores.template(namespace, "chat-uploads").orElseGet(() -> {
+            var template = stores.template("chat-uploads").orElseGet(() -> {
                 var created = new ai.mindconnect.vectorstore.tools.VectorStoreTemplate(
                         "chat-uploads", environment.getOrDefault("vectorStoreEmbeddingConfig", "embeddings"),
                         null, Map.of("description", "Per-chat-session upload stores (auto-created)"));
-                stores.registry(namespace).saveTemplate(created);
+                stores.registry().saveTemplate(created);
                 return created;
             });
             // The store is the chat's user's: the vector tools reach it only on that user's behalf.
-            var store = stores.open(namespace, storeName, template.name(),
+            var store = stores.open(storeName, template.name(),
                     ai.mindconnect.vectorstore.tools.VectorStoreInstance.Scope.SESSION,
                     sessionId.value(), session.userId() == null ? null : session.userId().value());
-            var instance = stores.settingsFor(namespace, storeName);
+            var instance = stores.settingsFor(storeName);
             // A copy in the session's own directory, for the file tools and
             // for the ingestion workflow, which runs in the session's scope.
             java.util.Optional<java.nio.file.Path> copy = userHome()
@@ -173,7 +168,9 @@ public class AttachSupport {
 
     private static boolean workflowModulesPresent() {
         try {
-            Class.forName("ai.mindconnect.workflow.admin.run.WorkflowRunService");
+            // The engine with its step types, and the store the workflow is read from.
+            Class.forName("ai.mindconnect.workflow.spi.SpiWorkflowContextFactory");
+            Class.forName("ai.mindconnect.workflow.persistence.port.WorkflowDataRepository");
             return true;
         } catch (ClassNotFoundException e) {
             return false;
@@ -197,14 +194,16 @@ public class AttachSupport {
             var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                             + "' not found in the workflow store"));
-            var runner = new ai.mindconnect.workflow.admin.run.WorkflowRunService(null);
-            ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
+            // The SPI factory wires every step type and resolver on the classpath, the agent and tool steps included.
+            var executor = new ai.mindconnect.workflow.execution.WorkflowExecutorService(
+                    ai.mindconnect.workflow.spi.SpiWorkflowContextFactory.create());
+            ai.mindconnect.workflow.execution.WorkflowResult result;
             // The tool steps run on behalf of the chat's user and session — the
             // calls its store accepts — and resolve their paths in its directories.
             if (copyInSessionDir != null) {
                 var scope = ai.mindconnect.agent.tool.ToolCallScope.ofSession(
                         chat.userId(), chat.id(), copyInSessionDir.getParent().toString());
-                report = scope.runWith(() -> runner.runWithAttributes(workflow,
+                result = scope.runWith(() -> executor.executeWorkflow(workflow,
                         Map.of("file", stored.name(), "store", instance.name(), "file_id", stored.id().value()),
                         Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(), scope)));
             } else {
@@ -217,14 +216,14 @@ public class AttachSupport {
                     java.nio.file.Files.copy(in, target,
                             java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
-                report = runner.runWithAttributes(workflow,
+                result = executor.executeWorkflow(workflow,
                         Map.of("file", base.relativize(target).toString(), "store", instance.name(),
                                 "file_id", stored.id().value()),
                         Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(),
                                 new ai.mindconnect.agent.tool.ToolCallScope(chat.userId(), chat.id(), null)));
             }
-            if (!report.success()) {
-                throw new IllegalStateException("ingestion workflow failed: " + report.error());
+            if (!result.isSuccess()) {
+                throw new IllegalStateException("ingestion workflow failed: " + result.failureMessage());
             }
             return stored.name() + " ingested via workflow '" + instance.ingestionWorkflow() + "'.";
         }

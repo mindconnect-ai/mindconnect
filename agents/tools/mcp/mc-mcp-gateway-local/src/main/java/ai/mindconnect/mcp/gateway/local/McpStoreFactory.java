@@ -1,22 +1,21 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 
 import java.nio.file.Path;
 
 /**
- * Where the gateway of one namespace keeps its registrations and its
- * discovery cache. Files by default; the Postgres starter contributes the
- * tables under {@code mindconnect.persistence=postgres}, and
- * {@link NamespacedMcpGateways} asks this once per namespace, on first use.
+ * Where the gateway keeps its registrations and its discovery cache, in the
+ * namespace the scope names per call. Files by default; the Postgres starter
+ * contributes the tables under {@code mindconnect.persistence=postgres}.
  */
 public interface McpStoreFactory {
 
-    /** The registrations of {@code namespace}. */
-    McpServerRepository serverRepository(Namespace namespace);
+    /** The registrations of the namespace {@code scope} names per call. */
+    McpServerRepository serverRepository(ScopeSupplier scope);
 
-    /** The discovery cache of {@code namespace}. */
-    McpDiscoveryStore discoveryStore(Namespace namespace);
+    /** The discovery cache of the namespace {@code scope} names per call. */
+    McpDiscoveryStore discoveryStore(ScopeSupplier scope);
 
     /**
      * Both as files under {@code <storageRoot>/<namespace>/system} —
@@ -25,13 +24,13 @@ public interface McpStoreFactory {
     static McpStoreFactory files(Path storageRoot) {
         return new McpStoreFactory() {
             @Override
-            public McpServerRepository serverRepository(Namespace namespace) {
-                return new FileMcpServerRepository(storageRoot, namespace);
+            public McpServerRepository serverRepository(ScopeSupplier scope) {
+                return new FileMcpServerRepository(storageRoot, scope);
             }
 
             @Override
-            public McpDiscoveryStore discoveryStore(Namespace namespace) {
-                return new FileMcpDiscoveryStore(storageRoot, namespace);
+            public McpDiscoveryStore discoveryStore(ScopeSupplier scope) {
+                return new FileMcpDiscoveryStore(storageRoot, scope);
             }
         };
     }

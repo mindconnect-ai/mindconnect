@@ -1,6 +1,7 @@
 package ai.mindconnect.message.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.Sql;
@@ -27,7 +28,7 @@ class PgConversationRepositoryTest {
     void setUp() {
         Sql sql = Sql.of(TestDb.requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_conversation");
-        repo = new PgConversationRepository(sql, NS).initSchema();
+        repo = new PgConversationRepository(sql, ScopeSupplier.fixed(NS)).initSchema();
     }
 
     private static Conversation at(String topic, String createdAt) {

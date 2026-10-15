@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.skill.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillId;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
@@ -8,12 +8,13 @@ import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
-import java.util.logging.Logger;
 
 /**
  * Stores the installation's own skills under
@@ -30,17 +31,16 @@ import java.util.logging.Logger;
  */
 public class FileSkillRepository implements SkillRepository {
 
-    private static final Logger log = Logger.getLogger(FileSkillRepository.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(FileSkillRepository.class);
     private static final String DIR = "system/skills";
 
     private final Documents<SkillId, Skill> skills;
 
-    public FileSkillRepository(Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        FileRepo repo = FileRepo.open(agentStorageDir, namespace.value());
+    public FileSkillRepository(Path agentStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
         this.skills = Documents.of(Skill.class)
                 .path((SkillId id) -> DIR + "/" + id.value() + ".json")
-                .build(repo, objectMapper);
-        log.info("SkillRepository storage: " + repo.resolve(DIR));
+                .build(() -> FileRepo.open(agentStorageDir, scope.namespace().value()), objectMapper);
+        log.info("SkillRepository storage: {}", agentStorageDir.resolve("<namespace>").resolve(DIR));
     }
 
     @Override

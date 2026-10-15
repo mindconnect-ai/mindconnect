@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -25,8 +25,8 @@ import java.util.function.UnaryOperator;
  * {@link AgentSessionRepository} on Postgres: one row of {@code mc_agent_session}
  * per session, keyed by {@code (namespace, id)}, with the keys every listing
  * filters by — definition, user, parent — and the start time they sort by,
- * newest first. The repository is bound to one namespace and every statement
- * matches it.
+ * newest first. Every statement matches the namespace the scope names for
+ * the current call.
  *
  * <p>{@link #deleteById} removes the session row only. The file store deletes
  * the session's whole directory, taking working memory and todo list
@@ -36,17 +36,17 @@ import java.util.function.UnaryOperator;
 public final class PgAgentSessionRepository implements AgentSessionRepository {
 
     private final DocumentTable<AgentSession> sessions;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
 
-    public PgAgentSessionRepository(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgAgentSessionRepository(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope);
     }
 
-    public PgAgentSessionRepository(Sql sql, Namespace namespace) {
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+    public PgAgentSessionRepository(Sql sql, ScopeSupplier scope) {
+        this.scope = Objects.requireNonNull(scope, "scope");
         this.sessions = DocumentTable.of(AgentSession.class)
                 .table("mc_agent_session")
-                .partitionKey("namespace", "TEXT", s -> namespace.value())
+                .partitionKey("namespace", "TEXT", s -> scope.namespace().value())
                 .id("id", "TEXT", s -> s.id().value())
                 .column("agent_definition_id", "TEXT", s -> s.agentDefinitionId().value())
                 .column("user_id", "TEXT", s -> s.userId().value())
@@ -79,19 +79,19 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
     /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
     @Override
     public Optional<AgentSession> update(SessionId id, UnaryOperator<AgentSession> change) {
-        return sessions.update(namespace.value(), id.value(), change);
+        return sessions.update(scope.namespace().value(), id.value(), change);
     }
 
     @Override
     public Optional<AgentSession> findById(SessionId id) {
-        return sessions.findById(namespace.value(), id.value());
+        return sessions.findById(scope.namespace().value(), id.value());
     }
 
     @Override
     public List<AgentSession> findByAgent(AgentId agent, UserId user) {
         return sessions.find("WHERE namespace = ? AND agent_definition_id = ? AND user_id = ? "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                namespace.value(), agent.value(), user.value());
+                scope.namespace().value(), agent.value(), user.value());
     }
 
     /** Top-level sessions only — sub-agent sessions are reached through {@link #findByParentSession}. */
@@ -99,7 +99,7 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
     public List<AgentSession> findByUser(UserId user) {
         return sessions.find("WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                namespace.value(), user.value());
+                scope.namespace().value(), user.value());
     }
 
     /** Headers from the columns alone: the sidebar's list without a single document read. */
@@ -108,7 +108,7 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
         return sessions.select(PgAgentSessionRepository::header,
                 "WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                namespace.value(), user.value());
+                scope.namespace().value(), user.value());
     }
 
     @Override
@@ -116,7 +116,7 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
         return sessions.find("WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
                         + "AND COALESCE(session_type, 'chat') = ? "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                namespace.value(), user.value(), typeOrChat(type));
+                scope.namespace().value(), user.value(), typeOrChat(type));
     }
 
     @Override
@@ -125,7 +125,7 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
                 "WHERE namespace = ? AND user_id = ? AND parent_session_id IS NULL "
                         + "AND COALESCE(session_type, 'chat') = ? "
                         + "ORDER BY started_at DESC NULLS LAST, id",
-                namespace.value(), user.value(), typeOrChat(type));
+                scope.namespace().value(), user.value(), typeOrChat(type));
     }
 
     private static String typeOrChat(String type) {
@@ -154,11 +154,11 @@ public final class PgAgentSessionRepository implements AgentSessionRepository {
     @Override
     public List<AgentSession> findByParentSession(SessionId parent) {
         return sessions.find("WHERE namespace = ? AND parent_session_id = ? ORDER BY started_at NULLS LAST, id",
-                namespace.value(), parent.value());
+                scope.namespace().value(), parent.value());
     }
 
     @Override
     public void deleteById(SessionId id) {
-        sessions.deleteById(namespace.value(), id.value());
+        sessions.deleteById(scope.namespace().value(), id.value());
     }
 }

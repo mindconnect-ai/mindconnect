@@ -1,6 +1,7 @@
 package ai.mindconnect.chatui.service;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
@@ -25,7 +26,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SessionOwnershipTest {
 
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
+    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
     private final SessionOwnership ownership = new SessionOwnership(sessions);
 
     private final AgentSession alices = sessions.create(

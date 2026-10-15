@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ChatTurnId;
@@ -10,7 +10,6 @@ import ai.mindconnect.agent.runtime.domain.TraceId;
 import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,18 +52,20 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
      */
     public static final int DEFAULT_MAX_PER_SESSION = 50;
 
-    private final Path baseDir;
+    private final Path dataDir;
+    private final ScopeSupplier scope;
     private final int maxTracesPerSession;
     private final ObjectMapper mapper;
 
-    public FileLlmCallTraceRepository(Path baseDir, Namespace namespace) {
-        this(baseDir, DEFAULT_MAX_PER_SESSION, namespace);
+    public FileLlmCallTraceRepository(Path dataDir, ObjectMapper mapper, ScopeSupplier scope) {
+        this(dataDir, mapper, DEFAULT_MAX_PER_SESSION, scope);
     }
 
-    public FileLlmCallTraceRepository(Path baseDir, int maxTracesPerSession, Namespace namespace) {
-        this.baseDir = baseDir.resolve(namespace.value()).resolve("conversations").toAbsolutePath().normalize();
+    public FileLlmCallTraceRepository(Path dataDir, ObjectMapper mapper, int maxTracesPerSession, ScopeSupplier scope) {
+        this.dataDir = dataDir.toAbsolutePath().normalize();
+        this.mapper = mapper;
+        this.scope = scope;
         this.maxTracesPerSession = maxTracesPerSession;
-        this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
     @Override
@@ -87,8 +88,8 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
     @Override
     public List<LlmCallTrace> findByTurn(ChatTurnId turnId) {
         List<LlmCallTrace> result = new ArrayList<>();
-        if (!Files.isDirectory(baseDir)) return result;
-        try (DirectoryStream<Path> convs = Files.newDirectoryStream(baseDir)) {
+        if (!Files.isDirectory(conversationsDir())) return result;
+        try (DirectoryStream<Path> convs = Files.newDirectoryStream(conversationsDir())) {
             for (Path conv : convs) {
                 Path turnDir = conv.resolve("traces").resolve(turnId.value());
                 if (Files.isDirectory(turnDir)) {
@@ -133,7 +134,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
 
     @Override
     public List<LlmCallTrace> findByConversation(ConversationId conversationId) {
-        Path tracesRoot = baseDir.resolve(conversationId.value()).resolve("traces");
+        Path tracesRoot = conversationsDir().resolve(conversationId.value()).resolve("traces");
         if (!Files.isDirectory(tracesRoot)) return List.of();
         List<LlmCallTrace> result = new ArrayList<>();
         try (DirectoryStream<Path> turns = Files.newDirectoryStream(tracesRoot)) {
@@ -164,8 +165,8 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
 
     @Override
     public void deleteBySession(SessionId sessionId) {
-        if (!Files.isDirectory(baseDir)) return;
-        try (DirectoryStream<Path> convs = Files.newDirectoryStream(baseDir)) {
+        if (!Files.isDirectory(conversationsDir())) return;
+        try (DirectoryStream<Path> convs = Files.newDirectoryStream(conversationsDir())) {
             for (Path conv : convs) {
                 Path tracesRoot = conv.resolve("traces");
                 if (!Files.isDirectory(tracesRoot)) continue;
@@ -198,7 +199,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
     // ── layout: <conversation>/traces/<turn>/<startedAt>-<id>.json ──────────
 
     private Path turnDirFor(ConversationId conversationId, ChatTurnId turnId) {
-        return baseDir.resolve(conversationId.value()).resolve("traces").resolve(turnId.value());
+        return conversationsDir().resolve(conversationId.value()).resolve("traces").resolve(turnId.value());
     }
 
     private String filenameFor(LlmCallTrace trace) {
@@ -208,8 +209,8 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
     /** Every trace under every conversation, read in {@code namespace}. */
     private List<LlmCallTrace> allTraces() {
         List<LlmCallTrace> out = new ArrayList<>();
-        if (!Files.isDirectory(baseDir)) return out;
-        try (DirectoryStream<Path> convs = Files.newDirectoryStream(baseDir)) {
+        if (!Files.isDirectory(conversationsDir())) return out;
+        try (DirectoryStream<Path> convs = Files.newDirectoryStream(conversationsDir())) {
             for (Path conv : convs) {
                 Path tracesRoot = conv.resolve("traces");
                 if (!Files.isDirectory(tracesRoot)) continue;
@@ -251,7 +252,7 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
 
     private void enforceRetention(ConversationId conversationId) {
         if (maxTracesPerSession <= 0) return;
-        Path tracesRoot = baseDir.resolve(conversationId.value()).resolve("traces");
+        Path tracesRoot = conversationsDir().resolve(conversationId.value()).resolve("traces");
         if (!Files.isDirectory(tracesRoot)) return;
         List<Path> all = new ArrayList<>();
         try (DirectoryStream<Path> turns = Files.newDirectoryStream(tracesRoot)) {
@@ -276,5 +277,10 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
             }
         }
         log.debug("Retention sweep pruned {} oldest trace(s) for conversation {}", toDelete, conversationId);
+    }
+
+    /** The conversations directory of the namespace the current call works in. */
+    private Path conversationsDir() {
+        return dataDir.resolve(scope.namespace().value()).resolve("conversations");
     }
 }

@@ -2,6 +2,7 @@ package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
@@ -57,8 +58,8 @@ class AgentApiControllerOwnershipTest {
     Path dir;
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
-    private final InMemoryAgentDefinitionRepository definitions = new InMemoryAgentDefinitionRepository();
+    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
+    private final InMemoryAgentDefinitionRepository definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
     private final UserChannels userChannels = new UserChannels();
 
     private AgentSessionService sessionService;
@@ -69,13 +70,13 @@ class AgentApiControllerOwnershipTest {
     @BeforeEach
     void setUp() {
         sessionService = new AgentSessionService(definitions, sessions,
-                new InMemoryMessageStore().conversationManager(), new InMemoryWorkingMemoryRepository(),
-                new InMemoryConversationSummaryRepository(), new InMemoryTodoListRepository(),
+                new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
+                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
                 new InMemoryToolApprovalRepository(), userChannels);
         chat = new RecordingChatService(sessionService);
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
-                sessionService, chat, new FilesystemFileStore(dir, new Namespace("test")), userChannels,
+                sessionService, chat, new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test"))), userChannels,
                 new SessionAccess(sessions), new ObjectMapper(), null);
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }

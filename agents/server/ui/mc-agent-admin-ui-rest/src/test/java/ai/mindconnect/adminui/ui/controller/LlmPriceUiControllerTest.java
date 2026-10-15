@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui.controller;
 
 import ai.mindconnect.adminui.ui.component.LlmPricingComponent;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.lmstudio.LmStudioModelCatalog;
@@ -30,8 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class LlmPriceUiControllerTest {
 
-    private final InMemoryLlmConfigRepository configs = new InMemoryLlmConfigRepository();
-    private final InMemoryLlmPriceRepository prices = new InMemoryLlmPriceRepository();
+    private final InMemoryLlmConfigRepository configs = new InMemoryLlmConfigRepository(ScopeSupplier.local());
+    private final InMemoryLlmPriceRepository prices = new InMemoryLlmPriceRepository(ScopeSupplier.local());
     private final LlmPriceService service = new LlmPriceService(prices, configs);
     private final Clock clock = Clock.fixed(Instant.parse("2026-09-24T10:00:00Z"), ZoneOffset.UTC);
     private final LlmPriceUiController controller = new LlmPriceUiController(configs, service, clock,

@@ -42,10 +42,6 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-namespace</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-feature-transcription</artifactId>
         </dependency>
         <dependency>
@@ -68,6 +64,10 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-namespace-core</artifactId>
         </dependency>
     </dependencies>
 </project>

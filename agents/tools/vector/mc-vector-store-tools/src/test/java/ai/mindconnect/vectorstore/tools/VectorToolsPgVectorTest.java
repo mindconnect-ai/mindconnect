@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -76,7 +77,7 @@ class VectorToolsPgVectorTest {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) FAKE_EMBEDDINGS);
                 if (type == LlmConfigRepository.class) return Optional.of((T) FAKE_CONFIGS);
-                if (type == Namespace.class) return Optional.of((T) NS);
+                if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(NS));
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {

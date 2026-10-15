@@ -1,5 +1,6 @@
 package ai.mindconnect.adminui.ui.controller;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
 import ai.mindconnect.agent.runtime.skill.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SkillUiControllerTest {
 
-    private final InMemorySkillRepository repository = new InMemorySkillRepository();
+    private final InMemorySkillRepository repository = new InMemorySkillRepository(ScopeSupplier.local());
     private final SkillUiController controller = controller(repository);
 
     private static SkillUiController controller(SkillRepository repository) {

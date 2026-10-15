@@ -1,6 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpServerId;
@@ -17,8 +17,8 @@ import java.util.Optional;
 
 /**
  * Discoveries as one JSON file per server, beside the registrations:
- * {@code <storage>/<namespace>/system/mcp-schema-cache/<id>.json}. Bound to
- * one namespace at construction.
+ * {@code <storage>/<namespace>/system/mcp-schema-cache/<id>.json}, the
+ * namespace the scope names for the current call.
  */
 public final class FileMcpDiscoveryStore implements McpDiscoveryStore {
 
@@ -27,11 +27,12 @@ public final class FileMcpDiscoveryStore implements McpDiscoveryStore {
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
 
-    private final Path directory;
+    private final Path storageDir;
+    private final ScopeSupplier scope;
 
-    public FileMcpDiscoveryStore(Path storageDir, Namespace namespace) {
-        this.directory = storageDir.resolve(namespace.value()).resolve("system")
-                .resolve("mcp-schema-cache").toAbsolutePath();
+    public FileMcpDiscoveryStore(Path storageDir, ScopeSupplier scope) {
+        this.storageDir = storageDir.toAbsolutePath();
+        this.scope = scope;
     }
 
     @Override
@@ -72,6 +73,11 @@ public final class FileMcpDiscoveryStore implements McpDiscoveryStore {
 
     /** The id is a safe file name — {@link McpServerId} refuses anything else. */
     private Path fileFor(McpServerId server) {
-        return directory.resolve(server.value() + ".json");
+        return directory().resolve(server.value() + ".json");
+    }
+
+    /** The cache directory of the namespace the current call works in. */
+    private Path directory() {
+        return storageDir.resolve(scope.namespace().value()).resolve("system").resolve("mcp-schema-cache");
     }
 }

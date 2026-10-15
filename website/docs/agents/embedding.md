@@ -187,7 +187,7 @@ The server applications build their runtime the same way. `mc-agent-starter-runt
 is a Spring Boot starter whose auto-configuration runs the builder: the
 `Persistence` comes from the persistence starter of the application
 (`mc-agent-starter-file` or `mc-agent-starter-postgres`), the thread-bound scope
-from the namespace starter — then the `NamespaceFeature` is installed and the
+from the namespace starter — handed to the builder with `scope(…)`, so the
 runtime works in the namespace of each request — and the settings are the
 `mindconnect.*` properties they always were (`mindconnect.tools.*`,
 `mindconnect.agent.*`, `mindconnect.vector-store.*`, …). The starter exports the

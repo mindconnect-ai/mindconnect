@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Storage of agent definitions. An adapter is bound to one namespace when it
- * is built; every method works inside it.
+ * Storage of agent definitions. An adapter works in the namespace the scope
+ * names per call; every method works inside it.
  */
 public interface AgentDefinitionRepository {
 

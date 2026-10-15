@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -94,18 +95,21 @@ final class TestDb {
     /**
      * What a runtime on Postgres persistence offers the vector stores: its Sql
      * and DataSource, the embedding services (a fake with fixed three-dimensional
-     * vectors) and the data directory — plus whatever {@code strings} add.
+     * vectors), the data directory and a scope fixed to {@code namespace} — plus
+     * whatever {@code strings} add.
      */
-    static ToolEnvironment postgresEnvironment(DataSource dataSource, Path dataDir, Map<String, String> strings) {
-        return environment(dataSource, dataDir, strings);
+    static ToolEnvironment postgresEnvironment(Namespace namespace, DataSource dataSource, Path dataDir,
+                                               Map<String, String> strings) {
+        return environment(namespace, dataSource, dataDir, strings);
     }
 
     /** The same on file persistence: no Sql, no DataSource — only what {@code strings} configure. */
-    static ToolEnvironment fileEnvironment(Path dataDir, Map<String, String> strings) {
-        return environment(null, dataDir, strings);
+    static ToolEnvironment fileEnvironment(Namespace namespace, Path dataDir, Map<String, String> strings) {
+        return environment(namespace, null, dataDir, strings);
     }
 
-    private static ToolEnvironment environment(DataSource dataSource, Path dataDir, Map<String, String> strings) {
+    private static ToolEnvironment environment(Namespace namespace, DataSource dataSource, Path dataDir,
+                                               Map<String, String> strings) {
         Sql sql = dataSource == null ? null : Sql.of(dataSource);
         LlmEmbeddings embeddings = (config, texts) -> texts.stream()
                 .map(t -> t.contains("container") ? new float[]{1f, 0f, 0f} : new float[]{0f, 0f, 1f})
@@ -126,6 +130,7 @@ final class TestDb {
                 if (type == DataSource.class) return Optional.ofNullable((T) dataSource);
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) configs);
+                if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(namespace));
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {

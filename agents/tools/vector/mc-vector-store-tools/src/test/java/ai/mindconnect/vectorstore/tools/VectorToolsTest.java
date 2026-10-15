@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.Tool;
@@ -68,7 +69,7 @@ class VectorToolsTest {
             public <T> Optional<T> get(Class<T> type) {
                 if (type == LlmEmbeddings.class) return Optional.of((T) embeddings);
                 if (type == LlmConfigRepository.class) return Optional.of((T) configs);
-                if (type == Namespace.class) return Optional.of((T) new Namespace("test"));
+                if (type == ScopeSupplier.class) return Optional.of((T) ScopeSupplier.fixed(new Namespace("test")));
                 return Optional.empty();
             }
             @Override public Optional<String> getString(String key) {
@@ -102,7 +103,7 @@ class VectorToolsTest {
     /** A chat's upload store as the upload pipeline registers it: session-scoped, owned by the chat's user. */
     private String uploadStore(String owner, SessionId chat) {
         String name = "session-" + chat.value();
-        stores().open(NS, name, null, VectorStoreInstance.Scope.SESSION, chat.value(), owner);
+        stores().open(name, null, VectorStoreInstance.Scope.SESSION, chat.value(), owner);
         return name;
     }
 
@@ -235,7 +236,7 @@ class VectorToolsTest {
     void anUploadStoreWithoutOwnerIsReachableFromItsOwnChatUntilItGetsOne() {
         SessionId oldChat = SessionId.random();
         String oldStore = "session-" + oldChat.value();
-        stores().open(NS, oldStore, null, VectorStoreInstance.Scope.SESSION, oldChat.value());
+        stores().open(oldStore, null, VectorStoreInstance.Scope.SESSION, oldChat.value());
 
         assertThat(tool(new VectorTools.SearchFactory(), chat("carol", oldChat))
                 .execute(Map.of("query", "container")))
@@ -248,7 +249,7 @@ class VectorToolsTest {
         assertThat(tool(new VectorTools.UpsertFactory(), chat("carol", oldChat))
                 .execute(chunk(oldStore, "notes", "container notes")))
                 .contains("Stored 1 chunk(s)");
-        assertThat(stores().registry(NS).instance(oldStore).orElseThrow().owner()).isEqualTo("carol");
+        assertThat(stores().registry().instance(oldStore).orElseThrow().owner()).isEqualTo("carol");
 
         assertThat(tool(new VectorTools.SearchFactory(), chat("carol", SessionId.random()))
                 .execute(Map.of("store", oldStore, "query", "container")))
@@ -268,7 +269,7 @@ class VectorToolsTest {
         assertThat(tool(new VectorTools.UpsertFactory(), chat("dave", davesChat))
                 .execute(chunk(davesStore, "early", "container notes")))
                 .contains("Stored 1 chunk(s)");
-        VectorStoreInstance registered = stores().registry(NS).instance(davesStore).orElseThrow();
+        VectorStoreInstance registered = stores().registry().instance(davesStore).orElseThrow();
         assertThat(registered.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
         assertThat(registered.scopeRef()).isEqualTo(davesChat.value());
         assertThat(registered.owner()).isEqualTo("dave");
@@ -279,19 +280,19 @@ class VectorToolsTest {
         // Registered under the chat's name as GLOBAL: the chat's pipeline claims it.
         SessionId erinsChat = SessionId.random();
         String erinsStore = "session-" + erinsChat.value();
-        stores().open(NS, erinsStore, null, VectorStoreInstance.Scope.GLOBAL, null);
-        stores().open(NS, erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "erin");
-        VectorStoreInstance claimed = stores().registry(NS).instance(erinsStore).orElseThrow();
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "erin");
+        VectorStoreInstance claimed = stores().registry().instance(erinsStore).orElseThrow();
         assertThat(claimed.scope()).isEqualTo(VectorStoreInstance.Scope.SESSION);
         assertThat(claimed.scopeRef()).isEqualTo(erinsChat.value());
         assertThat(claimed.owner()).isEqualTo("erin");
         // An owned store is not claimed again, and nobody claims another chat's name.
-        stores().open(NS, erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "mallory");
-        assertThat(stores().registry(NS).instance(erinsStore).orElseThrow().owner()).isEqualTo("erin");
+        stores().open(erinsStore, null, VectorStoreInstance.Scope.SESSION, erinsChat.value(), "mallory");
+        assertThat(stores().registry().instance(erinsStore).orElseThrow().owner()).isEqualTo("erin");
         String franksStore = "session-" + SessionId.random().value();
-        stores().open(NS, franksStore, null, VectorStoreInstance.Scope.GLOBAL, null);
-        stores().open(NS, franksStore, null, VectorStoreInstance.Scope.SESSION, SessionId.random().value(), "mallory");
-        assertThat(stores().registry(NS).instance(franksStore).orElseThrow().owner()).isNull();
+        stores().open(franksStore, null, VectorStoreInstance.Scope.GLOBAL, null);
+        stores().open(franksStore, null, VectorStoreInstance.Scope.SESSION, SessionId.random().value(), "mallory");
+        assertThat(stores().registry().instance(franksStore).orElseThrow().owner()).isNull();
     }
 
     @Test
@@ -311,7 +312,7 @@ class VectorToolsTest {
         assertThat(tool(new VectorIngestFileTool.Factory(), chat("alice", alicesChat))
                 .execute(Map.of("path", "doc.txt", "store", alicesStore)))
                 .contains("Stored");
-        assertThat(stores().registry(NS).instance(alicesStore).orElseThrow().owner()).isEqualTo("alice");
+        assertThat(stores().registry().instance(alicesStore).orElseThrow().owner()).isEqualTo("alice");
     }
 
     @Test
@@ -464,7 +465,7 @@ class VectorToolsTest {
         Tool upsert = tool(new VectorTools.UpsertFactory());
         Tool delete = tool(new VectorTools.DeleteFileFactory());
         upsert.execute(Map.of("store", "kb", "file_id", "notes", "chunks", List.of(Map.of("text", "container notes"))));
-        VectorStore store = stores().store(NS, "kb");
+        VectorStore store = stores().store("kb");
         var ref = store.documentRef("notes");
         assertThat(store.indexed(ref)).isTrue();
 

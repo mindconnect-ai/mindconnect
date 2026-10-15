@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.tools.workflow;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.MapToolEnvironment;
 import ai.mindconnect.agent.tool.Tool;
@@ -13,6 +12,7 @@ import ai.mindconnect.workflow.domain.AssignVariablesData;
 import ai.mindconnect.workflow.domain.VariableAssignment;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
+import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,11 +43,10 @@ class WorkflowToolDataIsNotCodeTest {
 
     @BeforeEach
     void setUp() {
-        repository = new FileWorkflowDataRepository(dir, "test");
+        repository = new FileWorkflowDataRepository(dir, () -> "test");
         provider = new WorkflowToolProvider();
         provider.bind(MapToolEnvironment.builder()
-                .string("dataBaseDir", dir.toString())
-                .service(Namespace.class, new Namespace("test"))
+                .service(WorkflowDataRepository.class, repository)
                 .build());
     }
 

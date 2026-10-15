@@ -38,7 +38,7 @@ import java.nio.file.Path;
  *
  * <p>It declares no scope: an application works in one namespace unless it also
  * has {@code mc-agent-starter-namespace}, which binds a scope per request and
- * owns the {@code ThreadBoundScope} bean. A host without it — the CLI, an
+ * owns the {@code ThreadBoundScopeSupplier} bean. A host without it — the CLI, an
  * embedded server — gets a runtime fixed to {@code mindconnect.namespace},
  * which is what a single-namespace application wants and what its own start-up
  * threads can work with.

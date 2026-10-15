@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
 import ai.mindconnect.vectorstore.embedding.EntityType;
@@ -48,19 +49,19 @@ class IndexDefinitionsTest {
     void chatUploadsLiveInATableOfTheirOwn() {
         db = TestDb.requirePostgres();
         TestDb.forget(db, NS);
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
-        stores.registry(NS).saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", null, Map.of()));
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir, Map.of())).orElseThrow();
+        stores.registry().saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", null, Map.of()));
 
-        VectorStore chat = stores.open(NS, "session-s1", "chat-uploads", VectorStoreInstance.Scope.SESSION, "s1", "alice");
-        VectorStore kb = stores.open(NS, "kb", null, VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore chat = stores.open("session-s1", "chat-uploads", VectorStoreInstance.Scope.SESSION, "s1", "alice");
+        VectorStore kb = stores.open("kb", null, VectorStoreInstance.Scope.GLOBAL, null);
         chat.put(FILE_1, null, "1", TEXT);
         kb.put(kb.documentRef("notes"), null, "1", TEXT);
 
         Sql sql = Sql.of(db);
         assertThat(sql.scalar("SELECT count(*) FROM mc_embedding_chat WHERE namespace = ?", Long.class, NS.value())).isEqualTo(1L);
         assertThat(sql.scalar("SELECT count(*) FROM mc_embedding WHERE namespace = ?", Long.class, NS.value())).isEqualTo(1L);
-        assertThat(stores.indexOf(NS, chat.settings())).isEqualTo("chat-uploads");
-        assertThat(stores.indexLocation(NS, "chat-uploads")).endsWith("— table mc_embedding_chat");
+        assertThat(stores.indexOf(chat.settings())).isEqualTo("chat-uploads");
+        assertThat(stores.indexLocation("chat-uploads")).endsWith("— table mc_embedding_chat");
         assertThat(chat.search("container", 5)).hasSize(1);
         assertThat(kb.indexed(FILE_1)).as("another index: the file would be embedded there again").isFalse();
     }
@@ -69,20 +70,20 @@ class IndexDefinitionsTest {
     void aTemplateCanNameAnIndexInATableOfItsOwn() {
         db = TestDb.requirePostgres();
         TestDb.forget(db, NS);
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
-        stores.saveIndex(NS, new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, "one large base"));
-        stores.registry(NS).saveTemplate(new VectorStoreTemplate("handbooks", "embeddings", null, Map.of()).withIndex("big-kb"));
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir, Map.of())).orElseThrow();
+        stores.saveIndex(new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, "one large base"));
+        stores.registry().saveTemplate(new VectorStoreTemplate("handbooks", "embeddings", null, Map.of()).withIndex("big-kb"));
 
-        VectorStore store = stores.open(NS, "manuals", "handbooks", VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore store = stores.open("manuals", "handbooks", VectorStoreInstance.Scope.GLOBAL, null);
         store.put(FILE_1, null, "1", TEXT);
 
         assertThat(store.settings().index()).isEqualTo("big-kb");
         assertThat(Sql.of(db).scalar("SELECT count(*) FROM " + OWN_TABLE + " WHERE namespace = ?", Long.class, NS.value()))
                 .isEqualTo(1L);
-        assertThat(stores.indexes(NS)).extracting(IndexDefinition::name).containsExactly("default", "chat-uploads", "big-kb");
-        assertThat(stores.isBuiltIn(NS, "default")).isTrue();
-        assertThat(stores.isBuiltIn(NS, "big-kb")).isFalse();
-        assertThatThrownBy(() -> stores.index(NS, "nowhere")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(stores.indexes()).extracting(IndexDefinition::name).containsExactly("default", "chat-uploads", "big-kb");
+        assertThat(stores.isBuiltIn("default")).isTrue();
+        assertThat(stores.isBuiltIn("big-kb")).isFalse();
+        assertThatThrownBy(() -> stores.index("nowhere")).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -90,16 +91,16 @@ class IndexDefinitionsTest {
         db = TestDb.requirePostgres();
         TestDb.forget(db, NS);
         DefaultVectorStores stores = (DefaultVectorStores) VectorStores.fromEnvironment(
-                TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
+                TestDb.postgresEnvironment(NS, db, dir, Map.of())).orElseThrow();
         // The test database stands in for the tenant's own — reached by URL, not through the application's pool.
-        stores.saveIndex(NS, new IndexDefinition("default", "pgvector", OWN_TABLE, TestDb.URL + "?user=postgres",
+        stores.saveIndex(new IndexDefinition("default", "pgvector", OWN_TABLE, TestDb.URL + "?user=postgres",
                 "postgres", "test", null, null));
 
-        VectorStore kb = stores.open(NS, "kb", null, VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore kb = stores.open("kb", null, VectorStoreInstance.Scope.GLOBAL, null);
         kb.put(kb.documentRef("notes"), null, "1", TEXT);
 
-        assertThat(stores.indexLocation(NS)).isEqualTo("Postgres (pgvector), " + TestDb.URL + " — table " + OWN_TABLE);
-        assertThat(stores.isBuiltIn(NS, "default")).isFalse();
+        assertThat(stores.indexLocation()).isEqualTo("Postgres (pgvector), " + TestDb.URL + " — table " + OWN_TABLE);
+        assertThat(stores.isBuiltIn("default")).isFalse();
         Sql sql = Sql.of(db);
         assertThat(sql.scalar("SELECT count(*) FROM " + OWN_TABLE + " WHERE namespace = ?", Long.class, NS.value())).isEqualTo(1L);
 
@@ -111,17 +112,17 @@ class IndexDefinitionsTest {
     void onFilePersistence_anIndexWithoutUrlUsesTheConfiguredVectorStoreDatabase() {
         db = TestDb.requirePostgres();
         TestDb.forget(db, NS);
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of(
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(NS, dir, Map.of(
                 "vectorStoreUrl", TestDb.URL, "vectorStoreUser", TestDb.USER,
                 "vectorStorePassword", TestDb.PASSWORD))).orElseThrow();
-        stores.saveIndex(NS, new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
-        stores.registry(NS).saveTemplate(new VectorStoreTemplate("handbooks", "embeddings", null, Map.of()).withIndex("big-kb"));
+        stores.saveIndex(new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
+        stores.registry().saveTemplate(new VectorStoreTemplate("handbooks", "embeddings", null, Map.of()).withIndex("big-kb"));
 
-        VectorStore store = stores.open(NS, "manuals", "handbooks", VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore store = stores.open("manuals", "handbooks", VectorStoreInstance.Scope.GLOBAL, null);
         store.put(FILE_1, null, "1", TEXT);
 
         assertThat(stores.systemDatabase()).contains("the vector-store database, " + TestDb.URL);
-        assertThat(stores.indexLocation(NS, "big-kb"))
+        assertThat(stores.indexLocation("big-kb"))
                 .isEqualTo("Postgres (pgvector), the vector-store database, " + TestDb.URL + " — table " + OWN_TABLE);
         assertThat(Sql.of(db).scalar("SELECT count(*) FROM " + OWN_TABLE + " WHERE namespace = ?", Long.class, NS.value()))
                 .isEqualTo(1L);
@@ -129,31 +130,31 @@ class IndexDefinitionsTest {
 
     @Test
     void withoutAnyPostgres_anIndexWithoutUrlFallsBackToFiles_andSaysSo() {
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of())).orElseThrow();
-        stores.saveIndex(NS, new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(NS, dir, Map.of())).orElseThrow();
+        stores.saveIndex(new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
 
         assertThat(stores.systemDatabase()).isEmpty();
-        assertThat(stores.indexLocation(NS, "big-kb")).startsWith("Files in ").endsWith("no database for pgvector (file persistence)");
+        assertThat(stores.indexLocation("big-kb")).startsWith("Files in ").endsWith("no database for pgvector (file persistence)");
     }
 
     @Test
     void onPostgresPersistence_theSystemDatabaseIsTheApplications() {
         db = TestDb.requirePostgres();
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir, Map.of())).orElseThrow();
         assertThat(stores.systemDatabase()).contains("the application's database");
     }
 
     @Test
     void anOwnDatabaseThatCannotBeReachedMakesTheIndexUnavailable_notFiles() {
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of())).orElseThrow();
-        stores.saveIndex(NS, new IndexDefinition("far-kb", "pgvector", OWN_TABLE,
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(NS, dir, Map.of())).orElseThrow();
+        stores.saveIndex(new IndexDefinition("far-kb", "pgvector", OWN_TABLE,
                 "jdbc:postgresql://localhost:1/nowhere?user=x&password=y", null, null, null, null));
 
-        assertThatThrownBy(() -> stores.indexLocation(NS, "far-kb"))
+        assertThatThrownBy(() -> stores.indexLocation("far-kb"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("Index 'far-kb': the database jdbc:postgresql://localhost:1/nowhere cannot be reached (")
                 .satisfies(e -> assertThat(e.getMessage()).doesNotContain("password=y").doesNotContain("pgvector extension"));
-        assertThatThrownBy(() -> stores.index(NS, "far-kb")).isInstanceOf(IllegalStateException.class);
+        assertThatThrownBy(() -> stores.index("far-kb")).isInstanceOf(IllegalStateException.class);
         assertThat(dir.resolve(NS.value()).resolve("embeddings-far-kb")).as("no quiet fallback to files").doesNotExist();
     }
 
@@ -161,21 +162,21 @@ class IndexDefinitionsTest {
     void anOwnDatabaseWithoutPgvectorMakesTheIndexUnavailable_andSaysSo() {
         db = TestDb.requirePostgres();
         String url = TestDb.withoutPgvectorUrl();
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of())).orElseThrow();
-        stores.saveIndex(NS, new IndexDefinition("plain-kb", "pgvector", OWN_TABLE, url,
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(NS, dir, Map.of())).orElseThrow();
+        stores.saveIndex(new IndexDefinition("plain-kb", "pgvector", OWN_TABLE, url,
                 TestDb.NO_VECTOR_USER, TestDb.NO_VECTOR_USER, null, null));
 
-        assertThatThrownBy(() -> stores.indexLocation(NS, "plain-kb"))
+        assertThatThrownBy(() -> stores.indexLocation("plain-kb"))
                 .hasMessageContaining("Index 'plain-kb': the database " + url + " has no pgvector extension (");
     }
 
     @Test
     void theApplicationsDatabaseThatCannotBeReachedFallsBackToFiles_andSaysWhy() {
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(dir, Map.of(
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.fileEnvironment(NS, dir, Map.of(
                 "vectorStoreUrl", "jdbc:postgresql://localhost:1/nowhere"))).orElseThrow();
-        stores.saveIndex(NS, new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
+        stores.saveIndex(new IndexDefinition("big-kb", "pgvector", OWN_TABLE, null, null, null, null, null));
 
-        assertThat(stores.indexLocation(NS, "big-kb")).startsWith("Files in ")
+        assertThat(stores.indexLocation("big-kb")).startsWith("Files in ")
                 .contains("— the application's Postgres cannot be reached (");
     }
 
@@ -192,27 +193,28 @@ class IndexDefinitionsTest {
                     @Override public List<ai.mindconnect.llm.domain.LlmConfig> findAll() { return List.of(); }
                     @Override public void save(ai.mindconnect.llm.domain.LlmConfig config) { }
                     @Override public void deleteById(ai.mindconnect.llm.domain.LlmConfigId id) { }
-                }, null);
-        stores.registry(NS).saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", null, Map.of()));
-        VectorStore chat = stores.open(NS, "session-s1", "chat-uploads", VectorStoreInstance.Scope.SESSION, "s1", "alice");
+                }, ScopeSupplier.fixed(NS));
+        stores.registry().saveTemplate(new VectorStoreTemplate("chat-uploads", "embeddings", null, Map.of()));
+        VectorStore chat = stores.open("session-s1", "chat-uploads", VectorStoreInstance.Scope.SESSION, "s1", "alice");
         chat.put(FILE_1, null, "1", TEXT);
 
         assertThat(dir.resolve(NS.value()).resolve("embeddings-chat-uploads/entries")).isDirectory();
         assertThat(dir.resolve(NS.value()).resolve("embeddings")).doesNotExist();
-        assertThat(stores.indexLocation(NS, "chat-uploads")).endsWith("embeddings-chat-uploads — file persistence");
+        assertThat(stores.indexLocation("chat-uploads")).endsWith("embeddings-chat-uploads — file persistence");
     }
 
     @Test
     void aStoreFromBeforeIndexesFollowsItsTemplatesName() {
         DefaultVectorStores stores = new DefaultVectorStores(
-                new VectorStoreTemplate("default", "embeddings", null, Map.of()), dir, null, null, null);
+                new VectorStoreTemplate("default", "embeddings", null, Map.of()), dir, null, null,
+                ScopeSupplier.fixed(NS));
         VectorStoreInstance chat = new VectorStoreInstance("session-s1", "chat-uploads", "embeddings", null, Map.of(),
                 VectorStoreInstance.Scope.SESSION, "s1", "alice", Instant.now());
         VectorStoreInstance kb = new VectorStoreInstance("kb", "default", "embeddings", null, Map.of(),
                 VectorStoreInstance.Scope.GLOBAL, null, null, Instant.now());
 
-        assertThat(stores.indexOf(NS, chat)).isEqualTo("chat-uploads");
-        assertThat(stores.indexOf(NS, kb)).isEqualTo("default");
+        assertThat(stores.indexOf(chat)).isEqualTo("chat-uploads");
+        assertThat(stores.indexOf(kb)).isEqualTo("default");
     }
 
     @Test

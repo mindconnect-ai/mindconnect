@@ -1,6 +1,7 @@
 package ai.mindconnect.mcp.gateway.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.Jsonb;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.mcp.gateway.McpServerId;
@@ -28,8 +29,8 @@ class PgMcpServerRepositoryTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.freshMcpTables();
-        acme = new PgMcpServerRepository(sql, ACME).initSchema();
-        other = new PgMcpServerRepository(sql, OTHER).initSchema();
+        acme = new PgMcpServerRepository(sql, ScopeSupplier.fixed(ACME)).initSchema();
+        other = new PgMcpServerRepository(sql, ScopeSupplier.fixed(OTHER)).initSchema();
     }
 
     @Test

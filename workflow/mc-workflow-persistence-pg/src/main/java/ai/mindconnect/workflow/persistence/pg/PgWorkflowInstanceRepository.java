@@ -15,6 +15,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * {@link WorkflowInstanceRepository} on Postgres: one row of
@@ -49,18 +50,18 @@ public final class PgWorkflowInstanceRepository implements WorkflowInstanceRepos
 
     private final Sql sql;
     private final SnapshotSerializer serializer;
-    private final String partition;
+    private final Supplier<String> partition;
 
-    public PgWorkflowInstanceRepository(DataSource dataSource, String partition) {
+    public PgWorkflowInstanceRepository(DataSource dataSource, Supplier<String> partition) {
         this(Sql.of(dataSource), partition);
     }
 
-    public PgWorkflowInstanceRepository(Sql sql, String partition) {
+    public PgWorkflowInstanceRepository(Sql sql, Supplier<String> partition) {
         this(sql, partition, new SnapshotSerializer());
     }
 
-    public PgWorkflowInstanceRepository(Sql sql, String partition, SnapshotSerializer serializer) {
-        if (partition == null || partition.isBlank()) throw new IllegalArgumentException("A partition is required");
+    public PgWorkflowInstanceRepository(Sql sql, Supplier<String> partition, SnapshotSerializer serializer) {
+        if (partition == null) throw new IllegalArgumentException("A partition is required");
         this.sql = sql;
         this.serializer = serializer;
         this.partition = partition;
@@ -86,7 +87,7 @@ public final class PgWorkflowInstanceRepository implements WorkflowInstanceRepos
      * @return how many instances were imported
      */
     public int importFiles(Path directory) {
-        return WorkflowFileImport.once(sql, partition, "mc_workflow_instance", directory,
+        return WorkflowFileImport.once(sql, partition.get(), "mc_workflow_instance", directory,
                 (file, name) -> {
                     WorkflowInstanceSnapshot snapshot = serializer.fromJson(read(file));
                     if (snapshot.getInstanceId() == null || snapshot.getInstanceId().isBlank()) {
@@ -116,7 +117,7 @@ public final class PgWorkflowInstanceRepository implements WorkflowInstanceRepos
                         + "VALUES (?, ?, ?, ?, ?, now(), ?) ON CONFLICT (partition_key, id) DO UPDATE SET "
                         + "workflow_name = EXCLUDED.workflow_name, status = EXCLUDED.status, "
                         + "suspended_at = EXCLUDED.suspended_at, updated_at = now(), doc = EXCLUDED.doc",
-                partition, snapshot.getInstanceId(), snapshot.getWorkflowName(),
+                partition.get(), snapshot.getInstanceId(), snapshot.getWorkflowName(),
                 snapshot.getStatus() == null ? null : snapshot.getStatus().name(),
                 snapshot.getSuspendedAt(), Jsonb.of(json));
         return snapshot.getInstanceId();
@@ -125,23 +126,23 @@ public final class PgWorkflowInstanceRepository implements WorkflowInstanceRepos
     @Override
     public Optional<WorkflowInstanceSnapshot> findById(String instanceId) {
         return sql.queryOne("SELECT doc FROM mc_workflow_instance WHERE partition_key = ? AND id = ?",
-                row -> serializer.fromJson(row.string("doc")), partition, instanceId);
+                row -> serializer.fromJson(row.string("doc")), partition.get(), instanceId);
     }
 
     @Override
     public List<WorkflowInstanceSnapshot> findByWorkflow(String workflowName) {
         return sql.query("SELECT doc FROM mc_workflow_instance WHERE partition_key = ? AND workflow_name = ? ORDER BY suspended_at DESC, id",
-                row -> serializer.fromJson(row.string("doc")), partition, workflowName);
+                row -> serializer.fromJson(row.string("doc")), partition.get(), workflowName);
     }
 
     @Override
     public List<WorkflowInstanceSnapshot> findAll() {
         return sql.query("SELECT doc FROM mc_workflow_instance WHERE partition_key = ? ORDER BY suspended_at DESC, id",
-                row -> serializer.fromJson(row.string("doc")), partition);
+                row -> serializer.fromJson(row.string("doc")), partition.get());
     }
 
     @Override
     public boolean delete(String instanceId) {
-        return sql.update("DELETE FROM mc_workflow_instance WHERE partition_key = ? AND id = ?", partition, instanceId) > 0;
+        return sql.update("DELETE FROM mc_workflow_instance WHERE partition_key = ? AND id = ?", partition.get(), instanceId) > 0;
     }
 }

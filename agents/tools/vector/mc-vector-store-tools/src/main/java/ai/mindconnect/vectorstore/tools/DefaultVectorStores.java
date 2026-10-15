@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.jdbc.Sql;
@@ -29,8 +30,9 @@ import java.util.function.Function;
  * The one {@link VectorStores} implementation: templates from the host's
  * {@code mindconnect.vector-store.*} properties plus the persisted ones, and
  * per namespace one {@link VectorStoreRegistry} and one {@link EmbeddingIndex}
- * per {@link IndexDefinition index}. Every call names its namespace; nothing
- * here is bound to one.
+ * per {@link IndexDefinition index}. Every call works in the namespace the
+ * scope names for it; a namespace's registry and indexes are opened on its
+ * first call and kept, because a namespace may define its indexes its own way.
  *
  * <p>The registry follows the runtime's persistence: files under
  * {@code <dataBaseDir>/<namespace>/vector-stores}, or Postgres
@@ -73,8 +75,8 @@ public final class DefaultVectorStores implements VectorStores {
     private final Host host;
     private final LlmEmbeddings embeddings;
     private final LlmConfigRepository configs;
-    /** Who says which namespace the config repository answers for; null when it is bound for good. */
-    private final ai.mindconnect.agent.ScopeSupplier scope;
+    /** Who says which namespace a call works in. */
+    private final ScopeSupplier scope;
 
     /**
      * What the host brings: its data directory, the application's database (null
@@ -88,7 +90,7 @@ public final class DefaultVectorStores implements VectorStores {
 
     /** Registry and indexes on files, under {@code <baseDir>/<namespace>/}. */
     DefaultVectorStores(VectorStoreTemplate defaultTemplate, Path baseDir, LlmEmbeddings embeddings,
-                        LlmConfigRepository configs, ai.mindconnect.agent.ScopeSupplier scope) {
+                        LlmConfigRepository configs, ScopeSupplier scope) {
         this(defaultTemplate, fileRegistries(baseDir), new LegacyVectorStores(baseDir, null),
                 new Host(baseDir, null, null, builtIn(FILE, null, null, null), "file persistence", null),
                 embeddings, configs, scope);
@@ -96,14 +98,14 @@ public final class DefaultVectorStores implements VectorStores {
 
     DefaultVectorStores(VectorStoreTemplate defaultTemplate, Function<Namespace, VectorStoreRegistry> openRegistry,
                         LegacyVectorStores legacy, Host host, LlmEmbeddings embeddings, LlmConfigRepository configs,
-                        ai.mindconnect.agent.ScopeSupplier scope) {
+                        ScopeSupplier scope) {
         this.defaultTemplate = defaultTemplate;
         this.openRegistry = openRegistry;
         this.legacy = legacy;
         this.host = host;
         this.embeddings = embeddings;
         this.configs = configs;
-        this.scope = scope;
+        this.scope = java.util.Objects.requireNonNull(scope, "scope");
     }
 
     /**
@@ -155,7 +157,8 @@ public final class DefaultVectorStores implements VectorStores {
                 env.get(EncryptionHelper.class).orElse(null));
         return Optional.of(new DefaultVectorStores(defaultTemplate, registries,
                 new LegacyVectorStores(baseDir, runtimeDb), host, embeddings, configs,
-                env.get(ai.mindconnect.agent.ScopeSupplier.class).orElse(null)));
+                // The host's scope, else the default namespace.
+                env.get(ScopeSupplier.class).orElseGet(ScopeSupplier::local)));
     }
 
     /** The two built-in definitions of the given kind: the default table, and chat uploads apart from it. */
@@ -191,7 +194,7 @@ public final class DefaultVectorStores implements VectorStores {
      * {@link #forget forgets} it.
      */
     public void purge(Namespace namespace) {
-        for (IndexDefinition definition : indexes(namespace)) {
+        for (IndexDefinition definition : indexesOf(namespace)) {
             // The application's own database is cleared by the namespace purge.
             if (!definition.pgvector() || (definition.url() == null && host.runtimeDb() != null)) continue;
             DataSource db = database(definition);
@@ -208,79 +211,88 @@ public final class DefaultVectorStores implements VectorStores {
     }
 
     @Override
-    public VectorStoreRegistry registry(Namespace namespace) {
+    public VectorStoreRegistry registry() {
+        return registryOf(scope.namespace());
+    }
+
+    private VectorStoreRegistry registryOf(Namespace namespace) {
         return registries.computeIfAbsent(namespace, openRegistry);
     }
 
     @Override
-    public EmbeddingIndex index(Namespace namespace) {
-        return index(namespace, IndexDefinition.DEFAULT);
+    public EmbeddingIndex index() {
+        return index(IndexDefinition.DEFAULT);
     }
 
     @Override
-    public EmbeddingIndex index(Namespace namespace, String name) {
+    public EmbeddingIndex index(String name) {
+        Namespace namespace = scope.namespace();
         EmbeddingIndex index = open(namespace, name).index();
         importOnce(namespace);
         return index;
     }
 
     @Override
-    public List<IndexDefinition> indexes(Namespace namespace) {
+    public List<IndexDefinition> indexes() {
+        return indexesOf(scope.namespace());
+    }
+
+    private List<IndexDefinition> indexesOf(Namespace namespace) {
         Map<String, IndexDefinition> all = new LinkedHashMap<>();
         all.put(IndexDefinition.DEFAULT, host.builtIn().get(IndexDefinition.DEFAULT));
         all.put(IndexDefinition.CHAT_UPLOADS, host.builtIn().get(IndexDefinition.CHAT_UPLOADS));
-        registry(namespace).indexes().forEach(i -> all.put(i.name(), i));
+        registryOf(namespace).indexes().forEach(i -> all.put(i.name(), i));
         return List.copyOf(all.values());
     }
 
     @Override
-    public boolean isBuiltIn(Namespace namespace, String name) {
-        return host.builtIn().containsKey(name) && registry(namespace).index(name).isEmpty();
+    public boolean isBuiltIn(String name) {
+        return host.builtIn().containsKey(name) && registry().index(name).isEmpty();
     }
 
     @Override
-    public void saveIndex(Namespace namespace, IndexDefinition index) {
+    public void saveIndex(IndexDefinition index) {
         String password = index.password();
         // Kept encrypted like an LLM config's key; a ${VAR} placeholder stays as it is.
         if (password != null && host.encryption() != null && !password.startsWith("enc:")
                 && !ai.mindconnect.common.env.EnvVarResolver.containsPlaceholder(password)) {
             index = index.withPassword(host.encryption().encryptTagged(password));
         }
-        registry(namespace).saveIndex(index);
-        Map<String, Opened> byName = opened.get(namespace);
+        registry().saveIndex(index);
+        Map<String, Opened> byName = opened.get(scope.namespace());
         if (byName != null) byName.remove(index.name());
     }
 
     @Override
-    public void deleteIndex(Namespace namespace, String name) {
-        registry(namespace).deleteIndex(name);
-        Map<String, Opened> byName = opened.get(namespace);
+    public void deleteIndex(String name) {
+        registry().deleteIndex(name);
+        Map<String, Opened> byName = opened.get(scope.namespace());
         if (byName != null) byName.remove(name);
     }
 
     @Override
-    public String indexLocation(Namespace namespace) {
-        return indexLocation(namespace, IndexDefinition.DEFAULT);
+    public String indexLocation() {
+        return indexLocation(IndexDefinition.DEFAULT);
     }
 
     @Override
-    public String indexLocation(Namespace namespace, String name) {
-        return open(namespace, name).location();
+    public String indexLocation(String name) {
+        return open(scope.namespace(), name).location();
     }
 
     @Override
-    public String indexOf(Namespace namespace, VectorStoreInstance instance) {
+    public String indexOf(VectorStoreInstance instance) {
         if (instance.index() != null && !instance.index().isBlank()) {
             return instance.index();
         }
         // From before indexes: the template's rule, by the template's name.
-        return template(namespace, instance.templateName()).map(VectorStoreTemplate::effectiveIndex)
+        return template(instance.templateName()).map(VectorStoreTemplate::effectiveIndex)
                 .orElseGet(() -> new VectorStoreTemplate(instance.templateName() == null ? "" : instance.templateName(),
                         null, null, null).effectiveIndex());
     }
 
     private IndexDefinition definition(Namespace namespace, String name) {
-        return registry(namespace).index(name)
+        return registryOf(namespace).index(name)
                 .or(() -> Optional.ofNullable(host.builtIn().get(name)))
                 .orElseThrow(() -> new IllegalArgumentException("There is no index '" + name + "'"));
     }
@@ -316,7 +328,7 @@ public final class DefaultVectorStores implements VectorStores {
                 Sql sql = definition.url() == null && host.runtimeSql() != null ? host.runtimeSql() : Sql.of(db);
                 String where = definition.url() != null ? withoutCredentials(definition.url())
                         : systemDatabase().orElse("the application's database");
-                return new Opened(definition, new PgEmbeddingIndex(sql, namespace, definition.effectiveTable()),
+                return new Opened(definition, new PgEmbeddingIndex(sql, ScopeSupplier.fixed(namespace), definition.effectiveTable()),
                         "Postgres (pgvector), " + where + " — table " + definition.effectiveTable());
             }
         }
@@ -395,9 +407,9 @@ public final class DefaultVectorStores implements VectorStores {
             return;
         }
         try {
-            legacy.importInto(namespace, registry(namespace),
-                    instance -> open(namespace, indexOf(namespace, instance)).index(),
-                    defaultTemplate, instance -> embeddingModel(namespace, instance));
+            legacy.importInto(namespace, registryOf(namespace),
+                    instance -> open(namespace, indexOf(instance)).index(),
+                    defaultTemplate, this::embeddingModel);
         } catch (RuntimeException e) {
             // The new stores work regardless; the next start tries again.
             log.warn("Vector stores of namespace '{}' from before 0.9 could not all be imported: {}",
@@ -408,41 +420,40 @@ public final class DefaultVectorStores implements VectorStores {
     // ── templates & instances (registry + built-in default) ───────────────
 
     @Override
-    public List<VectorStoreTemplate> templates(Namespace namespace) {
+    public List<VectorStoreTemplate> templates() {
         List<VectorStoreTemplate> all = new ArrayList<>();
         all.add(defaultTemplate);
-        all.addAll(registry(namespace).templates());
+        all.addAll(registry().templates());
         return all;
     }
 
     @Override
-    public Optional<VectorStoreTemplate> template(Namespace namespace, String name) {
+    public Optional<VectorStoreTemplate> template(String name) {
         if (name == null || name.isBlank() || DEFAULT_TEMPLATE.equals(name)) {
             return Optional.of(defaultTemplate);
         }
-        return registry(namespace).template(name);
+        return registry().template(name);
     }
 
     @Override
-    public VectorStoreInstance settingsFor(Namespace namespace, String storeName) {
-        return registry(namespace).instance(storeName).orElseGet(() ->
+    public VectorStoreInstance settingsFor(String storeName) {
+        return registry().instance(storeName).orElseGet(() ->
                 VectorStoreInstance.fromTemplate(storeName, defaultTemplate,
                         VectorStoreInstance.Scope.GLOBAL, null));
     }
 
     @Override
-    public VectorStore open(Namespace namespace, String storeName, String templateName,
-                            VectorStoreInstance.Scope scope, String scopeRef) {
-        return open(namespace, storeName, templateName, scope, scopeRef, null);
+    public VectorStore open(String storeName, String templateName, VectorStoreInstance.Scope scope, String scopeRef) {
+        return open(storeName, templateName, scope, scopeRef, null);
     }
 
     @Override
-    public VectorStore open(Namespace namespace, String storeName, String templateName,
-                            VectorStoreInstance.Scope scope, String scopeRef, String owner) {
-        VectorStoreRegistry registry = registry(namespace);
+    public VectorStore open(String storeName, String templateName, VectorStoreInstance.Scope scope, String scopeRef,
+                            String owner) {
+        VectorStoreRegistry registry = registry();
         VectorStoreInstance instance = registry.instance(storeName).orElse(null);
         if (instance == null) {
-            VectorStoreTemplate template = template(namespace, templateName).orElseThrow(() ->
+            VectorStoreTemplate template = template(templateName).orElseThrow(() ->
                     new IllegalArgumentException("Unknown vector store template '" + templateName + "'"));
             instance = registry.registerInstance(
                     VectorStoreInstance.fromTemplate(storeName, template, scope, scopeRef, owner));
@@ -450,17 +461,17 @@ public final class DefaultVectorStores implements VectorStores {
             instance = instance.asChatStore(scopeRef, owner);
             registry.saveInstance(instance);
         }
-        return handle(namespace, instance);
+        return handle(instance);
     }
 
     @Override
-    public VectorStore store(Namespace namespace, String storeName) {
-        return handle(namespace, settingsFor(namespace, storeName));
+    public VectorStore store(String storeName) {
+        return handle(settingsFor(storeName));
     }
 
-    private VectorStore handle(Namespace namespace, VectorStoreInstance instance) {
-        return new VectorStore(instance, registry(namespace), index(namespace, indexOf(namespace, instance)),
-                () -> embeddingModel(namespace, instance), texts -> embed(namespace, instance, texts));
+    private VectorStore handle(VectorStoreInstance instance) {
+        return new VectorStore(instance, registry(), index(indexOf(instance)),
+                () -> embeddingModel(instance), texts -> embed(instance, texts));
     }
 
     /**
@@ -483,29 +494,17 @@ public final class DefaultVectorStores implements VectorStores {
 
     // ── embedding ──────────────────────────────────────────────────────────
 
-    /**
-     * The config as {@code namespace} knows it. The repository is routed by the thread's
-     * scope, which is not necessarily the namespace asked for — a caller working across
-     * namespaces must not get its own namespace's embedding model for another's store.
-     */
-    private Optional<LlmConfig> configIn(Namespace namespace, String configName) {
-        if (scope instanceof ai.mindconnect.agent.ThreadBoundScope bound) {
-            return bound.runIn(ai.mindconnect.agent.Scope.of(namespace), () -> configs.findResolvedByName(configName));
-        }
-        return configs.findResolvedByName(configName);
-    }
-
-    private LlmConfig config(Namespace namespace, VectorStoreInstance instance) {
+    private LlmConfig config(VectorStoreInstance instance) {
         String configName = instance.embeddingConfig();
-        return configIn(namespace, configName)
+        return configs.findResolvedByName(configName)
                 .orElseThrow(() -> new IllegalStateException("No LlmConfig named '" + configName
                         + "' (store '" + instance.name() + "') — create one pointing at an "
                         + "embedding model, e.g. LM Studio's text-embedding-nomic-embed-text-v1.5"));
     }
 
     @Override
-    public String embeddingModel(Namespace namespace, VectorStoreInstance instance) {
-        LlmConfig config = config(namespace, instance);
+    public String embeddingModel(VectorStoreInstance instance) {
+        LlmConfig config = config(instance);
         return config.provider() + ":" + resolved(config.model());
     }
 
@@ -522,12 +521,12 @@ public final class DefaultVectorStores implements VectorStores {
         }
     }
 
-    private List<float[]> embed(Namespace namespace, VectorStoreInstance instance, List<String> texts) {
-        return embeddings.embed(config(namespace, instance), texts);
+    private List<float[]> embed(VectorStoreInstance instance, List<String> texts) {
+        return embeddings.embed(config(instance), texts);
     }
 
     @Override
-    public List<float[]> embedFor(Namespace namespace, String storeName, List<String> texts) {
-        return embed(namespace, settingsFor(namespace, storeName), texts);
+    public List<float[]> embedFor(String storeName, List<String> texts) {
+        return embed(settingsFor(storeName), texts);
     }
 }

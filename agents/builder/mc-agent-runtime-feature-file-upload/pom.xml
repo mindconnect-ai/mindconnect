@@ -44,15 +44,16 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-vector-store-tools</artifactId>
         </dependency>
-        <!-- Ingestion through a workflow: only when the workflows feature and the admin runner are present. -->
+        <!-- Ingestion through a workflow: only when the workflows feature and the engine are present. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-tools-workflow</artifactId>
+            <artifactId>mc-workflow-spi-lookup</artifactId>
+            <version>${project.version}</version>
             <optional>true</optional>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-workflow-admin-rest</artifactId>
+            <artifactId>mc-workflow-persistence</artifactId>
             <version>${project.version}</version>
             <optional>true</optional>
         </dependency>

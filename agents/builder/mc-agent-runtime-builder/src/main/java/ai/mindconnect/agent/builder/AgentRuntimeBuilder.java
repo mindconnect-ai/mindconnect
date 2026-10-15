@@ -15,7 +15,6 @@ import ai.mindconnect.agent.runtime.feature.DefaultFeatureContext;
 import ai.mindconnect.agent.runtime.feature.DefaultRuntimeBeans;
 import ai.mindconnect.agent.runtime.feature.FeatureException;
 import ai.mindconnect.agent.runtime.feature.FeatureRegistry;
-import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
@@ -52,6 +51,7 @@ import ai.mindconnect.agent.runtime.service.prompt.PromptSections;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
+import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
 import ai.mindconnect.agent.runtime.service.task.SubAgentSupport;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
@@ -128,6 +128,7 @@ public class AgentRuntimeBuilder {
     private final DefaultFeatureContext context;
     private ObjectMapper objectMapper = new ObjectMapper().registerModule(new JavaTimeModule());
     private String namespaceName = Namespace.DEFAULT.value();
+    private ScopeSupplier scope;
     private String toolResultSummarizer = "rule";
     private EnvVarResolver envVarResolver = EnvVarResolver.system();
     /** null → the default mapper, reading media parts from the runtime's file store. */
@@ -287,9 +288,21 @@ public class AgentRuntimeBuilder {
         return this;
     }
 
-    /** The namespace every store of this runtime is bound to (default {@code local}). */
+    /** The namespace this runtime works in (default {@code local}) — unless a {@link #scope} names one per call. */
     public AgentRuntimeBuilder namespace(String namespace) {
         this.namespaceName = namespace;
+        return this;
+    }
+
+    /**
+     * Who says which namespace a call works in, instead of the one {@link #namespace}
+     * for the runtime's life. Every queued task carries the scope it was submitted in;
+     * a {@code ThreadBoundScopeSupplier} — a server's, bound per request — is bound to it again
+     * on every delivery, retry and wake-up.
+     */
+    public AgentRuntimeBuilder scope(ScopeSupplier scope) {
+        requireNotBuilt();
+        this.scope = java.util.Objects.requireNonNull(scope, "scope");
         return this;
     }
 
@@ -408,14 +421,14 @@ public class AgentRuntimeBuilder {
         return runtime;
     }
 
-    /** What every feature may rely on before anything else: the namespace, the mapper, the Sql and its DataSource. */
+    /** What every feature may rely on before anything else: the scope, the mapper, the Sql and its DataSource. */
     private void registerCoreSettings() {
-        context.bean(Namespace.class, () -> new Namespace(namespaceName));
-        // Where this runtime works — one namespace for its whole life.
-        context.bean(ScopeSupplier.class, () -> ScopeSupplier.fixed(context.require(Namespace.class)));
-        // … and so every adapter is built once, for that namespace. A feature that binds the
-        // scope per call (the namespace feature) replaces both beans.
-        context.bean(NamespaceRouting.class, () -> NamespaceRouting.fixed(context.require(Namespace.class)));
+        // Where this runtime works — one namespace for its whole life, or the one the host's scope
+        // names per call. Every adapter asks it per call.
+        ScopeSupplier workingScope = scope != null ? scope : ScopeSupplier.fixed(new Namespace(namespaceName));
+        context.instance(ScopeSupplier.class, workingScope);
+        // Every task carries the scope it was submitted in; a thread-bound scope is bound again around its execution.
+        context.contribute(TaskAdvisor.class, new ScopeTaskAdvisor(workingScope));
         context.bean(ObjectMapper.class, () -> objectMapper);
         context.bean(EnvVarResolver.class, () -> envVarResolver);
         if (persistence instanceof Persistence.Postgres postgres) {

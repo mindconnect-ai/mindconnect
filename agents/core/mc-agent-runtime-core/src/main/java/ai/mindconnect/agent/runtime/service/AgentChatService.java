@@ -35,7 +35,6 @@ import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
 import ai.mindconnect.agent.runtime.service.turn.LocalChatTurnHandle;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.taskqueue.TaskListener;
 import ai.mindconnect.taskqueue.TaskSubmission;
@@ -690,11 +689,7 @@ public class AgentChatService {
 
     private void completeInScope(TaskRecord task, CompletableFuture<String> outcome) {
         Runnable complete = () -> completeFrom(task, outcome);
-        if (scope instanceof ThreadBoundScope bound) {
-            ScopeTaskAdvisor.scopeIfAny(task).ifPresentOrElse(s -> bound.runIn(s, complete), complete);
-        } else {
-            complete.run();
-        }
+        ScopeTaskAdvisor.scopeIfAny(task).ifPresentOrElse(s -> scope.runIn(s, complete), complete);
     }
 
     private static void completeFrom(TaskRecord terminal, CompletableFuture<String> outcome) {

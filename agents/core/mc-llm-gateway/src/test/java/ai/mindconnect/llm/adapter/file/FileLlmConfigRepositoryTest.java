@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.llm.domain.LlmConfig;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -24,7 +25,7 @@ class FileLlmConfigRepositoryTest {
 
     @Test
     void a_config_written_with_a_field_this_version_does_not_know_still_loads() throws IOException {
-        FileLlmConfigRepository repo = new FileLlmConfigRepository(dir, strict, new Namespace("test"));
+        FileLlmConfigRepository repo = new FileLlmConfigRepository(dir, strict, ScopeSupplier.fixed(new Namespace("test")));
         LlmConfig stored = LlmConfig.lmStudio("local", "qwen", "http://localhost:1234");
         repo.save(stored);
         Path file = fileOf(stored);

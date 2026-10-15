@@ -1,6 +1,6 @@
 package ai.mindconnect.vectorstore.pgvector;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.jdbc.Row;
 import ai.mindconnect.jdbc.Sql;
@@ -34,8 +34,8 @@ import java.util.stream.Stream;
 
 /**
  * {@link EmbeddingIndex} on pgvector: the entries of every entity of every
- * namespace in one table — {@value #DEFAULT_TABLE} unless the index names another — bound to one namespace per
- * instance.
+ * namespace in one table — {@value #DEFAULT_TABLE} unless the index names another — every statement
+ * matching the namespace the scope names for the current call.
  *
  * <p><b>Search is filter first, rank second.</b> The candidates are selected
  * in a {@code MATERIALIZED} CTE — by ref over the primary key
@@ -84,7 +84,7 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
     private static final String KEY = "namespace = ? AND entity_type = ? AND source = ? AND container = ? AND entity_id = ?";
 
     private final Sql sql;
-    private final String namespace;
+    private final ScopeSupplier scope;
     /** This index's table, and beside it {@code <table>_field} for the declared fields. */
     private final String table;
     private final String fieldsTable;
@@ -93,12 +93,12 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
 
     private volatile boolean schemaReady;
 
-    public PgEmbeddingIndex(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace, DEFAULT_TABLE);
+    public PgEmbeddingIndex(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope, DEFAULT_TABLE);
     }
 
-    public PgEmbeddingIndex(Sql sql, Namespace namespace) {
-        this(sql, namespace, DEFAULT_TABLE);
+    public PgEmbeddingIndex(Sql sql, ScopeSupplier scope) {
+        this(sql, scope, DEFAULT_TABLE);
     }
 
     /**
@@ -107,9 +107,9 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
      *
      * @throws IllegalArgumentException for a table name that is not lower case letters, digits and '_'
      */
-    public PgEmbeddingIndex(Sql sql, Namespace namespace, String table) {
+    public PgEmbeddingIndex(Sql sql, ScopeSupplier scope, String table) {
         this.sql = Objects.requireNonNull(sql, "sql");
-        this.namespace = Objects.requireNonNull(namespace, "namespace").value();
+        this.scope = Objects.requireNonNull(scope, "scope");
         if (table == null || !TABLE_NAME.matcher(table).matches()) {
             throw new IllegalArgumentException("A table name is lower case letters, digits and '_', at most 48: '"
                     + table + "'");
@@ -118,8 +118,13 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
         this.fieldsTable = table + "_field";
     }
 
-    public PgEmbeddingIndex(DataSource dataSource, Namespace namespace, String table) {
-        this(Sql.of(dataSource), namespace, table);
+    public PgEmbeddingIndex(DataSource dataSource, ScopeSupplier scope, String table) {
+        this(Sql.of(dataSource), scope, table);
+    }
+
+    /** The namespace of the current call, as its rows carry it. */
+    private String namespace() {
+        return scope.namespace().value();
     }
 
     /** The table this index keeps its entries in. */
@@ -177,7 +182,7 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
                             + " c.embedding::vector"
                             + " FROM unnest(?::text[], ?::int[], ?::text[], ?::text[], ?::text[])"
                             + " AS c(chunk_id, ordinal, content, meta, embedding)",
-                    namespace, ref.type().value(), ref.source(), ref.container(), ref.id(), embeddingModel,
+                    namespace(), ref.type().value(), ref.source(), ref.container(), ref.id(), embeddingModel,
                     owner == null ? null : owner.value(), version, dimension,
                     ids, ordinals, contents, metas, vectors);
         });
@@ -329,7 +334,7 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
         }
         List<MetadataFields.ResolvedFilter> filters = resolve(query);
         Where where = new Where();
-        where.and("namespace = ?", namespace);
+        where.and("namespace = ?", namespace());
         where.and("embedding_model = ?", query.embeddingModel());
         if (query.refs() != null) {
             List<EntityRef> refs = List.copyOf(query.refs());
@@ -460,11 +465,11 @@ public final class PgEmbeddingIndex implements EmbeddingIndex {
     }
 
     private String lockKey(EntityRef ref) {
-        return String.join("\u001f", table, namespace, ref.type().value(), ref.source(), ref.container(), ref.id());
+        return String.join("\u001f", table, namespace(), ref.type().value(), ref.source(), ref.container(), ref.id());
     }
 
     private Object[] keyParams(EntityRef ref, Object... more) {
-        return concat(new Object[]{namespace, ref.type().value(), ref.source(), ref.container(), ref.id()}, more);
+        return concat(new Object[]{namespace(), ref.type().value(), ref.source(), ref.container(), ref.id()}, more);
     }
 
     private static Object[] concat(Object[] first, Object[] second) {

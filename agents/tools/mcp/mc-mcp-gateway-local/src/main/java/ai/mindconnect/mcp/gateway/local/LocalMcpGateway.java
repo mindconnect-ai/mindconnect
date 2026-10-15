@@ -1,6 +1,7 @@
 package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.mcp.gateway.McpCaller;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
 import ai.mindconnect.mcp.gateway.McpGateway;
@@ -20,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -34,6 +36,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * memory half is keyed on the repository's {@code version()}, so an edited
  * registration takes effect without a restart.
  *
+ * <p>One gateway serves every namespace: registrations, discoveries and
+ * pooled connections are those of the namespace the scope names per call.
+ *
  * <p>A server that cannot be reached costs its own tools and nothing else:
  * discovery failures are logged and remembered as "no tools" until a
  * registration changes or somebody re-reads that server's tools, so a broken
@@ -44,15 +49,18 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     private static final Logger log = LoggerFactory.getLogger(LocalMcpGateway.class);
 
     private final McpServerRepository repository;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
     private final McpProxy proxy;
     private final McpSessionRegistry sessions;
     private final McpDiscoveryCache discoveryCache;
     private final McpTargetEndpoints endpoints;
 
-    /** Server → discovered tools, valid for {@link #cachedAtVersion}. */
-    private final Map<McpServerId, List<McpTool>> toolsByServer = new ConcurrentHashMap<>();
-    private volatile long cachedAtVersion = Long.MIN_VALUE;
+    /** Pool key ({@code <namespace>/<server>}) → discovered tools, valid while the namespace is at {@link #cachedAtVersion}. */
+    private final Map<String, List<McpTool>> toolsByServer = new ConcurrentHashMap<>();
+    /** Namespace → the repository version its entries in {@link #toolsByServer} were found at. */
+    private final Map<String, Long> cachedAtVersion = new ConcurrentHashMap<>();
+    /** The pool keys calls opened connections under — what {@link #close} and {@link #forget(Namespace)} close. */
+    private final Set<String> pooled = ConcurrentHashMap.newKeySet();
 
     /**
      * Moves with every {@link #forget}. Dropping a discovery changes what
@@ -66,11 +74,11 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
                            McpProxy proxy,
                            McpSessionRegistry sessions,
                            McpDiscoveryStore discoveries,
-                           Namespace namespace,
+                           ScopeSupplier scope,
                            String containerRuntime,
                            McpStartPolicy startPolicy) {
         this.repository = repository;
-        this.namespace = namespace;
+        this.scope = scope;
         this.proxy = proxy;
         this.sessions = sessions;
         this.discoveryCache = new McpDiscoveryCache(discoveries);
@@ -98,7 +106,7 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
             return List.of();
         }
         invalidateStaleCache();
-        return toolsByServer.computeIfAbsent(server, key -> discover(registration.get()));
+        return toolsByServer.computeIfAbsent(providerKey(server), key -> discover(registration.get()));
     }
 
     @Override
@@ -108,9 +116,10 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
                 .findFirst()
                 .orElseThrow(() -> new McpGatewayException("no enabled MCP server " + server));
         McpEndpoint endpoint = endpoints.toEndpoint(registration.target());
+        String key = providerKey(server);
         try {
-            McpConnection connection = sessions.getOrOpen(
-                    caller.sessionId().value(), providerKey(server), endpoint);
+            pooled.add(key);
+            McpConnection connection = sessions.getOrOpen(caller.sessionId().value(), key, endpoint);
             return connection.callTool(toolName, arguments);
         } catch (McpGatewayException e) {
             throw e;
@@ -126,20 +135,35 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     }
 
     /**
-     * Closes this namespace's pooled connections. The registry is shared by every
-     * namespace's gateway and shuts down with the application, not here; the
-     * stored discovery cache survives.
+     * Closes the connections this gateway pooled. The registry shuts down with
+     * the application, not here; the stored discovery cache survives.
      */
     @Override
     public void close() {
-        for (McpServerRegistration registration : repository.findAll()) {
-            sessions.closeServer(providerKey(registration.id()));
-        }
+        pooled.forEach(sessions::closeServer);
+        pooled.clear();
     }
 
-    /** The pool's key for a server: qualified by the namespace, since the pool serves every namespace. */
+    /**
+     * Forgets a deleted namespace: what was discovered there, in memory, and its
+     * pooled connections. Its registrations and stored discoveries went with its
+     * directory or its rows.
+     */
+    public void forget(Namespace namespace) {
+        String prefix = namespace.value() + "/";
+        toolsByServer.keySet().removeIf(key -> key.startsWith(prefix));
+        cachedAtVersion.remove(namespace.value());
+        pooled.removeIf(key -> {
+            if (!key.startsWith(prefix)) return false;
+            sessions.closeServer(key);
+            return true;
+        });
+        discoveryGeneration.incrementAndGet();
+    }
+
+    /** The pool's key for a server: qualified by the namespace of the call, since the pool serves every namespace. */
     private String providerKey(McpServerId server) {
-        return namespace.value() + "/" + server.value();
+        return scope.namespace().value() + "/" + server.value();
     }
 
     /**
@@ -159,9 +183,11 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
      * "Re-read tools".
      */
     void forget(McpServerId server) {
-        toolsByServer.remove(server);
+        String key = providerKey(server);
+        toolsByServer.remove(key);
         discoveryCache.invalidate(server);
-        sessions.closeServer(providerKey(server));
+        sessions.closeServer(key);
+        pooled.remove(key);
         // Last: a lookup that read the version before this line sees the new
         // one next time and rebuilds; one that reads it after this line finds
         // the discovery already gone. Moved first, a lookup in between would
@@ -200,10 +226,11 @@ public final class LocalMcpGateway implements McpGateway, AutoCloseable {
     }
 
     private void invalidateStaleCache() {
+        String namespace = scope.namespace().value();
         long current = repository.version();
-        if (cachedAtVersion != current) {
-            toolsByServer.clear();
-            cachedAtVersion = current;
+        Long cached = cachedAtVersion.put(namespace, current);
+        if (cached == null || cached != current) {
+            toolsByServer.keySet().removeIf(key -> key.startsWith(namespace + "/"));
         }
     }
 }

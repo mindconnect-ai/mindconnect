@@ -5,6 +5,7 @@ import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.message.domain.ConversationId;
@@ -31,7 +32,7 @@ class PgAgentSessionRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        repo = new PgAgentSessionRepository(TestDb.fresh("mc_agent_session"), NS).initSchema();
+        repo = new PgAgentSessionRepository(TestDb.fresh("mc_agent_session"), ScopeSupplier.fixed(NS)).initSchema();
     }
 
     private static AgentSession session(String user, String startedAt, SessionId parent) {

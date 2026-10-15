@@ -11,6 +11,7 @@ import javax.sql.DataSource;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * {@link WorkflowDataRepository} on Postgres: one row of {@code mc_workflow}
@@ -42,18 +43,18 @@ public final class PgWorkflowDataRepository implements WorkflowDataRepository {
 
     private final Sql sql;
     private final JacksonWorkflowSerializer serializer;
-    private final String partition;
+    private final Supplier<String> partition;
 
-    public PgWorkflowDataRepository(DataSource dataSource, String partition) {
+    public PgWorkflowDataRepository(DataSource dataSource, Supplier<String> partition) {
         this(Sql.of(dataSource), partition);
     }
 
-    public PgWorkflowDataRepository(Sql sql, String partition) {
+    public PgWorkflowDataRepository(Sql sql, Supplier<String> partition) {
         this(sql, partition, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
     }
 
-    public PgWorkflowDataRepository(Sql sql, String partition, JacksonWorkflowSerializer serializer) {
-        if (partition == null || partition.isBlank()) throw new IllegalArgumentException("A partition is required");
+    public PgWorkflowDataRepository(Sql sql, Supplier<String> partition, JacksonWorkflowSerializer serializer) {
+        if (partition == null) throw new IllegalArgumentException("A partition is required");
         this.sql = sql;
         this.serializer = serializer;
         this.partition = partition;
@@ -80,7 +81,7 @@ public final class PgWorkflowDataRepository implements WorkflowDataRepository {
      * @return how many definitions were imported
      */
     public int importFiles(Path directory) {
-        return WorkflowFileImport.once(sql, partition, "mc_workflow", directory,
+        return WorkflowFileImport.once(sql, partition.get(), "mc_workflow", directory,
                 (file, id) -> new Imported(id, serializer.read(file)),
                 (tx, wf) -> new PgWorkflowDataRepository(tx, partition, serializer).save(wf.id(), wf.workflow()));
     }
@@ -90,29 +91,29 @@ public final class PgWorkflowDataRepository implements WorkflowDataRepository {
 
     @Override
     public List<String> listIds() {
-        return sql.query("SELECT id FROM mc_workflow WHERE partition_key = ? ORDER BY id", row -> row.string("id"), partition);
+        return sql.query("SELECT id FROM mc_workflow WHERE partition_key = ? ORDER BY id", row -> row.string("id"), partition.get());
     }
 
     @Override
     public Optional<WorkflowData> findById(String id) {
         return sql.queryOne("SELECT doc FROM mc_workflow WHERE partition_key = ? AND id = ?",
-                row -> serializer.read(row.string("doc")), partition, id);
+                row -> serializer.read(row.string("doc")), partition.get(), id);
     }
 
     @Override
     public void save(String id, WorkflowData workflow) {
         sql.update("INSERT INTO mc_workflow (partition_key, id, name, updated_at, doc) VALUES (?, ?, ?, now(), ?) "
                         + "ON CONFLICT (partition_key, id) DO UPDATE SET name = EXCLUDED.name, updated_at = now(), doc = EXCLUDED.doc",
-                partition, id, workflow.getName(), Jsonb.of(serializer.write(workflow)));
+                partition.get(), id, workflow.getName(), Jsonb.of(serializer.write(workflow)));
     }
 
     @Override
     public boolean delete(String id) {
-        return sql.update("DELETE FROM mc_workflow WHERE partition_key = ? AND id = ?", partition, id) > 0;
+        return sql.update("DELETE FROM mc_workflow WHERE partition_key = ? AND id = ?", partition.get(), id) > 0;
     }
 
     @Override
     public boolean exists(String id) {
-        return sql.scalar("SELECT count(*) FROM mc_workflow WHERE partition_key = ? AND id = ?", Long.class, partition, id) > 0;
+        return sql.scalar("SELECT count(*) FROM mc_workflow WHERE partition_key = ? AND id = ?", Long.class, partition.get(), id) > 0;
     }
 }

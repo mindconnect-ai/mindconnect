@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
 import ai.mindconnect.agent.EntityId;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
 import ai.mindconnect.agent.runtime.domain.TraceContext;
@@ -25,8 +25,8 @@ import java.util.function.Function;
 /**
  * {@link LlmCallTraceRepository} on Postgres: one row of {@code mc_llm_call_trace}
  * per LLM call, keyed by {@code (namespace, id)}, with the four ids a trace is
- * looked up by and the start time everything is ordered by. The repository is
- * bound to one namespace and every statement matches it.
+ * looked up by and the start time everything is ordered by. Every statement
+ * matches the namespace the scope names for the current call.
  *
  * <p>Retention is the file store's rule: after each save, a conversation
  * keeps its newest {@code maxTracesPerConversation} traces and the rest are
@@ -45,23 +45,23 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
     private final Sql sql;
     private final DocumentTable<LlmCallTrace> traces;
     private final int maxTracesPerConversation;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
 
-    public PgLlmCallTraceRepository(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), DEFAULT_MAX_PER_CONVERSATION, namespace);
+    public PgLlmCallTraceRepository(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), DEFAULT_MAX_PER_CONVERSATION, scope);
     }
 
-    public PgLlmCallTraceRepository(Sql sql, Namespace namespace) {
-        this(sql, DEFAULT_MAX_PER_CONVERSATION, namespace);
+    public PgLlmCallTraceRepository(Sql sql, ScopeSupplier scope) {
+        this(sql, DEFAULT_MAX_PER_CONVERSATION, scope);
     }
 
-    public PgLlmCallTraceRepository(Sql sql, int maxTracesPerConversation, Namespace namespace) {
+    public PgLlmCallTraceRepository(Sql sql, int maxTracesPerConversation, ScopeSupplier scope) {
         this.sql = sql;
         this.maxTracesPerConversation = maxTracesPerConversation;
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+        this.scope = Objects.requireNonNull(scope, "scope");
         this.traces = DocumentTable.of(LlmCallTrace.class)
                 .table("mc_llm_call_trace")
-                .partitionKey("namespace", "TEXT", t -> namespace.value())
+                .partitionKey("namespace", "TEXT", t -> scope.namespace().value())
                 .id("id", "TEXT", t -> t.id().value())
                 .column("conversation_id", "TEXT", t -> value(t.context().conversationId()))
                 .column("session_id", "TEXT", t -> value(t.context().sessionId()))
@@ -101,31 +101,31 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
             sql.update("DELETE FROM mc_llm_call_trace WHERE namespace = ? AND id IN ("
                             + "SELECT id FROM mc_llm_call_trace WHERE namespace = ? AND conversation_id = ? "
                             + "ORDER BY started_at DESC NULLS LAST, id DESC OFFSET ?)",
-                    namespace.value(), namespace.value(), conversationId.value(), maxTracesPerConversation);
+                    scope.namespace().value(), scope.namespace().value(), conversationId.value(), maxTracesPerConversation);
         }
     }
 
     @Override
     public List<LlmCallTrace> findByTurn(ChatTurnId turn) {
-        return traces.find("WHERE namespace = ? AND turn_id = ? " + ORDER, namespace.value(), turn.value());
+        return traces.find("WHERE namespace = ? AND turn_id = ? " + ORDER, scope.namespace().value(), turn.value());
     }
 
     @Override
     public List<LlmCallTrace> findBySession(SessionId session) {
-        return traces.find("WHERE namespace = ? AND session_id = ? " + ORDER, namespace.value(), session.value());
+        return traces.find("WHERE namespace = ? AND session_id = ? " + ORDER, scope.namespace().value(), session.value());
     }
 
     @Override
     public List<LlmCallTrace> findByConversation(ConversationId conversation) {
         return traces.find("WHERE namespace = ? AND conversation_id = ? " + ORDER,
-                namespace.value(), conversation.value());
+                scope.namespace().value(), conversation.value());
     }
 
     /** Headers from the columns alone — no {@code requestJson}, no {@code responseEvents} leave the database. */
     @Override
     public List<Header> findHeadersByConversation(ConversationId conversation) {
         return traces.select(PgLlmCallTraceRepository::header, "WHERE namespace = ? AND conversation_id = ? " + ORDER,
-                namespace.value(), conversation.value());
+                scope.namespace().value(), conversation.value());
     }
 
     /** {@link LlmCallTraceHeader} built from the row. */
@@ -167,17 +167,17 @@ public final class PgLlmCallTraceRepository implements LlmCallTraceRepository {
                     WHERE t.namespace = ?
                 )
                 SELECT doc FROM tree ORDER BY started_at NULLS LAST, id
-                """, traces.mapper(), namespace.value(), root.value(), namespace.value());
+                """, traces.mapper(), scope.namespace().value(), root.value(), scope.namespace().value());
     }
 
     @Override
     public Optional<LlmCallTrace> findById(TraceId id) {
-        return traces.findById(namespace.value(), id.value());
+        return traces.findById(scope.namespace().value(), id.value());
     }
 
     @Override
     public void deleteBySession(SessionId session) {
-        traces.delete("WHERE namespace = ? AND session_id = ?", namespace.value(), session.value());
+        traces.delete("WHERE namespace = ? AND session_id = ?", scope.namespace().value(), session.value());
     }
 
     private static final String ORDER = "ORDER BY started_at NULLS LAST, id";

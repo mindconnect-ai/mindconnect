@@ -1,5 +1,6 @@
 package ai.mindconnect.message.adapter.memory;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.message.port.in.ConversationManager;
 import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.message.service.ConversationService;
@@ -11,9 +12,13 @@ import ai.mindconnect.message.service.ConversationService;
  */
 public final class InMemoryMessageStore {
 
-    private final MessageRepository messageRepository = new InMemoryMessageRepository();
-    private final ConversationManager conversationManager =
-            new ConversationService(new InMemoryConversationRepository(), messageRepository);
+    private final MessageRepository messageRepository;
+    private final ConversationManager conversationManager;
+
+    public InMemoryMessageStore(ScopeSupplier scope) {
+        this.messageRepository = new InMemoryMessageRepository(scope);
+        this.conversationManager = new ConversationService(new InMemoryConversationRepository(scope), messageRepository);
+    }
 
     public MessageRepository messageRepository() {
         return messageRepository;

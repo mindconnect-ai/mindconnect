@@ -1,6 +1,7 @@
 package ai.mindconnect.mcp.gateway.local;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
 import ai.mindconnect.mcp.gateway.McpTarget;
@@ -72,7 +73,7 @@ class FileMcpServerRepositoryTest {
                 { "id": "gmail", "target": { "type": "process", "command": ["a"] } }
                 """);
 
-        assertThat(new FileMcpServerRepository(base, new Namespace("other")).findAll()).isEmpty();
+        assertThat(new FileMcpServerRepository(base, ScopeSupplier.fixed(new Namespace("other"))).findAll()).isEmpty();
     }
 
     @Test
@@ -156,7 +157,7 @@ class FileMcpServerRepositoryTest {
     }
 
     private FileMcpServerRepository repository() {
-        return new FileMcpServerRepository(base, ACME);
+        return new FileMcpServerRepository(base, ScopeSupplier.fixed(ACME));
     }
 
     private void write(String name, String json) throws IOException {

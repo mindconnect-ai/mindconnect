@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Outbound port for the memory entries of users. Bound to one namespace,
- * like every repository of the runtime: the same user has a memory of their
+ * Outbound port for the memory entries of users. In the namespace the scope
+ * names per call, like every repository of the runtime: the same user has a memory of their
  * own in each namespace. {@code agentId} {@code null} addresses the user's
  * own memory, an agent's id what that agent keeps about the user; a name is
  * unique within one of those.

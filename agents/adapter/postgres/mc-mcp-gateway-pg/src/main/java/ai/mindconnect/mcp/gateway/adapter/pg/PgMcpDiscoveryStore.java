@@ -1,6 +1,6 @@
 package ai.mindconnect.mcp.gateway.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.mcp.gateway.McpDiscovery;
@@ -29,19 +29,19 @@ public final class PgMcpDiscoveryStore implements McpDiscoveryStore {
 
     private static final Logger log = LoggerFactory.getLogger(PgMcpDiscoveryStore.class);
 
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
     private final DocumentTable<ObjectNode> discoveries;
 
-    public PgMcpDiscoveryStore(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgMcpDiscoveryStore(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope);
     }
 
     /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
-    public PgMcpDiscoveryStore(Sql sql, Namespace namespace) {
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+    public PgMcpDiscoveryStore(Sql sql, ScopeSupplier scope) {
+        this.scope = Objects.requireNonNull(scope, "scope");
         this.discoveries = DocumentTable.of(ObjectNode.class)
                 .table("mc_mcp_schema_cache")
-                .partitionKey("namespace", "TEXT", d -> namespace.value())
+                .partitionKey("namespace", "TEXT", d -> scope.namespace().value())
                 .id("server_id", "TEXT", d -> d.get("serverId").asText())
                 .build(sql);
     }
@@ -55,10 +55,10 @@ public final class PgMcpDiscoveryStore implements McpDiscoveryStore {
     @Override
     public Optional<McpDiscovery> find(McpServerId server) {
         try {
-            return discoveries.findById(namespace.value(), server.value()).map(McpDiscoveryJson::read);
+            return discoveries.findById(scope.namespace().value(), server.value()).map(McpDiscoveryJson::read);
         } catch (RuntimeException e) {
             log.warn("MCP discovery cache for '{}' in namespace '{}' unreadable: {}",
-                    server, namespace.value(), e.toString());
+                    server, scope.namespace().value(), e.toString());
             return Optional.empty();
         }
     }
@@ -72,17 +72,17 @@ public final class PgMcpDiscoveryStore implements McpDiscoveryStore {
         } catch (RuntimeException e) {
             // A cache that cannot be written is a slow start-up, not a failure.
             log.warn("cannot write MCP discovery cache for '{}' in namespace '{}': {}",
-                    server, namespace.value(), e.toString());
+                    server, scope.namespace().value(), e.toString());
         }
     }
 
     @Override
     public boolean delete(McpServerId server) {
         try {
-            return discoveries.deleteById(namespace.value(), server.value());
+            return discoveries.deleteById(scope.namespace().value(), server.value());
         } catch (RuntimeException e) {
             log.warn("cannot drop MCP discovery cache for '{}' in namespace '{}': {}",
-                    server, namespace.value(), e.toString());
+                    server, scope.namespace().value(), e.toString());
             return false;
         }
     }

@@ -1,13 +1,12 @@
 package ai.mindconnect.agent.runtime.feature.core;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.adapter.pg.PgAgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
@@ -100,10 +99,10 @@ public class CoreFeature extends ConfigurableFeature {
     private Boolean workingDirChoice;
     private String instructionsUserDir;
     private int maxTracesPerConversation = 50;
-    // The factories per namespace, set while installing: what the routing builds a namespace's adapters from.
-    private Function<Namespace, LlmRepositoryFactory> llmRepositories;
-    private Function<Namespace, MessageRepositoryFactory> messageRepositories;
-    private Function<Namespace, AgentRepositoryFactory> agentRepositories;
+    // The factories, set while installing; given the runtime's scope, their adapters work in the namespace it names per call.
+    private Function<ScopeSupplier, LlmRepositoryFactory> llmRepositories;
+    private Function<ScopeSupplier, MessageRepositoryFactory> messageRepositories;
+    private Function<ScopeSupplier, AgentRepositoryFactory> agentRepositories;
 
     // ── LLM ────────────────────────────────────────────────────────────────
 
@@ -177,17 +176,17 @@ public class CoreFeature extends ConfigurableFeature {
         return this;
     }
 
-    /** The agent repositories of one namespace — what other features route their own beans from. */
-    public AgentRepositoryFactory agentRepositories(Namespace namespace) {
-        return agentRepositories.apply(namespace);
+    /** The agent repositories on the runtime's persistence — what other features build their own beans from. */
+    public AgentRepositoryFactory agentRepositories(ScopeSupplier scope) {
+        return agentRepositories.apply(scope);
     }
 
-    public MessageRepositoryFactory messageRepositories(Namespace namespace) {
-        return messageRepositories.apply(namespace);
+    public MessageRepositoryFactory messageRepositories(ScopeSupplier scope) {
+        return messageRepositories.apply(scope);
     }
 
-    public LlmRepositoryFactory llmRepositories(Namespace namespace) {
-        return llmRepositories.apply(namespace);
+    public LlmRepositoryFactory llmRepositories(ScopeSupplier scope) {
+        return llmRepositories.apply(scope);
     }
 
     @Override
@@ -205,42 +204,40 @@ public class CoreFeature extends ConfigurableFeature {
 
     /**
      * The one place the persistence setting is looked at: it picks a repository
-     * factory per domain module — as a function of the namespace, so that the
-     * runtime's {@link NamespaceRouting} can build a namespace's adapters on demand.
-     * Every repository bean below is routed through it.
+     * factory per domain module — as a function of the scope, so that every
+     * repository bean below is built once, on first use, with the scope the
+     * runtime ends up with, and works in the namespace it names per call.
      */
     private void installRepositoryFactories(FeatureContext ctx) {
         switch (ctx.persistence()) {
             case Persistence.InMemory m -> {
-                llmRepositories = ns -> new InMemoryLlmRepositoryFactory();
-                messageRepositories = ns -> new InMemoryMessageRepositoryFactory();
-                agentRepositories = ns -> new InMemoryAgentRepositoryFactory(maxTracesPerConversation);
+                llmRepositories = InMemoryLlmRepositoryFactory::new;
+                messageRepositories = InMemoryMessageRepositoryFactory::new;
+                agentRepositories = scope -> new InMemoryAgentRepositoryFactory(scope, maxTracesPerConversation);
             }
             case Persistence.File f -> {
-                llmRepositories = ns -> new FileLlmRepositoryFactory(f.dataDir(), ctx.objectMapper(), ns);
-                messageRepositories = ns -> new FileMessageRepositoryFactory(f.dataDir(), ctx.objectMapper(), ns);
-                agentRepositories = ns -> new FileAgentRepositoryFactory(f.dataDir(), ctx.objectMapper(), ns, maxTracesPerConversation);
+                llmRepositories = scope -> new FileLlmRepositoryFactory(f.dataDir(), ctx.objectMapper(), scope);
+                messageRepositories = scope -> new FileMessageRepositoryFactory(f.dataDir(), ctx.objectMapper(), scope);
+                agentRepositories = scope -> new FileAgentRepositoryFactory(f.dataDir(), ctx.objectMapper(), scope, maxTracesPerConversation);
             }
             case Persistence.Postgres p -> {
-                llmRepositories = ns -> new PgLlmRepositoryFactory(sql(ctx), ns);
-                messageRepositories = ns -> new PgMessageRepositoryFactory(sql(ctx), ns);
-                agentRepositories = ns -> new PgAgentRepositoryFactory(sql(ctx), ns, maxTracesPerConversation);
+                llmRepositories = scope -> new PgLlmRepositoryFactory(sql(ctx), scope);
+                messageRepositories = scope -> new PgMessageRepositoryFactory(sql(ctx), scope);
+                agentRepositories = scope -> new PgAgentRepositoryFactory(sql(ctx), scope, maxTracesPerConversation);
             }
         }
     }
 
-    private static NamespaceRouting routing(FeatureContext ctx) {
-        return ctx.require(NamespaceRouting.class);
+    private static ScopeSupplier scope(FeatureContext ctx) {
+        return ctx.require(ScopeSupplier.class);
     }
 
     private void installLlm(FeatureContext ctx) {
         EncryptionHelper encryption = new EncryptionHelper(encryptionKey);
         ctx.instance(EncryptionHelper.class, encryption);
-        ctx.bean(LlmConfigRepository.class, () -> routing(ctx).route(LlmConfigRepository.class,
-                ns -> llmRepositories.apply(ns).llmConfigRepository()));
-        // What the configs cost, per period — its own entity beside the configs, routed the same way.
-        ctx.bean(LlmPriceRepository.class, () -> routing(ctx).route(LlmPriceRepository.class,
-                ns -> llmRepositories.apply(ns).llmPriceRepository()));
+        ctx.bean(LlmConfigRepository.class, () -> llmRepositories.apply(scope(ctx)).llmConfigRepository());
+        // What the configs cost, per period — its own entity beside the configs, built the same way.
+        ctx.bean(LlmPriceRepository.class, () -> llmRepositories.apply(scope(ctx)).llmPriceRepository());
         if (encryptionKey != null) {
             // The decorator model: the store stays plain, the key wraps it.
             ctx.decorate(LlmConfigRepository.class, repo -> new EncryptingLlmConfigRepository(repo, encryption));
@@ -279,10 +276,8 @@ public class CoreFeature extends ConfigurableFeature {
     }
 
     private void installMessages(FeatureContext ctx) {
-        ctx.bean(ConversationRepository.class, () -> routing(ctx).route(ConversationRepository.class,
-                ns -> messageRepositories.apply(ns).conversationRepository()));
-        ctx.bean(MessageRepository.class, () -> routing(ctx).route(MessageRepository.class,
-                ns -> messageRepositories.apply(ns).messageRepository()));
+        ctx.bean(ConversationRepository.class, () -> messageRepositories.apply(scope(ctx)).conversationRepository());
+        ctx.bean(MessageRepository.class, () -> messageRepositories.apply(scope(ctx)).messageRepository());
         ctx.bean(ConversationManager.class, () -> new ConversationService(
                 ctx.require(ConversationRepository.class), ctx.require(MessageRepository.class)));
     }
@@ -294,18 +289,12 @@ public class CoreFeature extends ConfigurableFeature {
         if (instructionsUserDir != null) ctx.property("instructionsUserDir", instructionsUserDir);
 
         Persistence persistence = ctx.persistence();
-        ctx.bean(AgentDefinitionRepository.class, () -> routing(ctx).route(AgentDefinitionRepository.class,
-                ns -> agentRepositories.apply(ns).agentDefinitionRepository()));
-        ctx.bean(AgentSessionRepository.class, () -> routing(ctx).route(AgentSessionRepository.class,
-                ns -> agentRepositories.apply(ns).agentSessionRepository()));
-        ctx.bean(WorkingMemoryRepository.class, () -> routing(ctx).route(WorkingMemoryRepository.class,
-                ns -> agentRepositories.apply(ns).workingMemoryRepository()));
-        ctx.bean(ConversationSummaryRepository.class, () -> routing(ctx).route(ConversationSummaryRepository.class,
-                ns -> agentRepositories.apply(ns).conversationSummaryRepository()));
-        ctx.bean(TodoListRepository.class, () -> routing(ctx).route(TodoListRepository.class,
-                ns -> agentRepositories.apply(ns).todoListRepository()));
-        ctx.bean(LlmCallTraceRepository.class, () -> routing(ctx).route(LlmCallTraceRepository.class,
-                ns -> agentRepositories.apply(ns).llmCallTraceRepository()));
+        ctx.bean(AgentDefinitionRepository.class, () -> agentRepositories.apply(scope(ctx)).agentDefinitionRepository());
+        ctx.bean(AgentSessionRepository.class, () -> agentRepositories.apply(scope(ctx)).agentSessionRepository());
+        ctx.bean(WorkingMemoryRepository.class, () -> agentRepositories.apply(scope(ctx)).workingMemoryRepository());
+        ctx.bean(ConversationSummaryRepository.class, () -> agentRepositories.apply(scope(ctx)).conversationSummaryRepository());
+        ctx.bean(TodoListRepository.class, () -> agentRepositories.apply(scope(ctx)).todoListRepository());
+        ctx.bean(LlmCallTraceRepository.class, () -> agentRepositories.apply(scope(ctx)).llmCallTraceRepository());
         ctx.bean(AgentRegistryService.class, () -> new AgentRegistryService(ctx.require(AgentDefinitionRepository.class)));
         ctx.bean(TodoListService.class, () -> new TodoListService(ctx.require(TodoListRepository.class)));
         // The todo list in the prompt, and the nudge to continue it after a tool call. Contributions are
@@ -315,8 +304,7 @@ public class CoreFeature extends ConfigurableFeature {
 
         // What agents remember about each user across chats: the memory tools write it, and an agent
         // that has them sees the index in its system prompt.
-        ctx.bean(UserMemoryRepository.class, () -> routing(ctx).route(UserMemoryRepository.class,
-                ns -> agentRepositories.apply(ns).userMemoryRepository()));
+        ctx.bean(UserMemoryRepository.class, () -> agentRepositories.apply(scope(ctx)).userMemoryRepository());
         ctx.bean(UserMemoryService.class, () -> new UserMemoryService(ctx.require(UserMemoryRepository.class)));
         ctx.contribute(PromptSection.class, new LazyMemoryIndex(ctx));
 
@@ -350,9 +338,6 @@ public class CoreFeature extends ConfigurableFeature {
         return ctx.require(ai.mindconnect.jdbc.Sql.class);
     }
 
-    private static Namespace namespace(FeatureContext ctx) {
-        return ctx.require(Namespace.class);
-    }
     /** The todo prompt context, its service resolved on first use — contributions are instances, beans are lazy. */
     private static class LazyTodoPromptContext implements PromptContextProvider {
         private final FeatureContext ctx;

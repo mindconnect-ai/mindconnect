@@ -14,6 +14,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -25,27 +26,24 @@ import java.util.stream.Stream;
  */
 public class FileWorkflowInstanceRepository implements WorkflowInstanceRepository {
 
-    private final Path directory;
+    private final Path dataDir;
+    private final Supplier<String> partition;
     private final SnapshotSerializer serializer;
 
     /**
      * @param baseDir   the data directory; the instances live in
      *                  {@code <baseDir>/<partition>/workflows/instances}
-     * @param partition the directory level this repository reads and writes —
-     *                  one partition never sees the instances of another
+     * @param partition the directory level a call reads and writes, asked on
+     *                  every call — one partition never sees the instances of another
      */
-    public FileWorkflowInstanceRepository(Path baseDir, String partition) {
+    public FileWorkflowInstanceRepository(Path baseDir, Supplier<String> partition) {
         this(baseDir, partition, new SnapshotSerializer());
     }
 
-    public FileWorkflowInstanceRepository(Path baseDir, String partition, SnapshotSerializer serializer) {
-        this.directory = directory(baseDir, partition);
+    public FileWorkflowInstanceRepository(Path baseDir, Supplier<String> partition, SnapshotSerializer serializer) {
+        this.dataDir = baseDir;
+        this.partition = partition;
         this.serializer = serializer;
-        try {
-            Files.createDirectories(directory);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot create " + directory, e);
-        }
     }
 
     /**
@@ -73,7 +71,7 @@ public class FileWorkflowInstanceRepository implements WorkflowInstanceRepositor
         String json = serializer.toJson(snapshot);
         Path target = fileFor(snapshot.getInstanceId());
         try {
-            Path temp = Files.createTempFile(directory, "snapshot", ".tmp");
+            Path temp = Files.createTempFile(instancesDir(), "snapshot", ".tmp");
             Files.writeString(temp, json, StandardCharsets.UTF_8);
             Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
@@ -101,7 +99,7 @@ public class FileWorkflowInstanceRepository implements WorkflowInstanceRepositor
 
     @Override
     public List<WorkflowInstanceSnapshot> findAll() {
-        try (Stream<Path> files = Files.list(directory)) {
+        try (Stream<Path> files = Files.list(instancesDir())) {
             List<WorkflowInstanceSnapshot> all = new ArrayList<>(files
                     .filter(p -> p.getFileName().toString().endsWith(".json"))
                     .map(this::read)
@@ -109,7 +107,7 @@ public class FileWorkflowInstanceRepository implements WorkflowInstanceRepositor
             all.sort(Comparator.comparingLong(WorkflowInstanceSnapshot::getSuspendedAt).reversed());
             return all;
         } catch (IOException e) {
-            throw new UncheckedIOException("Cannot list " + directory, e);
+            throw new UncheckedIOException("Cannot list " + instancesDir(), e);
         }
     }
 
@@ -133,6 +131,17 @@ public class FileWorkflowInstanceRepository implements WorkflowInstanceRepositor
     /** Ids are generated here, but a caller could hand one in — keep it a file name. */
     private Path fileFor(String instanceId) {
         String safe = instanceId.replaceAll("[^A-Za-z0-9._-]", "_");
-        return directory.resolve(safe + ".json");
+        return instancesDir().resolve(safe + ".json");
+    }
+
+    /** The instances directory of the partition the current call works in, created on first use. */
+    private Path instancesDir() {
+        Path dir = directory(dataDir, partition.get());
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot create " + dir, e);
+        }
+        return dir;
     }
 }

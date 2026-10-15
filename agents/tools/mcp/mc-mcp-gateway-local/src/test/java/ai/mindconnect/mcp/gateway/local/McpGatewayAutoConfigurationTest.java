@@ -56,20 +56,16 @@ class McpGatewayAutoConfigurationTest {
         runner().run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(McpGateway.class);
-            assertThat(context).hasSingleBean(NamespacedMcpGateways.class);
             assertThat(context).hasSingleBean(McpRegistryAdmin.class);
-            // The gateway the application sees routes to one per namespace; the default namespace's is a local one.
-            assertThat(context.getBean(NamespacedMcpGateways.class).forNamespace(ai.mindconnect.agent.Namespace.DEFAULT).gateway())
-                    .isInstanceOf(LocalMcpGateway.class);
+            // One gateway the application sees, for every namespace: the local one.
+            assertThat(context.getBean(McpGateway.class)).isInstanceOf(LocalMcpGateway.class);
         });
     }
 
     @Test
     void by_default_registrations_are_files() {
         runner().run(context -> {
-            NamespacedMcpGateways gateways = context.getBean(NamespacedMcpGateways.class);
-            assertThat(gateways.forNamespace(ai.mindconnect.agent.Namespace.DEFAULT).repository())
-                    .isInstanceOf(FileMcpServerRepository.class);
+            assertThat(context.getBean(McpServerRepository.class)).isInstanceOf(FileMcpServerRepository.class);
         });
     }
 
@@ -78,9 +74,7 @@ class McpGatewayAutoConfigurationTest {
         // How the Postgres starter puts registrations and discovery cache into tables.
         runner().withUserConfiguration(OwnStores.class).run(context -> {
             assertThat(context).hasNotFailed();
-            NamespacedMcpGateways gateways = context.getBean(NamespacedMcpGateways.class);
-            assertThat(gateways.forNamespace(new ai.mindconnect.agent.Namespace("acme")).repository())
-                    .isSameAs(OwnStores.REPOSITORY);
+            assertThat(context.getBean(McpServerRepository.class)).isSameAs(OwnStores.REPOSITORY);
             // The bundled registrations went into that store, not into a directory.
             assertThat(dataDir.resolve("local")).doesNotExist();
         });
@@ -91,9 +85,7 @@ class McpGatewayAutoConfigurationTest {
         // mc-mcp-gateway-pg not on the classpath: the servers stay where they are rather than vanish.
         runner().withPropertyValues("mindconnect.persistence=postgres").run(context -> {
             assertThat(context).hasNotFailed();
-            assertThat(context.getBean(NamespacedMcpGateways.class)
-                    .forNamespace(ai.mindconnect.agent.Namespace.DEFAULT).repository())
-                    .isInstanceOf(FileMcpServerRepository.class);
+            assertThat(context.getBean(McpServerRepository.class)).isInstanceOf(FileMcpServerRepository.class);
         });
     }
 
@@ -109,7 +101,7 @@ class McpGatewayAutoConfigurationTest {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(McpGateway.class);
             assertThat(context.getBean(McpGateway.class)).isInstanceOf(StubGateway.class);
-            assertThat(context).doesNotHaveBean(NamespacedMcpGateways.class);
+            assertThat(context).doesNotHaveBean(LocalMcpGateway.class);
             // No admin bean at all — not a bean that is null. The screen's
             // condition then fails and the screen stays away.
             assertThat(context).doesNotHaveBean(McpRegistryAdmin.class);
@@ -158,12 +150,12 @@ class McpGatewayAutoConfigurationTest {
         McpStoreFactory mcpStoreFactory() {
             return new McpStoreFactory() {
                 @Override
-                public McpServerRepository serverRepository(ai.mindconnect.agent.Namespace namespace) {
+                public McpServerRepository serverRepository(ai.mindconnect.agent.ScopeSupplier scope) {
                     return REPOSITORY;
                 }
 
                 @Override
-                public McpDiscoveryStore discoveryStore(ai.mindconnect.agent.Namespace namespace) {
+                public McpDiscoveryStore discoveryStore(ai.mindconnect.agent.ScopeSupplier scope) {
                     return new McpDiscoveryStore() {
                         @Override public java.util.Optional<ai.mindconnect.mcp.gateway.McpDiscovery> find(
                                 McpServerId server) { return java.util.Optional.empty(); }

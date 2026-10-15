@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.ui.controller;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.tool.AgentTool;
@@ -21,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** The admin sees every user's entries in the namespace, filters them by user, and deletes any. */
 class MemoryAdminUiControllerTest {
 
-    private final UserMemoryService memory = new UserMemoryService(new InMemoryUserMemoryRepository());
+    private final UserMemoryService memory = new UserMemoryService(new InMemoryUserMemoryRepository(ScopeSupplier.local()));
     private final MemoryAdminUiController controller = new MemoryAdminUiController(memory, null);
 
     @Test

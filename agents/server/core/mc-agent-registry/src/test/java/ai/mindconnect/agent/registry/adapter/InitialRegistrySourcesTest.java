@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.registry.adapter;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.adapter.initialdata.InitialRegistrySources;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
@@ -23,7 +24,7 @@ class InitialRegistrySourcesTest {
 
     @Test
     void a_shipped_registry_is_installed_under_its_file_name(@TempDir Path dir) {
-        FileRegistrySourceRepository repository = new FileRegistrySourceRepository(dir, Namespace.DEFAULT);
+        FileRegistrySourceRepository repository = new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
 
         assertThat(InitialRegistrySources.install(repository, LOCATION)).containsExactly("acme-agents");
 
@@ -35,7 +36,7 @@ class InitialRegistrySourcesTest {
 
     @Test
     void a_registry_already_configured_keeps_what_the_operator_made_of_it(@TempDir Path dir) {
-        FileRegistrySourceRepository repository = new FileRegistrySourceRepository(dir, Namespace.DEFAULT);
+        FileRegistrySourceRepository repository = new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
         InitialRegistrySources.install(repository, LOCATION);
         repository.save(repository.findById(ID).orElseThrow().withEnabled(false));
 

@@ -1,13 +1,12 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 
 import ai.mindconnect.agent.runtime.tools.todo.TodoList;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,12 +27,14 @@ public class FileTodoListRepository implements TodoListRepository {
     private static final Logger log = LoggerFactory.getLogger(FileTodoListRepository.class);
     private static final String FILE_NAME = "todos.json";
 
-    private final Path baseDir;
+    private final Path dataDir;
+    private final ScopeSupplier scope;
     private final ObjectMapper mapper;
 
-    public FileTodoListRepository(Path baseDir, Namespace namespace) {
-        this.baseDir = baseDir.resolve(namespace.value()).toAbsolutePath().normalize();
-        this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    public FileTodoListRepository(Path dataDir, ObjectMapper mapper, ScopeSupplier scope) {
+        this.dataDir = dataDir.toAbsolutePath().normalize();
+        this.mapper = mapper;
+        this.scope = scope;
     }
 
     @Override
@@ -75,9 +76,14 @@ public class FileTodoListRepository implements TodoListRepository {
     }
 
     private Path fileFor(SessionId sessionId) {
-        return baseDir
+        return namespaceDir()
                 .resolve("sessions")
                 .resolve(sessionId.value())
                 .resolve(FILE_NAME);
+    }
+
+    /** The directory of the namespace the current call works in. */
+    private Path namespaceDir() {
+        return dataDir.resolve(scope.namespace().value());
     }
 }

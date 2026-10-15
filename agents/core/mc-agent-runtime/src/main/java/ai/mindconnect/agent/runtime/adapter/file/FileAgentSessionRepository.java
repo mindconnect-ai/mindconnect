@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -10,6 +10,8 @@ import ai.mindconnect.filerepo.DocumentExistsException;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -20,7 +22,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
-import java.util.logging.Logger;
 import java.util.stream.Stream;
 
 /**
@@ -37,7 +38,7 @@ import java.util.stream.Stream;
  */
 public class FileAgentSessionRepository implements AgentSessionRepository {
 
-    private static final Logger log = Logger.getLogger(FileAgentSessionRepository.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(FileAgentSessionRepository.class);
     private static final String SESSIONS = "sessions";
     private static final String FILE_NAME = "session.json";
 
@@ -52,16 +53,23 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
     private static final Comparator<AgentSession> OLDEST_FIRST =
             Comparator.comparing(AgentSession::startedAt, Comparator.nullsLast(Comparator.naturalOrder()));
 
-    private final FileRepo repo;
+    private final Path agentStorageDir;
+    private final ScopeSupplier scope;
     private final Documents<SessionId, AgentSession> sessions;
 
-    public FileAgentSessionRepository(Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        this.repo = FileRepo.open(agentStorageDir, namespace.value());
+    public FileAgentSessionRepository(Path agentStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
+        this.agentStorageDir = agentStorageDir;
+        this.scope = scope;
         this.sessions = Documents.of(AgentSession.class)
                 .path((SessionId id) -> SESSIONS + "/" + id.value() + "/" + FILE_NAME)
-                .build(repo, objectMapper);
-        log.info("AgentSessionRepository base: " + repo.root());
+                .build(this::repo, objectMapper);
+        log.info("AgentSessionRepository base: {}", agentStorageDir.resolve("<namespace>"));
         warnAboutEarlierLayout();
+    }
+
+    /** The partition of the namespace the current call works in. */
+    private FileRepo repo() {
+        return FileRepo.open(agentStorageDir, scope.namespace().value());
     }
 
     @Override
@@ -115,10 +123,10 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
     @Override
     public void deleteById(SessionId id) {
         if (!sessions.delete(id)) return;
-        Path dir = repo.resolve(SESSIONS + "/" + id.value());
+        Path dir = repo().resolve(SESSIONS + "/" + id.value());
         try (Stream<Path> files = Files.walk(dir)) {
             files.sorted(Comparator.reverseOrder()).forEach(FileAgentSessionRepository::deleteQuietly);
-            log.info("Deleted session directory: " + dir);
+            log.info("Deleted session directory: {}", dir);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -132,19 +140,29 @@ public class FileAgentSessionRepository implements AgentSessionRepository {
         try {
             Files.deleteIfExists(file);
         } catch (IOException e) {
-            log.warning("Could not delete " + file + ": " + e.getMessage());
+            log.warn("Could not delete {}: {}", file, e.getMessage());
         }
     }
 
+    /** Looks into every namespace once, at start: which one a call works in is not known yet. */
     private void warnAboutEarlierLayout() {
-        Path users = repo.resolve("users");
+        try (DirectoryStream<Path> namespaces = Files.newDirectoryStream(agentStorageDir, Files::isDirectory)) {
+            for (Path namespaceDir : namespaces) {
+                warnAboutEarlierLayout(namespaceDir);
+            }
+        } catch (IOException e) {
+            // only a hint — nothing depends on it
+        }
+    }
+
+    private static void warnAboutEarlierLayout(Path namespaceDir) {
+        Path users = namespaceDir.resolve("users");
         if (!Files.isDirectory(users)) return;
         try (DirectoryStream<Path> userDirs = Files.newDirectoryStream(users)) {
             for (Path userDir : userDirs) {
                 if (Files.isDirectory(userDir.resolve(SESSIONS))) {
-                    log.warning("Sessions found under the earlier layout " + users
-                            + "/<user>/sessions/ — they are not read any more; sessions now live under "
-                            + repo.resolve(SESSIONS));
+                    log.warn("Sessions found under the earlier layout {}/<user>/sessions/ — they are not read any more;"
+                            + " sessions now live under {}", users, namespaceDir.resolve(SESSIONS));
                     return;
                 }
             }

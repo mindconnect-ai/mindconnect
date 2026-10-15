@@ -114,11 +114,11 @@ class PostgresCombinationsTest {
         // what an installation on file persistence left behind
         WorkflowData fromFile = new WorkflowData();
         fromFile.setName("from-file");
-        new FileWorkflowDataRepository(dataDir, namespace).save("from-file", fromFile);
+        new FileWorkflowDataRepository(dataDir, () -> namespace).save("from-file", fromFile);
         WorkflowInstanceSnapshot halted = new WorkflowInstanceSnapshot();
         halted.setWorkflowName("from-file");
         halted.setSuspendedAt(1_000);
-        String haltedId = new FileWorkflowInstanceRepository(dataDir, namespace).save(halted);
+        String haltedId = new FileWorkflowInstanceRepository(dataDir, () -> namespace).save(halted);
         Sql sql = Sql.of(dataSource());
 
         try (AgentRuntime runtime = AgentRuntimeBuilder.of(Persistence.postgres(dataSource(), dataDir))
@@ -139,7 +139,7 @@ class PostgresCombinationsTest {
                     row -> row.string("id"), namespace)).containsExactly("created", "from-file");
             assertThat(sql.scalar("SELECT count(*) FROM mc_workflow_instance WHERE partition_key = ?", Long.class, namespace))
                     .isEqualTo(1);
-            assertThat(new FileWorkflowDataRepository(dataDir, namespace).listIds()).containsExactly("from-file");
+            assertThat(new FileWorkflowDataRepository(dataDir, () -> namespace).listIds()).containsExactly("from-file");
 
             workflows.delete("created");
             workflows.delete("from-file");

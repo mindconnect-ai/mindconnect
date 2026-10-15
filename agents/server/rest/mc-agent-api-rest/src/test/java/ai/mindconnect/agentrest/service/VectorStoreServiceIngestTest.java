@@ -1,13 +1,13 @@
 package ai.mindconnect.agentrest.service;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
-import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -29,15 +29,14 @@ class VectorStoreServiceIngestTest {
 
     @Test
     void aFileTheReaderMayNotReadIsReportedLikeAMissingOne() throws Exception {
-        FileStore files = new FilesystemFileStore(dir.resolve("data"), new Namespace("test"));
+        FileStore files = new FilesystemFileStore(dir.resolve("data"), ScopeSupplier.fixed(new Namespace("test")));
         StoredFile alices = files.save("notes.txt", "text/plain",
                 new ByteArrayInputStream("secret".getBytes(StandardCharsets.UTF_8)), UserId.of("alice"));
         var beans = new StaticListableBeanFactory();
         beans.addBean("files", files);
         VectorStoreService service = new VectorStoreService(beans.getBeanProvider(VectorStores.class),
                 beans.getBeanProvider(FileStore.class), beans.getBeanProvider(WorkflowDataRepository.class),
-                beans.getBeanProvider(WorkflowInstanceRepository.class), dir.resolve("tools").toString(),
-                ai.mindconnect.agent.ScopeSupplier.local(),
+                dir.resolve("tools").toString(),
                 beans.getBeanProvider(ai.mindconnect.common.env.EnvVarResolver.class));
 
         assertThatThrownBy(() -> service.ingestStoredFile("handbook", alices.id().value(), UserId.of("bob")))

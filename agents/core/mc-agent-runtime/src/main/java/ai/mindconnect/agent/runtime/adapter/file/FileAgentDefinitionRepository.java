@@ -1,18 +1,19 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.common.Versions;
 import ai.mindconnect.filerepo.Documents;
 import ai.mindconnect.filerepo.FileRepo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.logging.Logger;
 
 /**
  * Stores agent definitions under {@code {base}/{namespace}/system/agents/{id}.json}.
@@ -23,17 +24,16 @@ import java.util.logging.Logger;
  */
 public class FileAgentDefinitionRepository implements AgentDefinitionRepository {
 
-    private static final Logger log = Logger.getLogger(FileAgentDefinitionRepository.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(FileAgentDefinitionRepository.class);
     private static final String DIR = "system/agents";
 
     private final Documents<AgentId, AgentDefinition> definitions;
 
-    public FileAgentDefinitionRepository(Path agentStorageDir, ObjectMapper objectMapper, Namespace namespace) {
-        FileRepo repo = FileRepo.open(agentStorageDir, namespace.value());
+    public FileAgentDefinitionRepository(Path agentStorageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
         this.definitions = Documents.of(AgentDefinition.class)
                 .path((AgentId id) -> DIR + "/" + id.value() + ".json")
-                .build(repo, objectMapper);
-        log.info("AgentDefinitionRepository storage: " + repo.resolve(DIR));
+                .build(() -> FileRepo.open(agentStorageDir, scope.namespace().value()), objectMapper);
+        log.info("AgentDefinitionRepository storage: {}", agentStorageDir.resolve("<namespace>").resolve(DIR));
     }
 
     @Override

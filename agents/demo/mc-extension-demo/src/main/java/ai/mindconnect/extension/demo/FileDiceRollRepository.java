@@ -1,6 +1,6 @@
 package ai.mindconnect.extension.demo;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -25,15 +25,22 @@ final class FileDiceRollRepository implements DiceRollRepository {
     private static final ObjectMapper MAPPER = new ObjectMapper().registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-    private final Path file;
+    private final Path dataDir;
+    private final ScopeSupplier scope;
 
-    FileDiceRollRepository(Path dataDir, Namespace namespace) {
-        this.file = dataDir.resolve(namespace.value()).resolve("ext").resolve("demo-dungeon")
-                .resolve("dice-rolls.jsonl").toAbsolutePath();
+    FileDiceRollRepository(Path dataDir, ScopeSupplier scope) {
+        this.dataDir = dataDir.toAbsolutePath();
+        this.scope = scope;
+    }
+
+    /** The rolls of the namespace the current call works in. */
+    private Path file() {
+        return dataDir.resolve(scope.namespace().value()).resolve("ext").resolve("demo-dungeon").resolve("dice-rolls.jsonl");
     }
 
     @Override
     public synchronized void append(DiceRoll roll) {
+        Path file = file();
         try {
             Files.createDirectories(file.getParent());
             Files.writeString(file, MAPPER.writeValueAsString(roll) + System.lineSeparator(), StandardCharsets.UTF_8,
@@ -45,6 +52,7 @@ final class FileDiceRollRepository implements DiceRollRepository {
 
     @Override
     public synchronized List<DiceRoll> since(Instant from) {
+        Path file = file();
         if (!Files.isRegularFile(file)) return List.of();
         List<DiceRoll> rolls = new ArrayList<>();
         try {

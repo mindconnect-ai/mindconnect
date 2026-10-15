@@ -1,6 +1,7 @@
 package ai.mindconnect.extension.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.extension.domain.ExtensionActivation;
 import ai.mindconnect.extension.domain.ExtensionId;
@@ -25,7 +26,7 @@ class FileExtensionActivationRepositoryTest {
 
     @Test
     void a_decision_is_one_document_in_the_namespace_s_system_directory() throws Exception {
-        var repo = new FileExtensionActivationRepository(dir, mapper, new Namespace("acme"));
+        var repo = new FileExtensionActivationRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("acme")));
 
         repo.save(ExtensionActivation.of(ACME, false, UserId.of("david")));
 
@@ -38,8 +39,8 @@ class FileExtensionActivationRepositoryTest {
 
     @Test
     void namespaces_do_not_see_each_other_s_decisions() {
-        var acme = new FileExtensionActivationRepository(dir, mapper, new Namespace("acme"));
-        var other = new FileExtensionActivationRepository(dir, mapper, new Namespace("other"));
+        var acme = new FileExtensionActivationRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("acme")));
+        var other = new FileExtensionActivationRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("other")));
 
         acme.save(ExtensionActivation.of(ACME, false, null));
 
@@ -49,7 +50,7 @@ class FileExtensionActivationRepositoryTest {
 
     @Test
     void deleting_forgets_and_an_empty_directory_is_no_decision() {
-        var repo = new FileExtensionActivationRepository(dir, mapper, new Namespace("acme"));
+        var repo = new FileExtensionActivationRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("acme")));
         assertThat(repo.find(ACME)).isEmpty();
 
         repo.save(ExtensionActivation.of(ACME, true, null));

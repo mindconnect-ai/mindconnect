@@ -3,7 +3,6 @@ package ai.mindconnect.agent.runtime.service.task;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.taskqueue.TaskAdvisor;
 import ai.mindconnect.taskqueue.TaskContext;
@@ -29,6 +28,10 @@ import java.util.Optional;
  * its parent's scope through {@link #beforeSubmit} — and a submission that
  * already names a namespace keeps it: a child never moves out of its
  * parent's namespace.
+ *
+ * <p>A runtime fixed to one namespace has its tasks stamped all the same, so
+ * every task record names its namespace; there is nothing to bind there, and
+ * a task runs as it is — one submitted before it was stamped included.
  */
 public final class ScopeTaskAdvisor implements TaskAdvisor {
 
@@ -37,44 +40,39 @@ public final class ScopeTaskAdvisor implements TaskAdvisor {
     /** Payload key of the user behind the work, present only when the scope had one. */
     public static final String USER = "mc.user";
 
-    private final ScopeSupplier submitting;
-    private final ThreadBoundScope executing;
+    private final ScopeSupplier scope;
 
     /**
-     * @param submitting whose scope a submission is stamped with
-     * @param executing  what an execution is bound to
+     * @param scope whose scope a submission is stamped with, and what an
+     *              execution runs in again ({@link ScopeSupplier#callIn})
      */
-    public ScopeTaskAdvisor(ScopeSupplier submitting, ThreadBoundScope executing) {
-        this.submitting = Objects.requireNonNull(submitting, "submitting");
-        this.executing = Objects.requireNonNull(executing, "executing");
+    public ScopeTaskAdvisor(ScopeSupplier scope) {
+        this.scope = Objects.requireNonNull(scope, "scope");
     }
 
     @Override
     public TaskSubmission beforeSubmit(TaskSubmission submission) {
         if (submission.payload().containsKey(NAMESPACE)) return submission;
-        Scope scope = submitting.get();
+        Scope submitter = scope.get();
         Map<String, Object> payload = new HashMap<>(submission.payload());
-        payload.put(NAMESPACE, scope.namespace().value());
-        scope.userIfAny().ifPresent(user -> payload.put(USER, user.value()));
+        payload.put(NAMESPACE, submitter.namespace().value());
+        submitter.userIfAny().ifPresent(user -> payload.put(USER, user.value()));
         return new TaskSubmission(submission.type(), payload, submission.priority(), submission.parentTaskId(),
                 submission.runAfter(), submission.maxAttempts(), submission.id());
     }
 
     @Override
     public TaskOutcome aroundExecute(TaskContext ctx, Execution chain) throws Exception {
-        return executing.callIn(scopeOf(ctx), () -> chain.proceed(ctx));
+        if (!scope.bindsPerThread()) return chain.proceed(ctx);
+        Scope submitted = scopeIfAny(ctx.task()).orElseThrow(() -> new IllegalStateException("Task "
+                + ctx.task().id() + " (" + ctx.task().type() + ") carries no namespace — it was submitted past the scope advisor"));
+        return scope.callIn(submitted, () -> chain.proceed(ctx));
     }
 
     /** Right inside the MDC advisor: everything that touches a store runs bound. */
     @Override
     public int order() {
         return Integer.MIN_VALUE + 2;
-    }
-
-    /** The scope a task was submitted in, read back from its payload. */
-    public static Scope scopeOf(TaskContext ctx) {
-        return scopeIfAny(ctx.task()).orElseThrow(() -> new IllegalStateException("Task " + ctx.task().id()
-                + " (" + ctx.task().type() + ") carries no namespace — it was submitted past the scope advisor"));
     }
 
     /** The scope a task record carries, if it was stamped — a monitor reading tasks of every namespace asks this. */

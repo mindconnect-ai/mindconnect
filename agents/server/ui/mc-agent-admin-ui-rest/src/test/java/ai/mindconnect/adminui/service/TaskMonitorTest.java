@@ -12,17 +12,16 @@ import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentSessionRepository;
-import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.namespace.adapter.memory.InMemoryNamespaceRepository;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskStatus;
 import ai.mindconnect.taskqueue.TaskSubmission;
@@ -76,11 +75,11 @@ class TaskMonitorTest {
             return TaskOutcome.done("ok");
         });
 
-        var definitions = new InMemoryAgentDefinitionRepository();
+        var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
         definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
                 "assistants", "bot", "prompt", null, "cfg", 5, null,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));
-        var sessions = new InMemoryAgentSessionRepository();
+        var sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
         sessions.create(new AgentSession(ALICE_SESSION, AGENT_ID, UserId.of("alice"), ConversationId.random(),
                 "Alice asks", SessionStatus.ACTIVE, Instant.now(), null,
                 null, null, null, null, null, null, null));
@@ -157,10 +156,9 @@ class TaskMonitorTest {
         var mapper = new com.fasterxml.jackson.databind.ObjectMapper()
                 .registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule())
                 .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        var scope = ThreadBoundScope.strict();
-        var sessions = NamespaceRouted.route(AgentSessionRepository.class, scope,
-                ns -> new FileAgentSessionRepository(data, mapper, ns));
-        var definitions = new InMemoryAgentDefinitionRepository();
+        var scope = ThreadBoundScopeSupplier.strict();
+        var sessions = new FileAgentSessionRepository(data, mapper, scope);
+        var definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
         definitions.save(new AgentDefinition(AGENT_ID, "Scout", "A test agent",
                 "assistants", "bot", "prompt", null, "cfg", 5, null,
                 AgentDefinitionStatus.ACTIVE, List.of(), List.of(), null, null, null, null));

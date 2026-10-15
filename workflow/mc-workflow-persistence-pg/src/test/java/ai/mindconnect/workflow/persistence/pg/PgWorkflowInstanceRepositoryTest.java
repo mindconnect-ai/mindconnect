@@ -26,7 +26,7 @@ class PgWorkflowInstanceRepositoryTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.fresh("mc_workflow_instance", "mc_workflow_import");
-        repo = new PgWorkflowInstanceRepository(sql, "test").initSchema();
+        repo = new PgWorkflowInstanceRepository(sql, () -> "test").initSchema();
     }
 
     private static WorkflowInstanceSnapshot snapshot(String workflow, long suspendedAt) {
@@ -90,7 +90,7 @@ class PgWorkflowInstanceRepositoryTest {
 
     @Test
     void onePartitionNeverSeesTheRunsOfAnother() {
-        var other = new PgWorkflowInstanceRepository(sql, "other").initSchema();
+        var other = new PgWorkflowInstanceRepository(sql, () -> "other").initSchema();
         String mine = repo.save(snapshot("approval", 1_000));
         String theirs = other.save(snapshot("approval", 2_000));
 
@@ -105,7 +105,7 @@ class PgWorkflowInstanceRepositoryTest {
 
     @Test
     void importsTheFilesOnceIntoAnEmptyPartitionAndKeepsThem() throws Exception {
-        var files = new FileWorkflowInstanceRepository(dataDir, "test");
+        var files = new FileWorkflowInstanceRepository(dataDir, () -> "test");
         String older = files.save(snapshot("approval", 1_000));
         String newer = files.save(snapshot("ingest", 2_000));
         Path dir = FileWorkflowInstanceRepository.directory(dataDir, "test");
@@ -126,9 +126,9 @@ class PgWorkflowInstanceRepositoryTest {
 
     @Test
     void aPartitionThatAlreadyHasRunsImportsNothingAndOthersImportTheirOwn() {
-        var other = new PgWorkflowInstanceRepository(sql, "other").initSchema();
-        new FileWorkflowInstanceRepository(dataDir, "test").save(snapshot("approval", 1_000));
-        new FileWorkflowInstanceRepository(dataDir, "other").save(snapshot("ingest", 2_000));
+        var other = new PgWorkflowInstanceRepository(sql, () -> "other").initSchema();
+        new FileWorkflowInstanceRepository(dataDir, () -> "test").save(snapshot("approval", 1_000));
+        new FileWorkflowInstanceRepository(dataDir, () -> "other").save(snapshot("ingest", 2_000));
         String own = repo.save(snapshot("own", 3_000));
 
         assertThat(repo.importFiles(FileWorkflowInstanceRepository.directory(dataDir, "test"))).isZero();

@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.PerNamespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 
 import ai.mindconnect.agent.runtime.tools.todo.TodoList;
@@ -12,21 +14,25 @@ import java.util.concurrent.ConcurrentHashMap;
 /** In-memory {@link TodoListRepository} — process-lifetime storage, no persistence. */
 public class InMemoryTodoListRepository implements TodoListRepository {
 
-    private final Map<SessionId, TodoList> store = new ConcurrentHashMap<>();
+    private final PerNamespace<Map<SessionId, TodoList>> store;
+
+    public InMemoryTodoListRepository(ScopeSupplier scope) {
+        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
+    }
 
     @Override
     public Optional<TodoList> findBySession(SessionId sessionId) {
-        return Optional.ofNullable(store.get(sessionId));
+        return Optional.ofNullable(store.current().get(sessionId));
     }
 
     @Override
     public TodoList save(TodoList list) {
-        store.put(list.sessionId(), list);
+        store.current().put(list.sessionId(), list);
         return list;
     }
 
     @Override
     public void deleteBySession(SessionId sessionId) {
-        store.remove(sessionId);
+        store.current().remove(sessionId);
     }
 }

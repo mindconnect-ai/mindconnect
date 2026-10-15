@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.registry.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.domain.RegistrySourceId;
 import ai.mindconnect.common.StaleVersionException;
@@ -25,8 +26,8 @@ class PgRegistrySourceRepositoryTest {
     void setUp() {
         sql = Sql.of(TestDb.require());
         sql.execute("DROP TABLE IF EXISTS mc_registry_source");
-        acme = new PgRegistrySourceRepository(sql, new Namespace("acme")).initSchema();
-        other = new PgRegistrySourceRepository(sql, new Namespace("other")).initSchema();
+        acme = new PgRegistrySourceRepository(sql, ScopeSupplier.fixed(new Namespace("acme"))).initSchema();
+        other = new PgRegistrySourceRepository(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
     }
 
     @Test

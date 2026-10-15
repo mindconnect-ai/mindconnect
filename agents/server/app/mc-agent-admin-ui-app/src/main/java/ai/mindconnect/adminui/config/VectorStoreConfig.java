@@ -1,6 +1,6 @@
 package ai.mindconnect.adminui.config;
 
-import ai.mindconnect.agent.NamespacePurge;
+import ai.mindconnect.namespace.port.out.NamespacePurge;
 import ai.mindconnect.vectorstore.tools.DefaultVectorStores;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import org.springframework.context.annotation.Bean;

@@ -10,7 +10,7 @@ import java.util.Optional;
 
 /**
  * Storage of LLM prices — one entry per price period of a config and model. An adapter
- * is bound to one namespace when it is built, like {@link LlmConfigRepository}.
+ * works in the namespace the scope names per call, like {@link LlmConfigRepository}.
  *
  * <p>The store keeps what it is given; the rules (no overlapping periods, no
  * price for an alias) are the service's, which checks them before it saves.

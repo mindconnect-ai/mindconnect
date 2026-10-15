@@ -1,6 +1,7 @@
 package ai.mindconnect.extension.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.extension.domain.InstalledSeed;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -22,7 +23,7 @@ class FileInstalledSeedRepositoryTest {
 
     @Test
     void the_installed_seeds_are_one_document_in_the_namespace_s_system_directory() throws Exception {
-        var repo = new FileInstalledSeedRepository(dir, mapper, new Namespace("acme"));
+        var repo = new FileInstalledSeedRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("acme")));
 
         repo.record(List.of(InstalledSeed.of("agent", "My agent", "acme-crm"),
                 InstalledSeed.of("llm-config", "claude-default", null)));
@@ -35,7 +36,7 @@ class FileInstalledSeedRepositoryTest {
 
     @Test
     void a_key_recorded_before_keeps_its_first_entry() {
-        var repo = new FileInstalledSeedRepository(dir, mapper, new Namespace("acme"));
+        var repo = new FileInstalledSeedRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("acme")));
 
         repo.record(List.of(InstalledSeed.of("agent", "email-assistant", "office")));
         repo.record(List.of(InstalledSeed.of("agent", "email-assistant", "other"),
@@ -48,13 +49,13 @@ class FileInstalledSeedRepositoryTest {
 
     @Test
     void namespaces_do_not_see_each_other_s_seeds() {
-        var acme = new FileInstalledSeedRepository(dir, mapper, new Namespace("acme"));
-        var other = new FileInstalledSeedRepository(dir, mapper, new Namespace("other"));
+        var acme = new FileInstalledSeedRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("acme")));
+        var other = new FileInstalledSeedRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("other")));
 
         acme.record(List.of(InstalledSeed.of("agent", "email-assistant", "office")));
 
         assertThat(other.all()).isEmpty();
-        assertThat(new FileInstalledSeedRepository(dir, mapper, new Namespace("acme")).keys())
+        assertThat(new FileInstalledSeedRepository(dir, mapper, ScopeSupplier.fixed(new Namespace("acme"))).keys())
                 .as("read back by a fresh adapter — after a restart")
                 .containsExactly("agent:email-assistant");
     }

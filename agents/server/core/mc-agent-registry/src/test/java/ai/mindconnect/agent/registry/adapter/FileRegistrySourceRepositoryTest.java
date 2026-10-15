@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.registry.adapter;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.registry.adapter.file.FileRegistrySourceRepository;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ class FileRegistrySourceRepositoryTest {
     @Test
     void a_saved_registry_reads_back_with_everything_it_was_given(@TempDir Path dir) {
         FileRegistrySourceRepository repository =
-                new FileRegistrySourceRepository(dir, Namespace.DEFAULT);
+                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
         RegistrySource source = new RegistrySource(RegistrySource.of("acme/agents").id(),
                 "Acme agents", "acme", "agents", "v2", "catalog/index.json", "ACME_TOKEN",
                 null, true, null);
@@ -35,7 +36,7 @@ class FileRegistrySourceRepositoryTest {
     @Test
     void a_disabled_registry_stays_configured_but_out_of_the_enabled_list(@TempDir Path dir) {
         FileRegistrySourceRepository repository =
-                new FileRegistrySourceRepository(dir, Namespace.DEFAULT);
+                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
         RegistrySource saved = repository.save(RegistrySource.of("acme/agents"));
 
         repository.save(saved.withEnabled(false));
@@ -47,7 +48,7 @@ class FileRegistrySourceRepositoryTest {
     @Test
     void deleting_one_leaves_the_store_empty(@TempDir Path dir) {
         FileRegistrySourceRepository repository =
-                new FileRegistrySourceRepository(dir, Namespace.DEFAULT);
+                new FileRegistrySourceRepository(dir, ScopeSupplier.fixed(Namespace.DEFAULT));
         RegistrySource saved = repository.save(RegistrySource.of("acme/agents"));
 
         repository.deleteById(saved.id());

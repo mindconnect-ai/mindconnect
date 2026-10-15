@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.registry.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.domain.RegistrySourceId;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
@@ -31,8 +31,8 @@ import java.util.stream.Stream;
  * {@code (namespace, id)}, with the name beside the document for the order
  * the screen lists them in.
  *
- * <p>Bound to one namespace: every row it writes carries it, every statement
- * matches it. The {@code namespace} column is what the namespace purge finds
+ * <p>Every row it writes carries the namespace the scope names for the
+ * current call, every statement matches it. The {@code namespace} column is what the namespace purge finds
  * the rows by.
  *
  * <p>An installation that ran on files before keeps its registries:
@@ -44,20 +44,20 @@ public final class PgRegistrySourceRepository implements RegistrySourceRepositor
     private static final Logger log = LoggerFactory.getLogger(PgRegistrySourceRepository.class);
 
     private final DocumentTable<RegistrySource> sources;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
     private final ObjectMapper mapper;
 
-    public PgRegistrySourceRepository(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgRegistrySourceRepository(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope);
     }
 
     /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
-    public PgRegistrySourceRepository(Sql sql, Namespace namespace) {
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+    public PgRegistrySourceRepository(Sql sql, ScopeSupplier scope) {
+        this.scope = Objects.requireNonNull(scope, "scope");
         this.mapper = sql.json().mapper();
         this.sources = DocumentTable.of(RegistrySource.class)
                 .table("mc_registry_source")
-                .partitionKey("namespace", "TEXT", s -> namespace.value())
+                .partitionKey("namespace", "TEXT", s -> scope.namespace().value())
                 .id("id", "TEXT", s -> s.id().value())
                 .requiredColumn("name", "TEXT", RegistrySource::name)
                 .build(sql);
@@ -84,7 +84,7 @@ public final class PgRegistrySourceRepository implements RegistrySourceRepositor
      */
     public int importFiles(Path directory) {
         if (directory == null || !Files.isDirectory(directory)
-                || sources.exists("WHERE namespace = ?", namespace.value())) {
+                || sources.exists("WHERE namespace = ?", scope.namespace().value())) {
             return 0;
         }
         List<Path> files;
@@ -117,12 +117,12 @@ public final class PgRegistrySourceRepository implements RegistrySourceRepositor
                 }
             } catch (IOException | RuntimeException e) {
                 log.warn("Skipped the registry file {} of namespace '{}': {}",
-                        file, namespace.value(), e.getMessage());
+                        file, scope.namespace().value(), e.getMessage());
             }
         }
         if (imported > 0) {
             log.info("Imported {} registry source(s) of namespace '{}' from {} into Postgres; the files are kept",
-                    imported, namespace.value(), directory);
+                    imported, scope.namespace().value(), directory);
         }
         return imported;
     }
@@ -130,7 +130,7 @@ public final class PgRegistrySourceRepository implements RegistrySourceRepositor
     /** Checks the version against the row read {@code FOR UPDATE} and stores it one higher, in one transaction. */
     @Override
     public RegistrySource save(RegistrySource source) {
-        return sources.compute(namespace.value(), source.id().value(), current ->
+        return sources.compute(scope.namespace().value(), source.id().value(), current ->
                 source.withVersion(Versions.next(
                         current.map(RegistrySource::version).orElse(null), source.version(),
                         "RegistrySource", source.id().value())));
@@ -138,16 +138,16 @@ public final class PgRegistrySourceRepository implements RegistrySourceRepositor
 
     @Override
     public Optional<RegistrySource> findById(RegistrySourceId id) {
-        return sources.findById(namespace.value(), id.value());
+        return sources.findById(scope.namespace().value(), id.value());
     }
 
     @Override
     public List<RegistrySource> findAll() {
-        return sources.find("WHERE namespace = ? ORDER BY lower(name), id", namespace.value());
+        return sources.find("WHERE namespace = ? ORDER BY lower(name), id", scope.namespace().value());
     }
 
     @Override
     public void deleteById(RegistrySourceId id) {
-        sources.deleteById(namespace.value(), id.value());
+        sources.deleteById(scope.namespace().value(), id.value());
     }
 }

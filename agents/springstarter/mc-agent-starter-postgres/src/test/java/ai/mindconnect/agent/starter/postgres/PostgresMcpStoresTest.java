@@ -1,10 +1,9 @@
 package ai.mindconnect.agent.starter.postgres;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.mcp.gateway.adapter.pg.PgMcpServerRepository;
 import ai.mindconnect.mcp.gateway.local.McpGatewayAutoConfiguration;
+import ai.mindconnect.mcp.gateway.local.McpServerRepository;
 import ai.mindconnect.mcp.gateway.local.McpStoreFactory;
-import ai.mindconnect.mcp.gateway.local.NamespacedMcpGateways;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -72,9 +71,7 @@ class PostgresMcpStoresTest {
         runner().run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).hasSingleBean(McpStoreFactory.class);
-            assertThat(context.getBean(NamespacedMcpGateways.class)
-                    .forNamespace(new Namespace("starter-mcp-test")).repository())
-                    .isInstanceOf(PgMcpServerRepository.class);
+            assertThat(context.getBean(McpServerRepository.class)).isInstanceOf(PgMcpServerRepository.class);
         });
     }
 
@@ -83,7 +80,7 @@ class PostgresMcpStoresTest {
         runner().withPropertyValues("mindconnect.mcp.enabled=false").run(context -> {
             assertThat(context).hasNotFailed();
             assertThat(context).doesNotHaveBean(McpStoreFactory.class);
-            assertThat(context).doesNotHaveBean(NamespacedMcpGateways.class);
+            assertThat(context).doesNotHaveBean(McpServerRepository.class);
         });
     }
 }

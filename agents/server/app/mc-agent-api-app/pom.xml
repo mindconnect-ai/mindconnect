@@ -85,6 +85,16 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-workflow</artifactId>
+        </dependency>
+        <!-- The workflow definitions under /api/workflows, and the workflow admin's run service. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-admin-rest</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-tools-mcp</artifactId>
         </dependency>
         <dependency>

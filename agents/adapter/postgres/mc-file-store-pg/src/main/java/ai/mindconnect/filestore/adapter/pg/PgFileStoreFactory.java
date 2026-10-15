@@ -1,23 +1,23 @@
 package ai.mindconnect.filestore.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.FileStoreFactory;
 import ai.mindconnect.jdbc.Sql;
 
-/** The file store as Postgres tables, bound to one namespace, created with its schema. */
+/** The file store as Postgres tables in the namespace the scope names per call, created with its schema. */
 public class PgFileStoreFactory implements FileStoreFactory {
 
     private final Sql sql;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
 
-    public PgFileStoreFactory(Sql sql, Namespace namespace) {
+    public PgFileStoreFactory(Sql sql, ScopeSupplier scope) {
         this.sql = sql;
-        this.namespace = namespace;
+        this.scope = scope;
     }
 
     @Override
     public FileStore fileStore() {
-        return new PgFileStore(sql, namespace).initSchema();
+        return new PgFileStore(sql, scope).initSchema();
     }
 }

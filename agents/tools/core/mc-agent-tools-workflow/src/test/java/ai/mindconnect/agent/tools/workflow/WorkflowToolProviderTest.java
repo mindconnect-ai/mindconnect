@@ -1,6 +1,5 @@
 package ai.mindconnect.agent.tools.workflow;
 
-import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tools.workflow.step.ToolCallData;
@@ -16,6 +15,7 @@ import ai.mindconnect.workflow.domain.HaltData;
 import ai.mindconnect.workflow.domain.VariableAssignment;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
+import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -71,14 +71,13 @@ class WorkflowToolProviderTest {
 
     @BeforeEach
     void setUp() {
-        repository = new FileWorkflowDataRepository(dir, "test");
+        repository = new FileWorkflowDataRepository(dir, () -> "test");
         repository.save("greeting", greeting());
         repository.save("halting", halting());
 
         provider = new WorkflowToolProvider();
         provider.bind(MapToolEnvironment.builder()
-                .string("dataBaseDir", dir.toString())
-                .service(Namespace.class, new Namespace("test"))
+                .service(WorkflowDataRepository.class, repository)
                 .build());
     }
 
@@ -213,8 +212,7 @@ class WorkflowToolProviderTest {
             @Override public boolean personal() { return true; }
         };
         provider.bind(MapToolEnvironment.builder()
-                .string("dataBaseDir", dir.toString())
-                .service(Namespace.class, new Namespace("test"))
+                .service(WorkflowDataRepository.class, repository)
                 .service(ai.mindconnect.common.env.EnvVarResolver.class, ai.mindconnect.common.env.EnvVarResolver.chain(
                         personal, ai.mindconnect.common.env.EnvVarResolver.of(Map.of("PROBE", "namespace-value"))))
                 .build());

@@ -32,9 +32,9 @@ class PostgresVectorStoresTest {
     void withPgvector_theIndexLivesInTheRuntimesDatabase() {
         DataSource db = TestDb.requirePostgres();
         TestDb.forget(db, NS);
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir, Map.of())).orElseThrow();
 
-        VectorStore store = stores.open(NS, "kb", VectorStores.DEFAULT_TEMPLATE, VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore store = stores.open("kb", VectorStores.DEFAULT_TEMPLATE, VectorStoreInstance.Scope.GLOBAL, null);
         store.put(store.documentRef("doc1"), null, "1",
                 List.of(new VectorStore.TextChunk("podman is a container engine", Map.of())));
 
@@ -47,16 +47,16 @@ class PostgresVectorStoresTest {
                 Long.class, NS.value())).isEqualTo(1L);
         assertThat(store.search("container", 1)).extracting(h -> h.ref().id()).containsExactly("doc1");
         assertThat(Files.exists(dir.resolve(NS.value()))).as("nothing of the stores is kept in files").isFalse();
-        assertThat(stores.indexLocation(NS)).isEqualTo("Postgres (pgvector), the application's database — table mc_embedding");
+        assertThat(stores.indexLocation()).isEqualTo("Postgres (pgvector), the application's database — table mc_embedding");
     }
 
     @Test
     void withoutPgvector_theIndexStaysInFiles_andTheRegistryInTheDatabase() {
         DataSource db = TestDb.withoutPgvector();
         TestDb.forget(db, NS);
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir, Map.of())).orElseThrow();
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir, Map.of())).orElseThrow();
 
-        VectorStore store = stores.open(NS, "kb", VectorStores.DEFAULT_TEMPLATE, VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore store = stores.open("kb", VectorStores.DEFAULT_TEMPLATE, VectorStoreInstance.Scope.GLOBAL, null);
         store.put(store.documentRef("doc1"), null, "1",
                 List.of(new VectorStore.TextChunk("podman is a container engine", Map.of())));
 
@@ -65,24 +65,24 @@ class PostgresVectorStoresTest {
         assertThat(dir.resolve(NS.value()).resolve("vector-stores/instances")).doesNotExist();
         assertThat(Sql.of(db).scalar("SELECT count(*) FROM mc_vector_store_instance WHERE namespace = ? AND name = 'kb'",
                 Long.class, NS.value())).isEqualTo(1L);
-        assertThat(stores.registry(NS).members("kb")).containsExactly(store.documentRef("doc1"));
-        assertThat(stores.indexLocation(NS)).startsWith("Files in ").contains("pgvs-choice/embeddings — the application's Postgres has no pgvector extension (");
+        assertThat(stores.registry().members("kb")).containsExactly(store.documentRef("doc1"));
+        assertThat(stores.indexLocation()).startsWith("Files in ").contains("pgvs-choice/embeddings — the application's Postgres has no pgvector extension (");
     }
 
     @Test
     void theHostCanKeepTheIndexInFiles() {
         DataSource db = TestDb.requirePostgres();
         TestDb.forget(db, NS);
-        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(db, dir,
+        VectorStores stores = VectorStores.fromEnvironment(TestDb.postgresEnvironment(NS, db, dir,
                 Map.of("vectorStoreBackend", "file"))).orElseThrow();
 
-        VectorStore store = stores.open(NS, "kb", VectorStores.DEFAULT_TEMPLATE, VectorStoreInstance.Scope.GLOBAL, null);
+        VectorStore store = stores.open("kb", VectorStores.DEFAULT_TEMPLATE, VectorStoreInstance.Scope.GLOBAL, null);
         store.put(EntityRef.of(ai.mindconnect.vectorstore.embedding.EntityType.FILE, EntityRef.FILE_STORE, "file-1"),
                 null, "1", List.of(new VectorStore.TextChunk("podman is a container engine", Map.of())));
 
         assertThat(dir.resolve(NS.value()).resolve("embeddings/entries")).isDirectory();
         assertThat(Sql.of(db).scalar("SELECT count(*) FROM mc_embedding WHERE namespace = ?", Long.class, NS.value()))
                 .isZero();
-        assertThat(stores.indexLocation(NS)).endsWith(" — mindconnect.vector-store.backend is 'file'");
+        assertThat(stores.indexLocation()).endsWith(" — mindconnect.vector-store.backend is 'file'");
     }
 }

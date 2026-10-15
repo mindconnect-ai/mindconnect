@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
 import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
@@ -20,23 +20,23 @@ import java.util.Optional;
  * agent keeps about them — a name is kebab-case, so the {@code @} cannot
  * collide, and the rows written before agents had a memory keep their ids.
  * {@code user_id} and {@code agent_id} are columns of their own for the
- * listings. Bound to one namespace; the namespace purge finds the table by
+ * listings. Works in the namespace the scope names per call; the namespace purge finds the table by
  * its {@code namespace} column.
  */
 public final class PgUserMemoryRepository implements UserMemoryRepository {
 
     private final DocumentTable<MemoryEntry> entries;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
 
-    public PgUserMemoryRepository(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgUserMemoryRepository(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope);
     }
 
-    public PgUserMemoryRepository(Sql sql, Namespace namespace) {
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+    public PgUserMemoryRepository(Sql sql, ScopeSupplier scope) {
+        this.scope = Objects.requireNonNull(scope, "scope");
         this.entries = DocumentTable.of(MemoryEntry.class)
                 .table("mc_user_memory")
-                .partitionKey("namespace", "TEXT", e -> namespace.value())
+                .partitionKey("namespace", "TEXT", e -> scope.namespace().value())
                 .id("id", "TEXT", e -> key(e.userId(), e.agentId(), e.name()))
                 .requiredColumn("user_id", "TEXT", e -> e.userId().value())
                 .column("agent_id", "TEXT", e -> e.agentId() == null ? null : e.agentId().value())
@@ -51,17 +51,17 @@ public final class PgUserMemoryRepository implements UserMemoryRepository {
 
     @Override
     public List<MemoryEntry> findByUser(UserId userId) {
-        return entries.find("WHERE namespace = ? AND user_id = ?", namespace.value(), userId.value());
+        return entries.find("WHERE namespace = ? AND user_id = ?", scope.namespace().value(), userId.value());
     }
 
     @Override
     public List<MemoryEntry> findAll() {
-        return entries.find("WHERE namespace = ?", namespace.value());
+        return entries.find("WHERE namespace = ?", scope.namespace().value());
     }
 
     @Override
     public Optional<MemoryEntry> find(UserId userId, AgentId agentId, String name) {
-        return entries.findById(namespace.value(), key(userId, agentId, name));
+        return entries.findById(scope.namespace().value(), key(userId, agentId, name));
     }
 
     @Override
@@ -71,7 +71,7 @@ public final class PgUserMemoryRepository implements UserMemoryRepository {
 
     @Override
     public boolean delete(UserId userId, AgentId agentId, String name) {
-        return entries.deleteById(namespace.value(), key(userId, agentId, name));
+        return entries.deleteById(scope.namespace().value(), key(userId, agentId, name));
     }
 
     private static String key(UserId userId, AgentId agentId, String name) {

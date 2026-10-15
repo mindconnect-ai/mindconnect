@@ -40,7 +40,6 @@
         <module>builder/mc-agent-runtime-feature-tools</module>
         <module>builder/mc-agent-runtime-feature-workflows</module>
         <module>builder/mc-agent-runtime-feature-file-upload</module>
-        <module>builder/mc-agent-runtime-feature-namespace</module>
         <module>builder/mc-agent-runtime-feature-transcription</module>
         <module>builder/mc-agent-runtime-feature-taskqueue</module>
         <module>builder/mc-agent-runtime-feature-subagents</module>
@@ -73,6 +72,7 @@
         <module>springstarter/mc-agent-starter-runtime</module>
         <module>springstarter/mc-agent-starter-registry</module>
         <module>springstarter/mc-agent-starter-extension</module>
+        <module>springstarter/mc-agent-starter-workflow</module>
         <module>server/core/mc-credentials</module>
         <module>core/mc-message-repository-core</module>
         <module>core/mc-message-repository</module>

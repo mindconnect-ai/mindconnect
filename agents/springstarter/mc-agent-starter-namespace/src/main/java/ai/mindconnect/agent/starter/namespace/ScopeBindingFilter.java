@@ -3,10 +3,10 @@ package ai.mindconnect.agent.starter.namespace;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.security.SecurityCurrentUserResolver;
 import ai.mindconnect.namespace.service.NamespaceService;
+import ai.mindconnect.namespace.service.ThreadBoundScopeSupplier;
 import ai.mindconnect.user.service.UserService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,7 +24,7 @@ import java.util.Optional;
 /**
  * Chooses the namespace of a request and binds it, with the caller, to the
  * thread for the rest of the request — the one place a server turns "who is
- * calling what" into the {@link Scope} every routed store asks for.
+ * calling what" into the {@link Scope} every store asks for.
  *
  * <p>The namespace comes, in this order, from the {@code /ns/{namespace}/}
  * prefix ({@link NamespacePathFilter}), the {@code X-Mindconnect-Namespace}
@@ -147,7 +147,7 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        if (!(scope instanceof ThreadBoundScope bound)) {
+        if (!(scope instanceof ThreadBoundScopeSupplier bound)) {
             chain.doFilter(request, response);
             return;
         }
@@ -212,7 +212,7 @@ public class ScopeBindingFilter extends OncePerRequestFilter {
         bindAndProceed(bound, answered, request, response, chain);
     }
 
-    private static void bindAndProceed(ThreadBoundScope bound, Scope answered, HttpServletRequest request,
+    private static void bindAndProceed(ThreadBoundScopeSupplier bound, Scope answered, HttpServletRequest request,
                                        HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         try {

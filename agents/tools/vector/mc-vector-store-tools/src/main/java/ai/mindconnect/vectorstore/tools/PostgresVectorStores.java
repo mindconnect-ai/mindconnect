@@ -1,6 +1,7 @@
 package ai.mindconnect.vectorstore.tools;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.vectorstore.pgvector.PgEmbeddingIndex;
 import org.slf4j.Logger;
@@ -83,7 +84,7 @@ final class PostgresVectorStores {
 
     /** The namespace's registry, with whatever the namespace kept in files brought over first. */
     VectorStoreRegistry open(Namespace namespace) {
-        PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, namespace);
+        PgVectorStoreRegistry registry = new PgVectorStoreRegistry(sql, ScopeSupplier.fixed(namespace));
         OPENING.lock();
         try {
             registry.initSchema();

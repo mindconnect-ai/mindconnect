@@ -1,6 +1,5 @@
 package ai.mindconnect.agentrest.service;
 
-import ai.mindconnect.agent.ScopeSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -17,9 +16,10 @@ import ai.mindconnect.vectorstore.tools.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
-import ai.mindconnect.workflow.admin.run.WorkflowRunService;
+import ai.mindconnect.workflow.execution.WorkflowExecutorService;
+import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
-import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
+import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -64,10 +64,8 @@ public class SessionFileService {
     private final ObjectProvider<DynamicToolActivations> activationsProvider;
     private final AgentSessionRepository sessions;
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
-    private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path spoolBase;
     /** Where a call works — every store call names the namespace. */
-    private final ScopeSupplier scope;
     private final ai.mindconnect.common.env.EnvVarResolver environment;
     /** Where a session's own directory is; unconfigured means the spool under the tools base dir. */
     private final ai.mindconnect.agent.runtime.service.UserHome userHome;
@@ -77,19 +75,15 @@ public class SessionFileService {
                               ObjectProvider<DynamicToolActivations> activationsProvider,
                               AgentSessionRepository sessions,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
-                              ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
                               ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome,
-                              ScopeSupplier scope,
                               ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
-        this.scope = scope;
         this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStore = fileStore;
         this.storesProvider = storesProvider;
         this.activationsProvider = activationsProvider;
         this.sessions = sessions;
         this.workflowsProvider = workflowsProvider;
-        this.workflowInstancesProvider = workflowInstancesProvider;
         this.spoolBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
         this.userHome = userHome.getIfAvailable(ai.mindconnect.agent.runtime.service.UserHome::none);
     }
@@ -149,12 +143,12 @@ public class SessionFileService {
         if (stores == null) return Map.of();
         String storeName = "session-" + sessionId.value();
         try {
-            if (stores.registry(scope.namespace()).instance(storeName).isEmpty()) {
+            if (stores.registry().instance(storeName).isEmpty()) {
                 return Map.of();
             }
             List<AttachedFile> attached = attachments(sessionId);
             Map<String, Long> chunks = new java.util.LinkedHashMap<>();
-            for (var entity : stores.store(scope.namespace(), storeName).entities()) {
+            for (var entity : stores.store(storeName).entities()) {
                 String fileId = attachedFileOf(entity.ref(), attached).map(AttachedFile::id).orElse(entity.ref().id());
                 chunks.merge(fileId, entity.chunks(), Long::sum);
             }
@@ -190,8 +184,8 @@ public class SessionFileService {
                 .findFirst().orElse(Path.of(fileIdOrName).getFileName().toString());
         VectorStores stores = storesProvider.getIfAvailable();
         String storeName = "session-" + sessionId.value();
-        if (stores != null && stores.registry(scope.namespace()).instance(storeName).isPresent()) {
-            VectorStore store = stores.store(scope.namespace(), storeName);
+        if (stores != null && stores.registry().instance(storeName).isPresent()) {
+            VectorStore store = stores.store(storeName);
             for (EntityRef ref : store.members()) {
                 boolean match = ref.id().equals(fileIdOrName)
                         || attachedFileOf(ref, attached).map(f -> f.name().equals(fileName)).orElse(false);
@@ -299,14 +293,14 @@ public class SessionFileService {
                     stored.name() + ": vector stores are not configured in this application.");
         }
         String storeName = "session-" + sessionId.value();
-        VectorStoreTemplate template = stores.template(scope.namespace(), CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
+        VectorStoreTemplate template = stores.template(CHAT_UPLOADS_TEMPLATE).orElseGet(() -> {
             VectorStoreTemplate created = new VectorStoreTemplate(CHAT_UPLOADS_TEMPLATE, "embeddings", "file-ingestion",
                     Map.of("description", "Per-chat-session upload stores (auto-created)"));
-            stores.registry(scope.namespace()).saveTemplate(created);
+            stores.registry().saveTemplate(created);
             return created;
         });
         // The store is the chat's user's: the vector tools reach it only on that user's behalf.
-        VectorStore store = stores.open(scope.namespace(), storeName, template.name(), VectorStoreInstance.Scope.SESSION,
+        VectorStore store = stores.open(storeName, template.name(), VectorStoreInstance.Scope.SESSION,
                 sessionId.value(), session.userId() == null ? null : session.userId().value());
         VectorStoreInstance instance = store.settings();
         // The stored file is one entity, whichever chats it is attached to: indexed
@@ -332,16 +326,16 @@ public class SessionFileService {
                 DirectIngestion.ingest(store, ref, session.userId(), "1", stored.name(), text);
             } else {
                 WorkflowDataRepository workflows = workflowsProvider.getIfAvailable();
-                WorkflowInstanceRepository workflowInstances = workflowInstancesProvider.getIfAvailable();
-                if (workflows == null || workflowInstances == null) {
+                if (workflows == null) {
                     return new AttachResult(stored, storeName, false,
                             stored.name() + ": the workflow engine is not configured in this application.");
                 }
                 var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                         new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                                 + "' not found"));
-                var runner = new WorkflowRunService(workflowInstances, environment.shared()::asMap);
-                ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
+                var executor = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+                        .withEnvironment(environment.shared()::asMap);
+                WorkflowResult result;
                 // The workflow's tool steps run on behalf of this chat's user and
                 // session — the calls its upload store accepts — and resolve their
                 // paths in the session's own directory, the file as uploads/<name>. That
@@ -351,7 +345,7 @@ public class SessionFileService {
                     Path sessionDir = copy.get().getParent().getParent();
                     String file = sessionDir.relativize(copy.get()).toString().replace('\\', '/');
                     ToolCallScope scope = ToolCallScope.ofSession(session.userId(), sessionId, sessionDir.toString());
-                    report = scope.runWith(() -> runner.runWithAttributes(workflow,
+                    result = scope.runWith(() -> executor.executeWorkflow(workflow,
                             Map.of("file", file, "store", storeName, "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(), scope)));
                 } else {
@@ -361,15 +355,15 @@ public class SessionFileService {
                     try (InputStream content = fileStore.content(stored.id())) {
                         Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
                     }
-                    report = runner.runWithAttributes(workflow,
+                    result = executor.executeWorkflow(workflow,
                             Map.of("file", spoolBase.relativize(target).toString(), "store", storeName,
                                     "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(),
                                     new ToolCallScope(session.userId(), sessionId, null)));
                 }
-                if (!report.success()) {
+                if (!result.isSuccess()) {
                     return new AttachResult(stored, storeName, false,
-                            stored.name() + ": ingestion failed — " + report.error());
+                            stored.name() + ": ingestion failed — " + result.failureMessage());
                 }
             }
             // The agent gets vector_search in this session from the next round

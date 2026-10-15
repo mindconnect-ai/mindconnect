@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.adapter.pg;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
@@ -26,7 +27,7 @@ class PgUserMemoryRepositoryTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.fresh("mc_user_memory");
-        repo = new PgUserMemoryRepository(sql, new Namespace("acme")).initSchema();
+        repo = new PgUserMemoryRepository(sql, ScopeSupplier.fixed(new Namespace("acme"))).initSchema();
     }
 
     @Test
@@ -55,7 +56,7 @@ class PgUserMemoryRepositoryTest {
     void anotherNamespaceSeesNothing() {
         repo.save(entry(ALICE, "role", "Buyer"));
 
-        PgUserMemoryRepository other = new PgUserMemoryRepository(sql, new Namespace("other")).initSchema();
+        PgUserMemoryRepository other = new PgUserMemoryRepository(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
         assertThat(other.findByUser(ALICE)).isEmpty();
         assertThat(other.find(ALICE, null, "role")).isEmpty();
     }

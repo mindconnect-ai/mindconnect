@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
@@ -34,7 +35,7 @@ class SessionToolsUserRosterTest {
 
     private static final UserId ALICE = UserId.of("alice");
 
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
+    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
     private final AgentDefinition agent = AgentDefinition
             .create("assistant", "a", "You help.", null, "llm")
             .withTools(List.of(AgentTool.of("web_search")));

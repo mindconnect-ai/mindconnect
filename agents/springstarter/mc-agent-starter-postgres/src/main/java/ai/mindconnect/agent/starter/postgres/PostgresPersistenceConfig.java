@@ -30,9 +30,8 @@ import javax.sql.DataSource;
  * file store would have written — and every store creates its own tables on
  * start ({@code CREATE TABLE IF NOT EXISTS}; no migration tool).
  *
- * <p>Every store is routed per namespace: the bean is a {@link NamespaceRouted}
- * proxy, the adapter behind it is built — schema included — for the namespace
- * the scope of the call names, when the namespace starter binds one.
+ * <p>Every store is one adapter whose statements match the namespace the
+ * scope of the call names, when the namespace starter binds one.
  *
  * <pre>
  * mindconnect:

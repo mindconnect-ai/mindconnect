@@ -1,6 +1,7 @@
 package ai.mindconnect.agentrest.auth;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
@@ -50,7 +51,7 @@ class CurrentUsersTest {
 
     @Test
     void aSessionOpensOnlyForItsOwner() {
-        var repo = new InMemoryAgentSessionRepository();
+        var repo = new InMemoryAgentSessionRepository(ScopeSupplier.local());
         AgentSession alices = repo.create(AgentSession.start(AgentId.of("default-chat"), UserId.of("alice"),
                 ConversationId.random()));
         var access = new SessionAccess(repo);

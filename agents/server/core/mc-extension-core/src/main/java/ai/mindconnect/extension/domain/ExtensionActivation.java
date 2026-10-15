@@ -9,8 +9,8 @@ import java.util.Objects;
  * An admin's decision about one extension in one namespace: on or off, when,
  * and by whom. Only decisions are stored — a namespace that never decided
  * has the extension as the manifest's {@code enabledByDefault} says. Like
- * every store, the repository holding these is bound to one namespace;
- * nothing here names it.
+ * every store, the repository holding these works in the namespace of the
+ * call; nothing here names it.
  */
 public record ExtensionActivation(ExtensionId extensionId, boolean enabled, Instant changedAt, UserId changedBy) {
 

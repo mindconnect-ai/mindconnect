@@ -4,7 +4,7 @@ import ai.mindconnect.adminui.service.MigrationService;
 import ai.mindconnect.adminui.service.NamespaceSeeding;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.StartupScope;
+import ai.mindconnect.namespace.service.StartupScope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;

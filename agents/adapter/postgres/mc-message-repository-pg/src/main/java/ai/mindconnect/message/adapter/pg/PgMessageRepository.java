@@ -1,6 +1,6 @@
 package ai.mindconnect.message.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
@@ -21,8 +21,8 @@ import java.util.function.UnaryOperator;
  * message, keyed by {@code (namespace, id)} so a re-save (the compressed flag,
  * a token count) replaces the row; the conversation id and the sequence
  * number sit beside the document because every read walks a conversation
- * in sequence order and the range delete cuts by it. The repository is
- * bound to one namespace and every statement matches it.
+ * in sequence order and the range delete cuts by it. Every statement matches
+ * the namespace the scope names for the current call.
  *
  * <p>No foreign key to the conversation: the file store never required the
  * conversation to exist first, and callers rely on that.
@@ -53,19 +53,19 @@ public final class PgMessageRepository implements MessageRepository {
 
     private final DocumentTable<Message> messages;
     private final Sql sql;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
 
-    public PgMessageRepository(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgMessageRepository(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope);
     }
 
     /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
-    public PgMessageRepository(Sql sql, Namespace namespace) {
+    public PgMessageRepository(Sql sql, ScopeSupplier scope) {
         this.sql = sql;
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+        this.scope = Objects.requireNonNull(scope, "scope");
         this.messages = DocumentTable.of(Message.class)
                 .table("mc_message")
-                .partitionKey("namespace", "TEXT", m -> namespace.value())
+                .partitionKey("namespace", "TEXT", m -> scope.namespace().value())
                 .id("id", "TEXT", m -> m.id().value())
                 .requiredColumn("conversation_id", "TEXT", m -> m.conversationId().value())
                 .requiredColumn("seq", "INTEGER", Message::sequenceNum)
@@ -87,19 +87,19 @@ public final class PgMessageRepository implements MessageRepository {
     /** Reads the row {@code FOR UPDATE} and writes the change in the same transaction. */
     @Override
     public Optional<Message> update(ConversationId conversation, MessageId id, UnaryOperator<Message> change) {
-        return messages.update(namespace.value(), id.value(), change);
+        return messages.update(scope.namespace().value(), id.value(), change);
     }
 
     @Override
     public List<Message> findByConversation(ConversationId conversation, PageRequest page) {
         return messages.find("WHERE namespace = ? AND conversation_id = ? ORDER BY seq, id LIMIT ? OFFSET ?",
-                namespace.value(), conversation.value(), page.size(), page.offset());
+                scope.namespace().value(), conversation.value(), page.size(), page.offset());
     }
 
     @Override
     public Optional<Message> findById(ConversationId conversation, MessageId id) {
         return messages.findOne("WHERE namespace = ? AND conversation_id = ? AND id = ?",
-                namespace.value(), conversation.value(), id.value());
+                scope.namespace().value(), conversation.value(), id.value());
     }
 
     /**
@@ -109,19 +109,19 @@ public final class PgMessageRepository implements MessageRepository {
      */
     @Override
     public Message append(ConversationId conversation, IntFunction<Message> create) {
-        int next = sql.scalar(NEXT_SEQUENCE, Integer.class, namespace.value(), conversation.value(),
-                namespace.value(), conversation.value());
+        int next = sql.scalar(NEXT_SEQUENCE, Integer.class, scope.namespace().value(), conversation.value(),
+                scope.namespace().value(), conversation.value());
         return messages.save(create.apply(next));
     }
 
     @Override
     public void deleteBySequenceRange(ConversationId conversation, int fromSeq, int toSeq) {
         messages.delete("WHERE namespace = ? AND conversation_id = ? AND seq BETWEEN ? AND ?",
-                namespace.value(), conversation.value(), fromSeq, toSeq);
+                scope.namespace().value(), conversation.value(), fromSeq, toSeq);
     }
 
     @Override
     public void deleteByConversation(ConversationId conversation) {
-        messages.delete("WHERE namespace = ? AND conversation_id = ?", namespace.value(), conversation.value());
+        messages.delete("WHERE namespace = ? AND conversation_id = ?", scope.namespace().value(), conversation.value());
     }
 }

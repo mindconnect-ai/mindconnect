@@ -1,6 +1,6 @@
 package ai.mindconnect.extension.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.extension.domain.InstalledSeed;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.filerepo.Documents;
@@ -21,9 +21,9 @@ import java.util.Optional;
  * document, {@code <storageDir>/<namespace>/system/installed-seeds.json},
  * listing them. One file rather than one per record because a record's name
  * is whatever its seed says — an agent may be called {@code Summarizer} or
- * {@code My agent} — and does not have to make a good file name. Bound to one
- * namespace at construction, like every other store; deleting the namespace
- * deletes the file with its directory.
+ * {@code My agent} — and does not have to make a good file name. One file per
+ * namespace, the one the scope names for the current call, like every other
+ * store; deleting the namespace deletes the file with its directory.
  */
 public class FileInstalledSeedRepository implements InstalledSeedRepository {
 
@@ -38,12 +38,11 @@ public class FileInstalledSeedRepository implements InstalledSeedRepository {
 
     private final Documents<String, Ledger> documents;
 
-    public FileInstalledSeedRepository(Path storageDir, ObjectMapper objectMapper, Namespace namespace) {
-        FileRepo repo = FileRepo.open(storageDir, namespace.value());
+    public FileInstalledSeedRepository(Path storageDir, ObjectMapper objectMapper, ScopeSupplier scope) {
         this.documents = Documents.of(Ledger.class)
                 .path((String key) -> PATH)
                 .prettyPrint()
-                .build(repo, objectMapper);
+                .build(() -> FileRepo.open(storageDir, scope.namespace().value()), objectMapper);
     }
 
     @Override

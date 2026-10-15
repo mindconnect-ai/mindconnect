@@ -13,6 +13,7 @@ import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -28,27 +29,24 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
 
     private static final String EXT = ".json";
 
-    private final Path baseDir;
+    private final Path dataDir;
+    private final Supplier<String> partition;
     private final JacksonWorkflowSerializer serializer;
 
     /**
      * @param baseDir   the data directory; the definitions live in
      *                  {@code <baseDir>/<partition>/workflows}
-     * @param partition the directory level this repository reads and writes —
-     *                  one partition never sees the definitions of another
+     * @param partition the directory level a call reads and writes, asked on
+     *                  every call — one partition never sees the definitions of another
      */
-    public FileWorkflowDataRepository(Path baseDir, String partition) {
+    public FileWorkflowDataRepository(Path baseDir, Supplier<String> partition) {
         this(baseDir, partition, new JacksonWorkflowSerializer(WorkflowObjectMapperFactory.create()));
     }
 
-    public FileWorkflowDataRepository(Path baseDir, String partition, JacksonWorkflowSerializer serializer) {
-        this.baseDir = directory(baseDir, partition);
+    public FileWorkflowDataRepository(Path baseDir, Supplier<String> partition, JacksonWorkflowSerializer serializer) {
+        this.dataDir = baseDir;
+        this.partition = partition;
         this.serializer = serializer;
-        try {
-            Files.createDirectories(this.baseDir);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Cannot create workflow store dir: " + this.baseDir, e);
-        }
     }
 
     /**
@@ -62,7 +60,7 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
 
     @Override
     public List<String> listIds() {
-        try (Stream<Path> files = Files.list(baseDir)) {
+        try (Stream<Path> files = Files.list(workflowsDir())) {
             List<String> ids = new ArrayList<>();
             files.filter(p -> p.getFileName().toString().endsWith(EXT))
                     .map(p -> stripExt(p.getFileName().toString()))
@@ -70,7 +68,7 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
                     .forEach(ids::add);
             return ids;
         } catch (IOException e) {
-            throw new UncheckedIOException("Cannot list workflows in " + baseDir, e);
+            throw new UncheckedIOException("Cannot list workflows in " + workflowsDir(), e);
         }
     }
 
@@ -84,7 +82,7 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
     public void save(String id, WorkflowData workflow) {
         Path target = fileFor(id);
         try {
-            Path temp = Files.createTempFile(baseDir, "wf", ".tmp");
+            Path temp = Files.createTempFile(workflowsDir(), "wf", ".tmp");
             serializer.write(workflow, temp);
             Files.move(temp, target, StandardCopyOption.REPLACE_EXISTING,
                     StandardCopyOption.ATOMIC_MOVE);
@@ -103,7 +101,7 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
     }
 
     private Path fileFor(String id) {
-        return baseDir.resolve(sanitize(id) + EXT);
+        return workflowsDir().resolve(sanitize(id) + EXT);
     }
 
     private static String stripExt(String name) {
@@ -113,5 +111,16 @@ public class FileWorkflowDataRepository implements WorkflowDataRepository {
     /** Keep ids to a safe file-name charset so they can't escape the base dir. */
     private static String sanitize(String id) {
         return id.replaceAll("[^A-Za-z0-9._-]", "_");
+    }
+
+    /** The definitions directory of the partition the current call works in, created on first use. */
+    private Path workflowsDir() {
+        Path dir = directory(dataDir, partition.get());
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot create workflow store dir: " + dir, e);
+        }
+        return dir;
     }
 }
