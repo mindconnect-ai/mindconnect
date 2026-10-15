@@ -9,7 +9,6 @@ ai.mindconnect.agent.tools.workflow.McAgentWorkflowStepsAutoConfiguration is not
 ai.mindconnect.agent.tools.workflow.NamespacedWorkflowStoresAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-agent-tools-workflow)
 ai.mindconnect.agent.tools.workflow.NamespacedWorkflowStoresAutoConfiguration$AdminRuns is not in a starter, app, rest, ui or demo module (module mc-agent-tools-workflow)
 ai.mindconnect.agent.tools.workflow.NamespacedWorkflowStoresAutoConfiguration$Postgres is not in a starter, app, rest, ui or demo module (module mc-agent-tools-workflow)
-ai.mindconnect.agent.tools.workflow.registry.WorkflowRegistryAutoConfiguration is not in a starter, app, rest, ui or demo module (module mc-agent-tools-workflow)
 ai.mindconnect.cli.CliConfig is not in a starter, app, rest, ui or demo module (module mc-agent-cli)
 ai.mindconnect.cli.CliRunner is not in a starter, app, rest, ui or demo module (module mc-agent-cli)
 ai.mindconnect.cli.CliStateStore is not in a starter, app, rest, ui or demo module (module mc-agent-cli)

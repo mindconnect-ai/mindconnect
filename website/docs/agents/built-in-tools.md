@@ -206,7 +206,7 @@ duration before the start; alarms at a fixed moment or relative to the end are
 kept on the server but not listed. A store that a distribution adds for
 another kind of account takes no reminders until it overrides `reminders()`.
 
-## MCP servers (`agents/mcp`)
+## MCP servers (`agents/tools/mcp`)
 
 Tools from [Model Context Protocol](https://modelcontextprotocol.io) servers are
 **registered, not compiled in**. Open **MCP Servers** in the admin UI, register a

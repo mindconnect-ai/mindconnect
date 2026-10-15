@@ -35,7 +35,7 @@ jobs:
       - name: Build jar
         run: >
           mvn -B --no-transfer-progress
-          -pl agents/server/mc-agent-admin-ui-app -am
+          -pl agents/server/app/mc-agent-admin-ui-app -am
           install -DskipTests
 
       - uses: docker/setup-buildx-action@v3
@@ -60,8 +60,8 @@ jobs:
         with:
           # Context is the module's target directory: the build only needs the
           # jar, and shipping the whole repo would send gigabytes to the daemon.
-          context: agents/server/mc-agent-admin-ui-app/target
-          file: agents/server/mc-agent-admin-ui-app/Dockerfile
+          context: agents/server/app/mc-agent-admin-ui-app/target
+          file: agents/server/app/mc-agent-admin-ui-app/Dockerfile
           push: true
           tags: ${{ steps.meta-admin.outputs.tags }}
           labels: ${{ steps.meta-admin.outputs.labels }}
@@ -85,7 +85,7 @@ jobs:
 
       - uses: docker/build-push-action@v6
         with:
-          context: agents/core/mc-agent-tools-code/images/python
+          context: agents/tools/core/mc-agent-tools-code/images/python
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.meta-code-exec-python.outputs.tags }}

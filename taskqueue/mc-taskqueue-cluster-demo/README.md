@@ -7,7 +7,7 @@ acceleration.
 
 ```bash
 podman compose up -d          # Postgres on :5433 (or docker compose)
-# macOS + podman: run agents/server/mc-agent-admin-ui-app/keycloak/fix-podman-clock.sh
+# macOS + podman: run agents/server/app/mc-agent-admin-ui-app/keycloak/fix-podman-clock.sh
 # once — the VM clock drifts after host suspend, and a drifted DB clock breaks
 # lease expiry and run_after scheduling in confusing ways.
 mvn -f taskqueue/mc-taskqueue-cluster-demo/pom.xml package -DskipTests

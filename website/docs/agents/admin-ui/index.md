@@ -17,7 +17,7 @@ credentials:
 
 ```bash
 export MINDCONNECT_ENCRYPTION_SECRET_KEY="change-me-to-a-32-char-secret!!!"
-mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run
+mvn -f agents/server/app/mc-agent-admin-ui-app/pom.xml spring-boot:run
 ```
 
 The key must be **16, 24 or 32 characters** long (it is used directly as an AES
@@ -41,7 +41,7 @@ must be running **before** you start the app, or login will fail.
 ### 1. Start Keycloak first
 
 ```bash
-cd agents/server/mc-agent-admin-ui-app
+cd agents/server/app/mc-agent-admin-ui-app
 cp .env.docker.example .env.docker   # first time: fill in the passwords
 ./start-keycloak.sh
 ```
@@ -55,7 +55,7 @@ yourself) and imports the `mindconnect` realm. Keycloak is then at
 
 ```bash
 MINDCONNECT_ENCRYPTION_SECRET_KEY="change-me-to-a-32-char-secret!!!" \
-mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run \
+mvn -f agents/server/app/mc-agent-admin-ui-app/pom.xml spring-boot:run \
   -Dspring-boot.run.arguments=--spring.profiles.active=keycloak
 ```
 
@@ -86,7 +86,7 @@ corrections — so a long suspend leaves the VM permanently behind.
 The fix is a one-time script:
 
 ```bash
-cd agents/server/mc-agent-admin-ui-app/keycloak
+cd agents/server/app/mc-agent-admin-ui-app/keycloak
 ./fix-podman-clock.sh
 ```
 

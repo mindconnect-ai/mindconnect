@@ -104,7 +104,6 @@ import java.util.Optional;
                 "ai.mindconnect.agent.registry.spring.RegistryAutoConfiguration",
                 "ai.mindconnect.agent.tools.workflow.NamespacedWorkflowStoresAutoConfiguration",
                 "ai.mindconnect.agent.tools.workflow.McAgentWorkflowStepsAutoConfiguration",
-                "ai.mindconnect.agent.tools.workflow.registry.WorkflowRegistryAutoConfiguration",
                 "ai.mindconnect.mcp.gateway.local.McpGatewayAutoConfiguration"})
 public class AgentRuntimeAutoConfiguration {
 

@@ -14,11 +14,11 @@ and the rule it violates.
   Found 2026-10-14 by the ArchUnit baseline. Size: small. Rule: D1.
 - [ ] **agents/core/mc-agent-runtime, mc-message, workflow/mc-workflow** `java.util.logging` in six file adapters (`FileAgentDefinitionRepository`, `FileAgentSessionRepository`, `FileSkillRepository`, `FileToolRepository`, `FileConversationRepository`, `FileMessageRepository`) and two step classes (`BaseStepInstance`, `BaseStepContainerInstance`). SLF4J everywhere.
   Found 2026-10-14 by the ArchUnit baseline, recounted 2026-10-15. Size: small. Rule: SLF4J.
-- [ ] **agents/core/mc-user-core** `StoredUserToolRoster` sits in an `adapter` package inside a `-core` module.
+- [ ] **agents/server/core/mc-user-core** `StoredUserToolRoster` sits in an `adapter` package inside a `-core` module.
   Found 2026-10-14 by the ArchUnit baseline. Size: small. Rule: D1.
 - [ ] **agents (libraries)** A dozen Spring wiring classes in library modules: `RegistryAutoConfiguration` (mc-agent-registry), `MindconnectSecurityAutoConfiguration` (mc-agent-security), `VirtualEnvToolsAutoConfiguration` and `OnBehalfJwksController` (mc-agent-tools-virtual-env), `McAgentWorkflowStepsAutoConfiguration`, `NamespacedWorkflowStoresAutoConfiguration` and `WorkflowRegistryAutoConfiguration` (mc-agent-tools-workflow), `ExtensionAutoConfiguration` (mc-extension), `McpGatewayAutoConfiguration` (mc-mcp-gateway-local); conventions put wiring in `springstarter/`.
   Found 2026-10-14 by the ArchUnit baseline, recounted 2026-10-15. Size: one wave. Rule: D1.
-- [ ] **agents/server/mc-agent-chat-ui-rest** `ChatUiController` has 2494 lines (2026-10-15), 83 methods, 20 fields: routing, page building, four dialogs, session-agent management and helpers in one class.
+- [ ] **agents/server/ui/mc-agent-chat-ui-rest** `ChatUiController` has 2494 lines (2026-10-15), 83 methods, 20 fields: routing, page building, four dialogs, session-agent management and helpers in one class.
   Found 2026-10-14 by the baseline (classes over 300 lines). Size: large. Rule: D3, one responsibility.
 - [ ] **workflow/mc-workflow-admin-rest** `WorkflowAdminUiController` has 2100 lines; same shape as the chat controller.
   Found 2026-10-14 by the baseline. Size: large. Rule: D3, one responsibility.
@@ -50,8 +50,10 @@ and the rule it violates.
   Found 2026-10-14 in mc-sandbox claude-todos.md. Size: large. Rule: –.
 - [ ] **agents/core/mc-agent-runtime-core** `LlmChatProvider.toAnswer` drops the assistant text of a round that also carries tool calls; only the final answer is persisted as `CHAT`, intermediate text is gone after a reload. Carry the text in the `TOOL_CALL` message and render it in the assembler.
   Found 2026-10-14 in mc-sandbox claude-todos.md. Size: one wave. Rule: –.
-- [ ] **agents/server/mc-agent-admin-ui-app** The seeded `initial-data/llm-configs/gemini-default.json` defaults its model to `${GEMINI_MODEL:gemini-2.0-flash}`, which Google no longer serves (HTTP 404 on `generateContent`); a fresh installation without `GEMINI_MODEL` gets a config that cannot answer. Google's 404 names `gemini-3.8-flash` as the successor; the live tests use `gemini-3.5-flash`, because the alias `gemini-flash-latest` answered 503 under load.
+- [ ] **agents/server/app/mc-agent-admin-ui-app** The seeded `initial-data/llm-configs/gemini-default.json` defaults its model to `${GEMINI_MODEL:gemini-2.0-flash}`, which Google no longer serves (HTTP 404 on `generateContent`); a fresh installation without `GEMINI_MODEL` gets a config that cannot answer. Google's 404 names `gemini-3.8-flash` as the successor; the live tests use `gemini-3.5-flash`, because the alias `gemini-flash-latest` answered 503 under load.
   Found 2026-10-15 in chore/llm-gateway-refactor by the agent, running the new `GeminiGatewayLiveTest`. Size: small. Rule: –.
+- [ ] **agents/tools/core/mc-agent-tools-workflow** `RunWorkflowToolTest.anInputThatIsMiniScript_cannotReachAClass` fails on `next`: it expects a `mini:` input to be evaluated and refused with "Method not found", but since inputs are stored as data (58290de8) the text comes back verbatim; either the test or the guard it documents is stale.
+  Found 2026-10-15 in chore/refactor-core by the agent, on the branch and on its base commit a920c763 with freshly built dependencies. Size: small. Rule: Logging, style, tests.
 
 ## Closed
 

@@ -49,11 +49,39 @@ the finished report:
 | `mc-agent-runtime` | Execution engine: sessions, memory, tool dispatch, sub-agent calls |
 | `mc-llm-gateway` | LLM abstraction — streaming chat, model routing |
 | `mc-message-repository` | Conversation & message storage |
-| `mc-credentials` | Credential storage for tools and providers |
-| `mc-agent-tools*` | Built-in tool providers (web, browser, document, todo, workflow) |
-| `mc-agent-registry-core` / `mc-agent-registry` | Import LLM configs, agents, workflows and whole packages from a registry — a GitHub project with an index |
+| `mc-file-store-core` / `mc-file-store` | The runtime's uploads, id-addressed: ports / filesystem backend |
+| `mc-agent-tool-spi` | What a tool is: `Tool`, `ToolFactory`, `MultiToolProvider`, the registry, and where file tools read and write |
 
-### `office/` — a person's own things, one port per kind
+### `tools/core/` — the built-in tool providers
+
+Each module is a provider against `mc-agent-tool-spi`; a distribution takes the
+ones it wants.
+
+| Module | Purpose |
+|--------|---------|
+| `mc-agent-tools` | Filesystem, workspace and bash — no network, no heavy parsers |
+| `mc-agent-tools-code` | Code execution in disposable containers via docker or podman |
+| `mc-agent-tools-document` | PDF, Word and text parsing via Tika, PDFBox and POI |
+| `mc-agent-tools-web` | HTTP fetch, search and HTML-to-Markdown |
+| `mc-agent-tools-web-browser` | Headless Chromium via Playwright for sites the plain fetch cannot see |
+| `mc-agent-tools-workflow` | Persisted workflows as tools, one per workflow |
+| `mc-agent-tools-virtual-env` | Binds the file tools, bash and code execution to a virtual environment server over its REST API |
+
+### `tools/vector/` — the knowledge tools
+
+| Module | Purpose |
+|--------|---------|
+| `mc-vector-store-tools` | The `knowledge` tool group (`vector_upsert`, `vector_search`, …) over the stores in `vectorstore/` |
+
+### `responses-api/` — the protocol a client talks to an agent with
+
+| Module | Purpose |
+|--------|---------|
+| `mc-agent-protocol` | The vocabulary: `Response`, `Item`, `Conversation`, events and commands — JDK only |
+| `mc-agent-protocol-mc-runtime` | The protocol implemented against the Mindconnect runtime: tools, sub-agents and memory run inside the turn |
+| `mc-agent-protocol-openai` | The protocol implemented against the real OpenAI Responses and Conversations API |
+
+### `tools/office/` — a person's own things, one port per kind
 
 | Module | Purpose |
 |--------|---------|
@@ -64,7 +92,7 @@ the finished report:
 | `mc-calendar-caldav` | CalDAV: the card, its Test button, and enough iCalendar to read and write an appointment |
 | `mc-agent-tools-calendar` | The calendar tools (`calendar_events`, `calendar_create` …) over every calendar account, named `provider.key` or `all` |
 
-### `mcp/` — Model Context Protocol servers as tools
+### `tools/mcp/` — Model Context Protocol servers as tools
 
 Registered, not compiled in: an operator adds a server in the admin UI and its
 tools join the catalog. Split like the rest of `agents/` — ports in `-core`,
@@ -77,7 +105,6 @@ server of its own without the tool side noticing.
 | `mc-mcp-gateway-local` | The in-process gateway — registrations on disk, discovery cache, Docker catalog |
 | `mc-mcp-proxy` | Talks to one server over stdio or streamable HTTP, on the official MCP Java SDK |
 | `mc-agent-tools-mcp` | The `MultiToolProvider` that turns every registered server's tools into agent tools |
-| `mc-mcp-gateway-admin-ui-rest` | The `/mcp-gateway` screen, embedded by the admin UI |
 
 Decisions: [doc/decisions](../doc/decisions/) (tool identity: 0001).
 
@@ -95,8 +122,8 @@ each one once.
 | `mc-agent-registry` | The GitHub client (raw files over HTTPS, optional token), the file-backed store of registries, the LLM-config and agent installers |
 | `mc-agent-registry-admin-ui-rest` | The `/registry` screen |
 
-Installers are contributed by the module that owns the entity — the workflow one
-lives in `mc-agent-tools-workflow` — so an installation without a workflow engine
+Installers are contributed next to the entity they install — the workflow one is
+`mc-agent-registry-workflow`, a module of its own — so an installation without a workflow engine
 lists workflows it cannot import and says so, instead of dragging the engine in.
 
 Nothing installs itself: reading a registry is safe, installing one is a decision
@@ -138,12 +165,28 @@ Embedding without Spring: `AgentRuntimeBuilder.usePostgres(dataSource, dataDir)`
 
 An app adds both; the property picks.
 
-### `server/` — deployable Spring Boot services
+### `server/` — what runs
+
+Four subdirectories: `app/` the Spring Boot applications, `rest/` and `ui/` the libraries they
+embed, `core/` the installation around the runtime (plain Java; Postgres adapters under `adapter/`).
 
 | Module | Purpose |
 |--------|---------|
-| `mc-agent-api-app` | Agent server (REST + WebSocket) |
-| `mc-agent-admin-ui-app` | Admin UI backend |
+| `app/mc-agent-api-app` | Agent server (REST, streaming via SSE) |
+| `app/mc-agent-admin-ui-app` | Admin UI application, port 9090 |
+| `rest/mc-agent-api-rest` | The REST API as a library |
+| `rest/mc-agent-api-responses-rest` | The OpenAI Responses API shape over the runtime |
+| `ui/mc-agent-admin-ui-rest` | The admin UI as an embeddable library |
+| `ui/mc-agent-chat-ui-rest` | The chat screens |
+| `ui/mc-agent-registry-admin-ui-rest` | The `/registry` screen |
+| `ui/mc-mcp-gateway-admin-ui-rest` | The `/mcp-gateway` screen |
+| `core/mc-agent-security` | Login and API-token security shared by both apps |
+| `core/mc-user-core` / `mc-user` | The users of an installation and their API tokens: domain, ports and services / file and in-memory adapters |
+| `core/mc-namespace-core` / `mc-namespace` | The namespaces of an installation and who belongs to them / file and in-memory adapters |
+| `core/mc-credentials` | Credential storage for tools and providers |
+| `core/mc-agent-registry-core` / `mc-agent-registry` | Import LLM configs, agents, workflows and whole packages from a registry — a GitHub project with an index |
+| `core/mc-agent-registry-workflow` | The registry's workflow installer, a module of its own so the registry does not drag in the workflow engine |
+| `core/mc-extension-core` / `mc-extension` | What an extension is — manifest, API routes, menu contributions, content per namespace — and its adapters |
 
 ### `client/`
 
@@ -209,7 +252,7 @@ yet.
 mvn -f agents/pom.xml clean install -DskipTests
 
 # Start the agent server
-mvn -f agents/server/mc-agent-api-app/pom.xml spring-boot:run
+mvn -f agents/server/app/mc-agent-api-app/pom.xml spring-boot:run
 
 # Start the CLI (connects to a running agent server)
 mvn -f agents/client/mc-agent-cli/pom.xml spring-boot:run

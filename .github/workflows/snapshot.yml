@@ -66,9 +66,9 @@ jobs:
         run: |
           set -euo pipefail
           case "${{ inputs.modules }}" in
-            admin-ui-app) pl="server/mc-agent-admin-ui-app" ;;
+            admin-ui-app) pl="server/app/mc-agent-admin-ui-app" ;;
             cli)          pl="client/mc-agent-cli" ;;
-            *)            pl="server/mc-agent-admin-ui-app,client/mc-agent-cli" ;;
+            *)            pl="server/app/mc-agent-admin-ui-app,client/mc-agent-cli" ;;
           esac
           mvn -B -ntp -f agents/pom.xml clean install -DskipTests -pl "$pl" -am -Dsha1="$SHA1"
 
@@ -83,7 +83,7 @@ jobs:
           mkdir -p snapshot-assets
           ver=$(mvn -B -q -ntp -DforceStdout help:evaluate -Dexpression=project.version -Dsha1="$SHA1")
           echo "VERSION=$ver" >> "$GITHUB_ENV"
-          for m in server/mc-agent-admin-ui-app:mc-agent-admin-ui-app \
+          for m in server/app/mc-agent-admin-ui-app:mc-agent-admin-ui-app \
                    client/mc-agent-cli:mc-agent-cli; do
             jar="agents/${m%%:*}/target/${m##*:}-${ver}-exec.jar"
             if [ -f "$jar" ]; then

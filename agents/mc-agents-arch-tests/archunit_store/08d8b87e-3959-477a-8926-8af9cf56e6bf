@@ -122,7 +122,6 @@ ai.mindconnect.agent.tools.virtualenv.OnBehalfTokens has 3 constructors
 ai.mindconnect.agent.tools.virtualenv.RemoteWorkspaceFiles has 2 constructors
 ai.mindconnect.agent.tools.virtualenv.VirtualEnvClientException has 2 constructors
 ai.mindconnect.agent.tools.virtualenv.VirtualEnvWorkspaceProvider has 2 constructors
-ai.mindconnect.agent.tools.workflow.registry.WorkflowRegistryInstaller has 2 constructors
 ai.mindconnect.agentrest.controller.AgentApiController$UpdateAgentRequest has 2 constructors
 ai.mindconnect.agentrest.controller.MemoryApiController has 2 constructors
 ai.mindconnect.agentrest.dto.StartSessionRequest has 3 constructors

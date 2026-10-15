@@ -72,8 +72,8 @@ state. Run `./after-branch-creation.sh` once per clone: builds install as
 `~/.m2`. Secrets live in the git-ignored `mc.env`.
 
 ```bash
-mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run   # admin UI, port 9090
-mvn -f agents/server/mc-agent-api-app/pom.xml spring-boot:run        # REST + SSE
+mvn -f agents/server/app/mc-agent-admin-ui-app/pom.xml spring-boot:run   # admin UI, port 9090
+mvn -f agents/server/app/mc-agent-api-app/pom.xml spring-boot:run        # REST + SSE
 mvn -f agents/client/mc-agent-cli/pom.xml spring-boot:run            # CLI
 ```
 

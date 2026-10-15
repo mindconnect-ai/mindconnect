@@ -75,7 +75,7 @@ away and logs you in as a fixed dev user (`mc_user`). With the variables above
 set:
 
 ```bash
-mvn -f agents/server/mc-agent-admin-ui-app/pom.xml spring-boot:run
+mvn -f agents/server/app/mc-agent-admin-ui-app/pom.xml spring-boot:run
 ```
 
 Then open **http://localhost:9090**.

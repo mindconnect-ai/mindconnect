@@ -85,24 +85,29 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     - `mc-agent-memory-strategies`: working-memory strategies (window, summarizing window, auto-compact)
     - `mc-llm-gateway-core` / `mc-llm-gateway`: LLM abstraction ports / provider adapters + routing
     - `mc-message-repository-core` / `mc-message-repository`: conversation & message storage
-    - `mc-agent-protocol` (+ `-openai`, `-mc-runtime`): protocol vocabulary and backend adapters
+    - `mc-file-store-core` / `mc-file-store`: the runtime's uploads, id-addressed — the ports the
+      runtime core depends on / the filesystem backend (Postgres: `adapter/postgres/mc-file-store-pg`)
     - `mc-agent-tool-spi`: what a tool is — `Tool`, `ToolFactory`, `MultiToolProvider`, registry;
       `WorkspaceFiles` / `WorkspaceProvider`: where file tools read and write and where `bash` runs
-    - `mc-agent-tools*`: built-in tool providers (filesystem/bash, code, document, web, web-browser, workflow)
+  - `tools/core/` — the built-in tool providers, each a module against `mc-agent-tool-spi`
+    - `mc-agent-tools*`: filesystem/bash, code, document, web, web-browser, workflow
     - `mc-agent-tools-virtual-env`: binds those tools to a virtual environment server over its REST API
       (workspace per chat, commands in its container, calls signed per user) when
       `mindconnect.virtual-env.client.url` is set; the server itself is not part of this repo
-    - `office/mc-mail-core`, `office/mc-mail-imap`, `office/mc-agent-tools-mail`:
+  - `tools/vector/` — `mc-vector-store-tools`: named stores as member lists of entity refs,
+    templates, the `vector_*` tools over the knowledge layer in `vectorstore/`
+  - `tools/office/` — a person's own things, one port per kind
+    - `mc-mail-core`, `mc-mail-imap`, `mc-agent-tools-mail`:
       a person's mail. `MailStore` is the port and `MailProvider` the seam a kind
       of mailbox plugs into (ServiceLoader); IMAP is one, and a distribution that
       adds Outlook or Gmail adds a provider, not a tool. The tools name a mailbox
       `provider.key` or `all`, and every change (`mail_send`, `mail_delete`) is a
       tool of its own so a binding can make it ask for approval
-    - `office/mc-mail-views`: a list of mail as a thing with a name — `MailListView`
+    - `mc-mail-views`: a list of mail as a thing with a name — `MailListView`
       (a folder, all inboxes, what an agent gathered) with a `ViewState` that is
       saved with it, `MailListViewFactory` as the seam for a new kind, a file
       `ViewStore`, and `CurrentView` for "what is on the screen"
-    - `office/mc-mail-index`: the window index — the newest heads of every
+    - `mc-mail-index`: the window index — the newest heads of every
       folder somebody looks at (`FolderWindow`, a thousand by default, in a
       file per user, account and folder), read through by the views and
       `mail_list`, written through by the actions, compared with the
@@ -110,29 +115,21 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       the window and says how far it reached (`MailIndex.Coverage`);
       `everything=true` on `mail_list` asks the provider instead. No
       background sync yet — that is Concept 42, step 3
-    - `office/mc-calendar-core`, `office/mc-calendar-caldav`,
-      `office/mc-agent-tools-calendar`: the same shape for a person's calendar.
+    - `mc-calendar-core`, `mc-calendar-caldav`,
+      `mc-agent-tools-calendar`: the same shape for a person's calendar.
       `CalendarProvider` is the seam, CalDAV the open kind (its own card, its
       Test button, a small iCalendar reader/writer), and the tools name an
       account `provider.key` or `all`
-    - `mc-agent-registry-core` / `mc-agent-registry`: importing from a registry — a GitHub
-      project with an index of LLM configs, agents, workflows and packages — ports + import
-      service / GitHub client, file-backed source store (Postgres: `adapter/postgres/mc-agent-registry-pg`),
-      installers. An installer is
-      contributed by the module owning the entity (the workflow one sits in
-      `mc-agent-tools-workflow`)
-    - `mc-credentials`: credential storage for tools & providers
-  - `mcp/` — MCP servers as registered tools, split like the rest (ports in `-core`)
+  - `responses-api/` — the protocol a client talks to an agent with
+    - `mc-agent-protocol` (+ `-openai`, `-mc-runtime`): protocol vocabulary and backend adapters
+  - `tools/mcp/` — MCP servers as registered tools, split like the rest (ports in `-core`)
     - `mc-mcp-gateway-core` / `mc-mcp-gateway-local`: gateway ports and types / the in-process gateway
       (registrations on disk, discovery cache, Docker catalog; Postgres: `adapter/postgres/mc-mcp-gateway-pg`)
     - `mc-mcp-proxy`: one server over stdio or streamable HTTP, on the MCP Java SDK
     - `mc-agent-tools-mcp`: the `MultiToolProvider` exposing registered servers' tools
-    - `mc-mcp-gateway-admin-ui-rest`: the `/mcp-gateway` admin screen
   - `vectorstore/` — the knowledge layer: `mc-vector-store` (the `EmbeddingIndex` — one per
     namespace for everything with text, keyed by `EntityRef`; heap/file implementation),
-    `mc-vector-store-pgvector` (`PgEmbeddingIndex`, one `mc_embedding` table), `mc-vector-store-tools`
-    (named stores = member lists of entity refs, templates, the `vector_*` tools),
-    `mc-file-store-core` / `mc-file-store`
+    `mc-vector-store-pgvector` (`PgEmbeddingIndex`, one `mc_embedding` table)
   - `adapter/` — alternative implementations of the core ports; `postgres/mc-*-pg`
     modules store domain objects as JSONB documents via `common/mc-jdbc`
   - `springstarter/` — Spring Boot starters: `mc-agent-starter-runtime` builds the runtime
@@ -144,10 +141,23 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); the
     shipped features live one per module in `builder/mc-agent-runtime-feature-*`
     (core = LLM + messages + agents, always installed; skills, tools, workflows, file-upload, transcription, subagents, taskqueue, namespace)
-  - `server/` — deployable Spring Boot services
-    - `mc-agent-api-rest` / `mc-agent-api-app`: REST API library / agent server (streaming via SSE)
-    - `mc-agent-admin-ui-rest` / `mc-agent-admin-ui-app`: admin UI library / app (port 9090)
-    - `mc-agent-registry-admin-ui-rest`: the `/registry` screen, embedded by the admin UI
+  - `server/` — what runs: the Spring Boot apps, their REST and UI libraries, and the
+    installation around the runtime
+    - `app/`: `mc-agent-api-app` (agent server, streaming via SSE), `mc-agent-admin-ui-app`
+      (admin UI, port 9090)
+    - `rest/`: `mc-agent-api-rest` (the REST API as a library), `mc-agent-api-responses-rest`
+      (the OpenAI Responses API shape)
+    - `ui/`: `mc-agent-admin-ui-rest` (the admin UI as a library), `mc-agent-chat-ui-rest` (the
+      chat), `mc-agent-registry-admin-ui-rest` (`/registry`), `mc-mcp-gateway-admin-ui-rest`
+      (`/mcp-gateway`), each embedded by the admin app
+    - `core/`: the installation around the runtime, plain Java with Postgres adapters under
+      `adapter/postgres` — `mc-user-core` / `mc-user` (users and their API tokens),
+      `mc-namespace-core` / `mc-namespace` (namespaces and who belongs to them), `mc-credentials`
+      (stored credentials), `mc-agent-registry-core` / `mc-agent-registry` (importing from a
+      registry, a GitHub project with an index; the workflow installer is `mc-agent-registry-workflow`,
+      a module of its own so the registry does not drag in the engine), `mc-extension-core` /
+      `mc-extension` (what an extension is: manifest, API routes, menu contributions, content per
+      namespace); and `mc-agent-security`, the login and API-token security both apps share
   - `client/mc-agent-cli`: terminal REPL client
 
 ## Architecture notes
