@@ -41,7 +41,8 @@
         <module>builder/mc-agent-runtime-feature-core</module>
         <module>builder/mc-agent-runtime-feature-skills</module>
         <module>builder/mc-agent-runtime-feature-tools</module>
-        <module>builder/mc-agent-runtime-feature-workflows</module>
+        <module>features/workflow/mc-agent-tools-workflow</module>
+        <module>features/workflow/mc-agent-workflow</module>
         <module>builder/mc-agent-runtime-feature-file-upload</module>
         <module>builder/mc-agent-runtime-feature-transcription</module>
         <module>builder/mc-agent-runtime-feature-taskqueue</module>
@@ -99,7 +100,6 @@
         <module>tools/office/mc-calendar-caldav</module>
         <module>tools/office/mc-agent-tools-calendar</module>
         <module>tools/core/mc-agent-tools-web-browser</module>
-        <module>tools/core/mc-agent-tools-workflow</module>
         <module>server/core/mc-agent-registry-core</module>
         <module>adapter/postgres/mc-agent-registry-pg</module>
         <module>server/core/mc-agent-registry</module>

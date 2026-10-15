@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.feature.workflows;
+package ai.mindconnect.agent.workflow.feature;
 
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.kernel.ConfigurableFeature;

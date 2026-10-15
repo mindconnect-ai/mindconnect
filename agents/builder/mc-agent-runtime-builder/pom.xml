@@ -136,7 +136,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-workflows</artifactId>
+            <artifactId>mc-agent-workflow</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>

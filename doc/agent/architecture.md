@@ -145,12 +145,15 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     embedding facade and runnable examples. The builder assembles a core plus installed
     `Feature`s (the kernel `common/mc-kernel`, package `ai.mindconnect.kernel`); the
     shipped features live one per module in `builder/mc-agent-runtime-feature-*`
-    (core = LLM + messages + agents, always installed; skills, tools, workflows, file-upload, transcription, subagents, taskqueue)
+    (core = LLM + messages + agents, always installed; skills, tools, file-upload, transcription, subagents, taskqueue)
   - `features/<name>/` — a capability with data of its own, extracted from the runtime core:
     `mc-<name>-core` (domain, port, service, its tools, its prompt section), `mc-<name>` (file and
     in-memory stores and the `Feature` that picks the store and wires the rest), `mc-<name>-pg`.
     The runtime core knows none of them; a feature hooks in through the core's interfaces
-    (`PromptSection`, `ToolAdvisor`, …) and the kernel's `contribute`. First: `user-memory`
+    (`PromptSection`, `ToolAdvisor`, …) and the kernel's `contribute`. First: `user-memory`;
+    `workflow` is the agent side of the `workflow/` area, whose engine and stores stand in
+    for `-core` and `-pg`: `mc-agent-tools-workflow` (tools and steps) and `mc-agent-workflow`
+    (`WorkflowsFeature`)
   - `server/` — what runs: the Spring Boot apps, their REST and UI libraries, and the
     installation around the runtime
     - `app/`: `mc-agent-api-app` (agent server, streaming via SSE), `mc-agent-admin-ui-app`
@@ -227,7 +230,8 @@ the thing to grep for.
   runtime is built on it, not the other way round: `AgentRuntimeBuilder` registers the
   host's settings as beans (`Persistence`, `ObjectMapper`, the scope, `ToolEnvironment`)
   and installs `CoreFeature` and the rest; the turn loop in `mc-agent-runtime-core` knows
-  no kernel. Each shipped feature is one module under `builder/mc-agent-runtime-feature-*`.
+  no kernel. The runtime's own features are modules under `builder/mc-agent-runtime-feature-*`,
+  a capability beside the core lives under `features/<name>/`.
   The Spring starters build the runtime from the features and export its beans.
 - **Installers live with the entity.** A registry installer is contributed by the module
   that owns the entity (the workflow one sits in `mc-agent-tools-workflow`).

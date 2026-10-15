@@ -324,7 +324,7 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-agent-runtime-feature-workflows</artifactId>
+                <artifactId>mc-agent-workflow</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

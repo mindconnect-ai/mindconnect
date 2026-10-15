@@ -41,7 +41,6 @@ carry the implementations.
 | `mc-agent-tools-document` | PDF/Word/text tools via Tika + PDFBox + POI. |
 | `mc-agent-tools-web` | HTTP fetch, web search, HTML-to-Markdown. |
 | `mc-agent-tools-web-browser` | Headless-Chromium fetching (Playwright) for JS-rendered sites — separate module because of the ~150 MB Chromium download. |
-| `mc-agent-tools-workflow` | Persisted workflows as agent tools — one tool per workflow, parameters from its input schema. |
 
 ## `tools/vector/` — the knowledge tools
 
@@ -99,6 +98,7 @@ next step.
 
 | Module | Purpose |
 |--------|---------|
+| `mc-agent-tools-workflow`, `mc-agent-workflow` | Persisted workflows as agent tools — one tool per workflow, parameters from its input schema — with the agent-call and tool-call steps (`mc-agent-tools-workflow`); `WorkflowsFeature`, the workflow store the runtime and the tools share, seeded from the classpath (`mc-agent-workflow`). The engine and its stores are the `workflow/` area. |
 | `mc-user-memory-core`, `mc-user-memory`, `mc-user-memory-pg` | What agents remember about each user across chats: the entries, `UserMemoryService`, the `memory_read`/`memory_write`/`memory_delete` tools and the memory index in the system prompt (`-core`); the file and in-memory stores and `UserMemoryFeature` (`mc-user-memory`); the Postgres store (`-pg`). |
 
 ## `builder/` & `demo/` — embedding
@@ -107,7 +107,7 @@ next step.
 |--------|---------|
 | `mc-agent-runtime-builder` | Spring-free `AgentRuntimeBuilder` facade for embedding the runtime in any Java program; every capability module (tools, vector stores, file store, workflows) is optional. Given a thread-bound scope (`scope(…)`), the runtime works in the namespace of the current call and its tasks carry their scope; without one, in a single namespace. |
 | `mc-agent-runtime-feature-core` | The `CoreFeature` every builder installs: the LLM layer, conversations and messages, agent definitions and sessions. `AgentRuntimeBuilder.of(persistence)` with it alone is the smallest runtime that chats. |
-| `mc-agent-runtime-feature-skills`, `-tools`, `-workflows`, `-file-upload`, `-transcription`, `-subagents`, `-taskqueue` | Optional features, one Maven module each, registered as services so `installFromClasspath()` finds them: stored skills, the tool registry over the `mc-agent-tools-*` modules, persisted workflows, files attached to a chat, speech to text, delegation to sub-agents, the configured task queue. See [Embedding the runtime](./embedding.md). |
+| `mc-agent-runtime-feature-skills`, `-tools`, `-file-upload`, `-transcription`, `-subagents`, `-taskqueue` | Optional features, one Maven module each, registered as services so `installFromClasspath()` finds them: stored skills, the tool registry over the `mc-agent-tools-*` modules, files attached to a chat, speech to text, delegation to sub-agents, the configured task queue. See [Embedding the runtime](./embedding.md). |
 | `mc-agent-simple-demo` | Runnable embedding examples: a minimal chat, and a chat with an attached file searched through the session's vector store. |
 
 ## `server/` — what runs
