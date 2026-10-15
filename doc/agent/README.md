@@ -1,5 +1,27 @@
 # doc/agent/
 
+## Status: parked
+
+Parked on 2026-10-15. This branch holds the full harness: the spec loop
+(`/refine`, progress files, `/inspect`), four reviewer subagents, three hooks,
+PMD and Jacoco against a frozen baseline, `scripts/baseline.sh` and the
+numbered quality catalog. It turned out too heavy to start with.
+
+Work continues on `chore/harness-minimal`, which keeps only what a cleanup
+needs: the ArchUnit rules with their frozen stores, one conventions page plus
+`architecture.md` and the decisions, and a `/tidy` skill that cleans up one
+module at a time. Pieces of this branch come back one by one, when the
+minimal set shows that they are missing.
+
+| Parked here | Comes back when |
+| --- | --- |
+| hooks (`protect-paths`, `after-edit`, `before-stop`) | agents keep stopping with a red build or edit the rules |
+| PMD, Jacoco, `scripts/baseline.sh`, `baseline.md`, `.github/scripts/` | ArchUnit plus `/tidy` leave method size, comments or duplication unchecked |
+| `quality-catalog.md` (D/I numbering), `testing.md`, `review-policy.yml` | several reviewers need to cite the same rules |
+| reviewer subagents, `/inspect`, `/refine`, `/gc`, `/gap`, `/arch-check` | features are built against the harness, not only cleanups |
+| `doc/specs/` and progress files | a change spans more than one session |
+| `launch.template.json`, `mc.env.example`, `after-branch-creation.sh` changes | the per-clone preview ports are needed again |
+
 The guides and the numbers behind the Claude Code harness in `.claude/`.
 
 | File | Content | Read by |
