@@ -13,7 +13,7 @@ import ai.mindconnect.agent.runtime.feature.subagents.SubAgentsFeature;
 import ai.mindconnect.agent.runtime.feature.taskqueue.TaskQueueFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.runtime.feature.transcription.TranscriptionFeature;
-import ai.mindconnect.agent.runtime.feature.workflows.WorkflowsFeature;
+import ai.mindconnect.agent.workflow.feature.WorkflowsFeature;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;

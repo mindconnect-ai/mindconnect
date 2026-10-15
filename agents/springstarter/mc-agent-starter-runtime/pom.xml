@@ -46,7 +46,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-workflows</artifactId>
+            <artifactId>mc-agent-workflow</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

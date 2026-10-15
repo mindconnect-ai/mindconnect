@@ -8,11 +8,11 @@
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-agents-parent</artifactId>
         <version>${revision}${sha1}${changelist}</version>
-        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+        <relativePath>../../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>mc-agent-runtime-feature-workflows</artifactId>
-    <name>mc-agent-runtime-feature-workflows</name>
+    <artifactId>mc-agent-workflow</artifactId>
+    <name>mc-agent-workflow</name>
     <packaging>jar</packaging>
     <description>Runtime feature: persisted workflows as tools — the workflow store the runtime and its
         tools share (files, memory or Postgres, following the runtime's persistence), seeded from the

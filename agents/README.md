@@ -64,8 +64,15 @@ ones it wants.
 | `mc-agent-tools-document` | PDF, Word and text parsing via Tika, PDFBox and POI |
 | `mc-agent-tools-web` | HTTP fetch, search and HTML-to-Markdown |
 | `mc-agent-tools-web-browser` | Headless Chromium via Playwright for sites the plain fetch cannot see |
-| `mc-agent-tools-workflow` | Persisted workflows as tools, one per workflow |
 | `mc-agent-tools-virtual-env` | Binds the file tools, bash and code execution to a virtual environment server over its REST API |
+
+### `features/` — capabilities beside the runtime core
+
+| Module | Purpose |
+|--------|---------|
+| `workflow/mc-agent-tools-workflow` | Persisted workflows as tools, one per workflow, and the agent-call and tool-call steps |
+| `workflow/mc-agent-workflow` | `WorkflowsFeature`: the workflow store the runtime and the tools share |
+| `user-memory/mc-user-memory-core`, `-pg`, `mc-user-memory` | What agents remember about each user, with `UserMemoryFeature` |
 
 ### `tools/vector/` — the knowledge tools
 

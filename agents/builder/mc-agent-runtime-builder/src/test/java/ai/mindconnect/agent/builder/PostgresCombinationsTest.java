@@ -9,7 +9,7 @@ import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.taskqueue.TaskQueueFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
-import ai.mindconnect.agent.runtime.feature.workflows.WorkflowsFeature;
+import ai.mindconnect.agent.workflow.feature.WorkflowsFeature;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.taskqueue.TaskQueue;
