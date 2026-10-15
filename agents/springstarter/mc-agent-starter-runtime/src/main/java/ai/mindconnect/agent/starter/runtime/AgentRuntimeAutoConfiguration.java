@@ -33,12 +33,13 @@ import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
+import ai.mindconnect.agent.todo.TodoListRepository;
+import ai.mindconnect.agent.todo.TodoListService;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolRepository;
 import ai.mindconnect.agent.usermemory.UserMemoryService;
+import ai.mindconnect.agent.todo.feature.TodoFeature;
 import ai.mindconnect.agent.usermemory.feature.UserMemoryFeature;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.llm.port.in.LlmChat;
@@ -143,6 +144,7 @@ public class AgentRuntimeAutoConfiguration {
 
         // The shipped features, configured from the same properties the Spring runtime always read.
         builder.install(new UserMemoryFeature());   // what agents remember about each user
+        builder.install(new TodoFeature());         // the working todo list of a session
         builder.install(new SkillsFeature().userDir(env.getProperty("mindconnect.agent.skills.user-dir", "")));
         ToolsFeature tools = new ToolsFeature().deferred();   // bound once the context is up, see below
         String disabled = env.getProperty("mindconnect.tools.disabled", "");

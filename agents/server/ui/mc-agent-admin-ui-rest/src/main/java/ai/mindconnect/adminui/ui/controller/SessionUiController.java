@@ -14,7 +14,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
+import ai.mindconnect.agent.todo.TodoListService;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;

@@ -25,6 +25,11 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-todo-pg</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-core</artifactId>
         </dependency>
         <dependency>

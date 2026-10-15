@@ -26,6 +26,10 @@
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-todo-core</artifactId>
+        </dependency>
 
         <!-- Channel: the SSE bus's sequencing, replay buffer and fan-out.
              Reached transitively through the runtime today; named here because

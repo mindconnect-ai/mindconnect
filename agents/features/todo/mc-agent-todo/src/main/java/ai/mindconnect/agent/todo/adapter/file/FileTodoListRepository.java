@@ -1,11 +1,11 @@
-package ai.mindconnect.agent.runtime.adapter.file;
+package ai.mindconnect.agent.todo.adapter.file;
 
 import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 
-import ai.mindconnect.agent.runtime.tools.todo.TodoList;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.todo.TodoList;
+import ai.mindconnect.agent.todo.TodoListRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

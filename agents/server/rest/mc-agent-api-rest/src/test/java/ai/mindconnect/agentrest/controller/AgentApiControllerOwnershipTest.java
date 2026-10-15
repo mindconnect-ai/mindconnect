@@ -8,7 +8,6 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryConversationSummaryRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
@@ -71,7 +70,7 @@ class AgentApiControllerOwnershipTest {
     void setUp() {
         sessionService = new AgentSessionService(definitions, sessions,
                 new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
-                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
+                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), List.of(),
                 new InMemoryToolApprovalRepository(), userChannels);
         chat = new RecordingChatService(sessionService);
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));

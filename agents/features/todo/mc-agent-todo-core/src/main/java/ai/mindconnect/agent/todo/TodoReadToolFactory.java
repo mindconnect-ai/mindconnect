@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.tools.todo;
+package ai.mindconnect.agent.todo;
 
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
@@ -6,11 +6,11 @@ import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolFactory;
 
-public final class TodoWriteToolFactory implements ToolFactory {
+public final class TodoReadToolFactory implements ToolFactory {
 
     private TodoListService service;
 
-    @Override public String name() { return TodoWriteTool.NAME; }
+    @Override public String name() { return TodoReadTool.NAME; }
 
     @Override public String group() { return "todo"; }
 
@@ -24,6 +24,6 @@ public final class TodoWriteToolFactory implements ToolFactory {
 
     @Override
     public Tool create(AgentTool agentTool, ToolCallScope scope) {
-        return new TodoWriteTool(service, scope.sessionId());
+        return new TodoReadTool(service, scope.sessionId());
     }
 }

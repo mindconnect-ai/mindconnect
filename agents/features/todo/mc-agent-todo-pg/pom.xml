@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>ai.mindconnect</groupId>
+        <artifactId>mc-agents-parent</artifactId>
+        <version>${revision}${sha1}${changelist}</version>
+        <relativePath>../../../mc-agents-parent/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mc-agent-todo-pg</artifactId>
+    <name>mc-agent-todo-pg</name>
+    <packaging>jar</packaging>
+    <description>
+        The todo lists of sessions in Postgres: one JSONB row per session in
+        mc_todo_list, keyed by namespace, via mc-jdbc.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-todo-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-domain</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-jdbc</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.tools.todo;
+package ai.mindconnect.agent.todo;
 
 /**
  * Renders a {@link TodoList} as a compact Markdown checklist for both

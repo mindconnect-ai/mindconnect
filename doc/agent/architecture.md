@@ -150,7 +150,8 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     `mc-<name>-core` (domain, port, service, its tools, its prompt section), `mc-<name>` (file and
     in-memory stores and the `Feature` that picks the store and wires the rest), `mc-<name>-pg`.
     The runtime core knows none of them; a feature hooks in through the core's interfaces
-    (`PromptSection`, `ToolAdvisor`, …) and the kernel's `contribute`. First: `user-memory`
+    (`PromptSection`, `PromptContextProvider`, `ToolAdvisor`, `SessionCleanup`, …) and the kernel's
+    `contribute`. So far: `user-memory`, `todo`
   - `server/` — what runs: the Spring Boot apps, their REST and UI libraries, and the
     installation around the runtime
     - `app/`: `mc-agent-api-app` (agent server, streaming via SSE), `mc-agent-admin-ui-app`

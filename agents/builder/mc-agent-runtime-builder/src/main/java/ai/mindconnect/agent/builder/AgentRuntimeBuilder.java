@@ -56,7 +56,7 @@ import ai.mindconnect.agent.runtime.service.task.SubAgentSupport;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.runtime.skill.SkillCatalog;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.runtime.port.out.SessionCleanup;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.ToolAdvisor;
 import ai.mindconnect.agent.tool.ToolEnvironment;
@@ -521,7 +521,7 @@ public class AgentRuntimeBuilder {
         context.bean(AgentSessionService.class, () -> new AgentSessionService(
                 context.require(AgentDefinitionRepository.class), context.require(AgentSessionRepository.class),
                 context.require(ConversationManager.class), context.require(WorkingMemoryRepository.class),
-                context.require(ConversationSummaryRepository.class), context.require(TodoListRepository.class),
+                context.require(ConversationSummaryRepository.class), beans.all(SessionCleanup.class),
                 context.require(ToolApprovalRepository.class), context.require(UserChannels.class),
                 context.require(WorkingDirPolicy.class), context.require(UserHome.class),
                 context.require(LlmCallTraceRepository.class)));

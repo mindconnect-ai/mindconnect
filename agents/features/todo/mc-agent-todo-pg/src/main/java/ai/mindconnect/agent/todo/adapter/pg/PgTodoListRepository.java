@@ -1,9 +1,9 @@
-package ai.mindconnect.agent.runtime.adapter.pg;
+package ai.mindconnect.agent.todo.adapter.pg;
 
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.tools.todo.TodoList;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
+import ai.mindconnect.agent.todo.TodoList;
+import ai.mindconnect.agent.todo.TodoListRepository;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 

@@ -6,7 +6,6 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryConversationSummaryRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryTodoListRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRepository;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
@@ -68,7 +67,7 @@ class VectorStoreApiControllerOwnershipTest {
     void setUp() {
         sessionService = new AgentSessionService(definitions, sessions,
                 new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
-                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
+                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), List.of(),
                 new InMemoryToolApprovalRepository(), new UserChannels());
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         String alicesSession = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();

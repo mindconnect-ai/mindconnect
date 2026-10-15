@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.tools.todo;
+package ai.mindconnect.agent.todo;
 
 import ai.mindconnect.agent.SessionId;
 import com.fasterxml.jackson.annotation.JsonIgnore;

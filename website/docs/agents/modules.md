@@ -100,6 +100,7 @@ next step.
 | Module | Purpose |
 |--------|---------|
 | `mc-user-memory-core`, `mc-user-memory`, `mc-user-memory-pg` | What agents remember about each user across chats: the entries, `UserMemoryService`, the `memory_read`/`memory_write`/`memory_delete` tools and the memory index in the system prompt (`-core`); the file and in-memory stores and `UserMemoryFeature` (`mc-user-memory`); the Postgres store (`-pg`). |
+| `mc-agent-todo-core`, `mc-agent-todo`, `mc-agent-todo-pg` | The working todo list of a session: the list, `TodoListService`, the `todo_read`/`todo_write` tools, the `todos`/`todo_list_md` prompt variables and the open-todo hint after a tool call (`-core`); the file and in-memory stores and `TodoFeature`, which also drops a list with its session (`mc-agent-todo`); the Postgres store (`-pg`). |
 
 ## `builder/` & `demo/` — embedding
 

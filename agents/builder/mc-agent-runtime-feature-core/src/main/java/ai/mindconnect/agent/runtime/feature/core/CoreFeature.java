@@ -19,12 +19,6 @@ import ai.mindconnect.agent.runtime.service.UserHome;
 import ai.mindconnect.agent.runtime.service.WorkingDirBrowser;
 import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
 import ai.mindconnect.agent.runtime.service.prompt.InstructionFiles;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.tools.todo.TodoContinuationAdvisor;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListPromptContextProvider;
-import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
-import ai.mindconnect.agent.runtime.port.out.PromptContextProvider;
-import ai.mindconnect.agent.tool.ToolAdvisor;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
@@ -72,7 +66,7 @@ import java.util.concurrent.TimeUnit;
  * gateway per provider family behind a routing chat, embeddings),
  * <b>conversations and messages</b>, and <b>agents</b> — definitions and
  * everything a session of one keeps: the session, working memory, summaries,
- * todos, LLM call traces, and where it may work on disk.
+ * LLM call traces, and where it may work on disk.
  *
  * <p>Every builder installs it. It is reached to configure —
  * {@code builder.feature(CoreFeature.class)} — or replaced by installing an
@@ -272,15 +266,8 @@ public class CoreFeature extends ConfigurableFeature {
         ctx.bean(AgentSessionRepository.class, () -> ctx.require(AgentRepositoryFactory.class).agentSessionRepository());
         ctx.bean(WorkingMemoryRepository.class, () -> ctx.require(AgentRepositoryFactory.class).workingMemoryRepository());
         ctx.bean(ConversationSummaryRepository.class, () -> ctx.require(AgentRepositoryFactory.class).conversationSummaryRepository());
-        ctx.bean(TodoListRepository.class, () -> ctx.require(AgentRepositoryFactory.class).todoListRepository());
         ctx.bean(LlmCallTraceRepository.class, () -> ctx.require(AgentRepositoryFactory.class).llmCallTraceRepository());
         ctx.bean(AgentRegistryService.class, () -> new AgentRegistryService(ctx.require(AgentDefinitionRepository.class)));
-        ctx.bean(TodoListService.class, () -> new TodoListService(ctx.require(TodoListRepository.class)));
-        // The todo list in the prompt, and the nudge to continue it after a tool call. Contributions are
-        // instances, so these resolve the service on first use rather than now.
-        ctx.contribute(PromptContextProvider.class, new LazyTodoPromptContext(ctx));
-        ctx.contribute(ToolAdvisor.class, new LazyTodoContinuation(ctx));
-
 
         // Where a session may work: under workingDirRoot when set, else in the
         // user's own home — under the namespace the current call works in, so
@@ -310,35 +297,5 @@ public class CoreFeature extends ConfigurableFeature {
 
     private static ai.mindconnect.jdbc.Sql sql(FeatureContext ctx) {
         return ctx.require(ai.mindconnect.jdbc.Sql.class);
-    }
-
-    /** The todo prompt context, its service resolved on first use — contributions are instances, beans are lazy. */
-    private static class LazyTodoPromptContext implements PromptContextProvider {
-        private final FeatureContext ctx;
-        private volatile PromptContextProvider delegate;
-        LazyTodoPromptContext(FeatureContext ctx) { this.ctx = ctx; }
-        private PromptContextProvider delegate() {
-            if (delegate == null) delegate = new TodoListPromptContextProvider(ctx.require(TodoListService.class));
-            return delegate;
-        }
-        @Override public int priority() { return delegate().priority(); }
-        @Override public void contribute(java.util.Map<String, Object> promptContext, AgentDefinition def,
-                                         ai.mindconnect.agent.runtime.domain.AgentSession session,
-                                         ai.mindconnect.agent.AuthenticationInfo auth) {
-            delegate().contribute(promptContext, def, session, auth);
-        }
-    }
-
-    private static class LazyTodoContinuation implements ToolAdvisor {
-        private final FeatureContext ctx;
-        private volatile ToolAdvisor delegate;
-        LazyTodoContinuation(FeatureContext ctx) { this.ctx = ctx; }
-        private ToolAdvisor delegate() {
-            if (delegate == null) delegate = new TodoContinuationAdvisor(ctx.require(TodoListService.class));
-            return delegate;
-        }
-        @Override public Result around(Invocation inv, Chain chain) throws Exception { return delegate().around(inv, chain); }
-        @Override public int order() { return delegate().order(); }
-        @Override public boolean applies(Invocation inv) { return delegate().applies(inv); }
     }
 }

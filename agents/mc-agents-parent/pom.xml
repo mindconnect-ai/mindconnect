@@ -94,6 +94,21 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-todo-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-todo-pg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-todo</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-llm-gateway-pg</artifactId>
                 <version>${project.version}</version>
             </dependency>

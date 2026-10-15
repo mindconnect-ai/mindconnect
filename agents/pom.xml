@@ -38,6 +38,9 @@
         <module>features/user-memory/mc-user-memory-core</module>
         <module>features/user-memory/mc-user-memory-pg</module>
         <module>features/user-memory/mc-user-memory</module>
+        <module>features/todo/mc-agent-todo-core</module>
+        <module>features/todo/mc-agent-todo-pg</module>
+        <module>features/todo/mc-agent-todo</module>
         <module>builder/mc-agent-runtime-feature-core</module>
         <module>builder/mc-agent-runtime-feature-skills</module>
         <module>builder/mc-agent-runtime-feature-tools</module>
