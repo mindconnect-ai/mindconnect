@@ -1,6 +1,8 @@
 package ai.mindconnect.mcp.gateway.local;
 
+import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.StartupScope;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpGateway;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
@@ -62,14 +64,15 @@ public class McpGatewayAutoConfiguration {
             Environment environment,
             ObjectProvider<ScopeSupplier> scope,
             ObjectProvider<McpStoreFactory> stores,
-            // The installation's default namespace: seeds go there, whatever scope a thread binds — and at
-            // start-up the main thread binds none.
+            // The installation's default namespace: start-up works there when nothing else is bound.
             @Value("${mindconnect.namespace:local}") String defaultNamespace,
             @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir) {
-        McpStoreFactory factory = stores.getIfAvailable(() -> fileStores(environment, dataBaseDir));
-        BundledMcpRegistrations.seed(factory.serverRepository(ScopeSupplier.fixed(seedNamespace(scope, defaultNamespace))),
-                "classpath:initial-data/mcp-servers/*.json");
-        return factory.serverRepository(scope.getIfAvailable(ScopeSupplier::local));
+        ScopeSupplier current = scope.getIfAvailable(ScopeSupplier::local);
+        McpServerRepository repository = stores.getIfAvailable(() -> fileStores(environment, dataBaseDir))
+                .serverRepository(current);
+        StartupScope.run(current, new Namespace(defaultNamespace),
+                () -> BundledMcpRegistrations.seed(repository, "classpath:initial-data/mcp-servers/*.json"));
+        return repository;
     }
 
     /**
@@ -166,18 +169,5 @@ public class McpGatewayAutoConfiguration {
     @ConditionalOnBean(LocalMcpGateway.class)
     public McpRegistryAdmin mcpRegistryAdmin(McpServerRepository repository, LocalMcpGateway gateway) {
         return new LocalMcpRegistryAdmin(repository, gateway);
-    }
-
-    /**
-     * Where bundled data is seeded: the namespace a fixed scope names — a
-     * single-namespace host chose it — and otherwise the installation default,
-     * because a thread-bound scope binds nothing at start-up.
-     */
-    private static ai.mindconnect.agent.Namespace seedNamespace(
-            ObjectProvider<ScopeSupplier> scope, String defaultNamespace) {
-        ScopeSupplier supplier = scope.getIfAvailable();
-        return supplier == null || supplier instanceof ai.mindconnect.agent.ThreadBoundScope
-                ? new ai.mindconnect.agent.Namespace(defaultNamespace)
-                : supplier.namespace();
     }
 }

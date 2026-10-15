@@ -41,7 +41,7 @@ import java.nio.file.Path;
 
 /**
  * Namespaces for a server: where the namespace of a request comes from, who
- * may work in which, and the {@link ThreadBoundScope} the routed stores read.
+ * may work in which, and the {@link ThreadBoundScope} every store reads.
  *
  * <p>Auto-configured ahead of the persistence starters so that the scope
  * supplier defined here is the one they route by. The namespace repository

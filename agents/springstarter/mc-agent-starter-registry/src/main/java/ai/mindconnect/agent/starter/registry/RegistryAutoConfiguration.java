@@ -84,9 +84,11 @@ public class RegistryAutoConfiguration {
             @Value("${mindconnect.registry.default-source:}") String defaultSource,
             ObjectProvider<ScopeSupplier> scope,
             @Value("${mindconnect.namespace:local}") String defaultNamespace) {
-        // Fixed to the namespace start-up seeds into, until registry sources work per namespace like the stores.
+        // Fixed to the namespace start-up works in, until registry sources work per namespace like the stores.
+        ScopeSupplier current = scope.getIfAvailable(() -> ScopeSupplier.fixed(new Namespace(defaultNamespace)));
+        Namespace startup = StartupScope.call(current, new Namespace(defaultNamespace), current::namespace);
         FileRegistrySourceRepository repository = new FileRegistrySourceRepository(
-                Path.of(dataBaseDir), ScopeSupplier.fixed(seedNamespace(scope, defaultNamespace)));
+                Path.of(dataBaseDir), ScopeSupplier.fixed(startup));
         InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
         seed(repository, defaultSource);
         return repository;
@@ -198,16 +200,5 @@ public class RegistryAutoConfiguration {
                                            @Value("${mindconnect.namespace:local}") String defaultNamespace) {
         return StartupScope.call(scope.getIfAvailable(), new Namespace(defaultNamespace),
                 () -> new RegistryService(sources, client, installers.orderedStream().toList()));
-    }
-    /**
-     * Where bundled data is seeded: the namespace a fixed scope names — a
-     * single-namespace host chose it — and otherwise the installation default,
-     * because a thread-bound scope binds nothing at start-up.
-     */
-    private static Namespace seedNamespace(ObjectProvider<ScopeSupplier> scope, String defaultNamespace) {
-        ScopeSupplier supplier = scope.getIfAvailable();
-        return supplier == null || supplier instanceof ThreadBoundScope
-                ? new Namespace(defaultNamespace)
-                : supplier.namespace();
     }
 }

@@ -24,7 +24,7 @@ import java.util.Optional;
 /**
  * Chooses the namespace of a request and binds it, with the caller, to the
  * thread for the rest of the request — the one place a server turns "who is
- * calling what" into the {@link Scope} every routed store asks for.
+ * calling what" into the {@link Scope} every store asks for.
  *
  * <p>The namespace comes, in this order, from the {@code /ns/{namespace}/}
  * prefix ({@link NamespacePathFilter}), the {@code X-Mindconnect-Namespace}
