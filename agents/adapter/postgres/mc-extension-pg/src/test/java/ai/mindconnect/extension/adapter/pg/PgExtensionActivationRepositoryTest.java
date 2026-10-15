@@ -1,6 +1,7 @@
 package ai.mindconnect.extension.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.extension.domain.ExtensionActivation;
 import ai.mindconnect.extension.domain.ExtensionId;
@@ -21,8 +22,8 @@ class PgExtensionActivationRepositoryTest {
     void setUp() {
         Sql sql = Sql.of(TestDb.require());
         sql.execute("DROP TABLE IF EXISTS mc_extension_activation");
-        acme = new PgExtensionActivationRepository(sql, new Namespace("acme")).initSchema();
-        other = new PgExtensionActivationRepository(sql, new Namespace("other")).initSchema();
+        acme = new PgExtensionActivationRepository(sql, ScopeSupplier.fixed(new Namespace("acme"))).initSchema();
+        other = new PgExtensionActivationRepository(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
     }
 
     @Test

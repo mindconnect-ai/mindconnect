@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
- * The agents area hands out the workflow stores routed per namespace, and
+ * The agents area hands out the workflow stores that work per namespace, and
  * the workflow area's own configurations — file and Postgres alike — back
  * off. The Postgres one did not, once: two beans named
  * {@code workflowDataRepository}, and the server did not start.

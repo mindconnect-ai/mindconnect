@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.PerNamespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.ChatTurnId;
@@ -32,20 +34,21 @@ public class InMemoryLlmCallTraceRepository implements LlmCallTraceRepository {
     /** The same cap the file adapter applies. {@code 0} or less keeps everything. */
     public static final int DEFAULT_MAX_PER_CONVERSATION = 50;
 
-    private final Map<TraceId, LlmCallTrace> store = new ConcurrentHashMap<>();
+    private final PerNamespace<Map<TraceId, LlmCallTrace>> store;
     private final int maxTracesPerConversation;
 
-    public InMemoryLlmCallTraceRepository() {
-        this(DEFAULT_MAX_PER_CONVERSATION);
+    public InMemoryLlmCallTraceRepository(ScopeSupplier scope) {
+        this(DEFAULT_MAX_PER_CONVERSATION, scope);
     }
 
-    public InMemoryLlmCallTraceRepository(int maxTracesPerConversation) {
+    public InMemoryLlmCallTraceRepository(int maxTracesPerConversation, ScopeSupplier scope) {
         this.maxTracesPerConversation = maxTracesPerConversation;
+        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
     }
 
     @Override
     public void save(LlmCallTrace trace) {
-        store.put(trace.id(), trace);
+        store.current().put(trace.id(), trace);
         enforceRetention(trace.context().conversationId());
     }
 
@@ -57,26 +60,26 @@ public class InMemoryLlmCallTraceRepository implements LlmCallTraceRepository {
                 .sorted(Comparator.comparing((LlmCallTrace t) -> t.startedAt() == null ? Instant.MIN : t.startedAt())
                         .thenComparing(t -> t.id().value()))
                 .limit(all.size() - maxTracesPerConversation)
-                .forEach(t -> store.remove(t.id()));
+                .forEach(t -> store.current().remove(t.id()));
     }
 
     @Override
     public List<LlmCallTrace> findByTurn(ChatTurnId turnId) {
-        return store.values().stream()
+        return store.current().values().stream()
                 .filter(t -> Objects.equals(t.context().turnId(), turnId))
                 .toList();
     }
 
     @Override
     public List<LlmCallTrace> findBySession(SessionId sessionId) {
-        return store.values().stream()
+        return store.current().values().stream()
                 .filter(t -> Objects.equals(t.context().sessionId(), sessionId))
                 .toList();
     }
 
     @Override
     public List<LlmCallTrace> findByConversation(ConversationId conversationId) {
-        return store.values().stream()
+        return store.current().values().stream()
                 .filter(t -> Objects.equals(t.context().conversationId(), conversationId))
                 .toList();
     }
@@ -89,25 +92,25 @@ public class InMemoryLlmCallTraceRepository implements LlmCallTraceRepository {
         boolean changed = true;
         while (changed) {
             changed = false;
-            for (LlmCallTrace t : store.values()) {
+            for (LlmCallTrace t : store.current().values()) {
                 ChatTurnId parent = t.context().parentTurnId();
                 if (parent != null && turnsInTree.contains(parent) && turnsInTree.add(t.context().turnId())) {
                     changed = true;
                 }
             }
         }
-        return store.values().stream()
+        return store.current().values().stream()
                 .filter(t -> turnsInTree.contains(t.context().turnId()))
                 .toList();
     }
 
     @Override
     public Optional<LlmCallTrace> findById(TraceId id) {
-        return Optional.ofNullable(store.get(id));
+        return Optional.ofNullable(store.current().get(id));
     }
 
     @Override
     public void deleteBySession(SessionId sessionId) {
-        store.values().removeIf(t -> Objects.equals(t.context().sessionId(), sessionId));
+        store.current().values().removeIf(t -> Objects.equals(t.context().sessionId(), sessionId));
     }
 }

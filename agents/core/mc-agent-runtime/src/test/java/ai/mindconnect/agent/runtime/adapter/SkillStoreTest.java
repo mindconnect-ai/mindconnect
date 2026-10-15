@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.file.FileSkillRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
 import ai.mindconnect.agent.runtime.skill.Skill;
@@ -31,12 +32,12 @@ class SkillStoreTest {
 
     @Test
     void theFileStoreKeepsEveryFieldAndChecksVersions(@TempDir Path dir) {
-        storeBehaves(new FileSkillRepository(dir, MAPPER, new Namespace("test")));
+        storeBehaves(new FileSkillRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test"))));
     }
 
     @Test
     void theInMemoryStoreBehavesTheSame() {
-        storeBehaves(new InMemorySkillRepository());
+        storeBehaves(new InMemorySkillRepository(ScopeSupplier.local()));
     }
 
     static void storeBehaves(SkillRepository repo) {
@@ -74,7 +75,7 @@ class SkillStoreTest {
 
     @Test
     void aNameNoModelCouldTypeIsNeverStored() {
-        SkillRepository repo = new InMemorySkillRepository();
+        SkillRepository repo = new InMemorySkillRepository(ScopeSupplier.local());
 
         assertThatThrownBy(() -> repo.save(Skill.create("Weekly Report", "d", "i", List.of())))
                 .isInstanceOf(IllegalArgumentException.class);

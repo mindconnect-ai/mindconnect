@@ -39,6 +39,11 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-registry-pg</artifactId>
         </dependency>
+        <!-- NamespaceFirstUse: a namespace's registries are prepared on its first use -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-namespace-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-core</artifactId>

@@ -43,7 +43,7 @@ class WorkflowToolDataIsNotCodeTest {
 
     @BeforeEach
     void setUp() {
-        repository = new FileWorkflowDataRepository(dir, "test");
+        repository = new FileWorkflowDataRepository(dir, () -> "test");
         provider = new WorkflowToolProvider();
         provider.bind(MapToolEnvironment.builder()
                 .service(WorkflowDataRepository.class, repository)

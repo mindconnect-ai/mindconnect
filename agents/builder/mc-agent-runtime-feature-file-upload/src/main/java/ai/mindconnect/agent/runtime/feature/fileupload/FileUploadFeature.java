@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.runtime.feature.fileupload;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
@@ -42,18 +42,17 @@ public class FileUploadFeature implements RuntimeFeature {
 
     @Override
     public void configure(FeatureContext ctx) {
-        // The factory per namespace: the persistence setting looked at once, the routing builds the rest.
-        Function<Namespace, FileStoreFactory> factories = switch (ctx.persistence()) {
+        // The factory: the persistence setting looked at once; the store works in the namespace the scope names per call.
+        Function<ScopeSupplier, FileStoreFactory> factories = switch (ctx.persistence()) {
             // In the database — unless fileStoreBackend names another backend: a host may keep
             // its records in Postgres and its files on a volume, as it always could.
             case Persistence.Postgres p -> ctx.property("fileStoreBackend").filter(b -> !b.isBlank() && !"postgres".equals(b)).isPresent()
-                    ? ns -> spiFactory(ctx, p, ns)
-                    : ns -> new PgFileStoreFactory(ctx.require(ai.mindconnect.jdbc.Sql.class), ns);
-            case Persistence.File f -> ns -> spiFactory(ctx, f, ns);
-            case Persistence.InMemory m -> ns -> spiFactory(ctx, m, ns);   // the side-channel directory
+                    ? scope -> spiFactory(ctx, p, scope)
+                    : scope -> new PgFileStoreFactory(ctx.require(ai.mindconnect.jdbc.Sql.class), scope);
+            case Persistence.File f -> scope -> spiFactory(ctx, f, scope);
+            case Persistence.InMemory m -> scope -> spiFactory(ctx, m, scope);   // the side-channel directory
         };
-        ctx.bean(FileStore.class, () -> ctx.require(NamespaceRouting.class).route(
-                FileStore.class, ns -> factories.apply(ns).fileStore()));
+        ctx.bean(FileStore.class, () -> factories.apply(ctx.require(ScopeSupplier.class)).fileStore());
         // The vector stores the attach path indexes into — and the vector tools search — from the same settings.
         ctx.bean(VectorStores.class, () -> VectorStores.fromEnvironment(ctx.require(ToolEnvironment.class))
                 .orElseThrow(() -> new ai.mindconnect.agent.runtime.feature.FeatureException(
@@ -69,9 +68,8 @@ public class FileUploadFeature implements RuntimeFeature {
                 ctx.require(UserHome.class)));
     }
 
-    private static FileStoreFactory spiFactory(FeatureContext ctx, Persistence persistence, Namespace namespace) {
+    private static FileStoreFactory spiFactory(FeatureContext ctx, Persistence persistence, ScopeSupplier scope) {
         return new SpiFileStoreFactory(ctx.property("fileStoreBackend").orElse("filesystem"), Map.of(
-                "baseDir", persistence.dataDir().toString(),
-                "namespace", namespace.value()));
+                "baseDir", persistence.dataDir().toString()), scope);
     }
 }

@@ -17,6 +17,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -51,6 +52,23 @@ class DocumentsTest {
                 .path((String id) -> "counters/" + id + ".json")
                 .lockTimeout(Duration.ofMinutes(1))
                 .build(repo, MAPPER);
+    }
+
+    @Test
+    void oneInstanceServesThePartitionItsSupplierNamesPerCall() {
+        AtomicReference<String> partition = new AtomicReference<>("acme");
+        Documents<String, Counter> shared = Documents.of(Counter.class)
+                .path((String id) -> "counters/" + id + ".json")
+                .build(() -> FileRepo.open(dir.resolve("data"), partition.get()), MAPPER);
+
+        shared.create("a", new Counter("a", 1));
+        partition.set("globex");
+        shared.create("a", new Counter("a", 2));
+
+        assertThat(shared.find("a")).contains(new Counter("a", 2));
+        partition.set("acme");
+        assertThat(shared.find("a")).contains(new Counter("a", 1));
+        assertThat(dir.resolve("data/globex/counters/a.json")).exists();
     }
 
     @Test

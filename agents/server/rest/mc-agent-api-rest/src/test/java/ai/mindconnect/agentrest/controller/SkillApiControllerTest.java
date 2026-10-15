@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
 import ai.mindconnect.agent.runtime.skill.Skill;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class SkillApiControllerTest {
 
-    private final InMemorySkillRepository repository = new InMemorySkillRepository();
+    private final InMemorySkillRepository repository = new InMemorySkillRepository(ScopeSupplier.local());
     private final SkillApiController controller = new SkillApiController(repository);
 
     private static SkillApiController.SkillRequest request(String name) {

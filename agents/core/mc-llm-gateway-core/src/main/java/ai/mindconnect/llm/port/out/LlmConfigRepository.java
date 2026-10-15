@@ -7,8 +7,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Storage of LLM configurations. An adapter is bound to one namespace when it
- * is built; a config's name is unique within it.
+ * Storage of LLM configurations. An adapter works in the namespace the scope
+ * names per call; a config's name is unique within it.
  */
 public interface LlmConfigRepository {
 

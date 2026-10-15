@@ -1,5 +1,7 @@
 package ai.mindconnect.message.adapter.memory;
 
+import ai.mindconnect.agent.PerNamespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.MessageId;
 
@@ -16,7 +18,11 @@ import java.util.function.IntFunction;
 /** In-memory {@link MessageRepository} — process-lifetime storage, no persistence. */
 public class InMemoryMessageRepository implements MessageRepository {
 
-    private final List<Message> store = new CopyOnWriteArrayList<>();
+    private final PerNamespace<List<Message>> store;
+
+    public InMemoryMessageRepository(ScopeSupplier scope) {
+        this.store = new PerNamespace<>(scope, CopyOnWriteArrayList::new);
+    }
 
     /**
      * Upsert, not append: {@code save} is also how an existing message is
@@ -25,8 +31,8 @@ public class InMemoryMessageRepository implements MessageRepository {
      */
     @Override
     public Message save(Message message) {
-        store.removeIf(existing -> existing.id().equals(message.id()));
-        store.add(message);
+        store.current().removeIf(existing -> existing.id().equals(message.id()));
+        store.current().add(message);
         return message;
     }
 
@@ -44,7 +50,7 @@ public class InMemoryMessageRepository implements MessageRepository {
 
     @Override
     public List<Message> findByConversation(ConversationId conversationId, PageRequest page) {
-        return store.stream()
+        return store.current().stream()
                 .filter(m -> m.conversationId().equals(conversationId))
                 .sorted(Comparator.comparingInt(Message::sequenceNum))
                 .skip((long) page.page() * page.size())
@@ -54,7 +60,7 @@ public class InMemoryMessageRepository implements MessageRepository {
 
     @Override
     public Optional<Message> findById(ConversationId conversation, MessageId id) {
-        return store.stream().filter(m -> m.conversationId().equals(conversation) && m.id().equals(id)).findFirst();
+        return store.current().stream().filter(m -> m.conversationId().equals(conversation) && m.id().equals(id)).findFirst();
     }
 
     /**
@@ -64,7 +70,7 @@ public class InMemoryMessageRepository implements MessageRepository {
      */
     @Override
     public synchronized Message append(ConversationId conversationId, IntFunction<Message> create) {
-        int next = store.stream()
+        int next = store.current().stream()
                 .filter(m -> m.conversationId().equals(conversationId))
                 .mapToInt(Message::sequenceNum)
                 .max().orElse(0) + 1;
@@ -73,12 +79,12 @@ public class InMemoryMessageRepository implements MessageRepository {
 
     @Override
     public void deleteBySequenceRange(ConversationId conversationId, int fromSeq, int toSeq) {
-        store.removeIf(m -> m.conversationId().equals(conversationId)
+        store.current().removeIf(m -> m.conversationId().equals(conversationId)
                 && m.sequenceNum() >= fromSeq && m.sequenceNum() <= toSeq);
     }
 
     @Override
     public void deleteByConversation(ConversationId conversationId) {
-        store.removeIf(m -> m.conversationId().equals(conversationId));
+        store.current().removeIf(m -> m.conversationId().equals(conversationId));
     }
 }

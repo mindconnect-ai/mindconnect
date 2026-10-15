@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.adapter.pg;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
@@ -46,8 +47,8 @@ class PgNamespaceIsolationTest {
 
     @Test
     void agentDefinitions() {
-        var a = new PgAgentDefinitionRepository(sql, A).initSchema();
-        var b = new PgAgentDefinitionRepository(sql, B).initSchema();
+        var a = new PgAgentDefinitionRepository(sql, ScopeSupplier.fixed(A)).initSchema();
+        var b = new PgAgentDefinitionRepository(sql, ScopeSupplier.fixed(B)).initSchema();
         AgentDefinition d = a.save(AgentDefinition.create("web-researcher", "desc", "prompt", "hello", "agent-default"));
 
         assertThat(b.findById(d.id())).isEmpty();
@@ -60,8 +61,8 @@ class PgNamespaceIsolationTest {
 
     @Test
     void agentSessions() {
-        var a = new PgAgentSessionRepository(sql, A).initSchema();
-        var b = new PgAgentSessionRepository(sql, B).initSchema();
+        var a = new PgAgentSessionRepository(sql, ScopeSupplier.fixed(A)).initSchema();
+        var b = new PgAgentSessionRepository(sql, ScopeSupplier.fixed(B)).initSchema();
         AgentSession parent = AgentSession.start(AgentId.random(), DAVID, ConversationId.random());
         AgentSession child = new AgentSession(SessionId.random(), parent.agentDefinitionId(), DAVID,
                 ConversationId.random(), "t", SessionStatus.ACTIVE, Instant.now(), null, parent.id(), null, null);
@@ -80,8 +81,8 @@ class PgNamespaceIsolationTest {
 
     @Test
     void conversationSummaries() {
-        var a = new PgConversationSummaryRepository(sql, A).initSchema();
-        var b = new PgConversationSummaryRepository(sql, B).initSchema();
+        var a = new PgConversationSummaryRepository(sql, ScopeSupplier.fixed(A)).initSchema();
+        var b = new PgConversationSummaryRepository(sql, ScopeSupplier.fixed(B)).initSchema();
         ConversationId conversation = ConversationId.random();
         ConversationSummary s = ConversationSummary.create(conversation, 1, 10, 10, "gist");
         a.save(s);
@@ -93,8 +94,8 @@ class PgNamespaceIsolationTest {
 
     @Test
     void workingMemory() {
-        var a = new PgWorkingMemoryRepository(sql, A).initSchema();
-        var b = new PgWorkingMemoryRepository(sql, B).initSchema();
+        var a = new PgWorkingMemoryRepository(sql, ScopeSupplier.fixed(A)).initSchema();
+        var b = new PgWorkingMemoryRepository(sql, ScopeSupplier.fixed(B)).initSchema();
         AuthenticationInfo david = AuthenticationInfo.of(DAVID);
         SessionId session = SessionId.random();
         WorkingMemory memory = new WorkingMemory("prompt", 1, List.of(), 0, "cl100k", 128_000);
@@ -111,8 +112,8 @@ class PgNamespaceIsolationTest {
 
     @Test
     void todoLists() {
-        var a = new PgTodoListRepository(sql, A).initSchema();
-        var b = new PgTodoListRepository(sql, B).initSchema();
+        var a = new PgTodoListRepository(sql, ScopeSupplier.fixed(A)).initSchema();
+        var b = new PgTodoListRepository(sql, ScopeSupplier.fixed(B)).initSchema();
         SessionId session = SessionId.random();
         TodoList list = TodoList.empty(session);
         a.save(list);
@@ -124,8 +125,8 @@ class PgNamespaceIsolationTest {
 
     @Test
     void llmCallTraces() {
-        var a = new PgLlmCallTraceRepository(sql, 1, A).initSchema();
-        var b = new PgLlmCallTraceRepository(sql, 1, B).initSchema();
+        var a = new PgLlmCallTraceRepository(sql, 1, ScopeSupplier.fixed(A)).initSchema();
+        var b = new PgLlmCallTraceRepository(sql, 1, ScopeSupplier.fixed(B)).initSchema();
         ConversationId conversation = ConversationId.random();
         SessionId session = SessionId.random();
         ChatTurnId root = ChatTurnId.random();

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
 import ai.mindconnect.agent.runtime.domain.TraceContext;
@@ -25,7 +26,7 @@ class InMemoryLlmCallTraceRepositoryTest {
 
     @Test
     void keepsOnlyTheNewestTracesPerConversation() {
-        var repo = new InMemoryLlmCallTraceRepository(3);
+        var repo = new InMemoryLlmCallTraceRepository(3, ScopeSupplier.local());
         for (int i = 0; i < 5; i++) repo.save(trace(CONVERSATION, "t" + i, Instant.ofEpochSecond(i)));
         repo.save(trace(OTHER, "o1", Instant.ofEpochSecond(0)));
 
@@ -37,14 +38,14 @@ class InMemoryLlmCallTraceRepositoryTest {
 
     @Test
     void aCapOfZeroKeepsEverything() {
-        var repo = new InMemoryLlmCallTraceRepository(0);
+        var repo = new InMemoryLlmCallTraceRepository(0, ScopeSupplier.local());
         for (int i = 0; i < 60; i++) repo.save(trace(CONVERSATION, "t" + i, Instant.ofEpochSecond(i)));
         assertThat(repo.findByConversation(CONVERSATION)).hasSize(60);
     }
 
     @Test
     void theDefaultCapMatchesTheFileAdapter() {
-        var repo = new InMemoryLlmCallTraceRepository();
+        var repo = new InMemoryLlmCallTraceRepository(ScopeSupplier.local());
         for (int i = 0; i < 60; i++) repo.save(trace(CONVERSATION, "t" + i, Instant.ofEpochSecond(i)));
         assertThat(repo.findByConversation(CONVERSATION))
                 .hasSize(InMemoryLlmCallTraceRepository.DEFAULT_MAX_PER_CONVERSATION);
@@ -52,7 +53,7 @@ class InMemoryLlmCallTraceRepositoryTest {
 
     @Test
     void deleteBySessionForgetsThatSessionOnly() {
-        var repo = new InMemoryLlmCallTraceRepository();
+        var repo = new InMemoryLlmCallTraceRepository(ScopeSupplier.local());
         repo.save(trace(CONVERSATION, "t1", Instant.ofEpochSecond(1)));
         repo.save(trace(OTHER, "o1", Instant.ofEpochSecond(1), SessionId.of("s2")));
 

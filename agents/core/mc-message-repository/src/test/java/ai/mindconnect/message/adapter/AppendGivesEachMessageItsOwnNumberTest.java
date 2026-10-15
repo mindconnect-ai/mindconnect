@@ -1,6 +1,7 @@
 package ai.mindconnect.message.adapter;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.adapter.file.FileMessageRepository;
@@ -44,9 +45,9 @@ class AppendGivesEachMessageItsOwnNumberTest {
     private static final String SENDER = UUID.randomUUID().toString();
 
     static List<MessageRepository> stores() {
-        return List.of(new InMemoryMessageRepository(),
+        return List.of(new InMemoryMessageRepository(ScopeSupplier.local()),
                 new FileMessageRepository(dir.resolve(UUID.randomUUID().toString()),
-                        new ObjectMapper().registerModule(new JavaTimeModule()), NS));
+                        new ObjectMapper().registerModule(new JavaTimeModule()), ScopeSupplier.fixed(NS)));
     }
 
     private static Message message(ConversationId conversation, int seq) {

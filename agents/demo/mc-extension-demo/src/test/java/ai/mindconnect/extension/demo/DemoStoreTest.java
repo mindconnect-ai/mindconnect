@@ -1,6 +1,7 @@
 package ai.mindconnect.extension.demo;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.Test;
@@ -16,8 +17,8 @@ class DemoStoreTest {
     @Test
     void the_file_store_keeps_one_document_per_record_in_the_extension_s_corner(@TempDir Path dir) {
         ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        DemoStore<Scenario> acme = DemoStore.onFiles(dir, new Namespace("acme"), mapper, Scenario.class, "scenario", Scenario::id);
-        DemoStore<Scenario> other = DemoStore.onFiles(dir, new Namespace("other"), mapper, Scenario.class, "scenario", Scenario::id);
+        DemoStore<Scenario> acme = DemoStore.onFiles(dir, ScopeSupplier.fixed(new Namespace("acme")), mapper, Scenario.class, "scenario", Scenario::id);
+        DemoStore<Scenario> other = DemoStore.onFiles(dir, ScopeSupplier.fixed(new Namespace("other")), mapper, Scenario.class, "scenario", Scenario::id);
 
         acme.save(Scenario.SEED.get(0));
         acme.save(Scenario.SEED.get(1));
@@ -34,7 +35,7 @@ class DemoStoreTest {
     @Test
     void an_adventure_round_trips_with_its_story_and_state(@TempDir Path dir) {
         ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
-        DemoStore<Adventure> store = DemoStore.onFiles(dir, new Namespace("acme"), mapper, Adventure.class, "adventure", Adventure::id);
+        DemoStore<Adventure> store = DemoStore.onFiles(dir, ScopeSupplier.fixed(new Namespace("acme")), mapper, Adventure.class, "adventure", Adventure::id);
         Adventure adventure = Adventure.start(Scenario.SEED.get(2), "s-1", "david")
                 .withLines(Adventure.Line.master("Midnight."), Adventure.Line.player("I knock."))
                 .withState(new Adventure.CharacterState(8, List.of("cloak", "knife"), "at the door", "RUNNING"));

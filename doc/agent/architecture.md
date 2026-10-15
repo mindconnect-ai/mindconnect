@@ -70,15 +70,17 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
       …) lives in the module that owns its entity. Every entity is addressed by such a record
       — `record XId(String value) implements EntityId` — never by a bare `UUID` or `String`;
       in JSON an id is its plain value. Ids, domain objects, ports and services carry no
-      namespace: persistence adapters (File, Pg, the file-store and vector-store backends)
-      are bound to one namespace in their constructor or config; above them a `NamespaceRouted`
-      proxy picks the adapter for the namespace the `ScopeSupplier` names right now (`Scope` =
+      namespace: persistence adapters (File, Pg, the file-store backends) take the
+      `ScopeSupplier` in their constructor and ask it on every call for the namespace to work
+      in — one adapter serves every namespace (the vector-store backends are still bound to one
+      namespace each) (`Scope` =
       namespace + optional `UserId` + host attributes; a library embeds with `ScopeSupplier.fixed`,
       a server binds a `ThreadBoundScope` per request and per queued task via `ScopeTaskAdvisor`;
       `mindconnect.namespace` is only the fallback while not every entry point binds). Work a
       namespace needs once per process — the Admin UI's seeding of `initial-data/**` into every
-      namespace, see `NamespaceSeeding` — is a `NamespaceFirstUse` registered with
-      `ThreadBoundScope.onBind`, so requests, tasks and start-up routines all trigger it
+      namespace, see `NamespaceSeeding` — is a `NamespaceFirstUse` (`mc-namespace-core`)
+      registered with `ThreadBoundScope.onBind`, so requests, tasks and start-up routines all
+      trigger it
     - `mc-agent-runtime-core` / `mc-agent-runtime` (packages `ai.mindconnect.agent.runtime.*`):
       execution engine (turn loop, tool dispatch, sub-agent calls, approvals) / its adapters
       (file & in-memory repos, Pebble prompt renderer, tokenizer)
@@ -207,12 +209,14 @@ the thing to grep for.
   application `service`; the sibling `mc-<x>` holds the adapters; Postgres adapters sit
   under `adapter/postgres/mc-<x>-pg` and store domain objects as JSONB through `common/mc-jdbc`.
 - **Namespace at the adapter, not in the id.** Ids, domain objects, ports and services carry
-  no namespace. A persistence adapter is bound to one namespace in its constructor;
-  `NamespaceRouted` picks the adapter for the namespace the `ScopeSupplier` names right now
-  (`Scope` = namespace + optional `UserId` + host attributes). A library embeds with
+  no namespace. A persistence adapter takes the `ScopeSupplier` in its constructor and asks
+  it on every call for the namespace (`Scope` = namespace + optional `UserId` + host
+  attributes); one adapter serves every namespace — an in-memory one keeps its entries in a
+  `PerNamespace`. A library embeds with
   `ScopeSupplier.fixed`; a server binds a `ThreadBoundScope` per request and per queued task
   via `ScopeTaskAdvisor`. Work a namespace needs once per process is a `NamespaceFirstUse`
-  registered with `ThreadBoundScope.onBind` (example: `NamespaceSeeding`).
+  (`mc-namespace-core`) registered with `ThreadBoundScope.onBind` (example: `NamespaceSeeding`);
+  what a store does when a namespace is deleted is a `NamespacePurge` there.
 - **Runtime features.** `AgentRuntimeBuilder` assembles a core plus installed
   `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); each
   shipped feature is one module under `builder/mc-agent-runtime-feature-*`. The Spring

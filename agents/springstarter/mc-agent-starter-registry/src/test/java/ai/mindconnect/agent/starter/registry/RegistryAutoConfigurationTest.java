@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Where the configured registries live follows {@code mindconnect.persistence}:
- * the files by default, Postgres — routed per namespace, the files imported
+ * the files by default, Postgres — per namespace of the call, the files imported
  * once, the file store never opened — on {@code postgres}.
  */
 class RegistryAutoConfigurationTest {

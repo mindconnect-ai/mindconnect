@@ -18,8 +18,7 @@ import java.util.function.UnaryOperator;
  * never finds it missing.
  *
  * <p><b>Writing.</b> {@link #bean} registers a lazy singleton, {@link #decorate}
- * wraps one registered by someone else (encryption, namespace routing, access
- * control), {@link #contribute} adds to a list the core collects (advisors,
+ * wraps one registered by someone else (encryption, access control), {@link #contribute} adds to a list the core collects (advisors,
  * workers, prompt providers), {@link #property} publishes a plain string for
  * adapters and the tool environment. {@link #onStart} and {@link #onClose}
  * hook the runtime's lifecycle.

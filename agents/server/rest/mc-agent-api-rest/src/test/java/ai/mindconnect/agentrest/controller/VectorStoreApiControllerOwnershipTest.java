@@ -1,5 +1,6 @@
 package ai.mindconnect.agentrest.controller;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
@@ -54,8 +55,8 @@ class VectorStoreApiControllerOwnershipTest {
             new VectorStoreTemplate("default", "embeddings", null, Map.of());
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
-    private final InMemoryAgentDefinitionRepository definitions = new InMemoryAgentDefinitionRepository();
+    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
+    private final InMemoryAgentDefinitionRepository definitions = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
     private final VectorStoreService service = mock(VectorStoreService.class);
 
     private AgentSessionService sessionService;
@@ -66,8 +67,8 @@ class VectorStoreApiControllerOwnershipTest {
     @BeforeEach
     void setUp() {
         sessionService = new AgentSessionService(definitions, sessions,
-                new InMemoryMessageStore().conversationManager(), new InMemoryWorkingMemoryRepository(),
-                new InMemoryConversationSummaryRepository(), new InMemoryTodoListRepository(),
+                new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
+                new InMemoryConversationSummaryRepository(ScopeSupplier.local()), new InMemoryTodoListRepository(ScopeSupplier.local()),
                 new InMemoryToolApprovalRepository(), new UserChannels());
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         String alicesSession = sessionService.openChat(agent.id(), UserId.of("alice")).id().value();

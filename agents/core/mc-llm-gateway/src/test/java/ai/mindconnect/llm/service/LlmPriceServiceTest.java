@@ -1,5 +1,6 @@
 package ai.mindconnect.llm.service;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmPriceRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -21,8 +22,8 @@ class LlmPriceServiceTest {
 
     @BeforeEach
     void setUp() {
-        configs = new InMemoryLlmConfigRepository();
-        prices = new InMemoryLlmPriceRepository();
+        configs = new InMemoryLlmConfigRepository(ScopeSupplier.local());
+        prices = new InMemoryLlmPriceRepository(ScopeSupplier.local());
         service = new LlmPriceService(prices, configs);
         configs.save(LlmConfig.claude("claude", "claude-sonnet-5", "key"));
         configs.save(LlmConfig.alias("default", "claude"));

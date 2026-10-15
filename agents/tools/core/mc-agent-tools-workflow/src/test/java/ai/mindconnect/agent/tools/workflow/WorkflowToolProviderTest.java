@@ -71,7 +71,7 @@ class WorkflowToolProviderTest {
 
     @BeforeEach
     void setUp() {
-        repository = new FileWorkflowDataRepository(dir, "test");
+        repository = new FileWorkflowDataRepository(dir, () -> "test");
         repository.save("greeting", greeting());
         repository.save("halting", halting());
 

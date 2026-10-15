@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.message.domain.ConversationId;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class FileConversationSummaryRepositoryTest {
 
     @Test
     void summariesComeBackInSequenceOrderEachInItsOwnFile(@TempDir Path dir) {
-        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, new Namespace("test"));
+        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
         ConversationSummary later = ConversationSummary.create(conversation, 11, 20, 10, "later");
         ConversationSummary earlier = ConversationSummary.create(conversation, 1, 10, 10, "earlier");
@@ -41,7 +42,7 @@ class FileConversationSummaryRepositoryTest {
 
     @Test
     void concurrentSavesAllLand(@TempDir Path dir) throws Exception {
-        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, new Namespace("test"));
+        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
 
         try (ExecutorService pool = Executors.newVirtualThreadPerTaskExecutor()) {
@@ -60,7 +61,7 @@ class FileConversationSummaryRepositoryTest {
 
     @Test
     void deletingAConversationsSummariesLeavesOthersAlone(@TempDir Path dir) {
-        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, new Namespace("test"));
+        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId gone = ConversationId.random();
         ConversationId kept = ConversationId.random();
         repo.save(ConversationSummary.create(gone, 1, 5, 5, "gone"));
@@ -75,7 +76,7 @@ class FileConversationSummaryRepositoryTest {
 
     @Test
     void anUnreadableSummaryCountsAsNoneAndIsNotOverwritten(@TempDir Path dir) throws Exception {
-        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, new Namespace("test"));
+        FileConversationSummaryRepository repo = new FileConversationSummaryRepository(dir, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
         ConversationSummary summary = ConversationSummary.create(conversation, 1, 5, 5, "gist");
         repo.save(summary);

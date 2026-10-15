@@ -31,7 +31,7 @@ import java.util.function.Supplier;
  * its entry points covered runs {@linkplain #strict() strict}.
  *
  * <p>Whoever has to know when work enters a namespace — to prepare it once,
- * the first time it is used after start (see {@link NamespaceFirstUse}) —
+ * the first time it is used after start (see {@code NamespaceFirstUse}) —
  * registers with {@link #onBind}. Every entry point binds through here, so
  * that one hook sees requests, queued tasks and start-up routines alike.
  */

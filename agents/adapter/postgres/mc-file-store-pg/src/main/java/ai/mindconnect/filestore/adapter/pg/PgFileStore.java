@@ -1,7 +1,7 @@
 package ai.mindconnect.filestore.adapter.pg;
 
 import ai.mindconnect.agent.EntityId;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
@@ -25,8 +25,8 @@ import java.util.Optional;
  * by {@code (namespace, id)} — the {@link StoredFile} metadata as columns, the
  * content as {@code bytea}. Ids are generated exactly as the filesystem
  * adapter generates them, so a file id looks the same whichever backend
- * produced it. The store is bound to one namespace and every statement
- * matches it.
+ * produced it. Every statement matches the namespace the scope names for the
+ * current call.
  *
  * <p>Content goes in and out whole. Uploads are documents, not videos; a
  * store that has to stream gigabytes wants an object store, not a table.
@@ -54,15 +54,15 @@ public final class PgFileStore implements FileStore {
     private static final String SELECT = "SELECT id, name, content_type, size, created_at, creator FROM mc_file";
 
     private final Sql sql;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
 
-    public PgFileStore(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgFileStore(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope);
     }
 
-    public PgFileStore(Sql sql, Namespace namespace) {
+    public PgFileStore(Sql sql, ScopeSupplier scope) {
         this.sql = sql;
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+        this.scope = Objects.requireNonNull(scope, "scope");
     }
 
     /** Runs the idempotent DDL ({@code CREATE TABLE IF NOT EXISTS …}, {@code ADD COLUMN IF NOT EXISTS …}). */
@@ -83,7 +83,7 @@ public final class PgFileStore implements FileStore {
         StoredFile file = new StoredFile(id, safeName, contentType, bytes.length, createdAt, creator);
         sql.update("INSERT INTO mc_file (namespace, id, name, content_type, size, created_at, content, creator) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                namespace.value(), id.value(), file.name(), file.contentType(), file.size(), file.createdAt(), bytes,
+                scope.namespace().value(), id.value(), file.name(), file.contentType(), file.size(), file.createdAt(), bytes,
                 creator == null ? null : creator.value());
         return file;
     }
@@ -91,13 +91,13 @@ public final class PgFileStore implements FileStore {
     @Override
     public Optional<StoredFile> find(FileId id) {
         return sql.queryOne(SELECT + " WHERE namespace = ? AND id = ?",
-                PgFileStore::storedFile, namespace.value(), id.value());
+                PgFileStore::storedFile, scope.namespace().value(), id.value());
     }
 
     @Override
     public InputStream content(FileId id) throws IOException {
         return sql.queryOne("SELECT content FROM mc_file WHERE namespace = ? AND id = ?",
-                        row -> row.bytes("content"), namespace.value(), id.value())
+                        row -> row.bytes("content"), scope.namespace().value(), id.value())
                 .map(bytes -> (InputStream) new ByteArrayInputStream(bytes))
                 .orElseThrow(() -> new IOException("No stored file with id '" + id + "'"));
     }
@@ -106,12 +106,12 @@ public final class PgFileStore implements FileStore {
     @Override
     public List<StoredFile> list() {
         return sql.query(SELECT + " WHERE namespace = ? ORDER BY created_at DESC, id",
-                PgFileStore::storedFile, namespace.value());
+                PgFileStore::storedFile, scope.namespace().value());
     }
 
     @Override
     public void delete(FileId id) {
-        sql.update("DELETE FROM mc_file WHERE namespace = ? AND id = ?", namespace.value(), id.value());
+        sql.update("DELETE FROM mc_file WHERE namespace = ? AND id = ?", scope.namespace().value(), id.value());
     }
 
     private static StoredFile storedFile(Row row) throws SQLException {

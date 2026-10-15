@@ -9,7 +9,7 @@ import java.util.Optional;
  * Where the answers of {@code tools/list} are remembered, one per server —
  * the storage half of {@link McpDiscoveryCache}, which decides when to ask a
  * server and when to answer from here. Like {@link McpServerRepository} an
- * implementation detail of the local gateway, and bound to one namespace.
+ * implementation detail of the local gateway, working in the namespace of the call.
  *
  * <p>A cache, not a record: losing an entry costs a server start, nothing
  * more. So a store that cannot read or write an entry says so in the log and

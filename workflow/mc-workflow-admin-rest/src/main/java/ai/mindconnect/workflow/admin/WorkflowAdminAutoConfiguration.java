@@ -46,7 +46,7 @@ public class WorkflowAdminAutoConfiguration {
     public WorkflowDataRepository workflowDataRepository(
             @Value("${mindconnect.data.base-dir:data}") String dir,
             @Value("${mindconnect.namespace:local}") String partition) {
-        return new FileWorkflowDataRepository(Path.of(dir), partition);
+        return new FileWorkflowDataRepository(Path.of(dir), () -> partition);
     }
 
     /**
@@ -61,6 +61,6 @@ public class WorkflowAdminAutoConfiguration {
     public WorkflowInstanceRepository workflowInstanceRepository(
             @Value("${mindconnect.data.base-dir:data}") String dir,
             @Value("${mindconnect.namespace:local}") String partition) {
-        return new FileWorkflowInstanceRepository(Path.of(dir), partition);
+        return new FileWorkflowInstanceRepository(Path.of(dir), () -> partition);
     }
 }

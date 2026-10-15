@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.filerepo.FileRepo;
@@ -30,14 +30,14 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
 
     private final RecordLog<ConversationId, ConversationSummary> summaries;
 
-    public FileConversationSummaryRepository(Path baseDir, Namespace namespace) {
+    public FileConversationSummaryRepository(Path baseDir, ScopeSupplier scope) {
         ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
         this.summaries = RecordLog.of(ConversationSummary.class)
                 .dir((ConversationId conversation) -> "conversations/" + conversation.value() + "/summaries")
                 .key(ConversationSummary::fromSequenceNum)
                 .id(s -> s.id().value())
                 .prettyPrint()
-                .build(FileRepo.open(baseDir, namespace.value()), mapper);
+                .build(() -> FileRepo.open(baseDir, scope.namespace().value()), mapper);
     }
 
     @Override

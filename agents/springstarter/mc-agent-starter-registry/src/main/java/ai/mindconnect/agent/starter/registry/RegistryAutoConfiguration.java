@@ -1,7 +1,6 @@
 package ai.mindconnect.agent.starter.registry;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.StartupScope;
 import ai.mindconnect.agent.ThreadBoundScope;
@@ -21,6 +20,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -34,6 +34,7 @@ import org.springframework.context.annotation.Configuration;
 
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.function.Consumer;
 
 /**
  * Wires the registry into a host application: the store of configured
@@ -83,9 +84,9 @@ public class RegistryAutoConfiguration {
             @Value("${mindconnect.registry.default-source:}") String defaultSource,
             ObjectProvider<ScopeSupplier> scope,
             @Value("${mindconnect.namespace:local}") String defaultNamespace) {
-        // Bound once at start-up until registry sources are routed per namespace like the stores.
+        // Fixed to the namespace start-up seeds into, until registry sources work per namespace like the stores.
         FileRegistrySourceRepository repository = new FileRegistrySourceRepository(
-                Path.of(dataBaseDir), seedNamespace(scope, defaultNamespace));
+                Path.of(dataBaseDir), ScopeSupplier.fixed(seedNamespace(scope, defaultNamespace)));
         InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
         seed(repository, defaultSource);
         return repository;
@@ -97,10 +98,9 @@ public class RegistryAutoConfiguration {
 
         /**
          * One row per registry in {@code mc_registry_source}, on the
-         * persistence starter's {@code Sql}, routed per namespace like the
-         * stores. The first call for a namespace creates the table, imports
-         * the files that namespace kept under
-         * {@code <mindconnect.data.base-dir>/<namespace>/system/registries/}
+         * persistence starter's {@code Sql}, in the namespace the scope names
+         * per call like the stores. A namespace's first use imports the files
+         * it kept under {@code <mindconnect.data.base-dir>/<namespace>/system/registries/}
          * when it has no row yet — read directly, the file store is never
          * opened — and then seeds what the file store seeds on every start.
          */
@@ -113,15 +113,20 @@ public class RegistryAutoConfiguration {
                 ObjectProvider<ScopeSupplier> scope,
                 @Value("${mindconnect.namespace:local}") String defaultNamespace) {
             Path storage = Path.of(dataBaseDir);
-            return NamespaceRouted.route(RegistrySourceRepository.class,
-                    scope.getIfAvailable(() -> ScopeSupplier.fixed(new Namespace(defaultNamespace))),
-                    ns -> {
-                        var repository = new PgRegistrySourceRepository(mindconnectSql, ns).initSchema();
-                        repository.importFiles(FileRegistrySourceRepository.directory(storage, ns));
-                        InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
-                        seed(repository, defaultSource);
-                        return repository;
-                    });
+            ScopeSupplier current = scope.getIfAvailable(() -> ScopeSupplier.fixed(new Namespace(defaultNamespace)));
+            Consumer<Namespace> prepare = ns -> {
+                var repository = new PgRegistrySourceRepository(mindconnectSql, ScopeSupplier.fixed(ns));
+                repository.importFiles(FileRegistrySourceRepository.directory(storage, ns));
+                InitialRegistrySources.install(repository, InitialRegistrySources.LOCATION);
+                seed(repository, defaultSource);
+            };
+            PgRegistrySourceRepository repository = new PgRegistrySourceRepository(mindconnectSql, current).initSchema();
+            if (current instanceof ThreadBoundScope bound) {
+                bound.onBind(new NamespaceFirstUse("Registry sources", prepare));
+            } else {
+                prepare.accept(current.namespace());
+            }
+            return repository;
         }
     }
 
@@ -183,7 +188,7 @@ public class RegistryAutoConfiguration {
      * and every entry then reports why it cannot be.
      *
      * <p>Built in the start-up scope: the service counts the sources as it
-     * starts, and a store routed per namespace needs a namespace to count in.
+     * starts, and a store that works per namespace needs a namespace to count in.
      */
     @Bean
     @ConditionalOnMissingBean

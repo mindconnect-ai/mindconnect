@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.tool.ToolRepository;
 import ai.mindconnect.agent.tool.ToolSettings;
 import ai.mindconnect.common.util.AtomicFiles;
@@ -8,6 +8,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -16,14 +18,13 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.logging.Logger;
 
 /**
  * Tool settings as one JSON document:
  * {@code <storage>/<namespace>/system/tool-settings.json}.
  *
- * <p>Bound to one namespace at construction, like every other store: one
- * process serves one namespace, so nothing above this class names it.
+ * <p>The file of the namespace the scope names for the current call, like
+ * every other store, so nothing above this class names the namespace.
  *
  * <p>One file rather than one per tool, because these are small and are read
  * together: every lookup wants the whole overlay, never a single entry. An
@@ -33,16 +34,17 @@ import java.util.logging.Logger;
  */
 public final class FileToolRepository implements ToolRepository {
 
-    private static final Logger log = Logger.getLogger(FileToolRepository.class.getName());
+    private static final Logger log = LoggerFactory.getLogger(FileToolRepository.class);
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
 
-    private final Path file;
+    private final Path storageDir;
+    private final ScopeSupplier scope;
 
-    public FileToolRepository(Path storageDir, Namespace namespace) {
-        this.file = storageDir.resolve(namespace.value()).resolve("system")
-                .resolve("tool-settings.json").toAbsolutePath();
+    public FileToolRepository(Path storageDir, ScopeSupplier scope) {
+        this.storageDir = storageDir.toAbsolutePath();
+        this.scope = scope;
     }
 
     @Override
@@ -52,6 +54,7 @@ public final class FileToolRepository implements ToolRepository {
 
     @Override
     public Map<String, ToolSettings> all() {
+        Path file = file();
         if (!Files.isRegularFile(file)) {
             return Map.of();
         }
@@ -67,7 +70,7 @@ public final class FileToolRepository implements ToolRepository {
         } catch (IOException | RuntimeException e) {
             // Unreadable settings must not take the tools with them: the
             // shipped state is a usable fallback, an empty catalog is not.
-            log.warning("tool settings " + file + " unusable, falling back to defaults: " + e);
+            log.warn("tool settings {} unusable, falling back to defaults: {}", file, e.toString());
             return Map.of();
         }
     }
@@ -95,6 +98,7 @@ public final class FileToolRepository implements ToolRepository {
      */
     @Override
     public long version() {
+        Path file = file();
         try {
             return Files.isRegularFile(file) ? Files.getLastModifiedTime(file).toMillis() : 0L;
         } catch (IOException e) {
@@ -103,6 +107,7 @@ public final class FileToolRepository implements ToolRepository {
     }
 
     private void write(Map<String, ToolSettings> all) {
+        Path file = file();
         try {
             if (all.isEmpty()) {
                 Files.deleteIfExists(file);   // back to the shipped state
@@ -114,6 +119,11 @@ public final class FileToolRepository implements ToolRepository {
         } catch (IOException e) {
             throw new UncheckedIOException("cannot write tool settings " + file, e);
         }
+    }
+
+    /** The settings file of the namespace the current call works in. */
+    private Path file() {
+        return storageDir.resolve(scope.namespace().value()).resolve("system").resolve("tool-settings.json");
     }
 
     private static ObjectNode write(ToolSettings settings) {

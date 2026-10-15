@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -26,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 class DynamicToolActivationsTest {
 
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
+    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
     private final DynamicToolActivations activations = new DynamicToolActivations(sessions);
     private final AgentDefinition noTools = AgentDefinition.create("demo", "d", "You.", null, "llm");
 

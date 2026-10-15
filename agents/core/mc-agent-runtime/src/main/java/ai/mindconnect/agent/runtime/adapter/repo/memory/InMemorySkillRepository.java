@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
+import ai.mindconnect.agent.PerNamespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.skill.Skill;
 import ai.mindconnect.agent.runtime.skill.SkillId;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
@@ -18,16 +20,20 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class InMemorySkillRepository implements SkillRepository {
 
-    private final Map<SkillId, Skill> skills = new ConcurrentHashMap<>();
+    private final PerNamespace<Map<SkillId, Skill>> skills;
+
+    public InMemorySkillRepository(ScopeSupplier scope) {
+        this.skills = new PerNamespace<>(scope, ConcurrentHashMap::new);
+    }
 
     @Override
     public List<Skill> findAll() {
-        return skills.values().stream().sorted(Comparator.comparing(Skill::name)).toList();
+        return skills.current().values().stream().sorted(Comparator.comparing(Skill::name)).toList();
     }
 
     @Override
     public Optional<Skill> findById(SkillId id) {
-        return Optional.ofNullable(skills.get(id));
+        return Optional.ofNullable(skills.current().get(id));
     }
 
     @Override
@@ -41,12 +47,12 @@ public class InMemorySkillRepository implements SkillRepository {
     @Override
     public Skill save(Skill skill) {
         Skill valid = skill.validated();
-        return skills.compute(valid.id(), (id, current) -> valid.withVersion(Versions.next(
+        return skills.current().compute(valid.id(), (id, current) -> valid.withVersion(Versions.next(
                 current == null ? null : current.version(), valid.version(), "Skill", id.value())));
     }
 
     @Override
     public void deleteById(SkillId id) {
-        skills.remove(id);
+        skills.current().remove(id);
     }
 }

@@ -5,14 +5,15 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowRepositoryFactory;
 
 import java.nio.file.Path;
+import java.util.function.Supplier;
 
-/** Workflows as JSON files under {@code <baseDir>/<partition>/workflows}. */
+/** Workflows as JSON files under {@code <baseDir>/<partition>/workflows}, the partition asked on every call. */
 public class FileWorkflowRepositoryFactory implements WorkflowRepositoryFactory {
 
     private final Path baseDir;
-    private final String partition;
+    private final Supplier<String> partition;
 
-    public FileWorkflowRepositoryFactory(Path baseDir, String partition) {
+    public FileWorkflowRepositoryFactory(Path baseDir, Supplier<String> partition) {
         this.baseDir = baseDir;
         this.partition = partition;
     }

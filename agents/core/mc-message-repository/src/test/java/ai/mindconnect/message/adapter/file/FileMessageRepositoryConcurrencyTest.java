@@ -1,6 +1,7 @@
 package ai.mindconnect.message.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
@@ -33,7 +34,7 @@ class FileMessageRepositoryConcurrencyTest {
 
     @Test
     void historyReadsWhileUpdatingNeverSeeAHalfWrittenMessage(@TempDir Path dir) throws Exception {
-        FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, new Namespace("test"));
+        FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
         Message message = repo.append(conversation, seq -> Message.of(conversation, "agent", ParticipantType.AGENT,
                 MessageType.TOOL_RESULT, "x".repeat(20_000), seq));
@@ -72,7 +73,7 @@ class FileMessageRepositoryConcurrencyTest {
 
     @Test
     void aTokenCountAndADurationSetAtTheSameTimeBothLand(@TempDir Path dir) throws Exception {
-        FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, new Namespace("test"));
+        FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
         Message message = repo.append(conversation, seq -> Message.of(conversation, "agent", ParticipantType.AGENT,
                 MessageType.TOOL_RESULT, "result", seq));
@@ -101,7 +102,7 @@ class FileMessageRepositoryConcurrencyTest {
 
     @Test
     void theNewestMessagesDeletedDoNotHandTheirNumbersOutAgain(@TempDir Path dir) {
-        FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, new Namespace("test"));
+        FileMessageRepository repo = new FileMessageRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test")));
         ConversationId conversation = ConversationId.random();
         for (int i = 0; i < 5; i++) {
             repo.append(conversation, seq -> Message.of(conversation, "user", ParticipantType.USER,

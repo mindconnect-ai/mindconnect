@@ -88,7 +88,7 @@ tables, typed rows, transactions — no ORM). See [Persistence](./persistence.md
 | `mc-agent-starter-postgres` | `mindconnect.persistence=postgres`: every port from one pooled `DataSource`, tables created on start. |
 | `mc-agent-starter-registry` | The registry for a server: the store of configured registries (file or Postgres, seeded from `initial-data/registries/` and `mindconnect.registry.default-source`), the GitHub client, the installers and the `RegistryService`. |
 | `mc-agent-starter-extension` | The extensions of an installation: the manifests on the classpath, the start-up audit, a namespace's and a brand's decisions (file or Postgres), the `ExtensionService`. |
-| `mc-agent-starter-workflow` | Workflows for a server: the workflow stores routed per namespace (file or Postgres), the admin's runs in the request's namespace and for its user, the agent-call and tool-call steps wired to the runtime. |
+| `mc-agent-starter-workflow` | Workflows for a server: the workflow stores in the namespace of the call (file or Postgres), the admin's runs in the request's namespace and for its user, the agent-call and tool-call steps wired to the runtime. |
 
 An app has both on the classpath; the property picks. The runtime's own
 Spring wiring (`DefaultAgentRuntimeConfig`) still lives in `mc-agent-runtime`

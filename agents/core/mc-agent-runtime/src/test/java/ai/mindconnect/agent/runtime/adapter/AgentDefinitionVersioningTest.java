@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.file.FileAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
@@ -35,12 +36,12 @@ class AgentDefinitionVersioningTest {
 
     @Test
     void theFileStoreChecksVersions(@TempDir Path dir) throws Exception {
-        versionsAreChecked(new FileAgentDefinitionRepository(dir, MAPPER, new Namespace("test")));
+        versionsAreChecked(new FileAgentDefinitionRepository(dir, MAPPER, ScopeSupplier.fixed(new Namespace("test"))));
     }
 
     @Test
     void theInMemoryStoreChecksVersions() throws Exception {
-        versionsAreChecked(new InMemoryAgentDefinitionRepository());
+        versionsAreChecked(new InMemoryAgentDefinitionRepository(ScopeSupplier.local()));
     }
 
     static void versionsAreChecked(AgentDefinitionRepository repo) throws Exception {

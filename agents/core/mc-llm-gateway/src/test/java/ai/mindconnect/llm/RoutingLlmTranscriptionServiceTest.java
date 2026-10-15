@@ -1,5 +1,6 @@
 package ai.mindconnect.llm;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.DomainException;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -33,7 +34,7 @@ class RoutingLlmTranscriptionServiceTest {
 
     @BeforeEach
     void setUp() {
-        repository = new InMemoryLlmConfigRepository();
+        repository = new InMemoryLlmConfigRepository(ScopeSupplier.local());
         repository.save(LlmConfig.speechToText("whisper", LlmProvider.OPENAI, "whisper-1",
                 "https://api.openai.com", "key"));
 

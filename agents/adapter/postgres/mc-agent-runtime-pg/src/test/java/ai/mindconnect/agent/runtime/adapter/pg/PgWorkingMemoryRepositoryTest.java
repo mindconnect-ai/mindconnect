@@ -5,6 +5,7 @@ import ai.mindconnect.agent.AuthenticationInfo;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,7 @@ class PgWorkingMemoryRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        repo = new PgWorkingMemoryRepository(TestDb.fresh("mc_working_memory"), NS).initSchema();
+        repo = new PgWorkingMemoryRepository(TestDb.fresh("mc_working_memory"), ScopeSupplier.fixed(NS)).initSchema();
     }
 
     private static WorkingMemory memory(String prompt) {

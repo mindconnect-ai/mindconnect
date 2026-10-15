@@ -2,13 +2,12 @@ package ai.mindconnect.namespace.service;
 
 import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespacePurge;
-import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.namespace.domain.Actor;
 import ai.mindconnect.namespace.domain.NamespaceDefinition;
 import ai.mindconnect.namespace.domain.NamespaceRole;
+import ai.mindconnect.namespace.port.out.NamespacePurge;
 import ai.mindconnect.namespace.port.out.NamespaceRepository;
 import ai.mindconnect.namespace.port.out.UserEmails;
 
@@ -423,14 +422,10 @@ public class NamespaceService {
                 try {
                     purge.purge(id);
                 } catch (RuntimeException e) {
-                    // A purge may have closed what the routed adapters hold; the retry and the
-                    // namespace, still there, get fresh ones.
-                    NamespaceRouted.evictEverywhere(id);
                     throw new IllegalStateException("Could not remove the data of '" + id + "': " + e.getMessage(), e);
                 }
             }
             namespaces.deleteById(id);
-            NamespaceRouted.evictEverywhere(id);
         }
     }
 

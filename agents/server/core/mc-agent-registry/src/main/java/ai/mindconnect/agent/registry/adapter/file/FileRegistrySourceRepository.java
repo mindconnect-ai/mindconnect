@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.registry.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.registry.domain.RegistrySource;
 import ai.mindconnect.agent.registry.domain.RegistrySourceId;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
@@ -28,21 +29,22 @@ public class FileRegistrySourceRepository implements RegistrySourceRepository {
     private static final String DIR = "system/registries";
 
     private final Documents<RegistrySourceId, RegistrySource> sources;
-    private final Path directory;
+    private final Path storageDir;
+    private final ScopeSupplier scope;
 
-    public FileRegistrySourceRepository(Path storageDir, Namespace namespace) {
+    public FileRegistrySourceRepository(Path storageDir, ScopeSupplier scope) {
         ObjectMapper objectMapper = new ObjectMapper()
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        FileRepo repo = FileRepo.open(storageDir, namespace.value());
-        this.directory = repo.resolve(DIR);
+        this.storageDir = storageDir;
+        this.scope = scope;
         this.sources = Documents.of(RegistrySource.class)
                 .path((RegistrySourceId id) -> DIR + "/" + id.value() + ".json")
-                .build(repo, objectMapper);
+                .build(() -> FileRepo.open(storageDir, scope.namespace().value()), objectMapper);
     }
 
-    /** Where the files are — what an initial-data installer seeds into. */
+    /** Where the files of the namespace the current call works in are — what an initial-data installer seeds into. */
     public Path directory() {
-        return directory;
+        return FileRepo.open(storageDir, scope.namespace().value()).resolve(DIR);
     }
 
     /**

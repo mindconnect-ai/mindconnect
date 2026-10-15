@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.common.StaleVersionException;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,7 +24,7 @@ class PgAgentDefinitionVersioningTest {
 
     @BeforeEach
     void setUp() {
-        repo = new PgAgentDefinitionRepository(TestDb.fresh("mc_agent_definition"), new Namespace("test")).initSchema();
+        repo = new PgAgentDefinitionRepository(TestDb.fresh("mc_agent_definition"), ScopeSupplier.fixed(new Namespace("test"))).initSchema();
     }
 
     @Test

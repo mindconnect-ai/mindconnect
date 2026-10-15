@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.LongFunction;
+import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 import java.util.function.UnaryOperator;
 
@@ -60,7 +61,7 @@ import java.util.function.UnaryOperator;
  */
 public class RecordLog<P, R> {
 
-    private final FileRepo repo;
+    private final Supplier<FileRepo> repo;
     private final Function<P, String> dir;
     private final ToLongFunction<R> key;
     private final Function<R, String> id;
@@ -69,7 +70,7 @@ public class RecordLog<P, R> {
     private final ObjectWriter writer;
     private final Duration lockTimeout;
 
-    private RecordLog(Builder<P, R> b, FileRepo repo, ObjectMapper mapper) {
+    private RecordLog(Builder<P, R> b, Supplier<FileRepo> repo, ObjectMapper mapper) {
         this.repo = repo;
         this.dir = b.dir;
         this.key = b.key;
@@ -87,7 +88,7 @@ public class RecordLog<P, R> {
 
     /** The directory holding the records of {@code parent}. */
     public Path dirOf(P parent) {
-        return repo.resolve(dir.apply(parent));
+        return repo.get().resolve(dir.apply(parent));
     }
 
     // ── reading ─────────────────────────────────────────────────────────────
@@ -225,7 +226,7 @@ public class RecordLog<P, R> {
      * refused; then the directory is listed for this one read.
      */
     private LogState state(Path d) {
-        LogState state = repo.logState(d);
+        LogState state = repo.get().logState(d);
         if (state != null) {
             return state;
         }
@@ -241,10 +242,10 @@ public class RecordLog<P, R> {
 
     /** The index, loading and publishing it if needed. The caller holds the directory's lock. */
     private LogState loaded(Path d) throws IOException {
-        LogState state = repo.logState(d);
+        LogState state = repo.get().logState(d);
         if (state == null) {
             state = LogState.load(d);
-            repo.putLogState(d, state);
+            repo.get().putLogState(d, state);
         }
         return state;
     }
@@ -258,7 +259,7 @@ public class RecordLog<P, R> {
         if (previous != null && !previous.fileName().equals(name)) {
             Files.deleteIfExists(d.resolve(previous.fileName()));
         }
-        repo.putLogState(d, state.with(new LogState.Entry(k, recordId, name)));
+        repo.get().putLogState(d, state.with(new LogState.Entry(k, recordId, name)));
     }
 
     private int remove(Path d, LogState state, List<LogState.Entry> gone) throws IOException {
@@ -272,7 +273,7 @@ public class RecordLog<P, R> {
         for (LogState.Entry e : gone) {
             Files.deleteIfExists(d.resolve(e.fileName()));
         }
-        repo.putLogState(d, state.without(gone));
+        repo.get().putLogState(d, state.without(gone));
         return gone.size();
     }
 
@@ -381,6 +382,16 @@ public class RecordLog<P, R> {
         }
 
         public RecordLog<P, R> build(FileRepo repo, ObjectMapper mapper) {
+            Objects.requireNonNull(repo, "repo");
+            return build(() -> repo, mapper);
+        }
+
+        /**
+         * For one instance that serves several partitions: {@code repo} names the
+         * partition of the current call. It is asked on every operation and must
+         * answer the same throughout one — a partition bound to the calling thread does.
+         */
+        public RecordLog<P, R> build(Supplier<FileRepo> repo, ObjectMapper mapper) {
             if (dir == null) throw new IllegalStateException("dir() is required");
             if (key == null) throw new IllegalStateException("key() is required");
             if (id == null) throw new IllegalStateException("id() is required");

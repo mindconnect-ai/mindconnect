@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
 import ai.mindconnect.agent.runtime.domain.TraceContext;
@@ -30,7 +31,7 @@ class PgLlmCallTraceRepositoryTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.fresh("mc_llm_call_trace");
-        repo = new PgLlmCallTraceRepository(sql, NS).initSchema();
+        repo = new PgLlmCallTraceRepository(sql, ScopeSupplier.fixed(NS)).initSchema();
     }
 
     private LlmCallTrace trace(ChatTurnId turn, ChatTurnId parentTurn, long atMillis) {
@@ -85,7 +86,7 @@ class PgLlmCallTraceRepositoryTest {
 
     @Test
     void aConversationKeepsOnlyItsNewestTraces() {
-        PgLlmCallTraceRepository small = new PgLlmCallTraceRepository(sql, 3, NS);
+        PgLlmCallTraceRepository small = new PgLlmCallTraceRepository(sql, 3, ScopeSupplier.fixed(NS));
         ChatTurnId turn = ChatTurnId.random();
         IntStream.rangeClosed(1, 5).forEach(i -> small.save(trace(turn, null, i * 1_000L)));
 

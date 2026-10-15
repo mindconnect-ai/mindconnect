@@ -51,7 +51,7 @@ public class WorkflowPostgresAutoConfiguration {
     }
 
     /**
-     * Backs off when the host brings its own — the agents area hands out stores routed per namespace.
+     * Backs off when the host brings its own — the agents area hands out stores that work in the namespace of the call.
      * What the file store kept under {@code mindconnect.data.base-dir} is imported once.
      */
     @Bean
@@ -59,7 +59,7 @@ public class WorkflowPostgresAutoConfiguration {
     WorkflowDataRepository workflowDataRepository(DataSource dataSource,
                                                   @Value("${mindconnect.namespace:local}") String partition,
                                                   @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), partition, Path.of(baseDir)).workflowDataRepository();
+        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), () -> partition, Path.of(baseDir)).workflowDataRepository();
     }
 
     @Bean
@@ -67,6 +67,6 @@ public class WorkflowPostgresAutoConfiguration {
     WorkflowInstanceRepository workflowInstanceRepository(DataSource dataSource,
                                                           @Value("${mindconnect.namespace:local}") String partition,
                                                           @Value("${mindconnect.data.base-dir:data}") String baseDir) {
-        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), partition, Path.of(baseDir)).workflowInstanceRepository();
+        return new PgWorkflowRepositoryFactory(Sql.of(dataSource), () -> partition, Path.of(baseDir)).workflowInstanceRepository();
     }
 }

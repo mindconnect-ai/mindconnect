@@ -12,9 +12,8 @@ import java.util.Optional;
  * only what should differ from the manifests' defaults. An empty repository
  * is the shipped state.
  *
- * <p>Like every store, an implementation is bound to the one namespace it
- * serves; above it a routing proxy picks the adapter for the namespace the
- * request works in.
+ * <p>Like every store, an implementation works in the namespace the scope
+ * names for the current call — the namespace the request works in.
  */
 public interface ExtensionActivationRepository {
 

@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.domain;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
@@ -72,7 +73,7 @@ class AgentSessionTypeTest {
 
     @Test
     void theChatsListLeavesOtherTypesOut() {
-        InMemoryAgentSessionRepository repo = new InMemoryAgentSessionRepository();
+        InMemoryAgentSessionRepository repo = new InMemoryAgentSessionRepository(ScopeSupplier.local());
         AgentSession chat = repo.create(new AgentSession(SessionId.random(), AgentId.random(), ME,
                 ConversationId.random(), null, SessionStatus.ACTIVE, Instant.parse("2026-09-01T00:00:00Z"),
                 null, null, null, null));

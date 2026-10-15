@@ -1,6 +1,6 @@
 package ai.mindconnect.mcp.gateway.adapter.pg;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.mcp.gateway.McpServerId;
@@ -27,8 +27,8 @@ import java.util.Optional;
  * registration's target is a sealed type the application's mapper does not
  * know, and one shape for both stores keeps an import a copy.
  *
- * <p>The repository is bound to one namespace: every row it writes carries
- * it, and every statement it runs matches it.
+ * <p>Every row it writes carries the namespace the scope names for the
+ * current call, and every statement it runs matches it.
  *
  * <p>{@link #importOnce} brings over the registration files a namespace had
  * before it moved to Postgres — once, remembered in {@code mc_mcp_server_import},
@@ -42,24 +42,24 @@ public final class PgMcpServerRepository implements McpServerRepository {
     private static final String IMPORT_TABLE = "mc_mcp_server_import";
 
     private final Sql sql;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
     private final DocumentTable<ObjectNode> servers;
 
-    public PgMcpServerRepository(DataSource dataSource, Namespace namespace) {
-        this(Sql.of(dataSource), namespace);
+    public PgMcpServerRepository(DataSource dataSource, ScopeSupplier scope) {
+        this(Sql.of(dataSource), scope);
     }
 
     /** Share a {@link Sql} — and with it the application's JSON mapper — with the other stores. */
-    public PgMcpServerRepository(Sql sql, Namespace namespace) {
+    public PgMcpServerRepository(Sql sql, ScopeSupplier scope) {
         this.sql = Objects.requireNonNull(sql, "sql");
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
-        this.servers = table(sql, namespace);
+        this.scope = Objects.requireNonNull(scope, "scope");
+        this.servers = table(sql, scope);
     }
 
-    private static DocumentTable<ObjectNode> table(Sql sql, Namespace namespace) {
+    private static DocumentTable<ObjectNode> table(Sql sql, ScopeSupplier scope) {
         return DocumentTable.of(ObjectNode.class)
                 .table("mc_mcp_server")
-                .partitionKey("namespace", "TEXT", d -> namespace.value())
+                .partitionKey("namespace", "TEXT", d -> scope.namespace().value())
                 .id("id", "TEXT", d -> d.get("id").asText())
                 .requiredColumn("display_name", "TEXT", d -> d.get("displayName").asText())
                 .build(sql);
@@ -78,31 +78,31 @@ public final class PgMcpServerRepository implements McpServerRepository {
 
     @Override
     public Optional<McpServerRegistration> findById(McpServerId id) {
-        return servers.findById(namespace.value(), id.value()).flatMap(this::read);
+        return servers.findById(scope.namespace().value(), id.value()).flatMap(this::read);
     }
 
     @Override
     public List<McpServerRegistration> findAll() {
-        return read(servers.find("WHERE namespace = ? ORDER BY id", namespace.value()));
+        return read(servers.find("WHERE namespace = ? ORDER BY id", scope.namespace().value()));
     }
 
     @Override
     public Optional<McpServerRegistration> findByName(String name) {
         if (name == null) return Optional.empty();
         return read(servers.find("WHERE namespace = ? AND lower(display_name) = lower(?) ORDER BY id",
-                namespace.value(), name)).stream().findFirst();
+                scope.namespace().value(), name)).stream().findFirst();
     }
 
     @Override
     public void save(McpServerRegistration registration) {
         servers.save(McpRegistrationJson.write(registration, JsonNodeFactory.instance));
-        log.info("MCP registration '{}' saved in namespace '{}'", registration.id(), namespace.value());
+        log.info("MCP registration '{}' saved in namespace '{}'", registration.id(), scope.namespace().value());
     }
 
     @Override
     public void deleteById(McpServerId id) {
-        if (servers.deleteById(namespace.value(), id.value())) {
-            log.info("MCP registration '{}' deleted from namespace '{}'", id, namespace.value());
+        if (servers.deleteById(scope.namespace().value(), id.value())) {
+            log.info("MCP registration '{}' deleted from namespace '{}'", id, scope.namespace().value());
         }
     }
 
@@ -121,7 +121,7 @@ public final class PgMcpServerRepository implements McpServerRepository {
                     long micros = latest == null ? 0L : latest.getEpochSecond() * 1_000_000L + latest.getNano() / 1_000;
                     return 31 * micros + row.longValue("n");
                 },
-                namespace.value()).orElse(0L);
+                scope.namespace().value()).orElse(0L);
     }
 
     /**
@@ -138,14 +138,14 @@ public final class PgMcpServerRepository implements McpServerRepository {
     public int importOnce(McpServerRepository files) {
         return sql.inTransaction(tx -> {
             int claimed = tx.update("INSERT INTO " + IMPORT_TABLE + " (namespace) VALUES (?) ON CONFLICT DO NOTHING",
-                    namespace.value());
+                    scope.namespace().value());
             if (claimed == 0) {
                 return 0;
             }
-            DocumentTable<ObjectNode> rows = table(tx, namespace);
-            if (rows.exists("WHERE namespace = ?", namespace.value())) {
+            DocumentTable<ObjectNode> rows = table(tx, scope);
+            if (rows.exists("WHERE namespace = ?", scope.namespace().value())) {
                 log.info("MCP registrations of namespace '{}' are in Postgres already — no files imported",
-                        namespace.value());
+                        scope.namespace().value());
                 return 0;
             }
             int imported = 0;
@@ -154,10 +154,10 @@ public final class PgMcpServerRepository implements McpServerRepository {
                     imported++;
                 }
             }
-            tx.update("UPDATE " + IMPORT_TABLE + " SET imported = ? WHERE namespace = ?", imported, namespace.value());
+            tx.update("UPDATE " + IMPORT_TABLE + " SET imported = ? WHERE namespace = ?", imported, scope.namespace().value());
             if (imported > 0) {
                 log.info("Imported {} MCP registration(s) of namespace '{}' from files into Postgres; "
-                        + "the files are kept but no longer read", imported, namespace.value());
+                        + "the files are kept but no longer read", imported, scope.namespace().value());
             }
             return imported;
         });
@@ -173,7 +173,7 @@ public final class PgMcpServerRepository implements McpServerRepository {
 
     /** A broken row is skipped with a warning, as a broken file is: one bad registration must not cost the others. */
     private Optional<McpServerRegistration> read(ObjectNode document) {
-        String source = servers.table() + " " + namespace.value() + "/" + document.path("id").asText("?");
+        String source = servers.table() + " " + scope.namespace().value() + "/" + document.path("id").asText("?");
         try {
             return Optional.of(McpRegistrationJson.read(document, source));
         } catch (RuntimeException e) {

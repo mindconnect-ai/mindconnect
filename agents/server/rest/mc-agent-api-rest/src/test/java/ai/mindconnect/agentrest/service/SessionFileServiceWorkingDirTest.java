@@ -2,6 +2,7 @@ package ai.mindconnect.agentrest.service;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -53,7 +54,7 @@ class SessionFileServiceWorkingDirTest {
 
     @BeforeEach
     void setUp() {
-        sessions = new InMemoryAgentSessionRepository();
+        sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
         home = UserHome.of(temp.resolve("home").resolve("{user}").toString());
         files = new StubFileStore();
         VectorStores stores = VectorStores.fromEnvironment(new ToolEnvironment() {

@@ -37,7 +37,7 @@ public class WorkflowStore {
     private static final String PARTITION = "default";
 
     private final Map<String, WorkflowData> workflows = new LinkedHashMap<>();
-    private final FileWorkflowDataRepository fileRepo = new FileWorkflowDataRepository(DATA_DIR, PARTITION);
+    private final FileWorkflowDataRepository fileRepo = new FileWorkflowDataRepository(DATA_DIR, () -> PARTITION);
 
     @PostConstruct
     void load() {

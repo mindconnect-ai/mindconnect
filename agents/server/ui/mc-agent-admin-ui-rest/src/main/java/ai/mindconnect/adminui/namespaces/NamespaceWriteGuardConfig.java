@@ -21,7 +21,7 @@ import org.springframework.context.annotation.Configuration;
  *
  * <p>It is a {@link BeanPostProcessor} because these stores are built
  * elsewhere — one auto-configuration per persistence backend, each already
- * routed per namespace — and the question is the installation's, not theirs.
+ * working per namespace — and the question is the installation's, not theirs.
  * Wrapping them here keeps that knowledge in one file instead of in five
  * modules that would all have to learn what a role is.
  *

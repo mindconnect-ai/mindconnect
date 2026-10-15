@@ -1,5 +1,6 @@
 package ai.mindconnect.filestore;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -17,8 +18,11 @@ public interface FileStoreBackend {
     /** Machine name ({@code "filesystem"}, {@code "s3"}, {@code "db"}). */
     String type();
 
-    /** Opens the store for this backend-specific config (dir, bucket, jdbc url, ...). */
-    FileStore open(Map<String, String> config);
+    /**
+     * Opens the store for this backend-specific config (dir, bucket, jdbc url, ...);
+     * it works in the namespace {@code scope} names for each call.
+     */
+    FileStore open(Map<String, String> config, ScopeSupplier scope);
 
     static List<FileStoreBackend> discover() {
         List<FileStoreBackend> backends = new ArrayList<>();

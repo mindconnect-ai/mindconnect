@@ -3,6 +3,7 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.adminui.service.MigrationService.FieldDiff;
 import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
@@ -46,9 +47,9 @@ class MigrationServiceFileRepoTest {
         ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule())
                 .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-        repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, json, new Namespace("test")), ENCRYPTION);
+        repo = new EncryptingLlmConfigRepository(new FileLlmConfigRepository(dir, json, ScopeSupplier.fixed(new Namespace("test"))), ENCRYPTION);
         service = new MigrationService(repo,
-                new InMemoryAgentDefinitionRepository(), new InMemorySkillRepository(), new InMemoryWorkflowDataRepository(),
+                new InMemoryAgentDefinitionRepository(ScopeSupplier.local()), new InMemorySkillRepository(ScopeSupplier.local()), new InMemoryWorkflowDataRepository(),
                 json, encryption);
     }
 

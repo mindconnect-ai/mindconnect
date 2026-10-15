@@ -68,9 +68,9 @@ wrapped in an `EncryptingLlmConfigRepository` when the app has an
 `EncryptionHelper`, and LLM call traces live under `conversations/` with a
 `mindconnect.agent.trace.max-per-session` retention cap (default 50).
 
-Every adapter — file or Postgres — is bound to one namespace when it is built;
-the starters hand out a routing proxy per port that keeps one adapter per
-namespace and forwards each call to the one the current `Scope` names. The
+Every adapter — file or Postgres — is built once and asks the current `Scope`
+on every call which namespace to work in: a file adapter resolves that
+namespace's directory, a Postgres adapter matches its `namespace` column. The
 scope is bound per request (from the `/ns/{namespace}/` prefix, the
 `X-Mindconnect-Namespace` header, or the namespace the user chose in the Admin
 UI) and per queued task; nothing above the repositories names a namespace.
@@ -86,7 +86,8 @@ single-node deployments.
 
 Besides the file adapters there is a full **in-memory** family
 (`InMemoryAgentSessionRepository`, `InMemoryMessageRepository`, …) used by the
-Spring-free `AgentRuntimeBuilder` and in tests. Two of them are bounded so that a
+Spring-free `AgentRuntimeBuilder` and in tests. Like the others they ask the
+scope on every call and keep a store per namespace. Two of them are bounded so that a
 long-lived embedded runtime does not grow with every turn: the trace store keeps
 at most 50 LLM call traces per conversation (the file store's cap), and the
 builder tells its task queue to forget finished task trees at the next

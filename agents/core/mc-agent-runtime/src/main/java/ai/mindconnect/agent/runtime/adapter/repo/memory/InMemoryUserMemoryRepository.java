@@ -1,6 +1,8 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.PerNamespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
 import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
@@ -15,33 +17,37 @@ public class InMemoryUserMemoryRepository implements UserMemoryRepository {
 
     private record Key(AgentId agentId, String name) { }
 
-    private final Map<UserId, Map<Key, MemoryEntry>> store = new ConcurrentHashMap<>();
+    private final PerNamespace<Map<UserId, Map<Key, MemoryEntry>>> store;
+
+    public InMemoryUserMemoryRepository(ScopeSupplier scope) {
+        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
+    }
 
     @Override
     public List<MemoryEntry> findByUser(UserId userId) {
-        return List.copyOf(store.getOrDefault(userId, Map.of()).values());
+        return List.copyOf(store.current().getOrDefault(userId, Map.of()).values());
     }
 
     @Override
     public List<MemoryEntry> findAll() {
-        return store.values().stream().flatMap(m -> m.values().stream()).toList();
+        return store.current().values().stream().flatMap(m -> m.values().stream()).toList();
     }
 
     @Override
     public Optional<MemoryEntry> find(UserId userId, AgentId agentId, String name) {
-        return Optional.ofNullable(store.getOrDefault(userId, Map.of()).get(new Key(agentId, name)));
+        return Optional.ofNullable(store.current().getOrDefault(userId, Map.of()).get(new Key(agentId, name)));
     }
 
     @Override
     public MemoryEntry save(MemoryEntry entry) {
-        store.computeIfAbsent(entry.userId(), u -> new ConcurrentHashMap<>())
+        store.current().computeIfAbsent(entry.userId(), u -> new ConcurrentHashMap<>())
                 .put(new Key(entry.agentId(), entry.name()), entry);
         return entry;
     }
 
     @Override
     public boolean delete(UserId userId, AgentId agentId, String name) {
-        Map<Key, MemoryEntry> entries = store.get(userId);
+        Map<Key, MemoryEntry> entries = store.current().get(userId);
         return entries != null && entries.remove(new Key(agentId, name)) != null;
     }
 }

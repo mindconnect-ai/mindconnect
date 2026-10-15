@@ -1,6 +1,7 @@
 package ai.mindconnect.message.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.common.PageRequest;
@@ -39,7 +40,7 @@ class FileMessageRepositoryTest {
 
     @BeforeEach
     void setUp() {
-        repo = new FileMessageRepository(dir, json, new Namespace("test"));
+        repo = new FileMessageRepository(dir, json, ScopeSupplier.fixed(new Namespace("test")));
     }
 
     @Test

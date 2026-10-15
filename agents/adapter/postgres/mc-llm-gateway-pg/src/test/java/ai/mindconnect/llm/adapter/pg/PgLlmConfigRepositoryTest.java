@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
@@ -33,12 +34,12 @@ class PgLlmConfigRepositoryTest {
     void setUp() {
         sql = Sql.of(requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_llm_config");
-        repo = new PgLlmConfigRepository(sql, NS).initSchema();
+        repo = new PgLlmConfigRepository(sql, ScopeSupplier.fixed(NS)).initSchema();
     }
 
     @Test
     void aRepositoryBoundToAnotherNamespaceSeesNothing() {
-        PgLlmConfigRepository other = new PgLlmConfigRepository(sql, new Namespace("other")).initSchema();
+        PgLlmConfigRepository other = new PgLlmConfigRepository(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
         LlmConfig config = LlmConfig.claude("claude", "claude-sonnet-5", "key");
         repo.save(config);
 
@@ -106,7 +107,7 @@ class PgLlmConfigRepositoryTest {
     @Test
     void initSchemaIsIdempotent() {
         repo.save(LlmConfig.alias("x", "y"));
-        new PgLlmConfigRepository(Sql.of(requirePostgres()), NS).initSchema();
+        new PgLlmConfigRepository(Sql.of(requirePostgres()), ScopeSupplier.fixed(NS)).initSchema();
         assertThat(repo.findAll()).hasSize(1);
     }
 

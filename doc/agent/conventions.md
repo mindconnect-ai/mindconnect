@@ -14,7 +14,7 @@ method:
 - grep for the noun and the verb you are about to use (`grep -rn "class .*Price" --include=*.java`);
   a `LlmPriceList` next to an `LlmPricing` is a finding;
 - read "Patterns with a name" in [architecture.md](architecture.md): typed ids,
-  `NamespaceRouted`, `RuntimeFeature`, installers in the owning module, one
+  the `ScopeSupplier` at the adapter, `RuntimeFeature`, installers in the owning module, one
   injected `ObjectMapper`;
 - when two modules need the same ten lines, extract the one class they both
   wanted; do not copy "so each module stays independent";
@@ -40,7 +40,7 @@ method:
 
 | Good, from the code | Why it works |
 | --- | --- |
-| `NamespaceRouted` | says what it does to what it wraps: routes by namespace |
+| `ThreadBoundScope` | says what it is and where it lives: the scope bound to the thread |
 | `TaskStore`, `JdbcTaskStore`, `InMemoryTaskStore` | the port and its adapters, one noun |
 | `CronExpression`, `TaskSchedule` | the thing itself, not `ScheduleInfo` or `CronData` |
 | `ToolCallWorker`, `PromptRenderer`, `LlmMessageMapper` | the pattern names the responsibility |

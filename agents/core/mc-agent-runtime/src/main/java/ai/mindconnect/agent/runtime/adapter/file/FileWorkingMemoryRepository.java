@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.common.util.AtomicFiles;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
@@ -28,11 +28,13 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
     private static final String MEMORY_FILE  = "working-memory.json";
     private static final String SUMMARY_FILE = "summary.md";
 
-    private final Path baseDir;
+    private final Path dataDir;
+    private final ScopeSupplier scope;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public FileWorkingMemoryRepository(Path baseDir, Namespace namespace) {
-        this.baseDir = baseDir.resolve(namespace.value()).toAbsolutePath().normalize();
+    public FileWorkingMemoryRepository(Path dataDir, ScopeSupplier scope) {
+        this.dataDir = dataDir.toAbsolutePath().normalize();
+        this.scope = scope;
     }
 
     @Override
@@ -98,7 +100,7 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private Path sessionDir(SessionId sessionId) {
-        return baseDir
+        return namespaceDir()
                 .resolve("sessions")
                 .resolve(sessionId.value());
     }
@@ -109,5 +111,10 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
         } catch (IOException e) {
             log.warn("Failed to delete {}: {}", file, e.getMessage());
         }
+    }
+
+    /** The directory of the namespace the current call works in. */
+    private Path namespaceDir() {
+        return dataDir.resolve(scope.namespace().value());
     }
 }

@@ -1,9 +1,9 @@
 package ai.mindconnect.agent.runtime.feature.tools;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.file.FileToolRepository;
 import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
@@ -65,8 +65,7 @@ public class ToolsFeature extends ConfigurableFeature {
         ctx.bean(ToolRegistryRef.class, ToolRegistryRef::new);
         // The operator's decisions about tools — on files only; Postgres keeps none yet.
         if (ctx.persistence() instanceof Persistence.File f) {
-            ctx.bean(ToolRepository.class, () -> ctx.require(NamespaceRouting.class).route(ToolRepository.class,
-                    ns -> new FileToolRepository(f.dataDir(), ns)));
+            ctx.bean(ToolRepository.class, () -> new FileToolRepository(f.dataDir(), ctx.require(ScopeSupplier.class)));
         }
         ctx.bean(ToolRegistry.class, () -> {
             ToolEnvironment env = ctx.require(ToolEnvironment.class);

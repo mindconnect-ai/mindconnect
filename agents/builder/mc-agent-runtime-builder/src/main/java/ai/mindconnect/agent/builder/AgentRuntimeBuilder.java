@@ -15,7 +15,6 @@ import ai.mindconnect.agent.runtime.feature.DefaultFeatureContext;
 import ai.mindconnect.agent.runtime.feature.DefaultRuntimeBeans;
 import ai.mindconnect.agent.runtime.feature.FeatureException;
 import ai.mindconnect.agent.runtime.feature.FeatureRegistry;
-import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
@@ -411,11 +410,9 @@ public class AgentRuntimeBuilder {
     /** What every feature may rely on before anything else: the namespace, the mapper, the Sql and its DataSource. */
     private void registerCoreSettings() {
         context.bean(Namespace.class, () -> new Namespace(namespaceName));
-        // Where this runtime works — one namespace for its whole life.
+        // Where this runtime works — one namespace for its whole life. A feature that binds the
+        // scope per call (the namespace feature) replaces the bean; every adapter asks it per call.
         context.bean(ScopeSupplier.class, () -> ScopeSupplier.fixed(context.require(Namespace.class)));
-        // … and so every adapter is built once, for that namespace. A feature that binds the
-        // scope per call (the namespace feature) replaces both beans.
-        context.bean(NamespaceRouting.class, () -> NamespaceRouting.fixed(context.require(Namespace.class)));
         context.bean(ObjectMapper.class, () -> objectMapper);
         context.bean(EnvVarResolver.class, () -> envVarResolver);
         if (persistence instanceof Persistence.Postgres postgres) {

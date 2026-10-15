@@ -1,7 +1,6 @@
 package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespaceFirstUse;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
@@ -10,6 +9,7 @@ import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.extension.port.out.InstalledSeedRepository;
 import ai.mindconnect.extension.service.ExtensionService;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
+import ai.mindconnect.namespace.service.NamespaceFirstUse;
 import ai.mindconnect.namespace.service.NamespaceService;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;

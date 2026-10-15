@@ -1,6 +1,8 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.PerNamespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 
@@ -17,7 +19,11 @@ import java.util.function.UnaryOperator;
 /** In-memory {@link AgentSessionRepository} — process-lifetime storage, no persistence. */
 public class InMemoryAgentSessionRepository implements AgentSessionRepository {
 
-    private final Map<SessionId, AgentSession> store = new ConcurrentHashMap<>();
+    private final PerNamespace<Map<SessionId, AgentSession>> store;
+
+    public InMemoryAgentSessionRepository(ScopeSupplier scope) {
+        this.store = new PerNamespace<>(scope, ConcurrentHashMap::new);
+    }
 
     /**
      * Newest first, and tolerant of a session without a start time: one
@@ -30,7 +36,7 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
 
     @Override
     public AgentSession create(AgentSession session) {
-        if (store.putIfAbsent(session.id(), session) != null) {
+        if (store.current().putIfAbsent(session.id(), session) != null) {
             throw new IllegalStateException("Session " + session.id().value() + " exists already");
         }
         return session;
@@ -39,18 +45,18 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
     /** {@code computeIfPresent} runs the change while holding the entry, so updates of one session take turns. */
     @Override
     public Optional<AgentSession> update(SessionId id, UnaryOperator<AgentSession> change) {
-        return Optional.ofNullable(store.computeIfPresent(id, (key, current) ->
+        return Optional.ofNullable(store.current().computeIfPresent(id, (key, current) ->
                 Objects.requireNonNull(change.apply(current), "update: the change returned null")));
     }
 
     @Override
     public Optional<AgentSession> findById(SessionId id) {
-        return Optional.ofNullable(store.get(id));
+        return Optional.ofNullable(store.current().get(id));
     }
 
     @Override
     public List<AgentSession> findByAgent(AgentId agent, UserId user) {
-        return store.values().stream()
+        return store.current().values().stream()
                 .filter(s -> Objects.equals(s.agentDefinitionId(), agent)
                         && Objects.equals(s.userId(), user))
                 .sorted(NEWEST_FIRST)
@@ -59,7 +65,7 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
 
     @Override
     public List<AgentSession> findByUser(UserId userId) {
-        return store.values().stream()
+        return store.current().values().stream()
                 .filter(s -> Objects.equals(s.userId(), userId)
                         && s.parentSessionId() == null)
                 .sorted(NEWEST_FIRST)
@@ -68,7 +74,7 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
 
     @Override
     public List<AgentSession> findByParentSession(SessionId parent) {
-        return store.values().stream()
+        return store.current().values().stream()
                 .filter(s -> Objects.equals(s.parentSessionId(), parent))
                 .sorted(java.util.Comparator.comparing(AgentSession::startedAt,
                         java.util.Comparator.nullsLast(java.util.Comparator.naturalOrder())))
@@ -77,6 +83,6 @@ public class InMemoryAgentSessionRepository implements AgentSessionRepository {
 
     @Override
     public void deleteById(SessionId id) {
-        store.remove(id);
+        store.current().remove(id);
     }
 }

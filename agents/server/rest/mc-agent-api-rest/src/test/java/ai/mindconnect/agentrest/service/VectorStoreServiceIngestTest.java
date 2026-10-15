@@ -1,6 +1,7 @@
 package ai.mindconnect.agentrest.service;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
@@ -29,7 +30,7 @@ class VectorStoreServiceIngestTest {
 
     @Test
     void aFileTheReaderMayNotReadIsReportedLikeAMissingOne() throws Exception {
-        FileStore files = new FilesystemFileStore(dir.resolve("data"), new Namespace("test"));
+        FileStore files = new FilesystemFileStore(dir.resolve("data"), ScopeSupplier.fixed(new Namespace("test")));
         StoredFile alices = files.save("notes.txt", "text/plain",
                 new ByteArrayInputStream("secret".getBytes(StandardCharsets.UTF_8)), UserId.of("alice"));
         var beans = new StaticListableBeanFactory();

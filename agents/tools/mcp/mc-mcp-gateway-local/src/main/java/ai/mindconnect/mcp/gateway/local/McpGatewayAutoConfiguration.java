@@ -1,7 +1,5 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.NamespacePurge;
-import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.mcp.gateway.McpCatalog;
 import ai.mindconnect.mcp.gateway.McpGateway;
@@ -9,6 +7,7 @@ import ai.mindconnect.mcp.gateway.McpRegistryAdmin;
 import ai.mindconnect.mcp.proxy.McpProxy;
 import ai.mindconnect.mcp.proxy.McpSessionRegistry;
 import ai.mindconnect.mcp.proxy.SdkMcpProxy;
+import ai.mindconnect.namespace.port.out.NamespacePurge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -51,33 +50,26 @@ public class McpGatewayAutoConfiguration {
     }
 
     /**
-     * The gateways, one per namespace. The default namespace is seeded with the
-     * bundled registrations here, before anything is served — the first tool
-     * lookup happens while the tool registry is being built. Existing files are
-     * never overwritten; a namespace somebody creates later starts empty.
-     * Declared as the holder, not as a gateway: {@code @ConditionalOnBean} below
-     * asks for this type, and a host with its own {@link McpGateway} takes it out.
+     * The registrations, in the namespace of the call. The default namespace is
+     * seeded with the bundled registrations here, before anything is served —
+     * the first tool lookup happens while the tool registry is being built.
+     * Existing files are never overwritten; a namespace somebody creates later
+     * starts empty. A host with its own {@link McpGateway} takes this out too.
      */
-    @Bean(destroyMethod = "close")
-    @ConditionalOnMissingBean(McpGateway.class)
-    public NamespacedMcpGateways mcpGateways(
-            McpProxy mcpProxy,
-            McpSessionRegistry sessions,
+    @Bean
+    @ConditionalOnMissingBean({McpServerRepository.class, McpGateway.class})
+    public McpServerRepository mcpServerRepository(
             Environment environment,
             ObjectProvider<ScopeSupplier> scope,
             ObjectProvider<McpStoreFactory> stores,
             // The installation's default namespace: seeds go there, whatever scope a thread binds — and at
             // start-up the main thread binds none.
             @Value("${mindconnect.namespace:local}") String defaultNamespace,
-            @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
-            @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime) {
-        // Whether process and docker targets start is the installation's call:
-        // mindconnect.mcp.allow-process / allow-docker, unset following sign-in.
-        NamespacedMcpGateways gateways = new NamespacedMcpGateways(
-                stores.getIfAvailable(() -> fileStores(environment, dataBaseDir)), mcpProxy, sessions,
-                containerRuntime, McpStartPolicy.from(environment));
-        gateways.seed(seedNamespace(scope, defaultNamespace), "classpath:initial-data/mcp-servers/*.json");
-        return gateways;
+            @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir) {
+        McpStoreFactory factory = stores.getIfAvailable(() -> fileStores(environment, dataBaseDir));
+        BundledMcpRegistrations.seed(factory.serverRepository(ScopeSupplier.fixed(seedNamespace(scope, defaultNamespace))),
+                "classpath:initial-data/mcp-servers/*.json");
+        return factory.serverRepository(scope.getIfAvailable(ScopeSupplier::local));
     }
 
     /**
@@ -91,22 +83,6 @@ public class McpGatewayAutoConfiguration {
                     + "(mc-mcp-gateway-pg) on the classpath — they stay in files under {}", dataBaseDir);
         }
         return McpStoreFactory.files(storageRoot(dataBaseDir));
-    }
-
-    /** A deleted namespace's gateway is closed and forgotten; its registrations went with its directory or its rows. */
-    @Bean
-    @ConditionalOnBean(NamespacedMcpGateways.class)
-    public NamespacePurge mcpGatewayPurge(NamespacedMcpGateways gateways) {
-        return gateways::drop;
-    }
-
-    /** The registrations of the namespace a call works in. */
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnBean(NamespacedMcpGateways.class)
-    public McpServerRepository mcpServerRepository(NamespacedMcpGateways gateways, ObjectProvider<ScopeSupplier> scope) {
-        return NamespaceRouted.route(McpServerRepository.class, scope.getIfAvailable(ScopeSupplier::local),
-                ns -> gateways.forNamespace(ns).repository());
     }
 
     /**
@@ -136,13 +112,36 @@ public class McpGatewayAutoConfiguration {
         return new McpSessionRegistry(mcpProxy);
     }
 
-    /** The gateway of the namespace a call works in. */
-    @Bean
+    /**
+     * The gateway, one for every namespace: what it discovers and the
+     * connections it opens are those of the namespace of the call.
+     */
+    @Bean(destroyMethod = "close")
     @ConditionalOnMissingBean(McpGateway.class)
-    @ConditionalOnBean(NamespacedMcpGateways.class)
-    public McpGateway mcpGateway(NamespacedMcpGateways gateways, ObjectProvider<ScopeSupplier> scope) {
-        return NamespaceRouted.route(McpGateway.class, scope.getIfAvailable(ScopeSupplier::local),
-                ns -> gateways.forNamespace(ns).gateway());
+    @ConditionalOnBean(McpServerRepository.class)
+    public LocalMcpGateway mcpGateway(
+            McpServerRepository repository,
+            McpProxy mcpProxy,
+            McpSessionRegistry sessions,
+            Environment environment,
+            ObjectProvider<ScopeSupplier> scope,
+            ObjectProvider<McpStoreFactory> stores,
+            @Value("${mindconnect.data.base-dir:./data}") String dataBaseDir,
+            @Value("${mindconnect.mcp.container-runtime:auto}") String containerRuntime) {
+        ScopeSupplier current = scope.getIfAvailable(ScopeSupplier::local);
+        McpDiscoveryStore discoveries = stores.getIfAvailable(() -> McpStoreFactory.files(storageRoot(dataBaseDir)))
+                .discoveryStore(current);
+        // Whether process and docker targets start is the installation's call:
+        // mindconnect.mcp.allow-process / allow-docker, unset following sign-in.
+        return new LocalMcpGateway(repository, mcpProxy, sessions, discoveries, current,
+                containerRuntime, McpStartPolicy.from(environment));
+    }
+
+    /** A deleted namespace is forgotten by the gateway; its registrations went with its directory or its rows. */
+    @Bean
+    @ConditionalOnBean(LocalMcpGateway.class)
+    public NamespacePurge mcpGatewayPurge(LocalMcpGateway gateway) {
+        return gateway::forget;
     }
 
     /**
@@ -164,11 +163,11 @@ public class McpGatewayAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean
-    @ConditionalOnBean(NamespacedMcpGateways.class)
-    public McpRegistryAdmin mcpRegistryAdmin(NamespacedMcpGateways gateways, ObjectProvider<ScopeSupplier> scope) {
-        return NamespaceRouted.route(McpRegistryAdmin.class, scope.getIfAvailable(ScopeSupplier::local),
-                ns -> gateways.forNamespace(ns).admin());
+    @ConditionalOnBean(LocalMcpGateway.class)
+    public McpRegistryAdmin mcpRegistryAdmin(McpServerRepository repository, LocalMcpGateway gateway) {
+        return new LocalMcpRegistryAdmin(repository, gateway);
     }
+
     /**
      * Where bundled data is seeded: the namespace a fixed scope names — a
      * single-namespace host chose it — and otherwise the installation default,

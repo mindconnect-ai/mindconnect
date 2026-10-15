@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.memory.domain.ConversationSummary;
 import ai.mindconnect.agent.runtime.tools.todo.TodoItem;
@@ -26,8 +27,8 @@ class PgTodoAndSummaryRepositoryTest {
     @BeforeEach
     void setUp() {
         Sql sql = TestDb.fresh("mc_todo_list", "mc_conversation_summary");
-        todos = new PgTodoListRepository(sql, NS).initSchema();
-        summaries = new PgConversationSummaryRepository(sql, NS).initSchema();
+        todos = new PgTodoListRepository(sql, ScopeSupplier.fixed(NS)).initSchema();
+        summaries = new PgConversationSummaryRepository(sql, ScopeSupplier.fixed(NS)).initSchema();
     }
 
     @Test

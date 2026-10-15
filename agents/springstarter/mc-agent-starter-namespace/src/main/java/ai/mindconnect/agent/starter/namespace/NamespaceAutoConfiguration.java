@@ -2,13 +2,13 @@ package ai.mindconnect.agent.starter.namespace;
 
 import ai.mindconnect.agent.Email;
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.namespace.adapter.env.EncryptingNamespaceRepository;
 import ai.mindconnect.namespace.adapter.env.NamespaceEnvVarResolver;
+import ai.mindconnect.namespace.port.out.NamespacePurge;
 import ai.mindconnect.user.adapter.env.UserEnvVarResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

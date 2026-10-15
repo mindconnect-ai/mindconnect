@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
@@ -61,10 +61,12 @@ public class FileUserMemoryRepository implements UserMemoryRepository {
     /** Under a user's directory: one directory per agent that keeps a memory of its own about them. */
     private static final String AGENTS = "agents";
 
-    private final Path baseDir;
+    private final Path dataDir;
+    private final ScopeSupplier scope;
 
-    public FileUserMemoryRepository(Path baseDir, Namespace namespace) {
-        this.baseDir = baseDir.resolve(namespace.value()).resolve("memory").toAbsolutePath().normalize();
+    public FileUserMemoryRepository(Path dataDir, ScopeSupplier scope) {
+        this.dataDir = dataDir.toAbsolutePath().normalize();
+        this.scope = scope;
     }
 
     @Override
@@ -82,7 +84,7 @@ public class FileUserMemoryRepository implements UserMemoryRepository {
     @Override
     public List<MemoryEntry> findAll() {
         List<MemoryEntry> entries = new ArrayList<>();
-        for (Path dir : directories(baseDir)) {
+        for (Path dir : directories(memoryDir())) {
             entries.addAll(findByUser(UserId.of(decode(dir.getFileName().toString()))));
         }
         return entries;
@@ -205,7 +207,7 @@ public class FileUserMemoryRepository implements UserMemoryRepository {
     }
 
     private Path userDir(UserId userId) {
-        return baseDir.resolve(encode(userId.value()));
+        return memoryDir().resolve(encode(userId.value()));
     }
 
     /** The directory of the user's own memory, or of one agent's about them. */
@@ -231,5 +233,10 @@ public class FileUserMemoryRepository implements UserMemoryRepository {
 
     private static String decode(String value) {
         return URLDecoder.decode(value, StandardCharsets.UTF_8);
+    }
+
+    /** The memory directory of the namespace the current call works in. */
+    private Path memoryDir() {
+        return dataDir.resolve(scope.namespace().value()).resolve("memory");
     }
 }

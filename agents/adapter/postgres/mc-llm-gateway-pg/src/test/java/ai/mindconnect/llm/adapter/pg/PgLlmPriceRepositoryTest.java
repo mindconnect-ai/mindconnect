@@ -1,6 +1,7 @@
 package ai.mindconnect.llm.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.domain.LlmPrice;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
@@ -34,13 +35,13 @@ class PgLlmPriceRepositoryTest extends LlmPriceRepositoryContract {
 
     @Override
     protected LlmPriceRepository repository() {
-        return new PgLlmPriceRepository(sql, NS).initSchema();
+        return new PgLlmPriceRepository(sql, ScopeSupplier.fixed(NS)).initSchema();
     }
 
     @Test
     void aRepositoryBoundToAnotherNamespaceSeesNothing() {
         LlmPriceRepository mine = repository();
-        LlmPriceRepository other = new PgLlmPriceRepository(sql, new Namespace("other")).initSchema();
+        LlmPriceRepository other = new PgLlmPriceRepository(sql, ScopeSupplier.fixed(new Namespace("other"))).initSchema();
         LlmPrice price = price("claude", "2026-01-01", null, "3", "15", null);
         mine.save(price);
 

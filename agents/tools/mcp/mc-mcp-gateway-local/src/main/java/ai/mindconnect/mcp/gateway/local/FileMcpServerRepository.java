@@ -1,6 +1,6 @@
 package ai.mindconnect.mcp.gateway.local;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.util.AtomicFiles;
 import ai.mindconnect.mcp.gateway.McpServerId;
 import ai.mindconnect.mcp.gateway.McpServerRegistration;
@@ -25,7 +25,7 @@ import java.util.stream.Stream;
  * Registrations as one JSON file per server:
  * {@code <storage>/<namespace>/system/mcp-servers/<id>.json} — where every
  * configuration store keeps its documents, agents and LLM configs alike.
- * Bound to one namespace at construction; one process serves one.
+ * The namespace is the one the scope names for the current call.
  *
  * <p>The directory is the source of truth — dropping a file in makes a
  * server appear, and an operator can diff and version them.
@@ -41,16 +41,17 @@ public final class FileMcpServerRepository implements McpServerRepository {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    private final Path directory;
+    private final Path storageDir;
+    private final ScopeSupplier scope;
 
-    public FileMcpServerRepository(Path storageDir, Namespace namespace) {
-        this.directory = storageDir.resolve(namespace.value()).resolve("system")
-                .resolve("mcp-servers").toAbsolutePath();
+    public FileMcpServerRepository(Path storageDir, ScopeSupplier scope) {
+        this.storageDir = storageDir.toAbsolutePath();
+        this.scope = scope;
     }
 
-    /** Where the registrations live — and where bundled ones are seeded. */
+    /** Where the registrations of the namespace the current call works in live — and where bundled ones are seeded. */
     Path directory() {
-        return directory;
+        return storageDir.resolve(scope.namespace().value()).resolve("system").resolve("mcp-servers");
     }
 
     @Override
@@ -67,11 +68,11 @@ public final class FileMcpServerRepository implements McpServerRepository {
 
     @Override
     public List<McpServerRegistration> findAll() {
-        if (!Files.isDirectory(directory)) {
+        if (!Files.isDirectory(directory())) {
             return List.of();
         }
         Map<McpServerId, McpServerRegistration> byId = new LinkedHashMap<>();
-        try (Stream<Path> files = Files.list(directory)) {
+        try (Stream<Path> files = Files.list(directory())) {
             List<Path> sorted = files
                     .filter(p -> p.getFileName().toString().endsWith(".json"))
                     .sorted(Comparator.comparing(p -> p.getFileName().toString()))
@@ -86,7 +87,7 @@ public final class FileMcpServerRepository implements McpServerRepository {
                 });
             }
         } catch (IOException e) {
-            throw new UncheckedIOException("cannot list MCP registrations in " + directory, e);
+            throw new UncheckedIOException("cannot list MCP registrations in " + directory(), e);
         }
         return List.copyOf(new ArrayList<>(byId.values()));
     }
@@ -126,7 +127,7 @@ public final class FileMcpServerRepository implements McpServerRepository {
      * renamed id would not be findable again.
      */
     private Path fileFor(McpServerId id) {
-        return directory.resolve(id.value() + ".json");
+        return directory().resolve(id.value() + ".json");
     }
 
     /**
@@ -136,10 +137,10 @@ public final class FileMcpServerRepository implements McpServerRepository {
      */
     @Override
     public long version() {
-        if (!Files.isDirectory(directory)) {
+        if (!Files.isDirectory(directory())) {
             return 0L;
         }
-        try (Stream<Path> files = Files.list(directory)) {
+        try (Stream<Path> files = Files.list(directory())) {
             long acc = 17L;
             for (Path file : files.sorted().toList()) {
                 acc = 31 * acc + file.getFileName().toString().hashCode();
@@ -147,7 +148,7 @@ public final class FileMcpServerRepository implements McpServerRepository {
             }
             return acc;
         } catch (IOException e) {
-            throw new UncheckedIOException("cannot stat MCP registrations in " + directory, e);
+            throw new UncheckedIOException("cannot stat MCP registrations in " + directory(), e);
         }
     }
 

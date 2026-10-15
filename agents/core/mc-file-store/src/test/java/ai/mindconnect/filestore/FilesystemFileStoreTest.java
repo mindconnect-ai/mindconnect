@@ -1,6 +1,8 @@
 package ai.mindconnect.filestore;
 
 
+import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,7 +23,7 @@ class FilesystemFileStoreTest {
 
     private FileStore store() {
         return FileStoreBackend.byType("filesystem").orElseThrow()
-                .open(Map.of("baseDir", dir.toString(), "namespace", "test"));
+                .open(Map.of("baseDir", dir.toString()), ScopeSupplier.fixed(new Namespace("test")));
     }
 
     @Test
@@ -59,7 +61,7 @@ class FilesystemFileStoreTest {
         StoredFile saved = store.save("a.txt", "text/plain",
                 new ByteArrayInputStream("a".getBytes(StandardCharsets.UTF_8)));
         FileStore other = FileStoreBackend.byType("filesystem").orElseThrow()
-                .open(Map.of("baseDir", dir.toString(), "namespace", "other"));
+                .open(Map.of("baseDir", dir.toString()), ScopeSupplier.fixed(new Namespace("other")));
         assertThat(other.find(saved.id())).isEmpty();
         assertThat(other.list()).isEmpty();
         assertThat(store.list()).containsExactly(saved);

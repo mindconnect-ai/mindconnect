@@ -3,7 +3,6 @@ package ai.mindconnect.adminui.service;
 import ai.mindconnect.adminui.namespaces.GuardedRepositories;
 import ai.mindconnect.adminui.namespaces.NamespaceWriteGuard;
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespaceRouted;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
@@ -38,17 +37,20 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Proxy;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The per-namespace seeding, end to end through a {@link ThreadBoundScope}
- * and routed in-memory stores: binding a namespace is what triggers it, as a
+ * and an in-memory store per namespace: binding a namespace is what triggers it, as a
  * request does. The seeds are {@code seed-test/} on the test classpath: an
  * LLM config and an agent of the host, and two agents, a skill and a
  * workflow that the manifest of {@code seed-crm} declares.
@@ -84,25 +86,41 @@ class NamespaceSeedingTest {
         restart();
     }
 
-    /** A new process: fresh scope, fresh routing, fresh seeding — the stored data stays. */
+    /**
+     * The store of the namespace the scope names, chosen per call — what the file
+     * and Postgres adapters do themselves, done here for in-memory stores the
+     * test can look into.
+     */
+    @SuppressWarnings("unchecked")
+    private <T> T perNamespace(Class<T> port, Function<Namespace, T> store) {
+        return (T) Proxy.newProxyInstance(port.getClassLoader(), new Class<?>[]{port}, (proxy, method, args) -> {
+            try {
+                return method.invoke(store.apply(scope.namespace()), args);
+            } catch (InvocationTargetException e) {
+                throw e.getCause();
+            }
+        });
+    }
+
+    /** A new process: fresh scope, fresh seeding — the stored data stays. */
     private void restart() {
         scope = ThreadBoundScope.strict();
         // Guarded as the admin app guards them: "plain-user" is an admin of nothing but the open default.
         NamespaceWriteGuard guard = new NamespaceWriteGuard(
                 new NamespaceService(new InMemoryNamespaceRepository(), LOCAL), scope);
-        LlmConfigRepository llm = new GuardedRepositories.LlmConfigs(NamespaceRouted.route(LlmConfigRepository.class,
-                scope, ns -> llmStores.computeIfAbsent(ns, n -> new InMemoryLlmConfigRepository())), guard);
-        AgentDefinitionRepository agents = new GuardedRepositories.Agents(NamespaceRouted.route(
-                AgentDefinitionRepository.class, scope,
-                ns -> agentStores.computeIfAbsent(ns, n -> new InMemoryAgentDefinitionRepository())), guard);
-        SkillRepository skills = new GuardedRepositories.Skills(NamespaceRouted.route(SkillRepository.class, scope,
-                ns -> skillStores.computeIfAbsent(ns, n -> new InMemorySkillRepository())), guard);
-        WorkflowDataRepository workflows = new GuardedRepositories.Workflows(NamespaceRouted.route(
-                WorkflowDataRepository.class, scope,
+        LlmConfigRepository llm = new GuardedRepositories.LlmConfigs(perNamespace(LlmConfigRepository.class,
+                ns -> llmStores.computeIfAbsent(ns, n -> new InMemoryLlmConfigRepository(ScopeSupplier.local()))), guard);
+        AgentDefinitionRepository agents = new GuardedRepositories.Agents(perNamespace(
+                AgentDefinitionRepository.class,
+                ns -> agentStores.computeIfAbsent(ns, n -> new InMemoryAgentDefinitionRepository(ScopeSupplier.local()))), guard);
+        SkillRepository skills = new GuardedRepositories.Skills(perNamespace(SkillRepository.class,
+                ns -> skillStores.computeIfAbsent(ns, n -> new InMemorySkillRepository(ScopeSupplier.local()))), guard);
+        WorkflowDataRepository workflows = new GuardedRepositories.Workflows(perNamespace(
+                WorkflowDataRepository.class,
                 ns -> workflowStores.computeIfAbsent(ns, n -> new InMemoryWorkflowDataRepository())), guard);
-        InstalledSeedRepository installed = NamespaceRouted.route(InstalledSeedRepository.class, scope,
+        InstalledSeedRepository installed = perNamespace(InstalledSeedRepository.class,
                 ns -> ledgers.computeIfAbsent(ns, n -> new InMemoryInstalledSeedRepository()));
-        ExtensionActivationRepository activations = NamespaceRouted.route(ExtensionActivationRepository.class, scope,
+        ExtensionActivationRepository activations = perNamespace(ExtensionActivationRepository.class,
                 ns -> decisions.computeIfAbsent(ns, n -> new InMemoryExtensionActivationRepository()));
         ExtensionService extensions = new ExtensionService(new ExtensionRegistry(List.of(crmExtension())), activations);
 
@@ -151,7 +169,7 @@ class NamespaceSeedingTest {
     }
 
     private List<String> agentNames(Namespace namespace) {
-        return agentStores.getOrDefault(namespace, new InMemoryAgentDefinitionRepository()).findAll().stream()
+        return agentStores.getOrDefault(namespace, new InMemoryAgentDefinitionRepository(ScopeSupplier.local())).findAll().stream()
                 .map(AgentDefinition::name).sorted().toList();
     }
 
@@ -182,7 +200,7 @@ class NamespaceSeedingTest {
     @Test
     void a_record_that_is_there_is_left_as_it_is_and_counted_as_got() {
         AgentDefinition mine = AgentDefinition.create("crm-assistant", "Our own, edited", "Be terse.", null, "x");
-        agentStores.computeIfAbsent(ERNI, n -> new InMemoryAgentDefinitionRepository()).save(mine);
+        agentStores.computeIfAbsent(ERNI, n -> new InMemoryAgentDefinitionRepository(ScopeSupplier.local())).save(mine);
 
         use(ERNI);
 
@@ -233,7 +251,7 @@ class NamespaceSeedingTest {
         use(ERNI);
 
         assertThat(agentNames(ERNI)).containsExactly("host-helper");
-        assertThat(skillStores.getOrDefault(ERNI, new InMemorySkillRepository()).findByName("crm-notes")).isEmpty();
+        assertThat(skillStores.getOrDefault(ERNI, new InMemorySkillRepository(ScopeSupplier.local())).findByName("crm-notes")).isEmpty();
         assertThat(workflowStores.getOrDefault(ERNI, new InMemoryWorkflowDataRepository()).exists("crm-flow")).isFalse();
         assertThat(ledger(ERNI)).containsExactlyInAnyOrder("llm-config:seed-test-llm", "agent:host-helper");
 

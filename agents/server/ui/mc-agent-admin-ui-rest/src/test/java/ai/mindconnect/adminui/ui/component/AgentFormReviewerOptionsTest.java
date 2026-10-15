@@ -1,6 +1,7 @@
 package ai.mindconnect.adminui.ui.component;
 
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
@@ -35,9 +36,9 @@ class AgentFormReviewerOptionsTest {
 
     /** The values the picker offers, read off the rendered form. */
     private static List<String> reviewerOptions(AgentDefinition edited, AgentDefinition... all) {
-        var repo = new InMemoryAgentDefinitionRepository();
+        var repo = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
         for (AgentDefinition a : all) repo.save(a);
-        var rendered = (UiStack) new AgentFormComponent(edited, new InMemoryLlmConfigRepository(),
+        var rendered = (UiStack) new AgentFormComponent(edited, new InMemoryLlmConfigRepository(ScopeSupplier.local()),
                 repo, new ObjectMapper()).render();
         UiForm form = rendered.getChildren().stream()
                 .filter(UiForm.class::isInstance).map(UiForm.class::cast).findFirst().orElseThrow();

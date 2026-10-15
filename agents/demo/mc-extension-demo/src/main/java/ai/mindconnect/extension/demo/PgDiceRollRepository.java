@@ -1,6 +1,6 @@
 package ai.mindconnect.extension.demo;
 
-import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.jdbc.DocumentTable;
 import ai.mindconnect.jdbc.Sql;
 
@@ -20,13 +20,13 @@ final class PgDiceRollRepository implements DiceRollRepository {
     static final String SCHEMA = "ext_demo_dungeon";
 
     private final DocumentTable<DiceRoll> rolls;
-    private final Namespace namespace;
+    private final ScopeSupplier scope;
 
-    PgDiceRollRepository(Sql sql, Namespace namespace) {
-        this.namespace = Objects.requireNonNull(namespace, "namespace");
+    PgDiceRollRepository(Sql sql, ScopeSupplier scope) {
+        this.scope = Objects.requireNonNull(scope, "scope");
         this.rolls = DocumentTable.of(DiceRoll.class)
                 .table(SCHEMA + ".dice_roll")
-                .partitionKey("namespace", "TEXT", r -> namespace.value())
+                .partitionKey("namespace", "TEXT", r -> scope.namespace().value())
                 .id("id", "TEXT", DiceRoll::id)
                 .requiredColumn("rolled_at", "TEXT", r -> r.at().toString())
                 .index("namespace", "rolled_at")
@@ -43,6 +43,6 @@ final class PgDiceRollRepository implements DiceRollRepository {
     @Override
     public List<DiceRoll> since(Instant from) {
         // ISO-8601 instants sort as text, which is what the column holds.
-        return rolls.find("WHERE namespace = ? AND rolled_at >= ? ORDER BY rolled_at", namespace.value(), from.toString());
+        return rolls.find("WHERE namespace = ? AND rolled_at >= ? ORDER BY rolled_at", scope.namespace().value(), from.toString());
     }
 }

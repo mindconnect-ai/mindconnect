@@ -57,6 +57,13 @@ public class FileRepo {
 
     private static final ConcurrentHashMap<Path, FileRepo> OPEN = new ConcurrentHashMap<>();
 
+    /**
+     * {@link #OPEN} by the path {@link #open} was called with: a store that opens
+     * its partition on every call, because the partition depends on the call,
+     * pays one lookup instead of a directory check and a real-path resolution.
+     */
+    private static final ConcurrentHashMap<Path, FileRepo> BY_SPELLING = new ConcurrentHashMap<>();
+
     /** How many {@link RecordLog} directories keep their index in memory; the least recently used go first. */
     private static final int MAX_LOG_STATES = 1024;
 
@@ -95,15 +102,19 @@ public class FileRepo {
      */
     public static FileRepo open(Path base, String partition) {
         requireDirectoryName(partition);
+        Path dir = base.resolve(partition);
+        FileRepo known = BY_SPELLING.get(dir);
+        if (known != null && !known.closed) return known;
         Path real;
         try {
-            Path dir = base.resolve(partition);
             Files.createDirectories(dir);
             real = dir.toRealPath();
         } catch (IOException e) {
             throw new FileRepoException("Cannot open partition '" + partition + "' of data directory " + base, e);
         }
-        return OPEN.computeIfAbsent(real, FileRepo::new);
+        FileRepo repo = OPEN.computeIfAbsent(real, FileRepo::new);
+        BY_SPELLING.put(dir, repo);
+        return repo;
     }
 
     /**
@@ -126,6 +137,7 @@ public class FileRepo {
         FileRepo repo = OPEN.remove(key);
         if (repo == null) return false;
         repo.closed = true;
+        BY_SPELLING.values().removeIf(open -> open == repo);
         try {
             repo.processLock.release();
         } catch (IOException e) {

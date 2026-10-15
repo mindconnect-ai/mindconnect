@@ -1,8 +1,8 @@
 package ai.mindconnect.namespace.adapter.file;
 
 import ai.mindconnect.agent.Namespace;
-import ai.mindconnect.agent.NamespacePurge;
 import ai.mindconnect.filerepo.FileRepo;
+import ai.mindconnect.namespace.port.out.NamespacePurge;
 import ai.mindconnect.namespace.service.NamespaceService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

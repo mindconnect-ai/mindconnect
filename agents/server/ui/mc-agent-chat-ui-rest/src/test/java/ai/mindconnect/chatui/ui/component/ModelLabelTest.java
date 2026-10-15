@@ -1,5 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
 import org.junit.jupiter.api.Test;
@@ -8,7 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class ModelLabelTest {
 
-    private final InMemoryLlmConfigRepository configs = new InMemoryLlmConfigRepository();
+    private final InMemoryLlmConfigRepository configs = new InMemoryLlmConfigRepository(ScopeSupplier.local());
 
     @Test
     void a_config_shows_its_model() {

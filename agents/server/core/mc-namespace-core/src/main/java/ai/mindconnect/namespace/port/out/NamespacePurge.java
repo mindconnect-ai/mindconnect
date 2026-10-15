@@ -1,4 +1,6 @@
-package ai.mindconnect.agent;
+package ai.mindconnect.namespace.port.out;
+
+import ai.mindconnect.agent.Namespace;
 
 /**
  * What a store does when a namespace is deleted: remove everything it kept

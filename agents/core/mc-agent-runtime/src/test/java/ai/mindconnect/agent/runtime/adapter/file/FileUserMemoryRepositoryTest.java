@@ -2,7 +2,10 @@ package ai.mindconnect.agent.runtime.adapter.file;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.Scope;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
 import ai.mindconnect.agent.runtime.usermemory.MemoryType;
@@ -24,7 +27,7 @@ class FileUserMemoryRepositoryTest {
 
     @Test
     void anEntryIsAMarkdownFileWithFrontMatterUnderTheNamespaceAndUser() throws Exception {
-        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, NS);
+        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS));
         Instant created = Instant.parse("2026-09-01T08:00:00Z");
         MemoryEntry entry = new MemoryEntry(ALICE, "preferred-language", MemoryType.FEEDBACK,
                 "Answers in German", "Always answer in German.\n\nWhy: she asked to.",
@@ -42,15 +45,30 @@ class FileUserMemoryRepositoryTest {
 
     @Test
     void usersAndNamespacesAreKeptApart() {
-        new FileUserMemoryRepository(dir, NS).save(entry(ALICE, "role"));
+        new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS)).save(entry(ALICE, "role"));
 
-        assertThat(new FileUserMemoryRepository(dir, NS).findByUser(UserId.of("bob"))).isEmpty();
-        assertThat(new FileUserMemoryRepository(dir, new Namespace("other")).findByUser(ALICE)).isEmpty();
+        assertThat(new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS)).findByUser(UserId.of("bob"))).isEmpty();
+        assertThat(new FileUserMemoryRepository(dir, ScopeSupplier.fixed(new Namespace("other"))).findByUser(ALICE)).isEmpty();
+    }
+
+    @Test
+    void oneRepositoryWorksInTheNamespaceBoundToTheCall() {
+        ThreadBoundScope scope = ThreadBoundScope.strict();
+        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, scope);
+        Namespace other = new Namespace("other");
+
+        scope.runIn(Scope.of(NS), () -> repo.save(entry(ALICE, "role")));
+
+        assertThat(scope.runIn(Scope.of(other), () -> repo.findByUser(ALICE))).isEmpty();
+        assertThat(scope.runIn(Scope.of(NS), () -> repo.findByUser(ALICE)))
+                .extracting(MemoryEntry::name).containsExactly("role");
+        assertThat(dir.resolve("acme/memory")).isDirectory();
+        assertThat(dir.resolve("other/memory/alice%40example.com/role.md")).doesNotExist();
     }
 
     @Test
     void deletingRemovesTheFile() {
-        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, NS);
+        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS));
         repo.save(entry(ALICE, "role"));
 
         assertThat(repo.delete(ALICE, null, "role")).isTrue();
@@ -73,7 +91,7 @@ class FileUserMemoryRepositoryTest {
                 app.mindconnect.ai, via deploy-admin-ui.sh.
                 """);
 
-        assertThat(new FileUserMemoryRepository(dir, NS).find(ALICE, null, "deploy-target")).get().satisfies(e -> {
+        assertThat(new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS)).find(ALICE, null, "deploy-target")).get().satisfies(e -> {
             assertThat(e.type()).isEqualTo(MemoryType.REFERENCE);
             assertThat(e.description()).isEqualTo("Deploys go to the Hetzner box");
             assertThat(e.content()).isEqualTo("app.mindconnect.ai, via deploy-admin-ui.sh.");
@@ -82,14 +100,14 @@ class FileUserMemoryRepositoryTest {
 
     @Test
     void aUserIdOfDotsDoesNotLeaveTheMemoryDirectory() {
-        new FileUserMemoryRepository(dir, NS).save(entry(UserId.of(".."), "role"));
+        new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS)).save(entry(UserId.of(".."), "role"));
 
         assertThat(dir.resolve("acme/memory/%2E%2E/role.md")).exists();
     }
 
     @Test
     void anAgentsEntriesLieInADirectoryOfTheirOwnAndComeBackWithTheirAgent() {
-        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, NS);
+        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS));
         AgentId secretary = AgentId.of("00000002-0000-0000-0000-000000000099");
         repo.save(entry(ALICE, "role"));
         repo.save(new MemoryEntry(ALICE, secretary, "role", MemoryType.PROJECT, "Travel desk", "c", null, null, null));
@@ -105,7 +123,7 @@ class FileUserMemoryRepositoryTest {
 
     @Test
     void findAllReadsEveryUsersDirectoryBackToTheirId() {
-        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, NS);
+        FileUserMemoryRepository repo = new FileUserMemoryRepository(dir, ScopeSupplier.fixed(NS));
         repo.save(entry(ALICE, "a"));
         repo.save(entry(UserId.of("bob"), "b"));
         repo.save(entry(UserId.of(".."), "c"));

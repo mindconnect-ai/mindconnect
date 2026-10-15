@@ -1,6 +1,7 @@
 package ai.mindconnect.message.adapter.pg;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.message.domain.ChatTurnId;
@@ -34,7 +35,7 @@ class PgMessageRepositoryTest {
         Sql sql = Sql.of(TestDb.requirePostgres());
         sql.execute("DROP TABLE IF EXISTS mc_message");
         sql.execute("DROP TABLE IF EXISTS mc_message_seq");
-        repo = new PgMessageRepository(sql, NS).initSchema();
+        repo = new PgMessageRepository(sql, ScopeSupplier.fixed(NS)).initSchema();
     }
 
     private Message message(int seq) {

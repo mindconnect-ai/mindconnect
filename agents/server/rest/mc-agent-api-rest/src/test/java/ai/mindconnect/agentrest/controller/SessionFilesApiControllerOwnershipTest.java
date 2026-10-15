@@ -2,6 +2,7 @@ package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
@@ -39,13 +40,13 @@ class SessionFilesApiControllerOwnershipTest {
     Path dir;
 
     private final TestCallers callers = new TestCallers();
-    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository();
+    private final InMemoryAgentSessionRepository sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
     private FileStore store;
     private MockMvc mvc;
 
     @BeforeEach
     void setUp() {
-        store = new FilesystemFileStore(dir, new Namespace("test"));
+        store = new FilesystemFileStore(dir, ScopeSupplier.fixed(new Namespace("test")));
         var controller = new SessionFilesApiController(store, null, new SessionAccess(sessions));
         mvc = MockMvcBuilders.standaloneSetup(controller).setCustomArgumentResolvers(callers.resolver()).build();
     }

@@ -24,7 +24,7 @@ class PgWorkflowDataRepositoryTest {
     @BeforeEach
     void setUp() {
         sql = TestDb.fresh("mc_workflow", "mc_workflow_import");
-        repo = new PgWorkflowDataRepository(sql, "test").initSchema();
+        repo = new PgWorkflowDataRepository(sql, () -> "test").initSchema();
     }
 
     private static WorkflowData workflow(String name) {
@@ -68,7 +68,7 @@ class PgWorkflowDataRepositoryTest {
 
     @Test
     void onePartitionNeverSeesTheRowsOfAnother() {
-        var other = new PgWorkflowDataRepository(sql, "other").initSchema();
+        var other = new PgWorkflowDataRepository(sql, () -> "other").initSchema();
         repo.save("wf", workflow("mine"));
         other.save("wf", workflow("theirs"));
         other.save("only-there", workflow("only-there"));
@@ -86,7 +86,7 @@ class PgWorkflowDataRepositoryTest {
 
     /** Two definitions as the file store writes them, and a file that is not one. */
     private Path filesOf(String partition) throws Exception {
-        var files = new FileWorkflowDataRepository(dataDir, partition);
+        var files = new FileWorkflowDataRepository(dataDir, () -> partition);
         files.save("greeter", workflow("greeter of " + partition));
         files.save("pipeline", workflow("pipeline"));
         Path dir = FileWorkflowDataRepository.directory(dataDir, partition);
@@ -102,7 +102,7 @@ class PgWorkflowDataRepositoryTest {
 
         assertThat(repo.listIds()).containsExactly("greeter", "pipeline");
         assertThat(repo.findById("greeter")).get().extracting(WorkflowData::getName).isEqualTo("greeter of test");
-        assertThat(new FileWorkflowDataRepository(dataDir, "test").listIds()).containsExactly("broken", "greeter", "pipeline");
+        assertThat(new FileWorkflowDataRepository(dataDir, () -> "test").listIds()).containsExactly("broken", "greeter", "pipeline");
     }
 
     @Test
@@ -113,7 +113,7 @@ class PgWorkflowDataRepositoryTest {
         repo.delete("pipeline");
 
         assertThat(repo.importFiles(dir)).isZero();
-        assertThat(new PgWorkflowDataRepository(sql, "test").initSchema().importFiles(dir)).isZero();
+        assertThat(new PgWorkflowDataRepository(sql, () -> "test").initSchema().importFiles(dir)).isZero();
         assertThat(repo.listIds()).isEmpty();
     }
 
@@ -128,7 +128,7 @@ class PgWorkflowDataRepositoryTest {
 
     @Test
     void theImportIsPerPartition() throws Exception {
-        var other = new PgWorkflowDataRepository(sql, "other").initSchema();
+        var other = new PgWorkflowDataRepository(sql, () -> "other").initSchema();
         other.save("own", workflow("own"));
         Path mine = filesOf("test");
         Path theirs = filesOf("other");

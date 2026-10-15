@@ -6,18 +6,16 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.ThreadBoundScope;
 import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.NamespaceRouting;
 import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.taskqueue.TaskAdvisor;
 
 /**
  * The namespace of the current call instead of one for the runtime's life
- * (concept 30). Three things change, and nothing else: the runtime's
+ * (concept 30). Two things change, and nothing else: the runtime's
  * {@link ScopeSupplier} is a {@link ThreadBoundScope} the host binds per
- * request; every repository a feature registers is {@link NamespaceRouting
- * routed} to the adapter of the namespace that scope names; and every task
- * on the queue carries the scope it was submitted in and runs bound to it
- * ({@link ScopeTaskAdvisor}).
+ * request — every repository a feature registers asks it per call — and
+ * every task on the queue carries the scope it was submitted in and runs
+ * bound to it ({@link ScopeTaskAdvisor}).
  *
  * <p>Installed explicitly — by a server that binds the scope, never found on
  * the classpath — because a runtime with it and nobody binding the scope has
@@ -60,7 +58,6 @@ public class NamespaceFeature extends ConfigurableFeature {
         if (scope == null) scope = ThreadBoundScope.strict();
         ThreadBoundScope bound = scope;
         ctx.instance(ScopeSupplier.class, bound);
-        ctx.instance(NamespaceRouting.class, NamespaceRouting.perScope(bound));
         // Stamps the namespace on submit, binds it around every execution — first delivery, retry, wake-up.
         ctx.contribute(TaskAdvisor.class, new ScopeTaskAdvisor(bound, bound));
     }

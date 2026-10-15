@@ -13,9 +13,8 @@ import java.util.stream.Collectors;
  * never had. Only ever added to: a record deleted from the namespace stays
  * here, and that is the point.
  *
- * <p>Like every store, an implementation is bound to the one namespace it
- * serves; above it a routing proxy picks the adapter for the namespace the
- * work runs in.
+ * <p>Like every store, an implementation works in the namespace the scope
+ * names for the current call — the namespace the work runs in.
  */
 public interface InstalledSeedRepository {
 

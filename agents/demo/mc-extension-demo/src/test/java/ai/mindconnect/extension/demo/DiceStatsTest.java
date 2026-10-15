@@ -1,6 +1,7 @@
 package ai.mindconnect.extension.demo;
 
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.ScopeSupplier;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -51,8 +52,8 @@ class DiceStatsTest {
 
     @Test
     void the_file_store_appends_per_namespace_and_reads_back_since(@TempDir Path dir) {
-        var acme = new FileDiceRollRepository(dir, new Namespace("acme"));
-        var other = new FileDiceRollRepository(dir, new Namespace("other"));
+        var acme = new FileDiceRollRepository(dir, ScopeSupplier.fixed(new Namespace("acme")));
+        var other = new FileDiceRollRepository(dir, ScopeSupplier.fixed(new Namespace("other")));
 
         acme.append(roll("2026-09-22T10:00:00Z", 4));
         acme.append(roll("2026-09-23T10:00:00Z", 2));

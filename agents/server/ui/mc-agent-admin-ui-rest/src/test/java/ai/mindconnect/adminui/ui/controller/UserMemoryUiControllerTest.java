@@ -4,6 +4,7 @@ import ai.mindconnect.adminui.ui.component.UserMemoryComponent;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponentAccess;
 import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
+import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryUserMemoryRepository;
@@ -34,8 +35,8 @@ class UserMemoryUiControllerTest {
     private static final UserId ALICE = UserId.of("alice");
     private static final UserId BOB = UserId.of("bob");
 
-    private final UserMemoryService memory = new UserMemoryService(new InMemoryUserMemoryRepository());
-    private final InMemoryAgentDefinitionRepository agents = new InMemoryAgentDefinitionRepository();
+    private final UserMemoryService memory = new UserMemoryService(new InMemoryUserMemoryRepository(ScopeSupplier.local()));
+    private final InMemoryAgentDefinitionRepository agents = new InMemoryAgentDefinitionRepository(ScopeSupplier.local());
     private final UserMemoryUiController controller = new UserMemoryUiController(memory, agents);
 
     @Test

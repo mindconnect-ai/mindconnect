@@ -52,13 +52,13 @@ import java.util.stream.Stream;
  */
 public class Documents<K, V> {
 
-    private final FileRepo repo;
+    private final Supplier<FileRepo> repo;
     private final Function<K, String> path;
     private final ObjectReader reader;
     private final ObjectWriter writer;
     private final Duration lockTimeout;
 
-    private Documents(Builder<K, V> b, FileRepo repo, ObjectMapper mapper) {
+    private Documents(Builder<K, V> b, Supplier<FileRepo> repo, ObjectMapper mapper) {
         this.repo = repo;
         this.path = b.path;
         this.reader = mapper.readerFor(b.type);
@@ -73,7 +73,7 @@ public class Documents<K, V> {
 
     /** The file of the document under {@code key}. */
     public Path pathOf(K key) {
-        return repo.resolve(path.apply(key));
+        return repo.get().resolve(path.apply(key));
     }
 
     // ── reading ─────────────────────────────────────────────────────────────
@@ -93,7 +93,7 @@ public class Documents<K, V> {
      */
     public List<V> findAll(String dir) {
         List<V> found = new ArrayList<>();
-        for (Path file : list(repo.resolve(dir))) {
+        for (Path file : list(repo.get().resolve(dir))) {
             String name = file.getFileName().toString();
             if (name.endsWith(".json") && !name.startsWith(".") && Files.isRegularFile(file)) {
                 read(file).ifPresent(found::add);
@@ -108,7 +108,7 @@ public class Documents<K, V> {
      */
     public List<V> findAll(String dir, String fileName) {
         List<V> found = new ArrayList<>();
-        for (Path sub : list(repo.resolve(dir))) {
+        for (Path sub : list(repo.get().resolve(dir))) {
             if (Files.isDirectory(sub)) {
                 read(sub.resolve(fileName)).ifPresent(found::add);
             }
@@ -295,6 +295,16 @@ public class Documents<K, V> {
         }
 
         public Documents<K, V> build(FileRepo repo, ObjectMapper mapper) {
+            Objects.requireNonNull(repo, "repo");
+            return build(() -> repo, mapper);
+        }
+
+        /**
+         * For one instance that serves several partitions: {@code repo} names the
+         * partition of the current call. It is asked on every operation and must
+         * answer the same throughout one — a partition bound to the calling thread does.
+         */
+        public Documents<K, V> build(Supplier<FileRepo> repo, ObjectMapper mapper) {
             if (path == null) throw new IllegalStateException("path() is required");
             return new Documents<>(this, Objects.requireNonNull(repo, "repo"), Objects.requireNonNull(mapper, "mapper"));
         }

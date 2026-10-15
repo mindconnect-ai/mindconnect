@@ -6,6 +6,7 @@ import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowRepositoryFactory;
 
 import java.nio.file.Path;
+import java.util.function.Supplier;
 
 /**
  * Workflow definitions in memory — nothing survives the process. Instances
@@ -15,9 +16,9 @@ import java.nio.file.Path;
 public class InMemoryWorkflowRepositoryFactory implements WorkflowRepositoryFactory {
 
     private final Path instancesDir;
-    private final String partition;
+    private final Supplier<String> partition;
 
-    public InMemoryWorkflowRepositoryFactory(Path instancesDir, String partition) {
+    public InMemoryWorkflowRepositoryFactory(Path instancesDir, Supplier<String> partition) {
         this.instancesDir = instancesDir;
         this.partition = partition;
     }

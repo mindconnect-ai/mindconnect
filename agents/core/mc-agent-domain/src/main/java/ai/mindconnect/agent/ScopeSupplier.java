@@ -5,8 +5,8 @@ import java.util.function.Supplier;
 /**
  * The {@link Scope} the runtime is working in <em>right now</em>.
  *
- * <p>The namespace is the one storage partition; every repository adapter is
- * bound to one when it is built. Nothing above the adapters names it —
+ * <p>The namespace is the one storage partition; every repository adapter
+ * takes this supplier and asks it on every call. Nothing above the adapters names it —
  * domain objects, ids, ports and services carry no namespace. What they get
  * instead is this: a way to ask, never a way to bind. How the answer comes
  * about is the host's business:
@@ -17,9 +17,6 @@ import java.util.function.Supplier;
  *   <li>a server chooses the scope per request or per queued task and
  *       binds it to the executing thread — {@link ThreadBoundScope}.</li>
  * </ul>
- *
- * <p>Adapters that serve many namespaces sit behind {@link NamespaceRouted},
- * which asks the supplier on every call.
  */
 @FunctionalInterface
 public interface ScopeSupplier extends Supplier<Scope> {
