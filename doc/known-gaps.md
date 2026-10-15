@@ -8,7 +8,7 @@ and the rule it violates.
 
 ## Open
 
-- [ ] **agents/core/mc-agent-runtime-core, mc-agent-memory-strategies, mc-llm-gateway-core** Jackson `ObjectMapper` is built and held as a static `MAPPER` in `MessageToLlmMessageMapper`, `ToolCalls`, `TurnMessage`, `LlmChatProvider`, `ToolCallWorker`, `SummarizingWindowStrategy`, `ToolPairSanitizer` and the port `LlmGateway`; `FeatureContext` exposes one. The core is meant to know no Jackson databind: a codec port in `-core` with the Jackson adapter in `mc-agent-runtime`, one injected mapper per runtime.
+- [ ] **agents/core/mc-agent-runtime-core, mc-agent-memory-strategies, mc-llm-gateway-core** Jackson `ObjectMapper` is built and held as a static `MAPPER` in `MessageToLlmMessageMapper`, `ToolCalls`, `TurnMessage`, `LlmChatProvider`, `ToolCallWorker`, `SummarizingWindowStrategy` and `ToolPairSanitizer`; `FeatureContext` exposes one. The port `LlmGateway` no longer builds one: its `chat()` takes the tool calls the adapter reassembled for the call event. The core is meant to know no Jackson databind: a codec port in `-core` with the Jackson adapter in `mc-agent-runtime`, one injected mapper per runtime.
   Found 2026-10-14 by the ArchUnit baseline (43 entries) and mc-sandbox refactorings.md. Size: one wave. Rule: D1, reuse.
 - [ ] **agents/core/mc-agent-runtime-core** `Persistence.Postgres` takes a `javax.sql.DataSource`; a core type names a JDBC type.
   Found 2026-10-14 by the ArchUnit baseline. Size: small. Rule: D1.
