@@ -35,22 +35,4 @@ public class LlmTransientException extends RuntimeException {
         return retryAfterMillis;
     }
 
-    /** Whether an HTTP status should be treated as a transient, retryable error. */
-    public static boolean isTransient(int httpStatus) {
-        return httpStatus == 429 || httpStatus == 529;
-    }
-
-    /**
-     * Parses a {@code Retry-After} header value (HTTP delay in seconds) into
-     * millis. Returns 0 when the header is absent, blank, or not a number —
-     * the caller then falls back to its own backoff schedule.
-     */
-    public static long parseRetryAfterMillis(String retryAfterHeader) {
-        if (retryAfterHeader == null || retryAfterHeader.isBlank()) return 0L;
-        try {
-            return (long) (Double.parseDouble(retryAfterHeader.trim()) * 1000);
-        } catch (NumberFormatException e) {
-            return 0L;
-        }
-    }
 }

@@ -41,7 +41,7 @@ public final class LlmHttpError {
      */
     public static void logHttpError(Logger log, String provider, LlmConfig config,
                                     int status, String retryAfterHeader, String body) {
-        if (!LlmTransientException.isTransient(status)) {
+        if (!isTransient(status)) {
             log.warn("LLM call failed: HTTP {} from {} — config '{}', model '{}' — body: {}",
                     status, provider, name(config), model(config), compact(body));
             return;
@@ -49,7 +49,7 @@ public final class LlmHttpError {
         log.warn("{} from {} — config '{}', model '{}'{}; {} — provider said: {}",
                 status == 429 ? "LLM RATE LIMIT (HTTP 429)" : "LLM OVERLOADED (HTTP " + status + ")",
                 provider, name(config), model(config),
-                retryAfterHint(LlmTransientException.parseRetryAfterMillis(retryAfterHeader)),
+                retryAfterHint(parseRetryAfterMillis(retryAfterHeader)),
                 whatHappensNext(config), compact(body));
     }
 
@@ -62,8 +62,8 @@ public final class LlmHttpError {
     public static RuntimeException failure(Logger log, String provider, LlmConfig config,
                                            int status, String retryAfterHeader, String body) {
         logHttpError(log, provider, config, status, retryAfterHeader, body);
-        if (LlmTransientException.isTransient(status)) {
-            long retryAfterMillis = LlmTransientException.parseRetryAfterMillis(retryAfterHeader);
+        if (isTransient(status)) {
+            long retryAfterMillis = parseRetryAfterMillis(retryAfterHeader);
             return new LlmTransientException(status, retryAfterMillis,
                     transientMessage(provider, config, status, retryAfterMillis));
         }
@@ -115,6 +115,25 @@ public final class LlmHttpError {
             next.append(", no fallback models configured");
         }
         return next.toString();
+    }
+
+    /** A rate limit or an overloaded provider: the two statuses worth a retry. */
+    private static boolean isTransient(int status) {
+        return status == 429 || status == 529;
+    }
+
+    /**
+     * A {@code Retry-After} header, seconds as HTTP defines it, in millis; 0
+     * when the header is absent, blank or not a number, and the caller's own
+     * backoff schedule applies.
+     */
+    private static long parseRetryAfterMillis(String header) {
+        if (header == null || header.isBlank()) return 0L;
+        try {
+            return (long) (Double.parseDouble(header.trim()) * 1000);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
     }
 
     /** The provider's body on one line, bounded — enough to see which quota was hit. */
