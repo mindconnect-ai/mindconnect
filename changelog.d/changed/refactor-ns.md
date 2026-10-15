@@ -16,3 +16,8 @@
   call hands it to `AgentRuntimeBuilder.scope(…)`. `ScopeTaskAdvisor` takes that one
   scope and is always attached, so every task names its namespace; it binds the
   scope around an execution only when the scope is thread-bound.
+  `ThreadBoundScope` is renamed `ThreadBoundScopeSupplier` and moves with
+  `StartupScope` from `mc-agent-domain` to `mc-namespace-core`
+  (`ai.mindconnect.namespace.service`); a host that binds the scope per thread
+  imports them from there. The core binds through `ScopeSupplier.runIn` and
+  `callIn`, which a fixed scope simply runs.
