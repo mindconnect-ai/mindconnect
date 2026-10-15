@@ -10,6 +10,8 @@ import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.TranscriptionGateway;
 
+import java.util.function.Consumer;
+
 /**
  * Routes a transcription by config name, the way
  * {@link RoutingLlmChatService} routes a chat: look the name up, follow an
@@ -34,7 +36,7 @@ public class RoutingLlmTranscriptionService implements LlmTranscription {
 
     @Override
     public TranscriptionResult transcribe(String configName, TranscriptionRequest request,
-                                          java.util.function.Consumer<String> onDelta) {
+                                          Consumer<String> onDelta) {
         return gateway.transcribe(resolveConfig(configName), request, onDelta);
     }
 

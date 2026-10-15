@@ -29,7 +29,7 @@ public sealed interface LlmStreamChunk
 
     /**
      * A fragment of a tool call. {@code index} groups fragments belonging to
-     * the same call (the LLM may stream multiple parallel calls verzahnt).
+     * the same call (the LLM may interleave several parallel calls).
      * Any of {@code id}, {@code name}, {@code argumentsFragment} may be null
      * — they are filled across multiple deltas as the LLM produces them.
      * <p>

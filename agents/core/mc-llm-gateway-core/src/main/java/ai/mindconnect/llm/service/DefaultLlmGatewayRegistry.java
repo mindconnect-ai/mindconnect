@@ -13,21 +13,11 @@ public class DefaultLlmGatewayRegistry implements LlmGatewayRegistry {
     private final Map<LlmProvider, LlmGateway> gateways;
 
     public DefaultLlmGatewayRegistry(Map<LlmProvider, LlmGateway> gateways) {
-        // Decorator chain (outermost first): Throttling → Retrying → provider.
-        // Throttling outside Retrying so one rate-limit permit covers a whole
-        // call including its 429/529 retries. Idempotent if a gateway is already
-        // wrapped (e.g. re-registration).
+        // Throttling outside Retrying, so one rate-limit permit covers a whole
+        // call including its 429/529 retries.
         Map<LlmProvider, LlmGateway> wrapped = new HashMap<>();
-        gateways.forEach((provider, gateway) -> {
-            LlmGateway g = gateway;
-            if (!(g instanceof RetryingLlmGateway) && !(g instanceof ThrottlingLlmGateway)) {
-                g = new RetryingLlmGateway(g);
-            }
-            if (!(g instanceof ThrottlingLlmGateway)) {
-                g = new ThrottlingLlmGateway(g);
-            }
-            wrapped.put(provider, g);
-        });
+        gateways.forEach((provider, gateway) ->
+                wrapped.put(provider, new ThrottlingLlmGateway(new RetryingLlmGateway(gateway))));
         this.gateways = Map.copyOf(wrapped);
     }
 

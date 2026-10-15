@@ -1,29 +1,24 @@
 package ai.mindconnect.llm.adapter.openai;
 
-import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.LlmCallEventBuilder;
-import ai.mindconnect.llm.adapter.LlmHttpErrors;
 import ai.mindconnect.llm.adapter.LlmWireLog;
 import ai.mindconnect.llm.adapter.SseBlockReader;
+import ai.mindconnect.llm.adapter.SseStreamingGateway;
+import ai.mindconnect.llm.adapter.StreamDelta;
 import ai.mindconnect.llm.adapter.ToolCallBuilder;
 import ai.mindconnect.llm.domain.*;
-import ai.mindconnect.llm.port.in.LlmCallListener;
-import ai.mindconnect.llm.port.out.LlmGateway;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.EnumSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -34,24 +29,50 @@ import java.util.function.Consumer;
  * Subclasses override {@link #endpointUrl} and {@link #authHeader} to handle
  * provider-specific URL shapes and authentication schemes.
  */
-abstract class AbstractOpenAiGateway implements LlmGateway {
+abstract class AbstractOpenAiGateway extends SseStreamingGateway {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractOpenAiGateway.class);
     private static final MediaType JSON = MediaType.get("application/json");
 
-    protected final OkHttpClient httpClient;
-    protected final ObjectMapper objectMapper;
-    protected final EncryptionHelper encryption;
-    protected final EnvVarResolver env;
-    private final ObjectWriter prettyWriter;
-
     AbstractOpenAiGateway(OkHttpClient httpClient, ObjectMapper objectMapper, EncryptionHelper encryption,
                           EnvVarResolver env) {
-        this.httpClient = httpClient;
-        this.objectMapper = objectMapper;
-        this.encryption = encryption;
-        this.env = env;
-        this.prettyWriter = objectMapper.writerWithDefaultPrettyPrinter();
+        super("OpenAI-compatible", httpClient, objectMapper, encryption, env);
+    }
+
+    @Override
+    protected Stream newStream() {
+        return new OpenAiStream();
+    }
+
+    /** One Chat Completions stream: its tool-call builders and the think-tag splitter. */
+    private final class OpenAiStream extends Stream {
+        private final Map<Integer, ToolCallBuilder> builders = new TreeMap<>();
+        private final ThinkTagSplitter thinkTags = new ThinkTagSplitter();
+
+        @Override
+        protected StreamDelta parse(String block, Consumer<LlmStreamChunk> handler) {
+            String dataLine = SseBlockReader.dataLine(block);
+            if (dataLine == null) return StreamDelta.NONE;
+            if ("[DONE]".equals(dataLine)) return StreamDelta.END;
+            return parseOpenAiDelta(dataLine, builders, thinkTags, handler);
+        }
+
+        /** A tail held back for a {@code <think>} tag that never came is answer text. */
+        @Override
+        protected StreamDelta flush(Consumer<LlmStreamChunk> handler) {
+            ThinkTagSplitter.Split tail = thinkTags.flush();
+            if (tail.thinking() != null) {
+                handler.accept(new LlmStreamChunk.ThinkingDelta(0, "thinking", tail.thinking(), null, null));
+            }
+            if (tail.text() == null) return StreamDelta.NONE;
+            handler.accept(new LlmStreamChunk.TextDelta(tail.text()));
+            return new StreamDelta(tail.text(), 1, null, 0, 0, false);
+        }
+
+        @Override
+        protected List<ToolCall> toolCalls() {
+            return ToolCallBuilder.buildAll(builders.values(), objectMapper);
+        }
     }
 
     /** Full URL for the chat/completions endpoint, derived from the config. */
@@ -66,129 +87,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
     }
 
     @Override
-    public void chatStreaming(LlmConfig config, LlmRequest request,
-                              Consumer<LlmStreamChunk> handler,
-                              Cancellation cancellation,
-                              LlmCallListener listener) {
-        config = config.resolved(env, encryption);
-        int msgCount = request.messages() == null ? 0 : request.messages().size();
-        int toolCount = request.tools() == null ? 0 : request.tools().size();
-        log.debug("LLM stream → model={} messages={} tools={}", config.model(), msgCount, toolCount);
-        LlmCallEventBuilder trace = new LlmCallEventBuilder(config, request);
-
-        StringBuilder assistantText = new StringBuilder();
-        Map<Integer, ToolCallBuilder> toolCallBuilders = new TreeMap<>();
-        ThinkTagSplitter thinkTags = new ThinkTagSplitter();
-        Integer errorStatus = null;
-        String errorBody = null;
-
-        ObjectNode requestNode;
-        String body;
-        try {
-            requestNode = buildRequestNode(config, request);
-            trace.request(prettyWriter, requestNode);
-            LlmWireLog.request(prettyWriter, requestNode);
-            body = objectMapper.writeValueAsString(requestNode);
-        } catch (IOException e) {
-            trace.report(listener, null, 0, 0, null, null, e.getMessage());
-            throw new RuntimeException("Failed to build OpenAI-compatible request", e);
-        }
-
-        // One slot, because the call may be replaced by a second attempt (see
-        // openStream); the abort hook always reaches the one in flight.
-        Call[] call = { httpClient.newCall(httpRequest(config, body)) };
-        // Wire the cancellation handle to the OkHttp call so cancel() actually
-        // closes the upstream HTTP connection — not just flips a flag.
-        cancellation.registerAbort(() -> call[0].cancel());
-
-        int textTokenCount = 0;
-        int inputTokens = 0;
-        int outputTokens = 0;
-        FinishReason finish = FinishReason.STOP;
-        StringBuilder debugAccumulatedText = LlmWireLog.enabled() ? new StringBuilder() : null;
-        boolean cancelledClean = false;
-
-        try (Response response = openStream(call, config, requestNode)) {
-            if (!response.isSuccessful()) {
-                errorStatus = response.code();
-                errorBody = response.body() != null ? response.body().string() : "(no body)";
-                throw LlmHttpErrors.failure(log, "OpenAI-compatible", config, errorStatus,
-                        response.header("retry-after"), errorBody);
-            }
-            try (BufferedReader reader = new BufferedReader(
-                    new InputStreamReader(response.body().byteStream()))) {
-
-                SseBlockReader blocks = new SseBlockReader(reader, cancellation);
-                String block;
-                while ((block = blocks.next()) != null) {
-                    trace.responseEvents().add(block);
-                    String dataLine = SseBlockReader.dataLine(block);
-                    if (dataLine == null) continue;
-                    if ("[DONE]".equals(dataLine)) break;
-                    ParsedDelta d = parseOpenAiDelta(dataLine, toolCallBuilders, thinkTags, handler);
-                    textTokenCount += d.textDeltas;
-                    if (d.text != null) {
-                        assistantText.append(d.text);
-                        if (debugAccumulatedText != null) debugAccumulatedText.append(d.text);
-                    }
-                    if (d.finishReason != null) finish = d.finishReason;
-                    if (d.promptTokens > 0) inputTokens = d.promptTokens;
-                    if (d.completionTokens > 0) outputTokens = d.completionTokens;
-                }
-                cancelledClean = blocks.cancelled();
-                if (blocks.trailing() != null) trace.responseEvents().add(blocks.trailing());
-                // A tail held back for a <think> tag that never came is answer
-                // text — unless the caller cancelled, after which nothing more
-                // may reach the handler.
-                ThinkTagSplitter.Split tail = cancelledClean ? ThinkTagSplitter.Split.NONE : thinkTags.flush();
-                if (tail.thinking() != null) {
-                    handler.accept(new LlmStreamChunk.ThinkingDelta(0, "thinking", tail.thinking(), null, null));
-                }
-                if (tail.text() != null) {
-                    handler.accept(new LlmStreamChunk.TextDelta(tail.text()));
-                    textTokenCount++;
-                    assistantText.append(tail.text());
-                    if (debugAccumulatedText != null) debugAccumulatedText.append(tail.text());
-                }
-            }
-        } catch (IOException e) {
-            if (call[0].isCanceled()) {
-                log.debug("LLM stream cancelled by caller after {}ms", trace.elapsedMillis());
-                cancelledClean = true;
-            } else {
-                trace.report(listener, summary(assistantText, toolCallBuilders),
-                        inputTokens, outputTokens,
-                        finish != null ? finish.name() : null, errorStatus,
-                        errorBody != null ? errorBody : e.getMessage());
-                throw new RuntimeException("Failed to stream from OpenAI-compatible endpoint", e);
-            }
-        } catch (RuntimeException e) {
-            trace.report(listener, summary(assistantText, toolCallBuilders),
-                    inputTokens, outputTokens,
-                    finish != null ? finish.name() : null, errorStatus, errorBody);
-            throw e;
-        }
-
-        // Successful (or cleanly cancelled) completion path.
-        trace.report(listener, summary(assistantText, toolCallBuilders),
-                inputTokens, outputTokens,
-                finish != null ? finish.name() : null, null, null);
-
-        if (cancelledClean) {
-            log.debug("LLM stream cancelled by caller after {}ms", trace.elapsedMillis());
-            return;
-        }
-
-        if (debugAccumulatedText != null && debugAccumulatedText.length() > 0) {
-            LlmWireLog.response(textTokenCount, debugAccumulatedText);
-        }
-        log.debug("LLM stream ← finish={} text-tokens={} in={}t out={}t {}ms",
-                finish, textTokenCount, inputTokens, outputTokens, trace.elapsedMillis());
-
-        handler.accept(new LlmStreamChunk.Done(finish, inputTokens, outputTokens));
-    }
-
-    private Request httpRequest(LlmConfig config, String body) {
+    protected Request httpRequest(LlmConfig config, String body) {
         return new Request.Builder()
                 .url(endpointUrl(config))
                 .header(authHeaderName(config), authHeader(config))
@@ -207,7 +106,8 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
      * replaces {@code call[0]} so the cancellation hook reaches the attempt in
      * flight.
      */
-    private Response openStream(Call[] call, LlmConfig config, ObjectNode requestNode) throws IOException {
+    @Override
+    protected Response open(Call[] call, LlmConfig config, ObjectNode requestNode) throws IOException {
         Response response = call[0].execute();
         if (response.code() != 400 || !requestNode.has("reasoning_effort")) return response;
         String errorBody = response.peekBody(64 * 1024).string();
@@ -221,11 +121,6 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         return call[0].execute();
     }
 
-    /** Per-delta extraction result so the streaming loop stays linear. */
-    record ParsedDelta(
-            String text, int textDeltas, FinishReason finishReason,
-            int promptTokens, int completionTokens) {}
-
     /**
      * Parses one OpenAI {@code data: {...}} payload, forwards the resulting
      * chunks to the live stream handler, and feeds the tool-call builders.
@@ -236,7 +131,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
      * field (Ollama, Groq, OpenRouter), or {@code <think>} tags inline in the
      * content, which {@code thinkTags} cuts out. Package-private for tests.
      */
-    ParsedDelta parseOpenAiDelta(String data,
+    StreamDelta parseOpenAiDelta(String data,
                                  Map<Integer, ToolCallBuilder> builders,
                                  ThinkTagSplitter thinkTags,
                                  Consumer<LlmStreamChunk> handler) {
@@ -309,12 +204,12 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                 promptTokens = usage.path("prompt_tokens").asInt(0);
                 completionTokens = usage.path("completion_tokens").asInt(0);
             }
-            return new ParsedDelta(text, textDeltas, finish, promptTokens, completionTokens);
+            return new StreamDelta(text, textDeltas, finish, promptTokens, completionTokens, false);
         } catch (StreamErrored e) {
             throw e;                       // a reported backend error must FAIL the call
         } catch (Exception e) {
             log.warn("Failed to parse OpenAI delta: {} — payload: {}", e.getMessage(), data);
-            return new ParsedDelta(null, 0, null, 0, 0);
+            return StreamDelta.NONE;
         }
     }
 
@@ -334,11 +229,6 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         }
     }
 
-    private LlmCallEvent.ResponseSummary summary(StringBuilder assistantText,
-                                                  Map<Integer, ToolCallBuilder> builders) {
-        return LlmCallEventBuilder.summary(assistantText, ToolCallBuilder.buildAll(builders.values(), objectMapper));
-    }
-
     private static FinishReason parseFinishReason(String raw) {
         return switch (raw) {
             case "stop" -> FinishReason.STOP;
@@ -348,12 +238,12 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         };
     }
 
-    // package-private for testing the wire JSON without a live HTTP call
-    ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
+    @Override
+    protected ObjectNode buildRequestNode(LlmConfig config, LlmRequest request) throws IOException {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("model", config.model());
         root.put("stream", true);
-        boolean reasoning = OpenAiModels.isReasoningModel(config.model());
+        boolean reasoning = OpenAiModelPolicy.isReasoningModel(config.model());
         if (!reasoning) {
             root.put("temperature", request.temperature() < 0 ? config.defaultTemperature() : request.temperature());
         }
@@ -377,7 +267,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         // API (provider OPENAI), and only OPENAI_CHAT_COMPLETIONS lands here.
         boolean tools = request.tools() != null && !request.tools().isEmpty();
         if (OPENAI_ITSELF.contains(config.provider()) && tools
-                && OpenAiModels.refusesToolsWithReasoningOnChat(config.model())) {
+                && OpenAiModelPolicy.refusesToolsWithReasoningOnChat(config.model())) {
             if (reasoningEffort != null && !"none".equals(reasoningEffort)) {
                 log.debug("{} takes no reasoning with tools on Chat Completions — sending reasoning_effort=none instead of {}",
                         config.model(), reasoningEffort);

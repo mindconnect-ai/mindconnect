@@ -14,9 +14,12 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Pattern;
 
 /**
  * Asks a provider which models it serves, so a config can be pointed at one by
@@ -204,7 +207,7 @@ public class ProviderModelCatalog {
             if (context == null) context = ModelListingReader.intOrNull(m.path("context_window"));
             models.add(new Model(id, label(id, name, context), typeOf(id), context));
         }
-        models.sort(java.util.Comparator.comparing(Model::id));
+        models.sort(Comparator.comparing(Model::id));
         return models;
     }
 
@@ -259,7 +262,7 @@ public class ProviderModelCatalog {
      * model from the admin who knows better.
      */
     static LlmConfigType typeOf(String id) {
-        String lower = id.toLowerCase(java.util.Locale.ROOT);
+        String lower = id.toLowerCase(Locale.ROOT);
         if (lower.contains("embed")) return LlmConfigType.EMBEDDING;
         if (lower.contains("whisper") || lower.contains("transcribe")) return LlmConfigType.SPEECH_TO_TEXT;
         return null;
@@ -271,7 +274,7 @@ public class ProviderModelCatalog {
      * models that predate chat. Providers list them next to their chat models,
      * but a chat call to one fails, and there is no config type for what they do.
      */
-    private static final java.util.regex.Pattern NO_CONFIG_TYPE = java.util.regex.Pattern.compile(
+    private static final Pattern NO_CONFIG_TYPE = Pattern.compile(
             "dall-e|gpt-image|chatgpt-image|imagen|(^|/)veo-|(^|/)sora"
                     + "|(^|[-_/.])tts([-_.]|$)"
                     + "|moderation|realtime|computer-use"
@@ -279,7 +282,7 @@ public class ProviderModelCatalog {
 
     /** Is this a model none of the config types can call? See {@link #NO_CONFIG_TYPE}. */
     static boolean fitsNoConfigType(String id) {
-        return NO_CONFIG_TYPE.matcher(id.toLowerCase(java.util.Locale.ROOT)).find();
+        return NO_CONFIG_TYPE.matcher(id.toLowerCase(Locale.ROOT)).find();
     }
 
     /** {@code gpt-4o · GPT-4o · 128k} — id first, since that is what the config stores. */

@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 /**
  * Routes a chat request at the config it names: resolves the name (following
@@ -141,6 +142,6 @@ public class RoutingLlmChatService implements LlmChat {
     }
 
     private static String names(List<LlmConfig> configs) {
-        return configs.stream().map(LlmConfig::name).collect(java.util.stream.Collectors.joining(", ", "[", "]"));
+        return configs.stream().map(LlmConfig::name).collect(Collectors.joining(", ", "[", "]"));
     }
 }

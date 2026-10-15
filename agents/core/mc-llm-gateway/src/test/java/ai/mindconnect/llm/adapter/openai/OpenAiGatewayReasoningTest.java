@@ -100,14 +100,14 @@ class OpenAiGatewayReasoningTest {
 
     @Test
     void onlyGpt56AndLaterRefuseToolsWithReasoning() {
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.6")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.6-luna")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.10-mini")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-6")).isTrue();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5.5")).isFalse();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-5-mini")).isFalse();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("gpt-4o")).isFalse();
-        assertThat(OpenAiModels.refusesToolsWithReasoningOnChat("o3")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.6")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.6-luna")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.10-mini")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-6")).isTrue();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5.5")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-5-mini")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("gpt-4o")).isFalse();
+        assertThat(OpenAiModelPolicy.refusesToolsWithReasoningOnChat("o3")).isFalse();
     }
 
     @Test

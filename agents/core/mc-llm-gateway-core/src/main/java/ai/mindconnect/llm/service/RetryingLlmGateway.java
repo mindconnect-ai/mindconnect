@@ -41,11 +41,6 @@ public class RetryingLlmGateway implements LlmGateway {
         this.delegate = delegate;
     }
 
-    /** The wrapped gateway (mainly for tests / introspection). */
-    public LlmGateway delegate() {
-        return delegate;
-    }
-
     @Override
     public void chatStreaming(LlmConfig config, LlmRequest request,
                               Consumer<LlmStreamChunk> handler,

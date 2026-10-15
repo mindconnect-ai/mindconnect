@@ -4,6 +4,7 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Supported providers. Each constant also declares the {@link AdditionalParamSpec}s
@@ -207,15 +208,15 @@ public enum LlmProvider {
 
         /** For the providers that also transcribe: the chat knob and the speech ones. */
         static final List<AdditionalParamSpec> CHAT_AND_TRANSCRIPTION =
-                java.util.stream.Stream.concat(CHAT.stream(), SpeechParams.TRANSCRIPTION.stream()).toList();
+                Stream.concat(CHAT.stream(), SpeechParams.TRANSCRIPTION.stream()).toList();
 
         /**
          * OpenAI itself: the gateway speaks the Responses API there, which can
          * also summarise the reasoning for the chat.
          */
-        static final List<AdditionalParamSpec> OPENAI = java.util.stream.Stream.of(
+        static final List<AdditionalParamSpec> OPENAI = Stream.of(
                 CHAT.stream(),
-                java.util.stream.Stream.of(AdditionalParamSpec.select("reasoning_summary", "Reasoning summary",
+                Stream.of(AdditionalParamSpec.select("reasoning_summary", "Reasoning summary",
                         List.of("auto", "concise", "detailed", "none"),
                         "A readable summary of what a reasoning model thought, shown in the chat. "
                                 + "OpenAI hands summaries only to verified organizations — set "

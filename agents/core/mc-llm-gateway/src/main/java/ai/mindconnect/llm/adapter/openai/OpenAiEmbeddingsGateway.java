@@ -78,7 +78,7 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
                 LlmHttpErrors.logHttpError(log, "OpenAI-compatible embeddings", config,
                         response.code(), response.header("retry-after"), payload);
                 throw new IllegalStateException("Embeddings call failed (" + response.code() + "): "
-                        + truncate(payload));
+                        + LlmHttpErrors.compact(payload));
             }
             JsonNode data = objectMapper.readTree(payload).path("data");
             // The API may return entries out of order; "index" is authoritative.
@@ -107,9 +107,5 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
             throw new IllegalStateException("Embeddings call to " + config.baseUrl() + " failed: "
                     + e.getMessage(), e);
         }
-    }
-
-    private static String truncate(String text) {
-        return text.length() > 500 ? text.substring(0, 500) + "…" : text;
     }
 }

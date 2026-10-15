@@ -1,8 +1,8 @@
 package ai.mindconnect.llm.adapter.memory;
 
-import ai.mindconnect.llm.domain.LlmConfigId;
-
+import ai.mindconnect.common.Versions;
 import ai.mindconnect.llm.domain.LlmConfig;
+import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 
 import java.util.List;
@@ -17,7 +17,7 @@ public class InMemoryLlmConfigRepository implements LlmConfigRepository {
 
     @Override
     public void save(LlmConfig config) {
-        store.compute(config.id(), (id, current) -> config.withVersion(ai.mindconnect.common.Versions.next(
+        store.compute(config.id(), (id, current) -> config.withVersion(Versions.next(
                 current == null ? null : current.version(), config.version(), "LlmConfig", id.value())));
     }
 

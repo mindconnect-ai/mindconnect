@@ -5,10 +5,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
  * Per-config retry policy for transient provider errors (HTTP 429 rate-limit /
- * 529 overloaded). Consumed by
- * {@link ai.mindconnect.llm.service.RetryingLlmGateway}. Attached to an
- * {@link LlmConfig} so different models/providers can be tuned independently;
- * when a config carries no policy, {@link #defaults()} applies.
+ * 529 overloaded), followed by {@link ai.mindconnect.llm.service.RetryingLlmGateway}.
+ * Attached to an {@link LlmConfig} so different models and providers can be
+ * tuned independently; a config without one is not retried at all.
  *
  * <p>Backoff is exponential: attempt <i>n</i> waits
  * {@code min(maxBackoffMillis, baseBackoffMillis * 2^(n-1))}, unless the
@@ -55,34 +54,22 @@ public record RetryConfig(
                 maxBackoffMillis != null ? maxBackoffMillis : DEFAULT_MAX_BACKOFF_MILLIS);
     }
 
-    /** The standard policy used when a config does not specify one. */
+    /** The policy the admin form offers when retry is switched on. */
     public static RetryConfig defaults() {
         return new RetryConfig(DEFAULT_ENABLED, DEFAULT_MAX_ATTEMPTS,
                 DEFAULT_BASE_BACKOFF_MILLIS, DEFAULT_MAX_BACKOFF_MILLIS);
     }
 
-    /**
-     * Hard ceiling for a server-supplied {@code Retry-After} wait, as a
-     * safety net against an absurd header value blocking a request
-     * indefinitely. Deliberately generous (5 min) — the server's hint is
-     * authoritative for how long the limit actually needs to clear, so we
-     * honour it in full up to this bound rather than clamping it to
-     * {@link #maxBackoffMillis} (which only governs our own exponential schedule).
-     */
+    /** The most a {@code Retry-After} is honoured, so an absurd header cannot park a request for good. */
     public static final long RETRY_AFTER_CEILING_MILLIS = 300_000L;
 
     /**
-     * Backoff in millis for the given 1-based attempt number.
-     * <p>
-     * A positive server-supplied {@code Retry-After} is <em>authoritative</em>:
-     * it says how long the limit genuinely needs to clear (e.g. until the
-     * per-minute token window resets), so it is honoured in full — only bounded
-     * by {@link #RETRY_AFTER_CEILING_MILLIS} as a safety net. Clamping it to
-     * {@link #maxBackoffMillis} would make us retry too early and hit the same
-     * limit again.
-     * <p>
-     * When there is no server hint, fall back to our own exponential schedule,
-     * which <em>is</em> capped at {@link #maxBackoffMillis}.
+     * Backoff in millis for the given 1-based attempt. A positive
+     * {@code Retry-After} says how long the limit genuinely needs to clear,
+     * so it is honoured in full up to {@link #RETRY_AFTER_CEILING_MILLIS};
+     * clamping it to {@link #maxBackoffMillis} would retry too early and hit
+     * the same limit again. Without a hint, the exponential schedule applies,
+     * and that one is capped.
      */
     public long backoffForAttempt(int attempt, long retryAfterMillis) {
         if (retryAfterMillis > 0) return Math.min(retryAfterMillis, RETRY_AFTER_CEILING_MILLIS);

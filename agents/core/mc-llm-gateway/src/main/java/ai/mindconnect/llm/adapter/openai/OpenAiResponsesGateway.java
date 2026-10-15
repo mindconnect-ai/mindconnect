@@ -40,9 +40,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
@@ -101,7 +104,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
      * that is not verified gets HTTP 400 for any request that asks for one. The summary is on
      * by default, so without remembering that, every call of such a key failed once more.
      */
-    private final java.util.Set<String> summariesRefused = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final Set<String> summariesRefused = ConcurrentHashMap.newKeySet();
 
     /** Thrown inside one attempt when OpenAI refuses the default summary; the call is made again without it. */
     private static final class SummaryRefused extends RuntimeException {
@@ -116,7 +119,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
                               Cancellation cancellation,
                               LlmCallListener listener) {
         LlmConfig resolved = config.resolved(env, encryption);
-        String endpoint = resolved.provider().baseUrlOr(resolved.baseUrl()) + "|" + java.util.Objects.hashCode(resolved.apiKey());
+        String endpoint = resolved.provider().baseUrlOr(resolved.baseUrl()) + "|" + Objects.hashCode(resolved.apiKey());
         try {
             stream(resolved, request, handler, cancellation, listener, summariesRefused.contains(endpoint));
         } catch (SummaryRefused refused) {
@@ -167,7 +170,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
                 errorStatus = response.code();
                 errorBody = response.body() != null ? response.body().string() : "(no body)";
                 if (errorStatus == 400 && !omitDefaultSummary && defaultSummaryRequested(config, request)
-                        && errorBody.toLowerCase(java.util.Locale.ROOT).contains("summar")) {
+                        && errorBody.toLowerCase(Locale.ROOT).contains("summar")) {
                     throw new SummaryRefused();
                 }
                 throw LlmHttpErrors.failure(log, "OpenAI Responses", config, errorStatus,
@@ -235,7 +238,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
 
     /** Whether the request asks for a summary nobody configured — the default the gateway may drop. */
     static boolean defaultSummaryRequested(LlmConfig config, LlmRequest request) {
-        return OpenAiModels.isReasoningModel(config.model())
+        return OpenAiModelPolicy.isReasoningModel(config.model())
                 && LlmParams.string(LlmParams.merge(config, request), "reasoning_summary") == null;
     }
 
@@ -250,7 +253,7 @@ public class OpenAiResponsesGateway implements LlmGateway {
         // Stateless: the history is ours and travels in every request.
         root.put("store", false);
 
-        boolean reasoning = OpenAiModels.isReasoningModel(config.model());
+        boolean reasoning = OpenAiModelPolicy.isReasoningModel(config.model());
         if (!reasoning) {
             root.put("temperature", request.temperature() < 0 ? config.defaultTemperature() : request.temperature());
         }

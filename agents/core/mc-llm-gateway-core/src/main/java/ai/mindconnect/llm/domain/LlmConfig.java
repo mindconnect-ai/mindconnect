@@ -1,9 +1,8 @@
 package ai.mindconnect.llm.domain;
 
 import ai.mindconnect.common.env.EnvVarResolver;
-import ai.mindconnect.common.env.EnvVarResolver;
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.Collections;
 import java.util.EnumSet;
@@ -115,13 +114,15 @@ public record LlmConfig(
     }
 
     /**
-     * Normalises the type ({@code null} reads as CHAT) and keeps a declared
-     * capability set as an unmodifiable copy in declaration order, so JSON
-     * and UI show a stable sequence. {@code null} stays {@code null}: not
-     * declared is a state of its own.
+     * Normalises what a stored or hand-written config may leave out: the type
+     * ({@code null} reads as CHAT), the parameter map, the fallback list. A
+     * declared capability set is kept as an unmodifiable copy in declaration
+     * order, so JSON and UI show a stable sequence; {@code null} stays
+     * {@code null}, since not declared is a state of its own.
      */
     public LlmConfig {
         if (type == null) type = LlmConfigType.CHAT;
+        if (additionalParams == null) additionalParams = Map.of();
         if (capabilities != null) {
             capabilities = capabilities.isEmpty() ? Set.of()
                     : Collections.unmodifiableSet(EnumSet.copyOf(capabilities));
@@ -145,7 +146,7 @@ public record LlmConfig(
     }
 
     /** Has this config declared its capabilities itself, rather than leaving them to the provider? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean declaresCapabilities() {
         return capabilities != null;
     }
@@ -155,56 +156,28 @@ public record LlmConfig(
      * is one, else the provider's default, else (no provider — an alias)
      * nothing. What the runtime asks through {@link #supports}.
      */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public Set<LlmCapability> effectiveCapabilities() {
         if (capabilities != null) return capabilities;
         return provider != null ? provider.defaultCapabilities() : Set.of();
     }
 
     /** Does this config — declared or by its provider's default — have the given capability? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean supports(LlmCapability capability) {
         return effectiveCapabilities().contains(capability);
     }
 
     /** Convenience: is this an embedding model? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean isEmbedding() {
         return type == LlmConfigType.EMBEDDING;
     }
 
     /** Convenience: is this a speech-to-text model? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean isSpeechToText() {
         return type == LlmConfigType.SPEECH_TO_TEXT;
-    }
-
-    /** Jackson deserialisation — trailing fields default for old persisted configs. */
-    @JsonCreator
-    public static LlmConfig fromJson(
-            @JsonProperty("id")                   String id,
-            @JsonProperty("name")                 String name,
-            @JsonProperty("provider")             LlmProvider provider,
-            @JsonProperty("model")                String model,
-            @JsonProperty("baseUrl")              String baseUrl,
-            @JsonProperty("apiKey")               String apiKey,
-            @JsonProperty("defaultTemperature")   double defaultTemperature,
-            @JsonProperty("maxOutputTokens")     int maxOutputTokens,
-            @JsonProperty("additionalParams")     Map<String, Object> additionalParams,
-            @JsonProperty("contextWindowTokens")  Integer contextWindowTokens,
-            @JsonProperty("isAlias")              boolean isAlias,
-            @JsonProperty("delegatesTo")          String delegatesTo,
-            @JsonProperty("retry")                RetryConfig retry,
-            @JsonProperty("rateLimit")            RateLimitConfig rateLimit,
-            @JsonProperty("type")                 LlmConfigType type,
-            @JsonProperty("capabilities")         Set<LlmCapability> capabilities,
-            @JsonProperty("fallbackModels")       List<String> fallbackModels,
-            @JsonProperty("version")              Long version) {
-        return new LlmConfig(new LlmConfigId(id), name, provider, model, baseUrl, apiKey,
-                defaultTemperature, maxOutputTokens,
-                additionalParams != null ? additionalParams : Map.of(),
-                contextWindowTokens, isAlias, delegatesTo, retry, rateLimit, type, capabilities,
-                fallbackModels, version);
     }
 
     /**
@@ -371,7 +344,7 @@ public record LlmConfig(
     }
 
     /** Does this config name at least one other config to fall back to on a rate limit? */
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JsonIgnore
     public boolean hasFallbackModels() {
         return fallbackModels != null && !fallbackModels.isEmpty();
     }
@@ -444,10 +417,9 @@ public record LlmConfig(
 
     /**
      * Convenience: resolves placeholders from the process environment, then
-     * decrypts the API key via the given
-     * {@link ai.mindconnect.common.util.encryption.EncryptionHelper}.
+     * decrypts the API key via the given {@link EncryptionHelper}.
      */
-    public LlmConfig resolved(ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
+    public LlmConfig resolved(EncryptionHelper encryption) {
         return resolved(EnvVarResolver.system(), encryption);
     }
 
@@ -457,7 +429,7 @@ public record LlmConfig(
      * {@link EnvVarResolver} they were built with.
      */
     public LlmConfig resolved(EnvVarResolver env,
-                              ai.mindconnect.common.util.encryption.EncryptionHelper encryption) {
+                              EncryptionHelper encryption) {
         LlmConfig r = resolved(env);
         return r.withApiKey(encryption.resolve(r.apiKey()));
     }

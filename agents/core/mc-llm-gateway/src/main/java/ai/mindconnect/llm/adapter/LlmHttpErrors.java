@@ -118,7 +118,7 @@ public final class LlmHttpErrors {
     }
 
     /** The provider's body on one line, bounded — enough to see which quota was hit. */
-    static String compact(String body) {
+    public static String compact(String body) {
         if (body == null || body.isBlank()) return "(no body)";
         String oneLine = body.replaceAll("\\s+", " ").trim();
         return oneLine.length() <= MAX_BODY_CHARS

@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.lmstudio;
 
 import ai.mindconnect.llm.adapter.ModelListing;
 import ai.mindconnect.llm.adapter.ModelListingReader;
+import ai.mindconnect.llm.domain.LlmProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
@@ -34,7 +35,7 @@ public class LmStudioModelCatalog {
     private static final Logger log = LoggerFactory.getLogger(LmStudioModelCatalog.class);
 
     /** Where LM Studio serves by default. */
-    public static final String DEFAULT_BASE_URL = ai.mindconnect.llm.domain.LlmProvider.LM_STUDIO.defaultBaseUrl();
+    public static final String DEFAULT_BASE_URL = LlmProvider.LM_STUDIO.defaultBaseUrl();
 
     private final ModelListingReader reader;
 

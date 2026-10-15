@@ -221,10 +221,10 @@ class OpenAiResponsesGatewayTest {
 
     @Test
     void everyGptAfterFiveIsAReasoningModel() {
-        assertThat(OpenAiModels.isReasoningModel("gpt-6")).isTrue();
-        assertThat(OpenAiModels.isReasoningModel("gpt-7.1-mini")).isTrue();
-        assertThat(OpenAiModels.isReasoningModel("gpt-4.1")).isFalse();
-        assertThat(OpenAiModels.isReasoningModel("gpt-4o")).isFalse();
+        assertThat(OpenAiModelPolicy.isReasoningModel("gpt-6")).isTrue();
+        assertThat(OpenAiModelPolicy.isReasoningModel("gpt-7.1-mini")).isTrue();
+        assertThat(OpenAiModelPolicy.isReasoningModel("gpt-4.1")).isFalse();
+        assertThat(OpenAiModelPolicy.isReasoningModel("gpt-4o")).isFalse();
     }
 
     /**
