@@ -62,6 +62,8 @@ and the rule it violates.
   Found 2026-10-15 in chore/refactor-core by the maintainer. Size: one wave. Rule: Look left and right (reuse), Architecture.
 - [ ] **agents/core/mc-agent-domain, mc-agent-runtime, mc-message-repository, mc-llm-gateway, mc-file-store** `Namespace` is a core type: `Scope` carries it, `NamespaceRouted` routes by it, and nineteen adapter constructors in the core modules take a `Namespace` to bind one partition; yet a namespace is an installation concern of the server (`mc-namespace-core` under `server/core`). The core should know only a partition provider (`ScopeProvider` or `PartitionProvider`, name open) that an adapter asks for the partition it writes to, and the server implements it as the namespace; `Scope.namespace()` and the constructor parameters go. How to cut it, and what the default partition of a library embedding is, is still to be discussed before any move.
   Found 2026-10-15 in chore/refactor-core by the maintainer. Size: large. Rule: D1, D2 (Architecture: hexagonal, the core knows no installation).
+- [ ] **agents/core/mc-agent-runtime-core** `FrontMatter`, the reader of the `---` header a Markdown file opens with, is JDK-only and knows nothing of the runtime, yet sits in the runtime core as the single class of package `agent.runtime.markdown`; `mc-agent-registry` imports it across the core boundary, and `FileUserMemoryRepository` in `mc-agent-runtime` keeps a `---` fence of its own instead. It belongs to `common/mc-common` (a `markdown` package next to `util`), where both, and the skills in `.claude/`, read the same header.
+  Found 2026-10-15 in chore/refactor-core by the maintainer. Size: small. Rule: Look left and right (reuse), Architecture.
 
 ## Closed
 
