@@ -6,21 +6,13 @@ import ai.mindconnect.llm.domain.LlmTransientException;
 import org.slf4j.Logger;
 
 /**
- * One place where every provider adapter turns a failed HTTP response into a
- * log line and an exception message.
- *
- * <p>It exists for the rate limit. A bare {@code HTTP 429} in the log says
- * nothing about <em>which</em> of a dozen configured models hit its limit, how
- * long the provider wants us to wait, or whether anything is going to be done
- * about it — so every 429/529 is logged with the config name, the model, the
- * {@code Retry-After} hint, and what the config's own {@code retry} policy and
- * {@link LlmConfig#fallbackModels() fallback models} will do next. That last
- * part is what turns "it was slow" into "this model is rate-limited and has no
- * fallback configured".
- *
- * <p>The provider's error body is kept — that is where the useful detail lives
- * (which quota, per minute or per day) — but flattened to one line and
- * truncated, so a rate limit costs one readable log entry, not a page.
+ * The one place every provider adapter turns a failed HTTP response into a log
+ * line and an exception. It exists for the rate limit: a bare 429 says nothing
+ * about which of a dozen configured models hit its limit, how long the provider
+ * wants to wait, or what happens next, so every 429 and 529 is logged with the
+ * config, the model, the {@code Retry-After} hint and what the config's retry
+ * policy and {@link LlmConfig#fallbackModels() fallback models} will do. The
+ * provider's error body is kept, flattened and truncated to one readable line.
  */
 public final class LlmHttpError {
 

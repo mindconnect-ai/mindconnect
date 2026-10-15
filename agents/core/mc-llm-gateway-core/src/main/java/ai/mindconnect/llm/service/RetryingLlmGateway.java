@@ -15,21 +15,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
- * Provider-agnostic retry wrapper around any {@link LlmGateway}. Catches
- * {@link LlmTransientException} (HTTP 429 rate-limit / 529 overloaded) and
- * retries the call with backoff, honouring the server's {@code Retry-After}
- * hint when present.
- *
- * <p><b>Streaming safety.</b> A retry is only safe while <em>no</em> chunk has
- * been forwarded to the caller's handler yet — otherwise a partial response
- * would be duplicated. Transient errors are reported by gateways before any
- * content streams, so this holds in practice. The wrapper enforces it with a
- * one-way "committed" latch: once the first chunk passes through, a later
- * {@link LlmTransientException} is rethrown instead of retried.
- *
- * <p>Backoff is exponential from {@link RetryConfig#baseBackoffMillis()}, attempts
- * are capped by {@link RetryConfig#maxAttempts()}; a positive {@code Retry-After} from the server takes
- * precedence over the computed delay.
+ * Retries a call that failed with an {@link LlmTransientException} with exponential
+ * backoff from {@link RetryConfig#baseBackoffMillis()}, capped by
+ * {@link RetryConfig#maxAttempts()}; a positive {@code Retry-After} from the server
+ * wins over the computed delay. A retry is only safe while no chunk has reached the
+ * caller's handler, otherwise a partial response would be duplicated, so a one-way
+ * latch commits the call at the first chunk and a later transient error is rethrown.
  */
 public class RetryingLlmGateway implements LlmGateway {
 

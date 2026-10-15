@@ -16,30 +16,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 /**
- * Provider-agnostic concurrency limiter around any {@link LlmGateway}. Caps the
- * number of in-flight requests <em>per config name</em> via a semaphore, so a
- * fan-out ({@code run_agents} spawning many sub-agents on the same config)
- * cannot exceed a provider's concurrency / rate limit.
- *
- * <p>The limit comes from {@link LlmConfig#rateLimit()}; a {@code null}
- * rate-limit config means unlimited (the call passes straight through). The
- * semaphore is keyed by config <em>name</em> so all callers of the same config
- * — across turns, sub-agents, and tool loops — share one pool of permits,
- * process-wide.
- *
- * <p>Placed <em>outside</em> {@link RetryingLlmGateway} in the decorator chain
- * so one permit covers a whole call including its 429/529 retries — a backing-off
- * request keeps holding its slot, which naturally reduces pressure on the
- * provider rather than freeing a slot for yet another concurrent attempt.
- *
- * <p>Waiting for a permit is cancellation-aware: it polls in short intervals and
- * bails out if the caller cancels, so a throttled request can still be aborted.
- *
- * <p><b>Permit count changes.</b> The permit pool for a config name is created
- * lazily on first use from that config's limit and then cached. If the limit is
- * edited later, the change takes effect after the cached entry is dropped (e.g.
- * a process restart). This keeps the hot path lock-free; live re-sizing is not a
- * requirement for the rate-limit use case.
+ * Caps the in-flight requests per config name with a semaphore, so a fan-out of
+ * sub-agents on one config cannot exceed the provider's concurrency limit; the pool
+ * is shared process-wide by every caller of that name. It sits outside
+ * {@link RetryingLlmGateway} so one permit covers a call including its retries,
+ * which keeps a backing-off request from freeing its slot for yet another attempt.
+ * Waiting polls in short intervals so a cancelled caller does not block. The pool is
+ * created from the config's limit on first use and cached; an edited limit applies
+ * after a restart, which keeps the hot path lock-free.
  */
 public class ThrottlingLlmGateway implements LlmGateway {
 

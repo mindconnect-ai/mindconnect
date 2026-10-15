@@ -49,26 +49,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * OpenAI's own API through the <b>Responses API</b> ({@code /v1/responses})
- * instead of Chat Completions. From gpt-5.6 on, OpenAI refuses function tools
- * together with reasoning on Chat Completions; only the Responses API takes
- * both. Every other OpenAI-compatible server stays on
- * {@link OpenAiCompatibleGateway}.
- *
- * <p>Stateless: {@code store=false}, the history travels in every request as
- * {@code input} items, so memory strategies, compaction and regenerate work
- * as with any other provider. What a reasoning model thought before its tool
- * calls must travel with it: the gateway asks for
- * {@code reasoning.encrypted_content} and hands each reasoning item on as a
- * {@link ThinkingBlock} of type {@value #REASONING} — the summary as its
- * text, the encrypted content as its data. The runtime stores it with the
- * tool calls, and the next request replays it in front of them.
- *
- * <p>Stream events map onto the port's chunks: reasoning summary deltas
- * become {@link LlmStreamChunk.ThinkingDelta}s, {@code output_text} deltas
- * {@link LlmStreamChunk.TextDelta}s, function calls
- * {@link LlmStreamChunk.ToolCallDelta}s — each grouped by the item's
- * {@code output_index}.
+ * OpenAI's own API through the Responses API: from gpt-5.6 on, Chat Completions
+ * refuses function tools together with reasoning, and only this API takes both.
+ * Stateless, the history travels in every request, so memory strategies and
+ * regenerate work as with any provider. What a reasoning model thought before its
+ * tool calls must travel back with them, so each reasoning item is handed on as a
+ * {@link ThinkingBlock} of type {@value #REASONING} with its encrypted content as
+ * data, and the next request replays it in front of the tool calls.
  */
 public class OpenAiResponsesGateway implements LlmGateway {
 

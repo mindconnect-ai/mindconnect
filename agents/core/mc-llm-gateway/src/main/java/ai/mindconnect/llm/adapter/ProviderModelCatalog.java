@@ -23,33 +23,12 @@ import java.util.regex.Pattern;
 
 /**
  * Asks a provider which models it serves, so a config can be pointed at one by
- * picking rather than by typing an id correctly from memory.
- *
- * <p>Three request shapes cover every provider that can be asked:
- * <ul>
- *   <li><b>OpenAI-compatible</b> — {@code GET {base}/v1/models} with a bearer
- *       token, answering {@code {"data":[{"id":…}]}}. OpenAI itself, Groq,
- *       Mistral, DeepSeek, Together, OpenRouter, Fireworks, Perplexity and
- *       Ollama all speak it (those that don't simply answer an error, which
- *       the form shows as a hint).</li>
- *   <li><b>Anthropic</b> — the same path, but authenticated with
- *       {@code x-api-key} plus {@code anthropic-version}, and with a
- *       {@code display_name} per model.</li>
- *   <li><b>Gemini</b> — {@code GET {base}/v1beta/models?key=…}, answering
- *       {@code {"models":[{"name":"models/…"}]}} with the generation methods
- *       each model supports, which is what tells chat from embedding.</li>
- * </ul>
- *
- * <p>LM Studio has a catalog of its own ({@code LmStudioModelCatalog}): its
- * native API reports context lengths and capabilities that {@code /v1/models}
- * does not. Azure OpenAI cannot be asked at all — a config there names a
- * <em>deployment</em>, which is the customer's own name for a model.
- *
- * <p>Never throws: an unreachable host, a wrong key or an endpoint that does
- * not exist comes back as a {@link ModelListing} carrying the reason, and the form
- * falls back to a text field. Timeouts are short because the call sits inside a
- * form round-trip, and answers are cached briefly so that typing in the form
- * does not re-ask the provider on every keystroke.
+ * picking rather than by typing an id from memory. OpenAI-compatible servers,
+ * Anthropic and Gemini each have their own listing shape and authentication; LM
+ * Studio has a catalog of its own, and Azure OpenAI cannot be asked, as a config
+ * there names a deployment. Never throws: an unreachable host, a wrong key or a
+ * missing endpoint comes back as a {@link ModelListing} carrying the reason. The
+ * call sits inside a form round-trip, hence the short timeouts and the brief cache.
  */
 public class ProviderModelCatalog {
 

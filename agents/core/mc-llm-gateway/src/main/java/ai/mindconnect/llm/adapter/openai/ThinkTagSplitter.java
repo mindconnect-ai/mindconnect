@@ -1,31 +1,12 @@
 package ai.mindconnect.llm.adapter.openai;
 
 /**
- * Separates inline reasoning from answer text in a Chat Completions stream.
- *
- * <p>Some OpenAI-compatible servers hand a reasoning model's thoughts over in
- * the {@code content} field, wrapped in {@code <think>…</think>} (LM Studio
- * with reasoning parsing off, Together, Fireworks, Groq in {@code raw}
- * format). Left alone, the reasoning would land in the chat bubble as if it
- * were the answer. This splitter sits between the delta parser and the
- * stream handler and routes what is inside the tags to the thinking channel
- * and what is outside to the text channel.
- *
- * <p>A thought comes before the answer, and that is the only place it is
- * looked for: once any real text has gone out, a {@code <think>} is just
- * text — a user asking what the tag does, or a quoted chat template, keeps
- * its answer. A stray {@code </think>} is dropped wherever it appears, so a
- * server whose template pre-filled the opening tag does not leak the closing
- * one; the reasoning before it cannot be told from the answer without
- * buffering the whole stream, and those servers usually parse it out
- * themselves ({@code reasoning_content}).
- *
- * <p>Deltas are small and cut anywhere, so a tag can straddle two of them
- * ({@code "<thi"} + {@code "nk>"}). The splitter keeps back the shortest
- * tail that could still turn out to be the start of the tag it is waiting
- * for and releases it as soon as the next delta shows it was not. One
- * instance per stream; {@link #flush()} at the end releases whatever was
- * held back.
+ * Routes what some OpenAI-compatible servers send inline as {@code <think>…</think>}
+ * in the {@code content} field to the thinking channel instead of the chat bubble.
+ * A thought is only looked for before the first real text, so a user quoting the
+ * tag keeps their answer; a stray closing tag is dropped so a pre-filled template
+ * does not leak it. Deltas cut anywhere, so the shortest tail that could still start
+ * a tag is held back until the next delta decides; {@link #flush()} releases it.
  */
 final class ThinkTagSplitter {
 

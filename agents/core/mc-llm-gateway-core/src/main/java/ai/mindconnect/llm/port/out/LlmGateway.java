@@ -21,21 +21,12 @@ import java.util.function.Consumer;
 public interface LlmGateway {
 
     /**
-     * Streams a chat completion. The handler receives chunks in arrival order
-     * and the stream always ends with exactly one {@link LlmStreamChunk.Done}.
-     * <p>
-     * If {@code cancellation.isCancelled()} flips during the call (typically
-     * because the caller invoked {@link Cancellation#cancel()} from another
-     * thread), the gateway aborts the underlying HTTP connection and returns
-     * promptly. The handler may receive a partial Text/ToolCall delta but
-     * is not guaranteed a {@code Done}.
-     * <p>
-     * The {@code listener} is invoked exactly once after the call ends
-     * (successfully or with an error) with the verbatim provider wire bodies.
-     * The adapter is expected to capture the JSON it sent, accumulate the
-     * raw response (or capture the error body), and fire the event from a
-     * {@code finally} block. Listener exceptions must be swallowed — a
-     * broken trace must never tear down the actual chat.
+     * Streams a chat completion: chunks arrive in order and a completed stream ends
+     * with exactly one {@link LlmStreamChunk.Done}. When the cancellation flips, the
+     * gateway aborts the connection and returns promptly, so the handler may see a
+     * partial delta and no {@code Done}. The listener is invoked exactly once after
+     * the call ends, successfully or not, with the verbatim wire bodies; its
+     * exceptions are swallowed, because a broken trace must never tear down the chat.
      */
     void chatStreaming(LlmConfig config, LlmRequest request,
                        Consumer<LlmStreamChunk> handler,

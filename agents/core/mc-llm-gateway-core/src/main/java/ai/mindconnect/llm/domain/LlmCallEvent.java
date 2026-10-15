@@ -4,23 +4,13 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Single observation of one provider call. Emitted to the {@link
- * ai.mindconnect.llm.port.in.LlmCallListener} a caller passes to
- * {@code chatStreaming(...)}, regardless of whether the call succeeded.
- *
- * <p>The event is deliberately provider-agnostic in its <em>shape</em> but
- * provider-specific in its <em>contents</em>: {@link #requestJson} holds
- * the verbatim wire request body, {@link #responseEvents} the verbatim
- * SSE event blocks the provider sent. That's what you want when the
- * provider rejects a request with a cryptic 400 or returns a tool call
- * you can't interpret. {@link #response} is the runtime's <em>own</em>
- * reconstruction of the final assistant message — text + tool calls
- * reassembled from the streamed deltas — for quick human reading.
- *
- * <p>Fields {@code promptTokens}, {@code completionTokens}, and
- * {@code finishReason} may be {@code 0} / {@code null} when the call
- * failed before usage was reported, or when the provider didn't supply
- * the data. The listener implementation must not assume they are present.
+ * One observation of a provider call, reported to the
+ * {@link ai.mindconnect.llm.port.in.LlmCallListener} whether the call succeeded or
+ * not. It carries the verbatim wire request and the verbatim SSE blocks because
+ * that is what explains a cryptic 400 or an uninterpretable tool call;
+ * {@link #response} is the runtime's own reconstruction for quick reading. Token
+ * counts and the finish reason are 0 or null when the call failed before usage was
+ * reported, so a listener must not rely on them.
  */
 public record LlmCallEvent(
         Instant startedAt,

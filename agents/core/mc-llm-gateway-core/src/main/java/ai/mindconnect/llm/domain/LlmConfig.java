@@ -75,23 +75,13 @@ public record LlmConfig(
          */
         Set<LlmCapability> capabilities,
         /**
-         * Other configs, <em>by name</em>, to try in order when this one is
-         * rate-limited — a provider answering HTTP 429 (rate limit) or 529
-         * (overloaded) after this config's own {@link #retry} policy is
-         * exhausted. Empty (the default) means <em>no fallback</em>: the
-         * transient error propagates to the caller.
-         *
-         * <p>Followed by {@link ai.mindconnect.llm.service.RoutingLlmChatService}:
-         * the first name that still answers serves the request. A fallback may
-         * name an alias (it is resolved like any other name) and may point at a
-         * different provider entirely — that is the point, a second vendor is
-         * not affected by the first one's limit. Only the config the request
-         * actually routed to is consulted, so fallback lists are not chained
-         * recursively; a name that no config carries is skipped with a warning.
-         *
-         * <p>A fallback is only taken while nothing has streamed yet — once the
-         * first chunk reached the caller, switching models would duplicate a
-         * partial answer, so the error propagates instead.
+         * Other configs, by name, to try in order when the provider still answers
+         * HTTP 429 or 529 after this config's own {@link #retry} policy; empty means
+         * the transient error propagates. A fallback may be an alias or another
+         * provider entirely, which is the point: a second vendor is not affected by
+         * the first one's limit. Lists are not chained, only the config the request
+         * routed to is consulted, and a fallback is taken only while nothing has
+         * streamed yet, since switching models mid-answer would duplicate a partial reply.
          */
         List<String> fallbackModels,
         /**

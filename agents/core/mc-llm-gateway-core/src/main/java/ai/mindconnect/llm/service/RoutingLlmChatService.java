@@ -22,22 +22,13 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
- * Routes a chat request at the config it names: resolves the name (following
- * aliases), asks the registry for the provider's gateway, and streams through
- * it.
- *
- * <p><b>Rate-limit fallbacks.</b> When the resolved config names
- * {@link LlmConfig#fallbackModels() fallback models} and the provider answers
- * with a transient error — HTTP 429 (rate limit) or 529 (overloaded), after the
- * config's own retry policy is exhausted — the request is re-routed at the next
- * named config, in order, until one answers or the list runs out. A fallback
- * typically lives at a different provider, whose limit is a different limit.
- *
- * <p>Switching model mid-answer would duplicate what the caller already saw, so
- * a fallback is only taken while nothing has streamed: the first chunk that
- * reaches the handler commits the call to its config, and a later transient
- * error propagates. Gateways report 429/529 before any content, so this is the
- * normal case, not an exception to it.
+ * Routes a chat request at the config it names, following aliases, and streams
+ * through the provider's gateway. When the provider answers with a transient error
+ * after the config's own retries and the config names
+ * {@link LlmConfig#fallbackModels() fallback models}, the request is re-routed at
+ * the next name until one answers. A fallback is taken only while nothing has
+ * streamed, since switching mid-answer would duplicate what the caller saw;
+ * gateways report 429 and 529 before any content, so that is the normal case.
  */
 public class RoutingLlmChatService implements LlmChat {
 
