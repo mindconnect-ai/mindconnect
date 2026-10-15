@@ -1,6 +1,7 @@
 package ai.mindconnect.llm;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /**
  * The one mapper the tests of this module read and write JSON with, configured like a host's:
