@@ -7,7 +7,7 @@ package ai.mindconnect.llm.domain;
  * stream content is produced, so the call can be safely retried.
  *
  * <p>The generic retry decorator
- * ({@code ai.mindconnect.llm.service.RetryingLlmGateway}) catches this and
+ * ({@link ai.mindconnect.llm.service.RetryingLlmGateway}) catches this and
  * applies backoff; non-transient failures should remain plain
  * {@link RuntimeException}s so they propagate immediately.
  *

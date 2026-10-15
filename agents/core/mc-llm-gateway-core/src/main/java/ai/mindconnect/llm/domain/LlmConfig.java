@@ -75,7 +75,7 @@ public record LlmConfig(
          * exhausted. Empty (the default) means <em>no fallback</em>: the
          * transient error propagates to the caller.
          *
-         * <p>Followed by {@code ai.mindconnect.llm.service.RoutingLlmChatService}:
+         * <p>Followed by {@link ai.mindconnect.llm.service.RoutingLlmChatService}:
          * the first name that still answers serves the request. A fallback may
          * name an alias (it is resolved like any other name) and may point at a
          * different provider entirely — that is the point, a second vendor is
