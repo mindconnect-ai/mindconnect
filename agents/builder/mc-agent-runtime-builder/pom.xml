@@ -20,6 +20,10 @@
         its own classpath — the rest of the builder API simply stays unused.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-kernel</artifactId>
+        </dependency>
         <!-- The one mandatory dependency: the runtime core (brings the LLM gateway). -->
         <dependency>
             <groupId>ai.mindconnect</groupId>

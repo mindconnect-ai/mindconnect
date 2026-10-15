@@ -4,7 +4,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 
 /**
  * The smallest agent runtime there is, embedded in a plain Java program — no
@@ -26,7 +26,7 @@ public class UsingAgentRuntimeMain {
                 .agentDefinitionFromClasspath("demo-agent.json")
                 .build()) {
 
-            System.out.println("Features: " + runtime.features().all().stream().map(RuntimeFeature::name).toList());
+            System.out.println("Features: " + runtime.features().all().stream().map(Feature::name).toList());
 
             String question = args.length > 0 ? String.join(" ", args)
                     : "In one sentence: what is a vector store?";

@@ -1,6 +1,4 @@
-package ai.mindconnect.agent.runtime.feature;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
+package ai.mindconnect.kernel;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,41 +9,27 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
- * The context the builder hands every feature: one bean registry, one
+ * The context a builder hands every feature: one bean registry, one
  * feature registry, one property map and the lifecycle hooks, shared by all
- * features of a runtime. The builder runs {@link #start()} after the last
- * {@code configure} and {@link #close()} when the runtime closes.
+ * features of a kernel. The builder runs {@link #start()} after the last
+ * {@code configure} and {@link #close()} when the kernel closes.
  */
 public class DefaultFeatureContext implements FeatureContext {
 
-    private final RuntimeView runtime;
-    private final DefaultRuntimeBeans beans;
-    private final Persistence persistence;
-    private volatile ObjectMapper objectMapper;
+    private final Kernel kernel;
+    private final DefaultBeans beans;
     private final Map<String, String> properties = new LinkedHashMap<>();
     private final List<Runnable> startHooks = new ArrayList<>();
     private final List<AutoCloseable> closeHooks = new ArrayList<>();
 
-    public DefaultFeatureContext(RuntimeView runtime, DefaultRuntimeBeans beans,
-                                 Persistence persistence, ObjectMapper objectMapper) {
-        this.runtime = runtime;
+    public DefaultFeatureContext(Kernel kernel, DefaultBeans beans) {
+        this.kernel = kernel;
         this.beans = beans;
-        this.persistence = persistence;
-        this.objectMapper = objectMapper;
     }
 
-    @Override public RuntimeView runtime() { return runtime; }
-    @Override public Persistence persistence() { return persistence; }
-    @Override public ObjectMapper objectMapper() { return objectMapper; }
-
-    /**
-     * The mapper every feature reads and writes its stores' JSON with. A builder creates
-     * the context before its host names a mapper, so the host's choice has to reach the
-     * context here — keeping the first one left a Spring host's configured mapper out of
-     * every file store and gateway.
-     */
-    public void objectMapper(ObjectMapper objectMapper) {
-        this.objectMapper = java.util.Objects.requireNonNull(objectMapper, "objectMapper");
+    @Override
+    public Kernel kernel() {
+        return kernel;
     }
 
     @Override
@@ -104,7 +88,8 @@ public class DefaultFeatureContext implements FeatureContext {
             }
         }
         if (!failures.isEmpty()) {
-            FeatureException e = new FeatureException(failures.size() + " close hook(s) failed", failures.get(0));
+            FeatureException e = new FeatureException(failures.size() + " close hook(s) failed");
+            e.initCause(failures.get(0));
             failures.stream().skip(1).forEach(e::addSuppressed);
             throw e;
         }

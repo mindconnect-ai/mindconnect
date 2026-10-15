@@ -22,6 +22,7 @@ used on its own — pull in just the one you need.
 | `mc-script-mini` | Minimal embeddable script runner |
 | `mc-jdbc` | Tiny JDBC helper: JSONB document tables, typed rows, transactions — no ORM |
 | `mc-file-repo` | The file counterpart: JSON documents read without locks, written atomically, one writer per file across the JVM |
+| `mc-kernel` | A container of features: lazy beans, decorators, contributions and lifecycle hooks, ordered by what each feature depends on — JDK only |
 
 ## Build
 

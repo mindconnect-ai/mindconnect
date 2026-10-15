@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.builder;
 
-import ai.mindconnect.agent.runtime.feature.FeatureException;
+import ai.mindconnect.kernel.FeatureException;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.subagents.SubAgentsFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;

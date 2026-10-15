@@ -143,7 +143,7 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     carries none either)
   - `builder/mc-agent-runtime-builder` + `demo/mc-agent-simple-demo` — Spring-free
     embedding facade and runnable examples. The builder assembles a core plus installed
-    `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); the
+    `Feature`s (the kernel `common/mc-kernel`, package `ai.mindconnect.kernel`); the
     shipped features live one per module in `builder/mc-agent-runtime-feature-*`
     (core = LLM + messages + agents, always installed; skills, tools, workflows, file-upload, transcription, subagents, taskqueue, namespace)
   - `server/` — what runs: the Spring Boot apps, their REST and UI libraries, and the
@@ -216,10 +216,14 @@ the thing to grep for.
   via `ScopeTaskAdvisor`, which resumes a task through `ScopeSupplier.callIn` and so knows no thread binding. Work a namespace needs once per process is a `NamespaceFirstUse`
   (`mc-namespace-core`) registered with `ThreadBoundScopeSupplier.onBind` (example: `NamespaceSeeding`);
   what a store does when a namespace is deleted is a `NamespacePurge` there. Decision: [0007](../decisions/0007-scope-supplier-per-call.md).
-- **Runtime features.** `AgentRuntimeBuilder` assembles a core plus installed
-  `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); each
-  shipped feature is one module under `builder/mc-agent-runtime-feature-*`. The Spring
-  starters build the runtime from the features and export its beans.
+- **Runtime features on a kernel.** The kernel (`common/mc-kernel`, package
+  `ai.mindconnect.kernel`, JDK only) is a container of `Feature`s: each registers lazy
+  beans, decorates beans of others and contributes to lists their owners collect. The agent
+  runtime is built on it, not the other way round: `AgentRuntimeBuilder` registers the
+  host's settings as beans (`Persistence`, `ObjectMapper`, the scope, `ToolEnvironment`)
+  and installs `CoreFeature` and the rest; the turn loop in `mc-agent-runtime-core` knows
+  no kernel. Each shipped feature is one module under `builder/mc-agent-runtime-feature-*`.
+  The Spring starters build the runtime from the features and export its beans.
 - **Installers live with the entity.** A registry installer is contributed by the module
   that owns the entity (the workflow one sits in `mc-agent-tools-workflow`).
 - **Provider seams.** A kind of external account plugs in through a `ServiceLoader`

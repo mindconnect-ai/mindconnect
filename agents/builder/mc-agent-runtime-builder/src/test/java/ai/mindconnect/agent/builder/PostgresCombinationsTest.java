@@ -4,7 +4,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.taskqueue.TaskQueueFeature;
@@ -80,7 +80,7 @@ class PostgresCombinationsTest {
                 .llmConfig(LlmConfig.lmStudio("test-llm", "m", "http://localhost:9"))
                 .agentDefinition(AgentDefinition.create("pg-agent", "pg", "You are a test.", null, "test-llm"));
         try (AgentRuntime runtime = builder.build()) {
-            assertThat(runtime.features().all()).extracting(RuntimeFeature::name)
+            assertThat(runtime.features().all()).extracting(Feature::name)
                     .containsExactly("core", "tools", "workflows", "file-upload", "task-queue");
             assertThat(runtime.beans().get(TaskStore.class)).isInstanceOf(JdbcTaskStore.class);
             assertThat(runtime.beans().get(TaskQueue.class)).isNotNull();

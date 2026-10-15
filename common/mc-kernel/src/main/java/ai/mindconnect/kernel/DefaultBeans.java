@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,16 +11,16 @@ import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
- * The runtime's bean registry: lazy singletons with stacked decorators and
+ * The kernel's bean registry: lazy singletons with stacked decorators and
  * contribution lists. Deliberately small — no reflection, no scanning, no
  * scopes. A bean is built on its first {@code get}, decorators applied
  * innermost-first in registration order, and cached; a cycle in the
  * factories is reported with the chain of types that closes it.
  *
  * <p>Registration is only open until {@link #freeze()}; after that the
- * registry is read-only, as a runtime's wiring is after {@code build()}.
+ * registry is read-only, as a kernel's wiring is after {@code build()}.
  */
-public class DefaultRuntimeBeans implements RuntimeBeans {
+public class DefaultBeans implements Beans {
 
     private final Map<Class<?>, Supplier<?>> factories = new LinkedHashMap<>();
     private final Map<Class<?>, List<UnaryOperator<Object>>> decorators = new LinkedHashMap<>();
@@ -28,7 +28,7 @@ public class DefaultRuntimeBeans implements RuntimeBeans {
     private final Map<Class<?>, Object> singletons = new LinkedHashMap<>();
     /** Types whose factory is running on the current thread's resolution chain — for cycle reports. */
     private final Set<Class<?>> resolving = new LinkedHashSet<>();
-    /** Consulted for a type nobody registered — a host container, for beans that live outside the runtime. */
+    /** Consulted for a type nobody registered — a host container, for beans that live outside the kernel. */
     private volatile java.util.function.Function<Class<?>, Optional<?>> fallback = type -> Optional.empty();
     private boolean frozen;
 
@@ -109,7 +109,7 @@ public class DefaultRuntimeBeans implements RuntimeBeans {
 
     /**
      * The bean of the given type <em>if it has already been built</em> — never
-     * building it. What a close hook asks: a runtime that never resolved a
+     * building it. What a close hook asks: a kernel that never resolved a
      * resource has nothing to release, and resolving one to close it would
      * start what shutdown is ending.
      */
@@ -125,7 +125,7 @@ public class DefaultRuntimeBeans implements RuntimeBeans {
 
     private void requireOpen() {
         if (frozen) {
-            throw new FeatureException("The runtime is built; its beans can no longer be registered or decorated");
+            throw new FeatureException("The kernel is built; its beans can no longer be registered or decorated");
         }
     }
 

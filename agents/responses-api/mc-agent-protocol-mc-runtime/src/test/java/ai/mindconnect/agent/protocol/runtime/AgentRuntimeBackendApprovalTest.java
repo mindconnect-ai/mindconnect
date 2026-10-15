@@ -10,8 +10,8 @@ import ai.mindconnect.agent.protocol.api.ResponseRequest;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
 import ai.mindconnect.agent.protocol.item.ConversationItemRecord;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.agent.tool.Tool;
@@ -154,7 +154,7 @@ class AgentRuntimeBackendApprovalTest {
         }
     }
 
-    static class ScriptedLlmFeature implements RuntimeFeature {
+    static class ScriptedLlmFeature implements Feature {
         @Override public String name() { return "scripted-llm"; }
         @Override public void configure(FeatureContext ctx) {
             ctx.decorate(LlmChat.class, original -> new ScriptedLlm());

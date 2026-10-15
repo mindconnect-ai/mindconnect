@@ -2,8 +2,8 @@ package ai.mindconnect.agent.runtime.feature.tools;
 
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.file.FileToolRepository;
-import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
+import ai.mindconnect.kernel.ConfigurableFeature;
+import ai.mindconnect.kernel.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
@@ -17,6 +17,7 @@ import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.agent.tool.ToolRegistry;
 import ai.mindconnect.agent.tool.ToolRegistryRef;
 import ai.mindconnect.agent.tool.ToolRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Tools for the agents: the SPI registry over whatever {@code mc-agent-tools-*}
@@ -64,8 +65,8 @@ public class ToolsFeature extends ConfigurableFeature {
         if (disabled != null) ctx.property("disabledTools", disabled);
         ctx.bean(ToolRegistryRef.class, ToolRegistryRef::new);
         // The operator's decisions about tools — on files only; Postgres keeps none yet.
-        if (ctx.persistence() instanceof Persistence.File f) {
-            ctx.bean(ToolRepository.class, () -> new FileToolRepository(f.dataDir(), ctx.objectMapper(),
+        if (ctx.require(Persistence.class) instanceof Persistence.File f) {
+            ctx.bean(ToolRepository.class, () -> new FileToolRepository(f.dataDir(), ctx.require(ObjectMapper.class),
                     ctx.require(ScopeSupplier.class)));
         }
         ctx.bean(ToolRegistry.class, () -> {
@@ -91,6 +92,6 @@ public class ToolsFeature extends ConfigurableFeature {
                 ctx.require(AgentSessionRepository.class), ctx.require(SkillCatalog.class),
                 ctx.find(ai.mindconnect.agent.tool.UserToolRoster.class)
                         .orElseGet(ai.mindconnect.agent.tool.UserToolRoster::none)));
-        ctx.bean(ToolExecutor.class, () -> new ToolExecutor(ctx.runtime().beans().all(ToolAdvisor.class)));
+        ctx.bean(ToolExecutor.class, () -> new ToolExecutor(ctx.kernel().beans().all(ToolAdvisor.class)));
     }
 }

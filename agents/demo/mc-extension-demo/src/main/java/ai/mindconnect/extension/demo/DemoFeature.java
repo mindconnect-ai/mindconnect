@@ -1,18 +1,19 @@
 package ai.mindconnect.extension.demo;
 
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
+import ai.mindconnect.kernel.ConfigurableFeature;
+import ai.mindconnect.kernel.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.jdbc.Sql;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Set;
 
 /**
  * The demo's runtime feature — found through
- * {@code META-INF/services/ai.mindconnect.agent.runtime.feature.RuntimeFeature},
+ * {@code META-INF/services/ai.mindconnect.kernel.Feature},
  * named in the manifest under {@code contributes.features}. It registers beans
  * of its own ({@link LlmCallCounter}, and the {@link DiceRollRepository} on
  * the persistence the host runs on, in the namespace of the call) and decorates one
@@ -28,14 +29,14 @@ public final class DemoFeature extends ConfigurableFeature {
     }
 
     @Override
-    public Set<Class<? extends RuntimeFeature>> dependsOn() {
+    public Set<Class<? extends Feature>> dependsOn() {
         return Set.of();
     }
 
     @Override
     protected void install(FeatureContext ctx) {
         ctx.bean(LlmCallCounter.class, LlmCallCounter::new);
-        ctx.bean(DiceRollRepository.class, () -> store(ctx.persistence(), scope(ctx)));
+        ctx.bean(DiceRollRepository.class, () -> store(ctx.require(Persistence.class), scope(ctx)));
         // The generic stores behind a record each: a bean lookup needs a class of its own.
         ctx.bean(ScenarioStore.class, () -> new ScenarioStore(documents(ctx, Scenario.class, "scenario", Scenario::id)));
         ctx.bean(AdventureStore.class, () -> new AdventureStore(documents(ctx, Adventure.class, "adventure", Adventure::id)));
@@ -45,8 +46,8 @@ public final class DemoFeature extends ConfigurableFeature {
 
     private static <T> DemoStore<T> documents(FeatureContext ctx, Class<T> type, String kind,
                                               java.util.function.Function<T, String> id) {
-        return switch (ctx.persistence()) {
-            case Persistence.File f -> DemoStore.onFiles(f.dataDir(), scope(ctx), ctx.objectMapper(), type, kind, id);
+        return switch (ctx.require(Persistence.class)) {
+            case Persistence.File f -> DemoStore.onFiles(f.dataDir(), scope(ctx), ctx.require(ObjectMapper.class), type, kind, id);
             case Persistence.Postgres pg -> DemoStore.onPostgres(Sql.of(pg.dataSource()), scope(ctx), type, kind, id);
             case Persistence.InMemory m -> DemoStore.inMemory(id);
         };

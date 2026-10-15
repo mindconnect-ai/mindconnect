@@ -5,7 +5,7 @@ import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.skills.SkillsFeature;
@@ -84,7 +84,7 @@ import java.util.Optional;
  * <p>What the application contributes: a {@link Persistence} (from its
  * persistence starter), the {@link ThreadBoundScopeSupplier} its request filter binds
  * (from the namespace or persistence starter — then the runtime works in the
- * namespace of the call), its {@link ObjectMapper}, any {@link RuntimeFeature}
+ * namespace of the call), its {@link ObjectMapper}, any {@link Feature}
  * beans (installed, replacing a shipped feature of the same name) and any
  * {@link AgentRuntimeCustomizer}. Every bean of the context is visible to the
  * runtime's tools as a fallback, so a tool from an optional module finds the
@@ -116,7 +116,7 @@ public class AgentRuntimeAutoConfiguration {
                               ApplicationContext context,
                               ObjectProvider<ThreadBoundScopeSupplier> boundScope,
                               ObjectProvider<EnvVarResolver> envVarResolver,
-                              ObjectProvider<RuntimeFeature> features,
+                              ObjectProvider<Feature> features,
                               ObjectProvider<AgentRuntimeCustomizer> customizers) {
         String namespace = env.getProperty("mindconnect.namespace", "local");
         AgentRuntimeBuilder builder = AgentRuntimeBuilder.of(persistence)
@@ -189,7 +189,7 @@ public class AgentRuntimeAutoConfiguration {
         AgentRuntime runtime = StartupScope.call(scope, new Namespace(namespace), builder::build);
         log.info("Agent runtime built: persistence {}, namespace {}, features {}",
                 persistence.getClass().getSimpleName(), scope != null ? "per call" : namespace,
-                runtime.features().all().stream().map(RuntimeFeature::name).toList());
+                runtime.features().all().stream().map(Feature::name).toList());
         return runtime;
     }
 

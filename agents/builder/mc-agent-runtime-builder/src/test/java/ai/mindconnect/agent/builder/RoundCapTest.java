@@ -6,8 +6,8 @@ import ai.mindconnect.agent.builder.lmstudio.TestTools;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.AgentToolId;
 import ai.mindconnect.common.Cancellation;
@@ -84,7 +84,7 @@ class RoundCapTest {
         TestTools.reset();
         return AgentRuntimeBuilder.useInMemoryPersistence()
                 .llmConfig(LlmConfig.lmStudio("scripted", "scripted-model", "http://localhost:1"))
-                .install(new RuntimeFeature() {
+                .install(new Feature() {
                     @Override public String name() { return "endless-llm"; }
                     @Override public void configure(FeatureContext ctx) {
                         ctx.decorate(LlmChat.class, original -> new EndlessLlm());

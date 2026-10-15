@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
 /**
  * A feature could not be installed or resolved: a dependency is not
@@ -9,9 +9,5 @@ public class FeatureException extends RuntimeException {
 
     public FeatureException(String message) {
         super(message);
-    }
-
-    public FeatureException(String message, Throwable cause) {
-        super(message, cause);
     }
 }

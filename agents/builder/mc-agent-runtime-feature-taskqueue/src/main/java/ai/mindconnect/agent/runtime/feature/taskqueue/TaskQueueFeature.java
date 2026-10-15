@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.runtime.feature.taskqueue;
 
-import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.FeatureException;
+import ai.mindconnect.kernel.ConfigurableFeature;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.FeatureException;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.taskqueue.LoggingTaskListener;
 import ai.mindconnect.taskqueue.TaskAdvisor;
@@ -75,9 +75,9 @@ public class TaskQueueFeature extends ConfigurableFeature {
     protected void install(FeatureContext ctx) {
         ctx.bean(TaskStore.class, () -> {
             if (!jdbc) return new InMemoryTaskStore();
-            if (!(ctx.persistence() instanceof Persistence.Postgres postgres)) {
+            if (!(ctx.require(Persistence.class) instanceof Persistence.Postgres postgres)) {
                 throw new FeatureException("TaskQueueFeature.jdbc() needs Postgres persistence; this runtime has "
-                        + ctx.persistence().getClass().getSimpleName());
+                        + ctx.require(Persistence.class).getClass().getSimpleName());
             }
             return new JdbcTaskStore(postgres.dataSource(), nodeId != null ? nodeId : defaultNodeId(), lease).initSchema();
         });
@@ -91,7 +91,7 @@ public class TaskQueueFeature extends ConfigurableFeature {
             queue.withRetention(retentionOf(ctx));
             if (maintenanceInterval != null) queue.withMaintenanceInterval(maintenanceInterval);
             // Every task carries the scope it was submitted in, is audited, … — whatever the features contributed.
-            ctx.runtime().beans().all(TaskAdvisor.class).forEach(queue::addAdvisor);
+            ctx.kernel().beans().all(TaskAdvisor.class).forEach(queue::addAdvisor);
             return queue;
         });
     }

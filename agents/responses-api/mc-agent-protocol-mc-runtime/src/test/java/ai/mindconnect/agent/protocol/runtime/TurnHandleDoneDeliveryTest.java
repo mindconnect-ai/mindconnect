@@ -5,8 +5,8 @@ import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.llm.domain.FinishReason;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -82,7 +82,7 @@ class TurnHandleDoneDeliveryTest {
         }
     }
 
-    static class AnsweringLlmFeature implements RuntimeFeature {
+    static class AnsweringLlmFeature implements Feature {
         @Override public String name() { return "answering-llm"; }
         @Override public void configure(FeatureContext ctx) {
             ctx.decorate(LlmChat.class, original -> new AnsweringLlm());

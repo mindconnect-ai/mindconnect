@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.feature.fileupload;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
-import ai.mindconnect.agent.runtime.feature.RuntimeBeans;
+import ai.mindconnect.kernel.Beans;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
@@ -36,14 +36,14 @@ public class AttachSupport {
     private final ai.mindconnect.filestore.FileStore fileStore;
     private final ai.mindconnect.vectorstore.tools.VectorStores stores;
     /** The host's workflow store when it has one (Postgres); null means the file store under {@code <dataBaseDir>/<namespace>/workflows}. */
-    private final RuntimeBeans beans;   // where the workflow store is, when the workflows feature is installed
+    private final Beans beans;   // where the workflow store is, when the workflows feature is installed
     private final ai.mindconnect.agent.runtime.service.UserHome userHome;
 
     private AttachSupport(Map<String, String> environment, DynamicToolActivations activations,
                           AgentSessionRepository sessions,
                           ai.mindconnect.filestore.FileStore fileStore,
                           ai.mindconnect.vectorstore.tools.VectorStores stores,
-                          RuntimeBeans beans,
+                          Beans beans,
                           ai.mindconnect.agent.runtime.service.UserHome userHome) {
         this.userHome = userHome;
         this.environment = environment;
@@ -59,7 +59,7 @@ public class AttachSupport {
                                        DynamicToolActivations activations,
                                        AgentSessionRepository sessions,
                                        ai.mindconnect.vectorstore.tools.VectorStores stores,
-                                       RuntimeBeans beans,
+                                       Beans beans,
                                        ai.mindconnect.filestore.FileStore fileStore,
                                        ai.mindconnect.agent.runtime.service.UserHome userHome) {
         return new AttachSupport(environment, activations, sessions, fileStore, stores, beans, userHome);
@@ -184,7 +184,7 @@ public class AttachSupport {
                           ai.mindconnect.vectorstore.tools.VectorStoreInstance instance,
                           ai.mindconnect.filestore.StoredFile stored,
                           ai.mindconnect.filestore.FileStore fileStore,
-                          RuntimeBeans beans,
+                          Beans beans,
                           ai.mindconnect.agent.runtime.domain.AgentSession chat,
                           java.nio.file.Path copyInSessionDir) throws Exception {
             // `chat` is the session the upload belongs to; its user owns the store.

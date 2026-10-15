@@ -1,6 +1,6 @@
 package ai.mindconnect.extension.adapter.classpath;
 
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.ToolFactory;
 import ai.mindconnect.extension.domain.ExtensionManifest;
@@ -66,7 +66,7 @@ public final class ContributionChecker {
         providers.addAll(serviceTypes(ToolFactory.class));
         providers.addAll(serviceTypes(MultiToolProvider.class));
         this.providerTypes = Set.copyOf(providers);
-        this.featureTypes = Set.copyOf(serviceTypes(RuntimeFeature.class));
+        this.featureTypes = Set.copyOf(serviceTypes(Feature.class));
     }
 
     private Set<String> serviceTypes(Class<?> spi) {

@@ -1,9 +1,7 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,30 +10,29 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class DefaultFeatureContextTest {
 
-    private static DefaultFeatureContext context(DefaultRuntimeBeans beans, FeatureRegistry features) {
-        RuntimeView view = new RuntimeView() {
-            @Override public RuntimeBeans beans() { return beans; }
+    private static DefaultFeatureContext context(DefaultBeans beans, FeatureRegistry features) {
+        Kernel view = new Kernel() {
+            @Override public Beans beans() { return beans; }
             @Override public Features features() { return features; }
         };
-        return new DefaultFeatureContext(view, beans, Persistence.inMemory(Path.of("/tmp/x")), new ObjectMapper());
+        return new DefaultFeatureContext(view, beans);
     }
 
     @Test
-    void aFeatureReadsAnotherFeaturesBeansThroughTheRuntime() {
-        var beans = new DefaultRuntimeBeans();
+    void aFeatureReadsAnotherFeaturesBeansThroughTheKernel() {
+        var beans = new DefaultBeans();
         var features = new FeatureRegistry();
         var ctx = context(beans, features);
         ctx.instance(String.class, "shared");
 
         assertThat(ctx.require(String.class)).isEqualTo("shared");
-        assertThat(ctx.runtime().beans().get(String.class)).isEqualTo("shared");
+        assertThat(ctx.kernel().beans().get(String.class)).isEqualTo("shared");
         assertThat(ctx.find(Integer.class)).isEmpty();
-        assertThat(ctx.persistence()).isInstanceOf(Persistence.InMemory.class);
     }
 
     @Test
     void propertiesAreSharedStringsNullRemoves() {
-        var ctx = context(new DefaultRuntimeBeans(), new FeatureRegistry());
+        var ctx = context(new DefaultBeans(), new FeatureRegistry());
         ctx.property("toolsBaseDir", "/tools");
         assertThat(ctx.property("toolsBaseDir")).contains("/tools");
         assertThat(ctx.properties()).containsEntry("toolsBaseDir", "/tools");
@@ -45,7 +42,7 @@ class DefaultFeatureContextTest {
 
     @Test
     void startHooksRunInOrderCloseHooksInReverseAndAllOfThem() {
-        var ctx = context(new DefaultRuntimeBeans(), new FeatureRegistry());
+        var ctx = context(new DefaultBeans(), new FeatureRegistry());
         List<String> log = new ArrayList<>();
         ctx.onStart(() -> log.add("start-1"));
         ctx.onStart(() -> log.add("start-2"));

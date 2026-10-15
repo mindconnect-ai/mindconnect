@@ -2,7 +2,7 @@ package ai.mindconnect.agent.starter.extension;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.ToolFactory;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -64,7 +64,7 @@ public class ExtensionAutoConfiguration {
     private static final Logger log = LoggerFactory.getLogger(ExtensionAutoConfiguration.class);
 
     /** The service interfaces the host loads from the classpath — what the audit looks at. */
-    static final List<Class<?>> CLASSPATH_SPIS = List.of(ToolFactory.class, MultiToolProvider.class, RuntimeFeature.class);
+    static final List<Class<?>> CLASSPATH_SPIS = List.of(ToolFactory.class, MultiToolProvider.class, Feature.class);
 
     @Bean
     @ConditionalOnMissingBean

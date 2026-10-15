@@ -5,8 +5,8 @@ import ai.mindconnect.agent.runtime.adapter.file.FileAgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.adapter.pg.PgAgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentRepositoryFactory;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
+import ai.mindconnect.kernel.ConfigurableFeature;
+import ai.mindconnect.kernel.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
@@ -60,6 +60,7 @@ import ai.mindconnect.message.port.out.ConversationRepository;
 import ai.mindconnect.message.port.out.MessageRepository;
 import ai.mindconnect.message.port.out.MessageRepositoryFactory;
 import ai.mindconnect.message.service.ConversationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 
 import java.nio.file.Path;
@@ -209,16 +210,16 @@ public class CoreFeature extends ConfigurableFeature {
      * runtime ends up with, and works in the namespace it names per call.
      */
     private void installRepositoryFactories(FeatureContext ctx) {
-        switch (ctx.persistence()) {
+        switch (ctx.require(Persistence.class)) {
             case Persistence.InMemory m -> {
                 llmRepositories = InMemoryLlmRepositoryFactory::new;
                 messageRepositories = InMemoryMessageRepositoryFactory::new;
                 agentRepositories = scope -> new InMemoryAgentRepositoryFactory(scope, maxTracesPerConversation);
             }
             case Persistence.File f -> {
-                llmRepositories = scope -> new FileLlmRepositoryFactory(f.dataDir(), ctx.objectMapper(), scope);
-                messageRepositories = scope -> new FileMessageRepositoryFactory(f.dataDir(), ctx.objectMapper(), scope);
-                agentRepositories = scope -> new FileAgentRepositoryFactory(f.dataDir(), ctx.objectMapper(), scope, maxTracesPerConversation);
+                llmRepositories = scope -> new FileLlmRepositoryFactory(f.dataDir(), ctx.require(ObjectMapper.class), scope);
+                messageRepositories = scope -> new FileMessageRepositoryFactory(f.dataDir(), ctx.require(ObjectMapper.class), scope);
+                agentRepositories = scope -> new FileAgentRepositoryFactory(f.dataDir(), ctx.require(ObjectMapper.class), scope, maxTracesPerConversation);
             }
             case Persistence.Postgres p -> {
                 llmRepositories = scope -> new PgLlmRepositoryFactory(sql(ctx), scope);
@@ -249,7 +250,7 @@ public class CoreFeature extends ConfigurableFeature {
                 .build());
         ctx.bean(LlmGatewayRegistry.class, () -> {
             var http = ctx.require(OkHttpClient.class);
-            var mapper = ctx.objectMapper();
+            var mapper = ctx.require(ObjectMapper.class);
             // Placeholders in a config resolve through whatever the host gave the runtime:
             // the process environment, or a chain that asks the user and the namespace first.
             var env = ctx.require(EnvVarResolver.class);
@@ -268,7 +269,7 @@ public class CoreFeature extends ConfigurableFeature {
         ctx.bean(LlmChat.class, () -> new RoutingLlmChatService(
                 ctx.require(LlmConfigRepository.class), ctx.require(LlmGatewayRegistry.class)));
         ctx.bean(LlmEmbeddings.class, () -> new OpenAiEmbeddingsGateway(
-                ctx.require(OkHttpClient.class), ctx.objectMapper(), encryption, ctx.require(EnvVarResolver.class)));
+                ctx.require(OkHttpClient.class), ctx.require(ObjectMapper.class), encryption, ctx.require(EnvVarResolver.class)));
         ctx.onStart(() -> {
             var repository = ctx.require(LlmConfigRepository.class);
             llmConfigs.forEach(repository::save);
@@ -288,7 +289,7 @@ public class CoreFeature extends ConfigurableFeature {
         if (workingDirChoice != null) ctx.property("workingDirChoice", workingDirChoice.toString());
         if (instructionsUserDir != null) ctx.property("instructionsUserDir", instructionsUserDir);
 
-        Persistence persistence = ctx.persistence();
+        Persistence persistence = ctx.require(Persistence.class);
         ctx.bean(AgentDefinitionRepository.class, () -> agentRepositories.apply(scope(ctx)).agentDefinitionRepository());
         ctx.bean(AgentSessionRepository.class, () -> agentRepositories.apply(scope(ctx)).agentSessionRepository());
         ctx.bean(WorkingMemoryRepository.class, () -> agentRepositories.apply(scope(ctx)).workingMemoryRepository());

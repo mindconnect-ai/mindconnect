@@ -8,8 +8,8 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
@@ -225,7 +225,7 @@ class IncompleteTurnTest {
         runtime = AgentRuntimeBuilder.useInMemoryPersistence()
                 .llmConfig(LlmConfig.lmStudio("scripted", "scripted-model", "http://localhost:1"))
                 .install(new ScriptedLlmFeature())
-                .install(new RuntimeFeature() {
+                .install(new Feature() {
                     @Override public String name() { return "approval-storage"; }
                     @Override public void configure(FeatureContext ctx) {
                         ctx.instance(ToolApprovalRepository.class, approvals);
@@ -302,7 +302,7 @@ class IncompleteTurnTest {
         runtime = AgentRuntimeBuilder.useInMemoryPersistence()
                 .llmConfig(LlmConfig.lmStudio("scripted", "scripted-model", "http://localhost:1"))
                 .install(new ScriptedLlmFeature())
-                .install(new RuntimeFeature() {
+                .install(new Feature() {
                     @Override public String name() { return "approval-storage"; }
                     @Override public void configure(FeatureContext ctx) {
                         ctx.instance(ToolApprovalRepository.class, mine);
@@ -372,7 +372,7 @@ class IncompleteTurnTest {
     }
 
     /** Replaces the model: which calls it makes depends on the agent's role, then it answers "done". */
-    static class ScriptedLlmFeature implements RuntimeFeature {
+    static class ScriptedLlmFeature implements Feature {
         @Override public String name() { return "scripted-llm"; }
         @Override public void configure(FeatureContext ctx) {
             ctx.decorate(LlmChat.class, original -> new ScriptedLlm());

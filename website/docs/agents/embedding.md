@@ -63,7 +63,7 @@ Add tools, and the file upload that needs them:
 ```
 
 `installFromClasspath()` installs every feature registered as a service
-(`META-INF/services/ai.mindconnect.agent.runtime.feature.RuntimeFeature`) on the
+(`META-INF/services/ai.mindconnect.kernel.Feature`) on the
 classpath, sorted by their dependencies — the shipped ones and your own.
 
 ### Rules
@@ -143,15 +143,15 @@ its `getString`.
 ## Writing a feature
 
 ```java
-public class AuditFeature extends ConfigurableFeature {     // or implement RuntimeFeature directly
+public class AuditFeature extends ConfigurableFeature {     // or implement Feature directly
     private Path logDir;
     public AuditFeature logDir(Path dir) { changing(); this.logDir = dir; return this; }   // refused once built
 
     @Override public String name() { return "audit"; }
-    @Override public Set<Class<? extends RuntimeFeature>> dependsOn() { return Set.of(ToolsFeature.class); }
+    @Override public Set<Class<? extends Feature>> dependsOn() { return Set.of(ToolsFeature.class); }
 
     @Override protected void install(FeatureContext ctx) {
-        ctx.bean(AuditLog.class, () -> new FileAuditLog(ctx.persistence().dataDir()));   // lazy singleton
+        ctx.bean(AuditLog.class, () -> new FileAuditLog(ctx.require(Persistence.class).dataDir()));   // lazy singleton
         ctx.decorate(LlmConfigRepository.class, repo -> new AuditedConfigs(repo, ctx.require(AuditLog.class)));
         ctx.contribute(ToolAdvisor.class, new AuditToolCalls(ctx.require(AuditLog.class)));
         ctx.contribute(TaskAdvisor.class, new AuditTasks());
@@ -161,8 +161,11 @@ public class AuditFeature extends ConfigurableFeature {     // or implement Runt
 }
 ```
 
-- `ctx.runtime()` is the runtime under construction; its `beans()` and
-  `features()` work here as they do after `build()`. Declaring a feature in
+- A feature is a `Feature` of the kernel (`ai.mindconnect.kernel`, module
+  `mc-kernel`). `ctx.kernel()` is the kernel under construction; its `beans()` and
+  `features()` work here as they do after `build()`. What the builder hands every
+  feature is a bean: `Persistence`, the `ObjectMapper`, the `ScopeSupplier`, the
+  `ToolEnvironment`. Declaring a feature in
   `dependsOn()` guarantees its beans are there when you read them.
 - Beans are **lazy singletons**: register suppliers in `configure`, resolve in the
   suppliers and in `onStart`. A feature may decorate a bean a later feature
@@ -173,12 +176,12 @@ public class AuditFeature extends ConfigurableFeature {     // or implement Runt
   `AgentRepositoryFactory`, `MessageRepositoryFactory`, `LlmRepositoryFactory` —
   with one implementation per backend (`File…`, `InMemory…`, `Pg…`); the file
   store and the workflow store have theirs too (`FileStoreFactory`,
-  `WorkflowRepositoryFactory`). A feature looks at the sealed `ctx.persistence()`
+  `WorkflowRepositoryFactory`). A feature looks at the sealed `ctx.require(Persistence.class)`
   once, to pick the factory, and every repository bean asks its factory; a
   feature of your own does the same (`ctx.require(AgentRepositoryFactory.class).skillRepository()`)
   instead of switching over the backend itself.
 
-Register the class in `META-INF/services/ai.mindconnect.agent.runtime.feature.RuntimeFeature`
+Register the class in `META-INF/services/ai.mindconnect.kernel.Feature`
 and `installFromClasspath()` finds it; or `install(new AuditFeature())` by hand.
 
 ## The same runtime in Spring Boot
@@ -199,7 +202,7 @@ finds the host's MCP gateway without the runtime naming it.
 An application contributes to the runtime with beans:
 
 ```java
-@Bean RuntimeFeature audit() { return new AuditFeature(); }          // installed, replacing a shipped feature of the same name
+@Bean Feature audit() { return new AuditFeature(); }          // installed, replacing a shipped feature of the same name
 @Bean AgentRuntimeCustomizer noBash() { return b -> b.property("disabledTools", "bash"); }
 ```
 

@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +15,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void aBeanIsBuiltOnceOnFirstUse() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         var builds = new AtomicInteger();
         beans.register(Greeter.class, () -> { builds.incrementAndGet(); return () -> "hi"; });
 
@@ -27,7 +27,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void decoratorsStackInRegistrationOrderOutermostLast() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         beans.decorate(Greeter.class, inner -> () -> "[" + inner.greet() + "]");   // before the bean exists
         beans.register(Greeter.class, () -> () -> "hi");
         beans.decorate(Greeter.class, inner -> () -> "<" + inner.greet() + ">");
@@ -37,7 +37,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void aLaterRegistrationReplacesTheFactoryButKeepsTheDecorators() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         beans.register(Greeter.class, () -> () -> "default");
         beans.decorate(Greeter.class, inner -> () -> "[" + inner.greet() + "]");
         beans.register(Greeter.class, () -> () -> "configured");
@@ -47,7 +47,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void contributionsAreAListInOrder() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         assertThat(beans.all(String.class)).isEmpty();
         beans.contribute(String.class, "a");
         beans.contribute(String.class, "b");
@@ -56,7 +56,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void aMissingBeanNamesItsType() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         assertThat(beans.find(Greeter.class)).isEmpty();
         assertThat(beans.has(Greeter.class)).isFalse();
         assertThatThrownBy(() -> beans.get(Greeter.class))
@@ -66,7 +66,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void aCycleIsReportedWithItsChain() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         beans.register(Greeter.class, () -> { beans.get(List.class); return () -> ""; });
         beans.register(List.class, () -> { beans.get(Greeter.class); return new ArrayList<>(); });
 
@@ -77,7 +77,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void afterFreezeNothingCanBeRegistered() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         beans.register(Greeter.class, () -> () -> "hi");
         beans.freeze();
         assertThatThrownBy(() -> beans.register(String.class, () -> "x")).isInstanceOf(FeatureException.class);
@@ -87,7 +87,7 @@ class DefaultRuntimeBeansTest {
 
     @Test
     void aBuiltBeanCannotBeReplacedOrDecoratedAnyMore() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         beans.register(Greeter.class, () -> () -> "hi");
         beans.get(Greeter.class);
         assertThatThrownBy(() -> beans.register(Greeter.class, () -> () -> "late"))

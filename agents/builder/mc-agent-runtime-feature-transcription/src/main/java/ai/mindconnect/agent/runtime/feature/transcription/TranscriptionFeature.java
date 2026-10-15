@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.feature.transcription;
 
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.openai.OpenAiTranscriptionGateway;
@@ -9,6 +9,7 @@ import ai.mindconnect.llm.port.in.LlmTranscription;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.TranscriptionGateway;
 import ai.mindconnect.llm.service.RoutingLlmTranscriptionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.OkHttpClient;
 
 /**
@@ -18,7 +19,7 @@ import okhttp3.OkHttpClient;
  * HTTP client, mapper, encryption and config repository; a runtime that
  * never hears audio leaves it out.
  */
-public class TranscriptionFeature implements RuntimeFeature {
+public class TranscriptionFeature implements Feature {
 
     @Override
     public String name() {
@@ -28,7 +29,7 @@ public class TranscriptionFeature implements RuntimeFeature {
     @Override
     public void configure(FeatureContext ctx) {
         ctx.bean(TranscriptionGateway.class, () -> new OpenAiTranscriptionGateway(
-                ctx.require(OkHttpClient.class), ctx.objectMapper(), ctx.require(EncryptionHelper.class),
+                ctx.require(OkHttpClient.class), ctx.require(ObjectMapper.class), ctx.require(EncryptionHelper.class),
                 ctx.require(EnvVarResolver.class)));
         ctx.bean(LlmTranscription.class, () -> new RoutingLlmTranscriptionService(
                 ctx.require(LlmConfigRepository.class), ctx.require(TranscriptionGateway.class)));

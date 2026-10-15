@@ -6,12 +6,12 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.domain.session.InlineSessionAgent;
-import ai.mindconnect.agent.runtime.feature.DefaultFeatureContext;
-import ai.mindconnect.agent.runtime.feature.DefaultRuntimeBeans;
-import ai.mindconnect.agent.runtime.feature.FeatureRegistry;
-import ai.mindconnect.agent.runtime.feature.Features;
-import ai.mindconnect.agent.runtime.feature.RuntimeBeans;
-import ai.mindconnect.agent.runtime.feature.RuntimeView;
+import ai.mindconnect.kernel.DefaultFeatureContext;
+import ai.mindconnect.kernel.DefaultBeans;
+import ai.mindconnect.kernel.FeatureRegistry;
+import ai.mindconnect.kernel.Features;
+import ai.mindconnect.kernel.Beans;
+import ai.mindconnect.kernel.Kernel;
 import ai.mindconnect.agent.runtime.feature.fileupload.AttachSupport;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
@@ -33,16 +33,16 @@ import java.util.function.Consumer;
  * ({@code runtime.feature(LlmFeature.class)}) or generically through
  * {@link #beans()} ({@code runtime.beans().get(LlmChat.class)}); the
  * convenience accessors below are the same lookups. The runtime is
- * {@link RuntimeView} so that a feature sees, while it is installed, exactly
+ * {@link Kernel} so that a feature sees, while it is installed, exactly
  * what a caller sees afterwards.
  */
-public class AgentRuntime implements RuntimeView, AutoCloseable {
+public class AgentRuntime implements Kernel, AutoCloseable {
 
-    private final DefaultRuntimeBeans beans;
+    private final DefaultBeans beans;
     private final FeatureRegistry features;
     private DefaultFeatureContext context;   // set by the builder once it exists — closing runs its hooks
 
-    AgentRuntime(DefaultRuntimeBeans beans, FeatureRegistry features) {
+    AgentRuntime(DefaultBeans beans, FeatureRegistry features) {
         this.beans = beans;
         this.features = features;
     }
@@ -52,7 +52,7 @@ public class AgentRuntime implements RuntimeView, AutoCloseable {
     }
 
     @Override
-    public RuntimeBeans beans() {
+    public Beans beans() {
         return beans;
     }
 

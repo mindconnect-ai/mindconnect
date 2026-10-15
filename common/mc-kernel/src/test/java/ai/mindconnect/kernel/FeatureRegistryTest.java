@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
 import org.junit.jupiter.api.Test;
 
@@ -10,26 +10,26 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class FeatureRegistryTest {
 
-    static class Tools implements RuntimeFeature {
+    static class Tools implements Feature {
         @Override public String name() { return "tools"; }
         @Override public void configure(FeatureContext ctx) { }
     }
 
     static class ConfiguredTools extends Tools { }
 
-    static class SubAgents implements RuntimeFeature {
+    static class SubAgents implements Feature {
         @Override public String name() { return "sub-agents"; }
-        @Override public Set<Class<? extends RuntimeFeature>> dependsOn() { return Set.of(Tools.class); }
+        @Override public Set<Class<? extends Feature>> dependsOn() { return Set.of(Tools.class); }
         @Override public void configure(FeatureContext ctx) { }
     }
 
-    static class Workflows implements RuntimeFeature {
+    static class Workflows implements Feature {
         @Override public String name() { return "workflows"; }
-        @Override public Set<Class<? extends RuntimeFeature>> dependsOn() { return Set.of(Tools.class, SubAgents.class); }
+        @Override public Set<Class<? extends Feature>> dependsOn() { return Set.of(Tools.class, SubAgents.class); }
         @Override public void configure(FeatureContext ctx) { }
     }
 
-    static class Impostor implements RuntimeFeature {
+    static class Impostor implements Feature {
         @Override public String name() { return "tools"; }
         @Override public void configure(FeatureContext ctx) { }
     }
@@ -87,7 +87,7 @@ class FeatureRegistryTest {
         var registry = new FeatureRegistry();
         registry.installAll(List.of(new Workflows(), new SubAgents(), new Tools()));
 
-        assertThat(registry.all()).extracting(RuntimeFeature::name)
+        assertThat(registry.all()).extracting(Feature::name)
                 .containsExactly("tools", "sub-agents", "workflows");
     }
 

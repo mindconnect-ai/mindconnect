@@ -1,49 +1,44 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Optional;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
 /**
- * What a {@link RuntimeFeature} talks to while it is being installed: the
- * runtime under construction to read from, and the registry to write to.
+ * What a {@link Feature} talks to while it is being installed: the
+ * kernel under construction to read from, and the registry to write to.
  *
- * <p><b>Reading.</b> {@link #runtime()} is the runtime being built — its
- * {@link RuntimeView#beans() beans} and {@link RuntimeView#features() features}
- * work here exactly as they do for a caller after {@code build()}. A feature
+ * <p><b>Reading.</b> {@link #kernel()} is the kernel being built — its
+ * {@link Kernel#beans() beans} and {@link Kernel#features() features}
+ * work here exactly as they do for a caller after {@code build()}. What a host
+ * hands every feature — its settings, its mapper, where it keeps data — is a
+ * bean like any other, registered before the first feature is configured. A feature
  * reads another feature's beans the way anyone else does; declaring that
- * feature in {@link RuntimeFeature#dependsOn()} is what guarantees the read
+ * feature in {@link Feature#dependsOn()} is what guarantees the read
  * never finds it missing.
  *
  * <p><b>Writing.</b> {@link #bean} registers a lazy singleton, {@link #decorate}
  * wraps one registered by someone else (encryption, access control), {@link #contribute} adds to a list the core collects (advisors,
  * workers, prompt providers), {@link #property} publishes a plain string for
  * adapters and the tool environment. {@link #onStart} and {@link #onClose}
- * hook the runtime's lifecycle.
+ * hook the kernel's lifecycle.
  */
 public interface FeatureContext {
 
     // ── reading ────────────────────────────────────────────────────────────
 
-    /** The runtime under construction. Its facade methods (chat, sessions) are not usable yet; its registries are. */
-    RuntimeView runtime();
+    /** The kernel under construction: its registries work, whatever a host builds on top of it does not yet. */
+    Kernel kernel();
 
-    /** Where this runtime keeps its data; every feature picks its adapter by switching over it. */
-    Persistence persistence();
-
-    /** The one mapper the runtime writes JSON with — file stores and Postgres documents share it. */
-    ObjectMapper objectMapper();
-
-    /** Shorthand for {@code runtime().beans().get(type)}. */
+    /** Shorthand for {@code kernel().beans().get(type)}. */
     default <T> T require(Class<T> type) {
-        return runtime().beans().get(type);
+        return kernel().beans().get(type);
     }
 
-    /** Shorthand for {@code runtime().beans().find(type)}. */
+    /** Shorthand for {@code kernel().beans().find(type)}. */
     default <T> Optional<T> find(Class<T> type) {
-        return runtime().beans().find(type);
+        return kernel().beans().find(type);
     }
 
     /** A plain-string setting published by the builder or a feature; see {@link #property(String, String)}. */
@@ -56,7 +51,7 @@ public interface FeatureContext {
 
     /**
      * Registers a lazy singleton: the factory runs on the first {@code get},
-     * the result is cached for the runtime's life. Registering a type twice
+     * the result is cached for the kernel's life. Registering a type twice
      * replaces the factory (a configured feature over a default), not the
      * decorators stacked on it.
      */
@@ -77,7 +72,7 @@ public interface FeatureContext {
     <T> void decorate(Class<T> type, UnaryOperator<T> decorator);
 
     /**
-     * Adds to the list of the given type, read with {@link RuntimeBeans#all}.
+     * Adds to the list of the given type, read with {@link Beans#all}.
      * For the many-of-a-kind: task advisors, tool advisors, workers, prompt
      * context providers, cleaners.
      */
@@ -89,6 +84,6 @@ public interface FeatureContext {
     /** Runs after every feature's {@code configure}, in installation order — schema, seeds, worker registration. */
     void onStart(Runnable hook);
 
-    /** Runs when the runtime closes, in reverse installation order. */
+    /** Runs when the kernel closes, in reverse installation order. */
     void onClose(AutoCloseable hook);
 }

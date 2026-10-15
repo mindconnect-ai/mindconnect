@@ -4,7 +4,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.skills.SkillsFeature;
@@ -50,7 +50,7 @@ class FeatureCombinationsTest {
     }
 
     private static java.util.List<String> names(AgentRuntime runtime) {
-        return runtime.features().all().stream().map(RuntimeFeature::name).toList();
+        return runtime.features().all().stream().map(Feature::name).toList();
     }
 
     @Test

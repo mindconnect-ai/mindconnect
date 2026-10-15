@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.runtime.feature.workflows;
 
 import ai.mindconnect.agent.ScopeSupplier;
-import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
+import ai.mindconnect.kernel.ConfigurableFeature;
+import ai.mindconnect.kernel.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.workflow.jackson.JacksonWorkflowSerializer;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;
@@ -53,7 +53,7 @@ public class WorkflowsFeature extends ConfigurableFeature {
     protected void install(FeatureContext ctx) {
         // The factory: the persistence setting looked at once; the partition is the namespace the scope names per call.
         // On Postgres, what the file stores kept under the data dir is imported once per namespace found there.
-        Function<Supplier<String>, WorkflowRepositoryFactory> factories = switch (ctx.persistence()) {
+        Function<Supplier<String>, WorkflowRepositoryFactory> factories = switch (ctx.require(Persistence.class)) {
             case Persistence.InMemory m -> partition -> new InMemoryWorkflowRepositoryFactory(m.dataDir(), partition);
             case Persistence.File f -> partition -> new FileWorkflowRepositoryFactory(f.dataDir(), partition);
             case Persistence.Postgres p -> partition -> new PgWorkflowRepositoryFactory(

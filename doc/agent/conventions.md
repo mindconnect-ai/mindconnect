@@ -14,7 +14,7 @@ method:
 - grep for the noun and the verb you are about to use (`grep -rn "class .*Price" --include=*.java`);
   a `LlmPriceList` next to an `LlmPricing` is a finding;
 - read "Patterns with a name" in [architecture.md](architecture.md): typed ids,
-  the `ScopeSupplier` at the adapter, `RuntimeFeature`, installers in the owning module, one
+  the `ScopeSupplier` at the adapter, `Feature`, installers in the owning module, one
   injected `ObjectMapper`;
 - when two modules need the same ten lines, extract the one class they both
   wanted; do not copy "so each module stays independent";

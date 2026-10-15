@@ -1,9 +1,7 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -17,18 +15,18 @@ class ConfigurableFeatureTest {
         @Override protected void install(FeatureContext ctx) { ctx.instance(String.class, text); }
     }
 
-    private static FeatureContext context(DefaultRuntimeBeans beans) {
+    private static FeatureContext context(DefaultBeans beans) {
         var features = new FeatureRegistry();
-        RuntimeView view = new RuntimeView() {
-            @Override public RuntimeBeans beans() { return beans; }
+        Kernel view = new Kernel() {
+            @Override public Beans beans() { return beans; }
             @Override public Features features() { return features; }
         };
-        return new DefaultFeatureContext(view, beans, Persistence.inMemory(Path.of("/tmp/x")), new ObjectMapper());
+        return new DefaultFeatureContext(view, beans);
     }
 
     @Test
     void settingsAreReadWhenConfiguredAndFrozenAfterwards() {
-        var beans = new DefaultRuntimeBeans();
+        var beans = new DefaultBeans();
         var greeting = new Greeting().text("hello");
         assertThat(greeting.configured()).isFalse();
 
@@ -40,7 +38,7 @@ class ConfigurableFeatureTest {
                 .isInstanceOf(FeatureException.class)
                 .hasMessageContaining("Greeting")
                 .hasMessageContaining("cannot change");
-        assertThatThrownBy(() -> greeting.configure(context(new DefaultRuntimeBeans())))
+        assertThatThrownBy(() -> greeting.configure(context(new DefaultBeans())))
                 .isInstanceOf(FeatureException.class);   // one runtime per instance
     }
 }

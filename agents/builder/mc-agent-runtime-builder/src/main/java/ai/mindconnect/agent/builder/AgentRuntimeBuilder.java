@@ -10,13 +10,12 @@ import ai.mindconnect.agent.runtime.adapter.prompt.PebblePromptRenderer;
 import ai.mindconnect.agent.runtime.adapter.rule.RuleBasedToolResultSummarizer;
 import ai.mindconnect.agent.runtime.adapter.token.TokenCounterRegistry;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.feature.BeansToolEnvironment;
-import ai.mindconnect.agent.runtime.feature.DefaultFeatureContext;
-import ai.mindconnect.agent.runtime.feature.DefaultRuntimeBeans;
-import ai.mindconnect.agent.runtime.feature.FeatureException;
-import ai.mindconnect.agent.runtime.feature.FeatureRegistry;
+import ai.mindconnect.kernel.DefaultFeatureContext;
+import ai.mindconnect.kernel.DefaultBeans;
+import ai.mindconnect.kernel.FeatureException;
+import ai.mindconnect.kernel.FeatureRegistry;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategyFactory;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
@@ -87,7 +86,7 @@ import java.util.function.Consumer;
 
 /**
  * Assembles an {@link AgentRuntime} without Spring, the way an
- * {@code ObjectMapper} is assembled: a core plus the {@link RuntimeFeature
+ * {@code ObjectMapper} is assembled: a core plus the {@link Feature
  * features} installed into it.
  *
  * <pre>{@code
@@ -122,7 +121,7 @@ import java.util.function.Consumer;
 public class AgentRuntimeBuilder {
 
     private final Persistence persistence;
-    private final DefaultRuntimeBeans beans = new DefaultRuntimeBeans();
+    private final DefaultBeans beans = new DefaultBeans();
     private final FeatureRegistry features = new FeatureRegistry();
     private final AgentRuntime runtime = new AgentRuntime(beans, features);
     private final DefaultFeatureContext context;
@@ -140,7 +139,7 @@ public class AgentRuntimeBuilder {
 
     private AgentRuntimeBuilder(Persistence persistence) {
         this.persistence = persistence;
-        this.context = new DefaultFeatureContext(runtime, beans, persistence, objectMapper);
+        this.context = new DefaultFeatureContext(runtime, beans);
         runtime.context(context);
         context.property("defaultBaseDir", System.getProperty("user.home"));
         context.property("dataBaseDir", persistence.dataDir().toString());
@@ -200,19 +199,19 @@ public class AgentRuntimeBuilder {
     // ── features ───────────────────────────────────────────────────────────
 
     /**
-     * Installs a feature. Its {@link RuntimeFeature#dependsOn() dependencies}
+     * Installs a feature. Its {@link Feature#dependsOn() dependencies}
      * must already be installed — a missing one is an error here, not an
      * auto-install. A feature of a name already installed replaces it.
      */
-    public AgentRuntimeBuilder install(RuntimeFeature feature) {
+    public AgentRuntimeBuilder install(Feature feature) {
         requireNotBuilt();
         features.install(feature);
         return this;
     }
 
     /**
-     * Installs every {@link RuntimeFeature} registered as a service
-     * ({@code META-INF/services/ai.mindconnect.agent.runtime.feature.RuntimeFeature})
+     * Installs every {@link Feature} registered as a service
+     * ({@code META-INF/services/ai.mindconnect.kernel.Feature})
      * on the classpath, sorted by their dependencies — the way Jackson's
      * {@code findAndRegisterModules} finds modules. Features already installed
      * under the same name are kept, so a configured instance wins over a
@@ -220,8 +219,8 @@ public class AgentRuntimeBuilder {
      */
     public AgentRuntimeBuilder installFromClasspath() {
         requireNotBuilt();
-        List<RuntimeFeature> found = new ArrayList<>();
-        ServiceLoader.load(RuntimeFeature.class).forEach(feature -> {
+        List<Feature> found = new ArrayList<>();
+        ServiceLoader.load(Feature.class).forEach(feature -> {
             if (features.byName(feature.name()).isEmpty()) found.add(feature);
         });
         features.installAll(found);
@@ -229,14 +228,14 @@ public class AgentRuntimeBuilder {
     }
 
     /** Configures an installed feature in place — a default one, or one installed earlier. */
-    public <F extends RuntimeFeature> AgentRuntimeBuilder configure(Class<F> feature, Consumer<F> configurer) {
+    public <F extends Feature> AgentRuntimeBuilder configure(Class<F> feature, Consumer<F> configurer) {
         requireNotBuilt();
         configurer.accept(features.get(feature));
         return this;
     }
 
     /** The installed feature of the given class — the same instance {@code runtime.feature(type)} returns after {@link #build()}. */
-    public <F extends RuntimeFeature> F feature(Class<F> type) {
+    public <F extends Feature> F feature(Class<F> type) {
         return features.get(type);
     }
 
@@ -280,11 +279,10 @@ public class AgentRuntimeBuilder {
         return this;
     }
 
-    /** The mapper the runtime's stores and gateways use — handed to the features' context as well. */
+    /** The mapper the runtime's stores and gateways use — every feature reads it as the {@code ObjectMapper} bean. */
     public AgentRuntimeBuilder objectMapper(ObjectMapper objectMapper) {
         requireNotBuilt();
         this.objectMapper = objectMapper;
-        context.objectMapper(objectMapper);
         return this;
     }
 
@@ -412,7 +410,7 @@ public class AgentRuntimeBuilder {
         requireNotBuilt();
         built = true;
         registerCoreSettings();
-        for (RuntimeFeature feature : features.all()) {
+        for (Feature feature : features.all()) {
             feature.configure(context);
         }
         registerCore();
@@ -421,8 +419,9 @@ public class AgentRuntimeBuilder {
         return runtime;
     }
 
-    /** What every feature may rely on before anything else: the scope, the mapper, the Sql and its DataSource. */
+    /** What every feature may rely on before anything else: the persistence, the scope, the mapper, the Sql and its DataSource. */
     private void registerCoreSettings() {
+        context.instance(Persistence.class, persistence);
         // Where this runtime works — one namespace for its whole life, or the one the host's scope
         // names per call. Every adapter asks it per call.
         ScopeSupplier workingScope = scope != null ? scope : ScopeSupplier.fixed(new Namespace(namespaceName));

@@ -91,7 +91,7 @@ public record ExtensionManifest(
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Contributes(
             Tools tools,
-            /** {@code RuntimeFeature} implementations, by class name. */
+            /** {@code Feature} implementations, by class name. */
             List<String> features,
             Content content,
             Ui ui,

@@ -1,8 +1,8 @@
 package ai.mindconnect.agent.runtime.feature.subagents;
 
-import ai.mindconnect.agent.runtime.feature.ConfigurableFeature;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.ConfigurableFeature;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.runtime.service.task.AgentTurnWorker;
 import ai.mindconnect.agent.runtime.service.task.SubAgentSupport;
@@ -34,7 +34,7 @@ public class SubAgentsFeature extends ConfigurableFeature {
     }
 
     @Override
-    public Set<Class<? extends RuntimeFeature>> dependsOn() {
+    public Set<Class<? extends Feature>> dependsOn() {
         return Set.of(ToolsFeature.class);
     }
 

@@ -3,10 +3,10 @@ package ai.mindconnect.agent.builder;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.feature.FeatureContext;
-import ai.mindconnect.agent.runtime.feature.FeatureException;
+import ai.mindconnect.kernel.FeatureContext;
+import ai.mindconnect.kernel.FeatureException;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
+import ai.mindconnect.kernel.Feature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
@@ -51,7 +51,7 @@ class AgentRuntimeFeaturesTest {
                 .agentDefinition(demoAgent());
         try (AgentRuntime runtime = builder.build()) {
 
-            assertThat(runtime.features().all()).extracting(RuntimeFeature::name)
+            assertThat(runtime.features().all()).extracting(Feature::name)
                     .containsExactly("core");
             assertThat(runtime.features().has(ToolsFeature.class)).isFalse();
             // no tools feature: the core offers the agents an empty registry, and a session still opens
@@ -69,7 +69,7 @@ class AgentRuntimeFeaturesTest {
         CoreFeature mine = new CoreFeature();
         try (AgentRuntime runtime = AgentRuntimeBuilder.of(Persistence.inMemory(tempDir())).install(mine).build()) {
             assertThat(runtime.feature(CoreFeature.class)).isSameAs(mine);
-            assertThat(runtime.features().all()).extracting(RuntimeFeature::name).containsExactly("core");
+            assertThat(runtime.features().all()).extracting(Feature::name).containsExactly("core");
         }
     }
 
@@ -97,7 +97,7 @@ class AgentRuntimeFeaturesTest {
             assertThat(runtime.feature(CoreFeature.class).defaultLlmConfigName()).isEqualTo("test-llm");
             assertThat(runtime.beans().get(LlmConfigRepository.class).findByName("test-llm")).isPresent();
             assertThat(runtime.llmConfigs()).isSameAs(runtime.beans().get(LlmConfigRepository.class));
-            assertThat(runtime.features().all()).extracting(RuntimeFeature::name)
+            assertThat(runtime.features().all()).extracting(Feature::name)
                     .containsExactlyInAnyOrder("core", "skills", "tools", "workflows", "file-upload", "transcription", "sub-agents", "task-queue");
         }
     }
@@ -143,19 +143,19 @@ class AgentRuntimeFeaturesTest {
     }
 
     /** A feature of one's own: an advisor for the tools and one for the queue, and a bean of its own. */
-    static class AuditFeature implements RuntimeFeature {
+    static class AuditFeature implements Feature {
         record Audit(String who) { }
         final ToolAdvisor toolAdvisor = (inv, chain) -> chain.proceed(inv);
         final TaskAdvisor taskAdvisor = new TaskAdvisor() { };
 
         @Override public String name() { return "audit"; }
-        @Override public Set<Class<? extends RuntimeFeature>> dependsOn() { return Set.of(ToolsFeature.class); }
+        @Override public Set<Class<? extends Feature>> dependsOn() { return Set.of(ToolsFeature.class); }
         @Override public void configure(FeatureContext ctx) {
             ctx.instance(Audit.class, new Audit("me"));
             ctx.contribute(ToolAdvisor.class, toolAdvisor);
             ctx.contribute(TaskAdvisor.class, taskAdvisor);
             // reads another feature's bean through the runtime, lazily
-            ctx.bean(String.class, () -> "audit of " + ctx.runtime().beans().get(LlmConfigRepository.class).getClass().getSimpleName());
+            ctx.bean(String.class, () -> "audit of " + ctx.kernel().beans().get(LlmConfigRepository.class).getClass().getSimpleName());
         }
     }
 
@@ -176,7 +176,7 @@ class AgentRuntimeFeaturesTest {
         try (AgentRuntime runtime = AgentRuntimeBuilder.of(Persistence.inMemory(tempDir()))
                 .installFromClasspath()
                 .build()) {
-            var names = runtime.features().all().stream().map(RuntimeFeature::name).toList();
+            var names = runtime.features().all().stream().map(Feature::name).toList();
             assertThat(names).containsExactlyInAnyOrder(
                     "core", "skills", "tools", "workflows", "file-upload", "transcription", "sub-agents", "task-queue");
             assertThat(names.indexOf("tools")).isLessThan(names.indexOf("file-upload"));

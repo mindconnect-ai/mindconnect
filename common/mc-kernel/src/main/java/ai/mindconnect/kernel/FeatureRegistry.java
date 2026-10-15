@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The central registry of a runtime's features. {@link #install} checks the
+ * The central registry of a kernel's features. {@link #install} checks the
  * feature's dependencies against what is already installed and fails when
  * one is missing — at install time, so the stack trace points at the call
  * and the installation order reads as the dependency order.
@@ -21,16 +21,16 @@ import java.util.Set;
  */
 public class FeatureRegistry implements Features {
 
-    private final Map<String, RuntimeFeature> byName = new LinkedHashMap<>();
+    private final Map<String, Feature> byName = new LinkedHashMap<>();
 
-    public synchronized void install(RuntimeFeature feature) {
-        for (Class<? extends RuntimeFeature> dependency : feature.dependsOn()) {
+    public synchronized void install(Feature feature) {
+        for (Class<? extends Feature> dependency : feature.dependsOn()) {
             if (find(dependency).isEmpty()) {
                 throw new FeatureException(describe(feature) + " needs " + dependency.getSimpleName()
                         + ", which is not installed. Install it first.");
             }
         }
-        RuntimeFeature previous = byName.get(feature.name());
+        Feature previous = byName.get(feature.name());
         if (previous != null && !previous.getClass().isAssignableFrom(feature.getClass())) {
             throw new FeatureException(describe(feature) + " cannot replace " + describe(previous)
                     + ": a replacement must be of the same class or a subclass, so that features"
@@ -44,32 +44,32 @@ public class FeatureRegistry implements Features {
      * the classpath needs no ordering of its own. A dependency neither in the
      * set nor already installed is reported like any other missing one.
      */
-    public synchronized void installAll(Collection<? extends RuntimeFeature> features) {
-        for (RuntimeFeature feature : sort(features)) {
+    public synchronized void installAll(Collection<? extends Feature> features) {
+        for (Feature feature : sort(features)) {
             install(feature);
         }
     }
 
-    /** Topological order of the given features by {@link RuntimeFeature#dependsOn()}; a cycle is an error. */
-    public static List<RuntimeFeature> sort(Collection<? extends RuntimeFeature> features) {
-        List<RuntimeFeature> ordered = new ArrayList<>();
-        Set<RuntimeFeature> done = new LinkedHashSet<>();
-        Set<RuntimeFeature> visiting = new LinkedHashSet<>();
-        for (RuntimeFeature feature : features) {
+    /** Topological order of the given features by {@link Feature#dependsOn()}; a cycle is an error. */
+    public static List<Feature> sort(Collection<? extends Feature> features) {
+        List<Feature> ordered = new ArrayList<>();
+        Set<Feature> done = new LinkedHashSet<>();
+        Set<Feature> visiting = new LinkedHashSet<>();
+        for (Feature feature : features) {
             visit(feature, features, ordered, done, visiting);
         }
         return ordered;
     }
 
-    private static void visit(RuntimeFeature feature, Collection<? extends RuntimeFeature> all,
-                              List<RuntimeFeature> ordered, Set<RuntimeFeature> done, Set<RuntimeFeature> visiting) {
+    private static void visit(Feature feature, Collection<? extends Feature> all,
+                              List<Feature> ordered, Set<Feature> done, Set<Feature> visiting) {
         if (done.contains(feature)) return;
         if (!visiting.add(feature)) {
             throw new FeatureException("Features depend on each other in a cycle: "
                     + visiting.stream().map(FeatureRegistry::describe).toList());
         }
-        for (Class<? extends RuntimeFeature> dependency : feature.dependsOn()) {
-            for (RuntimeFeature candidate : all) {
+        for (Class<? extends Feature> dependency : feature.dependsOn()) {
+            for (Feature candidate : all) {
                 if (dependency.isInstance(candidate)) {
                     visit(candidate, all, ordered, done, visiting);
                 }
@@ -81,30 +81,30 @@ public class FeatureRegistry implements Features {
     }
 
     @Override
-    public synchronized <F extends RuntimeFeature> F get(Class<F> type) {
+    public synchronized <F extends Feature> F get(Class<F> type) {
         return find(type).orElseThrow(() -> new FeatureException(
                 "Feature " + type.getSimpleName() + " is not installed"));
     }
 
     @Override
-    public synchronized <F extends RuntimeFeature> Optional<F> find(Class<F> type) {
-        for (RuntimeFeature feature : byName.values()) {
+    public synchronized <F extends Feature> Optional<F> find(Class<F> type) {
+        for (Feature feature : byName.values()) {
             if (type.isInstance(feature)) return Optional.of(type.cast(feature));
         }
         return Optional.empty();
     }
 
     @Override
-    public synchronized Optional<RuntimeFeature> byName(String name) {
+    public synchronized Optional<Feature> byName(String name) {
         return Optional.ofNullable(byName.get(name));
     }
 
     @Override
-    public synchronized List<RuntimeFeature> all() {
+    public synchronized List<Feature> all() {
         return List.copyOf(byName.values());
     }
 
-    static String describe(RuntimeFeature feature) {
+    static String describe(Feature feature) {
         return feature.getClass().getSimpleName() + " (\"" + feature.name() + "\")";
     }
 }

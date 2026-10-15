@@ -1,13 +1,13 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.kernel;
 
 import java.util.List;
 import java.util.Optional;
 
 /**
- * The bean registry of a runtime: lazy singletons by type, plus the lists
+ * The bean registry of a kernel: lazy singletons by type, plus the lists
  * features {@link FeatureContext#contribute contribute} to.
  */
-public interface RuntimeBeans {
+public interface Beans {
 
     /** The bean of the given type, built on first use. */
     <T> T get(Class<T> type) throws FeatureException;

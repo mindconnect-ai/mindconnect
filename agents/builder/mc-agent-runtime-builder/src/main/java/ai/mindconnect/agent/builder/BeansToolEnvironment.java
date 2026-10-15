@@ -1,6 +1,8 @@
-package ai.mindconnect.agent.runtime.feature;
+package ai.mindconnect.agent.builder;
 
 import ai.mindconnect.agent.tool.ToolEnvironment;
+import ai.mindconnect.kernel.Beans;
+import ai.mindconnect.kernel.FeatureContext;
 
 import java.util.Map;
 import java.util.Optional;
@@ -15,10 +17,10 @@ import java.util.function.Supplier;
  */
 public class BeansToolEnvironment implements ToolEnvironment {
 
-    private final RuntimeBeans beans;
+    private final Beans beans;
     private final Supplier<Map<String, String>> properties;
 
-    public BeansToolEnvironment(RuntimeBeans beans, Supplier<Map<String, String>> properties) {
+    public BeansToolEnvironment(Beans beans, Supplier<Map<String, String>> properties) {
         this.beans = beans;
         this.properties = properties;
     }
