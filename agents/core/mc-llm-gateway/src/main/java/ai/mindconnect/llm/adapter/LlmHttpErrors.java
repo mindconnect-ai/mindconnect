@@ -54,6 +54,23 @@ public final class LlmHttpErrors {
     }
 
     /**
+     * Logs a non-2xx provider response and returns the exception the gateway
+     * throws for it: an {@link LlmTransientException} for a rate limit or an
+     * overload, so the retry decorator can back off, a plain
+     * {@link RuntimeException} for anything else, which fails fast.
+     */
+    public static RuntimeException failure(Logger log, String provider, LlmConfig config,
+                                           int status, String retryAfterHeader, String body) {
+        logHttpError(log, provider, config, status, retryAfterHeader, body);
+        if (LlmTransientException.isTransient(status)) {
+            long retryAfterMillis = LlmTransientException.parseRetryAfterMillis(retryAfterHeader);
+            return new LlmTransientException(status, retryAfterMillis,
+                    transientMessage(provider, config, status, retryAfterMillis));
+        }
+        return new RuntimeException(provider + " stream error: " + status);
+    }
+
+    /**
      * The message a {@link LlmTransientException} carries: the same facts as
      * the log line, minus the provider body, so the error that reaches a user
      * or a trace names the model that was limited rather than a bare status.

@@ -2,6 +2,7 @@ package ai.mindconnect.llm.adapter.openai;
 
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.ToolCallBuilder;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
 import ai.mindconnect.llm.domain.LlmMessage;
@@ -231,7 +232,7 @@ class OpenAiGatewayReasoningTest {
 
     private List<LlmStreamChunk> parse(String... payloads) {
         List<LlmStreamChunk> chunks = new ArrayList<>();
-        Map<Integer, AbstractOpenAiGateway.OpenAiToolCallBuilder> builders = new TreeMap<>();
+        Map<Integer, ToolCallBuilder> builders = new TreeMap<>();
         ThinkTagSplitter splitter = new ThinkTagSplitter();
         for (String payload : payloads) {
             gateway.parseOpenAiDelta(payload, builders, splitter, chunks::add);

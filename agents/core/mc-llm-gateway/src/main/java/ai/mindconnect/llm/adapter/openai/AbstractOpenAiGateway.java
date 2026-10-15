@@ -3,12 +3,14 @@ package ai.mindconnect.llm.adapter.openai;
 import ai.mindconnect.common.Cancellation;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
+import ai.mindconnect.llm.adapter.LlmCallEventBuilder;
 import ai.mindconnect.llm.adapter.LlmHttpErrors;
-import ai.mindconnect.llm.adapter.TraceRedaction;
+import ai.mindconnect.llm.adapter.LlmWireLog;
+import ai.mindconnect.llm.adapter.SseBlockReader;
+import ai.mindconnect.llm.adapter.ToolCallBuilder;
 import ai.mindconnect.llm.domain.*;
 import ai.mindconnect.llm.port.in.LlmCallListener;
 import ai.mindconnect.llm.port.out.LlmGateway;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -21,11 +23,7 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -39,7 +37,6 @@ import java.util.function.Consumer;
 abstract class AbstractOpenAiGateway implements LlmGateway {
 
     private static final Logger log = LoggerFactory.getLogger(AbstractOpenAiGateway.class);
-    static final Logger wire = LoggerFactory.getLogger("ai.mindconnect.llm.wire");
     private static final MediaType JSON = MediaType.get("application/json");
 
     protected final OkHttpClient httpClient;
@@ -77,15 +74,10 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         int msgCount = request.messages() == null ? 0 : request.messages().size();
         int toolCount = request.tools() == null ? 0 : request.tools().size();
         log.debug("LLM stream → model={} messages={} tools={}", config.model(), msgCount, toolCount);
-        long start = System.currentTimeMillis();
-        Instant startedAt = Instant.ofEpochMilli(start);
+        LlmCallEventBuilder trace = new LlmCallEventBuilder(config, request);
 
-        // Trace buffers — populated as the stream progresses, drained into
-        // LlmCallEvent in the finally path (success or error).
-        String prettyRequestJson = null;
-        List<String> responseEvents = new ArrayList<>();
         StringBuilder assistantText = new StringBuilder();
-        Map<Integer, OpenAiToolCallBuilder> toolCallBuilders = new TreeMap<>();
+        Map<Integer, ToolCallBuilder> toolCallBuilders = new TreeMap<>();
         ThinkTagSplitter thinkTags = new ThinkTagSplitter();
         Integer errorStatus = null;
         String errorBody = null;
@@ -94,12 +86,11 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         String body;
         try {
             requestNode = buildRequestNode(config, request);
-            try { prettyRequestJson = prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)); } catch (Exception ignored) {}
-            logWireRequest(requestNode);
+            trace.request(prettyWriter, requestNode);
+            LlmWireLog.request(prettyWriter, requestNode);
             body = objectMapper.writeValueAsString(requestNode);
         } catch (IOException e) {
-            fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                    responseEvents, null, 0, 0, null, null, e.getMessage());
+            trace.report(listener, null, 0, 0, null, null, e.getMessage());
             throw new RuntimeException("Failed to build OpenAI-compatible request", e);
         }
 
@@ -114,68 +105,38 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         int inputTokens = 0;
         int outputTokens = 0;
         FinishReason finish = FinishReason.STOP;
-        StringBuilder debugAccumulatedText = wire.isDebugEnabled() ? new StringBuilder() : null;
+        StringBuilder debugAccumulatedText = LlmWireLog.enabled() ? new StringBuilder() : null;
         boolean cancelledClean = false;
 
         try (Response response = openStream(call, config, requestNode)) {
             if (!response.isSuccessful()) {
                 errorStatus = response.code();
                 errorBody = response.body() != null ? response.body().string() : "(no body)";
-                LlmHttpErrors.logHttpError(log, "OpenAI-compatible", config, errorStatus,
+                throw LlmHttpErrors.failure(log, "OpenAI-compatible", config, errorStatus,
                         response.header("retry-after"), errorBody);
-                // Transient errors (rate limit / overloaded) are typed so the
-                // generic RetryingLlmGateway can back off and retry.
-                if (LlmTransientException.isTransient(errorStatus)) {
-                    long retryAfterMillis = LlmTransientException.parseRetryAfterMillis(
-                            response.header("retry-after"));
-                    throw new LlmTransientException(errorStatus, retryAfterMillis,
-                            LlmHttpErrors.transientMessage("OpenAI-compatible", config, errorStatus,
-                                    retryAfterMillis));
-                }
-                throw new RuntimeException("OpenAI-compatible stream error: " + errorStatus);
             }
             try (BufferedReader reader = new BufferedReader(
                     new InputStreamReader(response.body().byteStream()))) {
 
-                // SSE block accumulator: collect lines until a blank line,
-                // then process and store the block as one trace entry.
-                StringBuilder block = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (cancellation.isCancelled()) { cancelledClean = true; break; }
-                    if (line.isEmpty()) {
-                        // Block boundary — capture and parse.
-                        if (block.length() > 0) {
-                            String blockText = block.toString();
-                            responseEvents.add(blockText);
-                            // Strip trailing newline before parsing.
-                            String dataLine = extractDataLine(blockText);
-                            if (dataLine != null) {
-                                if ("[DONE]".equals(dataLine)) {
-                                    block.setLength(0);
-                                    break;
-                                }
-                                ParsedDelta d = parseOpenAiDelta(dataLine, toolCallBuilders, thinkTags, handler);
-                                textTokenCount += d.textDeltas;
-                                if (d.text != null) {
-                                    assistantText.append(d.text);
-                                    if (debugAccumulatedText != null) debugAccumulatedText.append(d.text);
-                                }
-                                if (d.finishReason != null) finish = d.finishReason;
-                                if (d.promptTokens > 0) inputTokens = d.promptTokens;
-                                if (d.completionTokens > 0) outputTokens = d.completionTokens;
-                            }
-                            block.setLength(0);
-                        }
-                        continue;
+                SseBlockReader blocks = new SseBlockReader(reader, cancellation);
+                String block;
+                while ((block = blocks.next()) != null) {
+                    trace.responseEvents().add(block);
+                    String dataLine = SseBlockReader.dataLine(block);
+                    if (dataLine == null) continue;
+                    if ("[DONE]".equals(dataLine)) break;
+                    ParsedDelta d = parseOpenAiDelta(dataLine, toolCallBuilders, thinkTags, handler);
+                    textTokenCount += d.textDeltas;
+                    if (d.text != null) {
+                        assistantText.append(d.text);
+                        if (debugAccumulatedText != null) debugAccumulatedText.append(d.text);
                     }
-                    if (block.length() > 0) block.append('\n');
-                    block.append(line);
+                    if (d.finishReason != null) finish = d.finishReason;
+                    if (d.promptTokens > 0) inputTokens = d.promptTokens;
+                    if (d.completionTokens > 0) outputTokens = d.completionTokens;
                 }
-                // Some providers omit the final blank line; flush whatever is left.
-                if (block.length() > 0 && !cancelledClean) {
-                    responseEvents.add(block.toString());
-                }
+                cancelledClean = blocks.cancelled();
+                if (blocks.trailing() != null) trace.responseEvents().add(blocks.trailing());
                 // A tail held back for a <think> tag that never came is answer
                 // text — unless the caller cancelled, after which nothing more
                 // may reach the handler.
@@ -192,41 +153,37 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
             }
         } catch (IOException e) {
             if (call[0].isCanceled()) {
-                log.debug("LLM stream cancelled by caller after {}ms", System.currentTimeMillis() - start);
+                log.debug("LLM stream cancelled by caller after {}ms", trace.elapsedMillis());
                 cancelledClean = true;
             } else {
-                fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                        responseEvents, summary(assistantText, toolCallBuilders),
+                trace.report(listener, summary(assistantText, toolCallBuilders),
                         inputTokens, outputTokens,
                         finish != null ? finish.name() : null, errorStatus,
                         errorBody != null ? errorBody : e.getMessage());
                 throw new RuntimeException("Failed to stream from OpenAI-compatible endpoint", e);
             }
         } catch (RuntimeException e) {
-            fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                    responseEvents, summary(assistantText, toolCallBuilders),
+            trace.report(listener, summary(assistantText, toolCallBuilders),
                     inputTokens, outputTokens,
                     finish != null ? finish.name() : null, errorStatus, errorBody);
             throw e;
         }
 
         // Successful (or cleanly cancelled) completion path.
-        fireListener(listener, startedAt, start, config, request, prettyRequestJson,
-                responseEvents, summary(assistantText, toolCallBuilders),
+        trace.report(listener, summary(assistantText, toolCallBuilders),
                 inputTokens, outputTokens,
                 finish != null ? finish.name() : null, null, null);
 
         if (cancelledClean) {
-            log.debug("LLM stream cancelled by caller after {}ms", System.currentTimeMillis() - start);
+            log.debug("LLM stream cancelled by caller after {}ms", trace.elapsedMillis());
             return;
         }
 
         if (debugAccumulatedText != null && debugAccumulatedText.length() > 0) {
-            wire.debug("← stream response (accumulated, {} text tokens):\n{}",
-                    textTokenCount, debugAccumulatedText);
+            LlmWireLog.response(textTokenCount, debugAccumulatedText);
         }
         log.debug("LLM stream ← finish={} text-tokens={} in={}t out={}t {}ms",
-                finish, textTokenCount, inputTokens, outputTokens, System.currentTimeMillis() - start);
+                finish, textTokenCount, inputTokens, outputTokens, trace.elapsedMillis());
 
         handler.accept(new LlmStreamChunk.Done(finish, inputTokens, outputTokens));
     }
@@ -259,17 +216,9 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         log.warn("{} refused reasoning_effort for model {} — retrying without it: {}",
                 config.provider(), config.model(), errorBody.replaceAll("\\s+", " ").trim());
         requestNode.remove("reasoning_effort");
-        logWireRequest(requestNode);
+        LlmWireLog.request(prettyWriter, requestNode);
         call[0] = httpClient.newCall(httpRequest(config, objectMapper.writeValueAsString(requestNode)));
         return call[0].execute();
-    }
-
-    /** Pulls the {@code data: …} payload out of a single SSE block. */
-    private static String extractDataLine(String block) {
-        for (String line : block.split("\n")) {
-            if (line.startsWith("data: ")) return line.substring(6).trim();
-        }
-        return null;
     }
 
     /** Per-delta extraction result so the streaming loop stays linear. */
@@ -288,7 +237,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
      * content, which {@code thinkTags} cuts out. Package-private for tests.
      */
     ParsedDelta parseOpenAiDelta(String data,
-                                 Map<Integer, OpenAiToolCallBuilder> builders,
+                                 Map<Integer, ToolCallBuilder> builders,
                                  ThinkTagSplitter thinkTags,
                                  Consumer<LlmStreamChunk> handler) {
         try {
@@ -342,7 +291,7 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
                     String name = fn.has("name") ? fn.path("name").asText() : null;
                     String argsFrag = fn.has("arguments") ? fn.path("arguments").asText() : null;
                     handler.accept(new LlmStreamChunk.ToolCallDelta(index, id, name, argsFrag));
-                    builders.computeIfAbsent(index, i -> new OpenAiToolCallBuilder())
+                    builders.computeIfAbsent(index, i -> new ToolCallBuilder())
                             .feed(id, name, argsFrag);
                 }
             }
@@ -385,73 +334,9 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
         }
     }
 
-    /** Builds the {@link LlmCallEvent.ResponseSummary} from accumulators. */
     private LlmCallEvent.ResponseSummary summary(StringBuilder assistantText,
-                                                  Map<Integer, OpenAiToolCallBuilder> builders) {
-        String text = assistantText.length() == 0 ? null : assistantText.toString();
-        List<ToolCall> toolCalls = new ArrayList<>();
-        for (OpenAiToolCallBuilder b : builders.values()) {
-            ToolCall built = b.build(objectMapper);
-            if (built != null) toolCalls.add(built);
-        }
-        if (text == null && toolCalls.isEmpty()) return null;
-        return new LlmCallEvent.ResponseSummary(text, toolCalls);
-    }
-
-    /**
-     * Reassembles a streaming tool call. Mirrors the builder in ToolLoopRunner —
-     * lives here too because the adapter needs to surface the assembled list
-     * via the listener (for trace persistence), independent of the runtime.
-     */
-    static final class OpenAiToolCallBuilder {
-        private String id;
-        private String name;
-        private final StringBuilder argsJson = new StringBuilder();
-
-        void feed(String id, String name, String argsFrag) {
-            if (id != null) this.id = id;
-            if (name != null) this.name = name;
-            if (argsFrag != null) this.argsJson.append(argsFrag);
-        }
-
-        ToolCall build(ObjectMapper mapper) {
-            if (id == null || name == null) return null;
-            try {
-                Map<String, Object> args = argsJson.isEmpty()
-                        ? new HashMap<>()
-                        : mapper.readValue(argsJson.toString(), new TypeReference<>() {});
-                return new ToolCall(id, name, args);
-            } catch (Exception e) {
-                return new ToolCall(id, name, new HashMap<>());
-            }
-        }
-    }
-
-    /**
-     * Fires the call listener with the captured event. Wraps the call in
-     * try/catch — a broken listener must never propagate into the chat path.
-     */
-    private void fireListener(LlmCallListener listener,
-                               Instant startedAt, long start,
-                               LlmConfig config, LlmRequest request,
-                               String requestJson,
-                               List<String> responseEvents,
-                               LlmCallEvent.ResponseSummary response,
-                               int promptTokens, int completionTokens,
-                               String finishReason,
-                               Integer errorStatus, String errorBody) {
-        if (listener == null) return;
-        long durationMs = System.currentTimeMillis() - start;
-        try {
-            listener.onCall(new LlmCallEvent(
-                    startedAt, durationMs,
-                    request.configName(), config.model(),
-                    promptTokens, completionTokens, finishReason,
-                    requestJson, responseEvents, response,
-                    errorStatus, errorBody));
-        } catch (Exception e) {
-            log.warn("LlmCallListener threw — swallowing to keep chat alive: {}", e.getMessage());
-        }
+                                                  Map<Integer, ToolCallBuilder> builders) {
+        return LlmCallEventBuilder.summary(assistantText, ToolCallBuilder.buildAll(builders.values(), objectMapper));
     }
 
     private static FinishReason parseFinishReason(String raw) {
@@ -461,15 +346,6 @@ abstract class AbstractOpenAiGateway implements LlmGateway {
             case "length" -> FinishReason.LENGTH;
             default -> FinishReason.ERROR;
         };
-    }
-
-    private void logWireRequest(ObjectNode requestNode) {
-        if (!wire.isDebugEnabled()) return;
-        try {
-            wire.debug("→ stream request:\n{}", prettyWriter.writeValueAsString(TraceRedaction.redactMedia(requestNode)));
-        } catch (Exception e) {
-            wire.debug("→ stream request: <serialise failed: {}>", e.getMessage());
-        }
     }
 
     // package-private for testing the wire JSON without a live HTTP call
