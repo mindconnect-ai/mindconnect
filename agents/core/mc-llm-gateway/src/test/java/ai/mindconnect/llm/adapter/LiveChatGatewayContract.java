@@ -9,6 +9,7 @@ import ai.mindconnect.llm.domain.LlmConfigType;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.llm.domain.LlmProvider;
 import ai.mindconnect.llm.domain.LlmRequest;
+import ai.mindconnect.llm.domain.LlmResponse;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.domain.ToolCall;
 import ai.mindconnect.llm.domain.ToolDefinition;
@@ -94,18 +95,18 @@ public abstract class LiveChatGatewayContract {
         LlmRequest request = LlmRequest.streaming(config.name(), List.of(
                 LlmMessage.system("Use the get_weather tool for any weather question."),
                 LlmMessage.user("What is the weather in Berlin right now?")), List.of(weather));
-        List<LlmStreamChunk> chunks = new ArrayList<>();
         List<LlmCallEvent> events = new ArrayList<>();
 
-        gateway().chatStreaming(config, request, chunks::add, Cancellation.none(), events::add);
+        LlmResponse response = gateway().chat(config, request, Cancellation.none(), events::add);
 
-        assertThat(chunks).anyMatch(LlmStreamChunk.ToolCallDelta.class::isInstance);
-        assertThat(events).hasSize(1);
-        assertThat(events.get(0).response().toolCalls()).hasSize(1);
-        ToolCall call = events.get(0).response().toolCalls().get(0);
+        assertThat(response.toolCalls()).hasSize(1);
+        ToolCall call = response.toolCalls().get(0);
         assertThat(call.name()).isEqualTo("get_weather");
         assertThat(call.id()).isNotBlank();
         assertThat(String.valueOf(call.arguments().get("city"))).containsIgnoringCase("Berlin");
+
+        assertThat(events).hasSize(1);
+        assertThat(events.get(0).response().toolCalls()).extracting(ToolCall::name).containsExactly("get_weather");
     }
 
     @Test
