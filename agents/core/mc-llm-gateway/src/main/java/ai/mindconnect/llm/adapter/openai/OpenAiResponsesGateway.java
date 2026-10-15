@@ -349,18 +349,14 @@ public class OpenAiResponsesGateway implements LlmGateway {
                     switch (part) {
                         case LlmContent.Text t -> content.addObject().put("type", "input_text").put("text", t.text());
                         case LlmContent.Image i -> content.addObject().put("type", "input_image")
-                                .put("image_url", dataUrl(i.mediaType(), i.base64()));
+                                .put("image_url", AbstractOpenAiGateway.dataUrl(i.mediaType(), i.base64()));
                         case LlmContent.Document d -> content.addObject().put("type", "input_file")
                                 .put("filename", d.name())
-                                .put("file_data", dataUrl(d.mediaType(), d.base64()));
+                                .put("file_data", AbstractOpenAiGateway.dataUrl(d.mediaType(), d.base64()));
                     }
                 }
             }
         }
-    }
-
-    private static String dataUrl(String mediaType, String base64) {
-        return "data:" + mediaType + ";base64," + base64;
     }
 
     // ── stream ──────────────────────────────────────────────────────────────

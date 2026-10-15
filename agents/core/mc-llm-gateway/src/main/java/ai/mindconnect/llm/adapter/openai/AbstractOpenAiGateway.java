@@ -365,7 +365,7 @@ abstract class AbstractOpenAiGateway extends SseStreamingGateway {
         }
     }
 
-    private static String dataUrl(String mediaType, String base64) {
+    static String dataUrl(String mediaType, String base64) {
         return "data:" + mediaType + ";base64," + base64;
     }
 }

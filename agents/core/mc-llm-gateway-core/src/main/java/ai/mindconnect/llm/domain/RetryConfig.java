@@ -54,12 +54,6 @@ public record RetryConfig(
                 maxBackoffMillis != null ? maxBackoffMillis : DEFAULT_MAX_BACKOFF_MILLIS);
     }
 
-    /** The policy the admin form offers when retry is switched on. */
-    public static RetryConfig defaults() {
-        return new RetryConfig(DEFAULT_ENABLED, DEFAULT_MAX_ATTEMPTS,
-                DEFAULT_BASE_BACKOFF_MILLIS, DEFAULT_MAX_BACKOFF_MILLIS);
-    }
-
     /** The most a {@code Retry-After} is honoured, so an absurd header cannot park a request for good. */
     public static final long RETRY_AFTER_CEILING_MILLIS = 300_000L;
 

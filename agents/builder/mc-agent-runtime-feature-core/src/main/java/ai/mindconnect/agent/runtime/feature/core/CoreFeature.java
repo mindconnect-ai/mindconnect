@@ -33,7 +33,7 @@ import ai.mindconnect.agent.tool.ToolAdvisor;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.anthropic.ClaudeGateway;
-import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
+import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.adapter.file.FileLlmRepositoryFactory;
 import ai.mindconnect.llm.adapter.memory.InMemoryLlmRepositoryFactory;
 import ai.mindconnect.llm.adapter.pg.PgLlmRepositoryFactory;

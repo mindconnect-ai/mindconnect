@@ -69,7 +69,8 @@ class LlmHttpErrorsTest {
         RecordingLogger log = new RecordingLogger();
 
         LlmHttpErrors.logHttpError(log, "Anthropic",
-                CLAUDE.withRetry(RetryConfig.defaults()), 429, null, "");
+                CLAUDE.withRetry(new RetryConfig(true, RetryConfig.DEFAULT_MAX_ATTEMPTS,
+                        RetryConfig.DEFAULT_BASE_BACKOFF_MILLIS, RetryConfig.DEFAULT_MAX_BACKOFF_MILLIS)), 429, null, "");
 
         assertThat(log.rendered())
                 .contains("retrying up to 4 attempt(s)")

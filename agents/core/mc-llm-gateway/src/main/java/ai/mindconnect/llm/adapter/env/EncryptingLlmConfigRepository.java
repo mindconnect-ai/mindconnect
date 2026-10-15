@@ -1,4 +1,4 @@
-package ai.mindconnect.llm.adapter.file;
+package ai.mindconnect.llm.adapter.env;
 
 import ai.mindconnect.llm.domain.LlmConfigId;
 

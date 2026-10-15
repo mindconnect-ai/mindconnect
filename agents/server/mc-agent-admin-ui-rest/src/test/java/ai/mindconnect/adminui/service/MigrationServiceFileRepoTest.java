@@ -6,7 +6,7 @@ import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
-import ai.mindconnect.llm.adapter.file.EncryptingLlmConfigRepository;
+import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.domain.LlmConfigId;
