@@ -137,7 +137,9 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     `mc-agent-starter-postgres` supply the `Persistence` (`mindconnect.persistence` picks)
     plus users and tokens; `mc-agent-starter-namespace` the per-request scope;
     `mc-agent-starter-registry` and `mc-agent-starter-extension` wire the registry and the
-    extensions (the libraries under `server/core` carry no Spring)
+    extensions (the libraries under `server/core` carry no Spring); `mc-agent-starter-workflow`
+    the workflow stores per namespace and the agent and tool steps (`mc-agent-tools-workflow`
+    carries none either)
   - `builder/mc-agent-runtime-builder` + `demo/mc-agent-simple-demo` — Spring-free
     embedding facade and runnable examples. The builder assembles a core plus installed
     `RuntimeFeature`s (SPI in `mc-agent-runtime-core`, package `…runtime.feature`); the

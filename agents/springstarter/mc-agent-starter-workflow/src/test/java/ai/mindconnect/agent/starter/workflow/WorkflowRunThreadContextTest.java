@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.tools.workflow;
+package ai.mindconnect.agent.starter.workflow;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;

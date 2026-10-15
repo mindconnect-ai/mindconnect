@@ -73,6 +73,7 @@
         <module>springstarter/mc-agent-starter-runtime</module>
         <module>springstarter/mc-agent-starter-registry</module>
         <module>springstarter/mc-agent-starter-extension</module>
+        <module>springstarter/mc-agent-starter-workflow</module>
         <module>server/core/mc-credentials</module>
         <module>core/mc-message-repository-core</module>
         <module>core/mc-message-repository</module>

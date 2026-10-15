@@ -9,12 +9,10 @@ import ai.mindconnect.agent.tool.MultiToolProvider;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import ai.mindconnect.agent.tool.ToolEnvironment;
-import ai.mindconnect.workflow.persistence.file.FileWorkflowDataRepository;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -25,9 +23,9 @@ import java.util.Set;
  * an {@code ai.mindconnect.schema.Schema}), so the LLM knows exactly which inputs the workflow
  * expects. Executing the tool runs the workflow synchronously on the embedded engine.
  *
- * <p>Without a host store the workflows are read from {@code <dataBaseDir>/<namespace>/workflows}
- * — the same directory the embedded workflow admin manages, {@code data/local/workflows} by
- * default — so workflows created or edited in the admin UI are what the tools run.
+ * <p>The workflows are the host's {@link WorkflowDataRepository} — the same store the workflow
+ * admin writes to, whatever it is backed by. The provider never opens a store of its own: a
+ * host that offers no repository offers no workflow tools, and says so by failing to bind.
  *
  * <p>Fully dynamic: {@link #toolNames()} re-lists the store on every call (the registry
  * consults it live), so a workflow created in the admin UI is a tool on the very next
@@ -51,39 +49,17 @@ public final class WorkflowToolProvider implements MultiToolProvider {
         return GROUP;
     }
 
-    /**
-     * The host's {@link WorkflowDataRepository} when it provides one — the
-     * same store the workflow admin writes to, whatever it is backed by —
-     * and the file store under {@code <dataBaseDir>/<namespace>/workflows} otherwise.
-     */
+    /** @throws IllegalStateException when the environment carries no {@link WorkflowDataRepository} */
     @Override
     public void bind(ToolEnvironment env) {
         environment = env.get(EnvVarResolver.class)
                 .<Supplier<Map<String, String>>>map(vars -> vars.shared()::asMap)
                 .orElse(WorkflowExecutorService::processEnvironment);
-        Optional<WorkflowDataRepository> shared = env.get(WorkflowDataRepository.class);
-        if (shared.isPresent()) {
-            repository = shared.get();
-            log.info("WorkflowToolProvider: offering the host's workflows as tools (currently {})",
-                    toolNames().size());
-            return;
-        }
-        String dir = env.getString("dataBaseDir").orElse("data");
-        try {
-            var namespace = env.get(ai.mindconnect.agent.Namespace.class);
-            if (namespace.isEmpty()) {
-                log.warn("WorkflowToolProvider: the tool environment names no namespace — no workflow tools available");
-                repository = null;
-                return;
-            }
-            repository = new FileWorkflowDataRepository(Path.of(dir), namespace.get().value());
-            log.info("WorkflowToolProvider: offering workflows from {} as tools (currently {})",
-                    dir, toolNames().size());
-        } catch (RuntimeException e) {
-            log.warn("WorkflowToolProvider: cannot open workflow store at {} — no workflow tools available ({})",
-                    dir, e.getMessage());
-            repository = null;
-        }
+        repository = env.get(WorkflowDataRepository.class).orElseThrow(() -> new IllegalStateException(
+                "WorkflowToolProvider: the tool environment carries no WorkflowDataRepository"
+                        + " — no workflow tools available"));
+        log.info("WorkflowToolProvider: offering the host's workflows as tools (currently {})",
+                toolNames().size());
     }
 
     @Override

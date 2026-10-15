@@ -33,12 +33,12 @@ import java.util.function.Function;
  * from inside a workflow, so it fails the step at once, naming the tools that
  * asked — before, it blocked the run for good.
  */
-final class WorkflowAgentCalls {
+public final class WorkflowAgentCalls {
 
     /** The user an agent call runs as when the workflow runs on nobody's behalf. */
-    static final String WORKFLOW_USER = "workflow";
+    public static final String WORKFLOW_USER = "workflow";
     /** The type of an agent-call step's session — kept out of the chat's history. */
-    static final String SESSION_TYPE = "workflow";
+    public static final String SESSION_TYPE = "workflow";
 
     private final Function<String, Optional<AgentId>> agents;
     private final BiFunction<AgentId, UserId, SessionId> open;
@@ -51,7 +51,7 @@ final class WorkflowAgentCalls {
      * @param submit  sends the message into the session
      * @param timeout how long a step waits for the turn
      */
-    WorkflowAgentCalls(Function<String, Optional<AgentId>> agents, BiFunction<AgentId, UserId, SessionId> open,
+    public WorkflowAgentCalls(Function<String, Optional<AgentId>> agents, BiFunction<AgentId, UserId, SessionId> open,
                        BiFunction<SessionId, String, ChatTurnHandle> submit, Duration timeout) {
         this.agents = Objects.requireNonNull(agents, "agents");
         this.open = Objects.requireNonNull(open, "open");
@@ -65,7 +65,7 @@ final class WorkflowAgentCalls {
                 .orElseGet(() -> UserId.of(WORKFLOW_USER));
     }
 
-    String call(String agentName, String message) {
+    public String call(String agentName, String message) {
         AgentId agent = agents.apply(agentName)
                 .orElseThrow(() -> new IllegalArgumentException("No agent named '" + agentName + "'"));
         SessionId session = open.apply(agent, caller());
