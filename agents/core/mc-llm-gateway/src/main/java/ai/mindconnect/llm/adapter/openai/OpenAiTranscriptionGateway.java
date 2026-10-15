@@ -93,6 +93,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     public TranscriptionResult transcribe(LlmConfig config, TranscriptionRequest request,
                                           Consumer<String> onDelta) {
         LlmConfig cfg = config.resolved(env, encryption);
+        String baseUrl = cfg.provider().baseUrlOr(cfg.baseUrl());
         LlmParameterMap params = LlmParameterMap.of(cfg, null);
         String responseFormat = param(params, "response_format", "json");
         String stream = param(params, "stream", "auto");
@@ -107,8 +108,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
                 // without it before giving up, since the field was our idea,
                 // not the caller's. A config can skip this with stream=off.
                 if (askForStream && response.code() == 400) {
-                    log.debug("Endpoint {} refused the stream field; asking again without it",
-                            cfg.baseUrl());
+                    log.debug("Endpoint {} refused the stream field; asking again without it", baseUrl);
                     return transcribeWithoutStream(cfg, request, responseFormat, onDelta);
                 }
                 throw failed(response);
@@ -121,7 +121,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
                     result.text().length(), streamed(response) ? ", streamed" : "");
             return result;
         } catch (IOException e) {
-            throw new IllegalStateException("Transcription call to " + cfg.baseUrl() + " failed: "
+            throw new IllegalStateException("Transcription call to " + baseUrl + " failed: "
                     + e.getMessage(), e);
         }
     }
@@ -139,7 +139,7 @@ public final class OpenAiTranscriptionGateway implements TranscriptionGateway {
     /** One call with this adapter's own deadline on the shared client. */
     private Call call(LlmConfig cfg, TranscriptionRequest request, String responseFormat, boolean askForStream) {
         Request.Builder http = new Request.Builder()
-                .url(cfg.baseUrl() + "/v1/audio/transcriptions")
+                .url(cfg.provider().baseUrlOr(cfg.baseUrl()) + "/v1/audio/transcriptions")
                 .post(multipartBody(cfg, request, responseFormat, askForStream));
         // A local server usually takes no key; sending an empty bearer breaks some of them.
         if (cfg.apiKey() != null && !cfg.apiKey().isBlank()) {

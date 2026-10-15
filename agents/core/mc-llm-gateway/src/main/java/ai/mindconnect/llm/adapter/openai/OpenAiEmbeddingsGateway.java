@@ -56,6 +56,7 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
             return List.of();
         }
         config = config.resolved(env, encryption);
+        String baseUrl = config.provider().baseUrlOr(config.baseUrl());
 
         ObjectNode body = objectMapper.createObjectNode();
         body.put("model", config.model());
@@ -65,7 +66,7 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
         long start = System.currentTimeMillis();
         try {
             Request request = new Request.Builder()
-                    .url(config.baseUrl() + "/v1/embeddings")
+                    .url(baseUrl + "/v1/embeddings")
                     .header("Authorization", "Bearer " + config.apiKey())
                     .post(RequestBody.create(objectMapper.writeValueAsBytes(body), JSON))
                     .build();
@@ -104,7 +105,7 @@ public final class OpenAiEmbeddingsGateway implements LlmEmbeddings {
             return result;
             }
         } catch (IOException e) {
-            throw new IllegalStateException("Embeddings call to " + config.baseUrl() + " failed: "
+            throw new IllegalStateException("Embeddings call to " + baseUrl + " failed: "
                     + e.getMessage(), e);
         }
     }
