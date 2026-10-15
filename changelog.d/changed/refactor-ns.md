@@ -11,4 +11,8 @@
   (`PerNamespace`); a test that builds one passes `ScopeSupplier.local()`.
   `VectorStores` names no namespace any more: its methods work in the namespace of
   the call, and `PgEmbeddingIndex` and `PgVectorStoreRegistry` take a
-  `ScopeSupplier` instead of a `Namespace`.
+  `ScopeSupplier` instead of a `Namespace`. `NamespaceFeature` and its module
+  `mc-agent-runtime-feature-namespace` are gone: a host that binds the scope per
+  call hands it to `AgentRuntimeBuilder.scope(…)`. `ScopeTaskAdvisor` takes that one
+  scope and is always attached, so every task names its namespace; it binds the
+  scope around an execution only when the scope is thread-bound.

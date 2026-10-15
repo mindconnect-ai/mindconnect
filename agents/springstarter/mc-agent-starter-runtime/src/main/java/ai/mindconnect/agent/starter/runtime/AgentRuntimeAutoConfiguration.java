@@ -10,7 +10,6 @@ import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
 import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
-import ai.mindconnect.agent.runtime.feature.namespace.NamespaceFeature;
 import ai.mindconnect.agent.runtime.feature.skills.SkillsFeature;
 import ai.mindconnect.agent.runtime.feature.subagents.SubAgentsFeature;
 import ai.mindconnect.agent.runtime.feature.taskqueue.TaskQueueFeature;
@@ -177,9 +176,9 @@ public class AgentRuntimeAutoConfiguration {
                 .property("fileStoreBackend", env.getProperty("mindconnect.file-store.backend",
                         persistence instanceof Persistence.Postgres ? "postgres" : "filesystem"));
 
-        // The server works in the namespace of the call: the scope its filter binds, the stores routed by it.
+        // The server works in the namespace of the call: the scope its filter binds, which every store asks.
         ThreadBoundScope scope = boundScope.getIfAvailable();
-        if (scope != null) builder.install(new NamespaceFeature().scope(scope));
+        if (scope != null) builder.scope(scope);
 
         // The application's own features and last words.
         features.orderedStream().forEach(builder::install);

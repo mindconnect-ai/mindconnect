@@ -28,7 +28,7 @@ class ScopeTaskAdvisorTest {
 
     @Test
     void stampsTheSubmittersNamespaceAndUser() {
-        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(Scope.of(ACME, DAVID)), bound);
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(Scope.of(ACME, DAVID)));
 
         TaskSubmission stamped = advisor.beforeSubmit(TaskSubmission.of("agent.turn", Map.of("sessionId", "s1")));
 
@@ -39,7 +39,7 @@ class ScopeTaskAdvisorTest {
 
     @Test
     void leavesTheUserOutWhenTheScopeHasNone() {
-        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME), bound);
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME));
 
         TaskSubmission stamped = advisor.beforeSubmit(TaskSubmission.of("agent.turn", Map.of()));
 
@@ -49,7 +49,7 @@ class ScopeTaskAdvisorTest {
 
     @Test
     void keepsANamespaceTheSubmissionAlreadyNames() {
-        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME), bound);
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME));
 
         TaskSubmission stamped = advisor.beforeSubmit(
                 TaskSubmission.of("agent.tool", Map.of(ScopeTaskAdvisor.NAMESPACE, "parent")));
@@ -59,7 +59,7 @@ class ScopeTaskAdvisorTest {
 
     @Test
     void stampsWhateverIsBoundAtSubmitTime() {
-        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(bound, bound);
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(bound);
 
         TaskSubmission stamped = bound.runIn(Scope.of(ACME),
                 () -> advisor.beforeSubmit(TaskSubmission.of("agent.turn", Map.of())));
@@ -69,8 +69,10 @@ class ScopeTaskAdvisorTest {
 
     @Test
     void bindsTheStampedScopeAroundTheExecution() throws Exception {
-        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME), bound);
-        TaskSubmission stamped = advisor.beforeSubmit(TaskSubmission.of("agent.turn", Map.of()));
+        // Submitted elsewhere — the payload is all that travels — and executed here.
+        TaskSubmission stamped = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME))
+                .beforeSubmit(TaskSubmission.of("agent.turn", Map.of()));
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(bound);
         AtomicReference<Scope> seen = new AtomicReference<>();
 
         TaskOutcome outcome = advisor.aroundExecute(contextOf(stamped), ctx -> {
@@ -86,8 +88,9 @@ class ScopeTaskAdvisorTest {
 
     @Test
     void bindsTheUserToo() throws Exception {
-        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(Scope.of(ACME, DAVID)), bound);
-        TaskSubmission stamped = advisor.beforeSubmit(TaskSubmission.of("agent.turn", Map.of()));
+        TaskSubmission stamped = new ScopeTaskAdvisor(ScopeSupplier.fixed(Scope.of(ACME, DAVID)))
+                .beforeSubmit(TaskSubmission.of("agent.turn", Map.of()));
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(bound);
         AtomicReference<Scope> seen = new AtomicReference<>();
 
         advisor.aroundExecute(contextOf(stamped), ctx -> {
@@ -100,12 +103,22 @@ class ScopeTaskAdvisorTest {
 
     @Test
     void refusesATaskWithoutANamespace() {
-        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME), bound);
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(bound);
 
         assertThatThrownBy(() -> advisor.aroundExecute(contextOf(TaskSubmission.of("agent.turn", Map.of())),
                 ctx -> TaskOutcome.done("ok")))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("carries no namespace");
+    }
+
+    @Test
+    void aFixedScopeRunsATaskAsItIs_evenOneWithoutANamespace() throws Exception {
+        ScopeTaskAdvisor advisor = new ScopeTaskAdvisor(ScopeSupplier.fixed(ACME));
+
+        TaskOutcome outcome = advisor.aroundExecute(contextOf(TaskSubmission.of("agent.turn", Map.of())),
+                ctx -> TaskOutcome.done("ok"));
+
+        assertThat(outcome).isEqualTo(TaskOutcome.done("ok"));
     }
 
     private static TaskContext contextOf(TaskSubmission submission) {

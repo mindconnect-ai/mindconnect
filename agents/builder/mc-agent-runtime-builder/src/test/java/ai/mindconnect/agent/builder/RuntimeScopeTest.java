@@ -9,7 +9,6 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
-import ai.mindconnect.agent.runtime.feature.namespace.NamespaceFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.runtime.service.task.ScopeTaskAdvisor;
 import ai.mindconnect.llm.domain.LlmConfig;
@@ -20,24 +19,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * With the namespace feature the runtime works in the namespace of the
+ * Given a thread-bound scope, the runtime works in the namespace of the
  * current call: what one namespace stores, another does not see, and the
  * queue carries the scope with every task.
  */
-class NamespaceFeatureTest {
+class RuntimeScopeTest {
 
     private static final Namespace A = new Namespace("a");
     private static final Namespace B = new Namespace("b");
 
     @Test
     void repositoriesFollowTheBoundNamespace() throws Exception {
-        var feature = new NamespaceFeature().fallback(Namespace.DEFAULT);
+        ThreadBoundScope scope = ThreadBoundScope.withFallback(Scope.of(Namespace.DEFAULT));
         AgentRuntimeBuilder builder = AgentRuntimeBuilder.of(Persistence.inMemory())
-                .install(feature)
+                .scope(scope)
                 .install(new ToolsFeature());
         builder.feature(CoreFeature.class).llmConfig(LlmConfig.lmStudio("test-llm", "m", "http://localhost:9"));
         try (AgentRuntime runtime = builder.build()) {
-            ThreadBoundScope scope = feature.scope();
             assertThat(runtime.beans().get(ScopeSupplier.class)).isSameAs(scope);
             assertThat(runtime.beans().all(TaskAdvisor.class)).anyMatch(a -> a instanceof ScopeTaskAdvisor);
 
@@ -63,7 +61,7 @@ class NamespaceFeatureTest {
     @Test
     void strictRefusesAnUnboundCall() throws Exception {
         AgentRuntimeBuilder builder = AgentRuntimeBuilder.of(Persistence.inMemory())
-                .install(new NamespaceFeature().strict());
+                .scope(ThreadBoundScope.strict());
         try (AgentRuntime runtime = builder.build()) {
             assertThatThrownBy(() -> runtime.agentDefinitions().findByName("x")).isInstanceOf(Exception.class);
         }

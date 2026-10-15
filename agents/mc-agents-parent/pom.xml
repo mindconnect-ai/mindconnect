@@ -314,11 +314,6 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-agent-runtime-feature-namespace</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-runtime-feature-transcription</artifactId>
                 <version>${project.version}</version>
             </dependency>
