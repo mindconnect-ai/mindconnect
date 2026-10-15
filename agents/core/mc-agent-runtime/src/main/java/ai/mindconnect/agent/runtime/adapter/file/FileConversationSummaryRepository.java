@@ -8,7 +8,6 @@ import ai.mindconnect.filerepo.FileRepoException;
 import ai.mindconnect.filerepo.RecordLog;
 import ai.mindconnect.message.domain.ConversationId;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,8 +29,7 @@ public class FileConversationSummaryRepository implements ConversationSummaryRep
 
     private final RecordLog<ConversationId, ConversationSummary> summaries;
 
-    public FileConversationSummaryRepository(Path baseDir, ScopeSupplier scope) {
-        ObjectMapper mapper = new ObjectMapper().registerModule(new JavaTimeModule());
+    public FileConversationSummaryRepository(Path baseDir, ObjectMapper mapper, ScopeSupplier scope) {
         this.summaries = RecordLog.of(ConversationSummary.class)
                 .dir((ConversationId conversation) -> "conversations/" + conversation.value() + "/summaries")
                 .key(ConversationSummary::fromSequenceNum)

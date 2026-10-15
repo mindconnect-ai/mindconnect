@@ -37,10 +37,10 @@ public class FileAgentRepositoryFactory implements AgentRepositoryFactory {
 
     @Override public AgentDefinitionRepository agentDefinitionRepository() { return new FileAgentDefinitionRepository(baseDir, objectMapper, scope); }
     @Override public AgentSessionRepository agentSessionRepository() { return new FileAgentSessionRepository(baseDir, objectMapper, scope); }
-    @Override public WorkingMemoryRepository workingMemoryRepository() { return new FileWorkingMemoryRepository(baseDir, scope); }
-    @Override public ConversationSummaryRepository conversationSummaryRepository() { return new FileConversationSummaryRepository(baseDir, scope); }
-    @Override public TodoListRepository todoListRepository() { return new FileTodoListRepository(baseDir, scope); }
-    @Override public LlmCallTraceRepository llmCallTraceRepository() { return new FileLlmCallTraceRepository(baseDir, maxTracesPerConversation, scope); }
+    @Override public WorkingMemoryRepository workingMemoryRepository() { return new FileWorkingMemoryRepository(baseDir, objectMapper, scope); }
+    @Override public ConversationSummaryRepository conversationSummaryRepository() { return new FileConversationSummaryRepository(baseDir, objectMapper, scope); }
+    @Override public TodoListRepository todoListRepository() { return new FileTodoListRepository(baseDir, objectMapper, scope); }
+    @Override public LlmCallTraceRepository llmCallTraceRepository() { return new FileLlmCallTraceRepository(baseDir, objectMapper, maxTracesPerConversation, scope); }
     @Override public SkillRepository skillRepository() { return new FileSkillRepository(baseDir, objectMapper, scope); }
     @Override public UserMemoryRepository userMemoryRepository() { return new FileUserMemoryRepository(baseDir, scope); }
 }

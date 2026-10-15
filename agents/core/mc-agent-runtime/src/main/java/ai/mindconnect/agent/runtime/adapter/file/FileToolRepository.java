@@ -6,7 +6,6 @@ import ai.mindconnect.agent.tool.ToolSettings;
 import ai.mindconnect.common.util.AtomicFiles;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,14 +35,13 @@ public final class FileToolRepository implements ToolRepository {
 
     private static final Logger log = LoggerFactory.getLogger(FileToolRepository.class);
 
-    private static final ObjectMapper MAPPER = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT);
-
     private final Path storageDir;
+    private final ObjectMapper mapper;
     private final ScopeSupplier scope;
 
-    public FileToolRepository(Path storageDir, ScopeSupplier scope) {
+    public FileToolRepository(Path storageDir, ObjectMapper mapper, ScopeSupplier scope) {
         this.storageDir = storageDir.toAbsolutePath();
+        this.mapper = mapper;
         this.scope = scope;
     }
 
@@ -59,7 +57,7 @@ public final class FileToolRepository implements ToolRepository {
             return Map.of();
         }
         try {
-            JsonNode root = MAPPER.readTree(file.toFile());
+            JsonNode root = mapper.readTree(file.toFile());
             Map<String, ToolSettings> settings = new LinkedHashMap<>();
             root.fields().forEachRemaining(entry ->
                     settings.put(entry.getKey(), read(entry.getValue())));
@@ -113,9 +111,9 @@ public final class FileToolRepository implements ToolRepository {
                 Files.deleteIfExists(file);   // back to the shipped state
                 return;
             }
-            ObjectNode root = MAPPER.createObjectNode();
+            ObjectNode root = mapper.createObjectNode();
             all.forEach((name, settings) -> root.set(name, write(settings)));
-            AtomicFiles.write(file, out -> MAPPER.writeValue(out, root));
+            AtomicFiles.write(file, out -> mapper.writerWithDefaultPrettyPrinter().writeValue(out, root));
         } catch (IOException e) {
             throw new UncheckedIOException("cannot write tool settings " + file, e);
         }
@@ -126,8 +124,8 @@ public final class FileToolRepository implements ToolRepository {
         return storageDir.resolve(scope.namespace().value()).resolve("system").resolve("tool-settings.json");
     }
 
-    private static ObjectNode write(ToolSettings settings) {
-        ObjectNode node = MAPPER.createObjectNode();
+    private ObjectNode write(ToolSettings settings) {
+        ObjectNode node = mapper.createObjectNode();
         if (settings.enabled() != null) {
             node.put("enabled", settings.enabled());
         }

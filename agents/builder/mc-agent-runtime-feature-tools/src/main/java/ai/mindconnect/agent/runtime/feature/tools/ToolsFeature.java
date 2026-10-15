@@ -65,7 +65,8 @@ public class ToolsFeature extends ConfigurableFeature {
         ctx.bean(ToolRegistryRef.class, ToolRegistryRef::new);
         // The operator's decisions about tools — on files only; Postgres keeps none yet.
         if (ctx.persistence() instanceof Persistence.File f) {
-            ctx.bean(ToolRepository.class, () -> new FileToolRepository(f.dataDir(), ctx.require(ScopeSupplier.class)));
+            ctx.bean(ToolRepository.class, () -> new FileToolRepository(f.dataDir(), ctx.objectMapper(),
+                    ctx.require(ScopeSupplier.class)));
         }
         ctx.bean(ToolRegistry.class, () -> {
             ToolEnvironment env = ctx.require(ToolEnvironment.class);

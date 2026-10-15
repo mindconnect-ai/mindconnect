@@ -7,7 +7,6 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.tools.todo.TodoList;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,10 +31,10 @@ public class FileTodoListRepository implements TodoListRepository {
     private final ScopeSupplier scope;
     private final ObjectMapper mapper;
 
-    public FileTodoListRepository(Path dataDir, ScopeSupplier scope) {
+    public FileTodoListRepository(Path dataDir, ObjectMapper mapper, ScopeSupplier scope) {
         this.dataDir = dataDir.toAbsolutePath().normalize();
+        this.mapper = mapper;
         this.scope = scope;
-        this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
     @Override

@@ -30,10 +30,11 @@ public class FileWorkingMemoryRepository implements WorkingMemoryRepository {
 
     private final Path dataDir;
     private final ScopeSupplier scope;
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final ObjectMapper mapper;
 
-    public FileWorkingMemoryRepository(Path dataDir, ScopeSupplier scope) {
+    public FileWorkingMemoryRepository(Path dataDir, ObjectMapper mapper, ScopeSupplier scope) {
         this.dataDir = dataDir.toAbsolutePath().normalize();
+        this.mapper = mapper;
         this.scope = scope;
     }
 

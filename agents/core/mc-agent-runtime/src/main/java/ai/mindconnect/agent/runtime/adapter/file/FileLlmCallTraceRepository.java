@@ -10,7 +10,6 @@ import ai.mindconnect.agent.runtime.domain.TraceId;
 import ai.mindconnect.agent.runtime.domain.LlmCallTrace;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,15 +57,15 @@ public class FileLlmCallTraceRepository implements LlmCallTraceRepository {
     private final int maxTracesPerSession;
     private final ObjectMapper mapper;
 
-    public FileLlmCallTraceRepository(Path dataDir, ScopeSupplier scope) {
-        this(dataDir, DEFAULT_MAX_PER_SESSION, scope);
+    public FileLlmCallTraceRepository(Path dataDir, ObjectMapper mapper, ScopeSupplier scope) {
+        this(dataDir, mapper, DEFAULT_MAX_PER_SESSION, scope);
     }
 
-    public FileLlmCallTraceRepository(Path dataDir, int maxTracesPerSession, ScopeSupplier scope) {
+    public FileLlmCallTraceRepository(Path dataDir, ObjectMapper mapper, int maxTracesPerSession, ScopeSupplier scope) {
         this.dataDir = dataDir.toAbsolutePath().normalize();
+        this.mapper = mapper;
         this.scope = scope;
         this.maxTracesPerSession = maxTracesPerSession;
-        this.mapper = new ObjectMapper().registerModule(new JavaTimeModule());
     }
 
     @Override
