@@ -11,31 +11,32 @@
         <relativePath>../../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>mc-user-memory-pg</artifactId>
-    <name>mc-user-memory-pg</name>
+    <artifactId>mc-agent-user-memory-core</artifactId>
+    <name>mc-agent-user-memory-core</name>
     <packaging>jar</packaging>
     <description>
-        The memory entries of users in Postgres: one JSONB row per entry in
-        mc_user_memory, keyed by namespace, via mc-jdbc.
+        What agents remember about each user across chats: the memory entries,
+        their port, the service, the memory_read/write/delete tools and the
+        memory index the system prompt shows. Plain Java on the runtime core.
     </description>
 
     <dependencies>
-        <dependency>
-            <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-user-memory-core</artifactId>
-        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-domain</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-jdbc</artifactId>
+            <artifactId>mc-agent-tool-spi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-core</artifactId>
         </dependency>
 
         <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-message-repository-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -46,11 +47,6 @@
         <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-simple</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

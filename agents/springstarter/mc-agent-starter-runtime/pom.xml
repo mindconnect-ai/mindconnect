@@ -26,7 +26,7 @@
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-user-memory</artifactId>
+            <artifactId>mc-agent-user-memory</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>

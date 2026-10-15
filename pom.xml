@@ -50,9 +50,9 @@
         <module>agents/tools/vector/mc-vector-store-tools</module>
         <module>agents/core/mc-file-store-core</module>
         <module>agents/core/mc-file-store</module>
-        <module>agents/features/user-memory/mc-user-memory-core</module>
-        <module>agents/features/user-memory/mc-user-memory-pg</module>
-        <module>agents/features/user-memory/mc-user-memory</module>
+        <module>agents/features/user-memory/mc-agent-user-memory-core</module>
+        <module>agents/features/user-memory/mc-agent-user-memory-pg</module>
+        <module>agents/features/user-memory/mc-agent-user-memory</module>
         <module>agents/features/todo/mc-agent-todo-core</module>
         <module>agents/features/todo/mc-agent-todo-pg</module>
         <module>agents/features/todo/mc-agent-todo</module>

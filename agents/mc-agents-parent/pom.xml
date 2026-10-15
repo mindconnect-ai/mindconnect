@@ -79,17 +79,17 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-user-memory-core</artifactId>
+                <artifactId>mc-agent-user-memory-core</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-user-memory-pg</artifactId>
+                <artifactId>mc-agent-user-memory-pg</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-user-memory</artifactId>
+                <artifactId>mc-agent-user-memory</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

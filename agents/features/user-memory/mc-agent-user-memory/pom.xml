@@ -11,32 +11,53 @@
         <relativePath>../../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>mc-user-memory-core</artifactId>
-    <name>mc-user-memory-core</name>
+    <artifactId>mc-agent-user-memory</artifactId>
+    <name>mc-agent-user-memory</name>
     <packaging>jar</packaging>
     <description>
-        What agents remember about each user across chats: the memory entries,
-        their port, the service, the memory_read/write/delete tools and the
-        memory index the system prompt shows. Plain Java on the runtime core.
+        The user-memory feature: the file and in-memory stores of the memory
+        entries and UserMemoryFeature, which picks the store by the runtime's
+        persistence, registers the service and contributes the memory index
+        to the system prompt.
     </description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-user-memory-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-user-memory-pg</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-kernel</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-domain</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-tool-spi</artifactId>
+            <artifactId>mc-common</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-core</artifactId>
+            <artifactId>mc-jdbc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
         </dependency>
 
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-message-repository-core</artifactId>
+            <artifactId>mc-namespace-core</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>

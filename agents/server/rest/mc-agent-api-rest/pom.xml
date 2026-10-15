@@ -19,12 +19,12 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-user-memory</artifactId>
+            <artifactId>mc-agent-user-memory</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-user-memory-core</artifactId>
+            <artifactId>mc-agent-user-memory-core</artifactId>
         </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
