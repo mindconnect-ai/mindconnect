@@ -8,7 +8,6 @@ import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.filestore.filesystem.FilesystemFileStore;
 import ai.mindconnect.vectorstore.tools.VectorStores;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
-import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.support.StaticListableBeanFactory;
@@ -37,7 +36,7 @@ class VectorStoreServiceIngestTest {
         beans.addBean("files", files);
         VectorStoreService service = new VectorStoreService(beans.getBeanProvider(VectorStores.class),
                 beans.getBeanProvider(FileStore.class), beans.getBeanProvider(WorkflowDataRepository.class),
-                beans.getBeanProvider(WorkflowInstanceRepository.class), dir.resolve("tools").toString(),
+                dir.resolve("tools").toString(),
                 beans.getBeanProvider(ai.mindconnect.common.env.EnvVarResolver.class));
 
         assertThatThrownBy(() -> service.ingestStoredFile("handbook", alices.id().value(), UserId.of("bob")))

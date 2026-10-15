@@ -29,11 +29,16 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-vector-store-tools</artifactId>
         </dependency>
-        <!-- Ingestion runs the store template's workflow; brings the workflow
-             engine + persistence ports. -->
+        <!-- Ingestion runs the store template's workflow: the engine with every
+             step type on the classpath, and the store it is read from. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-workflow-admin-rest</artifactId>
+            <artifactId>mc-workflow-spi-lookup</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-workflow-persistence</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- Word/PDF text extraction for direct ingestion; optional — hosts

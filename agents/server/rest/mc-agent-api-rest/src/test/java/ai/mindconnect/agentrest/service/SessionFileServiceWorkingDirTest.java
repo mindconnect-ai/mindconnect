@@ -75,7 +75,7 @@ class SessionFileServiceWorkingDirTest {
         stores.registry().saveTemplate(new VectorStoreTemplate(SessionFileService.CHAT_UPLOADS_TEMPLATE,
                 "embeddings", null, Map.of()));
         service = new SessionFileService(files, provider(stores), provider(null), sessions,
-                provider(null), provider(null), temp.resolve("tools").toString(), provider(home),
+                provider(null), temp.resolve("tools").toString(), provider(home),
                 provider(null));
     }
 

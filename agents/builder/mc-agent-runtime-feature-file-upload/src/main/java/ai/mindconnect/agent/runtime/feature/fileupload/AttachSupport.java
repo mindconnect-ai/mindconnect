@@ -168,7 +168,9 @@ public class AttachSupport {
 
     private static boolean workflowModulesPresent() {
         try {
-            Class.forName("ai.mindconnect.workflow.admin.run.WorkflowRunService");
+            // The engine with its step types, and the store the workflow is read from.
+            Class.forName("ai.mindconnect.workflow.spi.SpiWorkflowContextFactory");
+            Class.forName("ai.mindconnect.workflow.persistence.port.WorkflowDataRepository");
             return true;
         } catch (ClassNotFoundException e) {
             return false;
@@ -192,14 +194,16 @@ public class AttachSupport {
             var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                     new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                             + "' not found in the workflow store"));
-            var runner = new ai.mindconnect.workflow.admin.run.WorkflowRunService(null);
-            ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
+            // The SPI factory wires every step type and resolver on the classpath, the agent and tool steps included.
+            var executor = new ai.mindconnect.workflow.execution.WorkflowExecutorService(
+                    ai.mindconnect.workflow.spi.SpiWorkflowContextFactory.create());
+            ai.mindconnect.workflow.execution.WorkflowResult result;
             // The tool steps run on behalf of the chat's user and session — the
             // calls its store accepts — and resolve their paths in its directories.
             if (copyInSessionDir != null) {
                 var scope = ai.mindconnect.agent.tool.ToolCallScope.ofSession(
                         chat.userId(), chat.id(), copyInSessionDir.getParent().toString());
-                report = scope.runWith(() -> runner.runWithAttributes(workflow,
+                result = scope.runWith(() -> executor.executeWorkflow(workflow,
                         Map.of("file", stored.name(), "store", instance.name(), "file_id", stored.id().value()),
                         Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(), scope)));
             } else {
@@ -212,14 +216,14 @@ public class AttachSupport {
                     java.nio.file.Files.copy(in, target,
                             java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                 }
-                report = runner.runWithAttributes(workflow,
+                result = executor.executeWorkflow(workflow,
                         Map.of("file", base.relativize(target).toString(), "store", instance.name(),
                                 "file_id", stored.id().value()),
                         Map.of(ai.mindconnect.agent.tool.ToolCallScope.class.getName(),
                                 new ai.mindconnect.agent.tool.ToolCallScope(chat.userId(), chat.id(), null)));
             }
-            if (!report.success()) {
-                throw new IllegalStateException("ingestion workflow failed: " + report.error());
+            if (!result.isSuccess()) {
+                throw new IllegalStateException("ingestion workflow failed: " + result.failureMessage());
             }
             return stored.name() + " ingested via workflow '" + instance.ingestionWorkflow() + "'.";
         }

@@ -15,9 +15,10 @@ import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorTools;
 import ai.mindconnect.vectorstore.tools.VectorStores;
-import ai.mindconnect.workflow.admin.run.WorkflowRunService;
+import ai.mindconnect.workflow.execution.WorkflowExecutorService;
+import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
-import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
+import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -66,7 +67,6 @@ public class VectorStoreService {
     private final ObjectProvider<VectorStores> storesProvider;
     private final ObjectProvider<FileStore> fileStoreProvider;
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
-    private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path uploadBase;
     /** Where a call works — every store call names the namespace. */
     private final ai.mindconnect.common.env.EnvVarResolver environment;
@@ -74,7 +74,6 @@ public class VectorStoreService {
     public VectorStoreService(ObjectProvider<VectorStores> storesProvider,
                               ObjectProvider<FileStore> fileStoreProvider,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
-                              ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}")
                               String toolsBaseDir,
                               ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
@@ -82,7 +81,6 @@ public class VectorStoreService {
         this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStoreProvider = fileStoreProvider;
         this.workflowsProvider = workflowsProvider;
-        this.workflowInstancesProvider = workflowInstancesProvider;
         this.uploadBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
     }
 
@@ -303,9 +301,10 @@ public class VectorStoreService {
             if (stored != null) {
                 params.put("file_id", stored.id().value());
             }
-            var report = new WorkflowRunService(workflowInstances(), environment.shared()::asMap)
-                    .run(workflow, params);
-            return safeName + ": " + summarize(report);
+            WorkflowResult result = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+                    .withEnvironment(environment.shared()::asMap)
+                    .executeWorkflow(workflow, params);
+            return safeName + ": " + summarize(result);
         }
         String text = extractText(uploadBase, target);
         String owner = store.settings().owner();
@@ -336,17 +335,13 @@ public class VectorStoreService {
     }
 
     /** Human-readable outcome of an ingestion-workflow run. */
-    public static String summarize(WorkflowRunService.RunReport report) {
-        if (!report.success()) {
-            return "failed — " + (report.error() == null ? report.outcome().toString() : report.error());
+    public static String summarize(WorkflowResult result) {
+        if (!result.isSuccess()) {
+            return "failed — " + result.failureMessage();
         }
         // The seed workflow assigns vector_upsert's confirmation to 'result'.
-        return report.scope() != null && report.scope().variables() != null
-                ? report.scope().variables().stream()
-                        .filter(v -> "result".equals(v.name()) && v.value() != null)
-                        .map(WorkflowRunService.VarSnapshot::value)
-                        .findFirst().orElse("ingested")
-                : "ingested";
+        Object confirmation = result.getInstance().getVariableScope().getVariableValue("result");
+        return confirmation == null ? "ingested" : String.valueOf(confirmation);
     }
 
     /**
@@ -386,12 +381,6 @@ public class VectorStoreService {
 
     private WorkflowDataRepository workflows() {
         WorkflowDataRepository repo = workflowsProvider.getIfAvailable();
-        if (repo == null) throw new NotConfiguredException("Workflow engine");
-        return repo;
-    }
-
-    private WorkflowInstanceRepository workflowInstances() {
-        WorkflowInstanceRepository repo = workflowInstancesProvider.getIfAvailable();
         if (repo == null) throw new NotConfiguredException("Workflow engine");
         return repo;
     }

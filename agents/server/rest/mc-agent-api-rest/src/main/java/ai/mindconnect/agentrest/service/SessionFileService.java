@@ -16,9 +16,10 @@ import ai.mindconnect.vectorstore.tools.VectorStore;
 import ai.mindconnect.vectorstore.tools.VectorStoreInstance;
 import ai.mindconnect.vectorstore.tools.VectorStoreTemplate;
 import ai.mindconnect.vectorstore.tools.VectorStores;
-import ai.mindconnect.workflow.admin.run.WorkflowRunService;
+import ai.mindconnect.workflow.execution.WorkflowExecutorService;
+import ai.mindconnect.workflow.execution.WorkflowResult;
 import ai.mindconnect.workflow.persistence.port.WorkflowDataRepository;
-import ai.mindconnect.workflow.persistence.port.WorkflowInstanceRepository;
+import ai.mindconnect.workflow.spi.SpiWorkflowContextFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -63,7 +64,6 @@ public class SessionFileService {
     private final ObjectProvider<DynamicToolActivations> activationsProvider;
     private final AgentSessionRepository sessions;
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
-    private final ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider;
     private final Path spoolBase;
     /** Where a call works — every store call names the namespace. */
     private final ai.mindconnect.common.env.EnvVarResolver environment;
@@ -75,7 +75,6 @@ public class SessionFileService {
                               ObjectProvider<DynamicToolActivations> activationsProvider,
                               AgentSessionRepository sessions,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
-                              ObjectProvider<WorkflowInstanceRepository> workflowInstancesProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
                               ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome,
                               ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
@@ -85,7 +84,6 @@ public class SessionFileService {
         this.activationsProvider = activationsProvider;
         this.sessions = sessions;
         this.workflowsProvider = workflowsProvider;
-        this.workflowInstancesProvider = workflowInstancesProvider;
         this.spoolBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
         this.userHome = userHome.getIfAvailable(ai.mindconnect.agent.runtime.service.UserHome::none);
     }
@@ -328,16 +326,16 @@ public class SessionFileService {
                 DirectIngestion.ingest(store, ref, session.userId(), "1", stored.name(), text);
             } else {
                 WorkflowDataRepository workflows = workflowsProvider.getIfAvailable();
-                WorkflowInstanceRepository workflowInstances = workflowInstancesProvider.getIfAvailable();
-                if (workflows == null || workflowInstances == null) {
+                if (workflows == null) {
                     return new AttachResult(stored, storeName, false,
                             stored.name() + ": the workflow engine is not configured in this application.");
                 }
                 var workflow = workflows.findById(instance.ingestionWorkflow()).orElseThrow(() ->
                         new IllegalStateException("Ingestion workflow '" + instance.ingestionWorkflow()
                                 + "' not found"));
-                var runner = new WorkflowRunService(workflowInstances, environment.shared()::asMap);
-                ai.mindconnect.workflow.admin.run.WorkflowRunService.RunReport report;
+                var executor = new WorkflowExecutorService(SpiWorkflowContextFactory.create())
+                        .withEnvironment(environment.shared()::asMap);
+                WorkflowResult result;
                 // The workflow's tool steps run on behalf of this chat's user and
                 // session — the calls its upload store accepts — and resolve their
                 // paths in the session's own directory, the file as uploads/<name>. That
@@ -347,7 +345,7 @@ public class SessionFileService {
                     Path sessionDir = copy.get().getParent().getParent();
                     String file = sessionDir.relativize(copy.get()).toString().replace('\\', '/');
                     ToolCallScope scope = ToolCallScope.ofSession(session.userId(), sessionId, sessionDir.toString());
-                    report = scope.runWith(() -> runner.runWithAttributes(workflow,
+                    result = scope.runWith(() -> executor.executeWorkflow(workflow,
                             Map.of("file", file, "store", storeName, "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(), scope)));
                 } else {
@@ -357,15 +355,15 @@ public class SessionFileService {
                     try (InputStream content = fileStore.content(stored.id())) {
                         Files.copy(content, target, StandardCopyOption.REPLACE_EXISTING);
                     }
-                    report = runner.runWithAttributes(workflow,
+                    result = executor.executeWorkflow(workflow,
                             Map.of("file", spoolBase.relativize(target).toString(), "store", storeName,
                                     "file_id", stored.id().value()),
                             Map.of(ToolCallScope.class.getName(),
                                     new ToolCallScope(session.userId(), sessionId, null)));
                 }
-                if (!report.success()) {
+                if (!result.isSuccess()) {
                     return new AttachResult(stored, storeName, false,
-                            stored.name() + ": ingestion failed — " + report.error());
+                            stored.name() + ": ingestion failed — " + result.failureMessage());
                 }
             }
             // The agent gets vector_search in this session from the next round

@@ -35,6 +35,20 @@ public final class WorkflowResult {
     public boolean isHalted()   { return state == ExecutionState.HALTED; }
     public boolean isError()    { return state == ExecutionState.ERROR; }
 
+    /**
+     * The line to show for a run that did not finish, null for one that did:
+     * {@code "halted"} for a halt, and for a failure the cause a step failure
+     * wraps — the one the user needs — as its message, or its type when it has none.
+     */
+    public String failureMessage() {
+        if (isSuccess()) return null;
+        if (isHalted()) return "halted";
+        if (error == null) return "Execution failed.";
+        Throwable root = error.getCause() != null ? error.getCause() : error;
+        String message = root.getMessage();
+        return message == null || message.isBlank() ? root.getClass().getSimpleName() : message;
+    }
+
     /** Shortcut for the workflow's final result value. */
     public Object getResult() {
         return instance.getResult();
