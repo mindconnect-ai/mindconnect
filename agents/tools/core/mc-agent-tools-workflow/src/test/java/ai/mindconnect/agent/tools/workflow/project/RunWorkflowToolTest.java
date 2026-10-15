@@ -149,9 +149,9 @@ class RunWorkflowToolTest {
                   - set: {out: "${text}"}
                 result: out
                 """);
-        String result = run(tool(List.of(), List.of()), "echo",
-                Map.of("text", "mini: \"x\".getClass().forName(\"java.lang.Runtime\")"));
-        assertThat(result).startsWith("Error:").contains("Method not found");
+        // Inputs are data: the script never runs, so it never gets near a class.
+        String sneaky = "mini: \"x\".getClass().forName(\"java.lang.Runtime\")";
+        assertThat(run(tool(List.of(), List.of()), "echo", Map.of("text", sneaky))).isEqualTo(sneaky);
     }
 
     @Test
