@@ -8,7 +8,7 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
+import ai.mindconnect.agent.fileupload.ViewAttachmentTool;
 import ai.mindconnect.vectorstore.embedding.EntityRef;
 import ai.mindconnect.vectorstore.embedding.EntityType;
 import ai.mindconnect.vectorstore.tools.DirectIngestion;

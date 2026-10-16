@@ -28,6 +28,9 @@ public record AttachedFile(
         long sizeBytes,
         String path
 ) {
+    /** The tool that shows an attached image or PDF to the model again; the session offers it while one is attached. */
+    public static final String VIEW_TOOL = "view_attachment";
+
     @JsonCreator
     public AttachedFile(@JsonProperty("id") String id,
                         @JsonProperty("name") String name,

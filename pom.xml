@@ -59,11 +59,12 @@
         <module>agents/features/skills/mc-agent-skills-core</module>
         <module>agents/features/skills/mc-agent-skills-pg</module>
         <module>agents/features/skills/mc-agent-skills</module>
+        <module>agents/features/file-upload/mc-agent-file-upload-core</module>
         <module>agents/builder/mc-agent-runtime-feature-core</module>
         <module>agents/builder/mc-agent-runtime-feature-tools</module>
+        <module>agents/features/file-upload/mc-agent-file-upload</module>
         <module>agents/features/workflow/mc-agent-tools-workflow</module>
         <module>agents/features/workflow/mc-agent-workflow</module>
-        <module>agents/builder/mc-agent-runtime-feature-file-upload</module>
         <module>agents/builder/mc-agent-runtime-feature-transcription</module>
         <module>agents/builder/mc-agent-runtime-feature-taskqueue</module>
         <module>agents/builder/mc-agent-runtime-feature-subagents</module>

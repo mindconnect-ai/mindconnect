@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.feature.fileupload;
+package ai.mindconnect.agent.fileupload.feature;
 
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.kernel.FeatureContext;

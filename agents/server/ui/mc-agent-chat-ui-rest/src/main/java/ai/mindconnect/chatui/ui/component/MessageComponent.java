@@ -4,7 +4,7 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
+import ai.mindconnect.agent.fileupload.ViewAttachmentTool;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.chatui.ui.controller.ChatUiController;

@@ -1,11 +1,11 @@
-package ai.mindconnect.agent.runtime.feature.fileupload;
+package ai.mindconnect.agent.fileupload.feature;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.kernel.Beans;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
+import ai.mindconnect.agent.fileupload.ViewAttachmentTool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

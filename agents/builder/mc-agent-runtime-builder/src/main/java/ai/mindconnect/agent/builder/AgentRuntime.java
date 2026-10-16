@@ -12,7 +12,7 @@ import ai.mindconnect.kernel.FeatureRegistry;
 import ai.mindconnect.kernel.Features;
 import ai.mindconnect.kernel.Beans;
 import ai.mindconnect.kernel.Kernel;
-import ai.mindconnect.agent.runtime.feature.fileupload.AttachSupport;
+import ai.mindconnect.agent.fileupload.feature.AttachSupport;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;

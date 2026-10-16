@@ -26,7 +26,7 @@ import ai.mindconnect.common.LoggingContext;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
+import ai.mindconnect.agent.fileupload.ViewAttachmentTool;
 import ai.mindconnect.ui.model.UiAction;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;

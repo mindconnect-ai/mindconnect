@@ -6,7 +6,7 @@ import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.domain.ParticipantType;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
+import ai.mindconnect.agent.fileupload.ViewAttachmentTool;
 import org.junit.jupiter.api.Test;
 
 import java.time.format.DateTimeFormatter;

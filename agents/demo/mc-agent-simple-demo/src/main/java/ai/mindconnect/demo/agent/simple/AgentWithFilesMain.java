@@ -6,7 +6,7 @@ import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.core.CoreFeature;
-import ai.mindconnect.agent.runtime.feature.fileupload.FileUploadFeature;
+import ai.mindconnect.agent.fileupload.feature.FileUploadFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.llm.domain.LlmConfig;
 

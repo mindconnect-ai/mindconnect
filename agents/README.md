@@ -75,6 +75,7 @@ ones it wants.
 | `user-memory/mc-agent-user-memory-core`, `-pg`, `mc-agent-user-memory` | What agents remember about each user, with `UserMemoryFeature` |
 | `todo/mc-agent-todo-core`, `-pg`, `mc-agent-todo` | The working todo list of a session, with `TodoFeature` |
 | `skills/mc-agent-skills-core`, `-pg`, `mc-agent-skills` | Skills an agent loads at run time, with `SkillsFeature` |
+| `file-upload/mc-agent-file-upload-core`, `mc-agent-file-upload` | Files attached to a chat: the `view_attachment` tool, and `FileUploadFeature` with the attach path |
 
 ### `tools/vector/` — the knowledge tools
 

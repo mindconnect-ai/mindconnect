@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.runtime.tools.toolsearch;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
 import ai.mindconnect.agent.runtime.port.out.SkillToolGrant;
 import ai.mindconnect.agent.UserId;
@@ -227,7 +228,7 @@ public final class DynamicToolActivations {
         for (var file : session.attachedFiles()) {
             // An image is never indexed; everything else is, PDFs additionally readable page by page.
             if (file.isImage() || file.isPdf()) {
-                names.add(ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool.NAME);
+                names.add(AttachedFile.VIEW_TOOL);
             }
             if (!file.isImage()) {
                 names.add("vector_search");

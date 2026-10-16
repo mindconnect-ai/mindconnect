@@ -8,18 +8,22 @@
         <groupId>ai.mindconnect</groupId>
         <artifactId>mc-agents-parent</artifactId>
         <version>${revision}${sha1}${changelist}</version>
-        <relativePath>../../mc-agents-parent/pom.xml</relativePath>
+        <relativePath>../../../mc-agents-parent/pom.xml</relativePath>
     </parent>
 
-    <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
-    <name>mc-agent-runtime-feature-file-upload</name>
+    <artifactId>mc-agent-file-upload</artifactId>
+    <name>mc-agent-file-upload</name>
     <packaging>jar</packaging>
-    <description>Runtime feature: files attached to a chat — the file store that keeps them (a directory
+    <description>The file-upload feature: files attached to a chat — the file store that keeps them (a directory
         or Postgres, following the runtime's persistence) and the attach path that indexes a document
         into the session's vector store. Brings the file store and vector store modules with it; running
         an ingestion workflow additionally needs the workflows feature.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-file-upload-core</artifactId>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-kernel</artifactId>

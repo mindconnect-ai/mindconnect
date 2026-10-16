@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.tools.attachment;
+package ai.mindconnect.agent.fileupload;
 
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.agent.SessionId;
@@ -30,7 +30,7 @@ import java.util.Map;
  */
 public final class ViewAttachmentTool implements Tool {
 
-    public static final String NAME = "view_attachment";
+    public static final String NAME = AttachedFile.VIEW_TOOL;
 
     /** Metadata key on the inserted message: which tool put it there. */
     public static final String INSERTED_BY = "insertedBy";

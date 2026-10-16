@@ -96,7 +96,7 @@
         <!-- The examples attach files, so the runtime they build needs the file-upload feature. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-file-upload</artifactId>
+            <artifactId>mc-agent-file-upload</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>

@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.tools.attachment;
+package ai.mindconnect.agent.fileupload;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
