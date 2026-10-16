@@ -1,4 +1,4 @@
-| `TaskQueueFeature` | `mc-agent-runtime-feature-taskqueue` | the queue the turns run on, configured: `retention`, `maintenanceInterval`, and `jdbc()` for a store shared across nodes on Postgres, with the open approval questions beside it | — |---
+| `TaskQueueFeature` | `mc-agent-runtime-feature-taskqueue` | the queue the turns run on, configured: `retention`, `maintenanceInterval`, and `jdbc()` for a store shared across nodes on Postgres | — |---
 title: Embedding the runtime
 description: Build an agent runtime in plain Java from a core plus installed features — the way an ObjectMapper is a core plus modules.
 ---
@@ -39,7 +39,7 @@ its cross-cutting advisors, and it declares what it depends on.
 | `FileUploadFeature` | `mc-agent-file-upload` | the file store (a directory or Postgres, following the persistence) and `attachFile` — indexing a document into the session's vector store; brings `mc-file-store` and `mc-vector-store-tools` | `ToolsFeature` |
 | `TranscriptionFeature` | `mc-agent-runtime-feature-transcription` | speech to text by LLM config name, over the OpenAI-compatible transcription endpoint | — |
 | `SubAgentsFeature` | `mc-agent-runtime-feature-subagents` | agents delegating to agents: the inline `run_agent`/`run_agents` tools, sub-agent sessions, the recursion depth (`maxDepth`); without it a roster is ignored | `ToolsFeature` |
-| `TaskQueueFeature` | `mc-agent-runtime-feature-taskqueue` | the queue the turns run on, configured: `retention`, `maintenanceInterval`, and `jdbc()` for a store shared across nodes on Postgres, with the open approval questions beside it | — |
+| `TaskQueueFeature` | `mc-agent-runtime-feature-taskqueue` | the queue the turns run on, configured: `retention`, `maintenanceInterval`, and `jdbc()` for a store shared across nodes on Postgres | — |
 
 The core is always there: `of(persistence)` installs it, because a runtime without
 a model, a transcript or a session is not an agent runtime — which is why the
@@ -116,11 +116,10 @@ The non-blocking form is on the chat service: `chatService().sendChat(…)`
 returns a handle whose `outcome()` completes at the question, and
 `approve`/`deny` return the handle of the continuation.
 
-The open questions live in a `ToolApprovalRepository` as long as the parked calls
-they wake: in memory beside the in-process task store, and in the table
-`mc_tool_approval` once `TaskQueueFeature.jdbc()` keeps the tasks in Postgres, so a
-question survives a restart exactly when its call does. A feature of yours can
-register another (`ctx.instance(ToolApprovalRepository.class, …)`).
+The open questions live in a `ToolApprovalRepository` — in memory unless a
+feature of yours registers one (`ctx.instance(ToolApprovalRepository.class, …)`).
+A question in memory does not survive a restart, while a task queue on Postgres
+keeps the parked call: such a runtime needs a repository that persists as well.
 
 ## Reaching the beans
 

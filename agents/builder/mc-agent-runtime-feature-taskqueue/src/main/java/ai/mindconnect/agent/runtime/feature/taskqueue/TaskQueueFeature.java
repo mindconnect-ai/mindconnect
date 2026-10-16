@@ -4,9 +4,6 @@ import ai.mindconnect.kernel.ConfigurableFeature;
 import ai.mindconnect.kernel.FeatureContext;
 import ai.mindconnect.kernel.FeatureException;
 import ai.mindconnect.agent.runtime.feature.Persistence;
-import ai.mindconnect.agent.runtime.adapter.pg.PgToolApprovalRepository;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.taskqueue.LoggingTaskListener;
 import ai.mindconnect.taskqueue.TaskAdvisor;
 import ai.mindconnect.taskqueue.TaskQueue;
@@ -23,8 +20,7 @@ import java.time.Duration;
  * forgets finished task trees at once; with it: how long finished trees stay
  * readable, how often the maintenance loop runs, and — on Postgres
  * persistence — a {@link JdbcTaskStore} that several nodes share, each
- * claiming with a lease, and the open approval questions in a table beside it, since
- * a parked task must find its question again after a restart.
+ * claiming with a lease.
  */
 public class TaskQueueFeature extends ConfigurableFeature {
 
@@ -49,10 +45,7 @@ public class TaskQueueFeature extends ConfigurableFeature {
         return this;
     }
 
-    /**
-     * The store in the runtime's Postgres, shared by every node, with the approval questions its parked
-     * tasks wait on; an error on file or in-memory persistence.
-     */
+    /** The store in the runtime's Postgres, shared by every node; an error on file or in-memory persistence. */
     public TaskQueueFeature jdbc() {
         changing();
         this.jdbc = true;
@@ -80,10 +73,6 @@ public class TaskQueueFeature extends ConfigurableFeature {
 
     @Override
     protected void install(FeatureContext ctx) {
-        if (jdbc) {
-            // The questions live as long as the tasks they wake: in memory they would be gone after a restart.
-            ctx.bean(ToolApprovalRepository.class, () -> new PgToolApprovalRepository(ctx.require(Sql.class)).initSchema());
-        }
         ctx.bean(TaskStore.class, () -> {
             if (!jdbc) return new InMemoryTaskStore();
             if (!(ctx.require(Persistence.class) instanceof Persistence.Postgres postgres)) {
