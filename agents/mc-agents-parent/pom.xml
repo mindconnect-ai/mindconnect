@@ -359,6 +359,11 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-approvals</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-file-upload</artifactId>
                 <version>${project.version}</version>
             </dependency>

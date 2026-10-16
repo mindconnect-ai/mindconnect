@@ -76,6 +76,7 @@ ones it wants.
 | `todo/mc-agent-todo-core`, `-pg`, `mc-agent-todo` | The working todo list of a session, with `TodoFeature` |
 | `skills/mc-agent-skills-core`, `-pg`, `mc-agent-skills` | Skills an agent loads at run time, with `SkillsFeature` |
 | `file-upload/mc-agent-file-upload-core`, `mc-agent-file-upload` | Files attached to a chat: the `view_attachment` tool, and `FileUploadFeature` with the attach path |
+| `approvals/mc-agent-approvals` | The approval gate that parks a flagged tool call until a human answers |
 
 ### `tools/vector/` — the knowledge tools
 

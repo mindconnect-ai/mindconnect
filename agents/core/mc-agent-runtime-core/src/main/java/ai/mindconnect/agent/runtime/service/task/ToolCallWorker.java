@@ -18,17 +18,13 @@ import ai.mindconnect.agent.runtime.service.round.TurnMessage;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
 import ai.mindconnect.agent.tool.ToolRegistry;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
-import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.common.LoggingContext;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.llm.domain.ToolCall;
 import ai.mindconnect.message.domain.MessageType;
 import ai.mindconnect.message.port.in.ConversationManager;
-import ai.mindconnect.agent.runtime.service.approval.ApprovalNotifications;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalGate;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskQueue;
@@ -86,8 +82,7 @@ public final class ToolCallWorker implements TaskWorker {
     private final DynamicToolActivations dynamicToolActivations;
     private final ToolExecutor toolExecutor;
     private final SessionChannels sessionChannels;
-    private final UserChannels userChannels;
-    private final ToolApprovalRepository approvalStore;
+    private final ApprovalGate approvals;
     private final SubAgentCalls subAgents;
     private final SubAgentSupport subAgentSupport;
 
@@ -99,10 +94,9 @@ public final class ToolCallWorker implements TaskWorker {
                           DynamicToolActivations dynamicToolActivations,
                           ToolExecutor toolExecutor,
                           SessionChannels sessionChannels,
-                          ToolApprovalRepository approvalStore,
-                          UserChannels userChannels) {
+                          ApprovalGate approvals) {
         this(conversationManager, definitionRepository, sessionService, memoryStrategyFactory, toolRegistry,
-                dynamicToolActivations, toolExecutor, sessionChannels, approvalStore, userChannels,
+                dynamicToolActivations, toolExecutor, sessionChannels, approvals,
                 SubAgentSupport.enabled(AgentTurnWorker.MAX_DEPTH));
     }
 
@@ -115,8 +109,7 @@ public final class ToolCallWorker implements TaskWorker {
                           DynamicToolActivations dynamicToolActivations,
                           ToolExecutor toolExecutor,
                           SessionChannels sessionChannels,
-                          ToolApprovalRepository approvalStore,
-                          UserChannels userChannels,
+                          ApprovalGate approvals,
                           SubAgentSupport subAgentSupport) {
         this.subAgentSupport = subAgentSupport == null ? SubAgentSupport.disabled() : subAgentSupport;
         this.conversationManager = conversationManager;
@@ -127,8 +120,7 @@ public final class ToolCallWorker implements TaskWorker {
         this.dynamicToolActivations = dynamicToolActivations;
         this.toolExecutor = toolExecutor;
         this.sessionChannels = sessionChannels;
-        this.approvalStore = approvalStore;
-        this.userChannels = userChannels;
+        this.approvals = approvals;
         this.subAgents = new SubAgentCalls(conversationManager, definitionRepository,
                 sessionService, memoryStrategyFactory, sessionChannels, this.subAgentSupport);
     }
@@ -199,7 +191,7 @@ public final class ToolCallWorker implements TaskWorker {
             // notification (Allow/Deny once) or the fresh session rules
             // (Allow for this session — which thereby covers every parked
             // sibling without any sweeping).
-            switch (approvalGate(ctx, session, def, callId, toolName, arguments)) {
+            switch (approvals.check(ctx, session, def, callId, toolName, arguments)) {
                 case WAIT -> {
                     return TaskOutcome.suspendUntilNotified();
                 }
@@ -261,91 +253,6 @@ public final class ToolCallWorker implements TaskWorker {
                     TurnMessage.toolResult(callId, toolName, output, failed)
                             .with("durationMs", System.currentTimeMillis() - startMs));
             return TaskOutcome.done(failed ? "failed" : "ok");
-        }
-    }
-
-    // ── the approval gate ───────────────────────────────────────────────────
-
-    private enum Gate { PROCEED, WAIT, DENIED }
-
-    private static final com.fasterxml.jackson.databind.ObjectMapper MAPPER =
-            new com.fasterxml.jackson.databind.ObjectMapper();
-
-    /**
-     * Decides, in order: an explicit answer from the human (delivered as a
-     * task notification — the only way "Allow once"/"Deny" can work without
-     * a standing rule), then the standing rules (the agent's flag minus the
-     * session chain's approvals — "allow for this session" at the root covers
-     * every sub-agent), and only then parking: one store entry per open
-     * question (idempotent), one live card push, {@code WAIT}.
-     */
-    private Gate approvalGate(TaskContext ctx, AgentSession session, AgentDefinition def,
-                              String callId, String toolName, Map<String, Object> arguments) {
-        for (var notification : ctx.notifications()) {
-            Boolean decision = ApprovalNotifications
-                    .decision(notification);
-            if (decision != null) {
-                // The card lives in the root chat, and the store is keyed by it.
-                approvalStore.delete(sessionService.rootSession(session.id()).id(), callId);
-                return decision ? Gate.PROCEED : Gate.DENIED;
-            }
-        }
-        boolean flagged = def.tools().stream()
-                .anyMatch(t -> toolName.equals(t.name()) && t.enabled() && t.needsApproval());
-        if (!flagged) {
-            // Only a flagged call ever registers a card — no session lookups for the rest.
-            return Gate.PROCEED;
-        }
-        AgentSession root = sessionService.rootSession(session.id());
-        if (sessionService.isToolApproved(session.id(), toolName)) {
-            approvalStore.delete(root.id(), callId);   // no stale card outlives the decision
-            return Gate.PROCEED;
-        }
-        var entry = new ToolApproval(
-                ctx.task().id(), callId, toolName, approvalContent(toolName, arguments),
-                session.id(), root.id(), ctx.task().id(), java.time.Instant.now());
-        if (approvalStore.saveIfAbsent(entry)) {
-            log.info("Tool '{}' (call {}) waits at the approval gate — card registered for root session {}",
-                    toolName, callId, root.id());
-            publishApprovalCard(root, entry, arguments);
-            // The user's own stream too, so a client that is not looking at
-            // this chat — a session list, another tab — learns someone waits.
-            userChannels.publish(root.userId(), new UserEvent
-                    .ApprovalRequested(root.id(), callId, toolName));
-        }
-        return Gate.WAIT;
-    }
-
-    /** The card's payload — same {@code {"name","arguments"}} shape the UI has always parsed. */
-    private static String approvalContent(String toolName, Map<String, Object> arguments) {
-        try {
-            return MAPPER.writeValueAsString(Map.of(
-                    "name", toolName, "arguments", arguments == null ? Map.of() : arguments));
-        } catch (Exception e) {
-            return "{\"name\":\"" + toolName + "\",\"arguments\":{}}";
-        }
-    }
-
-    /**
-     * The live mirror of the registered card, pushed on the ROOT turn's
-     * channel — the suspended chat stream shows the card at once instead of
-     * waiting for a reload. Best-effort: the store still renders it.
-     */
-    private void publishApprovalCard(AgentSession root,
-                                     ToolApproval entry,
-                                     Map<String, Object> arguments) {
-        try {
-            var rootHistory = conversationManager.loadCompleteHistory(root.conversationId());
-            ChatTurnId rootTurnId = rootHistory.currentTurnId().orElse(null);
-            if (rootTurnId == null) return;
-            sessionChannels.publisherFor(root.id(), rootTurnId, rootHistory.currentRun())
-                    .accept(new StreamEvent.ApprovalRequested(
-                    entry.requestId(), entry.callId(), entry.toolName(),
-                    arguments == null ? Map.of() : arguments,
-                    entry.originSessionId(), entry.toolTaskId()));
-        } catch (Exception e) {
-            log.warn("Live approval card push failed (the store still renders it on reload): {}",
-                    e.getMessage());
         }
     }
 

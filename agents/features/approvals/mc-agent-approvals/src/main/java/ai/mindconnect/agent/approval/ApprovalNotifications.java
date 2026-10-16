@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service.approval;
+package ai.mindconnect.agent.approval;
 
 import ai.mindconnect.taskqueue.TaskNotification;
 

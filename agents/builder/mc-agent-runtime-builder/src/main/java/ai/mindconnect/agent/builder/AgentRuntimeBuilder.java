@@ -39,6 +39,8 @@ import ai.mindconnect.agent.runtime.service.UserHome;
 import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalGate;
+import ai.mindconnect.agent.approval.ParkingApprovalGate;
 import ai.mindconnect.agent.runtime.service.prompt.AgentMetadataProvider;
 import ai.mindconnect.agent.runtime.service.prompt.AgentToolsProvider;
 import ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider;
@@ -497,6 +499,13 @@ public class AgentRuntimeBuilder {
                 sessionId -> context.require(ToolApprovalRepository.class).deleteForSession(sessionId));
         context.bean(UserChannels.class, UserChannels::new);
         context.bean(SessionChannels.class, SessionChannels::new);
+        if (!beans.has(ApprovalGate.class)) {
+            // A flagged call parks until a human answers, unless a feature brings a gate of its own.
+            context.bean(ApprovalGate.class, () -> new ParkingApprovalGate(
+                    context.require(ToolApprovalRepository.class), context.require(AgentSessionService.class),
+                    context.require(ConversationManager.class), context.require(SessionChannels.class),
+                    context.require(UserChannels.class), context.require(TaskQueue.class)));
+        }
 
         // Null objects for the features that are not installed.
         if (!beans.has(SkillCatalog.class)) context.bean(SkillCatalog.class, SkillCatalog::none);
@@ -545,8 +554,7 @@ public class AgentRuntimeBuilder {
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
                 context.require(ToolRegistry.class), context.require(DynamicToolActivations.class),
                 context.require(ToolExecutor.class), context.require(SessionChannels.class),
-                context.require(ToolApprovalRepository.class), context.require(UserChannels.class),
-                context.require(SubAgentSupport.class)));
+                context.require(ApprovalGate.class), context.require(SubAgentSupport.class)));
         context.bean(SessionTitleWorker.class, () -> new SessionTitleWorker(
                 context.require(AgentSessionService.class), context.require(ConversationManager.class),
                 context.require(AgentTaskRunner.class), context.require(UserChannels.class)));
@@ -555,7 +563,7 @@ public class AgentRuntimeBuilder {
                 context.require(ConversationManager.class), context.require(MemoryStrategyFactory.class),
                 context.require(WorkingMemoryRepository.class), context.require(PromptRenderer.class),
                 context.require(SessionChannels.class), context.require(UserChannels.class),
-                context.require(TaskQueue.class), context.require(ToolApprovalRepository.class),
+                context.require(TaskQueue.class), context.require(ApprovalGate.class),
                 context.require(InstructionFiles.class), context.require(ScopeSupplier.class),
                 context.require(PromptSections.class)));
 

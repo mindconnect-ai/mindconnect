@@ -150,8 +150,8 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     `mc-<name>-core` (domain, port, service, its tools, its prompt section), `mc-<name>` (file and
     in-memory stores and the `Feature` that picks the store and wires the rest), `mc-<name>-pg`.
     The runtime core knows none of them; a feature hooks in through the core's interfaces
-    (`PromptSection`, `PromptContextProvider`, `ToolAdvisor`, `SessionCleanup`, `SkillToolGrant`, …) and the
-    kernel's `contribute`. So far: `user-memory`, `todo`, `skills`, `file-upload`; `workflow` is the agent side of the `workflow/`
+    (`PromptSection`, `PromptContextProvider`, `ToolAdvisor`, `SessionCleanup`, `SkillToolGrant`, `ApprovalGate`, …) and
+    the kernel's `contribute`. So far: `user-memory`, `todo`, `skills`, `file-upload`, `approvals`; `workflow` is the agent side of the `workflow/`
     area, whose engine and stores stand in for `-core` and `-pg`: `mc-agent-tools-workflow` (tools
     and steps) and `mc-agent-workflow` (`WorkflowsFeature`)
   - `server/` — what runs: the Spring Boot apps, their REST and UI libraries, and the

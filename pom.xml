@@ -60,6 +60,7 @@
         <module>agents/features/skills/mc-agent-skills-pg</module>
         <module>agents/features/skills/mc-agent-skills</module>
         <module>agents/features/file-upload/mc-agent-file-upload-core</module>
+        <module>agents/features/approvals/mc-agent-approvals</module>
         <module>agents/builder/mc-agent-runtime-feature-core</module>
         <module>agents/builder/mc-agent-runtime-feature-tools</module>
         <module>agents/features/file-upload/mc-agent-file-upload</module>

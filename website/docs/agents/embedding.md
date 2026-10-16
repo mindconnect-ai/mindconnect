@@ -121,6 +121,12 @@ feature of yours registers one (`ctx.instance(ToolApprovalRepository.class, …)
 A question in memory does not survive a restart, while a task queue on Postgres
 keeps the parked call: such a runtime needs a repository that persists as well.
 
+The gate itself is the port `ApprovalGate`: the runtime asks it right before a
+tool runs, for the open questions of a chat, to deliver an answer and to close the
+questions of a turn that ends. The default, `ParkingApprovalGate`
+(`mc-agent-approvals`), parks the call's task until the answer arrives; a feature
+of yours can register another (`ctx.instance(ApprovalGate.class, …)`).
+
 ## Reaching the beans
 
 Everything a feature registers is reachable after `build()`, decorated the way

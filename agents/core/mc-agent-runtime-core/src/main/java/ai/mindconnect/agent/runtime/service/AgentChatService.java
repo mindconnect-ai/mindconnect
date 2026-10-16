@@ -19,10 +19,9 @@ import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
-import ai.mindconnect.agent.runtime.service.approval.ApprovalNotifications;
+import ai.mindconnect.agent.runtime.service.approval.ApprovalGate;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.domain.ToolApproval;
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.round.ToolCalls;
 import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
@@ -90,7 +89,7 @@ public class AgentChatService {
     private final SessionChannels sessionChannels;
     private final UserChannels userChannels;
     private final TaskQueue queue;
-    private final ToolApprovalRepository approvalStore;
+    private final ApprovalGate approvals;
     /** Where this runtime works: a turn's handle is completed in the turn's own scope. */
     private final ScopeSupplier scope;
     /** Turns a caller holds a handle for, by task id — completed from the queue's listener, no thread waits. */
@@ -122,11 +121,11 @@ public class AgentChatService {
                             SessionChannels sessionChannels,
                             UserChannels userChannels,
                             TaskQueue queue,
-                            ToolApprovalRepository approvalStore,
+                            ApprovalGate approvals,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions) {
         this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
                 workingMemoryRepository, promptRenderer, sessionChannels, userChannels,
-                queue, approvalStore, instructions, ScopeSupplier.local());
+                queue, approvals, instructions, ScopeSupplier.local());
     }
 
     public AgentChatService(AgentSessionService sessionService,
@@ -138,12 +137,12 @@ public class AgentChatService {
                             SessionChannels sessionChannels,
                             UserChannels userChannels,
                             TaskQueue queue,
-                            ToolApprovalRepository approvalStore,
+                            ApprovalGate approvals,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
                             ScopeSupplier scope) {
         this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
                 workingMemoryRepository, promptRenderer, sessionChannels, userChannels,
-                queue, approvalStore, instructions, scope,
+                queue, approvals, instructions, scope,
                 ai.mindconnect.agent.runtime.service.prompt.PromptSections.none());
     }
 
@@ -157,7 +156,7 @@ public class AgentChatService {
                             SessionChannels sessionChannels,
                             UserChannels userChannels,
                             TaskQueue queue,
-                            ToolApprovalRepository approvalStore,
+                            ApprovalGate approvals,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
                             ScopeSupplier scope,
                             ai.mindconnect.agent.runtime.service.prompt.PromptSections promptSections) {
@@ -172,7 +171,7 @@ public class AgentChatService {
         this.sessionChannels = sessionChannels;
         this.userChannels = userChannels;
         this.queue = queue;
-        this.approvalStore = approvalStore;
+        this.approvals = approvals;
         this.scope = scope == null ? ScopeSupplier.local() : scope;
         this.instructions = instructions;
         // The queue tells us when a turn ended; no thread of ours waits for it.
@@ -334,7 +333,7 @@ public class AgentChatService {
         LocalChatTurnHandle handle = new LocalChatTurnHandle(turnId, sessionId, result, outcome, cancel);
 
         // An answer that leaves other questions open continues nothing yet.
-        List<ToolApproval> stillOpen = approvalStore.openForRoot(sessionId);
+        List<ToolApproval> stillOpen = approvals.open(sessionId);
         if (!stillOpen.isEmpty()) {
             outcome.complete(TurnResult.incomplete(turnId, stillOpen));
             if (stopAtGate) return handle;
@@ -351,7 +350,7 @@ public class AgentChatService {
             if (event.value() instanceof StreamEvent.ApprovalRequested asked) {
                 // One read decides: a question answered meanwhile — replayed, or answered
                 // while this event travelled — asks nothing any more, and the turn goes on.
-                List<ToolApproval> open = approvalStore.openForRoot(sessionId);
+                List<ToolApproval> open = approvals.open(sessionId);
                 if (open.stream().anyMatch(a -> a.callId().equals(asked.callId()))) {
                     // Every open gate moves the cursor, also one this handle's outcome is
                     // already past: a later gate of the same turn is where the answer's
@@ -433,7 +432,7 @@ public class AgentChatService {
      * approved, anything else still open as cancelled.
      */
     private void supersedeWaitingTurn(AgentSession session) {
-        List<ToolApproval> open = approvalStore.openForRoot(session.id());
+        List<ToolApproval> open = approvals.open(session.id());
         if (open.isEmpty()) return;
         java.util.Set<String> parked = new java.util.HashSet<>();
         for (ToolApproval approval : open) parked.add(approval.callId());
@@ -444,7 +443,7 @@ public class AgentChatService {
                         .with("approval", "denied").with("reason", "superseded")
                 : TurnMessage.toolResult(call.callId(), call.name(), SUPERSEDED_CANCEL, true));
         if (!cancelled) {
-            approvalStore.deleteForRoot(session.id());   // cards of a turn that is already gone
+            approvals.close(session.id());   // cards of a turn that is already gone
         }
     }
 
@@ -477,19 +476,15 @@ public class AgentChatService {
      * here and shows their cards.
      */
     public List<ToolApproval> openApprovals(SessionId rootSessionId) {
-        return approvalStore.openForRoot(rootSessionId);
+        return approvals.open(rootSessionId);
     }
 
     /**
      * The human's answer to an approval card — Deny, Allow once, or Allow for
      * this session. The card's identity is its chat and the {@code callId} —
-     * the provider's id alone is unique only within one response; everything
-     * else comes from the {@link ToolApprovalRepository} entry, the ONE truth for
-     * the open question. The decision travels as a task NOTIFICATION to the
-     * parked tool task, which re-runs its gate on wake: an explicit
-     * grant/denial wins (that is what makes "once" possible), a session-wide
-     * approval becomes a standing rule first — so every parked sibling of the
-     * same tool passes its own re-check without any sweeping.
+     * the provider's id alone is unique only within one response. The
+     * {@link ApprovalGate} delivers it to the parked call; once delivered, the
+     * user's other clients hear that the question is answered.
      *
      * <p>No stream, no resume, no run: the turn never ended — it is suspended
      * on the tool task and continues on its ORIGINAL stream the moment the
@@ -502,39 +497,7 @@ public class AgentChatService {
      */
     public boolean answerApproval(SessionId rootSessionId, String callId, boolean approved,
                                   ApprovalScope scope) {
-        ToolApproval open = approvalStore.find(rootSessionId, callId).orElse(null);
-        if (open == null) {
-            log.warn("No open approval for call {} in session {} — stale card, nothing to answer",
-                    callId, rootSessionId);
-            return false;
-        }
-        if (approved && scope == ApprovalScope.SESSION
-                && open.toolName() != null) {
-            sessionService.approveToolForSession(rootSessionId, open.toolName());
-            // Wake the parked siblings of the same tool: their gate re-check
-            // now passes via the fresh rule. Explicit grant keeps it
-            // deterministic even if a rule read would race the write.
-            for (ToolApproval other : approvalStore.openForRoot(rootSessionId)) {
-                if (other.callId().equals(callId)) continue;
-                if (!open.toolName().equals(other.toolName())) continue;
-                queue.notify(other.toolTaskId(),
-                        ApprovalNotifications.approvalGranted());
-                approvalStore.delete(rootSessionId, other.callId());
-                log.info("Session approval of '{}' released parked call {} as well",
-                        open.toolName(), other.callId());
-            }
-        }
-        boolean delivered = queue.notify(open.toolTaskId(), approved
-                ? ApprovalNotifications.approvalGranted()
-                : ApprovalNotifications.approvalDenied());
-        approvalStore.delete(rootSessionId, callId);
-        if (!delivered) {
-            log.warn("Approval for call {} could not be delivered — task {} is gone (restart/cancel)",
-                    callId, open.toolTaskId());
-            return false;
-        }
-        log.info("Approval answer for call {} ({}, scope {}) delivered to task {}",
-                callId, approved ? "granted" : "denied", scope, open.toolTaskId());
+        if (!approvals.answer(rootSessionId, callId, approved, scope)) return false;
         announce(rootSessionId, new UserEvent.ApprovalAnswered(rootSessionId, callId, approved));
         return true;
     }
@@ -604,7 +567,7 @@ public class AgentChatService {
         if (cancelled) {
             // The cascade killed the sub-turns too — their open approval
             // questions die with them, and so do their cards.
-            approvalStore.deleteForRoot(sessionId);
+            approvals.close(sessionId);
             appendCancelStubs(session, history, stub);
         }
         return cancelled;
