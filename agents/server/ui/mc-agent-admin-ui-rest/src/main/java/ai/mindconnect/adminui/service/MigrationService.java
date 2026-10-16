@@ -2,8 +2,8 @@ package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.Skill;
+import ai.mindconnect.agent.skill.SkillRepository;
 import ai.mindconnect.common.env.EnvVarResolver;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.domain.LlmConfig;

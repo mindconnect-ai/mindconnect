@@ -5,7 +5,7 @@ import ai.mindconnect.adminui.service.MigrationService.PendingMigration;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemorySkillRepository;
+import ai.mindconnect.agent.skill.adapter.memory.InMemorySkillRepository;
 import ai.mindconnect.common.util.encryption.EncryptionHelper;
 import ai.mindconnect.llm.adapter.env.EncryptingLlmConfigRepository;
 import ai.mindconnect.llm.adapter.file.FileLlmConfigRepository;

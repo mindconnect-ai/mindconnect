@@ -5,7 +5,6 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.AuthenticationInfo;
 
 /**
@@ -14,31 +13,21 @@ import ai.mindconnect.agent.AuthenticationInfo;
  * summaries), then the sections the runtime adds itself — where the session
  * works, the user's standing instructions, what the project asks of an agent
  * working there, what the features add ({@link PromptSection}s, e.g. the
- * user's memory), which skills it can load, and which files are attached to
+ * user's memory, the skills it can load), and which files are attached to
  * the chat.
  */
 public final class SystemPromptRenderer {
 
     private SystemPromptRenderer() {}
 
-    /** Without a skill catalog: an assembly that has no skills. */
+    /** Without sections: an assembly with no features that add to the prompt. */
     public static String render(PromptRenderer renderer,
                                 MemoryStrategy strategy,
                                 AgentDefinition def,
                                 AgentSession session,
                                 AuthenticationInfo auth,
                                 InstructionFiles instructions) {
-        return render(renderer, strategy, def, session, auth, instructions, SkillCatalog.none());
-    }
-
-    public static String render(PromptRenderer renderer,
-                                MemoryStrategy strategy,
-                                AgentDefinition def,
-                                AgentSession session,
-                                AuthenticationInfo auth,
-                                InstructionFiles instructions,
-                                SkillCatalog skills) {
-        return render(renderer, strategy, def, session, auth, instructions, skills, PromptSections.none());
+        return render(renderer, strategy, def, session, auth, instructions, PromptSections.none());
     }
 
     /** With the sections the features contributed, after the user's and the project's instructions. */
@@ -48,7 +37,6 @@ public final class SystemPromptRenderer {
                                 AgentSession session,
                                 AuthenticationInfo auth,
                                 InstructionFiles instructions,
-                                SkillCatalog skills,
                                 PromptSections sections) {
         String rendered = renderer.render(def.systemPrompt(), def, session, auth);
         String addendum = strategy.systemPromptAddendum(def, session);
@@ -56,7 +44,6 @@ public final class SystemPromptRenderer {
         return prompt + workingDirSection(session)
                 + instructions.userSection(session) + instructions.projectSection(session)
                 + (sections == null ? "" : sections.render(def, session))
-                + (skills == null ? "" : skills.promptSection(def, session))
                 + attachedFilesSection(session);
     }
 

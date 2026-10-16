@@ -1,8 +1,8 @@
 package ai.mindconnect.adminui.service;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillSource;
+import ai.mindconnect.agent.skill.Skill;
+import ai.mindconnect.agent.skill.SkillSource;
 import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.workflow.domain.WorkflowData;
 import ai.mindconnect.workflow.jackson.WorkflowObjectMapperFactory;

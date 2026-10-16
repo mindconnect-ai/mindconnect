@@ -112,6 +112,9 @@ public record AgentDefinition(
     /** The tool an agent with deferred tools gets from the runtime to find them. */
     public static final String TOOL_SEARCH = "tool_search";
 
+    /** The tool an agent with skills switched on gets from the runtime to load them. */
+    public static final String SKILL_TOOL = "skill";
+
     /**
      * Tools the runtime derives rather than an agent lists: the delegation
      * tools follow the roster, {@code tool_search} follows the deferred tools,
@@ -121,7 +124,7 @@ public record AgentDefinition(
      * "run_agent" without a roster to run.
      */
     public static final java.util.Set<String> DERIVED_TOOLS = java.util.Set.of(
-            "run_agent", "run_agents", "list_agents", TOOL_SEARCH, "skill");
+            "run_agent", "run_agents", "list_agents", TOOL_SEARCH, SKILL_TOOL);
 
     /**
      * Trim, fold case, and read blank as absent — for the two machine names.

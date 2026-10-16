@@ -143,12 +143,12 @@ class ToolSearchToolTest {
                 return Optional.of(stubTool(agentTool.name(), "Loads the full instructions of one skill."));
             }
             @Override public Map<String, Set<String>> toolNamesByGroup() {
-                return Map.of("skills", Set.of(ai.mindconnect.agent.runtime.skill.SkillTool.NAME));
+                return Map.of("skills", Set.of(ai.mindconnect.agent.runtime.domain.AgentDefinition.SKILL_TOOL));
             }
         };
         ref.set(withSkill);
 
-        String result = tool(Set.of(ai.mindconnect.agent.runtime.skill.SkillTool.NAME))
+        String result = tool(Set.of(ai.mindconnect.agent.runtime.domain.AgentDefinition.SKILL_TOOL))
                 .execute(Map.of("query", "skill instructions"));
 
         assertThat(result).as("the skill tool comes with the agent's skills setting, not from a search")

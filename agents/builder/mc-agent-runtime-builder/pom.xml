@@ -22,6 +22,10 @@
     <dependencies>
         <dependency>
             <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-skills-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
             <artifactId>mc-kernel</artifactId>
         </dependency>
         <!-- The one mandatory dependency: the runtime core (brings the LLM gateway). -->
@@ -130,7 +134,7 @@
              gets the ones it puts on its own classpath — use…() installs whatever it finds there. -->
         <dependency>
             <groupId>ai.mindconnect</groupId>
-            <artifactId>mc-agent-runtime-feature-skills</artifactId>
+            <artifactId>mc-agent-skills</artifactId>
             <optional>true</optional>
         </dependency>
         <dependency>

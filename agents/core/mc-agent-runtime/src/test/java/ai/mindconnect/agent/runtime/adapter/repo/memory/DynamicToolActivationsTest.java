@@ -121,7 +121,7 @@ class DynamicToolActivationsTest {
             return out;
         };
         DynamicToolActivations withRoster = new DynamicToolActivations(sessions,
-                ai.mindconnect.agent.runtime.skill.SkillCatalog.none(), roster);
+                ai.mindconnect.agent.runtime.port.out.SkillToolGrant.none(), roster);
         AgentDefinition def = noTools.withTools(List.of(AgentTool.of("bash"), AgentTool.of("file_write")));
         AgentSession session = session(def);
         sessions.update(session.id(), current -> current.withWorkingDir(project.toString()));

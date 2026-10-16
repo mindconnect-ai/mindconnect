@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.SkillDetailComponent;
-import ai.mindconnect.agent.runtime.skill.Skill;
+import ai.mindconnect.agent.skill.Skill;
 import ai.mindconnect.ui.model.UiPage;
 
 /** Read-only detail page for one skill. */

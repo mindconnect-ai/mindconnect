@@ -7,7 +7,7 @@ import ai.mindconnect.kernel.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
+import ai.mindconnect.agent.runtime.port.out.SkillToolGrant;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.ConfiguredToolRegistry;
 import ai.mindconnect.agent.tool.OverlayToolRegistry;
@@ -89,7 +89,7 @@ public class ToolsFeature extends ConfigurableFeature {
         // The user's own tools are the layer below the agent's list. Absent on a
         // host that keeps none, and then nothing changes for anybody.
         ctx.bean(DynamicToolActivations.class, () -> new DynamicToolActivations(
-                ctx.require(AgentSessionRepository.class), ctx.require(SkillCatalog.class),
+                ctx.require(AgentSessionRepository.class), ctx.require(SkillToolGrant.class),
                 ctx.find(ai.mindconnect.agent.tool.UserToolRoster.class)
                         .orElseGet(ai.mindconnect.agent.tool.UserToolRoster::none)));
         ctx.bean(ToolExecutor.class, () -> new ToolExecutor(ctx.kernel().beans().all(ToolAdvisor.class)));

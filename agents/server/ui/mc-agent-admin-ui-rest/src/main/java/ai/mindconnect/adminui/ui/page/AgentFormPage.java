@@ -23,7 +23,7 @@ public final class AgentFormPage extends AdminPage {
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentRepository;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
-    private final ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog;
+    private final ai.mindconnect.agent.skill.SkillCatalog skillCatalog;
 
     /**
      * @param agent {@code null} for the new-agent form, a populated
@@ -41,7 +41,7 @@ public final class AgentFormPage extends AdminPage {
                           LlmConfigRepository llmConfigRepository,
                           AgentDefinitionRepository agentRepository,
                           com.fasterxml.jackson.databind.ObjectMapper objectMapper,
-                          ai.mindconnect.agent.runtime.skill.SkillCatalog skillCatalog) {
+                          ai.mindconnect.agent.skill.SkillCatalog skillCatalog) {
         this.agent = agent;
         this.llmConfigRepository = llmConfigRepository;
         this.agentRepository = agentRepository;

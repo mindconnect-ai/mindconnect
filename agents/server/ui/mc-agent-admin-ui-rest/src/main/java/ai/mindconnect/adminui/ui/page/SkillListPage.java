@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.ui.page;
 
 import ai.mindconnect.adminui.ui.AdminPage;
 import ai.mindconnect.adminui.ui.component.SkillListComponent;
-import ai.mindconnect.agent.runtime.skill.Skill;
+import ai.mindconnect.agent.skill.Skill;
 import ai.mindconnect.ui.model.UiPage;
 
 import java.util.List;

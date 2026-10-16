@@ -9,7 +9,6 @@ import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.runtime.port.out.PromptRenderer;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
 import ai.mindconnect.agent.tool.TimeZones;
 import ai.mindconnect.llm.domain.LlmMessage;
 import ai.mindconnect.message.domain.ConversationId;
@@ -130,7 +129,7 @@ class CurrentTimeSectionTest {
         AgentSession session = AgentSession.start(def.id(), ALICE, ConversationId.random());
 
         String prompt = SystemPromptRenderer.render(template, noMemory, def, session, AuthenticationInfo.of(ALICE),
-                InstructionFiles.projectOnly(), SkillCatalog.none(),
+                InstructionFiles.projectOnly(),
                 PromptSections.of(List.of(new CurrentTimeSection(Clock.fixed(SUMMER, ZoneOffset.UTC), ZONES))));
 
         assertThat(prompt).startsWith("You help.")

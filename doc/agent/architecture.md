@@ -145,13 +145,13 @@ The root `pom.xml` is an aggregator that builds, in order: the parent POMs, the 
     embedding facade and runnable examples. The builder assembles a core plus installed
     `Feature`s (the kernel `common/mc-kernel`, package `ai.mindconnect.kernel`); the
     shipped features live one per module in `builder/mc-agent-runtime-feature-*`
-    (core = LLM + messages + agents, always installed; skills, tools, file-upload, transcription, subagents, taskqueue)
+    (core = LLM + messages + agents, always installed; tools, file-upload, transcription, subagents, taskqueue)
   - `features/<name>/` — a capability with data of its own, extracted from the runtime core:
     `mc-<name>-core` (domain, port, service, its tools, its prompt section), `mc-<name>` (file and
     in-memory stores and the `Feature` that picks the store and wires the rest), `mc-<name>-pg`.
     The runtime core knows none of them; a feature hooks in through the core's interfaces
-    (`PromptSection`, `PromptContextProvider`, `ToolAdvisor`, `SessionCleanup`, …) and the kernel's
-    `contribute`. So far: `user-memory`, `todo`; `workflow` is the agent side of the `workflow/`
+    (`PromptSection`, `PromptContextProvider`, `ToolAdvisor`, `SessionCleanup`, `SkillToolGrant`, …) and the
+    kernel's `contribute`. So far: `user-memory`, `todo`, `skills`; `workflow` is the agent side of the `workflow/`
     area, whose engine and stores stand in for `-core` and `-pg`: `mc-agent-tools-workflow` (tools
     and steps) and `mc-agent-workflow` (`WorkflowsFeature`)
   - `server/` — what runs: the Spring Boot apps, their REST and UI libraries, and the

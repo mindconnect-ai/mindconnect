@@ -59,7 +59,7 @@ public class AgentUiController {
     private final ObjectMapper objectMapper;
     /** Fills the form's skills picker; optional, like the skills screen's own store. */
     private final org.springframework.beans.factory.ObjectProvider<
-            ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog;
+            ai.mindconnect.agent.skill.SkillCatalog> skillCatalog;
 
     /** The "Memory" tab — what the agent keeps about its users; optional like the memory itself. */
     private final org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi;
@@ -72,7 +72,7 @@ public class AgentUiController {
                                 ToolTestService toolTestService,
                                 ObjectMapper objectMapper,
                                 org.springframework.beans.factory.ObjectProvider<
-                                        ai.mindconnect.agent.runtime.skill.SkillCatalog> skillCatalog,
+                                        ai.mindconnect.agent.skill.SkillCatalog> skillCatalog,
                                 org.springframework.beans.factory.ObjectProvider<MemoryAdminUiController> memoryUi) {
         this.memoryUi = memoryUi;
         this.registryService = registryService;
@@ -267,7 +267,7 @@ public class AgentUiController {
     }
 
     /** The skill catalog this host wires, or null when it wires none. */
-    private ai.mindconnect.agent.runtime.skill.SkillCatalog skills() {
+    private ai.mindconnect.agent.skill.SkillCatalog skills() {
         return skillCatalog.getIfAvailable();
     }
 

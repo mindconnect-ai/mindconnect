@@ -33,7 +33,7 @@ its cross-cutting advisors, and it declares what it depends on.
 | Feature | Maven module | Brings | Needs |
 |---|---|---|---|
 | `CoreFeature` | `mc-agent-runtime-feature-core` | what every runtime has: the LLM layer (config repository, encrypted with a key, gateways, routing chat, embeddings), conversations and messages, agent definitions and everything a session keeps | — (installed by every builder) |
-| `SkillsFeature` | `mc-agent-runtime-feature-skills` | stored skills and the catalog | — |
+| `SkillsFeature` | `mc-agent-skills` | stored skills (files, memory or Postgres, following the persistence) and the catalog | — |
 | `ToolsFeature` | `mc-agent-runtime-feature-tools` | the tool registry over the `mc-agent-tools-*` modules on the classpath, dynamic activation, the executor with every contributed `ToolAdvisor` | — |
 | `WorkflowsFeature` | `mc-agent-workflow` | the workflow store the runtime and the workflow tools share — files, memory or Postgres, following the persistence — seeded from the classpath; brings `mc-agent-tools-workflow` | — |
 | `FileUploadFeature` | `mc-agent-runtime-feature-file-upload` | the file store (a directory or Postgres, following the persistence) and `attachFile` — indexing a document into the session's vector store; brings `mc-file-store` and `mc-vector-store-tools` | `ToolsFeature` |

@@ -10,8 +10,8 @@ import static org.springframework.web.servlet.mvc.method.annotation.MvcUriCompon
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
-import ai.mindconnect.agent.runtime.skill.Skill;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
+import ai.mindconnect.agent.skill.Skill;
+import ai.mindconnect.agent.skill.SkillCatalog;
 import ai.mindconnect.ui.model.UiAction;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;

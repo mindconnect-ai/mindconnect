@@ -281,7 +281,7 @@ public class AutoCompactStrategy implements MemoryStrategy {
      */
     private static boolean isSkill(Message m) {
         return m.metadata() != null
-                && ai.mindconnect.agent.runtime.skill.SkillTool.NAME.equals(m.metadata().get("toolName"));
+                && ai.mindconnect.agent.runtime.domain.AgentDefinition.SKILL_TOOL.equals(m.metadata().get("toolName"));
     }
 
     /** Token count of the original tool result (or compressed if already compressed). */

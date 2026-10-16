@@ -42,12 +42,12 @@ public class InitialDataLoader {
 
     private final LlmConfigRepository llmConfigRepository;
     private final AgentDefinitionRepository agentDefinitionRepository;
-    private final ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository;
+    private final ai.mindconnect.agent.skill.SkillRepository skillRepository;
     private final ObjectMapper objectMapper;
 
     public InitialDataLoader(LlmConfigRepository llmConfigRepository,
                              AgentDefinitionRepository agentDefinitionRepository,
-                             ai.mindconnect.agent.runtime.skill.SkillRepository skillRepository,
+                             ai.mindconnect.agent.skill.SkillRepository skillRepository,
                              ObjectMapper objectMapper) {
         this.llmConfigRepository = llmConfigRepository;
         this.agentDefinitionRepository = agentDefinitionRepository;
@@ -91,8 +91,8 @@ public class InitialDataLoader {
             try {
                 String content = new String(resource.getInputStream().readAllBytes(),
                         java.nio.charset.StandardCharsets.UTF_8);
-                var incoming = ai.mindconnect.agent.runtime.skill.Skill.fromMarkdown(fallback, content,
-                        ai.mindconnect.agent.runtime.skill.SkillSource.MANAGED, null);
+                var incoming = ai.mindconnect.agent.skill.Skill.fromMarkdown(fallback, content,
+                        ai.mindconnect.agent.skill.SkillSource.MANAGED, null);
                 if (incoming == null) {
                     log.warn("Initial skill {} has no instructions, or a name that is not lower-case "
                             + "letters, digits and dashes — skipping", fileName);

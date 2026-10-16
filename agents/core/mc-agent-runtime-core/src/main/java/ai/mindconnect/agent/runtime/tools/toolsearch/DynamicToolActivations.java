@@ -2,9 +2,7 @@ package ai.mindconnect.agent.runtime.tools.toolsearch;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.service.workflows.ProjectWorkflowFiles;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
-import ai.mindconnect.agent.runtime.skill.SkillTool;
-import ai.mindconnect.agent.runtime.skill.SkillToolFactory;
+import ai.mindconnect.agent.runtime.port.out.SkillToolGrant;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.UserToolRoster;
@@ -29,24 +27,24 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class DynamicToolActivations {
 
     private final ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions;
-    /** What the {@code skill} tool would find; empty means the tool is not worth offering. */
-    private final SkillCatalog skills;
+    /** Whether the {@code skill} tool is offered, and with which names. */
+    private final SkillToolGrant skills;
     /** What the user keeps in their own account; {@link UserToolRoster#none()} where nobody can. */
     private final UserToolRoster userTools;
 
     public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions) {
-        this(sessions, SkillCatalog.none());
+        this(sessions, SkillToolGrant.none());
     }
 
     public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions,
-                                  SkillCatalog skills) {
+                                  SkillToolGrant skills) {
         this(sessions, skills, UserToolRoster.none());
     }
 
     public DynamicToolActivations(ai.mindconnect.agent.runtime.port.out.AgentSessionRepository sessions,
-                                  SkillCatalog skills, UserToolRoster userTools) {
+                                  SkillToolGrant skills, UserToolRoster userTools) {
         this.sessions = sessions;
-        this.skills = skills == null ? SkillCatalog.none() : skills;
+        this.skills = skills == null ? SkillToolGrant.none() : skills;
         this.userTools = userTools == null ? UserToolRoster.none() : userTools;
     }
 
@@ -131,7 +129,7 @@ public final class DynamicToolActivations {
         for (AgentTool tool : def.tools()) {
             // The skill tool follows the agent's skills setting alone (below): a
             // row assigned by hand would carry no names and reach every skill.
-            if (SkillTool.NAME.equals(tool.name())) continue;
+            if (ai.mindconnect.agent.runtime.domain.AgentDefinition.SKILL_TOOL.equals(tool.name())) continue;
             if (!tool.deferred()) {
                 refs.add(tool);
                 continue;
@@ -157,13 +155,10 @@ public final class DynamicToolActivations {
         if (def.delegates()) {
             refs.add(AgentTool.of("list_agents"));
         }
-        var skillsConfig = def.skillsOrDefault();
-        // hasSkills asks the catalog by the same setting, so SPECIFIC naming
-        // nothing gets no tool — the binding's empty list would mean "all".
-        if (skillsConfig.enabled() && hasSkills(def, sessionId)) {
-            refs.add(AgentTool.of(SkillTool.NAME, null, Map.of(
-                    SkillToolFactory.NAMES, List.copyOf(skillsConfig.names()))));
-        }
+        // The grant asks by the same setting, so SPECIFIC naming nothing gets no tool —
+        // the binding's empty list would mean "all".
+        var session = sessionId == null ? null : sessions.findById(sessionId).orElse(null);
+        skills.skillTool(def, session).ifPresent(refs::add);
         return refs;
     }
 
@@ -189,7 +184,7 @@ public final class DynamicToolActivations {
 
     /** What steers the agent's own toolset is not something a workflow step calls. */
     private static final Set<String> NOT_FOR_WORKFLOWS = Set.of(
-            ai.mindconnect.agent.runtime.domain.AgentDefinition.TOOL_SEARCH, SkillTool.NAME, "list_agents");
+            ai.mindconnect.agent.runtime.domain.AgentDefinition.TOOL_SEARCH, ai.mindconnect.agent.runtime.domain.AgentDefinition.SKILL_TOOL, "list_agents");
 
     /**
      * {@code run_workflow} when the project the session works in defines
@@ -213,16 +208,6 @@ public final class DynamicToolActivations {
         return AgentTool.of(ProjectWorkflowFiles.TOOL, null, Map.of(
                 ProjectWorkflowFiles.CALLER_TOOLS, List.copyOf(tools),
                 ProjectWorkflowFiles.CALLER_AGENTS, List.copyOf(def.effectiveCallableAgents())));
-    }
-
-    /**
-     * Whether this agent has a skill to load in this session — the same
-     * question the prompt's skills section answers, asked of the same
-     * catalog, so the tool and the section appear together or not at all.
-     */
-    private boolean hasSkills(ai.mindconnect.agent.runtime.domain.AgentDefinition def, SessionId sessionId) {
-        var session = sessionId == null ? null : sessions.findById(sessionId).orElse(null);
-        return !skills.available(def, session).isEmpty();
     }
 
     /**

@@ -2,7 +2,7 @@ package ai.mindconnect.adminui.namespaces;
 
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.SkillRepository;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.llm.port.out.LlmPriceRepository;
 import ai.mindconnect.mcp.gateway.McpRegistryAdmin;

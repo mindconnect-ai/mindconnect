@@ -15,7 +15,7 @@ import ai.mindconnect.agent.registry.port.out.RegistryInstaller;
 import ai.mindconnect.agent.registry.port.out.RegistrySourceRepository;
 import ai.mindconnect.agent.registry.service.RegistryService;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.skill.SkillRepository;
+import ai.mindconnect.agent.skill.SkillRepository;
 import ai.mindconnect.jdbc.Sql;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.namespace.service.NamespaceFirstUse;

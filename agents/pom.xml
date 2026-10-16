@@ -41,8 +41,10 @@
         <module>features/todo/mc-agent-todo-core</module>
         <module>features/todo/mc-agent-todo-pg</module>
         <module>features/todo/mc-agent-todo</module>
+        <module>features/skills/mc-agent-skills-core</module>
+        <module>features/skills/mc-agent-skills-pg</module>
+        <module>features/skills/mc-agent-skills</module>
         <module>builder/mc-agent-runtime-feature-core</module>
-        <module>builder/mc-agent-runtime-feature-skills</module>
         <module>builder/mc-agent-runtime-feature-tools</module>
         <module>features/workflow/mc-agent-tools-workflow</module>
         <module>features/workflow/mc-agent-workflow</module>

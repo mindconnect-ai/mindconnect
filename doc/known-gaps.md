@@ -80,6 +80,10 @@ and the rule it violates.
   Found 2026-10-16 in chore/refactor-ns by the maintainer. Size: large. Rule: Architecture (builder and features).
 - [ ] **agents/adapter/postgres/mc-agent-runtime-pg** The Postgres store of the todo feature is still tested from the runtime's Postgres module: `PgTodoAndSummaryRepositoryTest` tests `PgTodoListRepository` beside `PgConversationSummaryRepository`, and `PgNamespaceIsolationTest.todoLists` beside the runtime's stores, so `mc-agent-runtime-pg` keeps a test dependency on `mc-agent-todo-pg`. The todo cases belong in `mc-agent-todo-pg` with a `TestDb` of their own, as `PgUserMemoryRepositoryTest` went to `mc-agent-user-memory-pg`; left as they were because the move of the store did not allow splitting test sources.
   Found 2026-10-16 in chore/extract-todo by the agent. Size: small. Rule: Architecture (builder and features).
+- [ ] **agents/builder/mc-agent-runtime-builder** The skills section of the system prompt comes after the current-time section: `AgentRuntimeBuilder` adds the `SkillCatalog` after `CurrentTimeSection`, which keeps the order the prompt had, but the builder's own comment wants the date and time last because it is the part that changes every minute; every other section after it misses the prompt cache. Moving the skills before the time changes the prompt and wants its own change.
+  Found 2026-10-16 in chore/extract-skills by the agent. Size: small. Rule: –.
+- [ ] **agents/builder/mc-agent-runtime-builder** The builder, not `SkillsFeature`, hangs the `SkillCatalog` into the core (as the last `PromptSection` and as the `SkillToolGrant`) and registers `SkillCatalog.none()` without the feature, because a runtime without it still reads a project's own `.mindconnect/skills` (asserted by `FeatureCombinationsTest`). So `mc-agent-runtime-builder` depends on `mc-agent-skills-core` and the feature is not self-contained. Decide whether project skills need the feature; then the wiring moves into `SkillsFeature`.
+  Found 2026-10-16 in chore/extract-skills by the agent. Size: small (needs a decision). Rule: Architecture (builder and features).
 
 ## Closed
 

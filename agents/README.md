@@ -74,6 +74,7 @@ ones it wants.
 | `workflow/mc-agent-workflow` | `WorkflowsFeature`: the workflow store the runtime and the tools share |
 | `user-memory/mc-agent-user-memory-core`, `-pg`, `mc-agent-user-memory` | What agents remember about each user, with `UserMemoryFeature` |
 | `todo/mc-agent-todo-core`, `-pg`, `mc-agent-todo` | The working todo list of a session, with `TodoFeature` |
+| `skills/mc-agent-skills-core`, `-pg`, `mc-agent-skills` | Skills an agent loads at run time, with `SkillsFeature` |
 
 ### `tools/vector/` — the knowledge tools
 

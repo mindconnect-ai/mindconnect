@@ -1,3 +1,2 @@
 ai.mindconnect.agent.runtime.tools.toolsearch.ToolSearchToolFactory
 ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentToolFactory
-ai.mindconnect.agent.runtime.skill.SkillToolFactory

@@ -111,7 +111,6 @@ public class AgentChatService {
 
     private record PendingTitle(TaskRecord turn, CompletableFuture<String> outcome) {}
     private final ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions;
-    private final ai.mindconnect.agent.runtime.skill.SkillCatalog skills;
     private final ai.mindconnect.agent.runtime.service.prompt.PromptSections promptSections;
 
     public AgentChatService(AgentSessionService sessionService,
@@ -127,8 +126,7 @@ public class AgentChatService {
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions) {
         this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
                 workingMemoryRepository, promptRenderer, sessionChannels, userChannels,
-                queue, approvalStore, instructions,
-                ai.mindconnect.agent.runtime.skill.SkillCatalog.none(), ScopeSupplier.local());
+                queue, approvalStore, instructions, ScopeSupplier.local());
     }
 
     public AgentChatService(AgentSessionService sessionService,
@@ -142,11 +140,10 @@ public class AgentChatService {
                             TaskQueue queue,
                             ToolApprovalRepository approvalStore,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
-                            ai.mindconnect.agent.runtime.skill.SkillCatalog skills,
                             ScopeSupplier scope) {
         this(sessionService, definitionRepository, conversationManager, memoryStrategyFactory,
                 workingMemoryRepository, promptRenderer, sessionChannels, userChannels,
-                queue, approvalStore, instructions, skills, scope,
+                queue, approvalStore, instructions, scope,
                 ai.mindconnect.agent.runtime.service.prompt.PromptSections.none());
     }
 
@@ -162,7 +159,6 @@ public class AgentChatService {
                             TaskQueue queue,
                             ToolApprovalRepository approvalStore,
                             ai.mindconnect.agent.runtime.service.prompt.InstructionFiles instructions,
-                            ai.mindconnect.agent.runtime.skill.SkillCatalog skills,
                             ScopeSupplier scope,
                             ai.mindconnect.agent.runtime.service.prompt.PromptSections promptSections) {
         this.promptSections = promptSections == null
@@ -179,7 +175,6 @@ public class AgentChatService {
         this.approvalStore = approvalStore;
         this.scope = scope == null ? ScopeSupplier.local() : scope;
         this.instructions = instructions;
-        this.skills = skills == null ? ai.mindconnect.agent.runtime.skill.SkillCatalog.none() : skills;
         // The queue tells us when a turn ended; no thread of ours waits for it.
         if (queue != null) {
             queue.addListener(new TaskListener() {
@@ -719,7 +714,7 @@ public class AgentChatService {
         AgentDefinition def = effectiveDefinition(session);
         AuthenticationInfo auth = authFor(session);
         return WorkingMemoryBuilder.build(promptRenderer, memoryStrategyFactory.create(def),
-                def, session, auth, instructions, skills, promptSections);
+                def, session, auth, instructions, promptSections);
     }
 
     /**
@@ -740,7 +735,7 @@ public class AgentChatService {
         if (!result.isEmpty()) {
             try {
                 WorkingMemory stats = WorkingMemoryBuilder.build(promptRenderer, strategy, def, session,
-                        auth, instructions, skills, promptSections);
+                        auth, instructions, promptSections);
                 workingMemoryRepository.save(session.id(), auth, stats);
             } catch (Exception e) {
                 log.warn("Failed to save working memory after compression: {}", e.getMessage());

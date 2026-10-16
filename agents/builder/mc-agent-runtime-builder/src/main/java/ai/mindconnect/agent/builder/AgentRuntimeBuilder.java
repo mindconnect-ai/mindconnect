@@ -55,7 +55,8 @@ import ai.mindconnect.agent.runtime.service.task.SessionTitleWorker;
 import ai.mindconnect.agent.runtime.service.task.SubAgentSupport;
 import ai.mindconnect.agent.runtime.service.task.ToolCallWorker;
 import ai.mindconnect.agent.runtime.service.turn.ToolExecutor;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
+import ai.mindconnect.agent.skill.SkillCatalog;
+import ai.mindconnect.agent.runtime.port.out.SkillToolGrant;
 import ai.mindconnect.agent.runtime.port.out.SessionCleanup;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.agent.tool.ToolAdvisor;
@@ -460,10 +461,12 @@ public class AgentRuntimeBuilder {
             return new PebblePromptRenderer(providers);
         });
         // The sections the features add to every system prompt, in contribution order,
-        // then the date and time — last, as it is the part that changes every minute.
+        // then the date and time, then the skills an agent may load — the catalog is there
+        // without the skills feature too, since a project's own skills need no store.
         context.bean(PromptSections.class, () -> {
             List<PromptSection> sections = new ArrayList<>(beans.all(PromptSection.class));
             sections.add(new CurrentTimeSection(java.time.Clock.systemUTC(), zones));
+            sections.add(context.require(SkillCatalog.class));
             return PromptSections.of(sections);
         });
         context.bean(AgentTaskRunner.class, () -> {
@@ -494,11 +497,12 @@ public class AgentRuntimeBuilder {
 
         // Null objects for the features that are not installed.
         if (!beans.has(SkillCatalog.class)) context.bean(SkillCatalog.class, SkillCatalog::none);
+        context.bean(SkillToolGrant.class, () -> context.require(SkillCatalog.class));
         if (!beans.has(ToolRegistry.class)) context.instance(ToolRegistry.class, NO_TOOLS);
         if (!beans.has(SubAgentSupport.class)) context.instance(SubAgentSupport.class, SubAgentSupport.disabled());
         if (!beans.has(DynamicToolActivations.class)) {
             context.bean(DynamicToolActivations.class, () -> new DynamicToolActivations(
-                    context.require(AgentSessionRepository.class), context.require(SkillCatalog.class)));
+                    context.require(AgentSessionRepository.class), context.require(SkillToolGrant.class)));
         }
         if (!beans.has(ToolExecutor.class)) {
             context.bean(ToolExecutor.class, () -> new ToolExecutor(beans.all(ToolAdvisor.class)));
@@ -532,8 +536,8 @@ public class AgentRuntimeBuilder {
                 context.require(DynamicToolActivations.class), context.require(LlmChat.class),
                 context.require(LlmCallTraceRepository.class), context.require(SessionChannels.class),
                 context.require(AgentTaskRunner.class), context.require(WorkingMemoryRepository.class),
-                context.require(InstructionFiles.class), context.require(SkillCatalog.class),
-                context.require(SubAgentSupport.class), context.require(PromptSections.class)));
+                context.require(InstructionFiles.class), context.require(SubAgentSupport.class),
+                context.require(PromptSections.class)));
         context.bean(ToolCallWorker.class, () -> new ToolCallWorker(
                 context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),
@@ -550,8 +554,8 @@ public class AgentRuntimeBuilder {
                 context.require(WorkingMemoryRepository.class), context.require(PromptRenderer.class),
                 context.require(SessionChannels.class), context.require(UserChannels.class),
                 context.require(TaskQueue.class), context.require(ToolApprovalRepository.class),
-                context.require(InstructionFiles.class), context.require(SkillCatalog.class),
-                context.require(ScopeSupplier.class), context.require(PromptSections.class)));
+                context.require(InstructionFiles.class), context.require(ScopeSupplier.class),
+                context.require(PromptSections.class)));
 
         // The features' start hooks (schema, seeds) ran before this one: hooks run in registration order.
         context.onStart(() -> {

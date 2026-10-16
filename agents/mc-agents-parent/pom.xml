@@ -109,6 +109,21 @@
             </dependency>
             <dependency>
                 <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-skills-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-skills-pg</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
+                <artifactId>mc-agent-skills</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-llm-gateway-pg</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -325,11 +340,6 @@
             <dependency>
                 <groupId>ai.mindconnect</groupId>
                 <artifactId>mc-agent-runtime-feature-core</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>ai.mindconnect</groupId>
-                <artifactId>mc-agent-runtime-feature-skills</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

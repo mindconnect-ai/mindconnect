@@ -8,7 +8,7 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.service.task.SessionTools;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
-import ai.mindconnect.agent.runtime.skill.SkillCatalog;
+import ai.mindconnect.agent.runtime.port.out.SkillToolGrant;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolCallScope;
@@ -72,7 +72,7 @@ class SessionToolsUserRosterTest {
     /** The names the registry was asked to resolve for a session whose root is {@code rootSessionId}. */
     private List<String> names(SessionId rootSessionId) {
         resolved.clear();
-        new SessionTools(RECORDING, new DynamicToolActivations(sessions, SkillCatalog.none(), roster),
+        new SessionTools(RECORDING, new DynamicToolActivations(sessions, SkillToolGrant.none(), roster),
                 agent, session, rootSessionId).liveTools();
         return List.copyOf(resolved);
     }
