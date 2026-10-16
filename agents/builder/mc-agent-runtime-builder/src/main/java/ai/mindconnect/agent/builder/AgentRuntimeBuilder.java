@@ -492,6 +492,9 @@ public class AgentRuntimeBuilder {
             // Open approval questions in memory, unless a feature brings storage that outlives a restart.
             context.bean(ToolApprovalRepository.class, InMemoryToolApprovalRepository::new);
         }
+        // A deleted session takes its open questions along, whichever store holds them.
+        context.contribute(SessionCleanup.class,
+                sessionId -> context.require(ToolApprovalRepository.class).deleteForSession(sessionId));
         context.bean(UserChannels.class, UserChannels::new);
         context.bean(SessionChannels.class, SessionChannels::new);
 
@@ -526,9 +529,8 @@ public class AgentRuntimeBuilder {
                 context.require(AgentDefinitionRepository.class), context.require(AgentSessionRepository.class),
                 context.require(ConversationManager.class), context.require(WorkingMemoryRepository.class),
                 context.require(ConversationSummaryRepository.class), beans.all(SessionCleanup.class),
-                context.require(ToolApprovalRepository.class), context.require(UserChannels.class),
-                context.require(WorkingDirPolicy.class), context.require(UserHome.class),
-                context.require(LlmCallTraceRepository.class)));
+                context.require(UserChannels.class), context.require(WorkingDirPolicy.class),
+                context.require(UserHome.class), context.require(LlmCallTraceRepository.class)));
         context.bean(AgentTurnWorker.class, () -> new AgentTurnWorker(
                 context.require(ConversationManager.class), context.require(AgentDefinitionRepository.class),
                 context.require(AgentSessionService.class), context.require(MemoryStrategyFactory.class),

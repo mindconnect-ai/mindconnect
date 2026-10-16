@@ -38,7 +38,7 @@ class SessionTitleWorkerTest {
     private final List<Message> messages = new ArrayList<>();
     private final Map<SessionId, AgentSession> sessions = new ConcurrentHashMap<>();
     private final AgentSessionService sessionService =
-            new AgentSessionService(null, new MapSessions(sessions), conversations(), null, null, null, null, null);
+            new AgentSessionService(null, new MapSessions(sessions), conversations(), null, null, null, null);
     private final List<String> generatorInputs = new ArrayList<>();
 
     private SessionTitleWorker worker(AgentTaskRunner generator) {

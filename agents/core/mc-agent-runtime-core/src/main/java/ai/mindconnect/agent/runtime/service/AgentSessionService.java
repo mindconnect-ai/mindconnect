@@ -22,7 +22,6 @@ import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.Participant;
 import ai.mindconnect.message.port.in.ConversationManager;
 
-import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.stream.UserChannels;
 import ai.mindconnect.agent.runtime.service.stream.UserEvent;
 import org.slf4j.Logger;
@@ -53,7 +52,6 @@ public class AgentSessionService {
     private final ConversationSummaryRepository summaryRepository;
     /** What features keep for a session goes with it. */
     private final List<SessionCleanup> cleanups;
-    private final ToolApprovalRepository approvalStore;
     private final UserChannels userChannels;
     private final WorkingDirPolicy workingDirPolicy;
     /** Where a session's own directory lives — none when the runtime has no users' home. */
@@ -68,10 +66,9 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 List<SessionCleanup> cleanups,
-                                ToolApprovalRepository approvalStore,
                                 UserChannels userChannels) {
         this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
-                summaryRepository, cleanups, approvalStore, userChannels,
+                summaryRepository, cleanups, userChannels,
                 WorkingDirPolicy.unrestricted());
     }
 
@@ -81,11 +78,10 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 List<SessionCleanup> cleanups,
-                                ToolApprovalRepository approvalStore,
                                 UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy) {
         this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
-                summaryRepository, cleanups, approvalStore, userChannels,
+                summaryRepository, cleanups, userChannels,
                 workingDirPolicy, UserHome.none());
     }
 
@@ -96,12 +92,11 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 List<SessionCleanup> cleanups,
-                                ToolApprovalRepository approvalStore,
                                 UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy,
                                 UserHome userHome) {
         this(definitionRepository, sessionRepository, conversationManager, workingMemoryRepository,
-                summaryRepository, cleanups, approvalStore, userChannels,
+                summaryRepository, cleanups, userChannels,
                 workingDirPolicy, userHome, null);
     }
 
@@ -115,7 +110,6 @@ public class AgentSessionService {
                                 WorkingMemoryRepository workingMemoryRepository,
                                 ConversationSummaryRepository summaryRepository,
                                 List<SessionCleanup> cleanups,
-                                ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository approvalStore,
                                 ai.mindconnect.agent.runtime.service.stream.UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy,
                                 UserHome userHome,
@@ -129,7 +123,6 @@ public class AgentSessionService {
         this.workingMemoryRepository = workingMemoryRepository;
         this.summaryRepository = summaryRepository;
         this.cleanups = cleanups;
-        this.approvalStore = approvalStore;
         this.userChannels = userChannels;
     }
 
@@ -512,7 +505,6 @@ public class AgentSessionService {
         workingMemoryRepository.delete(sessionId, auth);
         summaryRepository.deleteByConversation(session.conversationId());
         cleanups.forEach(cleanup -> cleanup.sessionDeleted(sessionId));
-        approvalStore.deleteForSession(sessionId);
         if (traceRepository != null) traceRepository.deleteBySession(sessionId);
         // The conversation is the session's own: its messages go with it, or they
         // would pile up unreachable behind a session id nothing resolves any more.

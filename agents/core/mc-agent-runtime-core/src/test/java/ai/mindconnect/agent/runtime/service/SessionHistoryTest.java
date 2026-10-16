@@ -73,7 +73,7 @@ class SessionHistoryTest {
             @Override public List<AgentSession> findByParentSession(SessionId parent) { return List.of(); }
             @Override public void deleteById(SessionId id) { }
         };
-        return new AgentSessionService(null, sessions, conversations, null, null, null, null, null);
+        return new AgentSessionService(null, sessions, conversations, null, null, null, null);
     }
 
     /** Only what {@code loadHistory} touches; the page it was asked for is kept. */

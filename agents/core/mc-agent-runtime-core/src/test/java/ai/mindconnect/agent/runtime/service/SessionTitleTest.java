@@ -26,7 +26,7 @@ class SessionTitleTest {
 
     private final Map<SessionId, AgentSession> stored = new ConcurrentHashMap<>();
     private final AgentSessionService service =
-            new AgentSessionService(null, new MapSessions(stored), null, null, null, null, null, null);
+            new AgentSessionService(null, new MapSessions(stored), null, null, null, null, null);
 
     @Test
     void theGeneratedTitleNamesAnUntitledChat() {

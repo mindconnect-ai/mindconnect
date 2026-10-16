@@ -11,10 +11,9 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * {@link ToolApprovalRepository} in memory — the default. Nothing survives a
- * restart: with a persistent task store a parked task outlives its entry and
- * cannot be answered any more, so such an installation needs a repository that
- * persists as well.
+ * {@link ToolApprovalRepository} in memory — the default, beside the in-process
+ * task store: nothing survives a restart, and neither do the parked tasks. A
+ * task store in Postgres brings {@code PgToolApprovalRepository} instead.
  */
 public class InMemoryToolApprovalRepository implements ToolApprovalRepository {
 

@@ -53,7 +53,7 @@ class SessionFilesUiControllerTest {
         var sessions = new InMemoryAgentSessionRepository(ScopeSupplier.local());
         session = sessions.create(AgentSession.start(AgentId.random(), UserId.of("alice"), ConversationId.random())
                 .withWorkingDir(root));
-        var sessionService = new AgentSessionService(null, sessions, null, null, null, null, null, null);
+        var sessionService = new AgentSessionService(null, sessions, null, null, null, null, null);
         controller = new SessionFilesUiController(sessionService, sessions, currentUsers());
     }
 

@@ -1,6 +1,5 @@
 package ai.mindconnect.agentrest.controller;
 
-import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryToolApprovalRepository;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.SessionId;
@@ -71,7 +70,7 @@ class AgentApiControllerOwnershipTest {
         sessionService = new AgentSessionService(definitions, sessions,
                 new InMemoryMessageStore(ScopeSupplier.local()).conversationManager(), new InMemoryWorkingMemoryRepository(ScopeSupplier.local()),
                 new InMemoryConversationSummaryRepository(ScopeSupplier.local()), List.of(),
-                new InMemoryToolApprovalRepository(), userChannels);
+                userChannels);
         chat = new RecordingChatService(sessionService);
         agent = definitions.save(AgentDefinition.create("helper", "Helps.", "You help.", null, "chat"));
         AgentApiController controller = new AgentApiController(new AgentRegistryService(definitions),
