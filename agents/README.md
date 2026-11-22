@@ -77,7 +77,7 @@ ones it wants.
 
 | Module | Purpose |
 |--------|---------|
-| `mc-agent-protocol` | The vocabulary: `Response`, `Item`, `Conversation`, events and commands — JDK only |
+| `mc-agent-protocol` | The vocabulary: `Response`, `ConversationItem`, `Conversation`, events and commands — JDK only |
 | `mc-agent-protocol-mc-runtime` | The protocol implemented against the Mindconnect runtime: tools, sub-agents and memory run inside the turn |
 | `mc-agent-protocol-openai` | The protocol implemented against the real OpenAI Responses and Conversations API |
 

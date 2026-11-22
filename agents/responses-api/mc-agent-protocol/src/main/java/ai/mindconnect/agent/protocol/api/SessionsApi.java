@@ -9,16 +9,16 @@ import java.util.Optional;
  * completing the triangle:
  *
  * <pre>
- * Sessions        open(agent)  → binds a (new or existing) conversation to an agent
- * AgentResponses  create(...)  → runs one response on a session
- * Conversations   items(...)   → reads the durable log behind it
+ * SessionsApi       open(agent)  → binds a (new or existing) conversation to an agent
+ * ResponsesApi      create(...)  → runs one response on a session
+ * ConversationsApi  items(...)   → reads the durable log behind it
  * </pre>
  *
  * Agents themselves are referenced by name only. Their definitions (prompt,
  * model, tool set, memory strategy) are managed through the admin domain —
  * deliberately not through this protocol.
  */
-public interface Sessions {
+public interface SessionsApi {
 
     /** Opens a session with a fresh conversation, bound to the named agent. */
     Session open(String agentName);

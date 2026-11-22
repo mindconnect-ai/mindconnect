@@ -8,7 +8,7 @@ inside the turn.
 ```java
 var backend = new AgentRuntimeBackend(runtime.chatService(), runtime.sessionService(),
         runtime.agentDefinitions(), runtime.conversationManager(), "user-1")
-        .withFiles(runtime.fileStore(), runtime::attachStored);   // optional: Files surface
+        .withFiles(runtime.fileStore(), runtime::attachStored);   // optional: FilesApi surface
 
 Session s = backend.open("travel-assistant");
 Response r = backend.create(ResponseRequest.text(s.id(), "Find me a hotel in Lisbon"));
@@ -59,12 +59,12 @@ web search, a running container binary for code execution).
 
 | Protocol | Runtime |
 |---|---|
-| `Sessions.open` | `AgentDefinitionRepository.findByName` + `AgentSessionService.openChat` |
-| `AgentResponses.create` | `AgentChatService.submitChat` → `ChatTurnHandle`; blocking joins, `background` returns the running snapshot |
+| `SessionsApi.open` | `AgentDefinitionRepository.findByName` + `AgentSessionService.openChat` |
+| `ResponsesApi.create` | `AgentChatService.submitChat` → `ChatTurnHandle`; blocking joins, `background` returns the running snapshot |
 | output items + events | **`ResponseAssembler`**: translates the runtime's `StreamEvent`s — tokens accumulate into the pending assistant message, tool calls become `FunctionCall`/`FunctionCallOutput` pairs (ids synthesized, FIFO-paired), sub-agents become `AgentCall` pairs, `ResponseRevised` replaces the draft text |
 | `subscribe(afterSeq)` | assembler buffer: replay + live, strictly increasing `seq` |
 | `cancel` | `ChatTurnHandle.cancel()` (cooperative, cascades to sub-agents) |
-| `Conversations.items` | `ConversationManager.loadHistory`, lossily mapped from the legacy `Message` format |
+| `ConversationsApi.items` | `ConversationManager.loadHistory`, lossily mapped from the legacy `Message` format |
 
 ## v1 limitations (each one is a concept-doc pointer)
 

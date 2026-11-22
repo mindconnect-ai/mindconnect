@@ -13,7 +13,7 @@ import java.util.Map;
  * One execution over a conversation: reads the conversation's items as
  * context, appends the items it produces, and carries the run lifecycle.
  * The API unit of the protocol — created by
- * {@link ai.mindconnect.agent.protocol.api.AgentResponses#create}, observed
+ * {@link ai.mindconnect.agent.protocol.api.ResponsesApi#create}, observed
  * via {@link ai.mindconnect.agent.protocol.event.ResponseEvent} streams.
  *
  * <p>Sub-agent delegation makes the protocol recursive: a child response has

@@ -10,7 +10,7 @@ import java.util.Optional;
  * ({@code ContentPart.Document}/{@code Image}/{@code Audio} with a
  * {@code MediaSource.FileId}) — or hand it to a tool that reads it.
  */
-public interface Files {
+public interface FilesApi {
 
     StoredFile upload(String filename, String mediaType, byte[] content);
 

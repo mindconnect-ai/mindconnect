@@ -4,7 +4,7 @@ import ai.mindconnect.agent.protocol.IncompleteReason;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseStatus;
 import ai.mindconnect.agent.protocol.Usage;
-import ai.mindconnect.agent.protocol.api.AgentResponses;
+import ai.mindconnect.agent.protocol.api.ResponsesApi;
 import ai.mindconnect.agent.protocol.api.ResponseRequest;
 import ai.mindconnect.agent.protocol.api.SubscribeRequest;
 import ai.mindconnect.agent.protocol.api.Subscription;
@@ -33,7 +33,7 @@ class ToolLoopTest {
     void answersOpenCallAndFinishes() {
         String sessionId = "sess_1";
 
-        AgentResponses fake = new AgentResponses() {
+        ResponsesApi fake = new ResponsesApi() {
             int round = 0;
 
             @Override
@@ -70,7 +70,7 @@ class ToolLoopTest {
 
     @Test
     void unknownToolYieldsFailedOutputInsteadOfCrash() {
-        AgentResponses fake = new AgentResponses() {
+        ResponsesApi fake = new ResponsesApi() {
             int round = 0;
 
             @Override
