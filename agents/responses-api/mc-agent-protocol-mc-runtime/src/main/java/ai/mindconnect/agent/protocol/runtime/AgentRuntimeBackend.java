@@ -7,11 +7,11 @@ import ai.mindconnect.agent.protocol.Conversation;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.Session;
 import ai.mindconnect.agent.protocol.StoredFile;
-import ai.mindconnect.agent.protocol.api.AgentResponses;
-import ai.mindconnect.agent.protocol.api.Conversations;
-import ai.mindconnect.agent.protocol.api.Files;
+import ai.mindconnect.agent.protocol.api.ResponsesApi;
+import ai.mindconnect.agent.protocol.api.ConversationsApi;
+import ai.mindconnect.agent.protocol.api.FilesApi;
 import ai.mindconnect.agent.protocol.api.ResponseRequest;
-import ai.mindconnect.agent.protocol.api.Sessions;
+import ai.mindconnect.agent.protocol.api.SessionsApi;
 import ai.mindconnect.agent.protocol.api.SubscribeRequest;
 import ai.mindconnect.agent.protocol.api.Subscription;
 import ai.mindconnect.agent.protocol.event.ResponseEvent;
@@ -68,7 +68,7 @@ import java.util.function.Supplier;
  *
  * <p>v1 mapping notes: ids are the runtime's id values as strings; responses are
  * tracked in-memory (a restart forgets them — the conversation keeps the
- * durable truth); {@code Conversations.items} maps the legacy Message format
+ * durable truth); {@code ConversationsApi.items} maps the legacy Message format
  * lossily until items are stored natively (concept 9).
  */
 public final class AgentRuntimeBackend {
@@ -157,7 +157,7 @@ public final class AgentRuntimeBackend {
     }
 
     /**
-     * Enables the {@code Files} surface and {@code Document(FileId)} content
+     * Enables the {@code FilesApi} surface and {@code Document(FileId)} content
      * parts. Wire from the builder:
      * {@code .withFiles(runtime.fileStore(), runtime::attachStored)}.
      */
@@ -190,13 +190,13 @@ public final class AgentRuntimeBackend {
 
     // ── The three protocol surfaces, by composition ─────────────────────────
 
-    public Sessions sessions() { return sessionsApi; }
+    public SessionsApi sessions() { return sessionsApi; }
 
-    public AgentResponses responses() { return responsesApi; }
+    public ResponsesApi responses() { return responsesApi; }
 
-    public Conversations conversations() { return conversationsApi; }
+    public ConversationsApi conversations() { return conversationsApi; }
 
-    public Files files() { return filesApi; }
+    public FilesApi files() { return filesApi; }
 
     public Session open(String agentName) { return sessionsApi.open(agentName); }
 
@@ -225,7 +225,7 @@ public final class AgentRuntimeBackend {
         return Optional.ofNullable(assemblers.get(responseId));
     }
 
-    private final Sessions sessionsApi = new Sessions() {
+    private final SessionsApi sessionsApi = new SessionsApi() {
 
         @Override
         public Session open(String agentName) {
@@ -258,7 +258,7 @@ public final class AgentRuntimeBackend {
         }
     };
 
-    private final AgentResponses responsesApi = new AgentResponses() {
+    private final ResponsesApi responsesApi = new ResponsesApi() {
 
         @Override
         public Response create(ResponseRequest request) {
@@ -436,7 +436,7 @@ public final class AgentRuntimeBackend {
         }
     };
 
-    private final Files filesApi = new Files() {
+    private final FilesApi filesApi = new FilesApi() {
 
         @Override
         public StoredFile upload(String filename, String mediaType, byte[] content) {
@@ -473,7 +473,7 @@ public final class AgentRuntimeBackend {
         }
     }
 
-    private final Conversations conversationsApi = new Conversations() {
+    private final ConversationsApi conversationsApi = new ConversationsApi() {
 
         @Override
         public Conversation create() {

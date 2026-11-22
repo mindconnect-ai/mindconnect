@@ -1,9 +1,9 @@
 package ai.mindconnect.agent.protocol;
 
-import ai.mindconnect.agent.protocol.api.AgentResponses;
-import ai.mindconnect.agent.protocol.api.Conversations;
+import ai.mindconnect.agent.protocol.api.ResponsesApi;
+import ai.mindconnect.agent.protocol.api.ConversationsApi;
 import ai.mindconnect.agent.protocol.api.ResponseRequest;
-import ai.mindconnect.agent.protocol.api.Sessions;
+import ai.mindconnect.agent.protocol.api.SessionsApi;
 import ai.mindconnect.agent.protocol.api.SubscribeRequest;
 import ai.mindconnect.agent.protocol.api.Subscription;
 import ai.mindconnect.agent.protocol.api.ToolDefinition;
@@ -31,9 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ApiUsageExampleTest {
 
     // In real use: AgentRuntime.builder()...build() or new HttpAgentClient(url)
-    Sessions sessions;
-    AgentResponses responses;
-    Conversations conversations;
+    SessionsApi sessions;
+    ResponsesApi responses;
+    ConversationsApi conversations;
 
     @Test
     void simpleBlockingChat() {

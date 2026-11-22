@@ -86,7 +86,7 @@ public class AttachSupport {
     /**
      * Ingests an ALREADY-STORED file into the session's vector store and
      * activates {@code vector_search} — the second half of {@link #attach},
-     * for callers that upload first (protocol {@code Files.upload}) and
+     * for callers that upload first (protocol {@code FilesApi.upload}) and
      * reference later ({@code Document(FileId)} content parts).
      */
     public String attachStored(SessionId sessionId, ai.mindconnect.filestore.StoredFile stored) {

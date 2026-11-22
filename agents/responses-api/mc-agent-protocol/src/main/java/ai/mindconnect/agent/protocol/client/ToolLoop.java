@@ -3,7 +3,7 @@ package ai.mindconnect.agent.protocol.client;
 import ai.mindconnect.agent.protocol.IncompleteReason;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseStatus;
-import ai.mindconnect.agent.protocol.api.AgentResponses;
+import ai.mindconnect.agent.protocol.api.ResponsesApi;
 import ai.mindconnect.agent.protocol.api.ResponseRequest;
 import ai.mindconnect.agent.protocol.api.ToolDefinition;
 import ai.mindconnect.agent.protocol.item.ConversationItem;
@@ -25,16 +25,16 @@ import java.util.Map;
  */
 public final class ToolLoop {
 
-    private final AgentResponses responses;
+    private final ResponsesApi responsesApi;
     private final Map<String, ToolHandler> handlers = new LinkedHashMap<>();
     private final int maxRounds;
 
-    public ToolLoop(AgentResponses responses, List<ToolHandler> handlers) {
+    public ToolLoop(ResponsesApi responses, List<ToolHandler> handlers) {
         this(responses, handlers, 10);
     }
 
-    public ToolLoop(AgentResponses responses, List<ToolHandler> handlers, int maxRounds) {
-        this.responses = responses;
+    public ToolLoop(ResponsesApi responses, List<ToolHandler> handlers, int maxRounds) {
+        this.responsesApi = responses;
         handlers.forEach(h -> this.handlers.put(h.definition().name(), h));
         this.maxRounds = maxRounds;
     }
@@ -42,7 +42,7 @@ public final class ToolLoop {
     /** Runs the request, answering tool calls locally until the response is terminal. */
     public Response run(ResponseRequest request) {
         List<ToolDefinition> tools = mergedTools(request);
-        Response response = responses.create(request.withClientTools(tools));
+        Response response = responsesApi.create(request.withClientTools(tools));
 
         for (int round = 0; round < maxRounds && waitsForTools(response); round++) {
             List<ConversationItem> outputs = new ArrayList<>();
@@ -50,7 +50,7 @@ public final class ToolLoop {
                 outputs.add(execute(call));
             }
             if (outputs.isEmpty()) break;   // waiting, but nothing we can answer
-            response = responses.create(
+            response = responsesApi.create(
                     new ResponseRequest(request.sessionId(), outputs, false, tools));
         }
         return response;

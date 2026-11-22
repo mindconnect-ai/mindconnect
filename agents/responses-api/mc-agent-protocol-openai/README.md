@@ -23,12 +23,12 @@ Response r = new ToolLoop(backend.responses(), List.of(weatherHandler))
 | Protocol | OpenAI |
 |---|---|
 | `PseudoAgent` (name → model, instructions, tools) | there is no agent concept — per-request `model`/`instructions`/`tools`, filled from the registry |
-| `Session.open` | `POST /conversations` + local binding |
+| `SessionsApi.open` | `POST /conversations` + local binding |
 | `ResponseRequest` | `POST /responses {conversation, input, tools, store, background}` |
 | function tools | ALL client-executed (no runtime): open declared call ⇒ `INCOMPLETE(WAITING_FOR_TOOL_OUTPUT)` |
 | hosted tools (`web_search`, `file_search`, `code_interpreter`, …) | pass-through; execute inside OpenAI; appear as call items whose names never match a declared function tool ⇒ never "open" |
 | `subscribe(afterSeq)` | `GET /responses/{id}?stream=true&starting_after=n` (background responses only) |
-| `Conversations.items` | `GET /conversations/{id}/items?order=asc` |
+| `ConversationsApi.items` | `GET /conversations/{id}/items?order=asc` |
 | String ids | OpenAI's own ids (`resp_…`, `conv_…`) travel verbatim — no mapping layer |
 
 ## Sub-agents (agent-as-tool)
@@ -54,8 +54,8 @@ Live example: `OpenAiSubAgentsExampleTest`.
 ## Findings for the protocol (from building this)
 
 1. **`get(id)` collides across the three interfaces** (different return
-   types) — one class cannot implement Sessions + AgentResponses +
-   Conversations together; this backend composes them (`sessions()`,
+   types) — one class cannot implement `SessionsApi` + `ResponsesApi` +
+   `ConversationsApi` together; this backend composes them (`sessions()`,
    `responses()`, `conversations()`).
 2. ~~UUID ids are too narrow~~ — **resolved**: protocol ids are opaque
    Strings now; the whole `IdMap` layer was deleted.
@@ -70,7 +70,7 @@ Live example: `OpenAiSubAgentsExampleTest`.
    `web_search_call` item, executed inside OpenAI.
 2. **code execution** — `withHostedTool({type: code_interpreter, container: auto})`;
    Python runs hosted, the result lands in the answer.
-3. **upload + ask** — `backend.files().upload(...)` (new `Files` surface), then a
+3. **upload + ask** — `backend.files().upload(...)` (new `FilesApi` surface), then a
    message with `ContentPart.Document(MediaSource.FileId(id))` asks against the PDF.
 4. **upload + analyze with code** — a CSV handed to the code_interpreter container
    via `file_ids`; the model computes over the file.

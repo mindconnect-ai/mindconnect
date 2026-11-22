@@ -24,7 +24,7 @@ import java.util.function.Consumer;
  * delivery, a result, errors and authorization — that is an API call, not
  * an event.
  */
-public interface AgentResponses {
+public interface ResponsesApi {
 
     /**
      * Creates a response on the session's conversation. Blocking unless

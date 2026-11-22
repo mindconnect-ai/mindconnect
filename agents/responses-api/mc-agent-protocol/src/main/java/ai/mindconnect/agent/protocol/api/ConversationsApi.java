@@ -12,7 +12,7 @@ import java.util.Optional;
  * execution. Sessions (agent binding, memory state) sit above conversations
  * and are intentionally not part of this surface.
  */
-public interface Conversations {
+public interface ConversationsApi {
 
     Conversation create();
 

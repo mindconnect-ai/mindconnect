@@ -1,0 +1,433 @@
+@startuml
+package protocol {
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/Usage.java#Usage
+  class Usage {
+    -inputTokens: long
+    -outputTokens: long
+    {static} +ZERO: Usage
+    +totalTokens(): long
+    +plus(other: Usage): Usage
+  }
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/Session.java#Session
+  class Session {
+    -id: String
+    -conversationId: String
+    -agentName: String
+    -createdAt: Instant
+  }
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/StoredFile.java#StoredFile
+  class StoredFile {
+    -id: String
+    -filename: String
+    -mediaType: String
+    -sizeBytes: long
+  }
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/Conversation.java#Conversation
+  class Conversation {
+    -id: String
+    -createdAt: Instant
+  }
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/Response.java#Response
+  class Response {
+    -id: String
+    -conversationId: String
+    -sessionId: String
+    -agentName: String
+    -status: ResponseStatus
+    -incompleteReason: IncompleteReason
+    -parentResponseId: String
+    -spawnedByItemId: String
+    -output: List<ConversationItemRecord>
+    -usage: Usage
+    -error: ResponseError
+    -metadata: Map<String, Object>
+    -createdAt: Instant
+    -completedAt: Instant
+    +openFunctionCalls(): java.util.List<ConversationItem.FunctionCall>
+    +outputText(): String
+  }
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/ResponseError.java#ResponseError
+  class ResponseError {
+    -code: String
+    -message: String
+  }
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/ResponseStatus.java#ResponseStatus
+  enum ResponseStatus {
+    QUEUED
+    IN_PROGRESS
+    COMPLETED
+    INCOMPLETE
+    FAILED
+    CANCELLED
+    +terminal(): boolean
+  }
+  ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/IncompleteReason.java#IncompleteReason
+  enum IncompleteReason {
+    WAITING_FOR_APPROVAL
+    WAITING_FOR_TOOL_OUTPUT
+    MAX_ROUNDS
+    MAX_OUTPUT_TOKENS
+    CONTEXT_OVERFLOW
+  }
+  package client {
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/client/ToolLoop.java#ToolLoop
+    class ToolLoop {
+      -responsesApi: ResponsesApi
+      -handlers: Map<String, ToolHandler>
+      -maxRounds: int
+      +ToolLoop(responses: ResponsesApi, handlers: List<ToolHandler>)
+      +ToolLoop(responses: ResponsesApi, handlers: List<ToolHandler>, maxRounds: int)
+      +run(request: ResponseRequest): Response
+      {static} -waitsForTools(response: Response): boolean
+      -execute(call: ConversationItem.FunctionCall): ConversationItem
+      -mergedTools(request: ResponseRequest): List<ToolDefinition>
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/client/ToolHandler.java#ToolHandler
+    interface ToolHandler {
+      +definition(): ToolDefinition
+      +execute(arguments: Map<String, Object>): String
+      {static} +of(definition: ToolDefinition, fn: Function<Map<String, Object>, String>): ToolHandler
+    }
+  }
+  package event {
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#ResponseEvent
+    interface ResponseEvent {
+      +responseId(): String
+      +seq(): long
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#Created
+    class Created {
+      -responseId: String
+      -seq: long
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#InProgress
+    class InProgress {
+      -responseId: String
+      -seq: long
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#Completed
+    class Completed {
+      -responseId: String
+      -seq: long
+      -usage: Usage
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#Incomplete
+    class Incomplete {
+      -responseId: String
+      -seq: long
+      -reason: IncompleteReason
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#Failed
+    class Failed {
+      -responseId: String
+      -seq: long
+      -error: ResponseError
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#Cancelled
+    class Cancelled {
+      -responseId: String
+      -seq: long
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#OutputItemAdded
+    class OutputItemAdded {
+      -responseId: String
+      -seq: long
+      -entry: ConversationItemRecord
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#OutputItemDone
+    class OutputItemDone {
+      -responseId: String
+      -seq: long
+      -entry: ConversationItemRecord
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#OutputTextDelta
+    class OutputTextDelta {
+      -responseId: String
+      -seq: long
+      -itemId: String
+      -delta: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#ArgumentsDelta
+    class ArgumentsDelta {
+      -responseId: String
+      -seq: long
+      -itemId: String
+      -delta: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#ReasoningDelta
+    class ReasoningDelta {
+      -responseId: String
+      -seq: long
+      -itemId: String
+      -delta: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/event/ResponseEvent.java#Activity
+    class Activity {
+      -responseId: String
+      -seq: long
+      -kind: String
+      -data: Map<String, Object>
+    }
+  }
+  package api {
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/ToolDefinition.java#ToolDefinition
+    class ToolDefinition {
+      -name: String
+      -description: String
+      -parametersSchema: Map<String, Object>
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/Subscription.java#Subscription
+    interface Subscription {
+      +close(): void
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/FilesApi.java#FilesApi
+    interface FilesApi {
+      +upload(filename: String, mediaType: String, content: byte[]): StoredFile
+      +get(fileId: String): Optional<StoredFile>
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/SubscribeRequest.java#SubscribeRequest
+    class SubscribeRequest {
+      -responseId: String
+      -afterSeq: long
+      -includeChildren: boolean
+      {static} +live(responseId: String): SubscribeRequest
+      {static} +replay(responseId: String): SubscribeRequest
+      +withChildren(): SubscribeRequest
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/ConversationsApi.java#ConversationsApi
+    interface ConversationsApi {
+      +create(): Conversation
+      +get(conversationId: String): Optional<Conversation>
+      +append(conversationId: String, item: ConversationItem): ConversationItemRecord
+      +items(conversationId: String, afterSeq: long, limit: int): List<ConversationItemRecord>
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/ResponseRequest.java#ResponseRequest
+    class ResponseRequest {
+      -sessionId: String
+      -input: List<ConversationItem>
+      -background: boolean
+      -clientTools: List<ToolDefinition>
+      {static} +text(sessionId: String, text: String): ResponseRequest
+      {static} +approval(sessionId: String, requestId: String, approved: boolean): ResponseRequest
+      {static} +toolOutput(sessionId: String, callId: String, output: String): ResponseRequest
+      +inBackground(): ResponseRequest
+      +withClientTools(tools: List<ToolDefinition>): ResponseRequest
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/ResponsesApi.java#ResponsesApi
+    interface ResponsesApi {
+      +create(request: ResponseRequest): Response
+      +get(responseId: String): Optional<Response>
+      +cancel(responseId: String): boolean
+      +subscribe(request: SubscribeRequest, consumer: Consumer<ResponseEvent>): Subscription
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/api/SessionsApi.java#SessionsApi
+    interface SessionsApi {
+      +open(agentName: String): Session
+      +openOn(conversationId: String, agentName: String): Session
+      +get(sessionId: String): Optional<Session>
+    }
+  }
+  package item {
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#ConversationItem
+    interface ConversationItem
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#Message
+    class Message {
+      -role: Role
+      -content: List<ContentPart>
+      {static} +user(text: String): Message
+      {static} +assistant(text: String): Message
+      {static} +system(text: String): Message
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#Reasoning
+    class Reasoning {
+      -text: String
+      -signature: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#FunctionCall
+    class FunctionCall {
+      -callId: String
+      -name: String
+      -arguments: Map<String, Object>
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#FunctionCallDispatched
+    class FunctionCallDispatched {
+      -callId: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#FunctionCallOutput
+    class FunctionCallOutput {
+      -callId: String
+      -output: String
+      -failed: boolean
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#AgentCall
+    class AgentCall {
+      -callId: String
+      -agentName: String
+      -input: String
+      -childResponseId: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#ApprovalRequest
+    class ApprovalRequest {
+      -requestId: String
+      -kind: String
+      -payload: Map<String, Object>
+      -originResponseId: String
+      {static} +TOOL_APPROVAL: String
+      {static} +toolApproval(requestId: String, call: FunctionCall): ApprovalRequest
+      +callId(): String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItem.java#ApprovalResponse
+    class ApprovalResponse {
+      -requestId: String
+      -approved: boolean
+      -note: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/Role.java#Role
+    enum Role {
+      USER
+      ASSISTANT
+      SYSTEM
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ConversationItemRecord.java#ConversationItemRecord
+    class ConversationItemRecord {
+      -id: String
+      -seq: long
+      -item: ConversationItem
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#ContentPart
+    interface ContentPart
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#Text
+    class Text {
+      -text: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#Image
+    class Image {
+      -source: MediaSource
+      -detail: Detail
+      {static} +of(source: MediaSource): Image
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#Detail
+    enum Detail {
+      AUTO
+      LOW
+      HIGH
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#Audio
+    class Audio {
+      -source: MediaSource
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#Document
+    class Document {
+      -source: MediaSource
+      -name: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#MediaSource
+    interface MediaSource
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#Url
+    class Url {
+      -url: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#FileId
+    class FileId {
+      -fileId: String
+    }
+    ' @code mindconnect/agents/responses-api/mc-agent-protocol/src/main/java/ai/mindconnect/agent/protocol/item/ContentPart.java#Inline
+    class Inline {
+      -base64Data: String
+      -mediaType: String
+    }
+  }
+}
+ResponseEvent <|.. Created
+ResponseEvent <|.. InProgress
+ResponseEvent <|.. Completed
+ResponseEvent <|.. Incomplete
+ResponseEvent <|.. Failed
+ResponseEvent <|.. Cancelled
+ResponseEvent <|.. OutputItemAdded
+ResponseEvent <|.. OutputItemDone
+ResponseEvent <|.. OutputTextDelta
+ResponseEvent <|.. ArgumentsDelta
+ResponseEvent <|.. ReasoningDelta
+ResponseEvent <|.. Activity
+ConversationItem <|.. Message
+ConversationItem <|.. Reasoning
+ConversationItem <|.. FunctionCall
+ConversationItem <|.. FunctionCallDispatched
+ConversationItem <|.. FunctionCallOutput
+ConversationItem <|.. AgentCall
+ConversationItem <|.. ApprovalRequest
+ConversationItem <|.. ApprovalResponse
+ContentPart <|.. Text
+ContentPart <|.. Image
+ContentPart <|.. Audio
+ContentPart <|.. Document
+MediaSource <|.. Url
+MediaSource <|.. FileId
+MediaSource <|.. Inline
+ToolLoop --> ResponsesApi : responses
+ToolLoop --> "*" ToolHandler : handlers
+ToolLoop ..> Response
+ToolLoop ..> ResponseRequest
+ToolLoop ..> ConversationItem
+ToolLoop ..> FunctionCall
+ToolLoop ..> ToolDefinition
+ToolHandler ..> ToolDefinition
+Completed --> Usage : usage
+Incomplete --> IncompleteReason : reason
+Failed --> ResponseError : error
+OutputItemAdded --> ConversationItemRecord : entry
+OutputItemDone --> ConversationItemRecord : entry
+Usage --> Usage : ZERO
+FilesApi ..> StoredFile
+ConversationsApi ..> Conversation
+ConversationsApi ..> ConversationItemRecord
+ConversationsApi ..> ConversationItem
+ResponseRequest --> "*" ConversationItem : input
+ResponseRequest --> "*" ToolDefinition : clientTools
+ResponsesApi ..> Response
+ResponsesApi ..> ResponseRequest
+ResponsesApi ..> Subscription
+ResponsesApi ..> SubscribeRequest
+ResponsesApi ..> ResponseEvent
+SessionsApi ..> Session
+Response --> ResponseStatus : status
+Response --> IncompleteReason : incompleteReason
+Response --> "*" ConversationItemRecord : output
+Response --> Usage : usage
+Response --> ResponseError : error
+Response ..> FunctionCall
+Message --> Role : role
+Message --> "*" ContentPart : content
+ApprovalRequest ..> FunctionCall
+ConversationItemRecord --> ConversationItem : item
+Image --> MediaSource : source
+Image --> Detail : detail
+Audio --> MediaSource : source
+Document --> MediaSource : source
+' @layout:begin "Method dependencies"
+' only-rel ToolLoop ..> Response
+' only-rel ToolLoop ..> ResponseRequest
+' only-rel ToolLoop ..> ConversationItem
+' only-rel ToolLoop ..> FunctionCall
+' only-rel ToolLoop ..> ToolDefinition
+' only-rel ToolHandler ..> ToolDefinition
+' only-rel FilesApi ..> StoredFile
+' only-rel ConversationsApi ..> Conversation
+' only-rel ConversationsApi ..> ConversationItemRecord
+' only-rel ConversationsApi ..> ConversationItem
+' only-rel ResponsesApi ..> Response
+' only-rel ResponsesApi ..> ResponseRequest
+' only-rel ResponsesApi ..> Subscription
+' only-rel ResponsesApi ..> SubscribeRequest
+' only-rel ResponsesApi ..> ResponseEvent
+' only-rel SessionsApi ..> Session
+' only-rel Response ..> FunctionCall
+' only-rel ApprovalRequest ..> FunctionCall
+' viewport x=2640 y=1101 zoom=0.33
+' @layout:end
+' @layout:begin
+' with "Method dependencies"
+' viewport x=5846 y=186 zoom=1.11
+' @layout:end
+@enduml

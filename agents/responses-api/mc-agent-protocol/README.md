@@ -32,10 +32,10 @@ ai.mindconnect.agent.protocol
 │                              OutputTextDelta · ArgumentsDelta · ReasoningDelta   (live only)
 │
 └─ api                 the two port interfaces every transport adapts
-     Sessions          open · openOn · get                      (bind a conversation to an agent)
-     Files             upload · get                             (files that content and tools reference)
-     AgentResponses    create · get · cancel · subscribe        (commands — the only inbound surface)
-     Conversations     create · get · append · items            (state)
+     SessionsApi       open · openOn · get                      (bind a conversation to an agent)
+     FilesApi          upload · get                             (files that content and tools reference)
+     ResponsesApi      create · get · cancel · subscribe        (commands — the only inbound surface)
+     ConversationsApi  create · get · append · items            (state)
      ResponseRequest, SubscribeRequest, Subscription, ToolDefinition (client-side tools)
 ```
 
@@ -62,7 +62,7 @@ appends are two entries.
    only deltas are live-only. The stream is never the truth.
 4. **Streams are flat, the protocol is recursive.** A sub-agent is a child
    Response (`AgentCall.childResponseId`); aggregation is a subscription option.
-5. **Commands are calls, not events.** Four methods on `AgentResponses`; every
+5. **Commands are calls, not events.** Four methods on `ResponsesApi`; every
    transport is a thin adapter onto them.
 6. **Ids are opaque Strings.** Backends carry their native ids verbatim
    (`resp_…` at OpenAI, UUIDs in our runtime) — the protocol never assumes a
