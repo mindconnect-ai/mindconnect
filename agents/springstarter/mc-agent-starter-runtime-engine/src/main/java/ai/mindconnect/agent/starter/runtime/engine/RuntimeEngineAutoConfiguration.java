@@ -2,7 +2,6 @@ package ai.mindconnect.agent.starter.runtime.engine;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.OptionalInt;
 import java.util.stream.Stream;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -48,6 +47,7 @@ import ai.mindconnect.agent.runtime.capabilities.toolsearch.ToolSearchPlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.LoggingTraceSink;
 import ai.mindconnect.agent.runtime.capabilities.trace.TracePlugin;
 import ai.mindconnect.agent.runtime.capabilities.trace.TraceSink;
+import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmGatewayModelPlugin;
 import ai.mindconnect.agent.runtime.engine.adapter.pg.PgSessionRepository;
@@ -57,7 +57,6 @@ import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.runtime.engine.service.RuntimePlugin;
 import ai.mindconnect.jdbc.Sql;
-import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.llm.port.out.LlmConfigRepository;
 import ai.mindconnect.message.port.out.MessageRepository;
@@ -191,7 +190,7 @@ public class RuntimeEngineAutoConfiguration {
     RuntimeParts runtimeParts(NamespaceProvider namespaces, UserProvider users, SessionStore sessions,
                               AgentManagement agents, TaskQueue queue,
                               ObjectProvider<SharedStateStore> sharedState, LlmGatewayModelPlugin model,
-                              CapabilityPlugins capabilities) {
+                              CapabilityPlugins capabilities, ObjectProvider<MediaReader> media) {
         Plugin applicationBeans = new Plugin() {
             @Override
             public String name() {
@@ -204,6 +203,7 @@ public class RuntimeEngineAutoConfiguration {
                 registry.provide(UserProvider.class, () -> users);
                 registry.contribute(AgentResolver.class, new ManagedAgentResolver(agents));
                 registry.provide(SessionStore.class, () -> sessions);
+                media.ifAvailable(reader -> registry.provide(MediaReader.class, () -> reader));
             }
         };
         return new RuntimeParts(Stream.concat(
@@ -212,15 +212,13 @@ public class RuntimeEngineAutoConfiguration {
                 capabilities.plugins().stream()).toList());
     }
 
-    /** The model through the application's LLM chat; a model's context window is what its LLM configuration says. */
+    /** The model through the application's LLM chat; what is known of a model is what its LLM configuration says. */
     @Bean
     @ConditionalOnMissingBean
     LlmGatewayModelPlugin llmGatewayModelPlugin(LlmChat chat, LlmCallTraceListener traces,
                                                 LlmConfigRepository configurations) {
-        return new LlmGatewayModelPlugin(chat, traces, model -> configurations.findByName(model)
-                .map(LlmConfig::contextWindowTokens)
-                .map(OptionalInt::of)
-                .orElseGet(OptionalInt::empty));
+        // Resolved: an alias carries neither a context window nor what the model reads.
+        return new LlmGatewayModelPlugin(chat, traces, configurations::findResolvedByName);
     }
 
     @Bean

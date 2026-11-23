@@ -1,10 +1,12 @@
 package ai.mindconnect.agent.runtime.engine.adapter.llm;
 
-import java.util.OptionalInt;
+import java.util.Optional;
 import java.util.function.Function;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
+import ai.mindconnect.llm.domain.LlmConfig;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.llm.port.in.LlmChat;
 import ai.mindconnect.plugin.Plugin;
@@ -15,18 +17,18 @@ public final class LlmGatewayModelPlugin implements Plugin {
 
     private final LlmChat chat;
     private final LlmCallTraceListener traces;
-    private final Function<String, OptionalInt> contextWindows;
+    private final Function<String, Optional<LlmConfig>> configurations;
 
     /**
      * @param traces         who hears every provider call; {@link LlmCallTraceListener#NONE} for nobody
-     * @param contextWindows the context window of a model by its name, as the LLM configuration has it;
-     *                       empty where it is not known
+     * @param configurations what the LLM configuration says of a model by its name — its context window,
+     *                       the kinds of media it reads; empty where the model is not known
      */
     public LlmGatewayModelPlugin(LlmChat chat, LlmCallTraceListener traces,
-                                 Function<String, OptionalInt> contextWindows) {
+                                 Function<String, Optional<LlmConfig>> configurations) {
         this.chat = chat;
         this.traces = traces;
-        this.contextWindows = contextWindows;
+        this.configurations = configurations;
     }
 
     @Override
@@ -36,6 +38,7 @@ public final class LlmGatewayModelPlugin implements Plugin {
 
     @Override
     public void install(PluginRegistry registry) {
-        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat, new ObjectMapper(), traces, contextWindows));
+        registry.provide(ModelGateway.class, () -> new LlmChatModelGateway(chat, new ObjectMapper(), traces,
+                configurations, registry.find(MediaReader.class).orElseGet(MediaReader::none)));
     }
 }

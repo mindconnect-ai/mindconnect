@@ -14,6 +14,7 @@ import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.LlmAnswer;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
+import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.llm.domain.LlmCallEvent;
@@ -34,7 +35,7 @@ class LlmChatModelGatewayTest {
         List<String> heard = new ArrayList<>();
         LlmChatModelGateway gateway = new LlmChatModelGateway(chat, new ObjectMapper(),
                 (turnId, event) -> heard.add(turnId.value() + " " + event.requestJson()),
-                model -> java.util.OptionalInt.empty());
+                model -> java.util.Optional.empty(), MediaReader.none());
 
         LlmAnswer answer = gateway.ask(new ModelRequest(TurnId.of("t1"), ModelSettings.ofModel("model"),
                 "You help.", List.of(TurnMessage.user(List.of(new ContentPart.Text("Hi")))), List.of()), event -> { });

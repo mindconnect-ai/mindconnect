@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
+import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.runtime.service.UserHome;
@@ -102,6 +104,13 @@ public class RuntimeBridgeAutoConfiguration {
                                         EarlierAgentConverter converter, ObjectMapper json) {
         return new ManagedStoresFeature(agents::getObject, sessions::getObject, namespaces::getObject, converter,
                 json);
+    }
+
+    /** A file a message refers to is read from the application's file store. */
+    @Bean
+    @ConditionalOnMissingBean
+    MediaReader mediaReader(FileStore files) {
+        return new FileStoreMediaReader(files);
     }
 
     @Bean

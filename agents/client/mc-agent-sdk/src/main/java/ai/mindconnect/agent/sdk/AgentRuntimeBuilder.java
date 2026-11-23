@@ -3,7 +3,6 @@ package ai.mindconnect.agent.sdk;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -77,7 +76,7 @@ public final class AgentRuntimeBuilder {
 
     /** The model, through the LLM gateway. */
     public AgentRuntimeBuilder model(LlmChat chat) {
-        this.model = new LlmGatewayModelPlugin(chat, LlmCallTraceListener.NONE, model -> OptionalInt.empty());
+        this.model = new LlmGatewayModelPlugin(chat, LlmCallTraceListener.NONE, model -> java.util.Optional.empty());
         return this;
     }
 

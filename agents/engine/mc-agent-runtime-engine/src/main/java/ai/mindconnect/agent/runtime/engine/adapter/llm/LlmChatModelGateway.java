@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.engine.adapter.llm;
 
+import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
+import ai.mindconnect.llm.domain.LlmConfig;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -62,16 +64,18 @@ public final class LlmChatModelGateway implements ModelGateway {
     private final LlmChat chat;
     private final ObjectMapper json;
     private final LlmCallTraceListener traces;
-    private final Function<String, OptionalInt> contextWindows;
+    private final Function<String, Optional<LlmConfig>> configurations;
+    private final MediaReader media;
     /** The calls underway, each with the handle that closes its connection. */
     private final Map<TurnId, Cancellation> inFlight = new ConcurrentHashMap<>();
 
     public LlmChatModelGateway(LlmChat chat, ObjectMapper json, LlmCallTraceListener traces,
-                               Function<String, OptionalInt> contextWindows) {
+                               Function<String, Optional<LlmConfig>> configurations, MediaReader media) {
         this.chat = chat;
         this.json = json;
         this.traces = traces;
-        this.contextWindows = contextWindows;
+        this.configurations = configurations;
+        this.media = media;
     }
 
     @Override
@@ -101,7 +105,8 @@ public final class LlmChatModelGateway implements ModelGateway {
 
     @Override
     public OptionalInt contextWindowTokens(ModelSettings settings) {
-        return settings.model() == null ? OptionalInt.empty() : contextWindows.apply(settings.model());
+        return configuration(settings).map(LlmConfig::contextWindowTokens).map(OptionalInt::of)
+                .orElseGet(OptionalInt::empty);
     }
 
     @Override
@@ -114,11 +119,16 @@ public final class LlmChatModelGateway implements ModelGateway {
 
     // ── request ─────────────────────────────────────────────────────────────
 
-    private static LlmRequest llmRequest(ModelRequest request) {
+    private Optional<LlmConfig> configuration(ModelSettings settings) {
+        return settings.model() == null ? Optional.empty() : configurations.apply(settings.model());
+    }
+
+    private LlmRequest llmRequest(ModelRequest request) {
         ModelSettings settings = request.settings();
         List<LlmMessage> messages = new ArrayList<>();
         messages.add(LlmMessage.system(request.instructions()));
-        request.messages().forEach(message -> llmMessage(message).ifPresent(messages::add));
+        MediaParts mediaParts = new MediaParts(media, configuration(settings).orElse(null), request);
+        request.messages().forEach(message -> llmMessage(message, mediaParts).ifPresent(messages::add));
 
         Map<String, Object> additional = new LinkedHashMap<>(settings.extra());
         if (settings.reasoningEffort() != null) {
@@ -135,30 +145,16 @@ public final class LlmChatModelGateway implements ModelGateway {
     }
 
     /** One history message as the model reads it; empty for a marker the model never sees. */
-    private static Optional<LlmMessage> llmMessage(TurnMessage message) {
+    private static Optional<LlmMessage> llmMessage(TurnMessage message, MediaParts mediaParts) {
         return switch (message.type()) {
             case USER -> Optional.of(LlmMessage.user(message.content().stream()
-                    .map(LlmChatModelGateway::llmContent).toList()));
+                    .map(part -> mediaParts.llmContent(part, message)).toList()));
             case ASSISTANT -> Optional.of(LlmMessage.assistant(message.text()));
             case TOOL_CALL -> Optional.of(LlmMessage.assistantWithToolCalls(
                     thinkingBlocks(message), toolCalls(message)));
             case TOOL_RESULT -> Optional.of(LlmMessage.tool(
                     String.valueOf(message.metadata().get("callId")), message.text()));
             case TOOL_DISPATCHED -> Optional.empty();
-        };
-    }
-
-    private static LlmContent llmContent(ContentPart part) {
-        return switch (part) {
-            case ContentPart.Text text -> new LlmContent.Text(text.text());
-            case ContentPart.Image image when image.source() instanceof ContentPart.MediaSource.Inline inline ->
-                    new LlmContent.Image(inline.base64Data(), inline.mediaType());
-            case ContentPart.Document document
-                    when document.source() instanceof ContentPart.MediaSource.Inline inline ->
-                    new LlmContent.Document(inline.base64Data(), inline.mediaType(), document.name());
-            default -> throw new IllegalArgumentException(
-                    "This gateway sends text and inline images and documents; it has no file store "
-                            + "to read " + part.getClass().getSimpleName() + " from");
         };
     }
 
