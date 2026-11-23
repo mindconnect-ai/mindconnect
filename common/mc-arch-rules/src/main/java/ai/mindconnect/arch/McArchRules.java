@@ -107,10 +107,14 @@ public final class McArchRules {
         classes().should(notLieOnAPackageCycle())
             .as("D2: no cycles between packages"));
 
-    /** D3: more than seven constructor parameters is more than one responsibility. */
+    /**
+     * D3: more than seven constructor parameters is more than one responsibility.
+     * A record is exempt: a value holds what it holds.
+     */
     @ArchTest
     static final ArchRule narrowConstructors = FreezingArchRule.freeze(
-        classes().should(haveConstructorsWithAtMostParameters(7))
+        classes().that().areNotRecords()
+            .should(haveConstructorsWithAtMostParameters(7))
             .as("D3: a constructor takes at most 7 parameters"));
 
     /**
