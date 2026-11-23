@@ -4,16 +4,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
+import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.runtime.memory.domain.AutoCompactConfig;
 import ai.mindconnect.agent.runtime.memory.domain.FullHistoryMemoryConfig;
 import ai.mindconnect.agent.runtime.memory.domain.MemoryConfig;
+import ai.mindconnect.agent.runtime.memory.domain.NoMemoryConfig;
+import ai.mindconnect.agent.runtime.memory.domain.WindowedMemoryConfig;
 import ai.mindconnect.agent.runtime.memory.domain.SummarizingWindowConfig;
 import ai.mindconnect.agent.tool.AgentTool;
 
@@ -38,6 +42,7 @@ public final class AgentDefinitionMapper {
         metadata.put(AGENT_ID, stored.id().value());
         metadata.put(SubAgentPlugin.SUB_AGENTS,
                 stored.callableAgents() == null ? List.of() : List.copyOf(stored.callableAgents()));
+        skills(stored.skills()).ifPresent(picked -> metadata.put(SkillPlugin.SKILLS, picked));
         if (stored.memoryConfig() != null) {
             metadata.put(MemoryPlugin.MEMORY, memory(stored.memoryConfig()));
         }
@@ -68,11 +73,20 @@ public final class AgentDefinitionMapper {
         return new ToolBinding(tool.name(), tool.deferred(), metadata);
     }
 
-    /**
-     * The five strategies of the earlier runtime as the three of this one.
-     * A window counted in messages and "no memory" have no counterpart: both
-     * become a window sized by the model's context.
-     */
+    /** Every skill is no entry at all, none is an empty list, and the ones named are the list. */
+    private static Optional<List<String>> skills(
+            ai.mindconnect.agent.runtime.domain.AgentDefinition.SkillsConfig skills) {
+        if (skills == null) {
+            return Optional.empty();
+        }
+        return switch (skills.mode()) {
+            case ALL -> Optional.empty();
+            case NONE -> Optional.of(List.of());
+            case SPECIFIC -> Optional.of(skills.names());
+        };
+    }
+
+    /** The five strategies of the earlier runtime as the four of this one. */
     private static Map<String, Object> memory(MemoryConfig config) {
         return switch (config) {
             case FullHistoryMemoryConfig full -> Map.of("strategy", "full");
@@ -84,7 +98,8 @@ public final class AgentDefinitionMapper {
                     "strategy", "compact",
                     "maxConversationRatio", compact.compactAtRatio(),
                     "summaryPlacement", compact.summaryPlacement().name().toLowerCase(Locale.ROOT));
-            default -> Map.of("strategy", "window");
+            case NoMemoryConfig none -> Map.of("strategy", "none");
+            case WindowedMemoryConfig window -> Map.of("strategy", "window", "maxMessages", window.windowSize());
         };
     }
 }

@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
+import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -38,6 +40,7 @@ import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
+import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.memory.domain.AutoCompactConfig;
@@ -66,7 +69,28 @@ import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;
 /** An agent as the application stores it, with a tool of the earlier SPI, run by the runtime on the plugin kernel. */
 class RuntimeBridgeAutoConfigurationTest {
 
-    private static final ScopeSupplier SCOPE = ScopeSupplier.fixed(new Namespace("test"));
+    private static final Namespace NAMESPACE = new Namespace("test");
+
+    /** A scope as a server's request filter binds it: per thread, the namespace and whoever is signed in. */
+    private static final ScopeSupplier SCOPE = new ScopeSupplier() {
+        private final ThreadLocal<Scope> bound = new ThreadLocal<>();
+
+        @Override
+        public Scope get() {
+            return bound.get() == null ? Scope.of(NAMESPACE) : bound.get();
+        }
+
+        @Override
+        public <T> T callIn(Scope scope, Callable<T> body) throws Exception {
+            Scope before = bound.get();
+            bound.set(scope);
+            try {
+                return body.call();
+            } finally {
+                bound.set(before);
+            }
+        }
+    };
     private static final AgentDefinition LIBRARIAN = new AgentDefinition(AgentId.random(), "librarian",
             "Finds books.", "You find books.", null, "small", 6, AutoCompactConfig.DEFAULT,
             AgentDefinitionStatus.ACTIVE,
@@ -96,7 +120,8 @@ class RuntimeBridgeAutoConfigurationTest {
         @Override
         public String execute(Map<String, Object> arguments) {
             return "found " + arguments.get("q") + " in " + entry.overrides().get("branch") + " for "
-                    + ToolCallScope.current().map(calling -> calling.userId().value()).orElse("nobody");
+                    + ToolCallScope.current().map(calling -> calling.userId().value()).orElse("nobody")
+                    + " as " + SCOPE.get().userIfAny().map(acting -> acting.value()).orElse("nobody");
         }
     });
 
@@ -120,7 +145,10 @@ class RuntimeBridgeAutoConfigurationTest {
         assertThat(agent.binding("order_book").orElseThrow().metadata())
                 .containsEntry(PermissionPlugin.NEEDS_APPROVAL, true);
         assertThat(agent.metadata()).containsEntry(AgentDefinitionMapper.AGENT_ID, LIBRARIAN.id().value())
-                .containsKey(MemoryPlugin.MEMORY);
+                .containsEntry(MemoryPlugin.MEMORY, Map.of("strategy", "compact", "maxConversationRatio",
+                        AutoCompactConfig.DEFAULT.compactAtRatio(), "summaryPlacement", "user_message"))
+                // Every skill there is: no entry.
+                .doesNotContainKey(SkillPlugin.SKILLS);
     }
 
     @Test
@@ -162,12 +190,15 @@ class RuntimeBridgeAutoConfigurationTest {
                             null, context.getBean(AgentDefinitionMapper.class).toRuntime(LIBRARIAN), Map.of()));
                     TurnService turns = context.getBean(TurnService.class);
 
-                    Turn ended = awaitEnd(turns, turns.submit(TurnRequest.text(session.id(), "Do we have owls?")));
+                    // The session is Ada's; Eve is signed in and asks in it.
+                    TurnId turnId = SCOPE.callIn(Scope.of(NAMESPACE, ai.mindconnect.agent.UserId.of("eve")),
+                            () -> turns.submit(TurnRequest.text(session.id(), "Do we have owls?")));
+                    Turn ended = awaitEnd(turns, turnId);
 
                     assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
                     assertThat(context.getBean(SessionStore.class).messages(session.id()))
                             .filteredOn(message -> message.type() == TurnMessage.Type.TOOL_RESULT)
-                            .extracting(TurnMessage::text).containsExactly("found owls in main for ada");
+                            .extracting(TurnMessage::text).containsExactly("found owls in main for ada as eve");
                     // The held-back tool is not offered; the agent's own description of the other is.
                     assertThat(asked.get(0).tools()).filteredOn(tool -> tool.name().equals("search_catalog"))
                             .extracting(tool -> tool.description()).containsExactly("Searches our catalog.");
