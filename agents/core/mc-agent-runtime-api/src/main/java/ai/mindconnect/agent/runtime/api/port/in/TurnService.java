@@ -4,7 +4,6 @@ import java.util.List;
 import java.util.Optional;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.loop.port.out.TurnEventListener;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
@@ -67,11 +66,11 @@ public interface TurnService {
     void resume(TurnId turnId, List<InterruptionAnswer> answers);
 
     /**
-     * Follows the turn's events until the subscription is closed or the turn
-     * is over. A listener that comes late is first told what it missed, so
-     * subscribing right after {@link #submit} loses nothing.
+     * Follows the turn until the subscription is closed or the turn is over.
+     * A listener that comes late is first told what it missed — the end
+     * included — so subscribing right after {@link #submit} loses nothing.
      */
-    Subscription subscribe(TurnId turnId, TurnEventListener events);
+    Subscription subscribe(TurnId turnId, TurnListener listener);
 
     /** Tells the turn to stop; it ends cancelled at the next point it can. */
     void cancel(TurnId turnId);

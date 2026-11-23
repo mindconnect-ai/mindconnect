@@ -6,7 +6,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import ai.mindconnect.agent.loop.domain.TurnMessage;
-import ai.mindconnect.agent.loop.port.out.TurnEventListener;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
@@ -17,6 +16,7 @@ import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
 import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
+import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
@@ -137,7 +137,7 @@ public final class DefaultTurnService implements TurnService {
     }
 
     @Override
-    public Subscription subscribe(TurnId turnId, TurnEventListener listener) {
+    public Subscription subscribe(TurnId turnId, TurnListener listener) {
         return events.subscribe(turnId, listener);
     }
 
@@ -150,6 +150,7 @@ public final class DefaultTurnService implements TurnService {
         for (Turn turn : parked) {
             sessionStore.find(turn.sessionId()).ifPresent(session -> sessionEvents.publish(session,
                     new SessionEvent.TurnFinished(turn.sessionId(), turn.id(), TurnStatus.CANCELLED)));
+            turns.turn(turn.id()).ifPresent(events::finished);
         }
     }
 

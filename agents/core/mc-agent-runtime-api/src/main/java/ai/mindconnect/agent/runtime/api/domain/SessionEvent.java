@@ -3,13 +3,14 @@ package ai.mindconnect.agent.runtime.api.domain;
 import java.util.List;
 import java.util.Map;
 
+import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 
 /**
  * What happens in a session, coarse enough to follow many sessions at once:
- * turns begin and end, messages and tool calls begin and end. No fragments
- * of an answer being written — whoever wants those watches the one turn it
- * is looking at.
+ * turns begin and end, messages and tool calls begin and end. Whoever shows
+ * a session as it happens reads {@link TurnReported} as well: what the turn
+ * itself reports, fragments of an answer being written included.
  *
  * <p>Every event names its session and, where it belongs to one, its turn, so a listener that hears
  * several sessions — all of a user's, or a session with the sessions under
@@ -20,6 +21,14 @@ public sealed interface SessionEvent {
     SessionId sessionId();
 
     TurnId turnId();
+
+    /**
+     * What a turn of the session reports, as the agent loop says it: the
+     * fragments of the answer and of the reasoning, every message as it is
+     * written, the outcome. The other events are the digest of these; a
+     * listener that shows a list of sessions passes this one by.
+     */
+    record TurnReported(SessionId sessionId, TurnId turnId, TurnEvent event) implements SessionEvent { }
 
     /** A turn began to run. */
     record TurnStarted(SessionId sessionId, TurnId turnId, String agentName) implements SessionEvent { }

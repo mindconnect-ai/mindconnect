@@ -139,6 +139,7 @@ final class TurnWorker implements TaskWorker {
     private void ended(AgentContext context, Turn turn, TurnStatus status, TurnOutcome outcome, String error) {
         Turn ended = new Turn(turn.id(), turn.parent(), turn.sessionId(), turn.agent(), status,
                 List.of(), outcome, error);
+        events.toTurnListeners().finished(ended);
         hooks.run(RuntimeHook.TURN_END, context, asked -> ended);
     }
 

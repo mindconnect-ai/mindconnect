@@ -156,7 +156,7 @@ public final class RuntimeChatService {
                 failed(finished.status()).ifPresent(answer::completeExceptionally);
             }
         });
-        Subscription following = turns.subscribe(turnId, events);
+        Subscription following = turns.subscribe(turnId, events::onEvent);
         answer.whenComplete((text, failure) -> {
             if (failure == null) {
                 outcome.complete(TurnResult.completed(chatTurnId, text));

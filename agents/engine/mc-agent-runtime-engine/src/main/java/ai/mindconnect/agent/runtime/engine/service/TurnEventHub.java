@@ -7,8 +7,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import ai.mindconnect.agent.loop.domain.TurnEvent;
-import ai.mindconnect.agent.loop.port.out.TurnEventListener;
+import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
+import ai.mindconnect.agent.runtime.api.port.in.TurnListener;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 
 /**
@@ -24,8 +25,10 @@ final class TurnEventHub {
     /** One turn's events so far and its listeners, changed and read under its own lock. */
     private static final class Channel {
         private final List<TurnEvent> events = new ArrayList<>();
+        /** The turn as it ended; {@code null} while it has not. */
+        private Turn finished;
         // A listener may leave while it is being told something — at the turn's end, typically.
-        private final List<TurnEventListener> listeners = new CopyOnWriteArrayList<>();
+        private final List<TurnListener> listeners = new CopyOnWriteArrayList<>();
     }
 
     private final Map<TurnId, Channel> channels = new ConcurrentHashMap<>();
@@ -38,10 +41,24 @@ final class TurnEventHub {
         }
     }
 
-    Subscription subscribe(TurnId turnId, TurnEventListener listener) {
+    /** The turn is over: told once, to whoever listens now and whoever comes later. */
+    void finished(Turn turn) {
+        Channel channel = channels.computeIfAbsent(turn.id(), id -> new Channel());
+        synchronized (channel) {
+            if (channel.finished == null) {
+                channel.finished = turn;
+                channel.listeners.forEach(listener -> listener.onFinished(turn));
+            }
+        }
+    }
+
+    Subscription subscribe(TurnId turnId, TurnListener listener) {
         Channel channel = channels.computeIfAbsent(turnId, id -> new Channel());
         synchronized (channel) {
             channel.events.forEach(listener::onEvent);
+            if (channel.finished != null) {
+                listener.onFinished(channel.finished);
+            }
             channel.listeners.add(listener);
         }
         return () -> {

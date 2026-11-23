@@ -76,7 +76,7 @@ final class ChatStreams implements SessionEventListener {
                 sessionFrames.publisherFor(started.sessionId().value(), turnId.value()));
         users.publish(user, new UserEvent.TurnStarted(chat(started), ChatTurnId.of(turnId.value())));
         // A listener that comes late is told what it missed: nothing the turn said so far is lost.
-        following.put(turnId, new Following(user, frames, turns.get().subscribe(turnId, frames)));
+        following.put(turnId, new Following(user, frames, turns.get().subscribe(turnId, frames::onEvent)));
     }
 
     /** The turn has to ask: a frame, and the user's stream names each tool call that waits. */

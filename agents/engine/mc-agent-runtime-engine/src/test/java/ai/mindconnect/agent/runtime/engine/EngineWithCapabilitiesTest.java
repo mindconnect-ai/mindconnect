@@ -291,6 +291,50 @@ class EngineWithCapabilitiesTest {
     }
 
     @Test
+    void whoever_follows_a_session_hears_what_its_turns_report() throws InterruptedException {
+        List<ai.mindconnect.agent.runtime.api.domain.SessionEvent> heard =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
+        registry.get(ai.mindconnect.agent.runtime.api.port.in.SessionService.class)
+                .subscribe(session.id(), false, heard::add);
+        model.script.add(call("c1", "bash", Map.of()));
+
+        TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Run it"));
+        awaitRest(turnId);
+
+        assertThat(heard).filteredOn(ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnReported.class::isInstance)
+                .extracting(event -> ((ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnReported) event)
+                        .event().getClass().getSimpleName())
+                .contains("TurnStarted", "MessageAppended", "TurnWaiting");
+        // A turn that waits has not finished.
+        assertThat(heard).noneMatch(
+                ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnFinished.class::isInstance);
+        turns.cancel(turnId);
+    }
+
+    @Test
+    void whoever_follows_a_turn_is_told_its_end_also_when_coming_late() throws InterruptedException {
+        model.script.add(TurnMessage.assistant("Hello."));
+        TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Hi"));
+        awaitRest(turnId);
+        List<Turn> finished = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        turns.subscribe(turnId, new ai.mindconnect.agent.runtime.api.port.in.TurnListener() {
+            @Override
+            public void onEvent(ai.mindconnect.agent.loop.domain.TurnEvent event) { }
+
+            @Override
+            public void onFinished(Turn turn) {
+                finished.add(turn);
+            }
+        });
+
+        for (int i = 0; i < 200 && finished.isEmpty(); i++) {
+            Thread.sleep(10);
+        }
+        assertThat(finished).extracting(Turn::status).containsExactly(TurnStatus.COMPLETED);
+    }
+
+    @Test
     void a_sub_agent_runs_a_turn_of_its_own_and_its_answer_is_the_tools_result() throws InterruptedException {
         model.script.add(call("c1", "researcher", Map.of("task", "Find the capital of France.")));
         model.script.add(TurnMessage.assistant("Paris."));
@@ -353,7 +397,8 @@ class EngineWithCapabilitiesTest {
                 .isEqualTo(new SessionEvent.Notice(session.id(), null, "session.title",
                         Map.of("title", "A greeting")));
         assertThat(sessions.find(session.id()).orElseThrow().metadata()).containsEntry("title", "A greeting");
-        assertThat(heard).first().isInstanceOf(SessionEvent.TurnStarted.class);
+        assertThat(heard).filteredOn(event -> !(event instanceof SessionEvent.TurnReported))
+                .first().isInstanceOf(SessionEvent.TurnStarted.class);
         assertThat(heard).anyMatch(SessionEvent.TurnFinished.class::isInstance);
     }
 

@@ -35,16 +35,21 @@ final class SessionEventTranslator {
         this.turn = turn;
     }
 
-    /** One event of the loop, as zero, one or two events of the session. */
+    /** One event of the loop: as it is, and as the events of the session it amounts to. */
     void translate(TurnEvent event) {
         TurnId turnId = turn.id();
+        publish(new SessionEvent.TurnReported(session.id(), turnId, event));
         switch (event) {
             case TurnEvent.TurnStarted started ->
                     publish(new SessionEvent.TurnStarted(session.id(), turnId, turn.agent().name()));
             case TurnEvent.TextDelta delta -> announceAnswer();
             case TurnEvent.MessageAppended appended -> translate(appended.message());
-            case TurnEvent.TurnEnded ended ->
+            case TurnEvent.TurnEnded ended -> {
+                // A turn that waits for its tools has not ended.
+                if (statusOf(ended).isFinal()) {
                     publish(new SessionEvent.TurnFinished(session.id(), turnId, statusOf(ended)));
+                }
+            }
             // A turn that goes on after a wait, the model's reasoning and a
             // plain wait for tools are nothing a session reports.
             case TurnEvent.TurnResumed resumed -> { }
