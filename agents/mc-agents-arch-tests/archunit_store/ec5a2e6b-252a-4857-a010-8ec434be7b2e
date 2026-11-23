@@ -38,4 +38,4 @@ Static Initializer <ai.mindconnect.agent.runtime.service.MessageToLlmMessageMapp
 Static Initializer <ai.mindconnect.agent.runtime.service.round.ToolCalls.<clinit>()> calls constructor <com.fasterxml.jackson.databind.ObjectMapper.<init>()> in (ToolCalls.java:48)
 Static Initializer <ai.mindconnect.agent.runtime.service.round.TurnMessage.<clinit>()> calls constructor <com.fasterxml.jackson.databind.ObjectMapper.<init>()> in (TurnMessage.java:30)
 Static Initializer <ai.mindconnect.agent.runtime.service.task.LlmChatProvider.<clinit>()> calls constructor <com.fasterxml.jackson.databind.ObjectMapper.<init>()> in (LlmChatProvider.java:76)
-Static Initializer <ai.mindconnect.agent.runtime.service.task.ToolCallWorker.<clinit>()> calls constructor <com.fasterxml.jackson.databind.ObjectMapper.<init>()> in (ToolCallWorker.java:272)
+Static Initializer <ai.mindconnect.agent.runtime.service.task.ToolCallWorker.<clinit>()> calls constructor <com.fasterxml.jackson.databind.ObjectMapper.<init>()> in (ToolCallWorker.java:271)

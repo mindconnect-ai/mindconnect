@@ -61,7 +61,8 @@ public class RuntimeBridgeAutoConfiguration {
 
     @Bean
     OpenApprovalRecorder openApprovalRecorder(ToolApprovalRepository approvals, ObjectProvider<SessionStore> sessions,
-                                              UserEventFeed userFeed) {
+                                              UserEventFeed userFeed,
+                                   ObjectProvider<ai.mindconnect.agent.tools.usermemory.UserMemoryService> userMemory) {
         return new OpenApprovalRecorder(approvals, sessions::getObject, userFeed);
     }
 
@@ -75,7 +76,9 @@ public class RuntimeBridgeAutoConfiguration {
     @Bean
     Plugin applicationSourcePlugin(AgentDefinitionRepository agents, AgentDefinitionMapper mapper,
                                    SkillRepository skills, ToolRegistry tools, OpenApprovalRecorder openApprovals,
-                                   UserEventFeed userFeed) {
+                                   UserEventFeed userFeed,
+                                   ObjectProvider<ai.mindconnect.agent.tools.usermemory.UserMemoryService> userMemory) {
+        AgentResolver storedAgents = new RepositoryAgentResolver(agents, mapper);
         return new Plugin() {
             @Override
             public String name() {
@@ -84,7 +87,7 @@ public class RuntimeBridgeAutoConfiguration {
 
             @Override
             public void install(PluginRegistry registry) {
-                registry.contribute(AgentResolver.class, new RepositoryAgentResolver(agents, mapper));
+                registry.contribute(AgentResolver.class, storedAgents);
                 registry.contribute(SkillResolver.class, new RepositorySkillResolver(skills));
                 registry.contribute(ToolResolver.class, new RegistryToolResolver(tools));
                 // In this application a tool is switched on by the agent naming it; the tool
@@ -95,6 +98,9 @@ public class RuntimeBridgeAutoConfiguration {
                 registry.listen(RuntimeHook.TOOL_CALL, openApprovals::called);
                 registry.listen(RuntimeHook.TURN_END, (context, turn) -> openApprovals.ended(context));
                 registry.contribute(SessionEventListener.class, userFeed);
+                // What an agent remembers of a user is the application's for now; whoever shows it asks the runtime.
+                userMemory.ifAvailable(memory -> registry.provide(
+                        ai.mindconnect.agent.tools.usermemory.UserMemoryService.class, () -> memory));
             }
         };
     }

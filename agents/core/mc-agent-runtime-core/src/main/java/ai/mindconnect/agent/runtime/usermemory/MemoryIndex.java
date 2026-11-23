@@ -1,5 +1,11 @@
 package ai.mindconnect.agent.runtime.usermemory;
 
+import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
+import ai.mindconnect.agent.tools.usermemory.MemoryReach;
+import ai.mindconnect.agent.tools.usermemory.MemoryReadTool;
+import ai.mindconnect.agent.tools.usermemory.MemoryWriteTool;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
+
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.tool.AgentTool;
@@ -22,7 +28,7 @@ import java.util.Optional;
 public final class MemoryIndex implements PromptSection {
 
     /** The tool group all memory tools are filed under. */
-    public static final String TOOL_GROUP = "memory";
+    public static final String TOOL_GROUP = MemoryReadTool.GROUP;
 
     /** Most entries listed; past it the model is pointed to {@code memory_read}. */
     static final int MAX_LINES = 100;
@@ -82,18 +88,12 @@ public final class MemoryIndex implements PromptSection {
             return out.toString();
         }
         out.append('\n');
-        entries.stream().limit(MAX_LINES).forEach(e -> out.append(line(e, reach)).append('\n'));
+        entries.stream().limit(MAX_LINES).forEach(e -> out.append(e.indexLine(reach)).append('\n'));
         if (entries.size() > MAX_LINES) {
             out.append("… and ").append(entries.size() - MAX_LINES)
                     .append(" older ones — `memory_read` without a name lists them all.\n");
         }
         return out.toString().stripTrailing();
-    }
-
-    /** One entry as the index lists it; under {@link MemoryReach#BOTH} with the memory it is in. */
-    static String line(MemoryEntry entry, MemoryReach reach) {
-        String where = reach == MemoryReach.BOTH ? (entry.shared() ? ", user's" : ", yours") : "";
-        return "- " + entry.name() + " (" + entry.type().wireName() + where + "): " + entry.description();
     }
 
     private static Optional<AgentTool> binding(AgentDefinition def, String name) {

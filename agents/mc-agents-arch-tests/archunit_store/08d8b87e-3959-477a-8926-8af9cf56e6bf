@@ -55,7 +55,6 @@ ai.mindconnect.agent.runtime.adapter.pg.PgAgentDefinitionRepository has 2 constr
 ai.mindconnect.agent.runtime.adapter.pg.PgAgentRepositoryFactory has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgAgentSessionRepository has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgConversationSummaryRepository has 2 constructors
-ai.mindconnect.agent.runtime.adapter.pg.PgUserMemoryRepository has 2 constructors
 ai.mindconnect.agent.runtime.adapter.pg.PgWorkingMemoryRepository has 2 constructors
 ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentRepositoryFactory has 2 constructors
 ai.mindconnect.agent.runtime.domain.AgentDefinition has 4 constructors
@@ -83,10 +82,6 @@ ai.mindconnect.agent.runtime.service.turn.LocalChatTurnHandle has 2 constructors
 ai.mindconnect.agent.runtime.service.turn.ToolExecutor has 2 constructors
 ai.mindconnect.agent.runtime.service.turn.ToolExecutor$Context has 2 constructors
 ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations has 3 constructors
-ai.mindconnect.agent.runtime.usermemory.MemoryDeleteTool has 2 constructors
-ai.mindconnect.agent.runtime.usermemory.MemoryEntry has 2 constructors
-ai.mindconnect.agent.runtime.usermemory.MemoryReadTool has 2 constructors
-ai.mindconnect.agent.runtime.usermemory.MemoryWriteTool has 2 constructors
 ai.mindconnect.agent.security.UserRecorder has 2 constructors
 ai.mindconnect.agent.skill.adapter.pg.PgSkillRepository has 2 constructors
 ai.mindconnect.agent.starter.namespace.ScopeBindingFilter has 3 constructors
@@ -115,6 +110,11 @@ ai.mindconnect.agent.tools.document.GrepDocumentTool has 3 constructors
 ai.mindconnect.agent.tools.document.ReadDocumentSectionTool has 3 constructors
 ai.mindconnect.agent.tools.document.ReadDocumentTool has 3 constructors
 ai.mindconnect.agent.tools.todo.adapter.pg.PgTodoListRepository has 2 constructors
+ai.mindconnect.agent.tools.usermemory.MemoryDeleteTool has 2 constructors
+ai.mindconnect.agent.tools.usermemory.MemoryEntry has 2 constructors
+ai.mindconnect.agent.tools.usermemory.MemoryReadTool has 2 constructors
+ai.mindconnect.agent.tools.usermemory.MemoryWriteTool has 2 constructors
+ai.mindconnect.agent.tools.usermemory.adapter.pg.PgUserMemoryRepository has 2 constructors
 ai.mindconnect.agent.tools.virtualenv.OnBehalfTokens has 3 constructors
 ai.mindconnect.agent.tools.virtualenv.RemoteWorkspaceFiles has 2 constructors
 ai.mindconnect.agent.tools.virtualenv.VirtualEnvClientException has 2 constructors

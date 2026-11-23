@@ -95,6 +95,8 @@
         <module>adapter/postgres/mc-agent-skill-pg</module>
         <module>tools/core/mc-agent-tools-todo</module>
         <module>adapter/postgres/mc-agent-tools-todo-pg</module>
+        <module>tools/core/mc-agent-tools-usermemory</module>
+        <module>adapter/postgres/mc-agent-tools-usermemory-pg</module>
         <module>core/mc-agent-management-api</module>
         <module>engine/mc-agent-management</module>
         <module>adapter/postgres/mc-agent-runtime-engine-pg</module>

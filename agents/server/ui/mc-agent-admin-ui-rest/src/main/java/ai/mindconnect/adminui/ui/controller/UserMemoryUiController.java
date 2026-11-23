@@ -6,8 +6,8 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
+import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.ui.model.UiDialog;
 import ai.mindconnect.ui.model.UiNode;
@@ -48,9 +48,10 @@ public class UserMemoryUiController {
     private final AgentDefinitionRepository agents;
 
     @Autowired
-    public UserMemoryUiController(ObjectProvider<UserMemoryService> memory,
+    public UserMemoryUiController(ObjectProvider<ai.mindconnect.agent.sdk.AgentRuntime> runtime,
                                   ObjectProvider<AgentDefinitionRepository> agents) {
-        this(memory.getIfAvailable(), agents.getIfAvailable());
+        this(runtime.stream().findFirst().flatMap(found -> found.find(UserMemoryService.class)).orElse(null),
+                agents.getIfAvailable());
     }
 
     UserMemoryUiController(UserMemoryService memory, AgentDefinitionRepository agents) {

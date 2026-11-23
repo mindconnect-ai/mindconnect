@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.runtime.usermemory;
 
+import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryRepository;
+
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
 

@@ -5,7 +5,7 @@ import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepositor
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.skill.port.out.SkillRepository;
 import ai.mindconnect.agent.tools.todo.TodoListRepository;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryRepository;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryRepository;
 
 /**
  * Creates the agent runtime's repositories for one persistence backend —

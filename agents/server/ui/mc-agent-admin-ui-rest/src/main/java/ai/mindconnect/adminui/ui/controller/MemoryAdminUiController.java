@@ -5,11 +5,11 @@ import ai.mindconnect.adminui.ui.component.UserMemoryComponent.Row;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
-import ai.mindconnect.agent.runtime.usermemory.MemoryReach;
-import ai.mindconnect.agent.runtime.usermemory.MemoryReadTool;
-import ai.mindconnect.agent.runtime.usermemory.MemoryWriteTool;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
+import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
+import ai.mindconnect.agent.tools.usermemory.MemoryReach;
+import ai.mindconnect.agent.tools.usermemory.MemoryReadTool;
+import ai.mindconnect.agent.tools.usermemory.MemoryWriteTool;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 import ai.mindconnect.agent.tool.AgentTool;
 import ai.mindconnect.ui.model.UiField;
 import ai.mindconnect.ui.model.UiForm;
@@ -66,9 +66,10 @@ public class MemoryAdminUiController {
     private final AgentDefinitionRepository agents;
 
     @Autowired
-    public MemoryAdminUiController(ObjectProvider<UserMemoryService> memory,
+    public MemoryAdminUiController(ObjectProvider<ai.mindconnect.agent.sdk.AgentRuntime> runtime,
                                    ObjectProvider<AgentDefinitionRepository> agents) {
-        this(memory.getIfAvailable(), agents.getIfAvailable());
+        this(runtime.stream().findFirst().flatMap(found -> found.find(UserMemoryService.class)).orElse(null),
+                agents.getIfAvailable());
     }
 
     MemoryAdminUiController(UserMemoryService memory, AgentDefinitionRepository agents) {

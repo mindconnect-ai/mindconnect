@@ -2,8 +2,8 @@ package ai.mindconnect.agentrest.controller;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.usermemory.MemoryEntry;
-import ai.mindconnect.agent.runtime.usermemory.UserMemoryService;
+import ai.mindconnect.agent.tools.usermemory.MemoryEntry;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 import ai.mindconnect.agentrest.auth.CurrentUser;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -41,8 +41,8 @@ public class MemoryApiController {
     private final UserMemoryService memory;
 
     @Autowired
-    public MemoryApiController(ObjectProvider<UserMemoryService> memory) {
-        this(memory.getIfAvailable());
+    public MemoryApiController(ObjectProvider<ai.mindconnect.agent.sdk.AgentRuntime> runtime) {
+        this(runtime.stream().findFirst().flatMap(found -> found.find(UserMemoryService.class)).orElse(null));
     }
 
     MemoryApiController(UserMemoryService memory) {
