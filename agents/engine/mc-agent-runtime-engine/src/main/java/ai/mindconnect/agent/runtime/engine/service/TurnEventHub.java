@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.port.out.TurnEventListener;
@@ -23,7 +24,8 @@ final class TurnEventHub {
     /** One turn's events so far and its listeners, changed and read under its own lock. */
     private static final class Channel {
         private final List<TurnEvent> events = new ArrayList<>();
-        private final List<TurnEventListener> listeners = new ArrayList<>();
+        // A listener may leave while it is being told something — at the turn's end, typically.
+        private final List<TurnEventListener> listeners = new CopyOnWriteArrayList<>();
     }
 
     private final Map<TurnId, Channel> channels = new ConcurrentHashMap<>();
