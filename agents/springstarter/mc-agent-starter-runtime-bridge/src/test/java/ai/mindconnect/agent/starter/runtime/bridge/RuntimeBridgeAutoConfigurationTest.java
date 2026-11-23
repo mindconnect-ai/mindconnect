@@ -49,6 +49,7 @@ import ai.mindconnect.agent.runtime.domain.SessionStatus;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationId;
@@ -225,7 +226,8 @@ class RuntimeBridgeAutoConfigurationTest {
                 .withBean(ToolRegistry.class, () -> TOOLS)
                 .withBean(ConversationSummaryRepository.class, () -> mock(ConversationSummaryRepository.class))
                 .withBean(LlmCallTraceRepository.class, () -> traces)
-                .withBean(AgentSessionRepository.class, () -> chatSessions);
+                .withBean(AgentSessionRepository.class, () -> chatSessions)
+                .withBean(AgentChatService.class, () -> mock(AgentChatService.class));
     }
 
     /** A model that first calls the tool with the question's subject and then answers. */

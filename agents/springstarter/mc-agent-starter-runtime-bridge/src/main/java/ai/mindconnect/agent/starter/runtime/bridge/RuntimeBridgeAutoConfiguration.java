@@ -22,6 +22,7 @@ import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepositor
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.tool.ToolRegistry;
@@ -88,8 +89,8 @@ public class RuntimeBridgeAutoConfiguration {
                                           ObjectProvider<SessionService> sessionService,
                                           ObjectProvider<SessionStore> sessions,
                                           AgentSessionRepository chatSessions, AgentDefinitionRepository agents,
-                                          AgentDefinitionMapper mapper) {
+                                          AgentDefinitionMapper mapper, AgentChatService earlier) {
         return new RuntimeChatService(turns.getObject(), sessionService.getObject(), sessions.getObject(), chatSessions,
-                new SessionAgentResolver(agents), mapper);
+                new SessionAgentResolver(agents), mapper, earlier);
     }
 }

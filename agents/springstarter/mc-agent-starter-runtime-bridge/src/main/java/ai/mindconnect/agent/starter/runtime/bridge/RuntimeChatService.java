@@ -27,8 +27,10 @@ import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
+import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.message.domain.ChatTurnId;
@@ -48,18 +50,21 @@ public final class RuntimeChatService {
     private final AgentSessionRepository chatSessions;
     private final SessionAgentResolver agents;
     private final AgentDefinitionMapper mapper;
+    private final AgentChatService earlier;
     /** The turn underway in a session: what a cancel and an approval answer are meant for. */
     private final Map<String, TurnId> underway = new ConcurrentHashMap<>();
 
     public RuntimeChatService(TurnService turns, SessionService sessionService, SessionStore sessions,
                               AgentSessionRepository chatSessions,
-                              SessionAgentResolver agents, AgentDefinitionMapper mapper) {
+                              SessionAgentResolver agents, AgentDefinitionMapper mapper,
+                              AgentChatService earlier) {
         this.turns = turns;
         this.sessionService = sessionService;
         this.sessions = sessions;
         this.chatSessions = chatSessions;
         this.agents = agents;
         this.mapper = mapper;
+        this.earlier = earlier;
     }
 
     public ChatTurnHandle submitChat(SessionId sessionId, String text, Consumer<StreamEvent> events) {
@@ -121,6 +126,15 @@ public final class RuntimeChatService {
                         : scope == ApprovalScope.SESSION ? InterruptionAnswer.approveAlways(interruptionId)
                         : InterruptionAnswer.approve(interruptionId))));
         return asked.isPresent();
+    }
+
+    /**
+     * What the model would be sent right now, for the memory page. Still
+     * the earlier runtime's view of the conversation: the page is drawn from
+     * its types, and both runtimes read the same messages.
+     */
+    public WorkingMemory memorySnapshot(SessionId sessionId) {
+        return earlier.memorySnapshot(sessionId);
     }
 
     /** The chat's session as the runtime knows it — created on its first turn, its directories kept current. */

@@ -36,6 +36,12 @@
             <version>${project.version}</version>
         </dependency>
         <!-- Agent platform — domain types plus the REST controllers the UI drives -->
+        <!-- The chat runs on the runtime on the plugin kernel; the bridge takes this page's calls there. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-starter-runtime-bridge</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-api-rest</artifactId>

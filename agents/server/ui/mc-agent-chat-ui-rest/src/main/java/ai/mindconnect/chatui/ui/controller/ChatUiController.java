@@ -19,7 +19,7 @@ import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
 import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
+import ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
@@ -56,7 +56,8 @@ public class ChatUiController {
     private static final Logger log = LoggerFactory.getLogger(ChatUiController.class);
 
     private final AgentSessionService sessionService;
-    private final AgentChatService chatService;
+    /** The chat on the runtime on the plugin kernel, behind the calls this page has always made. */
+    private final RuntimeChatService chatService;
     private final AgentDefinitionRepository agentRepository;
     private final AgentSessionRepository sessionRepository;
     private final TodoListService todoListService;
@@ -77,7 +78,7 @@ public class ChatUiController {
     private final ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser;
 
     public ChatUiController(AgentSessionService sessionService,
-                             AgentChatService chatService,
+                             RuntimeChatService chatService,
                              AgentDefinitionRepository agentRepository,
                              AgentSessionRepository sessionRepository,
                              TodoListService todoListService,
