@@ -15,8 +15,9 @@
     <name>mc-agent-management</name>
     <packaging>jar</packaging>
     <description>
-        The management API on the stores the runtime engine writes to: the
-        engine's session repository and the message repository.
+        The management API on stores: sessions on the engine's session
+        repository and the message repository, agents on a repository of its
+        own, in memory or on files.
     </description>
 
     <dependencies>
@@ -29,6 +30,20 @@
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime-engine</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-file-repo</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
