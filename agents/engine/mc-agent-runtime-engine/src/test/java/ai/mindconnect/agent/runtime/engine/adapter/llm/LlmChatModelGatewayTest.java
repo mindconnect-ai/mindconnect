@@ -33,7 +33,8 @@ class LlmChatModelGatewayTest {
         };
         List<String> heard = new ArrayList<>();
         LlmChatModelGateway gateway = new LlmChatModelGateway(chat, new ObjectMapper(),
-                (turnId, event) -> heard.add(turnId.value() + " " + event.requestJson()));
+                (turnId, event) -> heard.add(turnId.value() + " " + event.requestJson()),
+                model -> java.util.OptionalInt.empty());
 
         LlmAnswer answer = gateway.ask(new ModelRequest(TurnId.of("t1"), ModelSettings.ofModel("model"),
                 "You help.", List.of(TurnMessage.user(List.of(new ContentPart.Text("Hi")))), List.of()), event -> { });

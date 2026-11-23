@@ -6,8 +6,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -58,13 +60,16 @@ public final class LlmChatModelGateway implements ModelGateway {
     private final LlmChat chat;
     private final ObjectMapper json;
     private final LlmCallTraceListener traces;
+    private final Function<String, OptionalInt> contextWindows;
     /** The calls underway, each with the handle that closes its connection. */
     private final Map<TurnId, Cancellation> inFlight = new ConcurrentHashMap<>();
 
-    public LlmChatModelGateway(LlmChat chat, ObjectMapper json, LlmCallTraceListener traces) {
+    public LlmChatModelGateway(LlmChat chat, ObjectMapper json, LlmCallTraceListener traces,
+                               Function<String, OptionalInt> contextWindows) {
         this.chat = chat;
         this.json = json;
         this.traces = traces;
+        this.contextWindows = contextWindows;
     }
 
     @Override
@@ -87,6 +92,11 @@ public final class LlmChatModelGateway implements ModelGateway {
             inFlight.remove(request.turnId());
         }
         return cancellation.isCancelled() ? answer.interrupted() : answer.complete();
+    }
+
+    @Override
+    public OptionalInt contextWindowTokens(ModelSettings settings) {
+        return settings.model() == null ? OptionalInt.empty() : contextWindows.apply(settings.model());
     }
 
     @Override

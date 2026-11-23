@@ -1,0 +1,144 @@
+package ai.mindconnect.agent.runtime.capabilities.memory;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.OptionalInt;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import ai.mindconnect.agent.loop.domain.ContentPart;
+import ai.mindconnect.agent.loop.domain.LlmAnswer;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.loop.domain.Usage;
+import ai.mindconnect.agent.loop.port.out.TurnEventListener;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
+import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
+import ai.mindconnect.agent.runtime.api.domain.Session;
+import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.runtime.api.domain.TurnId;
+import ai.mindconnect.agent.runtime.api.domain.UserId;
+import ai.mindconnect.agent.runtime.api.hook.AgentContext;
+import ai.mindconnect.agent.runtime.api.hook.ModelCall;
+import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
+import ai.mindconnect.agent.runtime.api.port.out.ModelGateway;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.api.port.out.TokenCounter;
+import ai.mindconnect.plugin.DefaultPluginRegistry;
+import ai.mindconnect.plugin.PluginRegistry;
+
+/** A model that reads 100 tokens, a token per character, and a history of three turns of 40 tokens each. */
+class MemoryPluginTest {
+
+    private static final Session SESSION =
+            new Session(SessionId.of("s1"), UserId.of("ada"), null, null, Map.of(), Instant.EPOCH);
+    private static final List<TurnMessage> HISTORY = List.of(
+            said("m1", TurnMessage.Type.USER, "first question ...."),
+            said("m2", TurnMessage.Type.ASSISTANT, "first answer ......."),
+            said("m3", TurnMessage.Type.USER, "second question ..."),
+            said("m4", TurnMessage.Type.ASSISTANT, "second answer ......"),
+            said("m5", TurnMessage.Type.USER, "third question ....."));
+
+    private final List<ModelRequest> summaryRequests = new ArrayList<>();
+    private PluginRegistry registry;
+
+    @BeforeEach
+    void install_memory() {
+        registry = new DefaultPluginRegistry();
+        registry.provide(TokenCounter.class, () -> String::length);
+        registry.provide(ModelGateway.class, () -> new ModelGateway() {
+            @Override
+            public LlmAnswer ask(ModelRequest request, TurnEventListener events) {
+                summaryRequests.add(request);
+                return LlmAnswer.of(List.of(TurnMessage.assistant("SUMMARY " + summaryRequests.size())), new Usage(1, 1));
+            }
+
+            @Override
+            public OptionalInt contextWindowTokens(ModelSettings settings) {
+                return OptionalInt.of(100);
+            }
+
+            @Override
+            public void cancel(TurnId turnId) {
+            }
+        });
+        registry.install(new MemoryPlugin(new InMemorySummaryStore(NamespaceProvider.fixed("test"))));
+        registry.start();
+    }
+
+    @Test
+    void an_agent_that_asks_for_the_full_history_gets_it() {
+        assertThat(texts(sent(Map.of("strategy", "full"), 0.5))).hasSize(5);
+        assertThat(summaryRequests).isEmpty();
+    }
+
+    @Test
+    void a_window_leaves_out_the_oldest_turns_whole() {
+        ModelRequest sent = sent(Map.of("strategy", "window"), 0.7);
+
+        assertThat(texts(sent)).containsExactly("second question ...", "second answer ......", "third question .....");
+        assertThat(summaryRequests).isEmpty();
+    }
+
+    @Test
+    void compact_summarises_what_it_leaves_out_and_does_so_once() {
+        ModelRequest first = sent(Map.of("strategy", "compact"), 0.9);
+        ModelRequest second = sent(Map.of("strategy", "compact"), 0.9);
+
+        assertThat(summaryRequests).hasSize(1);
+        // Half the budget stays as said, and that is the turn underway; the two before it are summarised.
+        assertThat(summaryRequests.get(0).messages().get(0).text()).contains("first question", "second answer")
+                .doesNotContain("third question");
+        for (ModelRequest sent : List.of(first, second)) {
+            assertThat(sent.instructions()).startsWith("You help.").endsWith("SUMMARY 1");
+            assertThat(texts(sent)).containsExactly("third question .....");
+        }
+    }
+
+    @Test
+    void the_summary_can_be_placed_as_a_message_of_the_user() {
+        ModelRequest sent = sent(Map.of("strategy", "compact", "summaryPlacement", "user_message"), 0.9);
+
+        assertThat(sent.instructions()).isEqualTo("You help.");
+        assertThat(sent.messages().get(0).type()).isEqualTo(TurnMessage.Type.USER);
+        assertThat(sent.messages().get(0).text()).endsWith("SUMMARY 1");
+        assertThat(texts(sent).subList(1, 2)).containsExactly("third question .....");
+        assertThat(sent.messages()).hasSize(2);
+    }
+
+    @Test
+    void a_history_that_fits_is_sent_as_it_is() {
+        assertThat(sent(Map.of("strategy", "compact"), 1.0).messages()).isEqualTo(HISTORY);
+        assertThat(summaryRequests).isEmpty();
+    }
+
+    /** What the model is sent when an agent with these memory settings asks with the history. */
+    private ModelRequest sent(Map<String, Object> memory, double ratio) {
+        Map<String, Object> settings = new java.util.HashMap<>(memory);
+        settings.put("maxConversationRatio", ratio);
+        AgentDefinition agent = new AgentDefinition("helper", "Helps.", "You help.", ModelSettings.NONE,
+                List.of(), 5, Map.of(MemoryPlugin.MEMORY, settings));
+        List<ModelRequest> sent = new ArrayList<>();
+        registry.run(RuntimeHook.MODEL_CALL,
+                new ModelCall(new AgentContext(SESSION, agent, TurnId.of("t3")),
+                        new ModelRequest(TurnId.of("t3"), ModelSettings.NONE, "You help.", HISTORY, List.of())),
+                call -> {
+                    sent.add(call.request());
+                    return LlmAnswer.of(List.of(), new Usage(0, 0));
+                });
+        return sent.get(0);
+    }
+
+    private static List<String> texts(ModelRequest request) {
+        return request.messages().stream().map(TurnMessage::text).toList();
+    }
+
+    private static TurnMessage said(String id, TurnMessage.Type type, String text) {
+        return new TurnMessage(id, "t", type, List.of(new ContentPart.Text(text)), List.of(), Map.of());
+    }
+}

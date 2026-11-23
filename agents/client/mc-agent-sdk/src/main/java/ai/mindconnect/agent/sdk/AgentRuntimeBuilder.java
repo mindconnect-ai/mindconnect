@@ -3,6 +3,7 @@ package ai.mindconnect.agent.sdk;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -19,6 +20,7 @@ import ai.mindconnect.agent.sdk.inmemory.InMemoryGuardResolver;
 import ai.mindconnect.agent.sdk.inmemory.InMemorySkillResolver;
 import ai.mindconnect.agent.sdk.inmemory.InMemorySourcePlugin;
 import ai.mindconnect.agent.sdk.inmemory.InMemoryToolResolver;
+import ai.mindconnect.agent.runtime.capabilities.memory.InMemorySummaryStore;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.permission.ApprovalMemory;
 import ai.mindconnect.agent.runtime.capabilities.permission.InMemoryApprovalMemory;
@@ -55,9 +57,6 @@ import ai.mindconnect.taskqueue.memory.InMemoryTaskStore;
  */
 public final class AgentRuntimeBuilder {
 
-    private static final int HISTORY_BUDGET_TOKENS = 100_000;
-    private static final int RECENT_TOOL_RESULTS_KEPT = 3;
-
     private final List<AgentDefinition> agents = new ArrayList<>();
     private final List<Tool> tools = new ArrayList<>();
     private final List<SkillDefinition> skills = new ArrayList<>();
@@ -77,7 +76,7 @@ public final class AgentRuntimeBuilder {
 
     /** The model, through the LLM gateway. */
     public AgentRuntimeBuilder model(LlmChat chat) {
-        this.model = new LlmGatewayModelPlugin(chat, LlmCallTraceListener.NONE);
+        this.model = new LlmGatewayModelPlugin(chat, LlmCallTraceListener.NONE, model -> OptionalInt.empty());
         return this;
     }
 
@@ -181,7 +180,7 @@ public final class AgentRuntimeBuilder {
                 new SubAgentPlugin(),
                 new PermissionPlugin(unruledTools,
                         approvals != null ? approvals : new InMemoryApprovalMemory(namespaces)),
-                new MemoryPlugin(HISTORY_BUDGET_TOKENS, RECENT_TOOL_RESULTS_KEPT),
+                new MemoryPlugin(new InMemorySummaryStore(namespaces)),
                 new TracePlugin(new LoggingTraceSink()),
                 new InputGuardPlugin(),
                 new OutputGuardPlugin(),
