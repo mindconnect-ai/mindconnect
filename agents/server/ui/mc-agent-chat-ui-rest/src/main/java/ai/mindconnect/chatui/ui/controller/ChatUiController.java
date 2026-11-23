@@ -6,7 +6,11 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.chatui.ui.page.ChatPage;
-import ai.mindconnect.agent.chat.stream.StreamEvent;
+import ai.mindconnect.agent.loop.domain.TurnEvent;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.loop.domain.TurnOutcome;
+import ai.mindconnect.agent.runtime.api.domain.Interruption;
+import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.management.api.ManagedSession;
@@ -17,6 +21,7 @@ import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.starter.runtime.bridge.ChatTurnListener;
 import ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.tools.todo.TodoListService;
@@ -1105,7 +1110,7 @@ public class ChatUiController {
             // A title of its own spares the title generator a call for a
             // session that is gone again in a minute.
             sessionManagement.rename(runtimeId(test.id()), "Test: " + def.name());
-            turn = chatService.submitChat(test.id(), message, event -> { });
+            turn = chatService.submitChat(test.id(), message, ChatTurnListener.none());
             String answer = turn.result()
                     .get(SUBAGENT_TEST_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.answered(
@@ -1444,7 +1449,7 @@ public class ChatUiController {
         var agent = agentOpt.get();
 
         try (var ctx = LoggingContext.session(sessionId, null, agent.name())) {
-            ChatTurnHandle turn = chatService.submitChat(sessionId, text, streamLogger(agent.name()));
+            ChatTurnHandle turn = chatService.submitChat(sessionId, text, ChatTurnListener.none());
             turn.result().join();
         }
 
@@ -1644,7 +1649,7 @@ public class ChatUiController {
                                                                           AgentDefinition agent,
                                                                           java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> userParts,
                                                                           boolean initialRefresh,
-                                                                          java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
+                                                                          java.util.function.Function<ChatTurnListener, ChatTurnHandle> turnStarter) {
         SessionId sessionId = session.id();
         // Channel id == the id of the message-list container the patches
         // target. This way the client's {@code findStreamTarget} lookup
@@ -1734,126 +1739,117 @@ public class ChatUiController {
         // correlated only by taskId, so this is how we resolve their
         // container's session-keyed id.
         java.util.Map<java.util.UUID, SessionId> taskToSession = new java.util.concurrent.ConcurrentHashMap<>();
-        // Why a reviewer rewrote or blocked the answer, keyed by reviewer.
-        // ResponseRevised arrives before the decision it explains.
-        java.util.Map<String, String> reviewerDetail = new java.util.concurrent.ConcurrentHashMap<>();
-        java.util.List<ai.mindconnect.chatui.ui.component.TaskCardComponent> reviewerVerdicts =
-                new java.util.concurrent.CopyOnWriteArrayList<>();
-
-        java.util.function.Consumer<StreamEvent> onEvent = event -> {
-            // A thought ends with whatever it led to: anything that is not
-            // more thinking closes the open card of this scope.
-            LiveThinking thinking = thinkingFor(thinkings, sessionId, null);
-            if (!(event instanceof StreamEvent.Thinking)) {
-                closeThinking(thinking, liveView, bus, event instanceof StreamEvent.Token);
-            }
-            switch (event) {
-                case StreamEvent.Thinking th -> onThinking(thinking, null, th.text(), liveView, bus);
-                case StreamEvent.Token t -> {
-                    cumulativeText.append(t.text());
-                    if (!pendingAppended[0]) {
-                        // First token: drop the typing bubble and append
-                        // the streaming bot-reply placeholder BELOW any task
-                        // cards that arrived during the thinking phase.
-                        // Kept as the catch-up frame: a client that opens the
-                        // page mid-turn has no bubble, and every token after
-                        // it is a REPLACE that would land nowhere.
-                        sessionStreams.rememberBubble(channelId,
-                                publishPatch(bus, liveView.streamFirstToken(pendingId, typingId)));
-                        pendingAppended[0] = true;
-                    }
-                    // Token patches carry the CUMULATIVE text, so the newest
-                    // one alone restores the full reply so far.
-                    sessionStreams.rememberText(channelId,
-                            publishPatch(bus, liveView.streamToken(pendingId, cumulativeText.toString())));
-                }
-                case StreamEvent.ApprovalRequested ar -> {
-                    // Durable already (request message / store entry written
-                    // first); this is the live mirror: push the card into the
-                    // open stream. Bubbled when an origin session rode along.
-                    String argsJson;
-                    try {
-                        argsJson = ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER
-                                .writerWithDefaultPrettyPrinter().writeValueAsString(ar.arguments());
-                    } catch (Exception e) {
-                        argsJson = String.valueOf(ar.arguments());
-                    }
-                    var card = ai.mindconnect.chatui.ui.component.ApprovalCardComponent.approvalCard(
-                            sessionId, ar.callId(), ar.toolName(), argsJson,
-                            ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT
-                                    .format(java.time.Instant.now()));
-                    publishPatch(bus, liveView.appendApprovalCard(card));
-                }
-                case StreamEvent.ToolCallStarted s -> {
-                    // The model's round is on the record now: the message that carries
-                    // this call carries the thought before it too — also one that led to
-                    // text first. History renders that thought, so a joiner must not get
-                    // the live card on top of it.
-                    sessionStreams.forgetCardsStartingWith(channelId, "task-think-" + sessionId.value() + "-");
-                    startToolCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                            null, s.toolName(), s.arguments());
-                }
-                case StreamEvent.ToolCallResult r ->
-                    finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
-                            null, r.toolName(), r.result(), r.durationMs(), false);
-                case StreamEvent.ToolCallFailed f ->
-                    finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
-                            null, f.toolName(), f.error(), f.durationMs(), true);
-                case StreamEvent.SubAgentStarted s ->
-                    startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                            null, s.taskId(), s.agentName(), s.subSessionId(), s.input());
-                case StreamEvent.SubAgentDone sd ->
-                    finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                            sd.taskId(), sd.agentName(), sd.finalText(), null);
-                case StreamEvent.SubAgentError sErr ->
-                    finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                            sErr.taskId(), sErr.agentName(), null, sErr.error());
-                case StreamEvent.SubAgentEvent wrapper ->
-                    handleSubAgentInner(wrapper, liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                            thinkings, sessionId);
-                // Reviewers run AFTER the answer is already on screen. Without
-                // a card the chat just sits there, which is what made a
-                // finished-looking turn feel stuck.
-                case StreamEvent.Reviewing rv -> {
-                    String node = reviewerNodeId(sessionId, turnKey, rv.reviewerName());
-                    publishPatch(bus, appendCard(liveView, null,
-                            ai.mindconnect.chatui.ui.component.TaskCardComponent
-                                    .runningReviewer(node, rv.reviewerName())));
-                    openTaskNodeId[0] = node;
-                }
-                case StreamEvent.ReviewerDecision rd -> {
-                    var verdictCard = ai.mindconnect.chatui.ui.component.TaskCardComponent.doneReviewer(
-                            reviewerNodeId(sessionId, turnKey, rd.reviewerName()),
-                            rd.reviewerName(), String.valueOf(rd.verdict()),
-                            reviewerDetail.get(LAST_REVISION));
-                    publishPatch(bus, liveView.streamTaskUpdate(verdictCard));
-                    // Kept for after the turn: streamDone rebuilds the list
-                    // from persisted history, and a reviewer run is not part
-                    // of it, so the verdict would vanish the moment it
-                    // arrived. Re-appending is not persistence — a reload
-                    // still loses it — but the reader gets to see it.
-                    reviewerVerdicts.add(verdictCard);
-                }
-                // A reviewer that rewrote or blocked the answer says why; the
-                // verdict card is where that belongs, so keep it for the
-                // decision event that follows.
-                case StreamEvent.ResponseRevised rev ->
-                    reviewerDetail.put(LAST_REVISION, rev.reason());
-                default -> {}
-            }
-            logEvent(event, agent.name());
-        };
         // One event at a time. Parallel sub-agents (run_agents) deliver their events from
         // several task-queue workers at once, and the live state above — the thinking
         // cards, the open tasks, the reply so far — lives in plain maps and fields: a
         // lost entry left a card running for good, and iterating while another thread
         // wrote threw inside the handler.
         final Object liveLock = new Object();
-        ChatTurnHandle turn = turnStarter.apply(event -> {
+        Consumer<TurnEvent> onEvent = event -> {
             synchronized (liveLock) {
-                onEvent.accept(event);
+                // A thought ends with whatever it led to: anything that is not
+                // more thinking closes the open card of this scope.
+                LiveThinking thinking = thinkingFor(thinkings, sessionId, null);
+                if (!(event instanceof TurnEvent.ReasoningDelta)) {
+                    closeThinking(thinking, liveView, bus, event instanceof TurnEvent.TextDelta);
+                }
+                switch (event) {
+                    case TurnEvent.ReasoningDelta reasoning ->
+                        onThinking(thinking, null, reasoning.text(), liveView, bus);
+                    case TurnEvent.TextDelta text -> {
+                        cumulativeText.append(text.text());
+                        if (!pendingAppended[0]) {
+                            // First token: drop the typing bubble and append
+                            // the streaming bot-reply placeholder BELOW any task
+                            // cards that arrived during the thinking phase.
+                            // Kept as the catch-up frame: a client that opens the
+                            // page mid-turn has no bubble, and every token after
+                            // it is a REPLACE that would land nowhere.
+                            sessionStreams.rememberBubble(channelId,
+                                    publishPatch(bus, liveView.streamFirstToken(pendingId, typingId)));
+                            pendingAppended[0] = true;
+                        }
+                        // Token patches carry the CUMULATIVE text, so the newest
+                        // one alone restores the full reply so far.
+                        sessionStreams.rememberText(channelId,
+                                publishPatch(bus, liveView.streamToken(pendingId, cumulativeText.toString())));
+                    }
+                    case TurnEvent.MessageAppended appended -> {
+                        if (appended.message().type() == TurnMessage.Type.TOOL_CALL) {
+                            // The model's round is on the record now: the message that carries
+                            // this call carries the thought before it too — also one that led to
+                            // text first. History renders that thought, so a joiner must not get
+                            // the live card on top of it.
+                            sessionStreams.forgetCardsStartingWith(channelId,
+                                    "task-think-" + sessionId.value() + "-");
+                        }
+                        drawToolMessage(appended.message(), null, liveView, liveTasks, openTaskNodeId, bus,
+                                taskToSession);
+                    }
+                    default -> { }
+                }
             }
-        });
+        };
+        java.util.function.BiConsumer<Turn, TurnEvent> onSubAgentEvent = (subAgent, event) -> {
+            synchronized (liveLock) {
+                closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
+                // The card helpers know a sub-agent's run by a UUID; the turn's id gives one.
+                java.util.UUID taskId = java.util.UUID.nameUUIDFromBytes(
+                        subAgent.id().value().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                String agentName = subAgent.agent().name();
+                // Every sub-agent is shown one level below the turn: the events do not say how deep it is.
+                if (!liveTasks.containsKey("sub-" + taskId)) {
+                    log.info("sub-agent started: {}", agentName);
+                    startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
+                            null, taskId, agentName, SessionId.of(subAgent.sessionId().value()), "");
+                }
+                // The sub-agent's own reasoning, in its nested list — same rule as
+                // at the top level: anything but more thinking closes its card.
+                String scope = scopeOf(taskId, taskToSession);
+                LiveThinking thinking = thinkingFor(thinkings, sessionId, scope);
+                if (!(event instanceof TurnEvent.ReasoningDelta)) {
+                    closeThinking(thinking, liveView, bus, false);
+                }
+                switch (event) {
+                    case TurnEvent.ReasoningDelta reasoning ->
+                        onThinking(thinking, scope, reasoning.text(), liveView, bus);
+                    case TurnEvent.MessageAppended appended ->
+                        drawToolMessage(appended.message(), taskId, liveView, liveTasks, openTaskNodeId, bus,
+                                taskToSession);
+                    case TurnEvent.TurnEnded ended
+                            when ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS -> {
+                        log.info("sub-agent done: {}", agentName);
+                        finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession, taskId,
+                                agentName, ended.outcome().text() == null ? "" : ended.outcome().text(), null);
+                    }
+                    default -> { }
+                }
+            }
+        };
+        Consumer<List<Interruption>> asked = interruptions -> {
+            synchronized (liveLock) {
+                closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
+                // Durable already; this is the live mirror: push the card into the
+                // open stream, one per tool call that waits for an approval.
+                for (Interruption interruption : interruptions) {
+                    if (!Interruption.TOOL_APPROVAL.equals(interruption.kind())) continue;
+                    String argsJson;
+                    try {
+                        argsJson = ai.mindconnect.chatui.ui.SessionUiCommons.MAPPER
+                                .writerWithDefaultPrettyPrinter()
+                                .writeValueAsString(interruption.call().arguments());
+                    } catch (Exception e) {
+                        argsJson = String.valueOf(interruption.call().arguments());
+                    }
+                    var card = ai.mindconnect.chatui.ui.component.ApprovalCardComponent.approvalCard(
+                            sessionId, interruption.call().callId(), interruption.call().toolName(), argsJson,
+                            ai.mindconnect.chatui.ui.SessionUiCommons.DT_FMT
+                                    .format(java.time.Instant.now()));
+                    publishPatch(bus, liveView.appendApprovalCard(card));
+                }
+            }
+        };
+        ChatTurnHandle turn = turnStarter.apply(ChatTurnListener.of(onEvent, onSubAgentEvent, asked));
 
         // 3. When the turn completes, replace placeholders with persisted
         //    final bot message + collapsed activity, then send the done event.
@@ -1903,11 +1899,6 @@ public class ChatUiController {
                 // (assistant message, historic task cards, updated tokens).
                 ChatPage finalView = buildChatPage(session, agent);
                 publishPatch(bus, finalView.streamDone(typingId));
-                // After the rebuild, or they would be wiped by it. They sit
-                // below the answer, which is also when they ran.
-                for (var verdict : reviewerVerdicts) {
-                    publishPatch(bus, finalView.streamTaskStart(verdict));
-                }
 
                 // "done" ends the TURN, not the stream: subscribers stay
                 // attached and are still there when the next turn — possibly
@@ -2083,60 +2074,29 @@ public class ChatUiController {
         }
     }
 
-    /**
-     * Unwraps a (possibly multiply-nested) {@link StreamEvent.SubAgentEvent}
-     * and routes the innermost real event to the same card helpers used for
-     * top-level events. The key difference from the flat-indent past: the
-     * <em>immediate</em> parent sub-agent — the taskId of the innermost
-     * wrapper — becomes the card's {@code parentTaskId}, so the card is
-     * appended into that sub-agent's nested child list
-     * ({@code subtasks-{taskId}}) and the DOM hierarchy mirrors the agent
-     * call hierarchy.
-     */
-    private void handleSubAgentInner(StreamEvent.SubAgentEvent topWrapper,
-                                      ChatPage liveView,
-                                      java.util.LinkedHashMap<String, LiveTask> liveTasks,
-                                      String[] openTaskNodeId,
-                                      ai.mindconnect.chatui.service.StreamBus bus,
-                                      java.util.Map<java.util.UUID, SessionId> taskToSession,
-                                      java.util.Map<String, LiveThinking> thinkings,
-                                      SessionId sessionId) {
-        // Walk to the innermost real event; the last wrapper taskId is the
-        // immediate parent sub-agent that owns the event.
-        java.util.UUID parentTaskId = topWrapper.taskId();
-        StreamEvent inner = topWrapper.inner();
-        while (inner instanceof StreamEvent.SubAgentEvent next) {
-            parentTaskId = next.taskId();
-            inner = next.inner();
-        }
-
-        // The sub-agent's own reasoning, in its nested list — same rule as
-        // at the top level: anything but more thinking closes its card.
-        String scope = scopeOf(parentTaskId, taskToSession);
-        LiveThinking thinking = thinkingFor(thinkings, sessionId, scope);
-        if (!(inner instanceof StreamEvent.Thinking)) closeThinking(thinking, liveView, bus, false);
-
-        switch (inner) {
-            case StreamEvent.Thinking th -> onThinking(thinking, scope, th.text(), liveView, bus);
-            case StreamEvent.ToolCallStarted s ->
+    /** A tool call or its result on the record, as its live card; any other message draws nothing. */
+    private void drawToolMessage(TurnMessage message, java.util.UUID parentTaskId,
+                                 ChatPage liveView,
+                                 java.util.LinkedHashMap<String, LiveTask> liveTasks,
+                                 String[] openTaskNodeId,
+                                 ai.mindconnect.chatui.service.StreamBus bus,
+                                 java.util.Map<java.util.UUID, SessionId> taskToSession) {
+        switch (message.type()) {
+            // One card per call; a message with several calls announces the first,
+            // the rest show with their results.
+            case TOOL_CALL -> message.toolCalls().stream().findFirst().ifPresent(call -> {
+                log.info("tool started: {}", call.name());
                 startToolCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                        parentTaskId, s.toolName(), s.arguments());
-            case StreamEvent.ToolCallResult r ->
+                        parentTaskId, call.name(), call.arguments());
+            });
+            case TOOL_RESULT -> {
+                String toolName = String.valueOf(message.metadata().getOrDefault("toolName", "tool"));
+                boolean failed = Boolean.TRUE.equals(message.metadata().get("failed"));
+                log.info("tool {}: {}", failed ? "failed" : "done", toolName);
                 finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
-                        parentTaskId, r.toolName(), r.result(), r.durationMs(), false);
-            case StreamEvent.ToolCallFailed f ->
-                finishToolCard(liveView, liveTasks, openTaskNodeId, bus,
-                        parentTaskId, f.toolName(), f.error(), f.durationMs(), true);
-            case StreamEvent.SubAgentStarted s ->
-                startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                        parentTaskId, s.taskId(), s.agentName(), s.subSessionId(), s.input());
-            case StreamEvent.SubAgentDone sd ->
-                finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                        sd.taskId(), sd.agentName(), sd.finalText(), null);
-            case StreamEvent.SubAgentError sErr ->
-                finishSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                        sErr.taskId(), sErr.agentName(), null, sErr.error());
-            default -> {}
+                        parentTaskId, toolName, message.text(), 0, failed);
+            }
+            default -> { }
         }
     }
 
@@ -2157,19 +2117,6 @@ public class ChatUiController {
         // Fall back to the taskId itself if the mapping is somehow missing —
         // still consistent within this live stream.
         return sid != null ? sid.value() : parentTaskId.toString();
-    }
-
-    /** Marker key under which a pending revision reason is parked. */
-    private static final String LAST_REVISION = "__revision__";
-
-    /**
-     * One node per reviewer and session, so the running card and the verdict
-     * card are the same node — the verdict REPLACEs the "reviewing…" header
-     * instead of appending a second entry.
-     */
-    private static String reviewerNodeId(SessionId sessionId, String turnKey, String reviewerName) {
-        return "task-review-" + sessionId.value() + "-" + turnKey + "-"
-                + reviewerName.replaceAll("[^A-Za-z0-9_-]", "-");
     }
 
     /**
@@ -2384,66 +2331,6 @@ public class ChatUiController {
         } catch (Exception e) {
             log.warn("Failed to load working memory for session {}: {}", sessionId, e.getMessage());
             return null;
-        }
-    }
-
-    private void logEvent(StreamEvent event, String agentName) {
-        streamLogger(agentName).accept(event);
-    }
-
-    private Consumer<StreamEvent> streamLogger(String agentName) {
-        return event -> {
-            switch (event) {
-                case StreamEvent.AskingLlm a ->
-                    log.info("asking llm");
-                case StreamEvent.ToolCallStarted s ->
-                    log.info("tool started: {}", s.toolName());
-                case StreamEvent.ToolCallResult r ->
-                    log.info("tool done: {} ({}ms)", r.toolName(), r.durationMs());
-                case StreamEvent.ToolCallFailed f ->
-                    log.warn("tool failed: {} ({}ms): {}", f.toolName(), f.durationMs(), f.error());
-                case StreamEvent.Reviewing rv ->
-                    log.info("reviewing: {}", rv.reviewerName());
-                case StreamEvent.ReviewerDecision rd ->
-                    log.info("reviewer decision: {} → {}", rd.reviewerName(), rd.verdict());
-                case StreamEvent.ResponseRevised rev ->
-                    log.info("response revised: {} blocked={}", rev.reason(), rev.blocked());
-                case StreamEvent.SubAgentStarted s ->
-                    log.info("sub-agent started: {} (depth {})", s.agentName(), s.depth());
-                case StreamEvent.SubAgentEvent se ->
-                    logSubEvent(se, 1);
-                case StreamEvent.SubAgentDone sd ->
-                    log.info("sub-agent done: {}", sd.agentName());
-                case StreamEvent.SubAgentError sErr ->
-                    log.warn("sub-agent error: {}: {}", sErr.agentName(), sErr.error());
-                default -> {}
-            }
-        };
-    }
-
-    private void logSubEvent(StreamEvent.SubAgentEvent wrapper, int depth) {
-        StreamEvent inner = wrapper.inner();
-        while (inner instanceof StreamEvent.SubAgentEvent next) {
-            inner = next.inner();
-            depth++;
-        }
-        String prefix = "  ".repeat(depth) + "↳ ";
-        switch (inner) {
-            case StreamEvent.AskingLlm a ->
-                log.info("{}asking llm", prefix);
-            case StreamEvent.ToolCallStarted s ->
-                log.info("{}tool started: {}", prefix, s.toolName());
-            case StreamEvent.ToolCallResult r ->
-                log.info("{}tool done: {} ({}ms)", prefix, r.toolName(), r.durationMs());
-            case StreamEvent.ToolCallFailed f ->
-                log.warn("{}tool failed: {} ({}ms): {}", prefix, f.toolName(), f.durationMs(), f.error());
-            case StreamEvent.SubAgentStarted s ->
-                log.info("{}sub-agent: {} (depth {})", prefix, s.agentName(), s.depth());
-            case StreamEvent.SubAgentDone sd ->
-                log.info("{}sub-agent done: {}", prefix, sd.agentName());
-            case StreamEvent.SubAgentError sErr ->
-                log.warn("{}sub-agent error: {}: {}", prefix, sErr.agentName(), sErr.error());
-            default -> {}
         }
     }
 }

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 
@@ -30,7 +31,6 @@ import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.chat.stream.TurnResult;
 import ai.mindconnect.agent.chat.stream.TurnStatus;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
@@ -80,27 +80,29 @@ public final class RuntimeChatService {
         this.earlier = earlier;
     }
 
-    public ChatTurnHandle submitChat(SessionId sessionId, String text, Consumer<StreamEvent> events) {
-        return submitChat(sessionId, ai.mindconnect.message.domain.ContentPart.text(text), events);
-    }
-
-    public ChatTurnHandle submitChat(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts,
-                                     Consumer<StreamEvent> events) {
-        return submit(sessionId, parts.stream().map(RuntimeChatService::part).toList(), events);
+    public ChatTurnHandle submitChat(SessionId sessionId, String text, ChatTurnListener listener) {
+        return submit(sessionId, List.of(new ContentPart.Text(text)), listener);
     }
 
     /** Submits a message whose parts are the runtime's own — text, or media a history handed back. */
-    public ChatTurnHandle submit(SessionId sessionId, List<ContentPart> parts, Consumer<StreamEvent> events) {
+    public ChatTurnHandle submit(SessionId sessionId, List<ContentPart> parts, ChatTurnListener listener) {
         Started started = start(sessionId, parts);
         CompletableFuture<String> answer = new CompletableFuture<>();
-        StreamEventTranslator page = new StreamEventTranslator(started.turnId(), turns, events, answer);
         TurnFrameTranslator stream = new TurnFrameTranslator(started.turnId(), turns, started.stream());
+        Map<String, Optional<Turn>> subAgents = new ConcurrentHashMap<>();
         return following(started, answer, event -> {
             stream.onEvent(event);
-            page.onEvent(event);
+            if (started.turnId().value().equals(event.requestId())) {
+                listener.onEvent(event);
+                answerOf(event, started.turnId()).ifPresent(answer::complete);
+            } else {
+                // The events of a sub-agent's turn arrive on its caller's turn.
+                subAgents.computeIfAbsent(event.requestId(), id -> turns.find(TurnId.of(id)))
+                        .ifPresent(subAgent -> listener.onSubAgentEvent(subAgent, event));
+            }
         }, interruptions -> {
             stream.interrupted(interruptions);
-            page.interrupted(interruptions);
+            listener.asked(interruptions);
         }, false);
     }
 

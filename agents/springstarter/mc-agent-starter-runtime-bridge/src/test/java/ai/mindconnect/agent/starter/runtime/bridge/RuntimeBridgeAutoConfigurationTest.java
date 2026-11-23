@@ -31,7 +31,9 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
@@ -51,7 +53,6 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
@@ -269,6 +270,26 @@ class RuntimeBridgeAutoConfigurationTest {
         };
     }
 
+    /** What a chat's turn told its listener. */
+    private static final class Heard implements ChatTurnListener {
+
+        private final List<TurnEvent> events = new CopyOnWriteArrayList<>();
+        private final List<Interruption> asked = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void onEvent(TurnEvent event) {
+            events.add(event);
+        }
+
+        @Override
+        public void onSubAgentEvent(Turn subAgent, TurnEvent event) { }
+
+        @Override
+        public void asked(List<Interruption> interruptions) {
+            asked.addAll(interruptions);
+        }
+    }
+
     /** A chat page's session, not yet kept anywhere. */
     private static AgentSession chatSession() {
         return new AgentSession(ai.mindconnect.agent.SessionId.random(), LIBRARIAN.id(),
@@ -287,15 +308,17 @@ class RuntimeBridgeAutoConfigurationTest {
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     keptInTheRuntimesStore(context, chat);
-                    List<StreamEvent> streamed = new CopyOnWriteArrayList<>();
+                    Heard heard = new Heard();
 
                     ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
-                            .submitChat(chat.id(), "Do we have owls?", streamed::add);
+                            .submitChat(chat.id(), "Do we have owls?", heard);
 
                     assertThat(turn.result().get(5, TimeUnit.SECONDS)).isEqualTo("Found it.");
-                    assertThat(streamed).filteredOn(event -> !(event instanceof StreamEvent.AskingLlm))
-                            .extracting(event -> event.getClass().getSimpleName())
-                            .containsExactly("ToolCallStarted", "ToolCallResult", "Token", "TurnUsage", "Done");
+                    assertThat(heard.events).filteredOn(TurnEvent.MessageAppended.class::isInstance)
+                            .extracting(event -> ((TurnEvent.MessageAppended) event).message().type())
+                            .contains(TurnMessage.Type.TOOL_CALL, TurnMessage.Type.TOOL_RESULT);
+                    assertThat(heard.events).hasAtLeastOneElementOfType(TurnEvent.TextDelta.class)
+                            .last().isInstanceOf(TurnEvent.TurnEnded.class);
                     // Written into the conversation the chat page reads its history from.
                     assertThat(context.getBean(MessageRepository.class)
                             .findByConversation(chat.conversationId(), new PageRequest(0, 10)))
@@ -315,14 +338,12 @@ class RuntimeBridgeAutoConfigurationTest {
                 .run(context -> {
                     keptInTheRuntimesStore(context, chat);
                     RuntimeChatService chatService = context.getBean(RuntimeChatService.class);
-                    List<StreamEvent> streamed = new CopyOnWriteArrayList<>();
-                    ChatTurnHandle turn = chatService.submitChat(chat.id(), "Order the owl book.", streamed::add);
-                    for (int i = 0; i < 200 && streamed.stream()
-                            .noneMatch(StreamEvent.ApprovalRequested.class::isInstance); i++) {
+                    Heard heard = new Heard();
+                    ChatTurnHandle turn = chatService.submitChat(chat.id(), "Order the owl book.", heard);
+                    for (int i = 0; i < 200 && heard.asked.isEmpty(); i++) {
                         Thread.sleep(25);
                     }
-                    assertThat(streamed).filteredOn(StreamEvent.ApprovalRequested.class::isInstance)
-                            .extracting(event -> ((StreamEvent.ApprovalRequested) event).toolName())
+                    assertThat(heard.asked).extracting(asked -> asked.call().toolName())
                             .containsExactly("order_book");
                     assertThat(turn.result()).isNotDone();
                     // The card is kept where the page draws it from after a reload.
@@ -334,7 +355,7 @@ class RuntimeBridgeAutoConfigurationTest {
                     assertThat(chatService.answerApproval(chat.id(), "c1", true, ApprovalScope.ONCE)).isTrue();
 
                     assertThat(turn.result().get(5, TimeUnit.SECONDS)).isEqualTo("Found it.");
-                    assertThat(streamed).last().isInstanceOf(StreamEvent.Done.class);
+                    assertThat(heard.events).last().isInstanceOf(TurnEvent.TurnEnded.class);
                     verify(openApprovals).delete(chat.id(), "c1");
                 });
     }
@@ -352,7 +373,7 @@ class RuntimeBridgeAutoConfigurationTest {
         application(unreachable, agents, mock(LlmCallTraceRepository.class)).run(context -> {
             keptInTheRuntimesStore(context, chat);
             ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
-                    .submitChat(chat.id(), "Anyone there?", event -> { });
+                    .submitChat(chat.id(), "Anyone there?", ChatTurnListener.none());
 
             assertThatThrownBy(() -> turn.result().get(5, TimeUnit.SECONDS))
                     .isInstanceOf(ExecutionException.class).hasCauseInstanceOf(IllegalStateException.class);
