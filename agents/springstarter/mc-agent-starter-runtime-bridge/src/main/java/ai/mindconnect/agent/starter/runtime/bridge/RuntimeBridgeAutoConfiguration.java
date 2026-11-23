@@ -18,6 +18,8 @@ import ai.mindconnect.agent.runtime.capabilities.permission.PermissionRule;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionRuleSource;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillResolver;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
@@ -70,16 +72,26 @@ public class RuntimeBridgeAutoConfiguration {
         };
     }
 
+    /** The runtime's sessions in its own repository, its messages in the application's, the title carried over. */
     @Bean
     @ConditionalOnMissingBean
-    SummaryStore summaryStore(ConversationSummaryRepository summaries, MessageRepository messages) {
-        return new RepositorySummaryStore(summaries, messages);
+    SessionStore sessionStore(SessionRepository sessions, MessageRepository messages,
+                              AgentSessionRepository chatSessions) {
+        return new ChatSessionStore(new RepositorySessionStore(sessions, messages), chatSessions);
     }
 
     @Bean
     @ConditionalOnMissingBean
-    LlmCallTraceListener llmCallTraceListener(LlmCallTraceRepository traces, ObjectProvider<TurnService> turns) {
-        return new RepositoryLlmCallTraceListener(traces, turns::getObject);
+    SummaryStore summaryStore(ConversationSummaryRepository summaries, MessageRepository messages,
+                              ObjectProvider<SessionStore> sessions) {
+        return new RepositorySummaryStore(summaries, messages, sessions::getObject);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    LlmCallTraceListener llmCallTraceListener(LlmCallTraceRepository traces, ObjectProvider<TurnService> turns,
+                                              ObjectProvider<SessionStore> sessions) {
+        return new RepositoryLlmCallTraceListener(traces, turns::getObject, sessions::getObject);
     }
 
     /** After the runtime's own services: it calls them. */

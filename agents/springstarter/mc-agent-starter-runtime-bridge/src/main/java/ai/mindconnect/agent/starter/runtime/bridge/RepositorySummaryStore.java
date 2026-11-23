@@ -2,8 +2,11 @@ package ai.mindconnect.agent.starter.runtime.bridge;
 
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
+import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.runtime.capabilities.memory.ConversationSummary;
 import ai.mindconnect.agent.runtime.capabilities.memory.SummaryStore;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
@@ -24,15 +27,24 @@ final class RepositorySummaryStore implements SummaryStore {
 
     private final ConversationSummaryRepository summaries;
     private final MessageRepository messages;
+    private final Supplier<SessionStore> sessions;
 
-    RepositorySummaryStore(ConversationSummaryRepository summaries, MessageRepository messages) {
+    RepositorySummaryStore(ConversationSummaryRepository summaries, MessageRepository messages,
+                           Supplier<SessionStore> sessions) {
         this.summaries = summaries;
         this.messages = messages;
+        this.sessions = sessions;
+    }
+
+    /** The conversation the session's messages are in, which need not be the one under its own id. */
+    private ConversationId conversationOf(SessionId sessionId) {
+        return sessions.get().find(sessionId).map(RepositorySessionStore::conversationOf)
+                .orElseGet(() -> ConversationId.of(sessionId.value()));
     }
 
     @Override
     public Optional<ConversationSummary> find(SessionId sessionId) {
-        ConversationId conversation = ConversationId.of(sessionId.value());
+        ConversationId conversation = conversationOf(sessionId);
         return summaries.findByConversation(conversation).stream()
                 .max(Comparator.comparingInt(
                         ai.mindconnect.agent.runtime.memory.domain.ConversationSummary::toSequenceNum))
@@ -45,7 +57,7 @@ final class RepositorySummaryStore implements SummaryStore {
     /** The new summary contains the one before, so it takes its place. */
     @Override
     public void save(SessionId sessionId, ConversationSummary summary) {
-        ConversationId conversation = ConversationId.of(sessionId.value());
+        ConversationId conversation = conversationOf(sessionId);
         int through = messages.findById(conversation, MessageId.of(summary.throughMessageId()))
                 .map(Message::sequenceNum)
                 .orElseThrow(() -> new IllegalArgumentException(

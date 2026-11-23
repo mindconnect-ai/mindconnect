@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.loop.domain.ContentPart;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
@@ -22,6 +23,7 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
@@ -75,11 +77,12 @@ public final class RuntimeChatService {
                                      Consumer<StreamEvent> events) {
         AgentSession chat = chatSessions.findById(sessionId).orElseThrow(() ->
                 new IllegalArgumentException("There is no session " + sessionId.value()));
-        Session session = known(chat);
-        // The agent as it is now goes with every turn: a definition edited since the session was opened holds.
+        // The agent as it is now, for this turn and as the session's: a definition edited since the
+        // session was opened holds, and what works for the session between turns has a model to ask.
+        AgentDefinition agent = mapper.toRuntime(agents.resolve(chat));
+        Session session = known(chat, agent);
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
-                parts.stream().map(RuntimeChatService::part).toList(),
-                mapper.toRuntime(agents.resolve(chat))));
+                parts.stream().map(RuntimeChatService::part).toList(), agent));
         underway.put(sessionId.value(), turnId);
         CompletableFuture<String> answer = new CompletableFuture<>();
         StreamEventTranslator translator = new StreamEventTranslator(turnId, turns, events, answer);
@@ -138,7 +141,7 @@ public final class RuntimeChatService {
     }
 
     /** The chat's session as the runtime knows it — created on its first turn, its directories kept current. */
-    private Session known(AgentSession chat) {
+    private Session known(AgentSession chat, AgentDefinition agent) {
         ai.mindconnect.agent.runtime.api.domain.SessionId id =
                 ai.mindconnect.agent.runtime.api.domain.SessionId.of(chat.id().value());
         Map<String, Object> metadata = new HashMap<>();
@@ -147,14 +150,18 @@ public final class RuntimeChatService {
             metadata.put(RegistryToolResolver.WORKING_DIRECTORY, chat.workingDir());
         }
         metadata.put(RegistryToolResolver.ADDITIONAL_DIRECTORIES, chat.additionalDirs());
+        if (chat.title() != null && !chat.title().isBlank()) {
+            // A chat that has a name is given no other.
+            metadata.put(SessionTitlePlugin.TITLE, chat.title());
+        }
         if (sessions.find(id).isEmpty()) {
             sessions.create(new Session(id, UserId.of(chat.userId().value()),
                     chat.parentSessionId() == null ? null
                             : ai.mindconnect.agent.runtime.api.domain.SessionId.of(chat.parentSessionId().value()),
-                    null, metadata, chat.startedAt() == null ? Instant.now() : chat.startedAt()));
+                    agent, metadata, chat.startedAt() == null ? Instant.now() : chat.startedAt()));
         }
         return sessions.update(id, session -> {
-            Session current = session;
+            Session current = session.withAgent(agent);
             for (Map.Entry<String, Object> entry : metadata.entrySet()) {
                 current = current.withMetadata(entry.getKey(), entry.getValue());
             }
