@@ -1,9 +1,12 @@
 package ai.mindconnect.agent.runtime.capabilities.title;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
+import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.LlmAnswer;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.runtime.api.domain.ModelRequest;
@@ -24,8 +27,11 @@ final class SessionTitleWorker implements BackgroundWorker {
     static final String SESSION_ID = "sessionId";
     static final String TITLE = "title";
     static final String TITLE_FOUND = "session.title";
-    private static final String INSTRUCTIONS = "Give the conversation a title of at most six words, in the "
-            + "language it is held in. Answer with the title alone, without quotes or a full stop.";
+    private static final String INSTRUCTIONS = "You name conversations. You are shown the start of one. Do not "
+            + "answer it and do not continue it: give it a title of at most six words, in the language it is "
+            + "held in. Answer with the title alone, without quotes or a full stop.";
+    /** A model that answers the conversation instead of naming it must not make a paragraph the title. */
+    private static final int LONGEST_TITLE = 80;
 
     private final Supplier<SessionStore> sessions;
     private final Supplier<ModelGateway> model;
@@ -51,14 +57,19 @@ final class SessionTitleWorker implements BackgroundWorker {
         if (session == null || session.metadata().containsKey(TITLE)) {
             return;
         }
-        List<TurnMessage> exchange = sessions.get().messages(sessionId).stream()
+        // Shown as one text and not as the messages themselves: handed the exchange as a conversation,
+        // a model goes on with it instead of naming it.
+        String exchange = sessions.get().messages(sessionId).stream()
                 .filter(message -> message.type() == TurnMessage.Type.USER
                         || message.type() == TurnMessage.Type.ASSISTANT)
                 .limit(2)
-                .toList();
+                .map(message -> message.type().name().toLowerCase(Locale.ROOT) + ": " + message.text())
+                .collect(Collectors.joining("\n\n", "The conversation starts like this:\n\n", ""));
         LlmAnswer answer = model.get().ask(new ModelRequest(TurnId.of(NAME + "-" + sessionId.value()),
-                session.agent() == null ? ModelSettings.NONE : session.agent().modelSettings(), INSTRUCTIONS, exchange, List.of()), event -> { });
-        String title = answer.messages().stream().map(TurnMessage::text).findFirst().orElse("").strip();
+                session.agent() == null ? ModelSettings.NONE : session.agent().modelSettings(), INSTRUCTIONS,
+                List.of(TurnMessage.user(List.of(new ContentPart.Text(exchange)))), List.of()), event -> { });
+        String found = answer.messages().stream().map(TurnMessage::text).findFirst().orElse("").strip();
+        String title = found.length() <= LONGEST_TITLE ? found : found.substring(0, LONGEST_TITLE).strip() + "…";
         if (title.isEmpty()) {
             return;
         }
