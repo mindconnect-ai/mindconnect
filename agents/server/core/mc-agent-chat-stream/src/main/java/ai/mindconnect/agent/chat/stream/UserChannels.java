@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service.stream;
+package ai.mindconnect.agent.chat.stream;
 
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.channel.Channel;

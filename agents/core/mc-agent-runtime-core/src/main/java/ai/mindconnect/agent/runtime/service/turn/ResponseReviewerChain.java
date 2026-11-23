@@ -3,7 +3,7 @@ package ai.mindconnect.agent.runtime.service.turn;
 import ai.mindconnect.message.domain.MessageId;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.Message;

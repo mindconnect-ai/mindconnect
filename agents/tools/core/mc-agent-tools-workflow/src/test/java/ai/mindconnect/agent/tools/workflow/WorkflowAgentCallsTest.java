@@ -4,10 +4,10 @@ import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
-import ai.mindconnect.agent.runtime.domain.TurnResult;
-import ai.mindconnect.agent.runtime.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.chat.stream.ToolApproval;
+import ai.mindconnect.agent.chat.stream.TurnResult;
+import ai.mindconnect.agent.chat.stream.TurnStatus;
+import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.tool.ToolCallScope;
 import org.junit.jupiter.api.Test;
 

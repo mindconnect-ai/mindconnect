@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.port.out;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.chat.stream.ToolApproval;
 
 import java.util.List;
 import java.util.Optional;

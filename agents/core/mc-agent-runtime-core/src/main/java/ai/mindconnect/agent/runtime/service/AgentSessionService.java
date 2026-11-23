@@ -25,8 +25,8 @@ import ai.mindconnect.message.domain.Participant;
 import ai.mindconnect.message.port.in.ConversationManager;
 
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
-import ai.mindconnect.agent.runtime.service.stream.UserEvent;
+import ai.mindconnect.agent.chat.stream.UserChannels;
+import ai.mindconnect.agent.chat.stream.UserEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -117,7 +117,7 @@ public class AgentSessionService {
                                 ConversationSummaryRepository summaryRepository,
                                 TodoListRepository todoListRepository,
                                 ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository approvalStore,
-                                ai.mindconnect.agent.runtime.service.stream.UserChannels userChannels,
+                                ai.mindconnect.agent.chat.stream.UserChannels userChannels,
                                 WorkingDirPolicy workingDirPolicy,
                                 UserHome userHome,
                                 LlmCallTraceRepository traceRepository) {

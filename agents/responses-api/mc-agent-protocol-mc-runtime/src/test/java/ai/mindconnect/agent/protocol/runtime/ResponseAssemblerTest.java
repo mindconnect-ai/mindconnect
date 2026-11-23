@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.protocol.runtime;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseStatus;
 import ai.mindconnect.agent.protocol.event.ResponseEvent;

@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.domain;
+package ai.mindconnect.agent.chat.stream;
 
 /**
  * Lifecycle state of a single chat turn, as one handle sees it.

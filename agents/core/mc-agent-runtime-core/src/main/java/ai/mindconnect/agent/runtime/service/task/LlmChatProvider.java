@@ -4,7 +4,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.trace.domain.LlmCallTrace;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.trace.domain.TraceContext;
 import ai.mindconnect.agent.runtime.memory.port.in.MemoryStrategy;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;

@@ -22,16 +22,16 @@ import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.runtime.domain.TurnResult;
-import ai.mindconnect.agent.runtime.domain.TurnStatus;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
+import ai.mindconnect.agent.chat.stream.TurnResult;
+import ai.mindconnect.agent.chat.stream.TurnStatus;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
-import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.chat.stream.ApprovalScope;
+import ai.mindconnect.agent.chat.stream.ToolApproval;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.message.domain.ChatTurnId;
 
@@ -143,7 +143,7 @@ public final class RuntimeChatService {
      * since is replayed, then it goes on live, across turns.
      */
     public AgentChatService.Attachment attach(SessionId sessionId, long afterSeq,
-                                              Consumer<Channel.Event<ai.mindconnect.agent.runtime.service.stream.SessionEvent>> consumer) {
+                                              Consumer<Channel.Event<ai.mindconnect.agent.chat.stream.SessionEvent>> consumer) {
         AgentSession chat = chatSessions.findById(sessionId).orElseThrow(() ->
                 new IllegalArgumentException("There is no session " + sessionId.value()));
         return streams.attach(chat, afterSeq,

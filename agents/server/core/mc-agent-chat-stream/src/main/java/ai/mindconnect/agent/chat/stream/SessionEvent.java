@@ -1,7 +1,7 @@
-package ai.mindconnect.agent.runtime.service.stream;
+package ai.mindconnect.agent.chat.stream;
 
 import ai.mindconnect.message.domain.ChatTurnId;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 
 
 /**

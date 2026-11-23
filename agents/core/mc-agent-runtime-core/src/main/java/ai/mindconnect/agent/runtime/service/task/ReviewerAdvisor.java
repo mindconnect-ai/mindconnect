@@ -2,7 +2,7 @@ package ai.mindconnect.agent.runtime.service.task;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.runtime.service.round.AgentRoundAdvisor;
 import ai.mindconnect.agent.runtime.service.round.RoundOutcome;

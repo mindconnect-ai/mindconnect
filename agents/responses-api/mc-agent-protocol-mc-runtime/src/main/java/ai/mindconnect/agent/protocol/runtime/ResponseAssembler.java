@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.protocol.runtime;
 
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.protocol.IncompleteReason;
 import ai.mindconnect.agent.protocol.Response;
 import ai.mindconnect.agent.protocol.ResponseError;

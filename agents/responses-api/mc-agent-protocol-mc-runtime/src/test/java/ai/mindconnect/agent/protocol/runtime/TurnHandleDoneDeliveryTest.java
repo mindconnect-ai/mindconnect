@@ -4,7 +4,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.builder.AgentRuntime;
 import ai.mindconnect.agent.builder.AgentRuntimeBuilder;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.runtime.feature.FeatureContext;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.common.Cancellation;

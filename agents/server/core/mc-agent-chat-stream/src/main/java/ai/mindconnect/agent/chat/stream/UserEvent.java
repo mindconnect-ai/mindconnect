@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service.stream;
+package ai.mindconnect.agent.chat.stream;
 
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.agent.AgentId;
@@ -27,6 +27,9 @@ public sealed interface UserEvent
     /** How a turn ended, as far as the caller who submitted it can tell. */
     enum TurnOutcome { COMPLETED, FAILED, CANCELLED }
 
+    /** The type of a session a person started in the chat, and of every session that names none. */
+    String CHAT = "chat";
+
     /**
      * A top-level session was opened. Sub-agent sessions do not announce
      * themselves. {@code sessionType} is the session's type, so that a list
@@ -37,7 +40,7 @@ public sealed interface UserEvent
 
         public SessionStarted {
             if (sessionType == null || sessionType.isBlank()) {
-                sessionType = ai.mindconnect.agent.runtime.domain.AgentSession.CHAT;
+                sessionType = CHAT;
             }
         }
 

@@ -11,7 +11,7 @@ import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryWorkingMemoryRep
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.chat.stream.UserChannels;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.auth.VectorStoreAccess;
 import ai.mindconnect.agentrest.service.VectorStoreService;

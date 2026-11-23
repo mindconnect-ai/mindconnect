@@ -70,9 +70,9 @@ ai.mindconnect.agent.runtime.service.StatelessAgentTaskRunner has 2 constructors
 ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider has 3 constructors
 ai.mindconnect.agent.runtime.service.round.AgentLoop has 2 constructors
 ai.mindconnect.agent.runtime.service.round.RoundOutcome has 2 constructors
-ai.mindconnect.agent.runtime.service.stream.SessionChannels has 2 constructors
-ai.mindconnect.agent.runtime.service.stream.UserChannels has 2 constructors
-ai.mindconnect.agent.runtime.service.stream.UserEvent$SessionStarted has 2 constructors
+ai.mindconnect.agent.chat.stream.SessionChannels has 2 constructors
+ai.mindconnect.agent.chat.stream.UserChannels has 2 constructors
+ai.mindconnect.agent.chat.stream.UserEvent$SessionStarted has 2 constructors
 ai.mindconnect.agent.runtime.service.task.AgentTurnWorker has 4 constructors
 ai.mindconnect.agent.runtime.service.task.ConversationMessageLog has 2 constructors
 ai.mindconnect.agent.runtime.service.task.LlmChatProvider has 2 constructors

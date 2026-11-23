@@ -1,6 +1,6 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.chat.stream.ToolApproval;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.SessionId;
 import org.junit.jupiter.api.Test;

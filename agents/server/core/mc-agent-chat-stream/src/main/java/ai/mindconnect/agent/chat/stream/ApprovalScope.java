@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service.approval;
+package ai.mindconnect.agent.chat.stream;
 
 /** How far a human's "allow" reaches. */
 public enum ApprovalScope {

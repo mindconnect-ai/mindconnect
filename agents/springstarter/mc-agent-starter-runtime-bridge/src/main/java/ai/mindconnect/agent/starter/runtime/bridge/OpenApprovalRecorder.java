@@ -15,7 +15,7 @@ import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
 import ai.mindconnect.agent.runtime.api.hook.AgentContext;
 import ai.mindconnect.agent.runtime.api.hook.ToolInvocation;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.chat.stream.ToolApproval;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 
 /**

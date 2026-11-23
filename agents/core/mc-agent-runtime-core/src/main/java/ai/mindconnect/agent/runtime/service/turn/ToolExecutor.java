@@ -5,7 +5,7 @@ import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.AgentId;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.runtime.port.out.TokenCounter;
 import ai.mindconnect.agent.tool.Tool;
 import ai.mindconnect.agent.tool.ToolAdvisor;

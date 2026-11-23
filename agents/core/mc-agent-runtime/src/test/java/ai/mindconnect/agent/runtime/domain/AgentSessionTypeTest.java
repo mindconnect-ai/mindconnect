@@ -6,7 +6,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
-import ai.mindconnect.agent.runtime.service.stream.UserEvent;
+import ai.mindconnect.agent.chat.stream.UserEvent;
 import ai.mindconnect.message.domain.ConversationId;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;

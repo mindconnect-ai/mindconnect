@@ -5,12 +5,12 @@ import ai.mindconnect.agent.runtime.domain.AgentPatch;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.chat.stream.ApprovalScope;
+import ai.mindconnect.agent.chat.stream.ToolApproval;
 import ai.mindconnect.agentrest.auth.CurrentUser;
 import ai.mindconnect.agentrest.auth.SessionAccess;
 import ai.mindconnect.agentrest.dto.CreateAgentRequest;
@@ -26,7 +26,7 @@ import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.chat.stream.UserChannels;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import org.slf4j.Logger;
@@ -358,7 +358,7 @@ public class AgentApiController {
 
         ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> {
             sendFrame(emitter, StreamEventFrame.from(event));
-            if (event instanceof ai.mindconnect.agent.runtime.domain.StreamEvent.Done) {
+            if (event instanceof ai.mindconnect.agent.chat.stream.StreamEvent.Done) {
                 doneSent.complete(null);
             }
         });
@@ -638,7 +638,7 @@ public class AgentApiController {
                                                                 @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         SseEmitter emitter = new SseEmitter(120_000L);
-        java.util.function.Consumer<ai.mindconnect.agent.runtime.domain.StreamEvent> frames =
+        java.util.function.Consumer<ai.mindconnect.agent.chat.stream.StreamEvent> frames =
                 event -> sendFrame(emitter, StreamEventFrame.from(event));
         var continued = approved
                 ? chatService.approve(id, callId, ApprovalScope.fromParam(scope), frames)

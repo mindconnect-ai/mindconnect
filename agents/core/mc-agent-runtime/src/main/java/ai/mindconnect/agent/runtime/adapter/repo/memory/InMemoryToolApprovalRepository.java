@@ -1,7 +1,7 @@
 package ai.mindconnect.agent.runtime.adapter.repo.memory;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.ToolApproval;
+import ai.mindconnect.agent.chat.stream.ToolApproval;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 
 import java.util.Comparator;

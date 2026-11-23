@@ -51,11 +51,11 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
-import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
+import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
+import ai.mindconnect.agent.chat.stream.ApprovalScope;
 import ai.mindconnect.common.PageRequest;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
@@ -243,10 +243,10 @@ class RuntimeBridgeAutoConfigurationTest {
                         () -> mock(ai.mindconnect.agent.tools.todo.TodoListRepository.class))
                 .withBean(ai.mindconnect.message.port.in.ConversationManager.class,
                         () -> mock(ai.mindconnect.message.port.in.ConversationManager.class))
-                .withBean(ai.mindconnect.agent.runtime.service.stream.SessionChannels.class,
-                        ai.mindconnect.agent.runtime.service.stream.SessionChannels::new)
-                .withBean(ai.mindconnect.agent.runtime.service.stream.UserChannels.class,
-                        ai.mindconnect.agent.runtime.service.stream.UserChannels::new)
+                .withBean(ai.mindconnect.agent.chat.stream.SessionChannels.class,
+                        ai.mindconnect.agent.chat.stream.SessionChannels::new)
+                .withBean(ai.mindconnect.agent.chat.stream.UserChannels.class,
+                        ai.mindconnect.agent.chat.stream.UserChannels::new)
                 .withBean(ai.mindconnect.filestore.FileStore.class,
                         () -> mock(ai.mindconnect.filestore.FileStore.class))
                 .withBean(ai.mindconnect.agent.management.directory.WorkingDirPolicy.class,

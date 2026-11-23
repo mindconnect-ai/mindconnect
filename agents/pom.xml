@@ -121,6 +121,7 @@
         <module>tools/core/mc-agent-tools-workflow</module>
         <module>server/core/mc-agent-registry-core</module>
         <module>adapter/postgres/mc-agent-registry-pg</module>
+        <module>server/core/mc-agent-chat-stream</module>
         <module>server/core/mc-agent-registry</module>
         <module>server/core/mc-agent-registry-workflow</module>
         <module>tools/mcp/mc-mcp-proxy</module>

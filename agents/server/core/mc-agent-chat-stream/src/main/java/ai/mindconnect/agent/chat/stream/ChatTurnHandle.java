@@ -1,8 +1,8 @@
-package ai.mindconnect.agent.runtime.port.in;
+package ai.mindconnect.agent.chat.stream;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.TurnResult;
-import ai.mindconnect.agent.runtime.domain.TurnStatus;
+import ai.mindconnect.agent.chat.stream.TurnResult;
+import ai.mindconnect.agent.chat.stream.TurnStatus;
 import ai.mindconnect.message.domain.ChatTurnId;
 import java.util.concurrent.CompletableFuture;
 

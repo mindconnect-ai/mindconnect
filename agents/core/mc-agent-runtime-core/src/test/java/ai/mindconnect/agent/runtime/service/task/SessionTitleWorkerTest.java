@@ -7,7 +7,7 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.in.AgentTaskRunner;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
+import ai.mindconnect.agent.chat.stream.UserChannels;
 import ai.mindconnect.message.domain.ChatTurnId;
 import ai.mindconnect.message.domain.ConversationHistory;
 import ai.mindconnect.message.domain.ConversationId;

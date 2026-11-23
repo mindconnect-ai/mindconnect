@@ -5,12 +5,12 @@ import java.util.concurrent.CompletionException;
 import java.util.function.Consumer;
 
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
-import ai.mindconnect.agent.runtime.service.stream.SessionChannels;
-import ai.mindconnect.agent.runtime.service.stream.SessionEvent;
-import ai.mindconnect.agent.runtime.service.stream.UserChannels;
-import ai.mindconnect.agent.runtime.service.stream.UserEvent;
+import ai.mindconnect.agent.chat.stream.SessionChannels;
+import ai.mindconnect.agent.chat.stream.SessionEvent;
+import ai.mindconnect.agent.chat.stream.UserChannels;
+import ai.mindconnect.agent.chat.stream.UserEvent;
 import ai.mindconnect.channel.Channel;
 import ai.mindconnect.message.domain.ChatTurnId;
 

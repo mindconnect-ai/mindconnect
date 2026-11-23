@@ -1,8 +1,10 @@
 package ai.mindconnect.agent.runtime.port.in;
 
+import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
+
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.runtime.domain.StreamEvent;
+import ai.mindconnect.agent.chat.stream.StreamEvent;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.message.domain.Message;
 

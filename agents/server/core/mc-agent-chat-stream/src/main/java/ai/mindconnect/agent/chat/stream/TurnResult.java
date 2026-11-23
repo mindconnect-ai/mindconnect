@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.domain;
+package ai.mindconnect.agent.chat.stream;
 
 import ai.mindconnect.message.domain.ChatTurnId;
 
