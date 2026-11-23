@@ -19,6 +19,9 @@ import ai.mindconnect.plugin.PluginRegistry;
  */
 public final class SessionTitlePlugin implements Plugin {
 
+    /** The key in a session's metadata that holds its title. A session that has one is given no other. */
+    public static final String TITLE = SessionTitleWorker.TITLE;
+
     @Override
     public String name() {
         return "session-title";

@@ -35,6 +35,11 @@ public record Session(
         metadata = Map.copyOf(metadata);
     }
 
+    /** This session with another agent for the turns that bring none. */
+    public Session withAgent(AgentDefinition agent) {
+        return new Session(id, userId, parentId, agent, metadata, createdAt);
+    }
+
     /** This session with one more entry in its metadata, or another value for one it has. */
     public Session withMetadata(String key, Object value) {
         Map<String, Object> changed = new HashMap<>(metadata);
