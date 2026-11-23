@@ -142,17 +142,49 @@ public final class AttachmentPlugin implements Plugin {
                 : java.util.Optional.empty();
     }
 
-    /** The list in the instructions, made anew for every call, so a removed file leaves it at once. */
+    /**
+     * Announces the attached files so the model reaches for them instead
+     * of claiming it cannot see them. An image is not searched — it goes
+     * with its message — so it is listed apart, and only where it lies on
+     * disk.
+     */
     private static String listing(List<Attachment> attached) {
-        // An image is not searched: it goes with its message, so it is listed only where it lies on disk.
-        List<Attachment> listed = attached.stream().filter(file -> !file.isImage() || file.path() != null).toList();
-        if (listed.isEmpty()) {
+        List<Attachment> searched = attached.stream().filter(file -> !file.isImage()).toList();
+        List<Attachment> images = attached.stream().filter(file -> file.isImage() && file.path() != null).toList();
+        if (searched.isEmpty()) {
+            return images.isEmpty() ? "" : "\n\n## Attached files" + imagesOnDisk(images);
+        }
+        StringBuilder text = new StringBuilder("\n\n## Attached files\n"
+                + "The user attached these files to this conversation:\n");
+        searched.forEach(file -> text.append("- ").append(file.listing()).append('\n'));
+        if (searched.stream().anyMatch(file -> file.path() != null)) {
+            text.append("A file with a path is a file on disk: open it by that path — `file_read` for "
+                    + "text and code, `document_outline`, `document_sections`, `read_document` and "
+                    + "`grep_document` for PDF and Word — whenever the exact content, the structure or "
+                    + "a passage in context is what the question needs. What the file says as a whole, "
+                    + "which sections it has and in which order: open it, never search, because search "
+                    + "ranks fragments by similarity and drops the rest. ");
+        }
+        text.append("Their content is also indexed for semantic search: `vector_search` with your "
+                + "question (no `store` argument needed) finds passages across all of them, which is "
+                + "the way into a long document and the only way to a file without a path.");
+        if (searched.stream().anyMatch(file -> file.path() == null)) {
+            text.append(" A file without a path is NOT on the filesystem: `file_read`, `document_outline`, "
+                    + "`read_document`, `grep_document` and `bash` cannot open it, and its name is not a path.");
+        }
+        return text.append(imagesOnDisk(images)).toString();
+    }
+
+    /** Where the attached images are, for when the question is about the file rather than the picture. */
+    private static String imagesOnDisk(List<Attachment> images) {
+        if (images.isEmpty()) {
             return "";
         }
-        StringBuilder text = new StringBuilder("\n\n## Attached files\n\n"
-                + "The user attached these files to this conversation:\n");
-        listed.forEach(file -> text.append("- ").append(file.listing()).append('\n'));
-        return text.append(howToRead(listed)).append('\n').toString();
+        StringBuilder text = new StringBuilder("\nThe images the user attached are shown to you in the "
+                + "conversation; each one is also a file on disk:\n");
+        images.forEach(image -> text.append("- ").append(image.name()).append(" — `").append(image.path())
+                .append("`\n"));
+        return text.append("Their content is not indexed — `vector_search` does not find them.").toString();
     }
 
     private static String howToRead(List<Attachment> files) {

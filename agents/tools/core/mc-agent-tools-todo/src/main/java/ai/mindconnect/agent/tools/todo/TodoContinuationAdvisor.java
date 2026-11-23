@@ -55,10 +55,11 @@ public class TodoContinuationAdvisor implements ToolAdvisor {
         TodoList list = service.load(inv.scope().sessionId());
         if (list == null || !list.hasOpenItems()) return result;
 
-        return result.append(formatHint(list));
+        return result.append(hint(list));
     }
 
-    private static String formatHint(TodoList list) {
+    /** {@code _Open todos: 2 · Next: Find the tour dates_}: where the agent is in its plan. */
+    public static String hint(TodoList list) {
         long open = list.countByStatus(TodoStatus.PENDING)
                 + list.countByStatus(TodoStatus.IN_PROGRESS);
         String next = nextOpenContent(list);

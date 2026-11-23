@@ -250,8 +250,8 @@ public class RuntimeEngineAutoConfiguration {
     /**
      * What is installed last adds its section to an agent's instructions
      * first, so the instructions read: where the session works and what
-     * holds there, what is remembered of the user, the date, the attached
-     * files, the skills.
+     * holds there, what is remembered of the user, the date, the skills,
+     * the attached files.
      */
     @Bean
     CapabilityPlugins capabilityPlugins(ToolActivation activation, ApprovalMemory approvals, SummaryStore summaries,
@@ -261,11 +261,11 @@ public class RuntimeEngineAutoConfiguration {
                                         @Value("${mindconnect.agent.instructions.user-dir:}") String userDir) {
         TimeZones userZones = zones.getIfAvailable(TimeZones::system);
         List<Plugin> plugins = new ArrayList<>(List.of(
+                new AttachmentPlugin(),
                 new SkillPlugin(),
                 new ToolSearchPlugin(activation),
                 new SubAgentPlugin(),
                 new PermissionPlugin(PermissionEffect.DENY, approvals),
-                new AttachmentPlugin(),
                 new MemoryPlugin(summaries),
                 new TracePlugin(traces),
                 new InputGuardPlugin(),

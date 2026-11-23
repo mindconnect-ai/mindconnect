@@ -78,6 +78,9 @@ public record Attachment(String id, String name, String mediaType, long sizeByte
             case "ppt", "pptx" -> "presentation";
             case "md", "markdown" -> "Markdown";
             case "txt" -> "text file";
+            case "csv" -> "CSV";
+            case "json" -> "JSON";
+            case "html", "htm" -> "HTML page";
             case "" -> "file";
             default -> extension().toUpperCase(Locale.ROOT) + " file";
         };
