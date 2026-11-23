@@ -18,6 +18,7 @@ import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
 import ai.mindconnect.agent.runtime.capabilities.guard.InputGuardPlugin;
 import ai.mindconnect.agent.runtime.capabilities.guard.OutputGuardPlugin;
 import ai.mindconnect.agent.runtime.capabilities.memory.InMemorySummaryStore;
@@ -83,6 +84,12 @@ public class RuntimeEngineAutoConfiguration {
         return new ScopeNamespaceProvider(scope);
     }
 
+    @Bean
+    @ConditionalOnMissingBean
+    UserProvider userProvider(ScopeSupplier scope) {
+        return new ScopeUserProvider(scope);
+    }
+
     /** On Postgres where the application has it, else as files under the data directory. */
     @Bean
     @ConditionalOnMissingBean
@@ -143,7 +150,7 @@ public class RuntimeEngineAutoConfiguration {
 
     /** The runtime's own plugins, in the order they are installed. */
     @Bean
-    RuntimeParts runtimeParts(NamespaceProvider namespaces, SessionStore sessions, TaskQueue queue,
+    RuntimeParts runtimeParts(NamespaceProvider namespaces, UserProvider users, SessionStore sessions, TaskQueue queue,
                               ObjectProvider<SharedStateStore> sharedState, LlmGatewayModelPlugin model,
                               CapabilityPlugins capabilities) {
         Plugin applicationBeans = new Plugin() {
@@ -155,6 +162,7 @@ public class RuntimeEngineAutoConfiguration {
             @Override
             public void install(PluginRegistry registry) {
                 registry.provide(NamespaceProvider.class, () -> namespaces);
+                registry.provide(UserProvider.class, () -> users);
                 registry.provide(SessionStore.class, () -> sessions);
             }
         };

@@ -65,13 +65,15 @@ final class TurnTaskMapper {
     /**
      * The task that runs this turn.
      *
-     * @param after the turn of the same session that has to end first
+     * @param after  the turn of the same session that has to end first
+     * @param caller in whose namespace and as whom the turn runs, see {@link CallerBoundWorker}
      */
-    static TaskSubmission submission(TurnAcceptor.Accepted accepted, Optional<TurnId> after, String namespace) {
+    static TaskSubmission submission(TurnAcceptor.Accepted accepted, Optional<TurnId> after,
+                                     Map<String, Object> caller) {
         Turn turn = accepted.turn();
         Map<String, Object> payload = new LinkedHashMap<>();
         after.ifPresent(previous -> payload.put(AFTER, previous.value()));
-        payload.put(NamespaceBoundWorker.NAMESPACE, namespace);
+        payload.putAll(caller);
         payload.put(SESSION_ID, turn.sessionId().value());
         payload.put(USER_MESSAGE, MESSAGES.toJson(accepted.userMessage()));
         payload.put(AGENT, AGENTS.toJson(turn.agent()));
@@ -115,7 +117,7 @@ final class TurnTaskMapper {
         // A turn of another namespace does not exist for whoever asks from here, however it came by the id.
         return queue.get(turnId.value())
                 .filter(task -> TYPE.equals(task.type()))
-                .filter(task -> namespaces.current().equals(task.payload().get(NamespaceBoundWorker.NAMESPACE)))
+                .filter(task -> namespaces.current().equals(task.payload().get(CallerBoundWorker.NAMESPACE)))
                 .map(this::turn);
     }
 

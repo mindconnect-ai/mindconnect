@@ -103,7 +103,7 @@ final class ToolCallWorker implements TaskWorker {
     private TaskOutcome delegate(TaskContext ctx, ToolOutput.Delegated handedOn) {
         try {
             ctx.submitChild(TurnTaskMapper.submission(acceptor.accept(handedOn.request()), Optional.empty(),
-                    (String) ctx.task().payload().get(NamespaceBoundWorker.NAMESPACE)));
+                    CallerBoundWorker.callerOf(ctx.task())));
             return TaskOutcome.suspendUntilChildren();
         } catch (IllegalArgumentException e) {
             ctx.updateState(Map.of(FAILED, true));

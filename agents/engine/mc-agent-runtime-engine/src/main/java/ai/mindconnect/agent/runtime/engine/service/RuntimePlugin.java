@@ -14,6 +14,7 @@ import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionEventPublisher;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
+import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.taskqueue.SharedStateStore;
@@ -61,7 +62,8 @@ public final class RuntimePlugin implements Plugin {
                 registry.get(SessionStore.class), registry.get(SessionEventHub.class)));
         registry.provide(QueuedBackgroundWork.class,
                 () -> new QueuedBackgroundWork(queue,
-                        () -> registry.all(BackgroundWorker.class), registry.get(NamespaceProvider.class)));
+                        () -> registry.all(BackgroundWorker.class), registry.get(NamespaceProvider.class),
+                        registry.find(UserProvider.class).orElseGet(UserProvider::none)));
         registry.provide(BackgroundWork.class, () -> registry.get(QueuedBackgroundWork.class));
         // Built once and on first use: by then every plugin is installed, and
         // building it is what puts the workers on the queue.
@@ -73,17 +75,19 @@ public final class RuntimePlugin implements Plugin {
             TurnAcceptor acceptor = new TurnAcceptor(sessions,
                     () -> registry.all(ModelSettingsResolver.class), hooks);
             NamespaceProvider namespaces = registry.get(NamespaceProvider.class);
+            // Nobody acts unless someone says who: a library and a command line provide none.
+            UserProvider users = registry.find(UserProvider.class).orElseGet(UserProvider::none);
             TurnTaskMapper turns = new TurnTaskMapper(queue, namespaces);
-            queue.register(TurnTaskMapper.TYPE, new NamespaceBoundWorker(
+            queue.register(TurnTaskMapper.TYPE, new CallerBoundWorker(
                     new TurnWorker(sessions, tools, registry.get(ModelGateway.class), hooks, events, turns,
                             new InstructionRenderer(registry.get(PromptRenderer.class),
                                     () -> registry.all(PromptVariableProvider.class))),
-                    namespaces));
-            queue.register(ToolCallWorker.TYPE, new NamespaceBoundWorker(
-                    new ToolCallWorker(sessions, tools, hooks, turns, acceptor), namespaces));
-            queue.register(QueuedBackgroundWork.TYPE, new NamespaceBoundWorker(
-                    registry.get(QueuedBackgroundWork.class), namespaces));
-            return new DefaultTurnService(acceptor, sessions, queue, sharedState, events, namespaces);
+                    namespaces, users));
+            queue.register(ToolCallWorker.TYPE, new CallerBoundWorker(
+                    new ToolCallWorker(sessions, tools, hooks, turns, acceptor), namespaces, users));
+            queue.register(QueuedBackgroundWork.TYPE, new CallerBoundWorker(
+                    registry.get(QueuedBackgroundWork.class), namespaces, users));
+            return new DefaultTurnService(acceptor, sessions, queue, sharedState, events, namespaces, users);
         });
     }
 }

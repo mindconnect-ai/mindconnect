@@ -59,7 +59,7 @@ final class QueuedToolExecutor implements AgentRoundToolExecutor {
      */
     static void startTool(TaskContext ctx, ToolCall call, Optional<InterruptionAnswer> answer) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put(NamespaceBoundWorker.NAMESPACE, ctx.task().payload().get(NamespaceBoundWorker.NAMESPACE));
+        payload.putAll(CallerBoundWorker.callerOf(ctx.task()));
         payload.put(ToolCallWorker.TURN_ID, call.turnId().value());
         payload.put(ToolCallWorker.SESSION_ID, call.sessionId().value());
         payload.put(ToolCallWorker.CALL_ID, call.callId());

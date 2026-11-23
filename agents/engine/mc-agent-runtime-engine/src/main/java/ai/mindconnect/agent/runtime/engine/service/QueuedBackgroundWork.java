@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.runtime.engine.service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -7,6 +8,7 @@ import java.util.function.Supplier;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWork;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWorker;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
 import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskQueue;
@@ -27,17 +29,22 @@ final class QueuedBackgroundWork implements BackgroundWork, TaskWorker {
     private final TaskQueue queue;
     private final Supplier<List<BackgroundWorker>> workers;
     private final NamespaceProvider namespaces;
+    private final UserProvider users;
 
-    QueuedBackgroundWork(TaskQueue queue, Supplier<List<BackgroundWorker>> workers, NamespaceProvider namespaces) {
+    QueuedBackgroundWork(TaskQueue queue, Supplier<List<BackgroundWorker>> workers, NamespaceProvider namespaces,
+                         UserProvider users) {
         this.queue = queue;
         this.namespaces = namespaces;
+        this.users = users;
         this.workers = workers;
     }
 
     @Override
     public void submit(String workerName, Map<String, Object> payload) {
-        queue.submit(TaskSubmission.of(TYPE, Map.of(
-                NamespaceBoundWorker.NAMESPACE, namespaces.current(), WORKER, workerName, PAYLOAD, payload)));
+        Map<String, Object> task = new LinkedHashMap<>(CallerBoundWorker.caller(namespaces, users));
+        task.put(WORKER, workerName);
+        task.put(PAYLOAD, payload);
+        queue.submit(TaskSubmission.of(TYPE, task));
     }
 
     @Override
