@@ -3,7 +3,7 @@ package ai.mindconnect.agent.runtime.skill;
 import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
+import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
 
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;

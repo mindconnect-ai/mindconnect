@@ -1,7 +1,5 @@
-package ai.mindconnect.agent.runtime.service;
+package ai.mindconnect.agent.management.directory;
 
-import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -78,15 +76,15 @@ public final class UserHome {
     }
 
     /** The user's home, created on first use; empty without one. */
-    public Optional<Path> homeOf(UserId userId) {
+    public Optional<Path> homeOf(String userId) {
         Path home = homePath(userId);
         return home == null ? Optional.empty() : Optional.of(ensure(home));
     }
 
     /** A session's own directory under the user's home, created on first use; empty without a home. */
-    public Optional<Path> sessionDirOf(UserId userId, SessionId sessionId) {
+    public Optional<Path> sessionDirOf(String userId, String sessionId) {
         if (sessionId == null) return Optional.empty();
-        return homeOf(userId).map(home -> ensure(home.resolve("sessions").resolve(sessionId.value())));
+        return homeOf(userId).map(home -> ensure(home.resolve("sessions").resolve(sessionId)));
     }
 
     /**
@@ -94,24 +92,24 @@ public final class UserHome {
      * for telling a directory the session chose apart from the one it was
      * given. Empty without a home.
      */
-    public Optional<Path> existingSessionDirOf(UserId userId, SessionId sessionId) {
+    public Optional<Path> existingSessionDirOf(String userId, String sessionId) {
         Path home = homePath(userId);
         if (home == null || sessionId == null) return Optional.empty();
-        Path dir = home.resolve("sessions").resolve(sessionId.value());
+        Path dir = home.resolve("sessions").resolve(sessionId);
         return Files.isDirectory(dir) ? Optional.of(real(dir)) : Optional.empty();
     }
 
     /** Where a session's attached files are put for the file tools to read, created on first use. */
-    public Optional<Path> uploadsDirOf(UserId userId, SessionId sessionId) {
+    public Optional<Path> uploadsDirOf(String userId, String sessionId) {
         return sessionDirOf(userId, sessionId).map(dir -> ensure(dir.resolve("uploads")));
     }
 
     /** The user's home as a path, nothing created; {@code null} without a home or a user. */
-    private Path homePath(UserId userId) {
+    private Path homePath(String userId) {
         String template = template();
-        if (template == null || userId == null || userId.value() == null || userId.value().isBlank()) return null;
+        if (template == null || userId == null || userId.isBlank()) return null;
         return WorkingDirPolicy.expand(template.replace(WorkingDirPolicy.USER_PLACEHOLDER,
-                WorkingDirPolicy.pathSafe(userId.value()))).toAbsolutePath().normalize();
+                WorkingDirPolicy.pathSafe(userId))).toAbsolutePath().normalize();
     }
 
     private static Path ensure(Path dir) {

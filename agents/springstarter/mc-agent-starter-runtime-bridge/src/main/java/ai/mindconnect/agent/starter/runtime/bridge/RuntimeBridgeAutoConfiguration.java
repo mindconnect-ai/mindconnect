@@ -10,8 +10,8 @@ import ai.mindconnect.agent.runtime.api.port.out.MediaReader;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
-import ai.mindconnect.agent.runtime.service.UserHome;
-import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
+import ai.mindconnect.agent.management.directory.UserHome;
+import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
 import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -133,7 +133,7 @@ public class RuntimeBridgeAutoConfiguration {
     /** A session's own directory goes with it. */
     @Bean
     SessionCleanup sessionDirectoryCleanup(UserHome userHome) {
-        return new SessionDirectoryCleanup(userHome);
+        return new ai.mindconnect.agent.management.directory.SessionDirectoryCleanup(userHome);
     }
 
     /** A file a message refers to is read from the application's file store. */
@@ -158,7 +158,7 @@ public class RuntimeBridgeAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     SessionDirectoryPolicy sessionDirectoryPolicy(WorkingDirPolicy policy, UserHome userHome) {
-        return new WorkingDirSessionDirectoryPolicy(policy, userHome);
+        return new ai.mindconnect.agent.management.directory.RootedSessionDirectoryPolicy(policy, userHome);
     }
 
     @Bean

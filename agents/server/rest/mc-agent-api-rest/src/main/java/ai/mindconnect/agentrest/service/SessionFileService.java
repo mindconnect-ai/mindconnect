@@ -73,7 +73,7 @@ public class SessionFileService {
     /** Where a call works — every store call names the namespace. */
     private final ai.mindconnect.common.env.EnvVarResolver environment;
     /** Where a session's own directory is; unconfigured means the spool under the tools base dir. */
-    private final ai.mindconnect.agent.runtime.service.UserHome userHome;
+    private final ai.mindconnect.agent.management.directory.UserHome userHome;
 
     public SessionFileService(FileStore fileStore,
                               ObjectProvider<VectorStores> storesProvider,
@@ -82,7 +82,7 @@ public class SessionFileService {
                               ObjectProvider<ai.mindconnect.agent.management.api.SessionManagement> sessionManagement,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
-                              ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome,
+                              ObjectProvider<ai.mindconnect.agent.management.directory.UserHome> userHome,
                               ObjectProvider<ai.mindconnect.common.env.EnvVarResolver> environment) {
         this.environment = environment.getIfAvailable(ai.mindconnect.common.env.EnvVarResolver::system);
         this.fileStore = fileStore;
@@ -92,12 +92,12 @@ public class SessionFileService {
         this.sessionManagement = sessionManagement.getIfAvailable();
         this.workflowsProvider = workflowsProvider;
         this.spoolBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
-        this.userHome = userHome.getIfAvailable(ai.mindconnect.agent.runtime.service.UserHome::none);
+        this.userHome = userHome.getIfAvailable(ai.mindconnect.agent.management.directory.UserHome::none);
     }
 
     /** The copy of an attached file on disk: in the session's uploads directory when there is one. */
     private java.util.Optional<Path> uploadsDir(ai.mindconnect.agent.runtime.domain.AgentSession session) {
-        return userHome.uploadsDirOf(session.userId(), session.id());
+        return userHome.uploadsDirOf(session.userId().value(), session.id().value());
     }
 
     /**

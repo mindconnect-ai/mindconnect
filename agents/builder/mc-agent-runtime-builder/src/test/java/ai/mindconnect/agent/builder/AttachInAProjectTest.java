@@ -32,7 +32,7 @@ class AttachInAProjectTest {
         try (AgentRuntime runtime = runtime()) {
             UserId user = UserId.of("attach-user-1");
             Path project = Files.createDirectories(runtime.sessionService().userHome()
-                    .homeOf(user).orElseThrow().resolve("project"));
+                    .homeOf(user.value()).orElseThrow().resolve("project"));
             AgentSession session = runtime.openSession("test-agent", user, project);
 
             // An empty file needs no embedding endpoint: copied, then "no text content".

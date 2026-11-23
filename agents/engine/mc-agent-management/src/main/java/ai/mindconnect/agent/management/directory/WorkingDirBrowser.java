@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service;
+package ai.mindconnect.agent.management.directory;
 
 import java.io.IOException;
 import java.nio.file.Files;

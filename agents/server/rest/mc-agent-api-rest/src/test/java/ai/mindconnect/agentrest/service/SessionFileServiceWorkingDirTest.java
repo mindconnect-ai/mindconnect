@@ -7,7 +7,7 @@ import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.adapter.repo.memory.InMemoryAgentSessionRepository;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
-import ai.mindconnect.agent.runtime.service.UserHome;
+import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.tool.ToolEnvironment;
 import ai.mindconnect.filestore.FileId;
 import ai.mindconnect.filestore.FileStore;
@@ -91,7 +91,7 @@ class SessionFileServiceWorkingDirTest {
                 new ByteArrayInputStream(new byte[0])));
 
         assertThat(result.success()).as(result.message()).isTrue();
-        Path own = home.sessionDirOf(alice, session.id()).orElseThrow();
+        Path own = home.sessionDirOf(alice.value(), session.id().value()).orElseThrow();
         AgentSession after = sessions.findById(session.id()).orElseThrow();
         assertThat(after.attachedFile("report.md")).get().extracting(AttachedFile::path)
                 .isEqualTo(own.resolve("uploads").resolve("report.md").toString());
@@ -109,9 +109,9 @@ class SessionFileServiceWorkingDirTest {
     void aChatInItsOwnDirectory_orAboveIt_getsNothingAdded() throws Exception {
         UserId bob = UserId.of("bob");
         AgentSession inOwn = AgentSession.start(AgentId.random(), bob, ConversationId.random());
-        inOwn = sessions.create(inOwn.withWorkingDir(home.sessionDirOf(bob, inOwn.id()).orElseThrow().toString()));
+        inOwn = sessions.create(inOwn.withWorkingDir(home.sessionDirOf(bob.value(), inOwn.id().value()).orElseThrow().toString()));
         AgentSession inHome = sessions.create(AgentSession.start(AgentId.random(), bob, ConversationId.random())
-                .withWorkingDir(home.homeOf(bob).orElseThrow().toString()));
+                .withWorkingDir(home.homeOf(bob.value()).orElseThrow().toString()));
 
         for (AgentSession session : List.of(inOwn, inHome)) {
             var result = service.attach(session.id(), files.save("notes.md", "text/markdown",
@@ -134,7 +134,7 @@ class SessionFileServiceWorkingDirTest {
                 new ByteArrayInputStream(pixels)));
 
         assertThat(result.success()).as(result.message()).isTrue();
-        Path copy = home.sessionDirOf(carol, session.id()).orElseThrow().resolve("uploads").resolve("shot.png");
+        Path copy = home.sessionDirOf(carol.value(), session.id().value()).orElseThrow().resolve("uploads").resolve("shot.png");
         assertThat(copy).as("the file tools list it like any other upload").exists()
                 .hasBinaryContent(pixels);
         assertThat(sessions.findById(session.id()).orElseThrow().attachedFile("shot.png"))

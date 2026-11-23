@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.service.WorkingDirBrowser;
+import ai.mindconnect.agent.management.directory.WorkingDirBrowser;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
 import ai.mindconnect.agent.UserId;

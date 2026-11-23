@@ -249,10 +249,10 @@ class RuntimeBridgeAutoConfigurationTest {
                         ai.mindconnect.agent.runtime.service.stream.UserChannels::new)
                 .withBean(ai.mindconnect.filestore.FileStore.class,
                         () -> mock(ai.mindconnect.filestore.FileStore.class))
-                .withBean(ai.mindconnect.agent.runtime.service.WorkingDirPolicy.class,
-                        ai.mindconnect.agent.runtime.service.WorkingDirPolicy::unrestricted)
-                .withBean(ai.mindconnect.agent.runtime.service.UserHome.class,
-                        () -> ai.mindconnect.agent.runtime.service.UserHome.of(null))
+                .withBean(ai.mindconnect.agent.management.directory.WorkingDirPolicy.class,
+                        ai.mindconnect.agent.management.directory.WorkingDirPolicy::unrestricted)
+                .withBean(ai.mindconnect.agent.management.directory.UserHome.class,
+                        () -> ai.mindconnect.agent.management.directory.UserHome.of(null))
                 .withBean(ToolApprovalRepository.class, () -> openApprovals);
     }
 

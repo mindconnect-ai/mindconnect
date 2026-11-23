@@ -45,7 +45,7 @@ public class ChatFilesUiController {
     private final SessionFileService sessionFiles;
     private final AgentSessionRepository sessions;
     /** Whether this installation lets a user choose a chat's directories. */
-    private final ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy;
+    private final ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy;
     private final ai.mindconnect.agent.management.api.SessionManagement sessionManagement;
     private final ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents;
     private final SessionOwnership ownership;
@@ -60,7 +60,7 @@ public class ChatFilesUiController {
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  AgentSessionRepository sessions,
-                                 ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy,
+                                 ai.mindconnect.agent.management.directory.WorkingDirPolicy workingDirPolicy,
                                  ai.mindconnect.agent.management.api.SessionManagement sessionManagement,
                                  ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents,
                                  SessionOwnership ownership,

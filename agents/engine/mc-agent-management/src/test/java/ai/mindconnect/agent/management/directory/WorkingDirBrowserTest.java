@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service;
+package ai.mindconnect.agent.management.directory;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

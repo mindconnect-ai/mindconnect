@@ -6,7 +6,7 @@ import ai.mindconnect.agent.runtime.feature.Persistence;
 import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.feature.tools.ToolsFeature;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.UserHome;
+import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.runtime.tools.toolsearch.DynamicToolActivations;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.FileStoreFactory;

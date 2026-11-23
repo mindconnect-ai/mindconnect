@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.starter.runtime.bridge;
+package ai.mindconnect.agent.management.directory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -10,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionCleanup;
-import ai.mindconnect.agent.runtime.service.UserHome;
 
 /**
  * A session's own directory under its user's home goes with it — its
@@ -18,20 +17,20 @@ import ai.mindconnect.agent.runtime.service.UserHome;
  * pile up. Only that directory: one the user chose is theirs and is never
  * touched. Links inside are removed, not followed.
  */
-final class SessionDirectoryCleanup implements SessionCleanup {
+public final class SessionDirectoryCleanup implements SessionCleanup {
 
     private static final Logger log = LoggerFactory.getLogger(SessionDirectoryCleanup.class);
 
     private final UserHome userHome;
 
-    SessionDirectoryCleanup(UserHome userHome) {
+    public SessionDirectoryCleanup(UserHome userHome) {
         this.userHome = userHome;
     }
 
     @Override
     public void deleted(ManagedSession session) {
-        userHome.existingSessionDirOf(ai.mindconnect.agent.UserId.of(session.userId().value()),
-                ai.mindconnect.agent.SessionId.of(session.id().value())).ifPresent(directory -> {
+        userHome.existingSessionDirOf(session.userId().value(),
+                session.id().value()).ifPresent(directory -> {
             try (var paths = Files.walk(directory)) {
                 paths.sorted(Comparator.reverseOrder()).forEach(path -> {
                     try {

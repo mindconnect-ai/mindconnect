@@ -70,7 +70,7 @@ public class AgentApiController {
     private final UserChannels userChannels;
     private final SessionAccess sessionAccess;
     private final ObjectMapper compactMapper;
-    private final ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser;
+    private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
 
     public AgentApiController(AgentRegistryService registryService,
                             AgentSessionService sessionService,
@@ -82,11 +82,11 @@ public class AgentApiController {
                             SessionAccess sessionAccess,
                             ObjectMapper objectMapper,
                             @org.springframework.lang.Nullable
-                            ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser) {
+                            ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser) {
         // A host that defines no browser gets one over the session service's
         // policy — the same tree, without a bean to declare.
         this.dirBrowser = dirBrowser != null ? dirBrowser
-                : new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(sessionService.workingDirPolicy());
+                : new ai.mindconnect.agent.management.directory.WorkingDirBrowser(sessionService.workingDirPolicy());
         this.registryService = registryService;
         this.sessionService = sessionService;
         this.chatService = chatService;
@@ -234,7 +234,7 @@ public class AgentApiController {
                     + "parent, its sub-directories. Without `path`, the root. 400 when `path` lies "
                     + "outside the root or is no directory.")
     @GetMapping("/directories")
-    public ai.mindconnect.agent.runtime.service.WorkingDirBrowser.Listing listDirectories(
+    public ai.mindconnect.agent.management.directory.WorkingDirBrowser.Listing listDirectories(
             @RequestParam(required = false) String path, @CurrentUser UserId caller) {
         return dirBrowser.list(caller.value(), path);
     }

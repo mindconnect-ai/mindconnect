@@ -37,14 +37,14 @@ public class AttachSupport {
     private final ai.mindconnect.vectorstore.tools.VectorStores stores;
     /** The host's workflow store when it has one (Postgres); null means the file store under {@code <dataBaseDir>/<namespace>/workflows}. */
     private final RuntimeBeans beans;   // where the workflow store is, when the workflows feature is installed
-    private final ai.mindconnect.agent.runtime.service.UserHome userHome;
+    private final ai.mindconnect.agent.management.directory.UserHome userHome;
 
     private AttachSupport(Map<String, String> environment, DynamicToolActivations activations,
                           AgentSessionRepository sessions,
                           ai.mindconnect.filestore.FileStore fileStore,
                           ai.mindconnect.vectorstore.tools.VectorStores stores,
                           RuntimeBeans beans,
-                          ai.mindconnect.agent.runtime.service.UserHome userHome) {
+                          ai.mindconnect.agent.management.directory.UserHome userHome) {
         this.userHome = userHome;
         this.environment = environment;
         this.activations = activations;
@@ -61,7 +61,7 @@ public class AttachSupport {
                                        ai.mindconnect.vectorstore.tools.VectorStores stores,
                                        RuntimeBeans beans,
                                        ai.mindconnect.filestore.FileStore fileStore,
-                                       ai.mindconnect.agent.runtime.service.UserHome userHome) {
+                                       ai.mindconnect.agent.management.directory.UserHome userHome) {
         return new AttachSupport(environment, activations, sessions, fileStore, stores, beans, userHome);
     }
 
@@ -79,7 +79,7 @@ public class AttachSupport {
     }
 
     /** The users' home the runtime keeps session directories under — the copy of an upload goes there. */
-    private ai.mindconnect.agent.runtime.service.UserHome userHome() {
+    private ai.mindconnect.agent.management.directory.UserHome userHome() {
         return userHome;
     }
 
@@ -121,7 +121,7 @@ public class AttachSupport {
             // A copy in the session's own directory, for the file tools and
             // for the ingestion workflow, which runs in the session's scope.
             java.util.Optional<java.nio.file.Path> copy = userHome()
-                    .uploadsDirOf(session.userId(), sessionId).map(dir -> dir.resolve(stored.name()));
+                    .uploadsDirOf(session.userId().value(), sessionId.value()).map(dir -> dir.resolve(stored.name()));
             if (copy.isPresent()) {
                 try (InputStream in = fileStore.content(stored.id())) {
                     java.nio.file.Files.copy(in, copy.get(),

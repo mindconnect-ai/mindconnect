@@ -1,5 +1,7 @@
 package ai.mindconnect.agent.runtime.service;
 
+import ai.mindconnect.agent.management.directory.UserHome;
+import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
@@ -173,7 +175,7 @@ public class AgentSessionService {
      */
     private AgentSession inOwnDirectoryWhenNone(AgentSession session) {
         if (session.hasWorkingDir()) return session;
-        return userHome.sessionDirOf(session.userId(), session.id())
+        return userHome.sessionDirOf(session.userId().value(), session.id().value())
                 .map(own -> change(session.id(), stored -> stored.withWorkingDir(own.toString())))
                 .orElse(session);
     }
@@ -181,7 +183,7 @@ public class AgentSessionService {
     /** A session's own directory — where its uploads are — when the runtime has a users' home. */
     public java.util.Optional<java.nio.file.Path> sessionDir(SessionId sessionId) {
         AgentSession session = findSession(sessionId);
-        return userHome.sessionDirOf(session.userId(), session.id());
+        return userHome.sessionDirOf(session.userId().value(), session.id().value());
     }
 
     /**
@@ -194,7 +196,7 @@ public class AgentSessionService {
         List<java.nio.file.Path> roots = new java.util.ArrayList<>();
         if (session.hasWorkingDir()) roots.add(java.nio.file.Path.of(session.workingDir()));
         for (String dir : session.additionalDirs()) roots.add(java.nio.file.Path.of(dir));
-        userHome.existingSessionDirOf(session.userId(), session.id()).ifPresent(roots::add);
+        userHome.existingSessionDirOf(session.userId().value(), session.id().value()).ifPresent(roots::add);
         return new SessionDirectories(roots);
     }
 
@@ -210,7 +212,7 @@ public class AgentSessionService {
      * kept — a session that never had one gets nothing added.
      */
     private List<String> keepingOwnDirectory(AgentSession session, String newDir, List<String> extras) {
-        return userHome.existingSessionDirOf(session.userId(), session.id())
+        return userHome.existingSessionDirOf(session.userId().value(), session.id().value())
                 .map(java.nio.file.Path::toString)
                 .filter(own -> !own.equals(newDir) && !extras.contains(own))
                 .map(own -> {
@@ -277,7 +279,7 @@ public class AgentSessionService {
     private java.util.Set<String> directoriesHeld(AgentSession session) {
         java.util.Set<String> held = new java.util.HashSet<>(session.additionalDirs());
         if (session.hasWorkingDir()) held.add(session.workingDir());
-        userHome.existingSessionDirOf(session.userId(), session.id())
+        userHome.existingSessionDirOf(session.userId().value(), session.id().value())
                 .ifPresent(own -> held.add(own.toString()));
         return held;
     }
@@ -528,7 +530,7 @@ public class AgentSessionService {
      * and is never touched. Links inside are removed, not followed.
      */
     private void deleteOwnDirectory(AgentSession session) {
-        userHome.existingSessionDirOf(session.userId(), session.id()).ifPresent(dir -> {
+        userHome.existingSessionDirOf(session.userId().value(), session.id().value()).ifPresent(dir -> {
             try (var paths = java.nio.file.Files.walk(dir)) {
                 paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
                     try {

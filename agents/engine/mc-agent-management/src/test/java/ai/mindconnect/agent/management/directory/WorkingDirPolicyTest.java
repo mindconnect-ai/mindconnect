@@ -1,4 +1,4 @@
-package ai.mindconnect.agent.runtime.service;
+package ai.mindconnect.agent.management.directory;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

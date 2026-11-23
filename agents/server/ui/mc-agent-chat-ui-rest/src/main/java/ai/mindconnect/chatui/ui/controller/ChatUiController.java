@@ -75,7 +75,7 @@ public class ChatUiController {
     /** The agent a chat runs on, as the session management keeps it. */
     private final ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents;
     /** The server's tree a user may pick a working directory from. */
-    private final ai.mindconnect.agent.runtime.service.WorkingDirBrowser dirBrowser;
+    private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
 
     public ChatUiController(AgentSessionService sessionService,
                              RuntimeChatService chatService,
@@ -94,9 +94,9 @@ public class ChatUiController {
                              org.springframework.beans.factory.ObjectProvider<ai.mindconnect.chatui.ui.ChatHostLinks> hostLinks,
                              ai.mindconnect.llm.port.out.LlmConfigRepository llmConfigRepository,
                              ai.mindconnect.agent.tool.ToolRegistry toolRegistry,
-                             org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.runtime.service.WorkingDirBrowser> dirBrowser) {
+                             org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.management.directory.WorkingDirBrowser> dirBrowser) {
         this.dirBrowser = dirBrowser.getIfAvailable(() ->
-                new ai.mindconnect.agent.runtime.service.WorkingDirBrowser(sessionService.workingDirPolicy()));
+                new ai.mindconnect.agent.management.directory.WorkingDirBrowser(sessionService.workingDirPolicy()));
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
         this.chatService = chatService;
@@ -298,7 +298,7 @@ public class ChatUiController {
 
     /** The chooser's form at {@code path}, or at the root when there is none or it cannot be listed. */
     private ai.mindconnect.ui.model.UiForm pickerForm(ai.mindconnect.agent.runtime.domain.AgentSession session, String path) {
-        ai.mindconnect.agent.runtime.service.WorkingDirBrowser.Listing listing;
+        ai.mindconnect.agent.management.directory.WorkingDirBrowser.Listing listing;
         try {
             listing = dirBrowser.list(session.userId(), path);
         } catch (RuntimeException e) {
@@ -403,7 +403,7 @@ public class ChatUiController {
 
     /** The chooser's form redrawn in place. */
     private UiPatch redrawnPicker(ai.mindconnect.agent.runtime.domain.AgentSession session,
-                                  ai.mindconnect.agent.runtime.service.WorkingDirBrowser.Listing listing) {
+                                  ai.mindconnect.agent.management.directory.WorkingDirBrowser.Listing listing) {
         return UiPatch.of().patch(UiPatch.Operation.replace(
                 ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.ID,
                 ai.mindconnect.chatui.ui.component.DirectoryPickerComponent.form(session.id(), session, listing)));
