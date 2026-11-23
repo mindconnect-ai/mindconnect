@@ -81,10 +81,8 @@ public final class RuntimeChatService {
     public ChatTurnHandle submit(SessionId sessionId, List<ContentPart> parts, ChatTurnListener listener) {
         Started started = start(sessionId, parts);
         CompletableFuture<String> answer = new CompletableFuture<>();
-        TurnFrameTranslator stream = new TurnFrameTranslator(started.turnId(), turns, started.stream());
         Map<String, Optional<Turn>> subAgents = new ConcurrentHashMap<>();
         return following(started, answer, event -> {
-            stream.onEvent(event);
             if (started.turnId().value().equals(event.requestId())) {
                 listener.onEvent(event);
                 answerOf(event, started.turnId()).ifPresent(answer::complete);
@@ -93,30 +91,26 @@ public final class RuntimeChatService {
                 subAgents.computeIfAbsent(event.requestId(), id -> turns.find(TurnId.of(id)))
                         .ifPresent(subAgent -> listener.onSubAgentEvent(subAgent, event));
             }
-        }, interruptions -> {
-            stream.interrupted(interruptions);
-            listener.asked(interruptions);
-        }, false);
+        }, listener::asked, false);
     }
 
     /**
-     * Submits a message and reports the turn as the frames a client streams:
-     * to {@code frames} and, like every turn, on the session's stream.
+     * Submits a message and reports the turn to {@code frames} as the frames a
+     * client streams. The session's stream carries them too, like every turn's.
      */
     public ChatTurnHandle submitFrames(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts,
                                        Consumer<TurnFrame> frames) {
         Started started = start(sessionId, parts.stream().map(RuntimeChatService::part).toList());
         CompletableFuture<String> answer = new CompletableFuture<>();
-        TurnFrameTranslator translator = new TurnFrameTranslator(started.turnId(), turns,
-                started.stream().andThen(frames));
+        TurnFrameTranslator translator = new TurnFrameTranslator(started.turnId(), turns, frames);
         return following(started, answer, event -> {
             translator.onEvent(event);
             answerOf(event, started.turnId()).ifPresent(answer::complete);
         }, translator::interrupted, false);
     }
 
-    /** A turn that was submitted: the chat it runs in and where its frames go to reach the session's stream. */
-    private record Started(AgentSession chat, TurnId turnId, Consumer<TurnFrame> stream) { }
+    /** A turn that was submitted, and the chat it runs in. */
+    private record Started(AgentSession chat, TurnId turnId) { }
 
     private Started start(SessionId sessionId, List<ContentPart> parts) {
         AgentSession chat = chatSessions.findById(sessionId).orElseThrow(() ->
@@ -127,7 +121,7 @@ public final class RuntimeChatService {
                 .orElseThrow(() -> new IllegalStateException("Session " + sessionId.value() + " has no agent"));
         Session session = known(chat, agent);
         TurnId turnId = turns.submit(new TurnRequest(session.id(), parts, agent, Map.of()));
-        return new Started(chat, turnId, streams.started(chat, ChatTurnId.of(turnId.value())));
+        return new Started(chat, turnId);
     }
 
     /** The answer of the turn, once the event that ends it has come. */
@@ -155,7 +149,6 @@ public final class RuntimeChatService {
                 ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()), false, event -> {
             if (event instanceof SessionEvent.TurnInterrupted interrupted && interrupted.turnId().equals(turnId)) {
                 asked.accept(interrupted.interruptions());
-                streams.asked(started.chat(), interrupted.interruptions());
                 outcome.complete(TurnResult.incomplete(chatTurnId, earlier.openApprovals(sessionId)));
             }
             // A turn that dies does not say so itself; its session does, and whoever listens must hear an end.
@@ -175,9 +168,6 @@ public final class RuntimeChatService {
             following.close();
             asking.close();
         });
-        if (!untilAsked) {
-            answer.whenComplete((text, failure) -> streams.finished(started.chat(), chatTurnId, failure));
-        }
         return new Handle(turnId, sessionId, answer, outcome);
     }
 
@@ -188,7 +178,7 @@ public final class RuntimeChatService {
     public StreamAttachment attach(SessionId sessionId, long afterSeq, Consumer<Channel.Event<SessionFrame>> consumer) {
         AgentSession chat = chatSessions.findById(sessionId).orElseThrow(() ->
                 new IllegalArgumentException("There is no session " + sessionId.value()));
-        return streams.attach(chat, afterSeq, underway(sessionId).map(turn -> turn.id().value()).orElse(null),
+        return streams.attach(chat.id(), afterSeq, underway(sessionId).map(turn -> turn.id().value()).orElse(null),
                 consumer);
     }
 
@@ -267,7 +257,7 @@ public final class RuntimeChatService {
             // The session's stream already hears the turn from whoever submitted it; this is the caller's own.
             CompletableFuture<String> answer = new CompletableFuture<>();
             TurnFrameTranslator translator = new TurnFrameTranslator(turnId, turns, events);
-            handle = following(new Started(chatSessions.findById(sessionId).orElseThrow(), turnId, frame -> { }),
+            handle = following(new Started(chatSessions.findById(sessionId).orElseThrow(), turnId),
                     answer, event -> {
                         translator.onEvent(event);
                         answerOf(event, turnId).ifPresent(answer::complete);
@@ -277,7 +267,8 @@ public final class RuntimeChatService {
                 !approved ? InterruptionAnswer.reject(asked.get(), "")
                         : scope == ApprovalScope.SESSION ? InterruptionAnswer.approveAlways(asked.get())
                         : InterruptionAnswer.approve(asked.get())));
-        chatSessions.findById(sessionId).ifPresent(chat -> streams.answered(chat, callId, approved));
+        chatSessions.findById(sessionId)
+                .ifPresent(chat -> streams.answered(chat.id(), chat.userId(), callId, approved));
         return Optional.of(handle);
     }
 

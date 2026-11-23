@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.engine.service;
 
 import java.util.Set;
 
+import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.BackgroundWork;
@@ -56,7 +57,8 @@ public final class RuntimePlugin implements Plugin {
     @Override
     public void install(PluginRegistry registry) {
         registry.provide(SessionEventHub.class, () -> new SessionEventHub(
-                registry.get(SessionStore.class), registry.get(NamespaceProvider.class)));
+                registry.get(SessionStore.class), registry.get(NamespaceProvider.class),
+                () -> registry.all(SessionEventListener.class)));
         registry.provide(SessionEventPublisher.class, () -> registry.get(SessionEventHub.class));
         registry.provide(SessionService.class, () -> new DefaultSessionService(
                 registry.get(SessionStore.class), registry.get(SessionEventHub.class)));

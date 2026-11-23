@@ -277,6 +277,20 @@ class EngineWithCapabilitiesTest {
     }
 
     @Test
+    void a_listener_a_plugin_contributes_hears_sessions_it_did_not_subscribe_to() throws InterruptedException {
+        List<ai.mindconnect.agent.runtime.api.domain.SessionEvent> heard =
+                new java.util.concurrent.CopyOnWriteArrayList<>();
+        registry.contribute(ai.mindconnect.agent.runtime.api.port.in.SessionEventListener.class, heard::add);
+        model.script.add(TurnMessage.assistant("Hello."));
+
+        TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Hi"));
+        awaitRest(turnId);
+
+        assertThat(heard).hasAtLeastOneElementOfType(ai.mindconnect.agent.runtime.api.domain.SessionEvent.TurnStarted.class)
+                .allMatch(event -> event.sessionId().equals(session.id()));
+    }
+
+    @Test
     void a_sub_agent_runs_a_turn_of_its_own_and_its_answer_is_the_tools_result() throws InterruptedException {
         model.script.add(call("c1", "researcher", Map.of("task", "Find the capital of France.")));
         model.script.add(TurnMessage.assistant("Paris."));

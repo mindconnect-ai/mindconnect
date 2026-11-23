@@ -23,6 +23,7 @@ import org.springframework.context.annotation.Bean;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
+import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
@@ -77,7 +78,8 @@ public class RuntimeBridgeAutoConfiguration {
     /** The application's agents, skills and tools, contributed to the runtime. */
     @Bean
     Plugin applicationSourcePlugin(AgentDefinitionRepository agents, AgentDefinitionMapper mapper,
-                                   SkillRepository skills, ToolRegistry tools, OpenApprovalRecorder openApprovals) {
+                                   SkillRepository skills, ToolRegistry tools, OpenApprovalRecorder openApprovals,
+                                   ChatStreams chatStreams) {
         return new Plugin() {
             @Override
             public String name() {
@@ -96,6 +98,7 @@ public class RuntimeBridgeAutoConfiguration {
                 // Heard and not hooked in before or after: a call the permission check stops is still heard.
                 registry.listen(RuntimeHook.TOOL_CALL, openApprovals::called);
                 registry.listen(RuntimeHook.TURN_END, (context, turn) -> openApprovals.ended(context));
+                registry.contribute(SessionEventListener.class, chatStreams);
             }
         };
     }
@@ -177,11 +180,17 @@ public class RuntimeBridgeAutoConfiguration {
     }
 
     /** After the runtime's own services: it calls them. */
-    /** The stream of a session a client reconnects to, fed from every turn the chat service runs. */
+    /** The stream of a session a client reconnects to, fed from every turn of the runtime. */
     @Bean
     @ConditionalOnMissingBean
     SessionFrameChannels sessionFrameChannels() {
         return SessionFrameChannels.standalone();
+    }
+
+    @Bean
+    ChatStreams chatStreams(SessionFrameChannels sessionFrames, UserChannels userChannels,
+                            ObjectProvider<TurnService> turns, ObjectProvider<SessionStore> sessions) {
+        return new ChatStreams(sessionFrames, userChannels, turns::getObject, sessions::getObject);
     }
 
     @Bean
@@ -191,8 +200,8 @@ public class RuntimeBridgeAutoConfiguration {
                                           ObjectProvider<SessionStore> sessions,
                                           AgentSessionRepository chatSessions,
                                           ObjectProvider<SessionManagement> management, AgentChatService earlier,
-                                          SessionFrameChannels sessionFrames, UserChannels userChannels) {
+                                          ChatStreams chatStreams) {
         return new RuntimeChatService(turns.getObject(), sessionService.getObject(), sessions.getObject(), chatSessions,
-                management.getObject(), earlier, new ChatStreams(sessionFrames, userChannels));
+                management.getObject(), earlier, chatStreams);
     }
 }

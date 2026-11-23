@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +27,10 @@ import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
  * service subscribes here and the turn workers publish here, which is why
  * it is an object of its own that both are given.
  *
+ * <p>A plugin hears every session without subscribing: a
+ * {@link SessionEventListener} it contributes is told each event, of whatever
+ * user and namespace, in the namespace the event happened in.
+ *
  * <p>From now on, not from the beginning: a listener hears what happens
  * after it subscribed. What a session said before is in the session.
  *
@@ -41,14 +46,20 @@ public final class SessionEventHub implements SessionEventPublisher {
 
     private final SessionStore sessions;
     private final NamespaceProvider namespaces;
+    private final Supplier<List<SessionEventListener>> contributed;
     private final List<Listening> listeners = new CopyOnWriteArrayList<>();
     /** For each session, the sessions it is under, nearest first. A session's parent never changes. */
     private final Map<String, List<SessionId>> ancestors = new ConcurrentHashMap<>();
 
-    /** @param sessions where a session's parent is looked up */
-    public SessionEventHub(SessionStore sessions, NamespaceProvider namespaces) {
+    /**
+     * @param sessions    where a session's parent is looked up
+     * @param contributed the listeners plugins contributed, which hear every session
+     */
+    public SessionEventHub(SessionStore sessions, NamespaceProvider namespaces,
+                           Supplier<List<SessionEventListener>> contributed) {
         this.sessions = sessions;
         this.namespaces = namespaces;
+        this.contributed = contributed;
     }
 
     /** Every session of this user, sub-agent sessions included. */
@@ -76,15 +87,19 @@ public final class SessionEventHub implements SessionEventPublisher {
 
     void publish(Session session, SessionEvent event) {
         String namespace = namespaces.current();
+        contributed.get().forEach(listener -> tell(listener, event));
         for (Listening listening : listeners) {
-            if (!listening.namespace().equals(namespace) || !listening.wants().test(session)) {
-                continue;
+            if (listening.namespace().equals(namespace) && listening.wants().test(session)) {
+                tell(listening.listener(), event);
             }
-            try {
-                listening.listener().onEvent(event);
-            } catch (RuntimeException e) {
-                log.warn("Session event listener failed on {}: {}", event.getClass().getSimpleName(), e.toString());
-            }
+        }
+    }
+
+    private static void tell(SessionEventListener listener, SessionEvent event) {
+        try {
+            listener.onEvent(event);
+        } catch (RuntimeException e) {
+            log.warn("Session event listener failed on {}: {}", event.getClass().getSimpleName(), e.toString());
         }
     }
 
