@@ -92,6 +92,7 @@
         <module>core/mc-agent-management-api</module>
         <module>engine/mc-agent-management</module>
         <module>adapter/postgres/mc-agent-runtime-engine-pg</module>
+        <module>adapter/postgres/mc-agent-management-pg</module>
         <module>client/mc-agent-sdk</module>
         <module>client/mc-agent-cli-local</module>
 

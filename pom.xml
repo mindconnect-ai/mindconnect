@@ -145,6 +145,7 @@
         <module>agents/core/mc-agent-management-api</module>
         <module>agents/engine/mc-agent-management</module>
         <module>agents/adapter/postgres/mc-agent-runtime-engine-pg</module>
+        <module>agents/adapter/postgres/mc-agent-management-pg</module>
         <module>agents/client/mc-agent-sdk</module>
         <module>agents/client/mc-agent-cli-local</module>
         <module>agents/springstarter/mc-agent-starter-runtime-engine</module>
