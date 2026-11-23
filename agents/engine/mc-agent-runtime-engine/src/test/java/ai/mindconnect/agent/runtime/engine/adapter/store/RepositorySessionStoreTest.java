@@ -30,6 +30,7 @@ import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.common.PageRequest;
+import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
@@ -52,10 +53,13 @@ class RepositorySessionStoreTest {
     static Path directory;
 
     static Stream<SessionStore> stores() {
+        ScopeSupplier scope = RepositorySessionStore.scopeOf(NAMESPACES);
+        ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
         return Stream.of(
-                RepositorySessionStore.inMemory(NAMESPACES),
-                RepositorySessionStore.onFiles(directory, new ObjectMapper().registerModule(new JavaTimeModule()),
-                        NAMESPACES));
+                new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES),
+                        new InMemoryMessageRepository(scope)),
+                new RepositorySessionStore(new FileSessionRepository(directory, json, NAMESPACES),
+                        new FileMessageRepository(directory, json, scope)));
     }
 
     @ParameterizedTest

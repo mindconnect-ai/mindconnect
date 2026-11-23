@@ -20,7 +20,9 @@ import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
+import ai.mindconnect.agent.runtime.engine.adapter.store.FileSessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.message.adapter.file.FileMessageRepository;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import ai.mindconnect.agent.sdk.AgentRuntimeBuilder;
 import ai.mindconnect.plugin.Plugin;
@@ -59,7 +61,9 @@ public final class LocalRuntime {
         ObjectMapper json = new ObjectMapper().registerModule(new JavaTimeModule());
         HarnessDirectories directories = new HarnessDirectories(home);
         NamespaceProvider namespaces = NamespaceProvider.fixed(NAMESPACE);
-        SessionStore sessions = RepositorySessionStore.onFiles(home.resolve(".mc").resolve("data"), json, namespaces);
+        Path data = home.resolve(".mc").resolve("data");
+        SessionStore sessions = new RepositorySessionStore(new FileSessionRepository(data, json, namespaces),
+                new FileMessageRepository(data, json, RepositorySessionStore.scopeOf(namespaces)));
         return AgentRuntime.builder()
                 .namespaces(namespaces)
                 .sessionStore(provides("session-store-file", registry ->

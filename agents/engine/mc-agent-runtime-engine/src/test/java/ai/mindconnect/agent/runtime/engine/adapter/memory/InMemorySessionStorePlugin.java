@@ -2,11 +2,13 @@ package ai.mindconnect.agent.runtime.engine.adapter.memory;
 
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
+import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.plugin.Plugin;
 import ai.mindconnect.plugin.PluginRegistry;
 
-/** Sessions that live as long as the process: for a library user who keeps nothing, and for tests. */
+/** Sessions that live as long as the test. */
 public final class InMemorySessionStorePlugin implements Plugin {
 
     @Override
@@ -17,6 +19,10 @@ public final class InMemorySessionStorePlugin implements Plugin {
     @Override
     public void install(PluginRegistry registry) {
         registry.provide(SessionStore.class,
-                () -> RepositorySessionStore.inMemory(registry.get(NamespaceProvider.class)));
+                () -> {
+                    NamespaceProvider namespaces = registry.get(NamespaceProvider.class);
+                    return new RepositorySessionStore(new InMemorySessionRepository(namespaces),
+                            new InMemoryMessageRepository(RepositorySessionStore.scopeOf(namespaces)));
+                });
     }
 }

@@ -1,13 +1,10 @@
 package ai.mindconnect.agent.runtime.engine.adapter.store;
 
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.UnaryOperator;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.Scope;
@@ -19,8 +16,6 @@ import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.common.PageRequest;
-import ai.mindconnect.message.adapter.file.FileMessageRepository;
-import ai.mindconnect.message.adapter.memory.InMemoryMessageRepository;
 import ai.mindconnect.message.domain.ConversationId;
 import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.message.domain.MessageId;
@@ -31,7 +26,8 @@ import ai.mindconnect.message.port.out.MessageRepository;
  * the sessions, and the message repository for what was said in them — a
  * conversation per session, under the session's id. The message repository
  * is the one every product already has, in memory, on files and in
- * Postgres; the runtime keeps no messages of its own.
+ * Postgres; the runtime keeps no messages of its own. Which two
+ * repositories is for whoever assembles a runtime to say.
  */
 public final class RepositorySessionStore implements SessionStore {
 
@@ -60,20 +56,12 @@ public final class RepositorySessionStore implements SessionStore {
         this.messages = messages;
     }
 
-    /** Everything in the memory of this process. */
-    public static RepositorySessionStore inMemory(NamespaceProvider namespaces) {
-        return new RepositorySessionStore(new InMemorySessionRepository(namespaces),
-                new InMemoryMessageRepository(scopeOf(namespaces)));
-    }
-
-    /** Everything as files under one directory, a folder per namespace. */
-    public static RepositorySessionStore onFiles(Path base, ObjectMapper json, NamespaceProvider namespaces) {
-        return new RepositorySessionStore(new FileSessionRepository(base, json, namespaces),
-                new FileMessageRepository(base, json, scopeOf(namespaces)));
-    }
-
-    /** The message repository asks a scope supplier where the runtime asks a namespace provider. */
-    private static ScopeSupplier scopeOf(NamespaceProvider namespaces) {
+    /**
+     * The scope supplier a message repository is built with, answering from
+     * the runtime's namespace provider: the two then keep a session and its
+     * messages apart by the same namespace.
+     */
+    public static ScopeSupplier scopeOf(NamespaceProvider namespaces) {
         return () -> Scope.of(new Namespace(namespaces.current()));
     }
 
