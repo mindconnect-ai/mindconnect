@@ -9,7 +9,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.SessionId;
+import ai.mindconnect.agent.UserId;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
+import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.ToolOutput;
 import ai.mindconnect.agent.runtime.api.hook.AgentContext;
@@ -32,16 +34,20 @@ final class OpenApprovalRecorder {
 
     private final ToolApprovalRepository approvals;
     private final Supplier<SessionStore> sessions;
+    private final ChatStreams streams;
     private final ObjectMapper json = new ObjectMapper();
 
-    OpenApprovalRecorder(ToolApprovalRepository approvals, Supplier<SessionStore> sessions) {
+    /** @param streams where the user's clients hear that a question was answered */
+    OpenApprovalRecorder(ToolApprovalRepository approvals, Supplier<SessionStore> sessions, ChatStreams streams) {
         this.approvals = approvals;
         this.sessions = sessions;
+        this.streams = streams;
     }
 
     /** A tool call has been stopped or has run: an entry for a call that asks, none for one that was answered. */
     void called(ToolInvocation invocation, ToolOutput output) {
-        SessionId root = SessionId.of(rootOf(invocation.context().session()).id().value());
+        Session chat = rootOf(invocation.context().session());
+        SessionId root = SessionId.of(chat.id().value());
         String callId = invocation.call().callId();
         if (output instanceof ToolOutput.Interrupted asked && Interruption.TOOL_APPROVAL.equals(asked.kind())) {
             approvals.saveIfAbsent(new ToolApproval(callId, callId, invocation.call().toolName(),
@@ -49,6 +55,8 @@ final class OpenApprovalRecorder {
                     Instant.now()));
         } else if (invocation.answer().isPresent()) {
             approvals.delete(root, callId);
+            streams.answered(root, UserId.of(chat.userId().value()), callId, Boolean.TRUE.equals(
+                    invocation.answer().get().answer().get(InterruptionAnswer.APPROVED)));
         }
     }
 

@@ -65,8 +65,9 @@ import ai.mindconnect.plugin.PluginRegistry;
 public class RuntimeBridgeAutoConfiguration {
 
     @Bean
-    OpenApprovalRecorder openApprovalRecorder(ToolApprovalRepository approvals, ObjectProvider<SessionStore> sessions) {
-        return new OpenApprovalRecorder(approvals, sessions::getObject);
+    OpenApprovalRecorder openApprovalRecorder(ToolApprovalRepository approvals, ObjectProvider<SessionStore> sessions,
+                                              ChatStreams chatStreams) {
+        return new OpenApprovalRecorder(approvals, sessions::getObject, chatStreams);
     }
 
     @Bean

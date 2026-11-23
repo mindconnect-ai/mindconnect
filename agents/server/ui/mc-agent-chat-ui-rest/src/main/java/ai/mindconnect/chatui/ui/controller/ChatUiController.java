@@ -10,23 +10,20 @@ import ai.mindconnect.agent.loop.domain.TurnEvent;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.domain.TurnOutcome;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
-import ai.mindconnect.agent.runtime.api.domain.Turn;
+import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.port.in.SessionEventListener;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.trace.port.out.LlmCallTraceRepository;
-import ai.mindconnect.agent.starter.runtime.bridge.ChatTurnListener;
-import ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
-import ai.mindconnect.agent.chat.stream.ApprovalScope;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.ui.model.UiAction;
 
@@ -58,7 +55,9 @@ public class ChatUiController {
 
     private final AgentSessionService sessionService;
     /** The chat on the runtime on the plugin kernel, behind the calls this page has always made. */
-    private final RuntimeChatService chatService;
+    private final ai.mindconnect.agentrest.service.SessionTurns sessionTurns;
+    private final ai.mindconnect.agent.runtime.api.port.in.SessionService runtimeSessions;
+    private final ai.mindconnect.agent.runtime.service.AgentChatService earlierChat;
     private final ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener;
     private final AgentDefinitionRepository agentRepository;
     private final AgentSessionRepository sessionRepository;
@@ -83,7 +82,9 @@ public class ChatUiController {
     private final ai.mindconnect.agent.management.directory.WorkingDirBrowser dirBrowser;
 
     public ChatUiController(AgentSessionService sessionService,
-                             RuntimeChatService chatService,
+                             ai.mindconnect.agentrest.service.SessionTurns sessionTurns,
+                             org.springframework.beans.factory.ObjectProvider<ai.mindconnect.agent.runtime.api.port.in.SessionService> runtimeSessions,
+                             ai.mindconnect.agent.runtime.service.AgentChatService earlierChat,
                              ai.mindconnect.agent.starter.runtime.bridge.ChatOpener chatOpener,
                              AgentDefinitionRepository agentRepository,
                              AgentSessionRepository sessionRepository,
@@ -104,7 +105,9 @@ public class ChatUiController {
                 new ai.mindconnect.agent.management.directory.WorkingDirBrowser(sessionService.workingDirPolicy()));
         this.sessionService = sessionService;
         this.sessionFiles = sessionFiles;
-        this.chatService = chatService;
+        this.sessionTurns = sessionTurns;
+        this.runtimeSessions = runtimeSessions.getObject();
+        this.earlierChat = earlierChat;
         this.chatOpener = chatOpener;
         this.agentRepository = agentRepository;
         this.sessionRepository = sessionRepository;
@@ -402,6 +405,53 @@ public class ChatUiController {
     }
 
     /** The session's id as the runtime and the management know it. */
+    /**
+     * Starts a turn in the chat and follows its session, with the sessions of
+     * the sub-agents under it, until the turn is over.
+     *
+     * @return the turn's answer; failed when the turn failed or was cancelled
+     */
+    private java.util.concurrent.CompletableFuture<String> startTurn(
+            SessionId sessionId, List<ai.mindconnect.agent.loop.domain.ContentPart> input,
+            SessionEventListener live) {
+        ai.mindconnect.agent.runtime.api.domain.SessionId chat = runtimeId(sessionId);
+        java.util.concurrent.CompletableFuture<String> answer = new java.util.concurrent.CompletableFuture<>();
+        // Followed before the turn exists: a session's events are not replayed.
+        var following = runtimeSessions.subscribe(chat, true, event -> {
+            live.onEvent(event);
+            if (!event.sessionId().equals(chat)) {
+                return;
+            }
+            if (event instanceof SessionEvent.TurnReported reported
+                    && reported.event() instanceof TurnEvent.TurnEnded ended
+                    && ended.outcome().status() != TurnOutcome.Status.WAITING_FOR_TOOLS) {
+                answer.complete(ended.outcome().text() == null ? "" : ended.outcome().text());
+            } else if (event instanceof SessionEvent.TurnFinished finished) {
+                // A turn that dies does not say so itself; its session does.
+                switch (finished.status()) {
+                    case FAILED -> answer.completeExceptionally(new IllegalStateException("The turn failed"));
+                    case CANCELLED -> answer.completeExceptionally(
+                            new java.util.concurrent.CancellationException("The turn was cancelled"));
+                    default -> { }
+                }
+            }
+        });
+        answer.whenComplete((text, failure) -> following.close());
+        try {
+            sessionTurns.submit(chat, input);
+        } catch (RuntimeException e) {
+            following.close();
+            throw e;
+        }
+        return answer;
+    }
+
+    /** The card helpers know a sub-agent's run by a UUID; its session's id gives one. */
+    private static java.util.UUID taskOf(ai.mindconnect.agent.runtime.api.domain.SessionId subSession) {
+        return java.util.UUID.nameUUIDFromBytes(
+                subSession.value().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
     private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId sessionId) {
         return ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value());
     }
@@ -1104,26 +1154,25 @@ public class ChatUiController {
             AgentSession chat, AgentDefinition def, String message) {
         long start = System.currentTimeMillis();
         AgentSession test = null;
-        ChatTurnHandle turn = null;
         try {
             test = chatOpener.openUnder(chat, def.id());
             // A title of its own spares the title generator a call for a
             // session that is gone again in a minute.
             sessionManagement.rename(runtimeId(test.id()), "Test: " + def.name());
-            turn = chatService.submitChat(test.id(), message, ChatTurnListener.none());
-            String answer = turn.result()
+            String answer = startTurn(test.id(), List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(message)),
+                    event -> { })
                     .get(SUBAGENT_TEST_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.answered(
                     answer, System.currentTimeMillis() - start);
         } catch (java.util.concurrent.TimeoutException e) {
-            turn.cancel();
+            sessionTurns.cancel(runtimeId(test.id()));
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.failed(
                     "No answer within " + SUBAGENT_TEST_TIMEOUT.toMinutes() + " minutes — if a tool is "
                             + "waiting for approval, it asks in the chat behind this dialog.",
                     System.currentTimeMillis() - start);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            if (turn != null) turn.cancel();
+            if (test != null) sessionTurns.cancel(runtimeId(test.id()));
             return ai.mindconnect.chatui.ui.component.ChatSubAgentTestComponent.Result.failed(
                     "Interrupted", System.currentTimeMillis() - start);
         } catch (java.util.concurrent.ExecutionException | RuntimeException e) {
@@ -1449,8 +1498,8 @@ public class ChatUiController {
         var agent = agentOpt.get();
 
         try (var ctx = LoggingContext.session(sessionId, null, agent.name())) {
-            ChatTurnHandle turn = chatService.submitChat(sessionId, text, ChatTurnListener.none());
-            turn.result().join();
+            startTurn(sessionId, List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), event -> { })
+                    .join();
         }
 
         return ResponseEntity.ok(buildChatPage(sessionOpt.get(), agent).chatTurnComplete());
@@ -1467,7 +1516,7 @@ public class ChatUiController {
                                            @AuthenticationPrincipal OidcUser user) {
         SessionId sessionId = SessionId.of(sessionIdValue);
         if (ownedSession(sessionId, user).isEmpty()) return ResponseEntity.notFound().build();
-        boolean cancelled = chatService.cancelChat(sessionId);
+        boolean cancelled = sessionTurns.cancel(runtimeId(sessionId));
         log.info("DELETE /chat/api/sessions/{}/chat → cancelled={}", sessionId.value(), cancelled);
         return cancelled ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
     }
@@ -1545,8 +1594,8 @@ public class ChatUiController {
         SessionId sessionId = SessionId.of(sessionIdValue);
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
-        boolean delivered = chatService.answerApproval(sessionId, callId, approved,
-                ApprovalScope.fromParam(scope));
+        boolean delivered = sessionTurns.answerApproval(runtimeId(sessionId), callId, approved,
+                "session".equalsIgnoreCase(scope));
         log.info("POST /chat/api/sessions/{}/approval call={} approved={} scope={} delivered={}",
                 sessionId.value(), callId, approved, scope, delivered);
         return ResponseEntity.ok(ai.mindconnect.chatui.ui.component.MessageListComponent.removeApprovalCard(callId));
@@ -1601,7 +1650,7 @@ public class ChatUiController {
         // DOM instead of lingering until the end-of-turn refresh.
         var session = sessionOpt.get();
         return runTurnStream(session, agentOpt.get(), parts, true,
-                handler -> chatService.submit(session.id(), parts, handler));
+                handler -> startTurn(session.id(), parts, handler));
     }
 
     /**
@@ -1637,7 +1686,7 @@ public class ChatUiController {
                                                                           AgentDefinition agent,
                                                                           String text, boolean initialRefresh) {
         return runTurnStream(session, agent, List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), initialRefresh,
-                handler -> chatService.submitChat(session.id(), text, handler));
+                handler -> startTurn(session.id(), List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), handler));
     }
 
     /**
@@ -1649,7 +1698,7 @@ public class ChatUiController {
                                                                           AgentDefinition agent,
                                                                           java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> userParts,
                                                                           boolean initialRefresh,
-                                                                          java.util.function.Function<ChatTurnListener, ChatTurnHandle> turnStarter) {
+                                                                          java.util.function.Function<SessionEventListener, java.util.concurrent.CompletableFuture<String>> turnStarter) {
         SessionId sessionId = session.id();
         // Channel id == the id of the message-list container the patches
         // target. This way the client's {@code findStreamTarget} lookup
@@ -1685,7 +1734,7 @@ public class ChatUiController {
 
         // Register the stream so the chat-page renderer (and the generic
         // /chat/api/streams endpoint) can see "this session is streaming".
-        // Cancellation goes through the same chatService.cancelChat path
+        // Cancellation goes through the same path
         // the legacy DELETE /sessions/{id}/chat endpoint uses — no separate
         // mechanism to keep in sync.
         activeStreams.register(new ai.mindconnect.chatui.service.ActiveStreams.Handle(
@@ -1693,7 +1742,7 @@ public class ChatUiController {
                 streamLabel,
                 returnHref,
                 java.time.Instant.now(),
-                () -> chatService.cancelChat(sessionId),
+                () -> sessionTurns.cancel(runtimeId(sessionId)),
                 bus));
 
         // 0. Regenerate only: replace the message list with the trimmed
@@ -1790,22 +1839,33 @@ public class ChatUiController {
                 }
             }
         };
-        java.util.function.BiConsumer<Turn, TurnEvent> onSubAgentEvent = (subAgent, event) -> {
+        // A sub-agent's session began a turn: its card, under the sub-agent that called it.
+        Consumer<SessionEvent.TurnStarted> onSubAgentStarted = started -> {
+            synchronized (liveLock) {
+                java.util.UUID taskId = taskOf(started.sessionId());
+                if (liveTasks.containsKey("sub-" + taskId)) {
+                    return;
+                }
+                log.info("sub-agent started: {}", started.agentName());
+                // One the chat's own turn called has no card above it.
+                java.util.UUID caller = runtimeSessions.find(started.sessionId())
+                        .map(ai.mindconnect.agent.runtime.api.domain.Session::parentId)
+                        .map(ChatUiController::taskOf).orElse(null);
+                startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
+                        liveTasks.containsKey("sub-" + caller) ? caller : null,
+                        taskId, started.agentName(), SessionId.of(started.sessionId().value()), "");
+            }
+        };
+        java.util.function.BiConsumer<ai.mindconnect.agent.runtime.api.domain.SessionId, TurnEvent> onSubAgentEvent =
+                (subSession, event) -> {
             synchronized (liveLock) {
                 closeThinking(thinkingFor(thinkings, sessionId, null), liveView, bus, false);
-                // The card helpers know a sub-agent's run by a UUID; the turn's id gives one.
-                java.util.UUID taskId = java.util.UUID.nameUUIDFromBytes(
-                        subAgent.id().value().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                String agentName = subAgent.agent().name();
-                if (!liveTasks.containsKey("sub-" + taskId)) {
-                    log.info("sub-agent started: {}", agentName);
-                    // Under the sub-agent that called it; one the chat's own turn called has no card above it.
-                    java.util.UUID caller = java.util.UUID.nameUUIDFromBytes(
-                            subAgent.parent().value().getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                            liveTasks.containsKey("sub-" + caller) ? caller : null,
-                            taskId, agentName, SessionId.of(subAgent.sessionId().value()), "");
+                java.util.UUID taskId = taskOf(subSession);
+                LiveTask card = liveTasks.get("sub-" + taskId);
+                if (card == null) {
+                    return;
                 }
+                String agentName = card.name;
                 // The sub-agent's own reasoning, in its nested list — same rule as
                 // at the top level: anything but more thinking closes its card.
                 String scope = scopeOf(taskId, taskToSession);
@@ -1852,11 +1912,22 @@ public class ChatUiController {
                 }
             }
         };
-        ChatTurnHandle turn = turnStarter.apply(ChatTurnListener.of(onEvent, onSubAgentEvent, asked));
+        ai.mindconnect.agent.runtime.api.domain.SessionId chat = runtimeId(sessionId);
+        java.util.concurrent.CompletableFuture<String> answer = turnStarter.apply(event -> {
+            boolean own = event.sessionId().equals(chat);
+            switch (event) {
+                case SessionEvent.TurnStarted started when !own -> onSubAgentStarted.accept(started);
+                case SessionEvent.TurnInterrupted interrupted -> asked.accept(interrupted.interruptions());
+                case SessionEvent.TurnReported reported when own -> onEvent.accept(reported.event());
+                case SessionEvent.TurnReported reported ->
+                    onSubAgentEvent.accept(reported.sessionId(), reported.event());
+                default -> { }
+            }
+        });
 
         // 3. When the turn completes, replace placeholders with persisted
         //    final bot message + collapsed activity, then send the done event.
-        turn.result().whenComplete((response, error) -> {
+        answer.whenComplete((response, error) -> {
             if (error != null) {
                 Throwable cause = (error.getCause() != null) ? error.getCause() : error;
                 log.error("SSE chat error", cause);
@@ -2330,7 +2401,7 @@ public class ChatUiController {
      */
     private WorkingMemory safeMemorySnapshot(SessionId sessionId) {
         try {
-            return chatService.memorySnapshot(sessionId);
+            return earlierChat.memorySnapshot(sessionId);
         } catch (Exception e) {
             log.warn("Failed to load working memory for session {}: {}", sessionId, e.getMessage());
             return null;

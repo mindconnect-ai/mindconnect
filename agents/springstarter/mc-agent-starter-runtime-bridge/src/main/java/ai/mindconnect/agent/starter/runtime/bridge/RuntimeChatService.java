@@ -267,8 +267,6 @@ public final class RuntimeChatService {
                 !approved ? InterruptionAnswer.reject(asked.get(), "")
                         : scope == ApprovalScope.SESSION ? InterruptionAnswer.approveAlways(asked.get())
                         : InterruptionAnswer.approve(asked.get())));
-        chatSessions.findById(sessionId)
-                .ifPresent(chat -> streams.answered(chat.id(), chat.userId(), callId, approved));
         return Optional.of(handle);
     }
 
