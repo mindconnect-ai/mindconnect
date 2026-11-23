@@ -12,6 +12,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * The compiled classes of every module of one area, found through the area's
@@ -26,8 +27,8 @@ import java.util.regex.Pattern;
  * ({@code ../common/...}) belong to another area and are skipped, as are POM
  * packaged modules, modules without main sources and the arch-tests module itself.
  *
- * <p>A listed module without {@code target/classes} fails the run: a vacuous
- * pass over missing classes must never look green.
+ * <p>A listed module without compiled classes in {@code target/classes} fails
+ * the run: a vacuous pass over missing classes must never look green.
  */
 public final class AreaLocations implements LocationProvider {
 
@@ -56,7 +57,7 @@ public final class AreaLocations implements LocationProvider {
                     continue; // resources-only module, nothing to analyse
                 }
                 Path classes = module.resolve("target/classes");
-                if (!Files.isDirectory(classes)) {
+                if (!holdsClasses(classes)) {
                     throw new IllegalStateException("No compiled classes at " + classes
                         + " — build the area first (mvn -f " + aggregator + " install -DskipTests)");
                 }
@@ -69,6 +70,20 @@ public final class AreaLocations implements LocationProvider {
             throw new IllegalStateException("No modules found in " + aggregator + " with include=" + include);
         }
         return locations;
+    }
+
+    /**
+     * A directory that is there but empty counts as missing: an IDE that
+     * re-imports a module clears it, and the rules then pass over what is
+     * left — a dependency on a class that is not there is no violation.
+     */
+    private static boolean holdsClasses(Path classes) throws IOException {
+        if (!Files.isDirectory(classes)) {
+            return false;
+        }
+        try (Stream<Path> files = Files.walk(classes)) {
+            return files.anyMatch(file -> file.toString().endsWith(".class"));
+        }
     }
 
     private static boolean isPomPackaged(Path module) throws IOException {
