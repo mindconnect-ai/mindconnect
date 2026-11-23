@@ -70,6 +70,7 @@
         <module>springstarter/mc-agent-starter-postgres</module>
         <module>springstarter/mc-agent-starter-namespace</module>
         <module>springstarter/mc-agent-starter-runtime</module>
+        <module>springstarter/mc-agent-starter-runtime-engine</module>
         <module>springstarter/mc-agent-starter-registry</module>
         <module>springstarter/mc-agent-starter-extension</module>
         <module>springstarter/mc-agent-starter-workflow</module>
