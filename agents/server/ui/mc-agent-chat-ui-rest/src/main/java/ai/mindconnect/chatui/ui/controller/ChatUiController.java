@@ -22,10 +22,8 @@ import ai.mindconnect.agent.starter.runtime.bridge.RuntimeChatService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.runtime.tools.todo.TodoListService;
 import ai.mindconnect.common.LoggingContext;
-import ai.mindconnect.message.domain.Message;
 import ai.mindconnect.agent.runtime.service.approval.ApprovalScope;
 import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
-import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import ai.mindconnect.ui.model.UiAction;
 
 import static ai.mindconnect.ui.mvc.UiActions.trigger;
@@ -148,7 +146,7 @@ public class ChatUiController {
     /** Whether somebody wrote in {@code chat}; a store that cannot say counts it as written. */
     private boolean written(ManagedSession chat) {
         try {
-            return sessionService.hasMessages(SessionId.of(chat.id().value()));
+            return !sessionManagement.messages(chat.id()).isEmpty();
         } catch (RuntimeException e) {
             log.debug("Could not tell whether chat {} is empty: {}", chat.id(), e.toString());
             return true;
@@ -1116,7 +1114,7 @@ public class ChatUiController {
                     chat.workingDir(), chat.additionalDirs());
             // A title of its own spares the title generator a call for a
             // session that is gone again in a minute.
-            sessionService.updateTitle(test.id(), "Test: " + def.name());
+            sessionManagement.rename(runtimeId(test.id()), "Test: " + def.name());
             turn = chatService.submitChat(test.id(), message, event -> { });
             String answer = turn.result()
                     .get(SUBAGENT_TEST_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
@@ -1499,7 +1497,10 @@ public class ChatUiController {
         var agentOpt = java.util.Optional.of(chatAgents.effective(sessionOpt.get()));
         if (agentOpt.isEmpty()) return ResponseEntity.notFound().build();
 
-        sessionService.deleteMessages(sessionId, fromSeq, toSeq);
+        if (toSeq != Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Messages are deleted from one on to the end of the conversation");
+        }
+        sessionManagement.deleteMessagesFrom(runtimeId(sessionId), fromSeq);
 
         return ResponseEntity.ok(
                 buildChatPage(sessionOpt.get(), agentOpt.get()).headerOnly());
@@ -1581,16 +1582,15 @@ public class ChatUiController {
 
         // Capture the user message at `seq` before we delete it — its parts,
         // so an image sent with it is sent again.
-        java.util.List<ai.mindconnect.message.domain.ContentPart> parts = sessionService.loadHistory(sessionId).stream()
-                .filter(m -> m.sequenceNum() == seq)
-                .filter(m -> m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
-                .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER)
-                // a message the runtime inserted mid-turn is not a question to ask again
-                .filter(m -> !ViewAttachmentTool.insertedBy(m))
-                .map(Message::partsOrText)
+        java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> parts = sessionManagement.messages(runtimeId(sessionId)).stream()
+                .filter(m -> m.sequence() == seq)
+                .filter(m -> m.message().type() == ai.mindconnect.agent.loop.domain.TurnMessage.Type.USER)
+                .map(m -> m.message().content())
                 .findFirst()
                 .orElse(null);
-        String text = parts == null ? null : ai.mindconnect.message.domain.ContentPart.textOf(parts);
+        String text = parts == null ? null : parts.stream()
+                .filter(ai.mindconnect.agent.loop.domain.ContentPart.Text.class::isInstance).map(part -> ((ai.mindconnect.agent.loop.domain.ContentPart.Text) part).text())
+                .collect(java.util.stream.Collectors.joining("\n"));
         if (parts == null || (text.isBlank() && parts.size() == 1)) {
             return ResponseEntity.badRequest().build();
         }
@@ -1598,7 +1598,7 @@ public class ChatUiController {
         // Drop this message and everything after it; the turn below re-adds
         // the user message fresh, so deleting from `seq` inclusive avoids a
         // duplicate. toSeq = MAX_VALUE → delete to the end.
-        sessionService.deleteMessages(sessionId, seq, Integer.MAX_VALUE);
+        sessionManagement.deleteMessagesFrom(runtimeId(sessionId), seq);
         log.info("Regenerate session={} from seq={} (deleted to end, re-running turn)", sessionId, seq);
 
         // initialRefresh=true: push the trimmed conversation to the client
@@ -1606,7 +1606,7 @@ public class ChatUiController {
         // DOM instead of lingering until the end-of-turn refresh.
         var session = sessionOpt.get();
         return runTurnStream(session, agentOpt.get(), parts, true,
-                handler -> chatService.submitChat(session.id(), parts, handler));
+                handler -> chatService.submit(session.id(), parts, handler));
     }
 
     /**
@@ -1617,14 +1617,15 @@ public class ChatUiController {
      * same session and history, so the picture is there before the answer
      * rather than after the turn.
      */
-    private String userBubble(AgentSession session,
-                              java.util.List<ai.mindconnect.message.domain.ContentPart> parts) {
-        var history = sessionService.loadHistory(session.id());
-        var attached = ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice.unannounced(session, history);
-        var removed = ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice.unannouncedRemovals(session, history);
-        var shown = ai.mindconnect.agent.runtime.service.prompt.AttachmentParts.withAttachments(parts, session, attached);
-        return ai.mindconnect.chatui.ui.component.MessageComponent.userBubble(session.id(), attached, removed,
-                ai.mindconnect.message.domain.ContentPart.textOf(parts), shown);
+    private String userBubble(AgentSession session, java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> parts) {
+        var id = runtimeId(session.id());
+        var history = sessionManagement.messages(id).stream()
+                .map(ai.mindconnect.agent.management.api.ManagedMessage::message).toList();
+        var attached = ai.mindconnect.agent.runtime.capabilities.attachment.Attachment.of(
+                sessionManagement.find(id).orElseThrow().metadata());
+        return ai.mindconnect.chatui.ui.component.MessageComponent.userBubble(session.id(),
+                ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin.userMessage(
+                        attached, history, parts, Map.of()));
     }
 
     /**
@@ -1640,7 +1641,7 @@ public class ChatUiController {
     private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runChatStream(AgentSession session,
                                                                           AgentDefinition agent,
                                                                           String text, boolean initialRefresh) {
-        return runTurnStream(session, agent, ai.mindconnect.message.domain.ContentPart.text(text), initialRefresh,
+        return runTurnStream(session, agent, List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text(text)), initialRefresh,
                 handler -> chatService.submitChat(session.id(), text, handler));
     }
 
@@ -1651,7 +1652,7 @@ public class ChatUiController {
      */
     private ResponseEntity<ai.mindconnect.ui.model.UiPatch> runTurnStream(AgentSession session,
                                                                           AgentDefinition agent,
-                                                                          java.util.List<ai.mindconnect.message.domain.ContentPart> userParts,
+                                                                          java.util.List<ai.mindconnect.agent.loop.domain.ContentPart> userParts,
                                                                           boolean initialRefresh,
                                                                           java.util.function.Function<java.util.function.Consumer<StreamEvent>, ChatTurnHandle> turnStarter) {
         SessionId sessionId = session.id();

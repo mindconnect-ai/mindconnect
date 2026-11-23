@@ -70,7 +70,9 @@ class MarkdownTextTest {
     @Test
     void theUserBubbleEscapesTheTextButKeepsItsOwnIcons() {
         String bubble = MessageComponent.userBubble(ai.mindconnect.agent.SessionId.of("s"),
-                java.util.List.of("a<b>.png"), java.util.List.of(), "look at <div>", null);
+                new ai.mindconnect.agent.loop.domain.TurnMessage(null, null, ai.mindconnect.agent.loop.domain.TurnMessage.Type.USER,
+                        java.util.List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("look at <div>")), java.util.List.of(),
+                        java.util.Map.of("attachments", java.util.List.of("a<b>.png"))));
         assertThat(bubble).contains("<svg class=\"sui-icon\"")
                 .contains("a&lt;b>.png")
                 .contains("look at &lt;div>");
@@ -170,9 +172,9 @@ class MarkdownTextTest {
     @Test
     void attachmentNamesInTheBubbleAreEscaped() {
         String bubble = MessageComponent.userBubble(ai.mindconnect.agent.SessionId.of("s"),
-                java.util.List.of(), java.util.List.of(), "see file",
-                java.util.List.of(new ai.mindconnect.message.domain.ContentPart.File(
-                        "f-1", "<img src=x onerror=alert(1)>.pdf", "application/pdf", 10)));
+                ai.mindconnect.agent.loop.domain.TurnMessage.user(java.util.List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("see file"),
+                        new ai.mindconnect.agent.loop.domain.ContentPart.Document(new ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId("f-1"),
+                                "<img src=x onerror=alert(1)>.pdf"))));
         assertThat(bubble).contains("&lt;img src=x onerror=alert").doesNotContain("<img");
     }
 }

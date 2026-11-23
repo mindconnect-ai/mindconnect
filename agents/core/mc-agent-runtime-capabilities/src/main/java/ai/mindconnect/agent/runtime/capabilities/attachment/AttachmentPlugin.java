@@ -82,29 +82,40 @@ public final class AttachmentPlugin implements Plugin {
     /** The request with what changed among the attachments since the model was last told. */
     private static TurnRequest announcing(TurnInput input, List<TurnMessage> history) {
         TurnRequest request = input.request();
-        List<Attachment> attached = Attachment.of(input.session());
+        TurnMessage message = userMessage(Attachment.of(input.session()), history, request.input(),
+                request.metadata());
+        return new TurnRequest(request.sessionId(), message.content(), request.agent(), message.metadata());
+    }
+
+    /**
+     * The user's message as the next turn stores it: the input, the images
+     * and PDFs attached since the model was last told, and the record of
+     * what the message announces. For whoever shows the message before the
+     * turn has written it.
+     *
+     * @param history what was said in the session so far
+     */
+    public static TurnMessage userMessage(List<Attachment> attached, List<TurnMessage> history,
+                                          List<ContentPart> input, Map<String, Object> inputMetadata) {
         Set<String> told = told(history);
         List<Attachment> fresh = attached.stream().filter(file -> !told.contains(file.name())).toList();
         List<String> gone = told.stream()
                 .filter(name -> attached.stream().noneMatch(file -> file.name().equals(name)))
                 .toList();
-        if (fresh.isEmpty() && gone.isEmpty()) {
-            return request;
-        }
         // A file the caller already sends as a part of its own is not added a second time.
         Set<String> sent = new LinkedHashSet<>();
-        request.input().forEach(part -> fileOf(part).ifPresent(sent::add));
-        List<ContentPart> parts = new ArrayList<>(request.input());
+        input.forEach(part -> fileOf(part).ifPresent(sent::add));
+        List<ContentPart> parts = new ArrayList<>(input);
         fresh.stream().filter(Attachment::sendableAsPart).filter(file -> !sent.contains(file.id()))
                 .forEach(file -> parts.add(file.part()));
-        Map<String, Object> metadata = new LinkedHashMap<>(request.metadata());
+        Map<String, Object> metadata = new LinkedHashMap<>(inputMetadata);
         if (!fresh.isEmpty()) {
             metadata.put(ANNOUNCED, fresh.stream().map(Attachment::name).toList());
         }
         if (!gone.isEmpty()) {
             metadata.put(DETACHED, gone);
         }
-        return new TurnRequest(request.sessionId(), parts, request.agent(), metadata);
+        return new TurnMessage(null, null, TurnMessage.Type.USER, parts, List.of(), metadata);
     }
 
     /** What the model has been told is attached, after reading the history in order. */

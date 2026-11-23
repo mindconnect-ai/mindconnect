@@ -1,7 +1,6 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
-import ai.mindconnect.message.domain.ContentPart;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
@@ -58,9 +57,22 @@ public final class MessageComponent {
      * its name.
      */
     String withAttachmentChip(ManagedMessage m) {
-        StringBuilder out = new StringBuilder(userBubble(sessionId, names(m, AttachmentNotice.ATTACHMENTS),
-                names(m, AttachmentNotice.DETACHED), m.message().text(), null));
-        for (var part : m.message().content()) {
+        return userBubble(sessionId, m.message());
+    }
+
+    /**
+     * The body of a user bubble from the message itself — so the bubble a
+     * turn shows the moment it is sent carries the same attachment line and
+     * pictures the stored message renders with later.
+     */
+    public static String userBubble(SessionId sessionId, ai.mindconnect.agent.loop.domain.TurnMessage message) {
+        List<String> attached = names(message, AttachmentNotice.ATTACHMENTS);
+        List<String> removed = names(message, AttachmentNotice.DETACHED);
+        StringBuilder out = new StringBuilder();
+        if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(MarkdownText.safe(String.join(", ", attached))).append("*\n\n");
+        if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(MarkdownText.safe(String.join(", ", removed))).append(" removed*\n\n");
+        out.append(MarkdownText.safe(message.text()));
+        for (var part : message.content()) {
             if (part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Image image
                     && image.source() instanceof ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId file) {
                 image(out, sessionId, file.fileId(), image.name());
@@ -72,32 +84,9 @@ public final class MessageComponent {
     }
 
     /** The names a stored message announced under that key; empty when none. */
-    private static List<String> names(ManagedMessage m, String key) {
-        return m.message().metadata().get(key) instanceof java.util.Collection<?> names
+    private static List<String> names(ai.mindconnect.agent.loop.domain.TurnMessage message, String key) {
+        return message.metadata().get(key) instanceof java.util.Collection<?> names
                 ? names.stream().map(String::valueOf).toList() : List.of();
-    }
-
-    /**
-     * The body of a user bubble from its pieces rather than a stored message —
-     * so the bubble a turn shows the moment it is sent carries the same
-     * attachment line and pictures the persisted message renders with later.
-     */
-    public static String userBubble(SessionId sessionId, List<String> attached, List<String> removed,
-                                    String text, List<ContentPart> parts) {
-        StringBuilder out = new StringBuilder();
-        if (!attached.isEmpty()) out.append(icon("paperclip")).append(" *").append(MarkdownText.safe(String.join(", ", attached))).append("*\n\n");
-        if (!removed.isEmpty()) out.append(icon("trash-2")).append(" *").append(MarkdownText.safe(String.join(", ", removed))).append(" removed*\n\n");
-        out.append(text == null ? "" : MarkdownText.safe(text));
-        if (parts != null) {
-            for (var part : parts) {
-                if (part instanceof ContentPart.Image image) {
-                    image(out, sessionId, image.fileId(), image.name());
-                } else if (part instanceof ContentPart.File file) {
-                    document(out, file.name());
-                }
-            }
-        }
-        return out.toString();
     }
 
     /**

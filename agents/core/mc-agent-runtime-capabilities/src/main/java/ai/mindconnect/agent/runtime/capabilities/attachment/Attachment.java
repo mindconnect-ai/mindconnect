@@ -22,7 +22,12 @@ public record Attachment(String id, String name, String mediaType, long sizeByte
 
     /** The files attached to the session, in the order they were attached. */
     public static List<Attachment> of(Session session) {
-        if (!(session.metadata().get(AttachmentPlugin.ATTACHMENTS) instanceof List<?> stored)) {
+        return of(session.metadata());
+    }
+
+    /** The files a session's metadata holds as attached. */
+    public static List<Attachment> of(Map<String, Object> sessionMetadata) {
+        if (!(sessionMetadata.get(AttachmentPlugin.ATTACHMENTS) instanceof List<?> stored)) {
             return List.of();
         }
         return stored.stream()

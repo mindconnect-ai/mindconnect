@@ -5,7 +5,6 @@ import ai.mindconnect.chatui.service.SessionOwnership;
 import ai.mindconnect.filestore.FileStore;
 import ai.mindconnect.filestore.StoredFile;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
-import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.ui.model.UiPatch;
 import ai.mindconnect.ui.model.UiToast;
 import org.springframework.http.HttpStatus;
@@ -45,7 +44,9 @@ public class ChatFilesUiController {
     private final FileStore fileStore;
     private final SessionFileService sessionFiles;
     private final AgentSessionRepository sessions;
-    private final AgentSessionService sessionService;
+    /** Whether this installation lets a user choose a chat's directories. */
+    private final ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy;
+    private final ai.mindconnect.agent.management.api.SessionManagement sessionManagement;
     private final ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents;
     private final SessionOwnership ownership;
     /** Whether a turn is live right now — the composer is redrawn in that state. */
@@ -59,7 +60,8 @@ public class ChatFilesUiController {
 
     public ChatFilesUiController(FileStore fileStore, SessionFileService sessionFiles,
                                  AgentSessionRepository sessions,
-                                 AgentSessionService sessionService,
+                                 ai.mindconnect.agent.runtime.service.WorkingDirPolicy workingDirPolicy,
+                                 ai.mindconnect.agent.management.api.SessionManagement sessionManagement,
                                  ai.mindconnect.agent.starter.runtime.bridge.ChatAgentChoice chatAgents,
                                  SessionOwnership ownership,
                                  ai.mindconnect.chatui.service.ActiveStreams activeStreams,
@@ -70,7 +72,8 @@ public class ChatFilesUiController {
         this.fileStore = fileStore;
         this.sessionFiles = sessionFiles;
         this.sessions = sessions;
-        this.sessionService = sessionService;
+        this.workingDirPolicy = workingDirPolicy;
+        this.sessionManagement = sessionManagement;
         this.chatAgents = chatAgents;
         this.ownership = ownership;
         this.activeStreams = activeStreams;
@@ -112,11 +115,13 @@ public class ChatFilesUiController {
         var session = ownership.owned(sessionId, user).orElse(null);
         if (session == null) return false;
         if (session.attachedFiles().stream().anyMatch(f -> fileId.equals(f.id()))) return true;
-        return sessionService.loadHistory(sessionId).stream()
-                .filter(m -> m.parts() != null)
-                .flatMap(m -> m.parts().stream())
-                .anyMatch(part -> part instanceof ai.mindconnect.message.domain.ContentPart.Media media
-                        && fileId.equals(media.fileId()));
+        return sessionManagement.messages(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value())).stream()
+                .flatMap(m -> m.message().content().stream())
+                .map(part -> part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Image image ? image.source()
+                        : part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Document document
+                                ? document.source() : null)
+                .anyMatch(source -> source instanceof ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId file
+                        && fileId.equals(file.fileId()));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -200,7 +205,7 @@ public class ChatFilesUiController {
                 .withAgentCounts(agent, ai.mindconnect.chatui.ui.component.ChatToolsPickerComponent
                         .offered(toolRegistry.toolNamesByGroup()))
                 .withWorkingDir(session == null ? null : session.workingDir())
-                .withDirChoice(sessionService.workingDirChoice());
+                .withDirChoice(workingDirPolicy.allowsChoice());
         return UiPatch.Operation.replace(form.id(), form.render());
     }
 }

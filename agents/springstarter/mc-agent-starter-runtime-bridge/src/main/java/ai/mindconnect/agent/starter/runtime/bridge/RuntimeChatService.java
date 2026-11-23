@@ -78,6 +78,11 @@ public final class RuntimeChatService {
 
     public ChatTurnHandle submitChat(SessionId sessionId, List<ai.mindconnect.message.domain.ContentPart> parts,
                                      Consumer<StreamEvent> events) {
+        return submit(sessionId, parts.stream().map(RuntimeChatService::part).toList(), events);
+    }
+
+    /** Submits a message whose parts are the runtime's own — text, or media a history handed back. */
+    public ChatTurnHandle submit(SessionId sessionId, List<ContentPart> parts, Consumer<StreamEvent> events) {
         AgentSession chat = chatSessions.findById(sessionId).orElseThrow(() ->
                 new IllegalArgumentException("There is no session " + sessionId.value()));
         // The agent as it is now, for this turn and as the session's: a stored agent the chat refers to
@@ -86,7 +91,7 @@ public final class RuntimeChatService {
                 .orElseThrow(() -> new IllegalStateException("Session " + sessionId.value() + " has no agent"));
         Session session = known(chat, agent);
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
-                parts.stream().map(RuntimeChatService::part).toList(), agent, Map.of()));
+                parts, agent, Map.of()));
         sessions.update(session.id(), current -> current.withMetadata(LAST_TURN, turnId.value()));
         ChatTurnId chatTurnId = ChatTurnId.of(turnId.value());
         Consumer<StreamEvent> stream = streams.started(chat, chatTurnId);
