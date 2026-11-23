@@ -13,7 +13,6 @@ import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
-import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.sdk.AgentRuntime;
 import org.springframework.stereotype.Service;
 
@@ -37,9 +36,8 @@ public class SessionTurns {
         // A stored agent the session refers to holds as edited since.
         AgentDefinition agent = runtime.service(SessionManagement.class).agentOf(sessionId).orElseThrow(() ->
                 new IllegalStateException("Session " + sessionId.value() + " has no agent"));
-        // Kept as the session's too: what works for the session between turns has a model to ask.
-        runtime.service(SessionStore.class).update(sessionId, session -> session.withAgent(agent));
-        return runtime.turns().submit(new TurnRequest(sessionId, input, agent, Map.of()));
+        runtime.sessions().changeAgent(sessionId, agent);
+        return runtime.turns().submit(new TurnRequest(sessionId, input, Map.of()));
     }
 
     /** Whether there was a turn to cancel. */

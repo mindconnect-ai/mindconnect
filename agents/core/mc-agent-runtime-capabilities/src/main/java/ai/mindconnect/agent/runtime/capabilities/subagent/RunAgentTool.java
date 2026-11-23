@@ -105,6 +105,6 @@ final class RunAgentTool implements Tool {
         });
         metadata.put(SubAgentPlugin.OPENED_BY_CALL, call.callId());
         Session child = sessions.get().open(new SessionSpec(session.userId(), session.id(), agent, metadata));
-        return new TurnRequest(child.id(), List.of(new ContentPart.Text(message)), agent, Map.of());
+        return new TurnRequest(child.id(), List.of(new ContentPart.Text(message)), Map.of());
     }
 }

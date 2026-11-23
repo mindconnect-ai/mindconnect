@@ -20,8 +20,8 @@ import ai.mindconnect.agent.runtime.api.port.out.ModelSettingsResolver;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 
 /**
- * Decides what a turn is before it runs: whether it may start at all, as
- * which agent, with which model settings. The same for a turn a caller
+ * Decides what a turn is before it runs: whether it may start at all and
+ * with which model settings; it runs as the agent its session has now. The same for a turn a caller
  * submits and for one a tool hands its call to, which is why it is one
  * class. It only decides — the turn exists once its task is submitted.
  */
@@ -51,7 +51,7 @@ final class TurnAcceptor {
             throw new IllegalArgumentException("The turn was refused: " + refused.reason());
         }
         TurnRequest request = ((TurnAdmission.Admitted) admission).request();
-        AgentDefinition agent = agentOf(request, session);
+        AgentDefinition agent = agentOf(session);
         Turn turn = new Turn(TurnId.of(UUID.randomUUID().toString()), null, session.id(),
                 agent.withModelSettings(modelSettingsOf(session, agent)),
                 TurnStatus.QUEUED, List.of(), null, null);
@@ -59,14 +59,10 @@ final class TurnAcceptor {
                 request.metadata()));
     }
 
-    /** The request's agent, else the session's; a turn without either cannot run. */
-    private static AgentDefinition agentOf(TurnRequest request, Session session) {
-        if (request.agent() != null) {
-            return request.agent();
-        }
+    /** The session's agent; a session kept from before every session had one cannot run a turn. */
+    private static AgentDefinition agentOf(Session session) {
         if (session.agent() == null) {
-            throw new IllegalArgumentException(
-                    "The request brings no agent and session " + session.id().value() + " has none");
+            throw new IllegalArgumentException("Session " + session.id().value() + " has no agent");
         }
         return session.agent();
     }

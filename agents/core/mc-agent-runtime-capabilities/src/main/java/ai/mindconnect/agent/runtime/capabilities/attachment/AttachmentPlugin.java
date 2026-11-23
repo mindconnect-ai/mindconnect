@@ -84,7 +84,7 @@ public final class AttachmentPlugin implements Plugin {
         TurnRequest request = input.request();
         TurnMessage message = userMessage(Attachment.of(input.session()), history, request.input(),
                 request.metadata());
-        return new TurnRequest(request.sessionId(), message.content(), request.agent(), message.metadata());
+        return new TurnRequest(request.sessionId(), message.content(), message.metadata());
     }
 
     /**

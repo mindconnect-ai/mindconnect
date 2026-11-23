@@ -23,7 +23,6 @@ import ai.mindconnect.taskqueue.TaskContext;
 import ai.mindconnect.taskqueue.TaskOutcome;
 import ai.mindconnect.taskqueue.TaskRecord;
 import ai.mindconnect.taskqueue.TaskStatus;
-import ai.mindconnect.taskqueue.TaskSubmission;
 import ai.mindconnect.taskqueue.TaskWorker;
 
 /**
@@ -106,13 +105,11 @@ final class ToolCallWorker implements TaskWorker {
     private TaskOutcome delegate(TaskContext ctx, ToolOutput.Delegated handedOn) {
         try {
             // Accepted one by one before any is started: a request that is refused starts none.
-            List<TaskSubmission> accepted = handedOn.requests().stream()
-                    .map(request -> TurnTaskMapper.submission(acceptor.accept(request), Optional.empty(),
-                            CallerBoundWorker.callerOf(ctx.task())))
-                    .toList();
-            ctx.updateState(Map.of(DELEGATED_TO, handedOn.requests().stream()
-                    .map(request -> request.agent() == null ? "agent" : request.agent().name()).toList()));
-            accepted.forEach(ctx::submitChild);
+            List<TurnAcceptor.Accepted> accepted = handedOn.requests().stream().map(acceptor::accept).toList();
+            ctx.updateState(Map.of(DELEGATED_TO,
+                    accepted.stream().map(turn -> turn.turn().agent().name()).toList()));
+            accepted.forEach(turn -> ctx.submitChild(TurnTaskMapper.submission(turn, Optional.empty(),
+                    CallerBoundWorker.callerOf(ctx.task()))));
             return TaskOutcome.suspendUntilChildren();
         } catch (IllegalArgumentException e) {
             ctx.updateState(Map.of(FAILED, true));

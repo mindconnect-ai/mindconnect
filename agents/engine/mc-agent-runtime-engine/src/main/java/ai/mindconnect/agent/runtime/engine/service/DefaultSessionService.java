@@ -7,6 +7,7 @@ import java.util.UUID;
 
 import ai.mindconnect.agent.loop.domain.ToolCalls;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
@@ -42,6 +43,12 @@ public final class DefaultSessionService implements SessionService {
     @Override
     public Optional<Session> find(SessionId sessionId) {
         return sessions.find(sessionId);
+    }
+
+    @Override
+    public Session changeAgent(SessionId sessionId, AgentDefinition agent) {
+        existing(sessionId);
+        return sessions.update(sessionId, session -> session.withAgent(agent));
     }
 
     @Override

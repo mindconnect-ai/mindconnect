@@ -1,10 +1,14 @@
 package ai.mindconnect.agent.runtime.api.domain;
 
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * What the caller decides about a new session; the id and the time are the
- * runtime's. Only the user is needed — see {@link Session} for the rest.
+ * runtime's. See {@link Session} for what each part is.
+ *
+ * @param agent the agent that answers in the session; a session without
+ *              one could not run a turn, so there is none
  */
 public record SessionSpec(
         UserId userId,
@@ -14,11 +18,7 @@ public record SessionSpec(
 ) {
 
     public SessionSpec {
+        Objects.requireNonNull(agent, "a session needs an agent");
         metadata = Map.copyOf(metadata);
-    }
-
-    /** A root session with no agent and no metadata of its own. */
-    public static SessionSpec of(UserId userId) {
-        return new SessionSpec(userId, null, null, Map.of());
     }
 }

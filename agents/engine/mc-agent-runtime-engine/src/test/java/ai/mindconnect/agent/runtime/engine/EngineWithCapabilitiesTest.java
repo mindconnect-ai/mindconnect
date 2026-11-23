@@ -272,8 +272,7 @@ class EngineWithCapabilitiesTest {
                 "You talk to {{ user }}.{% if missing %} Never shown.{% endif %}", ModelSettings.NONE, List.of(), 5, Map.of());
         model.script.add(TurnMessage.assistant("Hello."));
 
-        awaitRest(turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Hi")), greeter, Map.of())));
+        awaitRest(turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), greeter).id(), "Hi")));
 
         assertThat(model.requests.get(0).instructions()).startsWith("You talk to ada.").doesNotContain("Never shown");
     }
@@ -390,8 +389,7 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("Ran."));
         model.script.add(TurnMessage.assistant("The operator ran it."));
 
-        TurnId turnId = turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Go")), boss, Map.of()));
+        TurnId turnId = turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), boss).id(), "Go"));
         Turn interrupted = awaitRest(turnId);
         assertThat(interrupted.status()).isEqualTo(TurnStatus.INTERRUPTED);
         Interruption interruption = interrupted.interruptions().get(0);
@@ -475,8 +473,7 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("`PASS`"));
         model.script.add(TurnMessage.assistant("Buy. This is not investment advice."));
 
-        Turn ended = awaitRest(turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("What now?")), advisor, Map.of())));
+        Turn ended = awaitRest(turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), advisor).id(), "What now?")));
 
         assertThat(ended.outcome().text()).isEqualTo("Buy. This is not investment advice.");
         assertThat(turns.messages(ended.id())).last().extracting(TurnMessage::text)
@@ -496,8 +493,7 @@ class EngineWithCapabilitiesTest {
         model.script.add(TurnMessage.assistant("Buy."));
         model.script.add(TurnMessage.assistant("BLOCK: I cannot advise on that."));
 
-        Turn ended = awaitRest(turns.submit(new TurnRequest(session.id(),
-                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("What now?")), advisor, Map.of())));
+        Turn ended = awaitRest(turns.submit(TurnRequest.text(sessions.changeAgent(session.id(), advisor).id(), "What now?")));
 
         assertThat(ended.outcome().text()).isEqualTo("I cannot advise on that.");
         assertThat(model.requests.stream().filter(request -> request.settings().model().equals("small")))

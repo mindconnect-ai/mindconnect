@@ -2,6 +2,7 @@ package ai.mindconnect.agent.runtime.api.port.in;
 
 import java.util.Optional;
 
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.SessionSpec;
@@ -21,6 +22,14 @@ public interface SessionService {
     Session open(SessionSpec spec);
 
     Optional<Session> find(SessionId sessionId);
+
+    /**
+     * Gives the session another agent: the turns accepted from now on run
+     * as it. A turn underway or waiting keeps the agent it started with.
+     *
+     * @throws IllegalArgumentException if there is no such session
+     */
+    Session changeAgent(SessionId sessionId, AgentDefinition agent);
 
     /**
      * A new session that starts where this one stands: with everything said
