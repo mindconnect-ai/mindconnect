@@ -86,6 +86,7 @@
         <module>core/mc-agent-runtime-api</module>
         <module>core/mc-agent-runtime-capabilities</module>
         <module>engine/mc-agent-runtime-engine</module>
+        <module>adapter/postgres/mc-agent-runtime-engine-pg</module>
         <module>client/mc-agent-sdk</module>
         <module>client/mc-agent-cli-local</module>
 
