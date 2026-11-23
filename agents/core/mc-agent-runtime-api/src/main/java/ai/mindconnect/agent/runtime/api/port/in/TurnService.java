@@ -6,6 +6,7 @@ import java.util.Optional;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.loop.port.out.TurnEventListener;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
+import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
@@ -34,6 +35,16 @@ public interface TurnService {
      * for an id no turn was accepted under.
      */
     Optional<Turn> find(TurnId turnId);
+
+    /**
+     * The turn of this session that has not ended: the one that runs, waits
+     * for its tools or has come back interrupted. Turns submitted after it
+     * stand in line behind it and are not it. Empty when the session is idle.
+     *
+     * <p>Only turns submitted to the session count. The turn of a sub-agent
+     * is found through the turn that called it ({@link Turn#parent}).
+     */
+    Optional<Turn> runningTurn(SessionId sessionId);
 
     /**
      * What the turn has written into its session so far, oldest first — the

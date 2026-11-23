@@ -1797,11 +1797,14 @@ public class ChatUiController {
                 java.util.UUID taskId = java.util.UUID.nameUUIDFromBytes(
                         subAgent.id().value().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                 String agentName = subAgent.agent().name();
-                // Every sub-agent is shown one level below the turn: the events do not say how deep it is.
                 if (!liveTasks.containsKey("sub-" + taskId)) {
                     log.info("sub-agent started: {}", agentName);
+                    // Under the sub-agent that called it; one the chat's own turn called has no card above it.
+                    java.util.UUID caller = java.util.UUID.nameUUIDFromBytes(
+                            subAgent.parent().value().getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     startSubAgentCard(liveView, liveTasks, openTaskNodeId, bus, taskToSession,
-                            null, taskId, agentName, SessionId.of(subAgent.sessionId().value()), "");
+                            liveTasks.containsKey("sub-" + caller) ? caller : null,
+                            taskId, agentName, SessionId.of(subAgent.sessionId().value()), "");
                 }
                 // The sub-agent's own reasoning, in its nested list — same rule as
                 // at the top level: anything but more thinking closes its card.

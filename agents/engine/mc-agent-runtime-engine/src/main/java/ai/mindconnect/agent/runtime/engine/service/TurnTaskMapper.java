@@ -126,13 +126,30 @@ final class TurnTaskMapper {
         TurnId turnId = TurnId.of(task.id());
         SessionId sessionId = SessionId.of((String) task.payload().get(SESSION_ID));
         List<Interruption> interruptions = interruptions(task);
-        return new Turn(turnId, sessionId,
+        return new Turn(turnId, callerOf(task), sessionId,
                 AGENTS.fromJson((Map<String, Object>) task.payload().get(AGENT)),
                 status(task, interruptions),
                 interruptions,
                 task.state().get(OUTCOME) instanceof Map<?, ?> outcome
                         ? outcomeFromJson((Map<String, Object>) outcome) : null,
                 task.status() == TaskStatus.FAILED && !task.cancelRequested() ? task.failure().message() : null);
+    }
+
+    /** The turn that called this one as a sub-agent, or {@code null}: the nearest turn task above it. */
+    private TurnId callerOf(TaskRecord task) {
+        // A turn a tool handed its call to hangs under that call's task.
+        Optional<TaskRecord> above = Optional.ofNullable(task.parentTaskId()).flatMap(queue::get);
+        while (above.isPresent() && !TYPE.equals(above.get().type())) {
+            above = Optional.ofNullable(above.get().parentTaskId()).flatMap(queue::get);
+        }
+        return above.map(caller -> TurnId.of(caller.id())).orElse(null);
+    }
+
+    /** The turn of the same session this one was lined up behind; empty for the session's first. */
+    Optional<TurnId> before(TurnId turnId) {
+        return queue.get(turnId.value())
+                .map(task -> (String) task.payload().get(AFTER))
+                .map(TurnId::of);
     }
 
     /**

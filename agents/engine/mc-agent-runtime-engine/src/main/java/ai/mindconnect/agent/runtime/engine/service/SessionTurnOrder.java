@@ -28,6 +28,19 @@ final class SessionTurnOrder {
         this.state = state;
     }
 
+    /** The turn at the end of the session's line; empty when no turn was ever submitted to it. */
+    Optional<TurnId> last(String namespace, SessionId sessionId) {
+        String line = "session-turns:" + namespace + ":" + sessionId.value();
+        Optional<String> last = state.get(line, LAST).map(String::valueOf);
+        // The hint may lag behind: on along the chain to its end.
+        Optional<String> next = last;
+        while (next.isPresent()) {
+            last = next;
+            next = state.get(line, "after:" + last.get()).map(String::valueOf);
+        }
+        return last.map(TurnId::of);
+    }
+
     /** Lines the turn up in its session; the turn it has to wait for, empty when it is the session's first. */
     Optional<TurnId> enqueue(String namespace, SessionId sessionId, TurnId turnId) {
         String line = "session-turns:" + namespace + ":" + sessionId.value();

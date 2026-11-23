@@ -201,6 +201,40 @@ class EngineWithCapabilitiesTest {
     }
 
     @Test
+    void the_sessions_running_turn_is_the_one_that_has_not_ended() throws InterruptedException {
+        model.script.add(call("c1", "bash", Map.of()));
+        model.script.add(TurnMessage.assistant("Done."));
+        assertThat(turns.runningTurn(session.id())).isEmpty();
+
+        TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Run it"));
+        Turn interrupted = awaitRest(turnId);
+        // A turn that waits for an answer has not ended, and one lined up behind it is not the running one.
+        TurnId behind = turns.submit(TurnRequest.text(session.id(), "And then?"));
+        assertThat(turns.runningTurn(session.id())).map(Turn::id).contains(turnId);
+
+        model.script.add(TurnMessage.assistant("Nothing."));
+        turns.resume(turnId, List.of(InterruptionAnswer.approve(interrupted.interruptions().get(0).id())));
+        awaitRest(turnId);
+        awaitRest(behind);
+
+        assertThat(turns.runningTurn(session.id())).isEmpty();
+    }
+
+    @Test
+    void a_sub_agents_turn_names_the_turn_that_called_it() throws InterruptedException {
+        model.script.add(call("c1", "researcher", Map.of("task", "Find the capital of France.")));
+        model.script.add(call("c2", "bash", Map.of()));
+
+        TurnId turnId = turns.submit(TurnRequest.text(session.id(), "Capital of France?"));
+        Turn interrupted = awaitRest(turnId);
+        TurnId subAgent = interrupted.interruptions().get(0).turnId();
+
+        assertThat(interrupted.parent()).isNull();
+        assertThat(turns.find(subAgent)).map(Turn::parent).contains(turnId);
+        turns.cancel(turnId);
+    }
+
+    @Test
     void a_rejected_approval_is_an_error_the_model_reads() throws InterruptedException {
         model.script.add(call("c1", "bash", Map.of()));
         model.script.add(TurnMessage.assistant("Then not."));

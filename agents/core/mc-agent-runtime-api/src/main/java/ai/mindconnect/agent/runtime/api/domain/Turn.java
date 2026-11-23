@@ -8,6 +8,8 @@ import ai.mindconnect.agent.loop.domain.TurnOutcome;
  * A turn as it stands — data, not a handle: whoever wants to follow it asks
  * the runtime again by {@link #id} or subscribes to its events.
  *
+ * @param parent        the turn that called this one as a sub-agent; {@code null}
+ *                      for a turn a caller submitted
  * @param agent         the agent as the turn runs it, resolved when the turn
  *                      was accepted and kept: a definition changed meanwhile
  *                      does not change a turn underway. Its model settings
@@ -22,6 +24,7 @@ import ai.mindconnect.agent.loop.domain.TurnOutcome;
  */
 public record Turn(
         TurnId id,
+        TurnId parent,
         SessionId sessionId,
         AgentDefinition agent,
         TurnStatus status,

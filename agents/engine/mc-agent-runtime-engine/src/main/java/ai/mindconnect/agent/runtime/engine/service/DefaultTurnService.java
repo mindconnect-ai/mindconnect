@@ -10,6 +10,7 @@ import ai.mindconnect.agent.loop.port.out.TurnEventListener;
 import ai.mindconnect.agent.runtime.api.domain.Interruption;
 import ai.mindconnect.agent.runtime.api.domain.InterruptionAnswer;
 import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
+import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
@@ -91,6 +92,22 @@ public final class DefaultTurnService implements TurnService {
     @Override
     public Optional<Turn> find(TurnId turnId) {
         return turns.turn(turnId);
+    }
+
+    @Override
+    public Optional<Turn> runningTurn(SessionId sessionId) {
+        // From the end of the session's line back to the first turn that has not ended.
+        Optional<Turn> running = Optional.empty();
+        Optional<TurnId> next = order.last(namespaces.current(), sessionId);
+        while (next.isPresent()) {
+            Optional<Turn> turn = turns.turn(next.get()).filter(found -> !found.status().isFinal());
+            if (turn.isEmpty()) {
+                break;
+            }
+            running = turn;
+            next = turns.before(next.get());
+        }
+        return running;
     }
 
     @Override

@@ -60,13 +60,6 @@ public final class RuntimeChatService {
     private final AgentChatService earlier;
     private final ChatStreams streams;
 
-    /**
-     * Metadata of the runtime's session: the turn last submitted in it — what
-     * a cancel and an approval answer are meant for. Kept in the session and
-     * not in this object, so both still find their turn after a restart.
-     */
-    static final String LAST_TURN = "lastTurn";
-
     public RuntimeChatService(TurnService turns, SessionService sessionService, SessionStore sessions,
                               AgentSessionRepository chatSessions,
                               SessionManagement management,
@@ -134,7 +127,6 @@ public final class RuntimeChatService {
                 .orElseThrow(() -> new IllegalStateException("Session " + sessionId.value() + " has no agent"));
         Session session = known(chat, agent);
         TurnId turnId = turns.submit(new TurnRequest(session.id(), parts, agent, Map.of()));
-        sessions.update(session.id(), current -> current.withMetadata(LAST_TURN, turnId.value()));
         return new Started(chat, turnId, streams.started(chat, ChatTurnId.of(turnId.value())));
     }
 
@@ -217,16 +209,9 @@ public final class RuntimeChatService {
         return underway.isPresent();
     }
 
-    /** The session's last turn, while it has not ended. */
+    /** The session's turn that has not ended. */
     private Optional<Turn> underway(SessionId sessionId) {
-        return sessions.find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()))
-                .map(session -> session.metadata().get(LAST_TURN))
-                .filter(String.class::isInstance)
-                .flatMap(turnId -> turns.find(TurnId.of((String) turnId)))
-                .filter(turn -> switch (turn.status()) {
-                    case COMPLETED, INCOMPLETE, CANCELLED, FAILED -> false;
-                    default -> true;
-                });
+        return turns.runningTurn(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()));
     }
 
     /** Why a turn that ended without saying so ended; empty for an end the turn reports itself. */
