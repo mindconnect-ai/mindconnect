@@ -9,7 +9,8 @@ import ai.mindconnect.chatui.ui.page.ChatPage;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
@@ -60,6 +61,8 @@ public class ChatUiController {
     private final RuntimeChatService chatService;
     private final AgentDefinitionRepository agentRepository;
     private final AgentSessionRepository sessionRepository;
+    /** What is done with sessions beside running turns in them: where the list of chats comes from. */
+    private final SessionManagement sessionManagement;
     private final TodoListService todoListService;
     private final ObjectMapper objectMapper;
     /** Optional — null in setups where trace persistence is disabled. */
@@ -81,6 +84,7 @@ public class ChatUiController {
                              RuntimeChatService chatService,
                              AgentDefinitionRepository agentRepository,
                              AgentSessionRepository sessionRepository,
+                             SessionManagement sessionManagement,
                              TodoListService todoListService,
                              ObjectMapper objectMapper,
                              LlmCallTraceRepository traceRepository,
@@ -99,6 +103,7 @@ public class ChatUiController {
         this.chatService = chatService;
         this.agentRepository = agentRepository;
         this.sessionRepository = sessionRepository;
+        this.sessionManagement = sessionManagement;
         this.todoListService = todoListService;
         this.objectMapper = objectMapper;
         this.traceRepository = traceRepository;
@@ -125,7 +130,7 @@ public class ChatUiController {
     @GetMapping({"", "/"})
     public ResponseEntity<UiPage> home(@AuthenticationPrincipal OidcUser user) {
         // Headers for the sidebar; only the chat being shown is loaded whole.
-        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId(user)), AgentSession.CHAT);
+        var sessions = chats(userId(user));
         var latest = ChatLanding.pick(sessions, lastShownChat(), this::written)
                 .flatMap(sessionRepository::findById);
         if (latest.isEmpty()) {
@@ -138,9 +143,9 @@ public class ChatUiController {
     }
 
     /** Whether somebody wrote in {@code chat}; a store that cannot say counts it as written. */
-    private boolean written(AgentSessionHeader chat) {
+    private boolean written(ManagedSession chat) {
         try {
-            return sessionService.hasMessages(chat.id());
+            return sessionService.hasMessages(SessionId.of(chat.id().value()));
         } catch (RuntimeException e) {
             log.debug("Could not tell whether chat {} is empty: {}", chat.id(), e.toString());
             return true;
@@ -168,7 +173,7 @@ public class ChatUiController {
         var session = openDefaultChat(userId);
         log.info("New chat {}", session.id());
         return ResponseEntity.ok(
-                shell(session, sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
+                shell(session, chats(userId)));
     }
 
     /** The agent, the model and the prompt of this chat, as a dialog over the conversation. */
@@ -298,7 +303,7 @@ public class ChatUiController {
         var saved = sessionService.replaceSessionAgent(sessionId, agent);
         String userId = userId(user);
         return ResponseEntity.ok(
-                shell(saved, sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT)));
+                shell(saved, chats(userId)));
     }
 
     /** This chat's own overrides on the agent it references, or {@code null}. */
@@ -496,7 +501,7 @@ public class ChatUiController {
             sessionService.updateTitle(sessionId, title.trim());
         }
         String userId = userId(user);
-        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT);
+        var sessions = chats(userId);
         var current = sessionRepository.findById(sessionId).orElseThrow();
         return ResponseEntity.ok(shell(current, sessions));
     }
@@ -516,13 +521,13 @@ public class ChatUiController {
         sessionService.deleteSession(sessionId);
         log.info("Chat {} deleted", sessionId);
 
-        var sessions = sessionRepository.findHeadersByUser(UserId.of(userId), AgentSession.CHAT);
+        var sessions = chats(userId);
         var newest = sessions.isEmpty()
                 ? java.util.Optional.<AgentSession>empty()
-                : sessionRepository.findById(sessions.get(0).id());
+                : sessionRepository.findById(SessionId.of(sessions.get(0).id().value()));
         if (newest.isEmpty()) {
             var fresh = openDefaultChat(userId);
-            return ResponseEntity.ok(shell(fresh, List.of(fresh)));
+            return ResponseEntity.ok(shell(fresh, chats(userId)));
         }
         return ResponseEntity.ok(shell(newest.get(), sessions));
     }
@@ -583,13 +588,23 @@ public class ChatUiController {
         return seen;
     }
 
+    /**
+     * The user's chats for the history drawer, newest first — from the
+     * management API, which lists what the runtime and the chat both keep.
+     */
+    private List<ManagedSession> chats(String userId) {
+        return sessionManagement.list(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId)).stream()
+                .filter(session -> ManagedSession.CHAT.equals(session.type()))
+                .toList();
+    }
+
     private UiPage shell(AgentSession session,
-                         List<? extends AgentSessionHeader> sessions) {
+                         List<ManagedSession> sessions) {
         return shell(session, sessions, ai.mindconnect.chatui.ui.component.ChatShellComponent.History.CHAT);
     }
 
     private UiPage shell(AgentSession session,
-                         List<? extends AgentSessionHeader> sessions,
+                         List<ManagedSession> sessions,
                          ai.mindconnect.chatui.ui.component.ChatShellComponent.History history) {
         var seen = rememberShown(session.id());
         var agent = agentResolver.resolve(session);
@@ -864,13 +879,14 @@ public class ChatUiController {
      * type with the same agent — a builder's drawer shows that builder's
      * conversations, not the chats and not the other builder's.
      */
-    private List<? extends AgentSessionHeader> historyOf(UserId userId, AgentSession session) {
+    private List<ManagedSession> historyOf(UserId userId, AgentSession session) {
         if (session.isOfType(AgentSession.CHAT)) {
-            return sessionRepository.findHeadersByUser(userId, AgentSession.CHAT);
+            return chats(userId.value());
         }
-        return sessionRepository.findHeadersByUser(userId, session.type()).stream()
-                .filter(h -> h.parentSessionId() == null
-                        && java.util.Objects.equals(h.agentDefinitionId(), session.agentDefinitionId()))
+        String agentId = session.agentDefinitionId() == null ? null : session.agentDefinitionId().value();
+        return sessionManagement.list(ai.mindconnect.agent.runtime.api.domain.UserId.of(userId.value())).stream()
+                .filter(listed -> session.type().equals(listed.type())
+                        && java.util.Objects.equals(listed.agentId().map(id -> id.value()).orElse(null), agentId))
                 .toList();
     }
 
@@ -1336,19 +1352,21 @@ public class ChatUiController {
     }
 
     /** The sessions with a turn in flight — the stream registry is the truth, as for the Stop button. */
-    private java.util.Set<SessionId> runningSessions(List<? extends AgentSessionHeader> sessions) {
+    private java.util.Set<SessionId> runningSessions(List<ManagedSession> sessions) {
         java.util.Set<SessionId> running = new java.util.HashSet<>();
         for (var s : sessions) {
-            if (activeStreams.findHandle(ai.mindconnect.chatui.service.SessionOwnership.channelOf(s.id())).isPresent()) running.add(s.id());
+            SessionId id = SessionId.of(s.id().value());
+            if (activeStreams.findHandle(ai.mindconnect.chatui.service.SessionOwnership.channelOf(id)).isPresent()) running.add(id);
         }
         return running;
     }
 
     /** The sessions with a tool stopped at the approval gate — the store is the truth, as for the cards. */
-    private java.util.Set<SessionId> waitingSessions(List<? extends AgentSessionHeader> sessions) {
+    private java.util.Set<SessionId> waitingSessions(List<ManagedSession> sessions) {
         java.util.Set<SessionId> waiting = new java.util.HashSet<>();
         for (var s : sessions) {
-            if (!approvalStore.openForRoot(s.id()).isEmpty()) waiting.add(s.id());
+            SessionId id = SessionId.of(s.id().value());
+            if (!approvalStore.openForRoot(id).isEmpty()) waiting.add(id);
         }
         return waiting;
     }

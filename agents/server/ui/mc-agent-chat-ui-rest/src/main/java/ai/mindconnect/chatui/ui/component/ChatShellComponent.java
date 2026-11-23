@@ -2,7 +2,7 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
+import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.ui.model.UiAppShell;
 import ai.mindconnect.ui.model.UiMenu;
@@ -36,7 +36,7 @@ public final class ChatShellComponent implements UiComponent {
     /** The header's burger targets the menu by id. */
     private static final String MENU_ID = "chat-menu";
 
-    private final List<? extends AgentSessionHeader> sessions;
+    private final List<ManagedSession> sessions;
     private final AgentSession active;
     private final String agentName;
     private final UiNode content;
@@ -79,7 +79,7 @@ public final class ChatShellComponent implements UiComponent {
         return this;
     }
 
-    public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
+    public ChatShellComponent(List<ManagedSession> sessions, AgentSession active,
                               String agentName, UiNode content) {
         this(sessions, active, agentName, content, java.util.Map.of());
     }
@@ -91,7 +91,7 @@ public final class ChatShellComponent implements UiComponent {
      *                   an inline session agent, a deleted definition — falls
      *                   back to the generic one.
      */
-    public ChatShellComponent(List<? extends AgentSessionHeader> sessions, AgentSession active,
+    public ChatShellComponent(List<ManagedSession> sessions, AgentSession active,
                               String agentName, UiNode content,
                               java.util.Map<AgentId, String> agentIcons) {
         this.sessions = sessions;
@@ -170,13 +170,14 @@ public final class ChatShellComponent implements UiComponent {
         menu.item(UiMenuItem.divider());
 
         SessionId activeId = active == null ? null : active.id();
-        for (AgentSessionHeader s : sessions) {
+        for (ManagedSession s : sessions) {
+            SessionId id = SessionId.of(s.id().value());
             String label = s.title() != null && !s.title().isBlank() ? s.title() : "New chat";
             String badge = badge(s, waiting, running, unseen);
-            menu.item(UiMenuItem.link("chat-" + s.id().value(), label, history.href().apply(s.id()))
+            menu.item(UiMenuItem.link("chat-" + id.value(), label, history.href().apply(id))
                     .icon(iconFor(s))
                     .badge(badge)
-                    .selected(s.id().equals(activeId)));
+                    .selected(id.equals(activeId)));
         }
         return menu;
     }
@@ -185,18 +186,18 @@ public final class ChatShellComponent implements UiComponent {
      * What a row says in place of its age, most urgent first: an answer is
      * waited for, a turn is in flight, the chat has not been opened here yet.
      */
-    static String badge(AgentSessionHeader s, java.util.Set<SessionId> waiting,
+    static String badge(ManagedSession s, java.util.Set<SessionId> waiting,
                         java.util.Set<SessionId> running, java.util.Set<SessionId> unseen) {
-        if (waiting.contains(s.id())) return BADGE_NEEDS_INPUT;
-        if (running.contains(s.id())) return BADGE_RUNNING;
-        if (unseen.contains(s.id())) return BADGE_NEW;
-        return ago(s.startedAt());
+        SessionId id = SessionId.of(s.id().value());
+        if (waiting.contains(id)) return BADGE_NEEDS_INPUT;
+        if (running.contains(id)) return BADGE_RUNNING;
+        if (unseen.contains(id)) return BADGE_NEW;
+        return ago(s.createdAt());
     }
 
     /** The icon of the agent this conversation belongs to, or the generic one. */
-    private String iconFor(AgentSessionHeader s) {
-        AgentId agentId = s.agentDefinitionId();
-        String icon = agentId == null ? null : agentIcons.get(agentId);
+    private String iconFor(ManagedSession s) {
+        String icon = s.agentId().map(id -> agentIcons.get(AgentId.of(id.value()))).orElse(null);
         return icon == null ? AgentDefinition.DEFAULT_ICON : icon;
     }
 

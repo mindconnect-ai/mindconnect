@@ -1,11 +1,8 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.agent.UserId;
-import ai.mindconnect.agent.runtime.domain.SessionStatus;
-import ai.mindconnect.agent.runtime.domain.view.AgentSessionHeader;
-import ai.mindconnect.message.domain.ConversationId;
+import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectories;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -16,18 +13,19 @@ import static org.assertj.core.api.Assertions.assertThat;
 /** A history row says the most urgent thing about its chat in place of its age. */
 class ChatShellComponentBadgeTest {
 
-    private record Chat(SessionId id, Instant startedAt) implements AgentSessionHeader {
-        public AgentId agentDefinitionId() { return null; }
-        public UserId userId() { return null; }
-        public ConversationId conversationId() { return null; }
-        public String title() { return null; }
-        public SessionStatus status() { return null; }
-        public Instant completedAt() { return null; }
-        public SessionId parentSessionId() { return null; }
+    /** A chat as the management API lists it. */
+    private static ManagedSession chat(SessionId id, String title, Instant startedAt) {
+        return new ManagedSession(ai.mindconnect.agent.runtime.api.domain.SessionId.of(id.value()),
+                ai.mindconnect.agent.runtime.api.domain.UserId.of("ada"), null, null, title, ManagedSession.CHAT,
+                ManagedSession.Status.ACTIVE, SessionDirectories.NONE, startedAt, java.util.Map.of());
     }
 
-    private final Chat chat = new Chat(SessionId.random(), Instant.now().minusSeconds(3 * 3600));
-    private final Set<SessionId> it = Set.of(chat.id());
+    private static SessionId id(ManagedSession chat) {
+        return SessionId.of(chat.id().value());
+    }
+
+    private final ManagedSession chat = chat(SessionId.random(), null, Instant.now().minusSeconds(3 * 3600));
+    private final Set<SessionId> it = Set.of(id(chat));
     private final Set<SessionId> none = Set.of();
 
     @Test
