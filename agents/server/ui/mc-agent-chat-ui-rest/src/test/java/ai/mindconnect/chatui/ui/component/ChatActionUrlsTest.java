@@ -2,10 +2,6 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
-import ai.mindconnect.message.domain.ParticipantType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
@@ -91,8 +87,9 @@ class ChatActionUrlsTest {
 
     @Test
     void aUserMessageCanBeRegeneratedAndDeletedFromHere() throws Exception {
-        var message = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER,
-                MessageType.CHAT, "hi", 7);
+        var message = new ai.mindconnect.agent.management.api.ManagedMessage(UUID.randomUUID().toString(), 7,
+                java.time.Instant.now(), ai.mindconnect.agent.loop.domain.TurnMessage.user(
+                        java.util.List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("hi"))), null, null);
         var item = new MessageComponent(SESSION, null, message, true,
                 DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())).item();
 

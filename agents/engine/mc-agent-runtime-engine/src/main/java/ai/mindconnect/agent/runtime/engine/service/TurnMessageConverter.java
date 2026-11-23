@@ -53,8 +53,16 @@ public final class TurnMessageConverter {
     private static Map<String, Object> partToJson(ContentPart part) {
         return switch (part) {
             case ContentPart.Text text -> Map.of("kind", "text", "text", text.text());
-            case ContentPart.Image image -> Map.of("kind", "image",
-                    "source", sourceToJson(image.source()), "detail", image.detail().name());
+            case ContentPart.Image image -> {
+                Map<String, Object> json = new LinkedHashMap<>();
+                json.put("kind", "image");
+                json.put("source", sourceToJson(image.source()));
+                json.put("detail", image.detail().name());
+                if (image.name() != null) {
+                    json.put("name", image.name());
+                }
+                yield json;
+            }
             case ContentPart.Audio audio -> Map.of("kind", "audio", "source", sourceToJson(audio.source()));
             case ContentPart.Document document -> Map.of("kind", "document",
                     "source", sourceToJson(document.source()), "name", document.name());
@@ -67,7 +75,7 @@ public final class TurnMessageConverter {
         return switch (kind) {
             case "text" -> new ContentPart.Text((String) json.get("text"));
             case "image" -> new ContentPart.Image(sourceFromJson((Map<String, Object>) json.get("source")),
-                    ContentPart.Image.Detail.valueOf((String) json.get("detail")));
+                    ContentPart.Image.Detail.valueOf((String) json.get("detail")), (String) json.get("name"));
             case "audio" -> new ContentPart.Audio(sourceFromJson((Map<String, Object>) json.get("source")));
             case "document" -> new ContentPart.Document(
                     sourceFromJson((Map<String, Object>) json.get("source")), (String) json.get("name"));

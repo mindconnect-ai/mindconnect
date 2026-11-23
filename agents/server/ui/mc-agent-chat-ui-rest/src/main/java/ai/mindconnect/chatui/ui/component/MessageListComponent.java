@@ -3,9 +3,8 @@ package ai.mindconnect.chatui.ui.component;
 import ai.mindconnect.chatui.ui.UiComponent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
-import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
 import ai.mindconnect.ui.model.UiList;
 import ai.mindconnect.ui.model.UiPatch;
@@ -74,7 +73,7 @@ public final class MessageListComponent implements UiComponent {
 
     private final SessionId sessionId;
     private final AgentDefinition agent;
-    private final List<Message> history;
+    private final List<ManagedMessage> history;
     private final WorkingMemory memory;
     private final SubAgentTreeProvider subAgentTree;
     /** Set when this session was spawned by a parent (sub-agent session) — drives the header link. */
@@ -93,12 +92,12 @@ public final class MessageListComponent implements UiComponent {
 
 
     public MessageListComponent(SessionId sessionId, AgentDefinition agent,
-                                List<Message> history, WorkingMemory memory) {
+                                List<ManagedMessage> history, WorkingMemory memory) {
         this(sessionId, agent, history, memory, SubAgentTreeProvider.NONE);
     }
 
     public MessageListComponent(SessionId sessionId, AgentDefinition agent,
-                                List<Message> history, WorkingMemory memory,
+                                List<ManagedMessage> history, WorkingMemory memory,
                                 SubAgentTreeProvider subAgentTree) {
         this.sessionId = sessionId;
         this.agent = agent;
@@ -223,12 +222,13 @@ public final class MessageListComponent implements UiComponent {
 
         // Sort by sequenceNum to be safe — persisted ordering should already
         // be correct but the component does not trust upstream.
-        List<Message> sorted = history.stream()
-                .sorted(Comparator.comparingInt(Message::sequenceNum))
+        List<ManagedMessage> sorted = history.stream()
+                .sorted(Comparator.comparingInt(ManagedMessage::sequence))
                 .toList();
 
-        List<Message> chatMessages = sorted.stream()
-                .filter(m -> m.type() == MessageType.CHAT)
+        List<ManagedMessage> chatMessages = sorted.stream()
+                .filter(m -> m.message().type() == TurnMessage.Type.USER
+                        || m.message().type() == TurnMessage.Type.ASSISTANT)
                 .toList();
 
         if (chatMessages.isEmpty()) {
@@ -242,11 +242,11 @@ public final class MessageListComponent implements UiComponent {
         // own collapsible task card BEFORE the agent message — so the flow
         // reads top-to-bottom (user → tools → answer), Claude-style.
         int prevAgentSeq = -1;
-        for (Message m : chatMessages) {
-            boolean isUser = m.senderType() == ParticipantType.USER;
+        for (ManagedMessage m : chatMessages) {
+            boolean isUser = m.message().type() == TurnMessage.Type.USER;
             // Before a user message too: a turn that was cancelled or failed has
             // tool calls but no answer, and its cards belong above the next question.
-            List<TaskCardComponent> tasks = toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, m.sequenceNum());
+            List<TaskCardComponent> tasks = toolCallHistory().buildHistoricTaskCards(sorted, prevAgentSeq, m.sequence());
             for (TaskCardComponent t : tasks) {
                 // Reuse the wrapper render to get the same <li> shape.
                 list.item(((UiList) t.render()).getItems().get(0));
@@ -258,7 +258,7 @@ public final class MessageListComponent implements UiComponent {
                         list.item(((UiList) Thoughts.card(m, thought).render()).getItems().get(0)));
             }
             list.item(messageItem(m, isUser));
-            prevAgentSeq = m.sequenceNum();
+            prevAgentSeq = m.sequence();
         }
         // The IN-FLIGHT turn's activity: task messages after the last CHAT
         // have no agent answer to group under yet — render them anyway, or a
@@ -467,15 +467,15 @@ public final class MessageListComponent implements UiComponent {
      * component's {@link SubAgentTreeProvider}.
      */
     public List<TaskCardComponent> allHistoricTaskCards() {
-        List<Message> sorted = history.stream()
-                .sorted(Comparator.comparingInt(Message::sequenceNum))
+        List<ManagedMessage> sorted = history.stream()
+                .sorted(Comparator.comparingInt(ManagedMessage::sequence))
                 .toList();
         return toolCallHistory().buildHistoricTaskCards(sorted, Integer.MIN_VALUE, Integer.MAX_VALUE);
     }
 
     /** The final assistant CHAT text in this component's history, or {@code null}. */
     public String lastAssistantText() {
-        return lastAssistantMessage().map(Message::content).orElse(null);
+        return lastAssistantMessage().map(m -> m.message().text()).orElse(null);
     }
 
     /**
@@ -487,17 +487,16 @@ public final class MessageListComponent implements UiComponent {
         return lastAssistantMessage().flatMap(m -> Thoughts.of(m).map(thought -> Thoughts.card(m, thought)));
     }
 
-    private java.util.Optional<Message> lastAssistantMessage() {
+    private java.util.Optional<ManagedMessage> lastAssistantMessage() {
         return history.stream()
-                .filter(m -> m.type() == MessageType.CHAT)
-                .filter(m -> m.senderType() != ParticipantType.USER)
-                .max(Comparator.comparingInt(Message::sequenceNum));
+                .filter(m -> m.message().type() == TurnMessage.Type.ASSISTANT)
+                .max(Comparator.comparingInt(ManagedMessage::sequence));
     }
 
     // ── Internal: the pieces this list is assembled from ───────────────────
 
     /** One message, rendered by its own component. */
-    private UiList.Item messageItem(Message m, boolean isUser) {
+    private UiList.Item messageItem(ManagedMessage m, boolean isUser) {
         return new MessageComponent(sessionId, agent, m, isUser, DT_FMT).item();
     }
 

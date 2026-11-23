@@ -1,11 +1,10 @@
 package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.SessionId;
-import ai.mindconnect.message.domain.ContentPart;
-import ai.mindconnect.message.domain.ConversationId;
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
-import ai.mindconnect.message.domain.ParticipantType;
+import ai.mindconnect.agent.loop.domain.ContentPart;
+import ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import org.junit.jupiter.api.Test;
 
@@ -21,17 +20,22 @@ class MessageComponentMediaTest {
     private static final String SESSION_VALUE = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
     private static final SessionId SESSION = SessionId.of(SESSION_VALUE);
 
-    private static MessageComponent component(Message m) {
+    private static MessageComponent component(ManagedMessage m) {
         return new MessageComponent(SESSION, null, m, true, DateTimeFormatter.ISO_INSTANT);
+    }
+
+    /** A user's message as the management reads it from the store. */
+    private static ManagedMessage userMessage(int sequence, java.util.Map<String, Object> metadata,
+                                              ContentPart... parts) {
+        return new ManagedMessage(UUID.randomUUID().toString(), sequence, java.time.Instant.now(),
+                new TurnMessage(null, null, TurnMessage.Type.USER, List.of(parts), List.of(), metadata), null, null);
     }
 
     @Test
     void anImagePartRendersAsThePictureFromTheChatsFileEndpoint() {
-        Message m = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER,
-                MessageType.CHAT,
-                List.of(new ContentPart.Text("what is this?"),
-                        new ContentPart.Image("f-1", "my [photo].png", "image/png", 3),
-                        new ContentPart.File("f-2", "spec.pdf", "application/pdf", 3)), 1);
+        ManagedMessage m = userMessage(1, java.util.Map.of(), new ContentPart.Text("what is this?"),
+                new ContentPart.Image(new FileId("f-1"), ContentPart.Image.Detail.AUTO, "my [photo].png"),
+                new ContentPart.Document(new FileId("f-2"), "spec.pdf"));
 
         String body = component(m).withAttachmentChip(m);
 
@@ -45,14 +49,12 @@ class MessageComponentMediaTest {
 
     @Test
     void anAttachmentShownAgainIsOneMutedLineWithoutThumbnailOrActions() throws Exception {
-        Message m = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER,
-                MessageType.CHAT,
-                List.of(new ContentPart.Text("[photo.png — image shown again at the assistant's request]"),
-                        new ContentPart.Image("f-1", "photo.png", "image/png", 3)), 2)
-                .withMetadata(java.util.Map.of(
+        ManagedMessage m = userMessage(2, java.util.Map.of(
                         ViewAttachmentTool.INSERTED_BY,
                         ViewAttachmentTool.NAME,
-                        ViewAttachmentTool.ATTACHMENT, "photo.png"));
+                        ViewAttachmentTool.ATTACHMENT, "photo.png"),
+                new ContentPart.Text("[photo.png — image shown again at the assistant's request]"),
+                new ContentPart.Image(new FileId("f-1"), ContentPart.Image.Detail.AUTO, "photo.png"));
 
         String json = new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(component(m).item());
 
@@ -62,8 +64,7 @@ class MessageComponentMediaTest {
 
     @Test
     void aTextMessageIsItsTextAlone() {
-        Message m = Message.of(ConversationId.random(), UUID.randomUUID().toString(), ParticipantType.USER,
-                MessageType.CHAT, "hello", 1);
+        ManagedMessage m = userMessage(1, java.util.Map.of(), new ContentPart.Text("hello"));
 
         assertThat(component(m).withAttachmentChip(m)).isEqualTo("hello");
     }

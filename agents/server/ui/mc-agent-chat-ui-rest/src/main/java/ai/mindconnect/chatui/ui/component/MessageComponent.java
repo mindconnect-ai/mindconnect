@@ -2,7 +2,7 @@ package ai.mindconnect.chatui.ui.component;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.message.domain.ContentPart;
-import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.runtime.service.prompt.AttachmentNotice;
 import ai.mindconnect.agent.runtime.tools.attachment.ViewAttachmentTool;
 import ai.mindconnect.ui.ext.markdown.UiMarkdown;
@@ -30,11 +30,11 @@ public final class MessageComponent {
 
     private final SessionId sessionId;
     private final AgentDefinition agent;
-    private final Message message;
+    private final ManagedMessage message;
     private final boolean fromUser;
     private final DateTimeFormatter timeFormat;
 
-    public MessageComponent(SessionId sessionId, AgentDefinition agent, Message message,
+    public MessageComponent(SessionId sessionId, AgentDefinition agent, ManagedMessage message,
                             boolean fromUser, DateTimeFormatter timeFormat) {
         this.sessionId = sessionId;
         this.agent = agent;
@@ -57,9 +57,24 @@ public final class MessageComponent {
      * picture itself, served from the chat's file endpoint; a document as
      * its name.
      */
-    String withAttachmentChip(Message m) {
-        return userBubble(sessionId, AttachmentNotice.announcedBy(m), AttachmentNotice.detachedBy(m),
-                m.content(), m.parts());
+    String withAttachmentChip(ManagedMessage m) {
+        StringBuilder out = new StringBuilder(userBubble(sessionId, names(m, AttachmentNotice.ATTACHMENTS),
+                names(m, AttachmentNotice.DETACHED), m.message().text(), null));
+        for (var part : m.message().content()) {
+            if (part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Image image
+                    && image.source() instanceof ai.mindconnect.agent.loop.domain.ContentPart.MediaSource.FileId file) {
+                image(out, sessionId, file.fileId(), image.name());
+            } else if (part instanceof ai.mindconnect.agent.loop.domain.ContentPart.Document document) {
+                document(out, document.name());
+            }
+        }
+        return out.toString();
+    }
+
+    /** The names a stored message announced under that key; empty when none. */
+    private static List<String> names(ManagedMessage m, String key) {
+        return m.message().metadata().get(key) instanceof java.util.Collection<?> names
+                ? names.stream().map(String::valueOf).toList() : List.of();
     }
 
     /**
@@ -76,18 +91,28 @@ public final class MessageComponent {
         if (parts != null) {
             for (var part : parts) {
                 if (part instanceof ContentPart.Image image) {
-                    // A linked image: the thumbnail (sized by the chat's CSS)
-                    // opens the original in a new tab — the markdown renderer
-                    // gives every link target="_blank".
-                    String url = contentUrl(sessionId, image.fileId());
-                    out.append("\n\n[![").append(MarkdownText.safe(markdownSafe(image.name()))).append("](")
-                            .append(url).append(")](").append(url).append(")");
+                    image(out, sessionId, image.fileId(), image.name());
                 } else if (part instanceof ContentPart.File file) {
-                    out.append("\n\n").append(icon("file-text")).append(" *").append(MarkdownText.safe(markdownSafe(file.name()))).append("*");
+                    document(out, file.name());
                 }
             }
         }
         return out.toString();
+    }
+
+    /**
+     * A linked image: the thumbnail (sized by the chat's CSS) opens the
+     * original in a new tab — the markdown renderer gives every link
+     * {@code target="_blank"}.
+     */
+    private static void image(StringBuilder out, SessionId sessionId, String fileId, String name) {
+        String url = contentUrl(sessionId, fileId);
+        out.append("\n\n[![").append(MarkdownText.safe(markdownSafe(name))).append("](")
+                .append(url).append(")](").append(url).append(")");
+    }
+
+    private static void document(StringBuilder out, String name) {
+        out.append("\n\n").append(icon("file-text")).append(" *").append(MarkdownText.safe(markdownSafe(name))).append("*");
     }
 
     /** Where the chat serves a file it holds, inline — see {@code ChatFilesUiController#content}. */
@@ -110,25 +135,25 @@ public final class MessageComponent {
         return name == null ? "" : name.replaceAll("[\\[\\]()*_`]", "");
     }
 
-    private UiList.Item chatItem(Message m, boolean isUser) {
-        if (ViewAttachmentTool.insertedBy(m)) {
+    private UiList.Item chatItem(ManagedMessage m, boolean isUser) {
+        if (ViewAttachmentTool.NAME.equals(m.message().metadata().get(ViewAttachmentTool.INSERTED_BY))) {
             return reshownItem(m);
         }
         String speaker = isUser ? "You" : agent.name();
         String time    = timeFormat.format(m.sentAt());
         String label   = speaker + "  [" + time + "]" + messageTokenSuffix(m);
         String css     = isUser ? "user-message" : "bot-message";
-        int seq        = m.sequenceNum();
+        int seq        = m.sequence();
 
-        var item = UiList.Item.of(m.id().value(), label)
-                .content(UiMarkdown.of("msg-" + m.id().value(), withAttachmentChip(m)).withCssClass(css));
+        var item = UiList.Item.of(m.id(), label)
+                .content(UiMarkdown.of("msg-" + m.id(), withAttachmentChip(m)).withCssClass(css));
 
         // Regenerate (USER messages only): delete this message + everything
         // after it, then re-run the turn (streaming) with the same text. Uses
         // the STREAM behaviour so the live tokens/task-cards flow exactly like
         // a normal send.
         if (isUser) {
-            item.action(UiAction.icon("regen-" + m.id().value(), "Regenerate").icon("refresh-cw")
+            item.action(UiAction.icon("regen-" + m.id(), "Regenerate").icon("refresh-cw")
                     .confirm("Delete the response(s) after this message and generate a new one?")
                     // Plain dispatch — the regenerated turn streams on the
                     // session's stream like any other.
@@ -138,7 +163,7 @@ public final class MessageComponent {
         // Delete-from-here: remove this message and every message after it.
         // toSeq = MAX_VALUE → the range delete runs to the end of the
         // conversation. Sub-agent sessions are not cleaned up.
-        item.action(UiAction.icon("delete-" + m.id().value(), "Delete from here").icon("trash-2")
+        item.action(UiAction.icon("delete-" + m.id(), "Delete from here").icon("trash-2")
                 .style(UiAction.Style.DANGER)
                 .confirm("Delete this message and all following messages?")
                 .onClick(trigger(on(ChatUiController.class)
@@ -151,18 +176,17 @@ public final class MessageComponent {
      * the picture is already in the bubble it came with: one muted line
      * naming the file, no thumbnail, no actions.
      */
-    private UiList.Item reshownItem(Message m) {
-        Object name = m.metadata() == null ? null
-                : m.metadata().get(ViewAttachmentTool.ATTACHMENT);
+    private UiList.Item reshownItem(ManagedMessage m) {
+        Object name = m.message().metadata().get(ViewAttachmentTool.ATTACHMENT);
         String line = icon("repeat") + " *" + markdownSafe(MarkdownText.safe(name == null ? "attachment" : name.toString()))
                 + "* shown to the assistant again  [" + timeFormat.format(m.sentAt()) + "]";
-        return UiList.Item.of(m.id().value(), "")
-                .content(UiMarkdown.of("msg-" + m.id().value(), line).withCssClass("reshown-message"));
+        return UiList.Item.of(m.id(), "")
+                .content(UiMarkdown.of("msg-" + m.id(), line).withCssClass("reshown-message"));
     }
 
     /** " · 42 tok" for a single message; empty when not counted. */
-    private String messageTokenSuffix(Message m) {
-        Integer t = m.tokenCount();
+    private String messageTokenSuffix(ManagedMessage m) {
+        Integer t = m.tokens();
         if (t == null || t <= 0) return "";
         return "  ·  " + String.format("%,d", t) + " tok";
     }}

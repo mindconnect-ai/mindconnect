@@ -6,7 +6,7 @@ import ai.mindconnect.chatui.ui.component.TaskCardComponent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
-import ai.mindconnect.message.domain.Message;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.ui.model.UiPage;
 import ai.mindconnect.ui.model.UiPatch;
@@ -57,12 +57,12 @@ public final class ChatPage {
     private final ChatFormComponent    chatForm;
 
     public ChatPage(AgentSession session, AgentDefinition agent,
-                    List<Message> history, WorkingMemory memory) {
+                    List<ManagedMessage> history, WorkingMemory memory) {
         this(session, agent, history, memory, false);
     }
 
     public ChatPage(AgentSession session, AgentDefinition agent,
-                    List<Message> history, WorkingMemory memory,
+                    List<ManagedMessage> history, WorkingMemory memory,
                     boolean streaming) {
         this(session, agent, history, memory, streaming,
                 MessageListComponent.SubAgentTreeProvider.NONE);
@@ -79,7 +79,7 @@ public final class ChatPage {
      *                     for a flat fallback.
      */
     public ChatPage(AgentSession session, AgentDefinition agent,
-                    List<Message> history, WorkingMemory memory,
+                    List<ManagedMessage> history, WorkingMemory memory,
                     boolean streaming,
                     MessageListComponent.SubAgentTreeProvider subAgentTree) {
         this.session = session;

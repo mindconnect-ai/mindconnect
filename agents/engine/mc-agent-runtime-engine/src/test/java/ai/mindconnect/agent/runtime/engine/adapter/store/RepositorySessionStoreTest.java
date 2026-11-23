@@ -143,4 +143,28 @@ class RepositorySessionStoreTest {
                 .containsEntry("cwd", "/tmp/project");
         assertThatThrownBy(() -> store.create(SESSION)).isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void a_message_written_the_earlier_way_reads_with_its_media_and_the_call_its_result_answers() {
+        InMemoryMessageRepository messages = new InMemoryMessageRepository(RepositorySessionStore.scopeOf(NAMESPACES));
+        SessionStore store = new RepositorySessionStore(new InMemorySessionRepository(NAMESPACES), messages);
+        store.create(SESSION);
+        ai.mindconnect.message.domain.ConversationId conversation = RepositorySessionStore.conversationOf(SESSION);
+        messages.append(conversation, seq -> ai.mindconnect.message.domain.Message.of(conversation, "ada",
+                ai.mindconnect.message.domain.ParticipantType.USER, ai.mindconnect.message.domain.MessageType.CHAT,
+                List.of(new ai.mindconnect.message.domain.ContentPart.Text("What is this?"),
+                        new ai.mindconnect.message.domain.ContentPart.Image("f-1", "owl.png", "image/png", 3)), seq));
+        messages.append(conversation, seq -> ai.mindconnect.message.domain.Message.of(conversation, "helper",
+                ai.mindconnect.message.domain.ParticipantType.AGENT,
+                ai.mindconnect.message.domain.MessageType.TOOL_RESULT,
+                "{\"toolCallId\":\"call_1\",\"toolName\":\"bash\",\"result\":\"done\"}", seq));
+
+        List<TurnMessage> read = store.messages(ID);
+
+        assertThat(read.get(0).content()).containsExactly(new ContentPart.Text("What is this?"),
+                new ContentPart.Image(new ContentPart.MediaSource.FileId("f-1"), ContentPart.Image.Detail.AUTO,
+                        "owl.png"));
+        assertThat(read.get(1).text()).isEqualTo("done");
+        assertThat(read.get(1).metadata()).containsEntry("callId", "call_1").containsEntry("toolName", "bash");
+    }
 }

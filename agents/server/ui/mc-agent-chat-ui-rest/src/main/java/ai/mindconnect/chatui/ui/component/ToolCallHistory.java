@@ -1,7 +1,7 @@
 package ai.mindconnect.chatui.ui.component;
 
-import ai.mindconnect.message.domain.Message;
-import ai.mindconnect.message.domain.MessageType;
+import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.ManagedMessage;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -47,7 +47,7 @@ public final class ToolCallHistory {
      * output. Orphan TOOL_RESULTs (e.g. from older runs) render as
      * output-only cards.
      */
-    public List<TaskCardComponent> buildHistoricTaskCards(List<Message> sorted,
+    public List<TaskCardComponent> buildHistoricTaskCards(List<ManagedMessage> sorted,
                                                            int fromSeq, int toSeq) {
         // Insertion order is render order; a slot reserved here keeps its
         // place when a later pass fills it (LinkedHashMap.put on a known key).
@@ -57,46 +57,40 @@ public final class ToolCallHistory {
 
         // Pass 1: collect inputs from TOOL_CALL messages, and reserve the
         // slots: the thought that led to the calls, then one per call.
-        for (Message m : sorted) {
-            if (m.sequenceNum() <= fromSeq || m.sequenceNum() >= toSeq) continue;
-            if (m.type() != MessageType.TOOL_CALL) continue;
+        for (ManagedMessage m : sorted) {
+            if (m.sequence() <= fromSeq || m.sequence() >= toSeq) continue;
+            if (m.message().type() != TurnMessage.Type.TOOL_CALL) continue;
             Thoughts.of(m).ifPresent(thought ->
-                    byCallId.put("think-" + m.id().value(), List.of(Thoughts.card(m, thought))));
+                    byCallId.put("think-" + m.id(), List.of(Thoughts.card(m, thought))));
             try {
-                JsonNode node  = MAPPER.readTree(m.content());
-                JsonNode calls = node.path("toolCalls");
-                if (calls.isArray()) {
-                    for (JsonNode tc : calls) {
-                        String id   = tc.path("id").asText("");
-                        String name = tc.path("name").asText("tool");
-                        JsonNode args = tc.path("arguments");
-                        String prettyArgs = MAPPER.writerWithDefaultPrettyPrinter()
-                                .writeValueAsString(args);
-                        nameByCallId.put(id, name);
-                        argsByCallId.put(id, prettyArgs);
-                        if (!id.isEmpty()) byCallId.putIfAbsent(id, List.of());
-                    }
+                for (TurnMessage.ToolCall call : m.message().toolCalls()) {
+                    String id = call.callId() == null ? "" : call.callId();
+                    nameByCallId.put(id, call.name() == null ? "tool" : call.name());
+                    argsByCallId.put(id, MAPPER.writerWithDefaultPrettyPrinter()
+                            .writeValueAsString(call.arguments()));
+                    if (!id.isEmpty()) byCallId.putIfAbsent(id, List.of());
                 }
             } catch (Exception ignored) {}
         }
 
         // Pass 2: collect outputs from TOOL_RESULT messages, build cards.
-        for (Message m : sorted) {
-            if (m.sequenceNum() <= fromSeq || m.sequenceNum() >= toSeq) continue;
-            if (m.type() != MessageType.TOOL_RESULT) continue;
+        for (ManagedMessage m : sorted) {
+            if (m.sequence() <= fromSeq || m.sequence() >= toSeq) continue;
+            if (m.message().type() != TurnMessage.Type.TOOL_RESULT) continue;
             try {
-                JsonNode node = MAPPER.readTree(m.content());
-                String callId   = node.path("toolCallId").asText("");
-                String toolName = node.path("toolName").asText(nameByCallId.getOrDefault(callId, "tool"));
-                String result   = node.path("result").asText("");
-                long   duration = m.durationMs() != null ? m.durationMs() : 0L;
+                java.util.Map<String, Object> metadata = m.message().metadata();
+                String callId   = metadata.get("callId") instanceof String id ? id : "";
+                String toolName = metadata.get("toolName") instanceof String name && !name.isEmpty()
+                        ? name : nameByCallId.getOrDefault(callId, "tool");
+                String result   = m.message().text();
+                long   duration = m.durationMillis() != null ? m.durationMillis() : 0L;
 
                 boolean isSubAgent = "run_agent".equals(toolName) || "run_agents".equals(toolName);
                 // The flag is what the runtime records (a cancel stub, a denied
                 // approval); the prefix is how older results said so.
-                boolean failed     = (m.metadata() != null && "true".equals(String.valueOf(m.metadata().get("failed"))))
-                        || (result != null && result.startsWith("Error:"));
-                String key = callId.isEmpty() ? ("task-hist-" + m.id().value()) : callId;
+                boolean failed     = "true".equals(String.valueOf(metadata.get("failed")))
+                        || result.startsWith("Error:");
+                String key = callId.isEmpty() ? ("task-hist-" + m.id()) : callId;
 
                 // Sub-agent call WITH a persisted result → done. Prefer the
                 // recursively-built nested tree (child sessions found by
@@ -126,7 +120,7 @@ public final class ToolCallHistory {
                 }
 
                 String body = TaskCardComponent.taskCardBody(argsByCallId.get(callId), result);
-                String nodeId = "task-hist-" + m.id().value();
+                String nodeId = "task-hist-" + m.id();
                 byCallId.put(key, List.of(TaskCardComponent.historic(nodeId, header, body)));
             } catch (Exception ignored) {}
         }
@@ -137,15 +131,13 @@ public final class ToolCallHistory {
         // the callId is known here even though the result isn't. Surface the
         // (running) nested tree via the provider, which finds the ACTIVE
         // child sessions. Inserted in TOOL_CALL order so they read correctly.
-        for (Message m : sorted) {
-            if (m.sequenceNum() <= fromSeq || m.sequenceNum() >= toSeq) continue;
-            if (m.type() != MessageType.TOOL_CALL) continue;
+        for (ManagedMessage m : sorted) {
+            if (m.sequence() <= fromSeq || m.sequence() >= toSeq) continue;
+            if (m.message().type() != TurnMessage.Type.TOOL_CALL) continue;
             try {
-                JsonNode calls = MAPPER.readTree(m.content()).path("toolCalls");
-                if (!calls.isArray()) continue;
-                for (JsonNode tc : calls) {
-                    String id   = tc.path("id").asText("");
-                    String name = tc.path("name").asText("");
+                for (TurnMessage.ToolCall call : m.message().toolCalls()) {
+                    String id   = call.callId() == null ? "" : call.callId();
+                    String name = call.name();
                     boolean isSubAgent = "run_agent".equals(name) || "run_agents".equals(name);
                     if (!isSubAgent || id.isEmpty() || !byCallId.getOrDefault(id, List.of()).isEmpty()) continue;
                     List<TaskCardComponent> subCards = subAgentTree.cardsFor(

@@ -141,14 +141,36 @@ final class SessionMessageMapper {
             String turnId = stored.turnId() == null ? null : stored.turnId().value();
             String text = stored.content() == null ? "" : stored.content();
             return switch (turnType) {
-                case TOOL_CALL -> new TurnMessage(stored.id().value(), turnId, turnType, List.of(),
-                        toolCalls(read(text)), metadata);
-                case TOOL_RESULT -> new TurnMessage(stored.id().value(), turnId, turnType,
-                        List.of(new ContentPart.Text(String.valueOf(read(text).getOrDefault("result", text)))),
-                        List.of(), metadata);
+                case TOOL_CALL -> {
+                    Map<String, Object> content = read(text);
+                    // What a message written the earlier way says in its content only reads as it is written now.
+                    if (content.containsKey("thinkingBlocks")) {
+                        metadata.putIfAbsent(THINKING_BLOCKS, content.get("thinkingBlocks"));
+                    }
+                    yield new TurnMessage(stored.id().value(), turnId, turnType, List.of(), toolCalls(content),
+                            metadata);
+                }
+                case TOOL_RESULT -> {
+                    Map<String, Object> content = read(text);
+                    if (content.get("toolCallId") instanceof String callId) {
+                        metadata.putIfAbsent("callId", callId);
+                    }
+                    if (content.get("toolName") instanceof String toolName && !toolName.isEmpty()) {
+                        metadata.putIfAbsent("toolName", toolName);
+                    }
+                    yield new TurnMessage(stored.id().value(), turnId, turnType,
+                            List.of(new ContentPart.Text(String.valueOf(content.getOrDefault("result", text)))),
+                            List.of(), metadata);
+                }
                 case TOOL_DISPATCHED -> new TurnMessage(stored.id().value(), turnId, turnType, List.of(), List.of(),
                         metadata);
                 case USER, ASSISTANT -> {
+                    if (!metadata.containsKey(CONTENT) && stored.parts() != null) {
+                        // Written the earlier way, with its media as parts of the repository's own.
+                        yield new TurnMessage(stored.id().value(), turnId, turnType,
+                                stored.parts().stream().map(SessionMessageMapper::part).toList(), List.of(),
+                                metadata);
+                    }
                     Map<String, Object> message = new LinkedHashMap<>();
                     message.put("id", stored.id().value());
                     message.put("turnId", turnId);
@@ -161,6 +183,16 @@ final class SessionMessageMapper {
                 }
             };
         });
+    }
+
+    private static ContentPart part(ai.mindconnect.message.domain.ContentPart part) {
+        return switch (part) {
+            case ai.mindconnect.message.domain.ContentPart.Text text -> new ContentPart.Text(text.text());
+            case ai.mindconnect.message.domain.ContentPart.Image image -> new ContentPart.Image(
+                    new ContentPart.MediaSource.FileId(image.fileId()), ContentPart.Image.Detail.AUTO, image.name());
+            case ai.mindconnect.message.domain.ContentPart.File file -> new ContentPart.Document(
+                    new ContentPart.MediaSource.FileId(file.fileId()), file.name());
+        };
     }
 
     @SuppressWarnings("unchecked")

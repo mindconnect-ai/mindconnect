@@ -173,7 +173,8 @@ public final class RuntimeChatService {
         return switch (part) {
             case ai.mindconnect.message.domain.ContentPart.Text text -> new ContentPart.Text(text.text());
             case ai.mindconnect.message.domain.ContentPart.Image image ->
-                    ContentPart.Image.of(new ContentPart.MediaSource.FileId(image.fileId()));
+                    new ContentPart.Image(new ContentPart.MediaSource.FileId(image.fileId()),
+                            ContentPart.Image.Detail.AUTO, image.name());
             case ai.mindconnect.message.domain.ContentPart.File file ->
                     new ContentPart.Document(new ContentPart.MediaSource.FileId(file.fileId()), file.name());
         };

@@ -1246,7 +1246,7 @@ public class ChatUiController {
      */
     private ChatPage buildChatPage(AgentSession session,
                                    AgentDefinition agent) {
-        var history = sessionService.loadHistory(session.id());
+        var history = sessionManagement.messages(runtimeId(session.id()));
         var memory  = safeMemorySnapshot(session.id());
         // Source-of-truth for "is this turn currently streaming?" is the
         // registry — not page-local state. Lets a navigate-back during a
@@ -1373,7 +1373,7 @@ public class ChatUiController {
             try {
                 var childAgent = agentRepository.findById(child.agentDefinitionId()).orElse(null);
                 String agentName = childAgent != null ? childAgent.name() : "sub-agent";
-                List<Message> childHistory = sessionService.loadHistory(child.id());
+                var childHistory = sessionManagement.messages(runtimeId(child.id()));
 
                 // A throwaway component reuses all the historic-card grouping
                 // logic for the sub-session, recursing through the same
@@ -1429,12 +1429,11 @@ public class ChatUiController {
     }
 
     /** The first USER CHAT message in a (sub-)session — the task it was given. */
-    private static String firstUserText(List<Message> history) {
+    private static String firstUserText(List<ai.mindconnect.agent.management.api.ManagedMessage> history) {
         return history.stream()
-                .filter(m -> m.type() == ai.mindconnect.message.domain.MessageType.CHAT)
-                .filter(m -> m.senderType() == ai.mindconnect.message.domain.ParticipantType.USER)
-                .min(java.util.Comparator.comparingInt(Message::sequenceNum))
-                .map(Message::content)
+                .filter(m -> m.message().type() == ai.mindconnect.agent.loop.domain.TurnMessage.Type.USER)
+                .min(java.util.Comparator.comparingInt(ai.mindconnect.agent.management.api.ManagedMessage::sequence))
+                .map(m -> m.message().text())
                 .orElse(null);
     }
 

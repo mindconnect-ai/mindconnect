@@ -18,11 +18,13 @@ public sealed interface ContentPart {
      * An image.
      *
      * @param detail vision-encoder hint; {@link Detail#AUTO} when unset
+     * @param name   the display filename, as a {@link Document} has one;
+     *               {@code null} for an image nobody named
      */
-    record Image(MediaSource source, Detail detail) implements ContentPart {
+    record Image(MediaSource source, Detail detail, String name) implements ContentPart {
 
         public static Image of(MediaSource source) {
-            return new Image(source, Detail.AUTO);
+            return new Image(source, Detail.AUTO, null);
         }
 
         /** Resolution hint for the vision encoder. */
