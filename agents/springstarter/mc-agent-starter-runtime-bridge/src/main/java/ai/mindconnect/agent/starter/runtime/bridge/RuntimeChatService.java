@@ -1,7 +1,5 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -18,17 +16,14 @@ import ai.mindconnect.agent.runtime.api.domain.SessionEvent;
 import ai.mindconnect.agent.runtime.api.domain.Turn;
 import ai.mindconnect.agent.runtime.api.domain.TurnId;
 import ai.mindconnect.agent.runtime.api.domain.TurnRequest;
-import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.Subscription;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
-import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.domain.TurnResult;
 import ai.mindconnect.agent.runtime.domain.TurnStatus;
-import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
@@ -40,9 +35,9 @@ import ai.mindconnect.message.domain.ChatTurnId;
 /**
  * The chat of the application on the runtime on the plugin kernel, behind
  * the calls the chat page already makes: submit a message, cancel, answer
- * an approval. The page keeps its sessions where it always had them; before
- * a turn the session is made known to the runtime, with the agent it has
- * right now and the conversation its messages are in.
+ * an approval. A chat's session is the runtime's session — the chat page
+ * reads it the earlier way from the same record — so a turn needs only the
+ * agent the chat has right now.
  */
 public final class RuntimeChatService {
 
@@ -165,33 +160,13 @@ public final class RuntimeChatService {
         return earlier.memorySnapshot(sessionId);
     }
 
-    /** The chat's session as the runtime knows it — created on its first turn, its directories kept current. */
+    /**
+     * The chat's session, which is the runtime's: one record both read. It
+     * is given the agent the chat has right now.
+     */
     private Session known(AgentSession chat, AgentDefinition agent) {
-        ai.mindconnect.agent.runtime.api.domain.SessionId id =
-                ai.mindconnect.agent.runtime.api.domain.SessionId.of(chat.id().value());
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put(RepositorySessionStore.CONVERSATION_ID, chat.conversationId().value());
-        if (chat.workingDir() != null) {
-            metadata.put(RegistryToolResolver.WORKING_DIRECTORY, chat.workingDir());
-        }
-        metadata.put(RegistryToolResolver.ADDITIONAL_DIRECTORIES, chat.additionalDirs());
-        if (chat.title() != null && !chat.title().isBlank()) {
-            // A chat that has a name is given no other.
-            metadata.put(SessionTitlePlugin.TITLE, chat.title());
-        }
-        if (sessions.find(id).isEmpty()) {
-            sessions.create(new Session(id, UserId.of(chat.userId().value()),
-                    chat.parentSessionId() == null ? null
-                            : ai.mindconnect.agent.runtime.api.domain.SessionId.of(chat.parentSessionId().value()),
-                    agent, metadata, chat.startedAt() == null ? Instant.now() : chat.startedAt()));
-        }
-        return sessions.update(id, session -> {
-            Session current = session.withAgent(agent);
-            for (Map.Entry<String, Object> entry : metadata.entrySet()) {
-                current = current.withMetadata(entry.getKey(), entry.getValue());
-            }
-            return current;
-        });
+        return sessions.update(ai.mindconnect.agent.runtime.api.domain.SessionId.of(chat.id().value()),
+                session -> session.withAgent(agent));
     }
 
     private static ContentPart part(ai.mindconnect.message.domain.ContentPart part) {

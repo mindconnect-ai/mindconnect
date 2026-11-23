@@ -41,7 +41,9 @@ import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
+import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
@@ -251,7 +253,7 @@ class RuntimeBridgeAutoConfigurationTest {
         };
     }
 
-    /** The chat page's session, as the application keeps it. */
+    /** A chat page's session, not yet kept anywhere. */
     private static AgentSession chatSession() {
         return new AgentSession(ai.mindconnect.agent.SessionId.random(), LIBRARIAN.id(),
                 ai.mindconnect.agent.UserId.of("ada"), ConversationId.random(), "Books", SessionStatus.ACTIVE,
@@ -268,6 +270,7 @@ class RuntimeBridgeAutoConfigurationTest {
         application(callingThenAnswering("search_catalog"), agents, mock(LlmCallTraceRepository.class))
                 .run(context -> {
                     assertThat(context).hasNotFailed();
+                    keptInTheRuntimesStore(context, chat);
                     List<StreamEvent> streamed = new CopyOnWriteArrayList<>();
 
                     ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
@@ -294,6 +297,7 @@ class RuntimeBridgeAutoConfigurationTest {
 
         application(callingThenAnswering("order_book"), agents, mock(LlmCallTraceRepository.class))
                 .run(context -> {
+                    keptInTheRuntimesStore(context, chat);
                     RuntimeChatService chatService = context.getBean(RuntimeChatService.class);
                     List<StreamEvent> streamed = new CopyOnWriteArrayList<>();
                     ChatTurnHandle turn = chatService.submitChat(chat.id(), "Order the owl book.", streamed::add);
@@ -330,12 +334,21 @@ class RuntimeBridgeAutoConfigurationTest {
         };
 
         application(unreachable, agents, mock(LlmCallTraceRepository.class)).run(context -> {
+            keptInTheRuntimesStore(context, chat);
             ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
                     .submitChat(chat.id(), "Anyone there?", event -> { });
 
             assertThatThrownBy(() -> turn.result().get(5, TimeUnit.SECONDS))
                     .isInstanceOf(ExecutionException.class).hasCauseInstanceOf(IllegalStateException.class);
         });
+    }
+
+    /** What opening a chat does in the application: its session goes into the runtime's store through the redirected repository. */
+    private static void keptInTheRuntimesStore(org.springframework.context.ApplicationContext context,
+                                               AgentSession chat) {
+        new ManagedAgentSessionRepository(() -> context.getBean(SessionRepository.class),
+                mock(AgentSessionRepository.class), context.getBean(ObjectMapper.class),
+                () -> context.getBean(NamespaceProvider.class)).create(chat);
     }
 
     private static Turn awaitEnd(TurnService turns, TurnId turnId) throws InterruptedException {

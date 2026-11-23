@@ -7,10 +7,14 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
+import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
+import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.agent.runtime.capabilities.memory.SummaryStore;
@@ -19,8 +23,8 @@ import ai.mindconnect.agent.runtime.capabilities.permission.PermissionRule;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionRuleSource;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillResolver;
 import ai.mindconnect.agent.runtime.engine.adapter.llm.LlmCallTraceListener;
-import ai.mindconnect.agent.runtime.engine.adapter.store.RepositorySessionStore;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
+import ai.mindconnect.agent.runtime.feature.RuntimeFeature;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
@@ -38,11 +42,12 @@ import ai.mindconnect.plugin.PluginRegistry;
  * What the application already keeps, behind the ports of the runtime on
  * the plugin kernel: its agents, skills and tools, its summaries and its
  * LLM call traces. Runs before the runtime's own auto-configuration, so the
- * stores here are the ones it finds.
+ * stores here are the ones it finds, and before the earlier runtime's, so
+ * the feature here is one it installs.
  */
-@AutoConfiguration(
-        afterName = "ai.mindconnect.agent.starter.runtime.AgentRuntimeAutoConfiguration",
-        beforeName = "ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration")
+@AutoConfiguration(beforeName = {
+        "ai.mindconnect.agent.starter.runtime.AgentRuntimeAutoConfiguration",
+        "ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration"})
 public class RuntimeBridgeAutoConfiguration {
 
     @Bean
@@ -82,12 +87,16 @@ public class RuntimeBridgeAutoConfiguration {
         };
     }
 
-    /** The runtime's sessions in its own repository, its messages in the application's, the title carried over. */
+    /**
+     * Installed into the earlier runtime: its agents and sessions are kept
+     * in the stores of the new one from here on.
+     */
     @Bean
-    @ConditionalOnMissingBean
-    SessionStore sessionStore(SessionRepository sessions, MessageRepository messages,
-                              AgentSessionRepository chatSessions) {
-        return new ChatSessionStore(new RepositorySessionStore(sessions, messages), chatSessions);
+    RuntimeFeature managedStoresFeature(ObjectProvider<AgentRepository> agents,
+                                        ObjectProvider<SessionRepository> sessions,
+                                        ObjectProvider<NamespaceProvider> namespaces,
+                                        AgentDefinitionMapper mapper, ObjectMapper json) {
+        return new ManagedStoresFeature(agents::getObject, sessions::getObject, namespaces::getObject, mapper, json);
     }
 
     @Bean

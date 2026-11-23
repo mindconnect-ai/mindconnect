@@ -88,7 +88,7 @@ final class RegistryToolResolver implements ToolResolver {
     }
 
     @SuppressWarnings("unchecked")
-    private static AgentTool agentTool(ToolBinding binding) {
+    static AgentTool agentTool(ToolBinding binding) {
         Map<String, Object> metadata = binding.metadata();
         return new AgentTool(
                 metadata.get(TOOL_ID) instanceof String id ? AgentToolId.of(id) : AgentToolId.random(),
