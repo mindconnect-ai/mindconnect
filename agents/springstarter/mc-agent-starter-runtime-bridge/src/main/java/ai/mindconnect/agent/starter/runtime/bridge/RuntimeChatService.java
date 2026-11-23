@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CancellationException;
 import java.util.function.Consumer;
 
 import ai.mindconnect.agent.SessionId;
@@ -53,8 +53,13 @@ public final class RuntimeChatService {
     private final SessionAgentResolver agents;
     private final AgentDefinitionMapper mapper;
     private final AgentChatService earlier;
-    /** The turn underway in a session: what a cancel and an approval answer are meant for. */
-    private final Map<String, TurnId> underway = new ConcurrentHashMap<>();
+
+    /**
+     * Metadata of the runtime's session: the turn last submitted in it — what
+     * a cancel and an approval answer are meant for. Kept in the session and
+     * not in this object, so both still find their turn after a restart.
+     */
+    static final String LAST_TURN = "lastTurn";
 
     public RuntimeChatService(TurnService turns, SessionService sessionService, SessionStore sessions,
                               AgentSessionRepository chatSessions,
@@ -83,7 +88,7 @@ public final class RuntimeChatService {
         Session session = known(chat, agent);
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
                 parts.stream().map(RuntimeChatService::part).toList(), agent));
-        underway.put(sessionId.value(), turnId);
+        sessions.update(session.id(), current -> current.withMetadata(LAST_TURN, turnId.value()));
         CompletableFuture<String> answer = new CompletableFuture<>();
         StreamEventTranslator translator = new StreamEventTranslator(turnId, turns, events, answer);
         // What the turn says comes from the turn; that it has to ask comes from its session.
@@ -91,24 +96,45 @@ public final class RuntimeChatService {
             if (event instanceof SessionEvent.TurnInterrupted interrupted && interrupted.turnId().equals(turnId)) {
                 translator.interrupted(interrupted.interruptions());
             }
+            // A turn that dies does not say so itself; its session does, and the page must hear an end.
+            if (event instanceof SessionEvent.TurnFinished finished && finished.turnId().equals(turnId)) {
+                failed(finished.status()).ifPresent(answer::completeExceptionally);
+            }
         });
         Subscription following = turns.subscribe(turnId, translator);
         answer.whenComplete((text, failure) -> {
             following.close();
             asking.close();
-            underway.remove(sessionId.value(), turnId);
         });
         return new Handle(turnId, sessionId, answer);
     }
 
     /** Whether there was a turn to cancel. */
     public boolean cancelChat(SessionId sessionId) {
-        TurnId turnId = underway.get(sessionId.value());
-        if (turnId == null) {
-            return false;
-        }
-        turns.cancel(turnId);
-        return true;
+        Optional<Turn> underway = underway(sessionId);
+        underway.ifPresent(turn -> turns.cancel(turn.id()));
+        return underway.isPresent();
+    }
+
+    /** The session's last turn, while it has not ended. */
+    private Optional<Turn> underway(SessionId sessionId) {
+        return sessions.find(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()))
+                .map(session -> session.metadata().get(LAST_TURN))
+                .filter(String.class::isInstance)
+                .flatMap(turnId -> turns.find(TurnId.of((String) turnId)))
+                .filter(turn -> switch (turn.status()) {
+                    case COMPLETED, INCOMPLETE, CANCELLED, FAILED -> false;
+                    default -> true;
+                });
+    }
+
+    /** Why a turn that ended without saying so ended; empty for an end the turn reports itself. */
+    private static Optional<Throwable> failed(ai.mindconnect.agent.runtime.api.domain.TurnStatus status) {
+        return switch (status) {
+            case FAILED -> Optional.of(new IllegalStateException("The turn failed"));
+            case CANCELLED -> Optional.of(new CancellationException("The turn was cancelled"));
+            default -> Optional.empty();
+        };
     }
 
     /**
@@ -118,13 +144,12 @@ public final class RuntimeChatService {
      * @return whether the answer reached a waiting call; false for a card that is stale
      */
     public boolean answerApproval(SessionId sessionId, String callId, boolean approved, ApprovalScope scope) {
-        TurnId turnId = underway.get(sessionId.value());
-        Optional<String> asked = Optional.ofNullable(turnId).flatMap(turns::find)
-                .map(Turn::interruptions).orElse(List.of()).stream()
+        Optional<Turn> underway = underway(sessionId);
+        Optional<String> asked = underway.map(Turn::interruptions).orElse(List.of()).stream()
                 .filter(interruption -> interruption.call() != null && callId.equals(interruption.call().callId()))
                 .map(interruption -> interruption.id())
                 .findFirst();
-        asked.ifPresent(interruptionId -> turns.resume(turnId, List.of(
+        asked.ifPresent(interruptionId -> turns.resume(underway.orElseThrow().id(), List.of(
                 !approved ? InterruptionAnswer.reject(interruptionId, "")
                         : scope == ApprovalScope.SESSION ? InterruptionAnswer.approveAlways(interruptionId)
                         : InterruptionAnswer.approve(interruptionId))));

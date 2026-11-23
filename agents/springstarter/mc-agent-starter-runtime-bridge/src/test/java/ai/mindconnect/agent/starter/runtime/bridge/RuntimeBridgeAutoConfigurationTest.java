@@ -1,7 +1,9 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -14,6 +16,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Test;
@@ -59,6 +62,7 @@ import ai.mindconnect.agent.runtime.memory.domain.AutoCompactConfig;
 import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
 import ai.mindconnect.agent.starter.runtime.engine.RuntimeEngineAutoConfiguration;
 import ai.mindconnect.agent.tool.AgentTool;
@@ -139,6 +143,9 @@ class RuntimeBridgeAutoConfigurationTest {
 
     /** The chat page's sessions, as the application keeps them. */
     private final AgentSessionRepository chatSessions = mock(AgentSessionRepository.class);
+
+    /** Where the chat page looks for the approvals a chat waits for. */
+    private final ToolApprovalRepository openApprovals = mock(ToolApprovalRepository.class);
 
     @TempDir
     Path dataDirectory;
@@ -227,7 +234,8 @@ class RuntimeBridgeAutoConfigurationTest {
                 .withBean(ConversationSummaryRepository.class, () -> mock(ConversationSummaryRepository.class))
                 .withBean(LlmCallTraceRepository.class, () -> traces)
                 .withBean(AgentSessionRepository.class, () -> chatSessions)
-                .withBean(AgentChatService.class, () -> mock(AgentChatService.class));
+                .withBean(AgentChatService.class, () -> mock(AgentChatService.class))
+                .withBean(ToolApprovalRepository.class, () -> openApprovals);
     }
 
     /** A model that first calls the tool with the question's subject and then answers. */
@@ -297,13 +305,37 @@ class RuntimeBridgeAutoConfigurationTest {
                             .extracting(event -> ((StreamEvent.ApprovalRequested) event).toolName())
                             .containsExactly("order_book");
                     assertThat(turn.result()).isNotDone();
+                    // The card is kept where the page draws it from after a reload.
+                    verify(openApprovals).saveIfAbsent(argThat(open -> open.callId().equals("c1")
+                            && open.rootSessionId().equals(chat.id())
+                            && open.content().contains("\"name\":\"order_book\"")));
 
                     assertThat(chatService.answerApproval(chat.id(), "unknown", true, ApprovalScope.ONCE)).isFalse();
                     assertThat(chatService.answerApproval(chat.id(), "c1", true, ApprovalScope.ONCE)).isTrue();
 
                     assertThat(turn.result().get(5, TimeUnit.SECONDS)).isEqualTo("Found it.");
                     assertThat(streamed).last().isInstanceOf(StreamEvent.Done.class);
+                    verify(openApprovals).delete(chat.id(), "c1");
                 });
+    }
+
+    @Test
+    void a_turn_that_fails_ends_for_the_chat_page_too() {
+        AgentDefinitionRepository agents = mock(AgentDefinitionRepository.class);
+        when(agents.findById(LIBRARIAN.id())).thenReturn(Optional.of(LIBRARIAN));
+        AgentSession chat = chatSession();
+        when(chatSessions.findById(chat.id())).thenReturn(Optional.of(chat));
+        LlmChat unreachable = (request, handler, cancellation, listener) -> {
+            throw new IllegalStateException("The provider is down");
+        };
+
+        application(unreachable, agents, mock(LlmCallTraceRepository.class)).run(context -> {
+            ChatTurnHandle turn = context.getBean(RuntimeChatService.class)
+                    .submitChat(chat.id(), "Anyone there?", event -> { });
+
+            assertThatThrownBy(() -> turn.result().get(5, TimeUnit.SECONDS))
+                    .isInstanceOf(ExecutionException.class).hasCauseInstanceOf(IllegalStateException.class);
+        });
     }
 
     private static Turn awaitEnd(TurnService turns, TurnId turnId) throws InterruptedException {

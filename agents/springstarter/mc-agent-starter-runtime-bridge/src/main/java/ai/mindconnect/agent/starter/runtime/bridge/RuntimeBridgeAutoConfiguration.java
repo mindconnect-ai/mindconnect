@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
+import ai.mindconnect.agent.runtime.api.hook.RuntimeHook;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
@@ -24,6 +25,7 @@ import ai.mindconnect.agent.runtime.memory.port.out.ConversationSummaryRepositor
 import ai.mindconnect.agent.runtime.port.out.AgentDefinitionRepository;
 import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
 import ai.mindconnect.agent.runtime.port.out.LlmCallTraceRepository;
+import ai.mindconnect.agent.runtime.port.out.ToolApprovalRepository;
 import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import ai.mindconnect.agent.runtime.skill.SkillRepository;
@@ -44,6 +46,11 @@ import ai.mindconnect.plugin.PluginRegistry;
 public class RuntimeBridgeAutoConfiguration {
 
     @Bean
+    OpenApprovalRecorder openApprovalRecorder(ToolApprovalRepository approvals, ObjectProvider<SessionStore> sessions) {
+        return new OpenApprovalRecorder(approvals, sessions::getObject);
+    }
+
+    @Bean
     @ConditionalOnMissingBean
     AgentDefinitionMapper agentDefinitionMapper() {
         return new AgentDefinitionMapper();
@@ -52,7 +59,7 @@ public class RuntimeBridgeAutoConfiguration {
     /** The application's agents, skills and tools, contributed to the runtime. */
     @Bean
     Plugin applicationSourcePlugin(AgentDefinitionRepository agents, AgentDefinitionMapper mapper,
-                                   SkillRepository skills, ToolRegistry tools) {
+                                   SkillRepository skills, ToolRegistry tools, OpenApprovalRecorder openApprovals) {
         return new Plugin() {
             @Override
             public String name() {
@@ -68,6 +75,9 @@ public class RuntimeBridgeAutoConfiguration {
                 // registry already leaves out what the operator disabled.
                 registry.contribute(PermissionRuleSource.class,
                         session -> List.of(new PermissionRule(PermissionRule.ANY, PermissionEffect.ALLOW)));
+                // Heard and not hooked in before or after: a call the permission check stops is still heard.
+                registry.listen(RuntimeHook.TOOL_CALL, openApprovals::called);
+                registry.listen(RuntimeHook.TURN_END, (context, turn) -> openApprovals.ended(context));
             }
         };
     }
