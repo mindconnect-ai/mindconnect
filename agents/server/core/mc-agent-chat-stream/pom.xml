@@ -21,6 +21,12 @@
     </description>
 
     <dependencies>
+        <!-- Frames are made from what the runtime reports. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-runtime-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-domain</artifactId>

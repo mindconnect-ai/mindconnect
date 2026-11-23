@@ -6,7 +6,6 @@ import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.AgentSpec;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.chat.stream.ChatTurnHandle;
-import ai.mindconnect.agent.runtime.service.AgentChatService;
 import ai.mindconnect.agent.runtime.service.AgentRegistryService;
 import ai.mindconnect.agent.runtime.service.AgentSessionService;
 import ai.mindconnect.agent.chat.stream.ApprovalScope;
@@ -19,7 +18,7 @@ import ai.mindconnect.agentrest.dto.AttachedFrame;
 import ai.mindconnect.agentrest.dto.SessionStreamFrame;
 import ai.mindconnect.agentrest.dto.UserEventFrame;
 import ai.mindconnect.agentrest.dto.IncompleteFrame;
-import ai.mindconnect.agentrest.dto.StreamEventFrame;
+import ai.mindconnect.agent.chat.stream.TurnFrame;
 import ai.mindconnect.agentrest.dto.UpdateToolsRequest;
 import ai.mindconnect.agent.AgentId;
 import ai.mindconnect.agent.SessionId;
@@ -356,9 +355,9 @@ public class AgentApiController {
         // Set once the turn's Done frame has gone out to this client.
         java.util.concurrent.CompletableFuture<Void> doneSent = new java.util.concurrent.CompletableFuture<>();
 
-        ChatTurnHandle turn = chatService.submitChat(sessionId, parts, event -> {
-            sendFrame(emitter, StreamEventFrame.from(event));
-            if (event instanceof ai.mindconnect.agent.chat.stream.StreamEvent.Done) {
+        ChatTurnHandle turn = chatService.submitFrames(sessionId, parts, frame -> {
+            sendFrame(emitter, frame);
+            if ("done".equals(frame.type())) {
                 doneSent.complete(null);
             }
         });
@@ -401,10 +400,7 @@ public class AgentApiController {
             log.error("Chat error for session {}: {}", sessionId, cause.getMessage());
             try {
                 emitter.send(SseEmitter.event().data(
-                        compactMapper.writeValueAsString(
-                                new StreamEventFrame("error", cause.getMessage(),
-                                        null, null, null, null, null, null, null, null, null,
-                                        null, null, null, null, null, null)),
+                        compactMapper.writeValueAsString(TurnFrame.error(cause.getMessage())),
                         MediaType.APPLICATION_JSON));
             } catch (Exception ignored) {}
             emitter.completeWithError(cause);
@@ -495,15 +491,12 @@ public class AgentApiController {
         // The replay runs on the channel's drain thread and could outrun the
         // attached frame below — the latch holds event frames until it is out.
         var attachedSent = new java.util.concurrent.CountDownLatch(1);
-        AgentChatService.Attachment attachment = chatService.attach(id, afterSeq, event -> {
+        var attachment = chatService.attach(id, afterSeq, event -> {
             try {
                 attachedSent.await();
                 emitter.send(SseEmitter.event().data(
                         compactMapper.writeValueAsString(new SessionStreamFrame(
-                                event.seq(),
-                                event.value().turnId().value(),
-                                event.value().run(),
-                                StreamEventFrame.from(event.value().event()))),
+                                event.seq(), event.value().turnId(), 1, event.value().frame())),
                         MediaType.APPLICATION_JSON));
             } catch (Exception e) {
                 emitter.completeWithError(e);
@@ -511,9 +504,9 @@ public class AgentApiController {
         });
         try {
             emitter.send(SseEmitter.event().data(
-                    compactMapper.writeValueAsString(AttachedFrame.of(
+                    compactMapper.writeValueAsString(new AttachedFrame("attached",
                             attachment.firstBufferedSeq(), attachment.latestSeq(),
-                            attachment.liveTurnId(), attachment.liveRun())),
+                            attachment.liveTurnId(), attachment.liveTurnId() == null ? null : 1)),
                     MediaType.APPLICATION_JSON));
         } catch (Exception e) {
             attachment.subscription().close();
@@ -638,8 +631,7 @@ public class AgentApiController {
                                                                 @CurrentUser UserId caller) {
         SessionId id = owned(sessionId, caller);
         SseEmitter emitter = new SseEmitter(120_000L);
-        java.util.function.Consumer<ai.mindconnect.agent.chat.stream.StreamEvent> frames =
-                event -> sendFrame(emitter, StreamEventFrame.from(event));
+        java.util.function.Consumer<TurnFrame> frames = frame -> sendFrame(emitter, frame);
         var continued = approved
                 ? chatService.approve(id, callId, ApprovalScope.fromParam(scope), frames)
                 : chatService.deny(id, callId, frames);

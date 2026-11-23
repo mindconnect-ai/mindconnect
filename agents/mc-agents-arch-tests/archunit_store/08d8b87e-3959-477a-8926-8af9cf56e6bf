@@ -37,6 +37,9 @@ ai.mindconnect.adminui.ui.page.NamespacesPage has 2 constructors
 ai.mindconnect.adminui.ui.page.ProfilePage has 5 constructors
 ai.mindconnect.adminui.ui.page.SkillListPage has 2 constructors
 ai.mindconnect.adminui.ui.page.ToolListPage has 2 constructors
+ai.mindconnect.agent.chat.stream.SessionChannels has 2 constructors
+ai.mindconnect.agent.chat.stream.UserChannels has 2 constructors
+ai.mindconnect.agent.chat.stream.UserEvent$SessionStarted has 2 constructors
 ai.mindconnect.agent.protocol.client.ToolLoop has 2 constructors
 ai.mindconnect.agent.protocol.openai.OpenAiResponsesBackend has 2 constructors
 ai.mindconnect.agent.protocol.runtime.AgentRuntimeBackend has 3 constructors
@@ -70,9 +73,6 @@ ai.mindconnect.agent.runtime.service.StatelessAgentTaskRunner has 2 constructors
 ai.mindconnect.agent.runtime.service.prompt.CurrentDateProvider has 3 constructors
 ai.mindconnect.agent.runtime.service.round.AgentLoop has 2 constructors
 ai.mindconnect.agent.runtime.service.round.RoundOutcome has 2 constructors
-ai.mindconnect.agent.chat.stream.SessionChannels has 2 constructors
-ai.mindconnect.agent.chat.stream.UserChannels has 2 constructors
-ai.mindconnect.agent.chat.stream.UserEvent$SessionStarted has 2 constructors
 ai.mindconnect.agent.runtime.service.task.AgentTurnWorker has 4 constructors
 ai.mindconnect.agent.runtime.service.task.ConversationMessageLog has 2 constructors
 ai.mindconnect.agent.runtime.service.task.LlmChatProvider has 2 constructors
@@ -125,7 +125,6 @@ ai.mindconnect.agent.trace.adapter.pg.PgLlmCallTraceRepository has 3 constructor
 ai.mindconnect.agentrest.controller.AgentApiController$UpdateAgentRequest has 2 constructors
 ai.mindconnect.agentrest.controller.MemoryApiController has 2 constructors
 ai.mindconnect.agentrest.dto.StartSessionRequest has 3 constructors
-ai.mindconnect.agentrest.dto.StreamEventFrame has 2 constructors
 ai.mindconnect.agentrest.service.TranscriptionChannels has 2 constructors
 ai.mindconnect.calendar.CalendarAccounts has 2 constructors
 ai.mindconnect.calendar.CalendarEvent has 2 constructors

@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.chat.stream.SessionFrameChannels;
 import ai.mindconnect.agent.tools.todo.TodoListRepository;
 import ai.mindconnect.agent.runtime.memory.port.out.WorkingMemoryRepository;
 import ai.mindconnect.agent.management.api.SessionCleanup;
@@ -176,6 +177,13 @@ public class RuntimeBridgeAutoConfiguration {
     }
 
     /** After the runtime's own services: it calls them. */
+    /** The stream of a session a client reconnects to, fed from every turn the chat service runs. */
+    @Bean
+    @ConditionalOnMissingBean
+    SessionFrameChannels sessionFrameChannels() {
+        return SessionFrameChannels.standalone();
+    }
+
     @Bean
     @ConditionalOnMissingBean
     RuntimeChatService runtimeChatService(ObjectProvider<TurnService> turns,
@@ -183,8 +191,8 @@ public class RuntimeBridgeAutoConfiguration {
                                           ObjectProvider<SessionStore> sessions,
                                           AgentSessionRepository chatSessions,
                                           ObjectProvider<SessionManagement> management, AgentChatService earlier,
-                                          SessionChannels sessionChannels, UserChannels userChannels) {
+                                          SessionFrameChannels sessionFrames, UserChannels userChannels) {
         return new RuntimeChatService(turns.getObject(), sessionService.getObject(), sessions.getObject(), chatSessions,
-                management.getObject(), earlier, new ChatStreams(sessionChannels, userChannels));
+                management.getObject(), earlier, new ChatStreams(sessionFrames, userChannels));
     }
 }
