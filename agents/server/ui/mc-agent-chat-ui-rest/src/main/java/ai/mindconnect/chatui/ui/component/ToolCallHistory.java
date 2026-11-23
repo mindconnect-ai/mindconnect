@@ -152,14 +152,18 @@ public final class ToolCallHistory {
         return byCallId.values().stream().flatMap(List::stream).toList();
     }
 
-    /** Pulls the "name" field out of a run_agent arguments JSON. */
+    /** The agent a run_agent call names, or the agents of a run_agents call's tasks, in their order. */
     private java.util.Optional<String> extractSubAgentName(String argsJson) {
         if (argsJson == null) return java.util.Optional.empty();
         try {
             JsonNode node = MAPPER.readTree(argsJson);
-            String name = node.path("name").asText("");
-            return name.isBlank() ? java.util.Optional.empty() : java.util.Optional.of(name);
+            List<String> names = new java.util.ArrayList<>();
+            names.add(node.path("name").asText(""));
+            node.path("tasks").forEach(task -> names.add(task.path("name").asText("")));
+            names.removeIf(String::isBlank);
+            return names.isEmpty() ? java.util.Optional.empty() : java.util.Optional.of(String.join(", ", names));
         } catch (Exception e) {
             return java.util.Optional.empty();
         }
-    }}
+    }
+}
