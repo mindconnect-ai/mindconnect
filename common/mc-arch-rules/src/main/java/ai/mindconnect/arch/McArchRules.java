@@ -90,11 +90,15 @@ public final class McArchRules {
             .should(McArchRules.be(IN_BOOT_MODULE))
             .as("D1: @Component, @Configuration, @RestController ... only in starters, apps, rest/ui modules and demos"));
 
-    /** D3: more than seven constructor parameters is more than one responsibility. */
+    /**
+     * D3: more than seven constructor parameters is more than one responsibility.
+     * A record is exempt: its constructor is its list of fields, and a value
+     * with nine fields is a value with nine fields, not a class doing nine things.
+     */
     @ArchTest
     static final ArchRule narrowConstructors = FreezingArchRule.freeze(
         classes().should(haveConstructorsWithAtMostParameters(7))
-            .as("D3: a constructor takes at most 7 parameters"));
+            .as("D3: a constructor takes at most 7 parameters (a record is exempt)"));
 
     /** D4: a suffix like Helper or Manager says the author did not find the role. */
     @ArchTest
@@ -186,6 +190,9 @@ public final class McArchRules {
         return new ArchCondition<>("have constructors with at most " + max + " parameters") {
             @Override
             public void check(JavaClass javaClass, ConditionEvents events) {
+                if (javaClass.isRecord()) {
+                    return;
+                }
                 for (JavaConstructor constructor : javaClass.getConstructors()) {
                     int count = constructor.getRawParameterTypes().size();
                     if (count > max) {

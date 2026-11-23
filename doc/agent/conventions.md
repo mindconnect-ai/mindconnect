@@ -25,7 +25,7 @@ method:
 
 - **One responsibility.** If you need "and" to say what a class does, it is two
   classes. Over ~300 lines or more than 7 constructor parameters is a reason
-  to look.
+  to look. A record's fields are not counted: a value holds what it holds.
 - **Named after its pattern, in the singular.** Registry, Catalog, Resolver,
   Policy, Strategy, Factory, Builder, Repository, Adapter, Gateway, Worker,
   Renderer, Reader, Writer, Converter, Mapper. `Service` only for an
@@ -139,6 +139,6 @@ one fails the build, and the store only shrinks.
 | --- | --- |
 | D1 | no framework in a `-core` module or an engine; no `adapter` package in a `-core` module; Spring wiring only at the edge |
 | D2 | `domain` ← `port` ← `service` ← `adapter`; an adapter does not import another module's adapter |
-| D3 | a constructor takes at most 7 parameters |
+| D3 | a constructor takes at most 7 parameters; a record is exempt |
 | D4 | no class ending in Helper, Util(s), Support, Commons, Holder, Manager; no method starting with process, handle, do unless a supertype names it |
 | Conventions | one constructor per class; SLF4J, never `java.util.logging` |
