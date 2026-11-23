@@ -14,10 +14,17 @@ import org.springframework.context.annotation.Bean;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.management.ManagedAgentResolver;
+import ai.mindconnect.agent.management.RepositoryAgentManagement;
 import ai.mindconnect.agent.management.RepositorySessionManagement;
+import ai.mindconnect.agent.management.adapter.FileAgentRepository;
+import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
+import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.UserProvider;
@@ -103,6 +110,24 @@ public class RuntimeEngineAutoConfiguration {
                 : new FileSessionRepository(Path.of(dataDirectory), json, namespaces);
     }
 
+    /** On Postgres where the application has it, else as files under the data directory. */
+    @Bean
+    @ConditionalOnMissingBean
+    AgentRepository agentRepository(ObjectProvider<Sql> sql, ObjectMapper json, NamespaceProvider namespaces,
+                                    @Value("${mindconnect.data.base-dir:data}") String dataDirectory) {
+        Sql database = sql.getIfAvailable();
+        return database != null
+                ? new PgAgentRepository(database, namespaces).initSchema()
+                : new FileAgentRepository(Path.of(dataDirectory), json, namespaces);
+    }
+
+    /** The agents as they are kept and edited; the runtime finds an agent another one calls here. */
+    @Bean
+    @ConditionalOnMissingBean
+    AgentManagement agentManagement(AgentRepository agents) {
+        return new RepositoryAgentManagement(agents);
+    }
+
     /** Listing, renaming and deleting sessions, on the same repositories the runtime writes to. */
     @Bean
     @ConditionalOnMissingBean
@@ -159,7 +184,8 @@ public class RuntimeEngineAutoConfiguration {
 
     /** The runtime's own plugins, in the order they are installed. */
     @Bean
-    RuntimeParts runtimeParts(NamespaceProvider namespaces, UserProvider users, SessionStore sessions, TaskQueue queue,
+    RuntimeParts runtimeParts(NamespaceProvider namespaces, UserProvider users, SessionStore sessions,
+                              AgentManagement agents, TaskQueue queue,
                               ObjectProvider<SharedStateStore> sharedState, LlmGatewayModelPlugin model,
                               CapabilityPlugins capabilities) {
         Plugin applicationBeans = new Plugin() {
@@ -172,6 +198,7 @@ public class RuntimeEngineAutoConfiguration {
             public void install(PluginRegistry registry) {
                 registry.provide(NamespaceProvider.class, () -> namespaces);
                 registry.provide(UserProvider.class, () -> users);
+                registry.contribute(AgentResolver.class, new ManagedAgentResolver(agents));
                 registry.provide(SessionStore.class, () -> sessions);
             }
         };

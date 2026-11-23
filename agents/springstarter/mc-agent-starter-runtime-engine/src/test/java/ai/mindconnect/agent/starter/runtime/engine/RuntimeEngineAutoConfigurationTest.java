@@ -18,6 +18,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.AgentManagement;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
@@ -30,6 +32,8 @@ import ai.mindconnect.agent.runtime.api.domain.TurnStatus;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
+import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
+import ai.mindconnect.plugin.PluginRegistry;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.llm.domain.LlmStreamChunk;
 import ai.mindconnect.llm.port.in.LlmChat;
@@ -81,6 +85,10 @@ class RuntimeEngineAutoConfigurationTest {
                     assertThat(context.getBean(MessageRepository.class)
                             .findByConversation(ConversationId.of(session.id().value()), new PageRequest(0, 10)))
                             .extracting(Message::content).containsExactly("Hi", "Hello.");
+                    // An agent kept in the management is one the runtime finds by name.
+                    context.getBean(AgentManagement.class).create(ManagedAgent.of(HELPER));
+                    assertThat(context.getBean(PluginRegistry.class).all(AgentResolver.class).get(0)
+                            .resolve("helper", session)).contains(HELPER);
                     // The same session, as the management API lists it.
                     assertThat(context.getBean(SessionManagement.class).list(UserId.of("ada")))
                             .extracting(listed -> listed.id()).containsExactly(session.id());
