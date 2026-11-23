@@ -175,7 +175,8 @@ public final class AgentRuntimeBuilder {
                         new InMemoryToolResolver(tools),
                         new InMemoryGuardResolver(inputGuards, outputGuards)),
                 new PebblePromptPlugin(),
-                new PromptPlugin(),
+                // The JVM's zone for everyone: an embedding without users of its own.
+                new PromptPlugin(java.time.Clock.systemUTC(), user -> java.time.ZoneId.systemDefault()),
                 new SkillPlugin(),
                 new ToolSearchPlugin(new InMemoryToolActivation(namespaces)),
                 new SubAgentPlugin(),

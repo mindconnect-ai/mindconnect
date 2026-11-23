@@ -40,7 +40,12 @@ public enum MemoryReach {
 
     /** The binding's setting; absent or unknown reads as {@link #USER}. */
     public static MemoryReach of(AgentTool binding) {
-        Object value = binding == null || binding.overrides() == null ? null : binding.overrides().get(OVERRIDE);
+        return of(binding == null ? null : binding.overrides());
+    }
+
+    /** The setting among a binding's overrides; absent or unknown reads as {@link #USER}. */
+    public static MemoryReach of(Map<String, ?> overrides) {
+        Object value = overrides == null ? null : overrides.get(OVERRIDE);
         if (value == null) return USER;
         return switch (value.toString().strip().toLowerCase(Locale.ROOT)) {
             case "agent" -> AGENT;

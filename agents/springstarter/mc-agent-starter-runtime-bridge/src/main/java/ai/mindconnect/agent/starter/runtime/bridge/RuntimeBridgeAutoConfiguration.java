@@ -12,6 +12,7 @@ import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.directory.UserHome;
 import ai.mindconnect.agent.management.directory.WorkingDirPolicy;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -26,6 +27,7 @@ import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.port.out.AgentResolver;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
+import ai.mindconnect.agent.runtime.api.port.out.PromptVariableProvider;
 import ai.mindconnect.agent.runtime.api.port.out.SessionStore;
 import ai.mindconnect.agent.runtime.api.port.out.ToolResolver;
 import ai.mindconnect.agent.runtime.capabilities.memory.SummaryStore;
@@ -61,8 +63,7 @@ public class RuntimeBridgeAutoConfiguration {
 
     @Bean
     OpenApprovalRecorder openApprovalRecorder(ToolApprovalRepository approvals, ObjectProvider<SessionStore> sessions,
-                                              UserEventFeed userFeed,
-                                   ObjectProvider<ai.mindconnect.agent.tools.usermemory.UserMemoryService> userMemory) {
+                                              UserEventFeed userFeed) {
         return new OpenApprovalRecorder(approvals, sessions::getObject, userFeed);
     }
 
@@ -76,8 +77,7 @@ public class RuntimeBridgeAutoConfiguration {
     @Bean
     Plugin applicationSourcePlugin(AgentDefinitionRepository agents, AgentDefinitionMapper mapper,
                                    SkillRepository skills, ToolRegistry tools, OpenApprovalRecorder openApprovals,
-                                   UserEventFeed userFeed,
-                                   ObjectProvider<ai.mindconnect.agent.tools.usermemory.UserMemoryService> userMemory) {
+                                   UserEventFeed userFeed) {
         AgentResolver storedAgents = new RepositoryAgentResolver(agents, mapper);
         return new Plugin() {
             @Override
@@ -98,9 +98,9 @@ public class RuntimeBridgeAutoConfiguration {
                 registry.listen(RuntimeHook.TOOL_CALL, openApprovals::called);
                 registry.listen(RuntimeHook.TURN_END, (context, turn) -> openApprovals.ended(context));
                 registry.contribute(SessionEventListener.class, userFeed);
-                // What an agent remembers of a user is the application's for now; whoever shows it asks the runtime.
-                userMemory.ifAvailable(memory -> registry.provide(
-                        ai.mindconnect.agent.tools.usermemory.UserMemoryService.class, () -> memory));
+                registry.contribute(PromptVariableProvider.class, (agent, session) ->
+                        agent.metadata().get(AgentDefinitionMapper.AGENT_ID) instanceof String id
+                                ? Map.of("agent_id", id) : Map.of());
             }
         };
     }

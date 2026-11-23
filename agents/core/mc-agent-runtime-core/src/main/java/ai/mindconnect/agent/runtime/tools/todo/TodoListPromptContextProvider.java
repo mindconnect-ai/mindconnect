@@ -1,19 +1,13 @@
 package ai.mindconnect.agent.runtime.tools.todo;
 
-import ai.mindconnect.agent.tools.todo.TodoFormatter;
-import ai.mindconnect.agent.tools.todo.TodoItem;
-import ai.mindconnect.agent.tools.todo.TodoList;
 import ai.mindconnect.agent.tools.todo.TodoListService;
-import ai.mindconnect.agent.tools.todo.TodoStatus;
+import ai.mindconnect.agent.tools.todo.TodoPromptVariable;
 
 import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.port.out.PromptContextProvider;
 import ai.mindconnect.agent.AuthenticationInfo;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -55,46 +49,6 @@ public class TodoListPromptContextProvider implements PromptContextProvider {
                             AgentSession session,
                             AuthenticationInfo auth) {
         if (session == null) return;
-        TodoList list = service.load(session.id());
-        // Empty list (no items at all) → keep the variables null so the
-        // template's {% if todo_list_md %} guard hides the section. As soon
-        // as the agent has written anything, surface the FULL list — open
-        // AND completed items — so subsequent turns have a record of what
-        // was done. Hiding completed items on prior turns is what made the
-        // agent "forget" its plan once it ticked the first box.
-        if (list.isEmpty()) {
-            ctx.put("todo_list_md", null);
-            ctx.put("todos", List.of());
-            return;
-        }
-        ctx.put("todo_list_md", renderMarkdown(list));
-        ctx.put("todos", toMaps(list));
-    }
-
-    private static String renderMarkdown(TodoList list) {
-        long open = list.countByStatus(TodoStatus.PENDING)
-                + list.countByStatus(TodoStatus.IN_PROGRESS);
-        long done = list.countByStatus(TodoStatus.COMPLETED);
-        String trailer = open == 0
-                ? "all done — call `todo_write` with a fresh plan if more work is needed"
-                : "use `todo_write` to mark items completed or refine the plan";
-        return "\n\n## Current Todo List\n"
-                + "(" + list.items().size() + " items: "
-                + open + " open · " + done + " done — " + trailer + ")\n\n"
-                + TodoFormatter.render(list)
-                + "\n";
-    }
-
-    private static List<Map<String, Object>> toMaps(TodoList list) {
-        List<Map<String, Object>> out = new ArrayList<>(list.items().size());
-        for (TodoItem item : list.items()) {
-            out.add(Map.of(
-                    "content",     item.content(),
-                    "activeForm",  item.activeForm() == null ? "" : item.activeForm(),
-                    "status",      item.status().name().toLowerCase(Locale.ROOT),
-                    "displayText", item.displayText()
-            ));
-        }
-        return out;
+        ctx.putAll(TodoPromptVariable.of(service.load(session.id())));
     }
 }

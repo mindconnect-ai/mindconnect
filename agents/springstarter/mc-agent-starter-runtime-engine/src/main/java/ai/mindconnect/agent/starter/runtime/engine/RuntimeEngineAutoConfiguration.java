@@ -1,10 +1,21 @@
 package ai.mindconnect.agent.starter.runtime.engine;
 
 import java.nio.file.Path;
+import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+
+import ai.mindconnect.agent.management.directory.DirectoryPromptPlugin;
+import ai.mindconnect.agent.management.directory.InstructionFileReader;
+import ai.mindconnect.agent.tool.TimeZones;
+import ai.mindconnect.agent.tools.todo.TodoListService;
+import ai.mindconnect.agent.tools.todo.TodoPlugin;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryPlugin;
+import ai.mindconnect.agent.tools.usermemory.UserMemoryService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -236,11 +247,20 @@ public class RuntimeEngineAutoConfiguration {
         return new LlmGatewayModelPlugin(chat, traces, configurations::findResolvedByName);
     }
 
+    /**
+     * What is installed last adds its section to an agent's instructions
+     * first, so the instructions read: where the session works and what
+     * holds there, what is remembered of the user, the date, the attached
+     * files, the skills.
+     */
     @Bean
     CapabilityPlugins capabilityPlugins(ToolActivation activation, ApprovalMemory approvals, SummaryStore summaries,
-                                        TraceSink traces) {
-        return new CapabilityPlugins(List.of(
-                new PromptPlugin(),
+                                        TraceSink traces, ObjectProvider<TimeZones> zones,
+                                        ObjectProvider<UserMemoryService> userMemory,
+                                        ObjectProvider<TodoListService> todoLists,
+                                        @Value("${mindconnect.agent.instructions.user-dir:}") String userDir) {
+        TimeZones userZones = zones.getIfAvailable(TimeZones::system);
+        List<Plugin> plugins = new ArrayList<>(List.of(
                 new SkillPlugin(),
                 new ToolSearchPlugin(activation),
                 new SubAgentPlugin(),
@@ -250,7 +270,13 @@ public class RuntimeEngineAutoConfiguration {
                 new TracePlugin(traces),
                 new InputGuardPlugin(),
                 new OutputGuardPlugin(),
-                new SessionTitlePlugin()));
+                new SessionTitlePlugin(),
+                new PromptPlugin(Clock.systemUTC(), user -> userZones.zoneOf(
+                        user == null ? null : ai.mindconnect.agent.UserId.of(user.value())))));
+        todoLists.ifAvailable(todos -> plugins.add(new TodoPlugin(todos)));
+        userMemory.ifAvailable(memory -> plugins.add(new UserMemoryPlugin(memory)));
+        plugins.add(new DirectoryPromptPlugin(InstructionFileReader.of(userDir)));
+        return new CapabilityPlugins(plugins);
     }
 
     /** Summarises a session's earlier turns on request. */

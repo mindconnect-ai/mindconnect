@@ -212,6 +212,54 @@ class RuntimeBridgeAutoConfigurationTest {
                 });
     }
 
+    @Test
+    void the_model_reads_the_instructions_with_everything_the_application_adds_in_its_order() throws Exception {
+        AgentDefinition archivist = new AgentDefinition(AgentId.random(), "archivist", "Files things.",
+                "You file for {{ user_id }} as {{ agent_name }} on {{ current_date }}."
+                        + "{% if todo_list_md %}{{ todo_list_md }}{% endif %}",
+                null, "small", 6, AutoCompactConfig.DEFAULT, AgentDefinitionStatus.ACTIVE,
+                List.of(new AgentTool(AgentToolId.random(), "memory_write", null, Map.of(), true, false, false,
+                        null)),
+                List.of(), Instant.EPOCH, Instant.EPOCH);
+        List<LlmRequest> asked = new CopyOnWriteArrayList<>();
+        LlmChat chat = (request, handler, cancellation, listener) -> {
+            asked.add(request);
+            handler.accept(new LlmStreamChunk.TextDelta("Filed."));
+        };
+        java.nio.file.Files.writeString(dataDirectory.resolve("AGENTS.md"), "Build with Maven.");
+        var memory = new ai.mindconnect.agent.tools.usermemory.UserMemoryService(
+                new ai.mindconnect.agent.tools.usermemory.adapter.InMemoryUserMemoryRepository(SCOPE));
+        memory.write(ai.mindconnect.agent.UserId.of("ada"), "role",
+                ai.mindconnect.agent.tools.usermemory.MemoryType.USER, "Head of purchasing", "c", null);
+        var todos = new ai.mindconnect.agent.tools.todo.TodoListService(
+                new ai.mindconnect.agent.tools.todo.adapter.InMemoryTodoListRepository(SCOPE));
+
+        application(chat, mock(AgentDefinitionRepository.class), mock(LlmCallTraceRepository.class))
+                .withPropertyValues("mindconnect.agent.instructions.user-dir=off")
+                .withBean(ai.mindconnect.agent.tools.usermemory.UserMemoryService.class, () -> memory)
+                .withBean(ai.mindconnect.agent.tools.todo.TodoListService.class, () -> todos)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    Session session = context.getBean(SessionService.class).open(new SessionSpec(UserId.of("ada"),
+                            null, context.getBean(AgentDefinitionMapper.class).toRuntime(archivist),
+                            Map.of("workingDir", dataDirectory.toString())));
+                    todos.replace(ai.mindconnect.agent.SessionId.of(session.id().value()), List.of(
+                            new ai.mindconnect.agent.tools.todo.TodoItem(java.util.UUID.randomUUID(), "Sort the shelf", "Sorting the shelf",
+                                    ai.mindconnect.agent.tools.todo.TodoStatus.PENDING, 0)));
+                    TurnService turns = context.getBean(TurnService.class);
+
+                    awaitOver(turns, turns.submit(TurnRequest.text(session.id(), "File this.")));
+
+                    String instructions = asked.get(0).messages().get(0).content();
+                    assertThat(instructions).startsWith("You file for ada as archivist on "
+                            + java.time.LocalDate.now() + ".\n\n## Current Todo List\n").contains("Sort the shelf");
+                    assertThat(java.util.stream.Stream.of("## Current Todo List", "## Working directory",
+                            "## Project instructions", "Build with Maven.", "## Memory", "Head of purchasing",
+                            "## Date and time").map(instructions::indexOf).toList())
+                            .doesNotContain(-1).isSorted();
+                });
+    }
+
     /** The application's beans as the starters find them, with this model and these stores. */
     private ApplicationContextRunner application(LlmChat chat, AgentDefinitionRepository agents,
                                                  LlmCallTraceRepository traces) {
