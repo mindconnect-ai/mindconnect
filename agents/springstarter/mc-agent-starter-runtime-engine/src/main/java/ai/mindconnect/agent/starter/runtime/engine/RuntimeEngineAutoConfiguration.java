@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Bean;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import ai.mindconnect.agent.ScopeSupplier;
+import ai.mindconnect.agent.management.RepositorySessionManagement;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
 import ai.mindconnect.agent.runtime.api.port.out.NamespaceProvider;
@@ -99,6 +101,13 @@ public class RuntimeEngineAutoConfiguration {
         return database != null
                 ? new PgSessionRepository(database, namespaces).initSchema()
                 : new FileSessionRepository(Path.of(dataDirectory), json, namespaces);
+    }
+
+    /** Listing, renaming and deleting sessions, on the same repositories the runtime writes to. */
+    @Bean
+    @ConditionalOnMissingBean
+    SessionManagement sessionManagement(SessionRepository sessions, MessageRepository messages) {
+        return new RepositorySessionManagement(sessions, messages);
     }
 
     @Bean

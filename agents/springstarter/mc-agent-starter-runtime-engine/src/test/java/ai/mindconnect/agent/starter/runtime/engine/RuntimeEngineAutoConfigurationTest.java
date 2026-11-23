@@ -18,6 +18,7 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import ai.mindconnect.agent.Namespace;
 import ai.mindconnect.agent.ScopeSupplier;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -80,6 +81,9 @@ class RuntimeEngineAutoConfigurationTest {
                     assertThat(context.getBean(MessageRepository.class)
                             .findByConversation(ConversationId.of(session.id().value()), new PageRequest(0, 10)))
                             .extracting(Message::content).containsExactly("Hi", "Hello.");
+                    // The same session, as the management API lists it.
+                    assertThat(context.getBean(SessionManagement.class).list(UserId.of("ada")))
+                            .extracting(listed -> listed.id()).containsExactly(session.id());
                     assertThat(dataDirectory.resolve("test/sessions/" + session.id().value() + "/runtime-session.json"))
                             .exists();
                 });
