@@ -33,6 +33,13 @@ public interface SessionManagement {
 
     ManagedSession changeDirectories(SessionId sessionId, SessionDirectories directories);
 
+    /**
+     * Sets one entry of the session's metadata. For what a client keeps
+     * about a session under a key of its own; what has a method here — the
+     * title, the status, the directories — is changed through that method.
+     */
+    ManagedSession setMetadata(SessionId sessionId, String key, Object value);
+
     /** Another agent for the turns that bring none of their own; what was said stays. */
     ManagedSession changeAgent(SessionId sessionId, AgentDefinition agent);
 

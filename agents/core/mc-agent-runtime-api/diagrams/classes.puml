@@ -1,0 +1,412 @@
+@startuml
+package api {
+  package hook {
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/ModelCall.java#ModelCall
+    class ModelCall {
+      -context: AgentContext
+      -request: ModelRequest
+      +with(changed: ModelRequest): ModelCall
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/TurnInput.java#TurnInput
+    class TurnInput {
+      -session: Session
+      -request: TurnRequest
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/RuntimeHook.java#RuntimeHook
+    class RuntimeHook {
+      {static} +TURN_INPUT: HookPoint<TurnInput, TurnAdmission>
+      {static} +INSTRUCTIONS: HookPoint<AgentContext, String>
+      {static} +TOOL_OFFER: HookPoint<AgentContext, List<ToolDefinition>>
+      {static} +MODEL_CALL: HookPoint<ModelCall, LlmAnswer>
+      {static} +TOOL_CALL: HookPoint<ToolInvocation, ToolOutput>
+      {static} +ANSWER: HookPoint<AgentContext, TurnMessage>
+      {static} +TURN_END: HookPoint<AgentContext, Turn>
+      -RuntimeHook()
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/AgentContext.java#AgentContext
+    class AgentContext {
+      -session: Session
+      -agent: AgentDefinition
+      -turnId: TurnId
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/TurnAdmission.java#TurnAdmission
+    interface TurnAdmission
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/TurnAdmission.java#Admitted
+    class Admitted {
+      -request: TurnRequest
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/TurnAdmission.java#Refused
+    class Refused {
+      -reason: String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/hook/ToolInvocation.java#ToolInvocation
+    class ToolInvocation {
+      -context: AgentContext
+      -call: ToolCall
+      -answer: Optional<InterruptionAnswer>
+    }
+  }
+  package port {
+    package in {
+      ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/port/in/TurnService.java#TurnService
+      interface TurnService {
+        +submit(request: TurnRequest): TurnId
+        +find(turnId: TurnId): Optional<Turn>
+        +messages(turnId: TurnId): List<TurnMessage>
+        +resume(turnId: TurnId, answers: List<InterruptionAnswer>): void
+        +subscribe(turnId: TurnId, events: TurnEventListener): Subscription
+        +cancel(turnId: TurnId): void
+      }
+      ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/port/in/Subscription.java#Subscription
+      interface Subscription {
+        +close(): void
+      }
+      ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/port/in/SessionService.java#SessionService
+      interface SessionService {
+        +open(spec: SessionSpec): Session
+        +find(sessionId: SessionId): Optional<Session>
+        +fork(sessionId: SessionId): Session
+        +forkAsChild(sessionId: SessionId): Session
+        +subscribe(userId: UserId, listener: SessionEventListener): Subscription
+        +subscribe(sessionId: SessionId, includeChildSessions: boolean, listener: SessionEventListener): Subscription
+      }
+      ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/port/in/SessionEventListener.java#SessionEventListener
+      interface SessionEventListener {
+        +onEvent(event: SessionEvent): void
+      }
+    }
+  }
+  package "domain" as domain2 {
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/Turn.java#Turn
+    class Turn {
+      -id: TurnId
+      -sessionId: SessionId
+      -agent: AgentDefinition
+      -modelSettings: ModelSettings
+      -status: TurnStatus
+      -interruptions: List<Interruption>
+      -outcome: TurnOutcome
+      -error: String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/TurnId.java#TurnId
+    class TurnId {
+      -value: String
+      {static} +of(value: String): TurnId
+      +toString(): String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/UserId.java#UserId
+    class UserId {
+      -value: String
+      {static} +of(value: String): UserId
+      +toString(): String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/Session.java#Session
+    class Session {
+      -id: SessionId
+      -userId: UserId
+      -parentId: SessionId
+      -defaultAgent: String
+      -modelSettings: ModelSettings
+      -metadata: Map<String, Object>
+      -createdAt: Instant
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ToolCall.java#ToolCall
+    class ToolCall {
+      -callId: String
+      -toolName: String
+      -arguments: Map<String, Object>
+      -turnId: TurnId
+      -sessionId: SessionId
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionId.java#SessionId
+    class SessionId {
+      -value: String
+      {static} +of(value: String): SessionId
+      +toString(): String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ToolOutput.java#ToolOutput
+    interface ToolOutput {
+      {static} +ok(text: String): ToolOutput
+      {static} +failed(error: String): ToolOutput
+      {static} +interrupt(kind: String, details: Map<String, Object>): ToolOutput
+      {static} +delegate(request: TurnRequest): ToolOutput
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ToolOutput.java#Completed
+    class Completed {
+      -text: String
+      -failed: boolean
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ToolOutput.java#Interrupted
+    class Interrupted {
+      -kind: String
+      -details: Map<String, Object>
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ToolOutput.java#Delegated
+    class Delegated {
+      -request: TurnRequest
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/TurnStatus.java#TurnStatus
+    enum TurnStatus {
+      QUEUED
+      RUNNING
+      WAITING
+      INTERRUPTED
+      COMPLETED
+      INCOMPLETE
+      CANCELLED
+      FAILED
+      +isFinal(): boolean
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionSpec.java#SessionSpec
+    class SessionSpec {
+      -userId: UserId
+      -parentId: SessionId
+      -defaultAgent: String
+      -modelSettings: ModelSettings
+      -metadata: Map<String, Object>
+      {static} +of(userId: UserId): SessionSpec
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ToolBinding.java#ToolBinding
+    class ToolBinding {
+      -name: String
+      -deferred: boolean
+      {static} +of(name: String): ToolBinding
+      {static} +deferred(name: String): ToolBinding
+      {static} +allOf(names: String...): List<ToolBinding>
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/TurnRequest.java#TurnRequest
+    class TurnRequest {
+      -sessionId: SessionId
+      -input: List<ContentPart>
+      -agentName: String
+      -modelSettings: ModelSettings
+      {static} +text(sessionId: SessionId, text: String): TurnRequest
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/Interruption.java#Interruption
+    class Interruption {
+      -id: String
+      -turnId: TurnId
+      -kind: String
+      -call: ToolCall
+      -details: Map<String, Object>
+      {static} +TOOL_APPROVAL: String
+      {static} +USER_INPUT: String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ModelRequest.java#ModelRequest
+    class ModelRequest {
+      -turnId: TurnId
+      -settings: ModelSettings
+      -instructions: String
+      -messages: List<TurnMessage>
+      -tools: List<ToolDefinition>
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#SessionEvent
+    interface SessionEvent {
+      +sessionId(): SessionId
+      +turnId(): TurnId
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#TurnStarted
+    class TurnStarted {
+      -sessionId: SessionId
+      -turnId: TurnId
+      -agentName: String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#TurnInterrupted
+    class TurnInterrupted {
+      -sessionId: SessionId
+      -turnId: TurnId
+      -interruptions: List<Interruption>
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#TurnFinished
+    class TurnFinished {
+      -sessionId: SessionId
+      -turnId: TurnId
+      -status: TurnStatus
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#MessageStarted
+    class MessageStarted {
+      -sessionId: SessionId
+      -turnId: TurnId
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#MessageFinished
+    class MessageFinished {
+      -sessionId: SessionId
+      -turnId: TurnId
+      -message: TurnMessage
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#ToolCallStarted
+    class ToolCallStarted {
+      -sessionId: SessionId
+      -turnId: TurnId
+      -callId: String
+      -toolName: String
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#ToolCallFinished
+    class ToolCallFinished {
+      -sessionId: SessionId
+      -turnId: TurnId
+      -callId: String
+      -toolName: String
+      -failed: boolean
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/SessionEvent.java#Notice
+    class Notice {
+      -sessionId: SessionId
+      -turnId: TurnId
+      -kind: String
+      -details: Map<String, Object>
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ModelSettings.java#ModelSettings
+    class ModelSettings {
+      -model: String
+      -temperature: Double
+      -maxOutputTokens: Integer
+      -reasoningEffort: String
+      -extra: Map<String, Object>
+      {static} +NONE: ModelSettings
+      {static} +ofModel(model: String): ModelSettings
+      +over(below: ModelSettings): ModelSettings
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/ToolDefinition.java#ToolDefinition
+    class ToolDefinition {
+      -name: String
+      -description: String
+      -parametersSchema: Map<String, Object>
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/AgentDefinition.java#AgentDefinition
+    class AgentDefinition {
+      -name: String
+      -description: String
+      -instructions: String
+      -modelSettings: ModelSettings
+      -tools: List<ToolBinding>
+      -maxRounds: int
+      -metadata: Map<String, Object>
+      +uses(toolName: String): boolean
+    }
+    ' @code mindconnect/agents/core/mc-agent-runtime-api/src/main/java/ai/mindconnect/agent/runtime/api/domain/InterruptionAnswer.java#InterruptionAnswer
+    class InterruptionAnswer {
+      -interruptionId: String
+      -answer: Map<String, Object>
+      {static} +APPROVED: String
+      {static} +REMEMBER: String
+      {static} +TEXT: String
+      {static} +approve(interruptionId: String): InterruptionAnswer
+      {static} +approveAlways(interruptionId: String): InterruptionAnswer
+      {static} +reject(interruptionId: String, note: String): InterruptionAnswer
+      {static} +text(interruptionId: String, text: String): InterruptionAnswer
+    }
+  }
+}
+
+TurnAdmission <|.. Admitted
+TurnAdmission <|.. Refused
+ToolOutput <|.. Completed
+ToolOutput <|.. Interrupted
+ToolOutput <|.. Delegated
+SessionEvent <|.. TurnStarted
+SessionEvent <|.. TurnInterrupted
+SessionEvent <|.. TurnFinished
+SessionEvent <|.. MessageStarted
+SessionEvent <|.. MessageFinished
+SessionEvent <|.. ToolCallStarted
+SessionEvent <|.. ToolCallFinished
+SessionEvent <|.. Notice
+ModelCall --> AgentContext : context
+ModelCall --> ModelRequest : request
+TurnInput --> Session : session
+TurnInput --> TurnRequest : request
+RuntimeHook --> TurnInput : TURN_INPUT
+RuntimeHook --> TurnAdmission : TURN_INPUT
+RuntimeHook --> AgentContext : INSTRUCTIONS
+RuntimeHook --> "*" ToolDefinition : TOOL_OFFER
+RuntimeHook --> ModelCall : MODEL_CALL
+RuntimeHook --> ToolInvocation : TOOL_CALL
+RuntimeHook --> ToolOutput : TOOL_CALL
+RuntimeHook --> Turn : TURN_END
+AgentContext --> Session : session
+AgentContext --> AgentDefinition : agent
+AgentContext --> TurnId : turnId
+Admitted --> TurnRequest : request
+ToolInvocation --> AgentContext : context
+ToolInvocation --> ToolCall : call
+ToolInvocation --> InterruptionAnswer : answer
+TurnService ..> TurnId
+TurnService ..> TurnRequest
+TurnService ..> Turn
+TurnService ..> InterruptionAnswer
+TurnService ..> Subscription
+SessionService ..> Session
+SessionService ..> SessionSpec
+SessionService ..> SessionId
+SessionService ..> Subscription
+SessionService ..> UserId
+SessionService ..> SessionEventListener
+SessionEventListener ..> SessionEvent
+Turn --> TurnId : id
+Turn --> SessionId : sessionId
+Turn --> AgentDefinition : agent
+Turn --> ModelSettings : modelSettings
+Turn --> TurnStatus : status
+Turn --> "*" Interruption : interruptions
+Session --> SessionId : id
+Session --> UserId : userId
+Session --> ModelSettings : modelSettings
+ToolCall --> TurnId : turnId
+ToolCall --> SessionId : sessionId
+ToolOutput ..> TurnRequest
+Delegated --> TurnRequest : request
+SessionSpec --> UserId : userId
+SessionSpec --> SessionId : parentId
+SessionSpec --> ModelSettings : modelSettings
+TurnRequest --> SessionId : sessionId
+TurnRequest --> ModelSettings : modelSettings
+Interruption --> TurnId : turnId
+Interruption --> ToolCall : call
+ModelRequest --> TurnId : turnId
+ModelRequest --> ModelSettings : settings
+ModelRequest --> "*" ToolDefinition : tools
+SessionEvent ..> SessionId
+SessionEvent ..> TurnId
+TurnStarted --> SessionId : sessionId
+TurnStarted --> TurnId : turnId
+TurnInterrupted --> SessionId : sessionId
+TurnInterrupted --> TurnId : turnId
+TurnInterrupted --> "*" Interruption : interruptions
+TurnFinished --> SessionId : sessionId
+TurnFinished --> TurnId : turnId
+TurnFinished --> TurnStatus : status
+MessageStarted --> SessionId : sessionId
+MessageStarted --> TurnId : turnId
+MessageFinished --> SessionId : sessionId
+MessageFinished --> TurnId : turnId
+ToolCallStarted --> SessionId : sessionId
+ToolCallStarted --> TurnId : turnId
+ToolCallFinished --> SessionId : sessionId
+ToolCallFinished --> TurnId : turnId
+Notice --> SessionId : sessionId
+Notice --> TurnId : turnId
+ModelSettings --> ModelSettings : NONE
+AgentDefinition --> ModelSettings : modelSettings
+AgentDefinition --> "*" ToolBinding : tools
+' @layout:begin "Method dependencies"
+' only-rel TurnService ..> TurnId
+' only-rel TurnService ..> TurnRequest
+' only-rel TurnService ..> Turn
+' only-rel TurnService ..> InterruptionAnswer
+' only-rel TurnService ..> Subscription
+' only-rel SessionService ..> Session
+' only-rel SessionService ..> SessionSpec
+' only-rel SessionService ..> SessionId
+' only-rel SessionService ..> Subscription
+' only-rel SessionService ..> UserId
+' only-rel SessionService ..> SessionEventListener
+' only-rel SessionEventListener ..> SessionEvent
+' only-rel ToolOutput ..> TurnRequest
+' only-rel SessionEvent ..> SessionId
+' only-rel SessionEvent ..> TurnId
+' @layout:end
+' @layout:begin
+' viewport x=2656 y=855 zoom=0.61
+' @layout:end
+@enduml

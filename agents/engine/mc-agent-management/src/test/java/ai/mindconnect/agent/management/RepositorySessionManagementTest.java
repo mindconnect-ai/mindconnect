@@ -72,10 +72,13 @@ class RepositorySessionManagementTest {
 
         assertThat(management.find(SessionId.of("plain"))).contains(new ManagedSession(SessionId.of("plain"), ADA,
                 null, "helper", null, ManagedSession.CHAT, ManagedSession.Status.ACTIVE, SessionDirectories.NONE,
-                Instant.parse("2026-11-01T00:00:00Z")));
+                Instant.parse("2026-11-01T00:00:00Z"), Map.of()));
         assertThat(management.find(SessionId.of("set-up"))).contains(new ManagedSession(SessionId.of("set-up"), ADA,
                 null, "helper", "Owls", "research", ManagedSession.Status.COMPLETED,
-                new SessionDirectories("/srv/owls", List.of("/srv/shared")), Instant.parse("2026-11-02T00:00:00Z")));
+                new SessionDirectories("/srv/owls", List.of("/srv/shared")), Instant.parse("2026-11-02T00:00:00Z"),
+                Map.of(ManagedSession.TITLE, "Owls", ManagedSession.TYPE, "research",
+                        ManagedSession.STATUS, "COMPLETED", ManagedSession.WORKING_DIRECTORY, "/srv/owls",
+                        ManagedSession.ADDITIONAL_DIRECTORIES, List.of("/srv/shared"))));
     }
 
     @Test
@@ -87,11 +90,13 @@ class RepositorySessionManagementTest {
         management.rename(id, "Owls");
         management.changeStatus(id, ManagedSession.Status.CANCELLED);
         management.changeDirectories(id, new SessionDirectories("/srv/owls", List.of()));
+        management.setMetadata(id, "chat.pinned", true);
         ManagedSession changed = management.changeAgent(id, other);
 
         assertThat(changed.title()).isEqualTo("Owls");
         assertThat(changed.status()).isEqualTo(ManagedSession.Status.CANCELLED);
         assertThat(changed.agentName()).isEqualTo("other");
+        assertThat(changed.metadata()).containsEntry("chat.pinned", true);
         Session found = runtime.find(id).orElseThrow();
         assertThat(found.agent()).isEqualTo(other);
         assertThat(found.metadata()).containsEntry(ManagedSession.TITLE, "Owls")

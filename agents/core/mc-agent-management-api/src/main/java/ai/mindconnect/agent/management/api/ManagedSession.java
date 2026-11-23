@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.management.api;
 
 import java.time.Instant;
+import java.util.Map;
 
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
 import ai.mindconnect.agent.runtime.api.domain.UserId;
@@ -21,6 +22,9 @@ import ai.mindconnect.agent.runtime.api.domain.UserId;
  * @param title     {@code null} until one was found or given
  * @param type      what kind of session it is, for a client that keeps
  *                  several kinds apart; {@link #CHAT} unless it says otherwise
+ * @param metadata  everything the session's metadata holds, the entries
+ *                  spelled out above included: where a user interface keeps
+ *                  what it alone knows about a session, under keys of its own
  */
 public record ManagedSession(
         SessionId id,
@@ -31,8 +35,13 @@ public record ManagedSession(
         String type,
         Status status,
         SessionDirectories directories,
-        Instant createdAt
+        Instant createdAt,
+        Map<String, Object> metadata
 ) {
+
+    public ManagedSession {
+        metadata = Map.copyOf(metadata);
+    }
 
     /** Metadata key of a session's title. */
     public static final String TITLE = "title";

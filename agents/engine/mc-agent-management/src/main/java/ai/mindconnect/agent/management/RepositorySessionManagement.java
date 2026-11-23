@@ -71,6 +71,11 @@ public final class RepositorySessionManagement implements SessionManagement {
     }
 
     @Override
+    public ManagedSession setMetadata(SessionId sessionId, String key, Object value) {
+        return changed(sessionId, session -> session.withMetadata(key, value));
+    }
+
+    @Override
     public ManagedSession changeAgent(SessionId sessionId, AgentDefinition agent) {
         return changed(sessionId, session -> session.withAgent(agent));
     }
@@ -128,6 +133,7 @@ public final class RepositorySessionManagement implements SessionManagement {
                                 ? working : null,
                         session.metadata().get(ManagedSession.ADDITIONAL_DIRECTORIES) instanceof List<?> more
                                 ? more.stream().map(String::valueOf).toList() : List.of()),
-                session.createdAt());
+                session.createdAt(),
+                session.metadata());
     }
 }
