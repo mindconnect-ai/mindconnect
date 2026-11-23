@@ -148,7 +148,7 @@ class EngineWithCapabilitiesTest {
         registry.contribute(ToolResolver.class, ToolResolver.of(List.of(tool("bash"), tool("read_pdf"))));
         registry.install(new SkillPlugin());
         registry.install(new ToolSearchPlugin(new InMemoryToolActivation(NamespaceProvider.fixed("test"))));
-        registry.install(new SubAgentPlugin());
+        registry.install(new SubAgentPlugin(key -> true));
         registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(NamespaceProvider.fixed("test"))));
         registry.install(new TracePlugin(traces::add));
         registry.install(new InputGuardPlugin());
@@ -352,6 +352,10 @@ class EngineWithCapabilitiesTest {
         assertThat(subAgentCall.settings().model()).isEqualTo("small");
         assertThat(subAgentCall.messages()).extracting(TurnMessage::text)
                 .containsExactly("Find the capital of France.");
+        // Its session stands under the caller's and names the call that opened it.
+        Session called = sessions.find(turns.find(subAgentCall.turnId()).orElseThrow().sessionId()).orElseThrow();
+        assertThat(called.parentId()).isEqualTo(session.id());
+        assertThat(called.metadata()).containsEntry(SubAgentPlugin.OPENED_BY_CALL, "c1");
     }
 
     @Test

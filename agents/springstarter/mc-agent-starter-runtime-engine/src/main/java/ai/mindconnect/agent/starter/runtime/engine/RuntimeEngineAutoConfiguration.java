@@ -4,11 +4,13 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 
+import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.directory.DirectoryPromptPlugin;
 import ai.mindconnect.agent.management.directory.InstructionFileReader;
 import ai.mindconnect.agent.tool.TimeZones;
@@ -265,7 +267,10 @@ public class RuntimeEngineAutoConfiguration {
                 new AttachmentPlugin(),
                 new SkillPlugin(),
                 new ToolSearchPlugin(activation),
-                new SubAgentPlugin(),
+                // A sub-agent works where its caller works; what is kept of the caller's session alone —
+                // its conversation, its title, its attachments — stays the caller's.
+                new SubAgentPlugin(Set.of(ManagedSession.WORKING_DIRECTORY,
+                        ManagedSession.ADDITIONAL_DIRECTORIES)::contains),
                 new PermissionPlugin(PermissionEffect.DENY, approvals),
                 new MemoryPlugin(summaries),
                 new TracePlugin(traces),

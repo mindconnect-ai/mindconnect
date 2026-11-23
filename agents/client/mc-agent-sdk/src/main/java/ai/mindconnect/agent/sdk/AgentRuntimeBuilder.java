@@ -179,7 +179,8 @@ public final class AgentRuntimeBuilder {
                 new PromptPlugin(java.time.Clock.systemUTC(), user -> java.time.ZoneId.systemDefault()),
                 new SkillPlugin(),
                 new ToolSearchPlugin(new InMemoryToolActivation(namespaces)),
-                new SubAgentPlugin(),
+                // Everything: an embedding keeps nothing of one session alone in its metadata.
+                new SubAgentPlugin(key -> true),
                 new PermissionPlugin(unruledTools,
                         approvals != null ? approvals : new InMemoryApprovalMemory(namespaces)),
                 new MemoryPlugin(new InMemorySummaryStore(namespaces)),

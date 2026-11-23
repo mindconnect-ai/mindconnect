@@ -3,6 +3,7 @@ package ai.mindconnect.agent.runtime.capabilities.subagent;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -43,6 +44,25 @@ public final class SubAgentPlugin implements Plugin {
                 : List.of();
     }
 
+    /**
+     * The key in a sub-agent's session metadata that names the tool call
+     * that opened it: whoever shows a conversation finds under a call the
+     * sessions of the agents it ran.
+     */
+    public static final String OPENED_BY_CALL = "parentToolCallId";
+
+    private final Predicate<String> inherited;
+
+    /**
+     * @param inherited which entries of a caller's session metadata its
+     *                  sub-agent's session takes over, by key: where it
+     *                  works, yes; what a store or a user interface keeps
+     *                  of that one session, no
+     */
+    public SubAgentPlugin(Predicate<String> inherited) {
+        this.inherited = inherited;
+    }
+
     @Override
     public String name() {
         return "sub-agents";
@@ -68,7 +88,8 @@ public final class SubAgentPlugin implements Plugin {
                 if (subAgentsOf(caller).isEmpty()) {
                     return Optional.empty();
                 }
-                RunAgentTool single = new RunAgentTool(caller, agents, registry.supplier(SessionService.class));
+                RunAgentTool single = new RunAgentTool(caller, agents, registry.supplier(SessionService.class),
+                        inherited);
                 return switch (toolName) {
                     case RunAgentTool.NAME -> Optional.of(single);
                     case RunAgentsTool.NAME -> Optional.of(new RunAgentsTool(single));

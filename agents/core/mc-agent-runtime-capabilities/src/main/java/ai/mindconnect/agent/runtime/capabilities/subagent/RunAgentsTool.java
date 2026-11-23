@@ -63,7 +63,7 @@ final class RunAgentsTool implements Tool {
         try {
             List<TurnRequest> requests = new ArrayList<>();
             for (Object task : tasks) {
-                requests.add(single.request(task instanceof Map<?, ?> named ? named : Map.of(), session));
+                requests.add(single.request(task instanceof Map<?, ?> named ? named : Map.of(), call, session));
             }
             return ToolOutput.delegate(requests);
         } catch (IllegalArgumentException e) {

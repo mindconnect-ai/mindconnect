@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin;
 import java.util.function.Function;
@@ -248,7 +249,8 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
                 ai.mindconnect.message.domain.ConversationId.of(
                         RepositorySessionStore.conversationOf(session).value()),
                 null, SessionStatus.ACTIVE, session.createdAt(), null,
-                session.parentId() == null ? null : SessionId.of(session.parentId().value()), null, null);
+                session.parentId() == null ? null : SessionId.of(session.parentId().value()), null,
+                session.metadata().get(SubAgentPlugin.OPENED_BY_CALL) instanceof String call ? call : null);
     }
 
     private static boolean sameAgent(AgentSession one, AgentSession other) {

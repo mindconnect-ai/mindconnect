@@ -1,7 +1,9 @@
 package ai.mindconnect.agent.runtime.capabilities.subagent;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import ai.mindconnect.agent.loop.domain.ContentPart;
@@ -44,11 +46,14 @@ final class RunAgentTool implements Tool {
     private final AgentDefinition caller;
     private final AgentResolver agents;
     private final Supplier<SessionService> sessions;
+    private final Predicate<String> inherited;
 
-    RunAgentTool(AgentDefinition caller, AgentResolver agents, Supplier<SessionService> sessions) {
+    RunAgentTool(AgentDefinition caller, AgentResolver agents, Supplier<SessionService> sessions,
+                 Predicate<String> inherited) {
         this.caller = caller;
         this.agents = agents;
         this.sessions = sessions;
+        this.inherited = inherited;
     }
 
     /** With the names in it: a model reads a tool's description far more reliably than it calls list_agents. */
@@ -65,7 +70,7 @@ final class RunAgentTool implements Tool {
     @Override
     public ToolOutput execute(ToolCall call, Session session) {
         try {
-            return ToolOutput.delegate(request(call.arguments(), session));
+            return ToolOutput.delegate(request(call.arguments(), call, session));
         } catch (IllegalArgumentException e) {
             return ToolOutput.failed("Error: " + e.getMessage());
         }
@@ -74,13 +79,14 @@ final class RunAgentTool implements Tool {
     /**
      * The turn that does one task, in a session of its own: the sub-agent
      * starts from the task alone, and its messages do not land in the
-     * caller's history. The metadata go along — it works in the same place
-     * for the same user.
+     * caller's history. Of the caller's metadata it takes over what the
+     * application said a sub-agent shares, and it names the call that
+     * opened it.
      *
      * @throws IllegalArgumentException for a task without an agent or a
      *         message, and for an agent the caller may not call
      */
-    TurnRequest request(Map<?, ?> task, Session session) {
+    TurnRequest request(Map<?, ?> task, ToolCall call, Session session) {
         if (!(task.get(AGENT) instanceof String name) || name.isBlank()
                 || !(task.get(MESSAGE) instanceof String message) || message.isBlank()) {
             throw new IllegalArgumentException("a task needs the agent's \"name\" and a \"message\"");
@@ -91,7 +97,14 @@ final class RunAgentTool implements Tool {
             throw new IllegalArgumentException("there is no agent named " + name + " you can call. Available to you: "
                     + String.join(", ", SubAgentPlugin.subAgentsOf(caller)));
         }
-        Session child = sessions.get().open(new SessionSpec(session.userId(), session.id(), agent, session.metadata()));
+        Map<String, Object> metadata = new HashMap<>();
+        session.metadata().forEach((key, value) -> {
+            if (inherited.test(key)) {
+                metadata.put(key, value);
+            }
+        });
+        metadata.put(SubAgentPlugin.OPENED_BY_CALL, call.callId());
+        Session child = sessions.get().open(new SessionSpec(session.userId(), session.id(), agent, metadata));
         return new TurnRequest(child.id(), List.of(new ContentPart.Text(message)), agent, Map.of());
     }
 }

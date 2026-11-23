@@ -70,7 +70,7 @@ class CapabilitiesWithoutEngineTest {
         registry.contribute(ToolResolver.class, ToolResolver.of(List.of(tool("web_search"), tool("bash"), tool("read_pdf"))));
         registry.install(new SkillPlugin());
         registry.install(new ToolSearchPlugin(new InMemoryToolActivation(NamespaceProvider.fixed("test"))));
-        registry.install(new SubAgentPlugin());
+        registry.install(new SubAgentPlugin(key -> true));
         registry.install(new PermissionPlugin(PermissionEffect.ALLOW, new InMemoryApprovalMemory(NamespaceProvider.fixed("test"))));
         registry.contribute(PermissionRuleSource.class, session -> List.of(
                 new PermissionRule("bash", PermissionEffect.ASK)));
