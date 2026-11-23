@@ -7,11 +7,15 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
 
+import ai.mindconnect.agent.management.api.AgentId;
+import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
+import ai.mindconnect.agent.management.port.out.AgentRepository;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
 import ai.mindconnect.agent.runtime.api.domain.SessionId;
@@ -25,7 +29,8 @@ import ai.mindconnect.message.port.out.MessageRepository;
  * Session management on the two repositories the engine's session store is
  * put together from: the sessions in the engine's own, what was said in the
  * message repository. It reads and writes what the runtime reads and writes,
- * so a session renamed here is the session a turn finds.
+ * so a session renamed here is the session a turn finds. A session that
+ * refers to a managed agent finds it in the agent repository.
  */
 public final class RepositorySessionManagement implements SessionManagement {
 
@@ -33,12 +38,14 @@ public final class RepositorySessionManagement implements SessionManagement {
 
     private final SessionRepository sessions;
     private final MessageRepository messages;
+    private final AgentRepository agents;
     private final SessionDirectoryPolicy directoryPolicy;
 
     public RepositorySessionManagement(SessionRepository sessions, MessageRepository messages,
-                                       SessionDirectoryPolicy directoryPolicy) {
+                                       AgentRepository agents, SessionDirectoryPolicy directoryPolicy) {
         this.sessions = sessions;
         this.messages = messages;
+        this.agents = agents;
         this.directoryPolicy = directoryPolicy;
     }
 
@@ -109,7 +116,39 @@ public final class RepositorySessionManagement implements SessionManagement {
 
     @Override
     public ManagedSession changeAgent(SessionId sessionId, AgentDefinition agent) {
-        return changed(sessionId, session -> session.withAgent(agent));
+        return changed(sessionId, session -> session.withAgent(agent)
+                .withMetadata(ManagedSession.AGENT, ManagedSession.OWN));
+    }
+
+    @Override
+    public ManagedSession useAgent(SessionId sessionId, AgentId agent) {
+        AgentDefinition definition = agents.find(agent).map(ManagedAgent::definition).orElseThrow(() ->
+                new IllegalArgumentException("There is no agent " + agent.value()));
+        // The definition is kept too: what works for the session between turns has a model to ask.
+        return changed(sessionId, session -> session.withAgent(definition)
+                .withMetadata(ManagedSession.AGENT_ID, agent.value())
+                .withMetadata(ManagedSession.AGENT, ManagedSession.REF));
+    }
+
+    @Override
+    public Optional<AgentDefinition> agentOf(SessionId sessionId) {
+        Session session = existing(sessionId);
+        if (agentOf(session) instanceof SessionAgent.Ref ref) {
+            Optional<AgentDefinition> current = agents.find(ref.id()).map(ManagedAgent::definition);
+            if (current.isPresent()) {
+                return current;
+            }
+        }
+        return Optional.ofNullable(session.agent());
+    }
+
+    private static SessionAgent agentOf(Session session) {
+        AgentId id = session.metadata().get(ManagedSession.AGENT_ID) instanceof String stored
+                ? AgentId.of(stored) : null;
+        if (id != null && ManagedSession.REF.equals(session.metadata().get(ManagedSession.AGENT))) {
+            return new SessionAgent.Ref(id);
+        }
+        return session.agent() == null ? null : new SessionAgent.Own(session.agent(), id);
     }
 
     @Override
@@ -155,7 +194,7 @@ public final class RepositorySessionManagement implements SessionManagement {
                 session.id(),
                 session.userId(),
                 session.parentId(),
-                session.agent() == null ? null : session.agent().name(),
+                agentOf(session),
                 session.metadata().get(ManagedSession.TITLE) instanceof String title ? title : null,
                 session.metadata().get(ManagedSession.TYPE) instanceof String type ? type : ManagedSession.CHAT,
                 session.metadata().get(ManagedSession.STATUS) instanceof String status

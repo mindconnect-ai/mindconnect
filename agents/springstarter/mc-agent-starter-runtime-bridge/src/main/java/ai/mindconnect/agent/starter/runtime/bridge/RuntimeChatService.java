@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.management.api.SessionManagement;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -45,8 +46,7 @@ public final class RuntimeChatService {
     private final SessionService sessionService;
     private final SessionStore sessions;
     private final AgentSessionRepository chatSessions;
-    private final SessionAgentResolver agents;
-    private final AgentDefinitionMapper mapper;
+    private final SessionManagement management;
     private final AgentChatService earlier;
 
     /**
@@ -58,14 +58,13 @@ public final class RuntimeChatService {
 
     public RuntimeChatService(TurnService turns, SessionService sessionService, SessionStore sessions,
                               AgentSessionRepository chatSessions,
-                              SessionAgentResolver agents, AgentDefinitionMapper mapper,
+                              SessionManagement management,
                               AgentChatService earlier) {
         this.turns = turns;
         this.sessionService = sessionService;
         this.sessions = sessions;
         this.chatSessions = chatSessions;
-        this.agents = agents;
-        this.mapper = mapper;
+        this.management = management;
         this.earlier = earlier;
     }
 
@@ -77,9 +76,10 @@ public final class RuntimeChatService {
                                      Consumer<StreamEvent> events) {
         AgentSession chat = chatSessions.findById(sessionId).orElseThrow(() ->
                 new IllegalArgumentException("There is no session " + sessionId.value()));
-        // The agent as it is now, for this turn and as the session's: a definition edited since the
-        // session was opened holds, and what works for the session between turns has a model to ask.
-        AgentDefinition agent = mapper.toRuntime(agents.resolve(chat));
+        // The agent as it is now, for this turn and as the session's: a stored agent the chat refers to
+        // holds as edited since, and what works for the session between turns has a model to ask.
+        AgentDefinition agent = management.agentOf(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()))
+                .orElseThrow(() -> new IllegalStateException("Session " + sessionId.value() + " has no agent"));
         Session session = known(chat, agent);
         TurnId turnId = turns.submit(new TurnRequest(session.id(),
                 parts.stream().map(RuntimeChatService::part).toList(), agent));

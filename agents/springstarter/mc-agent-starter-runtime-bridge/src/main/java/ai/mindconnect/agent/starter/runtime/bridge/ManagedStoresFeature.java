@@ -1,5 +1,11 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import java.util.Optional;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.AgentSession;
+import ai.mindconnect.common.DomainException;
+import java.util.concurrent.atomic.AtomicReference;
+import ai.mindconnect.agent.runtime.service.SessionAgentResolver;
 import java.util.function.Supplier;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +45,16 @@ final class ManagedStoresFeature implements RuntimeFeature {
         this.json = json;
     }
 
+    /** The definition the chat's choice amounts to right now; empty when the agent behind it is gone. */
+    static Optional<AgentDefinition> agentOf(AgentSession written, AgentDefinitionRepository definitions,
+                                             AgentDefinitionMapper mapper) {
+        try {
+            return Optional.of(mapper.toRuntime(new SessionAgentResolver(definitions).resolve(written)));
+        } catch (DomainException gone) {
+            return Optional.empty();
+        }
+    }
+
     @Override
     public String name() {
         return "managed-stores";
@@ -46,9 +62,14 @@ final class ManagedStoresFeature implements RuntimeFeature {
 
     @Override
     public void configure(FeatureContext ctx) {
-        ctx.decorate(AgentDefinitionRepository.class, earlier ->
-                new ManagedAgentDefinitionRepository(agents, earlier, mapper, json, namespaces));
+        // The agents as they are kept now, for a chat whose choice amounts to a definition of its own.
+        AtomicReference<AgentDefinitionRepository> definitions = new AtomicReference<>();
+        ctx.decorate(AgentDefinitionRepository.class, earlier -> {
+            definitions.set(new ManagedAgentDefinitionRepository(agents, earlier, mapper, json, namespaces));
+            return definitions.get();
+        });
         ctx.decorate(AgentSessionRepository.class, earlier ->
-                new ManagedAgentSessionRepository(sessions, earlier, json, namespaces));
+                new ManagedAgentSessionRepository(sessions, earlier, json, namespaces,
+                        written -> agentOf(written, definitions.get(), mapper)));
     }
 }

@@ -133,8 +133,9 @@ public class RuntimeEngineAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     SessionManagement sessionManagement(SessionRepository sessions, MessageRepository messages,
+                                        AgentRepository agents,
                                         ObjectProvider<SessionDirectoryPolicy> directoryPolicy) {
-        return new RepositorySessionManagement(sessions, messages,
+        return new RepositorySessionManagement(sessions, messages, agents,
                 directoryPolicy.getIfAvailable(SessionDirectoryPolicy::unrestricted));
     }
 

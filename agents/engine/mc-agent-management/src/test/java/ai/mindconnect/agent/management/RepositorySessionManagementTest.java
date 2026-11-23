@@ -15,7 +15,11 @@ import ai.mindconnect.agent.loop.domain.ContentPart;
 import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
+import ai.mindconnect.agent.management.api.ManagedAgent;
+import ai.mindconnect.agent.management.api.SessionAgent;
 import ai.mindconnect.agent.management.api.SessionDirectories;
+import ai.mindconnect.agent.management.port.out.AgentRepository;
 import java.util.Optional;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
@@ -43,7 +47,8 @@ class RepositorySessionManagementTest {
     private final MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
     /** What the runtime does: the sessions and messages the management API is to find. */
     private final SessionStore runtime = new RepositorySessionStore(sessions, messages);
-    private final SessionManagement management = new RepositorySessionManagement(sessions, messages,
+    private final AgentRepository agents = new InMemoryAgentRepository(NamespaceProvider.fixed("test"));
+    private final SessionManagement management = new RepositorySessionManagement(sessions, messages, agents,
             SessionDirectoryPolicy.unrestricted());
 
     private Session open(String id, String user, String parent, String createdAt, Map<String, Object> metadata) {
@@ -74,10 +79,10 @@ class RepositorySessionManagementTest {
                 ManagedSession.ADDITIONAL_DIRECTORIES, List.of("/srv/shared")));
 
         assertThat(management.find(SessionId.of("plain"))).contains(new ManagedSession(SessionId.of("plain"), ADA,
-                null, "helper", null, ManagedSession.CHAT, ManagedSession.Status.ACTIVE, SessionDirectories.NONE,
+                null, new SessionAgent.Own(HELPER, null), null, ManagedSession.CHAT, ManagedSession.Status.ACTIVE, SessionDirectories.NONE,
                 Instant.parse("2026-11-01T00:00:00Z"), Map.of()));
         assertThat(management.find(SessionId.of("set-up"))).contains(new ManagedSession(SessionId.of("set-up"), ADA,
-                null, "helper", "Owls", "research", ManagedSession.Status.COMPLETED,
+                null, new SessionAgent.Own(HELPER, null), "Owls", "research", ManagedSession.Status.COMPLETED,
                 new SessionDirectories("/srv/owls", List.of("/srv/shared")), Instant.parse("2026-11-02T00:00:00Z"),
                 Map.of(ManagedSession.TITLE, "Owls", ManagedSession.TYPE, "research",
                         ManagedSession.STATUS, "COMPLETED", ManagedSession.WORKING_DIRECTORY, "/srv/owls",
@@ -98,7 +103,7 @@ class RepositorySessionManagementTest {
 
         assertThat(changed.title()).isEqualTo("Owls");
         assertThat(changed.status()).isEqualTo(ManagedSession.Status.CANCELLED);
-        assertThat(changed.agentName()).isEqualTo("other");
+        assertThat(changed.agent()).isEqualTo(new SessionAgent.Own(other, null));
         assertThat(changed.metadata()).containsEntry("chat.pinned", true);
         Session found = runtime.find(id).orElseThrow();
         assertThat(found.agent()).isEqualTo(other);
@@ -110,6 +115,31 @@ class RepositorySessionManagementTest {
         assertThat(runtime.find(id).orElseThrow().metadata()).doesNotContainKey(ManagedSession.WORKING_DIRECTORY);
         assertThatThrownBy(() -> management.rename(SessionId.of("unknown"), "x"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void a_session_follows_the_managed_agent_it_refers_to_until_it_is_given_a_definition_of_its_own() {
+        SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
+        ManagedAgent owl = new RepositoryAgentManagement(agents).create(ManagedAgent.of(new AgentDefinition("owl", "Owls.", "You know owls.",
+                ModelSettings.NONE, List.of(), 5, Map.of())));
+        assertThat(management.find(id).orElseThrow().agent()).isEqualTo(new SessionAgent.Own(HELPER, null));
+
+        assertThat(management.useAgent(id, owl.id()).agent()).isEqualTo(new SessionAgent.Ref(owl.id()));
+        assertThat(management.agentOf(id)).contains(owl.definition());
+        AgentDefinition edited = new AgentDefinition("owl", "Owls.", "You know barn owls.", ModelSettings.NONE,
+                List.of(), 5, Map.of());
+        agents.update(owl.id(), agent -> agent.withDefinition(edited));
+        assertThat(management.agentOf(id)).as("the agent as it stands now").contains(edited);
+
+        // A definition of its own: the managed agent is where it came from, and no longer followed.
+        assertThat(management.changeAgent(id, HELPER).agent()).isEqualTo(new SessionAgent.Own(HELPER, owl.id()));
+        assertThat(management.agentOf(id)).contains(HELPER);
+
+        // An agent that is gone leaves the session what it last ran on.
+        management.useAgent(id, owl.id());
+        agents.delete(owl.id());
+        assertThat(management.agentOf(id)).contains(edited);
+        assertThatThrownBy(() -> management.useAgent(id, owl.id())).isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test
@@ -128,7 +158,7 @@ class RepositorySessionManagementTest {
                 return Optional.of("/home/" + session.userId().value() + "/" + session.id().value());
             }
         };
-        SessionManagement guarded = new RepositorySessionManagement(sessions, messages, underSrv);
+        SessionManagement guarded = new RepositorySessionManagement(sessions, messages, agents, underSrv);
         SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
 
         assertThat(guarded.changeDirectories(id, new SessionDirectories("/srv/owls", List.of("/srv/mice")))

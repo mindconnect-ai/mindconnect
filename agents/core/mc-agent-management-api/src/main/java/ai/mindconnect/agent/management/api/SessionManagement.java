@@ -48,8 +48,27 @@ public interface SessionManagement {
      */
     ManagedSession setMetadata(SessionId sessionId, String key, Object value);
 
-    /** Another agent for the turns that bring none of their own; what was said stays. */
+    /**
+     * A definition of the session's own to run on; what was said stays. A
+     * session that referred to a managed agent stops following it and keeps
+     * it as where the definition came from.
+     */
     ManagedSession changeAgent(SessionId sessionId, AgentDefinition agent);
+
+    /**
+     * The session runs on this managed agent from now on, as that agent
+     * stands when a turn begins.
+     *
+     * @throws IllegalArgumentException also if there is no such agent
+     */
+    ManagedSession useAgent(SessionId sessionId, AgentId agent);
+
+    /**
+     * The definition a turn in this session runs on now: the managed agent's
+     * for a session that refers to one — as last seen, should that agent be
+     * gone — else the session's own. Empty for a session without an agent.
+     */
+    Optional<AgentDefinition> agentOf(SessionId sessionId);
 
     /** Deletes the session, what was said in it, and every session under it. A session that is not there is none. */
     void delete(SessionId sessionId);

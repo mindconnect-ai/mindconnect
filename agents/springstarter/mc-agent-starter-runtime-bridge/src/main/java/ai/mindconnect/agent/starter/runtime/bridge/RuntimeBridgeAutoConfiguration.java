@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.runtime.service.UserHome;
 import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
@@ -129,9 +130,9 @@ public class RuntimeBridgeAutoConfiguration {
     RuntimeChatService runtimeChatService(ObjectProvider<TurnService> turns,
                                           ObjectProvider<SessionService> sessionService,
                                           ObjectProvider<SessionStore> sessions,
-                                          AgentSessionRepository chatSessions, AgentDefinitionRepository agents,
-                                          AgentDefinitionMapper mapper, AgentChatService earlier) {
+                                          AgentSessionRepository chatSessions,
+                                          ObjectProvider<SessionManagement> management, AgentChatService earlier) {
         return new RuntimeChatService(turns.getObject(), sessionService.getObject(), sessions.getObject(), chatSessions,
-                new SessionAgentResolver(agents), mapper, earlier);
+                management.getObject(), earlier);
     }
 }

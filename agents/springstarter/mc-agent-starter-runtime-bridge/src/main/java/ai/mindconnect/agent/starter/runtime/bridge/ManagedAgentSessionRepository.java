@@ -1,5 +1,9 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import java.util.function.Function;
+import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
+import ai.mindconnect.agent.runtime.domain.session.SessionAgent;
+import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -38,6 +42,11 @@ import ai.mindconnect.agent.runtime.port.out.AgentSessionRepository;
  * is the whole one with those entries laid over it — the runtime may have
  * given the chat a title, or remembered an approval, since.
  *
+ * <p>The agent a chat chose is spelled out as well, the way the management
+ * keeps it: a chat that names a stored agent and changes nothing about it
+ * refers to that agent; one that chose a model, tools or a prompt of its
+ * own runs on a definition of its own, put together when it is written.
+ *
  * <p>Sessions of the earlier store are taken over as they are asked for:
  * one by its id, a user's when their list is read, the ones under a session
  * with it.
@@ -51,11 +60,15 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
     private final AgentSessionRepository earlier;
     private final ObjectMapper json;
     private final Supplier<NamespaceProvider> namespaces;
+    /** The definition a session written the earlier way amounts to; empty when its agent is gone. */
+    private final Function<AgentSession, Optional<AgentDefinition>> agentOf;
     /** The users whose sessions were taken over, per namespace. */
     private final Set<String> takenOver = ConcurrentHashMap.newKeySet();
 
     ManagedAgentSessionRepository(Supplier<SessionRepository> sessions, AgentSessionRepository earlier,
-                                  ObjectMapper json, Supplier<NamespaceProvider> namespaces) {
+                                  ObjectMapper json, Supplier<NamespaceProvider> namespaces,
+                                  Function<AgentSession, Optional<AgentDefinition>> agentOf) {
+        this.agentOf = agentOf;
         this.sessions = sessions;
         this.earlier = earlier;
         this.json = json;
@@ -112,6 +125,9 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
         Optional<Session> stored = sessions.get().find(runtimeId(id));
         if (stored.isEmpty() || !stored.get().metadata().containsKey(EARLIER)) {
             earlier.findById(id).ifPresent(this::takeOver);
+        } else if (!stored.get().metadata().containsKey(ManagedSession.AGENT)) {
+            // Kept here before the chat's agent was spelled out: written once more, as it is.
+            sessions.get().update(runtimeId(id), known -> session(earlier(known), known));
         }
     }
 
@@ -152,7 +168,11 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
         Map<String, Object> metadata = new HashMap<>(stored == null ? Map.of() : stored.metadata());
         metadata.put(EARLIER, json.convertValue(written, Map.class));
         metadata.put(RepositorySessionStore.CONVERSATION_ID, written.conversationId().value());
-        metadata.put(ManagedSession.AGENT_ID, written.agentDefinitionId().value());
+        SessionAgent chosen = written.mainAgent().orElse(null);
+        boolean refers = chosen == null || chosen instanceof SessionAgentRef ref && unchanged(ref);
+        metadata.put(ManagedSession.AGENT_ID,
+                (chosen instanceof SessionAgentRef ref ? ref.id() : written.agentDefinitionId()).value());
+        metadata.put(ManagedSession.AGENT, refers ? ManagedSession.REF : ManagedSession.OWN);
         metadata.put(ManagedSession.TYPE, written.type());
         metadata.put(ManagedSession.STATUS, written.status().name());
         metadata.put(ManagedSession.ADDITIONAL_DIRECTORIES, written.additionalDirs());
@@ -172,7 +192,8 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
         return new Session(runtimeId(written.id()),
                 ai.mindconnect.agent.runtime.api.domain.UserId.of(written.userId().value()),
                 written.parentSessionId() == null ? null : runtimeId(written.parentSessionId()),
-                stored == null ? null : stored.agent(),
+                // Kept for a chat that refers to its agent as well: what the session last ran on.
+                agentOf.apply(written).orElse(stored == null ? null : stored.agent()),
                 metadata,
                 stored != null ? stored.createdAt()
                         : written.startedAt() == null ? Instant.now() : written.startedAt());
@@ -214,6 +235,12 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
                         RepositorySessionStore.conversationOf(session).value()),
                 null, SessionStatus.ACTIVE, session.createdAt(), null,
                 session.parentId() == null ? null : SessionId.of(session.parentId().value()), null, null);
+    }
+
+    /** Does the chat take the stored agent as it is? */
+    private static boolean unchanged(SessionAgentRef ref) {
+        return (ref.llmConfigName() == null || ref.llmConfigName().isBlank()) && !ref.hasPromptOverride()
+                && ref.tools() == null && ref.callableAgents() == null;
     }
 
     private static List<String> names(Object stored) {

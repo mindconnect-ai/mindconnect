@@ -5,3 +5,7 @@
   session" is remembered in the session itself, and a tool result that was
   shortened to save context stays shortened. Sub-agents show one level below
   the turn, however deep they are nested.
+- A chat either refers to a stored agent or runs on a definition of its own.
+  A chat that refers to an agent follows what is changed on that agent; as soon
+  as the chat chooses a model, tools, a prompt or sub-agents of its own, it
+  keeps its own definition and no longer follows the stored agent.

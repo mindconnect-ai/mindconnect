@@ -30,6 +30,7 @@ import ai.mindconnect.agent.runtime.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.runtime.domain.SessionStatus;
+import ai.mindconnect.agent.runtime.domain.session.SessionAgentRef;
 import ai.mindconnect.agent.runtime.engine.adapter.store.InMemorySessionRepository;
 import ai.mindconnect.agent.runtime.engine.port.out.SessionRepository;
 import ai.mindconnect.agent.runtime.memory.domain.AutoCompactConfig;
@@ -61,7 +62,8 @@ class ManagedStoresTest {
     private final SessionRepository runtimeSessions = new InMemorySessionRepository(NAMESPACES);
     private final AgentSessionRepository earlierSessions = mock(AgentSessionRepository.class);
     private final AgentSessionRepository sessions = new ManagedAgentSessionRepository(
-            () -> runtimeSessions, earlierSessions, JSON, () -> NAMESPACES);
+            () -> runtimeSessions, earlierSessions, JSON, () -> NAMESPACES,
+            written -> ManagedStoresFeature.agentOf(written, agents, new AgentDefinitionMapper()));
 
     private static AgentSession chat(String user) {
         return new AgentSession(SessionId.random(), LIBRARIAN.id(), UserId.of(user), ConversationId.random(), null,
@@ -133,6 +135,28 @@ class ManagedStoresTest {
         assertThat(sessions.findById(chat.id())).contains(chat);
         assertThat(sessions.findByUser(UserId.of("ada"))).containsExactly(chat);
         assertThat(sessions.findByAgent(LIBRARIAN.id(), UserId.of("ada"))).containsExactly(chat);
+    }
+
+    @Test
+    void a_chat_refers_to_its_agent_until_it_chooses_something_of_its_own() {
+        agents.save(LIBRARIAN);
+        AgentSession chat = sessions.create(chat("ada"));
+        ai.mindconnect.agent.runtime.api.domain.SessionId id =
+                ai.mindconnect.agent.runtime.api.domain.SessionId.of(chat.id().value());
+
+        assertThat(runtimeSessions.find(id).orElseThrow().metadata())
+                .containsEntry(ManagedSession.AGENT, ManagedSession.REF)
+                .containsEntry(ManagedSession.AGENT_ID, LIBRARIAN.id().value());
+        assertThat(runtimeSessions.find(id).orElseThrow().agent().instructions()).isEqualTo("You find books.");
+
+        // A prompt of the chat's own: the definition is the session's from here on.
+        sessions.update(chat.id(), session -> session.withSessionAgent(new SessionAgentRef(LIBRARIAN.id(), true,
+                "librarian", null, null, "You find maps.")));
+
+        assertThat(runtimeSessions.find(id).orElseThrow().metadata())
+                .containsEntry(ManagedSession.AGENT, ManagedSession.OWN)
+                .containsEntry(ManagedSession.AGENT_ID, LIBRARIAN.id().value());
+        assertThat(runtimeSessions.find(id).orElseThrow().agent().instructions()).isEqualTo("You find maps.");
     }
 
     @Test
