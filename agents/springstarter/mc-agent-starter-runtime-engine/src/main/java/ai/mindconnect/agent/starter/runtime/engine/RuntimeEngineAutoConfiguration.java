@@ -21,6 +21,7 @@ import ai.mindconnect.agent.management.adapter.FileAgentRepository;
 import ai.mindconnect.agent.management.adapter.pg.PgAgentRepository;
 import ai.mindconnect.agent.management.api.AgentManagement;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
+import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.port.in.SessionService;
 import ai.mindconnect.agent.runtime.api.port.in.TurnService;
@@ -131,8 +132,10 @@ public class RuntimeEngineAutoConfiguration {
     /** Listing, renaming and deleting sessions, on the same repositories the runtime writes to. */
     @Bean
     @ConditionalOnMissingBean
-    SessionManagement sessionManagement(SessionRepository sessions, MessageRepository messages) {
-        return new RepositorySessionManagement(sessions, messages);
+    SessionManagement sessionManagement(SessionRepository sessions, MessageRepository messages,
+                                        ObjectProvider<SessionDirectoryPolicy> directoryPolicy) {
+        return new RepositorySessionManagement(sessions, messages,
+                directoryPolicy.getIfAvailable(SessionDirectoryPolicy::unrestricted));
     }
 
     @Bean

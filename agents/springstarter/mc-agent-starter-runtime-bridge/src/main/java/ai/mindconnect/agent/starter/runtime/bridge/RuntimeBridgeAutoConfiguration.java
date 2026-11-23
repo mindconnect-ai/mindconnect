@@ -1,5 +1,8 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
+import ai.mindconnect.agent.runtime.service.UserHome;
+import ai.mindconnect.agent.runtime.service.WorkingDirPolicy;
 import java.util.List;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -97,6 +100,13 @@ public class RuntimeBridgeAutoConfiguration {
                                         ObjectProvider<NamespaceProvider> namespaces,
                                         AgentDefinitionMapper mapper, ObjectMapper json) {
         return new ManagedStoresFeature(agents::getObject, sessions::getObject, namespaces::getObject, mapper, json);
+    }
+
+    /** Which directories a session may have, as the earlier runtime's configuration says it. */
+    @Bean
+    @ConditionalOnMissingBean
+    SessionDirectoryPolicy sessionDirectoryPolicy(WorkingDirPolicy policy, UserHome userHome) {
+        return new WorkingDirSessionDirectoryPolicy(policy, userHome);
     }
 
     @Bean

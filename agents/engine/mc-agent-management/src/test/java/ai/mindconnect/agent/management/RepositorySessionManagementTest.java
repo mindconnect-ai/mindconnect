@@ -16,6 +16,8 @@ import ai.mindconnect.agent.loop.domain.TurnMessage;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
+import java.util.Optional;
+import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
@@ -41,7 +43,8 @@ class RepositorySessionManagementTest {
     private final MessageRepository messages = new InMemoryMessageRepository(ScopeSupplier.fixed(new Namespace("test")));
     /** What the runtime does: the sessions and messages the management API is to find. */
     private final SessionStore runtime = new RepositorySessionStore(sessions, messages);
-    private final SessionManagement management = new RepositorySessionManagement(sessions, messages);
+    private final SessionManagement management = new RepositorySessionManagement(sessions, messages,
+            SessionDirectoryPolicy.unrestricted());
 
     private Session open(String id, String user, String parent, String createdAt, Map<String, Object> metadata) {
         Session session = new Session(SessionId.of(id), UserId.of(user), parent == null ? null : SessionId.of(parent),
@@ -101,8 +104,42 @@ class RepositorySessionManagementTest {
         assertThat(found.agent()).isEqualTo(other);
         assertThat(found.metadata()).containsEntry(ManagedSession.TITLE, "Owls")
                 .containsEntry(ManagedSession.WORKING_DIRECTORY, "/srv/owls");
+        // Taking the working directory away leaves no entry behind.
+        assertThat(management.changeDirectories(id, SessionDirectories.NONE).directories())
+                .isEqualTo(SessionDirectories.NONE);
+        assertThat(runtime.find(id).orElseThrow().metadata()).doesNotContainKey(ManagedSession.WORKING_DIRECTORY);
         assertThatThrownBy(() -> management.rename(SessionId.of("unknown"), "x"))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void a_new_directory_has_to_pass_the_policy_and_the_sessions_own_is_kept() {
+        SessionDirectoryPolicy underSrv = new SessionDirectoryPolicy() {
+            @Override
+            public String admit(UserId user, String directory) {
+                if (!directory.startsWith("/srv/")) {
+                    throw new IllegalArgumentException(directory + " is outside /srv");
+                }
+                return directory;
+            }
+
+            @Override
+            public Optional<String> ownDirectory(ManagedSession session) {
+                return Optional.of("/home/" + session.userId().value() + "/" + session.id().value());
+            }
+        };
+        SessionManagement guarded = new RepositorySessionManagement(sessions, messages, underSrv);
+        SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
+
+        assertThat(guarded.changeDirectories(id, new SessionDirectories("/srv/owls", List.of("/srv/mice")))
+                .directories()).isEqualTo(new SessionDirectories("/srv/owls", List.of("/srv/mice", "/home/ada/s1")));
+        assertThatThrownBy(() -> guarded.changeDirectories(id, new SessionDirectories("/etc", List.of())))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("outside /srv");
+        // Its own directory lies outside the root and still passes: as a held one, and as where it works.
+        assertThat(guarded.changeDirectories(id, new SessionDirectories("/home/ada/s1", List.of())).directories())
+                .isEqualTo(new SessionDirectories("/home/ada/s1", List.of()));
+        assertThat(guarded.changeDirectories(id, SessionDirectories.NONE).directories())
+                .isEqualTo(new SessionDirectories(null, List.of("/home/ada/s1")));
     }
 
     @Test

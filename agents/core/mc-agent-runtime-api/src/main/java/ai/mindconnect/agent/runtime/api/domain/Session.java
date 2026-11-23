@@ -35,6 +35,13 @@ public record Session(
         metadata = Map.copyOf(metadata);
     }
 
+    /** This session without that entry in its metadata; the same session when it has none. */
+    public Session withoutMetadata(String key) {
+        Map<String, Object> changed = new HashMap<>(metadata);
+        changed.remove(key);
+        return new Session(id, userId, parentId, agent, changed, createdAt);
+    }
+
     /** This session with another agent for the turns that bring none. */
     public Session withAgent(AgentDefinition agent) {
         return new Session(id, userId, parentId, agent, metadata, createdAt);

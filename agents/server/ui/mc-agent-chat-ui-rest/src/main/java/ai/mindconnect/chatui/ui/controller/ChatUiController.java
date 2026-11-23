@@ -10,6 +10,7 @@ import ai.mindconnect.agent.runtime.domain.StreamEvent;
 import ai.mindconnect.agent.runtime.domain.AgentDefinitionStatus;
 import ai.mindconnect.agent.runtime.domain.AgentSession;
 import ai.mindconnect.agent.management.api.ManagedSession;
+import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.memory.domain.WorkingMemory;
 import ai.mindconnect.agent.runtime.port.in.ChatTurnHandle;
@@ -375,8 +376,11 @@ public class ChatUiController {
     public ResponseEntity<UiPatch> useDir(@PathVariable SessionId sessionId,
                                           @RequestBody Map<String, Object> raw,
                                           @AuthenticationPrincipal OidcUser user) {
-        if (ownedSession(sessionId, user).isEmpty()) return ResponseEntity.notFound().build();
-        var saved = sessionService.changeWorkingDir(sessionId, pathOf(raw), null);
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
+        sessionManagement.changeDirectories(runtimeId(sessionId),
+                new SessionDirectories(pathOf(raw), sessionOpt.get().additionalDirs()));
+        var saved = sessionRepository.findById(sessionId).orElseThrow();
         return ResponseEntity.ok(UiPatch.of()
                 .patch(UiPatch.Operation.remove("chat-dialog"))
                 .patch(composerRefresh(saved))
@@ -405,10 +409,15 @@ public class ChatUiController {
     public ResponseEntity<UiPatch> addDir(@PathVariable SessionId sessionId,
                                           @RequestBody Map<String, Object> raw,
                                           @AuthenticationPrincipal OidcUser user) {
-        if (ownedSession(sessionId, user).isEmpty()) return ResponseEntity.notFound().build();
+        var sessionOpt = ownedSession(sessionId, user);
+        if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String path = pathOf(raw);
         if (path == null) throw new IllegalArgumentException("Type or pick a directory to add first");
-        var saved = sessionService.addDirectory(sessionId, path);
+        var session = sessionOpt.get();
+        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.workingDir(),
+                java.util.stream.Stream.concat(session.additionalDirs().stream(), java.util.stream.Stream.of(path))
+                        .toList()));
+        var saved = sessionRepository.findById(sessionId).orElseThrow();
         return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId(), path))
                 .toast(ai.mindconnect.ui.model.UiToast.success("Added " + path).title("Additional directories")));
     }
@@ -421,10 +430,16 @@ public class ChatUiController {
         var sessionOpt = ownedSession(sessionId, user);
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         var session = sessionOpt.get();
-        var saved = sessionService.changeWorkingDir(sessionId, session.workingDir(),
-                session.additionalDirs().stream().filter(d -> !d.equals(path)).toList());
+        sessionManagement.changeDirectories(runtimeId(sessionId), new SessionDirectories(session.workingDir(),
+                session.additionalDirs().stream().filter(d -> !d.equals(path)).toList()));
+        var saved = sessionRepository.findById(sessionId).orElseThrow();
         return ResponseEntity.ok(redrawnPicker(saved, dirBrowser.list(saved.userId(), saved.workingDir()))
                 .toast(ai.mindconnect.ui.model.UiToast.success("Removed " + path).title("Additional directories")));
+    }
+
+    /** The session's id as the runtime and the management know it. */
+    private static ai.mindconnect.agent.runtime.api.domain.SessionId runtimeId(SessionId sessionId) {
+        return ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value());
     }
 
     /** The chooser's form redrawn in place. */
@@ -498,8 +513,7 @@ public class ChatUiController {
         if (sessionOpt.isEmpty()) return ResponseEntity.notFound().build();
         String title = new FormBody(raw).str("title");
         if (title != null && !title.isBlank()) {
-            sessionManagement.rename(
-                    ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()), title.trim());
+            sessionManagement.rename(runtimeId(sessionId), title.trim());
         }
         String userId = userId(user);
         var sessions = chats(userId);

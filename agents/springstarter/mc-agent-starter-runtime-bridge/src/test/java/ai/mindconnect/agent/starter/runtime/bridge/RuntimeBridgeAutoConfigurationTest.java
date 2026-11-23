@@ -237,6 +237,10 @@ class RuntimeBridgeAutoConfigurationTest {
                 .withBean(LlmCallTraceRepository.class, () -> traces)
                 .withBean(AgentSessionRepository.class, () -> chatSessions)
                 .withBean(AgentChatService.class, () -> mock(AgentChatService.class))
+                .withBean(ai.mindconnect.agent.runtime.service.WorkingDirPolicy.class,
+                        ai.mindconnect.agent.runtime.service.WorkingDirPolicy::unrestricted)
+                .withBean(ai.mindconnect.agent.runtime.service.UserHome.class,
+                        () -> ai.mindconnect.agent.runtime.service.UserHome.of(null))
                 .withBean(ToolApprovalRepository.class, () -> openApprovals);
     }
 

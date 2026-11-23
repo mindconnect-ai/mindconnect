@@ -31,6 +31,14 @@ public interface SessionManagement {
 
     ManagedSession changeStatus(SessionId sessionId, ManagedSession.Status status);
 
+    /**
+     * Other directories for the session. A directory it does not have yet
+     * has to pass the installation's {@link SessionDirectoryPolicy}; one it
+     * has stays without being asked about again, and the directory it was
+     * given is kept whatever is named here.
+     *
+     * @throws IllegalArgumentException also for a directory the policy refuses
+     */
     ManagedSession changeDirectories(SessionId sessionId, SessionDirectories directories);
 
     /**

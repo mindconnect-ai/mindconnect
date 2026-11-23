@@ -1,12 +1,16 @@
 package ai.mindconnect.agent.management;
 
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionDirectories;
+import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.Session;
@@ -29,10 +33,13 @@ public final class RepositorySessionManagement implements SessionManagement {
 
     private final SessionRepository sessions;
     private final MessageRepository messages;
+    private final SessionDirectoryPolicy directoryPolicy;
 
-    public RepositorySessionManagement(SessionRepository sessions, MessageRepository messages) {
+    public RepositorySessionManagement(SessionRepository sessions, MessageRepository messages,
+                                       SessionDirectoryPolicy directoryPolicy) {
         this.sessions = sessions;
         this.messages = messages;
+        this.directoryPolicy = directoryPolicy;
     }
 
     @Override
@@ -62,12 +69,37 @@ public final class RepositorySessionManagement implements SessionManagement {
 
     @Override
     public ManagedSession changeDirectories(SessionId sessionId, SessionDirectories directories) {
+        ManagedSession current = managed(existing(sessionId));
+        Optional<String> own = directoryPolicy.ownDirectory(current);
+        // What the session has passed once, or never had to: removing one directory resends the rest.
+        Set<String> held = new HashSet<>(current.directories().additional());
+        held.add(current.directories().working());
+        own.ifPresent(held::add);
+
+        String working = admitted(current, directories.working(), held);
+        Set<String> additional = new LinkedHashSet<>();
+        for (String directory : directories.additional()) {
+            String admitted = admitted(current, directory, held);
+            if (admitted != null) {
+                additional.add(admitted);
+            }
+        }
+        own.filter(directory -> !directory.equals(working)).ifPresent(additional::add);
+
         return changed(sessionId, session -> {
-            Session moved = session.withMetadata(ManagedSession.ADDITIONAL_DIRECTORIES, directories.additional());
+            Session moved = session.withMetadata(ManagedSession.ADDITIONAL_DIRECTORIES, List.copyOf(additional));
             // No working directory is no entry: an entry cannot hold nothing.
-            return directories.working() == null ? moved
-                    : moved.withMetadata(ManagedSession.WORKING_DIRECTORY, directories.working());
+            return working == null ? moved.withoutMetadata(ManagedSession.WORKING_DIRECTORY)
+                    : moved.withMetadata(ManagedSession.WORKING_DIRECTORY, working);
         });
+    }
+
+    /** The directory as it is stored: one the session has as it is, a new one as the policy admits it; none for blank. */
+    private String admitted(ManagedSession session, String directory, Set<String> held) {
+        if (directory == null || directory.isBlank()) {
+            return null;
+        }
+        return held.contains(directory) ? directory : directoryPolicy.admit(session.userId(), directory);
     }
 
     @Override
