@@ -91,7 +91,7 @@ final class TurnWorker implements TaskWorker {
         AgentContext agentContext = new AgentContext(session, turn.agent(), turnId);
         AgentLoop loop = new DefaultAgentLoop(
                 new DefaultAgentRound(
-                        new GatewayLlmProvider(gateway, tools, hooks, agentContext, turn.modelSettings()),
+                        new GatewayLlmProvider(gateway, tools, hooks, agentContext, turn.agent().modelSettings()),
                         new QueuedToolExecutor(ctx, decisions, turn, session)),
                 turn.agent().maxRounds());
         ctx.onCancel(() -> loop.cancel(turnId.value()));
@@ -136,7 +136,7 @@ final class TurnWorker implements TaskWorker {
 
     /** Lets whoever listens know the turn is over. The turn has ended by then; nothing here can change that. */
     private void ended(AgentContext context, Turn turn, TurnStatus status, TurnOutcome outcome, String error) {
-        Turn ended = new Turn(turn.id(), turn.sessionId(), turn.agent(), turn.modelSettings(), status,
+        Turn ended = new Turn(turn.id(), turn.sessionId(), turn.agent(), status,
                 List.of(), outcome, error);
         hooks.run(RuntimeHook.TURN_END, context, asked -> ended);
     }

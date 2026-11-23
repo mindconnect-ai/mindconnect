@@ -55,8 +55,9 @@ final class TurnAcceptor {
         }
         TurnRequest request = ((TurnAdmission.Admitted) admission).request();
         AgentDefinition agent = agentOf(request, session);
-        Turn turn = new Turn(TurnId.of(UUID.randomUUID().toString()), session.id(), agent,
-                modelSettingsOf(request, session, agent), TurnStatus.QUEUED, List.of(), null, null);
+        Turn turn = new Turn(TurnId.of(UUID.randomUUID().toString()), session.id(),
+                agent.withModelSettings(modelSettingsOf(request, session, agent)),
+                TurnStatus.QUEUED, List.of(), null, null);
         return new Accepted(turn, TurnMessage.user(request.input()));
     }
 

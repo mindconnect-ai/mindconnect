@@ -44,6 +44,11 @@ public record AgentDefinition(
         metadata = Map.copyOf(metadata);
     }
 
+    /** This agent with other model settings: how a turn keeps the settings it runs with. */
+    public AgentDefinition withModelSettings(ModelSettings settings) {
+        return new AgentDefinition(name, description, instructions, settings, tools, maxRounds, metadata);
+    }
+
     /** Whether the agent may use the tool at all, offered at once or not. */
     public boolean uses(String toolName) {
         return tools.stream().anyMatch(tool -> tool.name().equals(toolName));

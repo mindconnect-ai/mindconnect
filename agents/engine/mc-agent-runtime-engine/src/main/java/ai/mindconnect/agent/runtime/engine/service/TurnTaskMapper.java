@@ -77,7 +77,6 @@ final class TurnTaskMapper {
         payload.put(SESSION_ID, turn.sessionId().value());
         payload.put(USER_MESSAGE, MESSAGES.toJson(accepted.userMessage()));
         payload.put(AGENT, agentToJson(turn.agent()));
-        payload.put(MODEL_SETTINGS, settingsToJson(turn.modelSettings()));
         return TaskSubmission.of(TYPE, payload).withId(turn.id().value());
     }
 
@@ -129,7 +128,6 @@ final class TurnTaskMapper {
         List<Interruption> interruptions = interruptions(task);
         return new Turn(turnId, sessionId,
                 agentFromJson((Map<String, Object>) task.payload().get(AGENT)),
-                settingsFromJson((Map<String, Object>) task.payload().get(MODEL_SETTINGS)),
                 status(task, interruptions),
                 interruptions,
                 task.state().get(OUTCOME) instanceof Map<?, ?> outcome
