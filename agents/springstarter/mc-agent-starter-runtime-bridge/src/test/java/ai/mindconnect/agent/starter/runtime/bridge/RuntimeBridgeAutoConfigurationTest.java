@@ -155,7 +155,10 @@ class RuntimeBridgeAutoConfigurationTest {
         assertThat(agent.instructions()).isEqualTo("You find books.");
         assertThat(agent.modelSettings().model()).isEqualTo("small");
         assertThat(agent.maxRounds()).isEqualTo(6);
-        assertThat(agent.tools()).extracting(binding -> binding.name()).containsExactly("search_catalog", "order_book");
+        // The tool switched off stays among the agent's tools, and is none it uses.
+        assertThat(agent.tools()).extracting(binding -> binding.name())
+                .containsExactly("search_catalog", "order_book", "switched_off");
+        assertThat(agent.uses("switched_off")).isFalse();
         assertThat(agent.binding("search_catalog").orElseThrow().metadata())
                 .containsEntry("overrides", Map.of("branch", "main"))
                 .containsEntry("description", "Searches our catalog.")

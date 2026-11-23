@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -87,7 +88,8 @@ final class EarlierAgentConverter {
                 status,
                 untouched ? written.tools()
                         : runs.tools().stream().map(RegistryToolResolver::agentTool).toList(),
-                written == null ? List.of() : written.responseReviewers(),
+                runs.metadata().get(ResponseReviewPlugin.REVIEWERS) instanceof List<?> reviewers
+                        ? reviewers.stream().map(String::valueOf).toList() : List.of(),
                 runs.metadata().get(SubAgentPlugin.SUB_AGENTS) instanceof List<?> named
                         ? named.stream().map(String::valueOf).toList() : List.of(),
                 written == null ? null : written.callableByAgents(),

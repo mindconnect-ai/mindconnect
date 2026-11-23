@@ -127,7 +127,10 @@ final class ToolCallWorker implements TaskWorker {
     }
 
     private ToolOutput run(ToolCall call, AgentDefinition agent, Session session) {
-        Optional<Tool> tool = tools.resolve(call.toolName(), agent, session);
+        // Switched off for this agent is as good as not there, also for a model that calls it from memory.
+        boolean switchedOff = agent.tools().stream()
+                .anyMatch(binding -> binding.name().equals(call.toolName()) && !binding.enabled());
+        Optional<Tool> tool = switchedOff ? Optional.empty() : tools.resolve(call.toolName(), agent, session);
         if (tool.isEmpty()) {
             return ToolOutput.failed("Error: there is no tool named " + call.toolName());
         }

@@ -9,6 +9,7 @@ import java.util.Optional;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
 import ai.mindconnect.agent.runtime.api.domain.ModelSettings;
 import ai.mindconnect.agent.runtime.api.domain.ToolBinding;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.memory.MemoryPlugin;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
@@ -42,6 +43,9 @@ public final class AgentDefinitionMapper {
         metadata.put(AGENT_ID, stored.id().value());
         metadata.put(SubAgentPlugin.SUB_AGENTS,
                 stored.callableAgents() == null ? List.of() : List.copyOf(stored.callableAgents()));
+        if (!stored.effectiveResponseReviewers().isEmpty()) {
+            metadata.put(ResponseReviewPlugin.REVIEWERS, List.copyOf(stored.effectiveResponseReviewers()));
+        }
         skills(stored.skills()).ifPresent(picked -> metadata.put(SkillPlugin.SKILLS, picked));
         if (stored.memoryConfig() != null) {
             metadata.put(MemoryPlugin.MEMORY, memory(stored.memoryConfig()));
@@ -52,7 +56,7 @@ public final class AgentDefinitionMapper {
                 stored.systemPrompt() == null ? "" : stored.systemPrompt(),
                 // The name of an LLM configuration is the model's name to the gateway.
                 stored.llmConfigName() == null ? ModelSettings.NONE : ModelSettings.ofModel(stored.llmConfigName()),
-                stored.tools().stream().filter(AgentTool::enabled).map(AgentDefinitionMapper::binding).toList(),
+                stored.tools().stream().map(AgentDefinitionMapper::binding).toList(),
                 stored.maxIterations() > 0 ? stored.maxIterations() : DEFAULT_MAX_ROUNDS,
                 metadata);
     }
@@ -66,6 +70,9 @@ public final class AgentDefinitionMapper {
         }
         if (tool.maxResultChars() != null) {
             metadata.put(RegistryToolResolver.MAX_RESULT_CHARS, tool.maxResultChars());
+        }
+        if (!tool.enabled()) {
+            metadata.put(ToolBinding.ENABLED, false);
         }
         if (tool.needsApproval()) {
             metadata.put(PermissionPlugin.NEEDS_APPROVAL, true);

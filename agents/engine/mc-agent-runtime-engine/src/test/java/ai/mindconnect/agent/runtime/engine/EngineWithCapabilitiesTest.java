@@ -12,6 +12,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import ai.mindconnect.agent.runtime.capabilities.guard.GuardResolver;
 import ai.mindconnect.agent.runtime.capabilities.guard.InputGuardPlugin;
 import ai.mindconnect.agent.runtime.capabilities.guard.OutputGuardPlugin;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.permission.InMemoryApprovalMemory;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
@@ -152,6 +153,7 @@ class EngineWithCapabilitiesTest {
         registry.install(new TracePlugin(traces::add));
         registry.install(new InputGuardPlugin());
         registry.install(new OutputGuardPlugin());
+        registry.install(new ResponseReviewPlugin());
         registry.install(new SessionTitlePlugin());
         registry.contribute(PermissionRuleSource.class, any -> List.of(
                 new PermissionRule("bash", PermissionEffect.ASK)));
@@ -432,6 +434,67 @@ class EngineWithCapabilitiesTest {
         assertThat(ended.outcome().text()).isEqualTo("Buy. This is not investment advice.");
         assertThat(turns.messages(ended.id())).last().extracting(TurnMessage::text)
                 .isEqualTo("Buy. This is not investment advice.");
+    }
+
+    @Test
+    void a_tool_the_agent_has_switched_off_is_neither_offered_nor_run() throws InterruptedException {
+        AgentDefinition careful = new AgentDefinition("careful", "Is careful.", "You are careful.",
+                ModelSettings.ofModel("big"),
+                List.of(new ToolBinding("read_pdf", false, Map.of(ToolBinding.ENABLED, false))), 5, Map.of());
+        model.script.add(call("c1", "read_pdf", Map.of()));
+        model.script.add(TurnMessage.assistant("Could not read it."));
+
+        Turn ended = awaitRest(turns.submit(new TurnRequest(session.id(),
+                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("Read it.")), careful, Map.of())));
+
+        assertThat(ended.status()).isEqualTo(TurnStatus.COMPLETED);
+        assertThat(model.requests.get(0).tools()).extracting(ToolDefinition::name).doesNotContain("read_pdf");
+        assertThat(toolResults(ended.id())).noneMatch(result -> result.contains("ran read_pdf"));
+    }
+
+    @Test
+    void reviewers_read_the_answer_one_after_the_other_and_the_session_keeps_what_they_left()
+            throws InterruptedException {
+        AgentDefinition advisor = new AgentDefinition("advisor", "Advises.", "You advise.",
+                ModelSettings.ofModel("big"), List.of(), 5,
+                Map.of(ResponseReviewPlugin.REVIEWERS, List.of("lenient", "missing", "editor")));
+        registry.contribute(AgentResolver.class, AgentResolver.of(List.of(
+                new AgentDefinition("lenient", "Lets things pass.", "Pass what is fine.",
+                        ModelSettings.ofModel("small"), List.of(), 1, Map.of()),
+                new AgentDefinition("editor", "Adds the disclaimer.",
+                        "The user asked: {{ user_message }}. The draft: {{ agent_response }}.",
+                        ModelSettings.ofModel("small"), List.of(), 1, Map.of()))));
+        model.script.add(TurnMessage.assistant("Buy."));
+        model.script.add(TurnMessage.assistant("`PASS`"));
+        model.script.add(TurnMessage.assistant("Buy. This is not investment advice."));
+
+        Turn ended = awaitRest(turns.submit(new TurnRequest(session.id(),
+                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("What now?")), advisor, Map.of())));
+
+        assertThat(ended.outcome().text()).isEqualTo("Buy. This is not investment advice.");
+        assertThat(turns.messages(ended.id())).last().extracting(TurnMessage::text)
+                .isEqualTo("Buy. This is not investment advice.");
+        // The reviewer reads the question and the draft in its instructions, and is asked without tools.
+        ModelRequest review = model.requests.get(2);
+        assertThat(review.instructions()).startsWith("The user asked: What now?. The draft: Buy..");
+        assertThat(review.tools()).isEmpty();
+        assertThat(review.messages().get(0).text()).contains("<agent_response>\nBuy.\n</agent_response>");
+    }
+
+    @Test
+    void a_reviewer_that_blocks_replaces_the_answer_and_ends_the_review() throws InterruptedException {
+        AgentDefinition advisor = new AgentDefinition("advisor", "Advises.", "You advise.",
+                ModelSettings.ofModel("big"), List.of(), 5,
+                Map.of(ResponseReviewPlugin.REVIEWERS, List.of("researcher", "researcher")));
+        model.script.add(TurnMessage.assistant("Buy."));
+        model.script.add(TurnMessage.assistant("BLOCK: I cannot advise on that."));
+
+        Turn ended = awaitRest(turns.submit(new TurnRequest(session.id(),
+                List.of(new ai.mindconnect.agent.loop.domain.ContentPart.Text("What now?")), advisor, Map.of())));
+
+        assertThat(ended.outcome().text()).isEqualTo("I cannot advise on that.");
+        assertThat(model.requests.stream().filter(request -> request.settings().model().equals("small")))
+                .hasSize(1);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

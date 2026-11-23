@@ -39,7 +39,7 @@ public final class ToolSearchPlugin implements Plugin {
 
         registry.after(RuntimeHook.TOOL_OFFER, (context, tools) -> {
             List<String> deferred = context.agent().tools().stream()
-                    .filter(ToolBinding::deferred).map(ToolBinding::name).toList();
+                    .filter(ToolBinding::enabled).filter(ToolBinding::deferred).map(ToolBinding::name).toList();
             if (deferred.isEmpty()) {
                 return tools;
             }

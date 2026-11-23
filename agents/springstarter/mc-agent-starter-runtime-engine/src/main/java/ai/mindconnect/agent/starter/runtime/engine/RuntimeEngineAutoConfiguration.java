@@ -50,6 +50,7 @@ import ai.mindconnect.agent.runtime.capabilities.permission.SessionApprovalMemor
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionEffect;
 import ai.mindconnect.agent.runtime.capabilities.permission.PermissionPlugin;
 import ai.mindconnect.agent.runtime.capabilities.prompt.PromptPlugin;
+import ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin;
 import ai.mindconnect.agent.runtime.capabilities.skill.SkillPlugin;
 import ai.mindconnect.agent.runtime.capabilities.subagent.SubAgentPlugin;
 import ai.mindconnect.agent.runtime.capabilities.title.SessionTitlePlugin;
@@ -270,6 +271,7 @@ public class RuntimeEngineAutoConfiguration {
                 new TracePlugin(traces),
                 new InputGuardPlugin(),
                 new OutputGuardPlugin(),
+                new ResponseReviewPlugin(),
                 new SessionTitlePlugin(),
                 new PromptPlugin(Clock.systemUTC(), user -> userZones.zoneOf(
                         user == null ? null : ai.mindconnect.agent.UserId.of(user.value())))));

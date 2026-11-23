@@ -17,8 +17,21 @@ import java.util.Map;
  */
 public record ToolBinding(String name, boolean deferred, Map<String, Object> metadata) {
 
+    /**
+     * The key in the metadata that switches the tool off for this agent
+     * with {@code false}: it stays among the agent's tools with everything
+     * set for it, and is neither offered nor run until it is switched on
+     * again.
+     */
+    public static final String ENABLED = "enabled";
+
     public ToolBinding {
         metadata = Map.copyOf(metadata);
+    }
+
+    /** Whether the agent may use the tool now; see {@link #ENABLED}. */
+    public boolean enabled() {
+        return !Boolean.FALSE.equals(metadata.get(ENABLED));
     }
 
     public static ToolBinding of(String name) {

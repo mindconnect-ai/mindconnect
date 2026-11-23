@@ -186,6 +186,7 @@ public final class AgentRuntimeBuilder {
                 new TracePlugin(new LoggingTraceSink()),
                 new InputGuardPlugin(),
                 new OutputGuardPlugin(),
+                new ai.mindconnect.agent.runtime.capabilities.review.ResponseReviewPlugin(),
                 new SessionTitlePlugin()));
         plugins.addAll(more);
         plugins.stream().filter(plugin -> !left.contains(plugin.getClass())).forEach(registry::install);
