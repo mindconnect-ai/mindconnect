@@ -75,6 +75,7 @@ class SessionFileServiceWorkingDirTest {
         stores.registry().saveTemplate(new VectorStoreTemplate(SessionFileService.CHAT_UPLOADS_TEMPLATE,
                 "embeddings", null, Map.of()));
         service = new SessionFileService(files, provider(stores), provider(null), sessions,
+                provider(managementOver(sessions)),
                 provider(null), temp.resolve("tools").toString(), provider(home),
                 provider(null));
     }
@@ -142,6 +143,33 @@ class SessionFileServiceWorkingDirTest {
         service.deleteAttachment(session.id(), "shot.png");
         assertThat(copy).as("detaching takes the copy with it").doesNotExist();
         assertThat(sessions.findById(session.id()).orElseThrow().attachedFile("shot.png")).isEmpty();
+    }
+
+    /**
+     * The session management as the application wires it: on the record the
+     * session repository reads, so what is attached there shows here.
+     */
+    private static ai.mindconnect.agent.management.api.SessionManagement managementOver(
+            InMemoryAgentSessionRepository sessions) {
+        var management = mock(ai.mindconnect.agent.management.api.SessionManagement.class);
+        org.mockito.Mockito.when(management.attach(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenAnswer(call -> {
+            ai.mindconnect.agent.management.api.SessionAttachment file = call.getArgument(1);
+            ai.mindconnect.agent.runtime.api.domain.SessionId id = call.getArgument(0);
+            sessions.update(ai.mindconnect.agent.SessionId.of(id.value()), session -> session.withAttachedFiles(
+                            List.of(new AttachedFile(file.id(), file.name(), file.mediaType(), file.sizeBytes(),
+                                    file.path()))))
+                    .orElseThrow(() -> new IllegalArgumentException("There is no session " + id.value()));
+            return null;
+        });
+        org.mockito.Mockito.when(management.detach(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.anyString())).thenAnswer(call -> {
+            ai.mindconnect.agent.runtime.api.domain.SessionId id = call.getArgument(0);
+            sessions.update(ai.mindconnect.agent.SessionId.of(id.value()),
+                    session -> session.withoutAttachedFile(call.getArgument(1)));
+            return null;
+        });
+        return management;
     }
 
     // ── Stubs ──────────────────────────────────────────────────────────────

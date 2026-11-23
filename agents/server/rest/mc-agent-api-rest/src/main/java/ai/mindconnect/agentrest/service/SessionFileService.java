@@ -63,6 +63,11 @@ public class SessionFileService {
     private final ObjectProvider<VectorStores> storesProvider;
     private final ObjectProvider<DynamicToolActivations> activationsProvider;
     private final AgentSessionRepository sessions;
+    /**
+     * Where a session's attachments are kept; {@code null} in an application that runs the earlier runtime
+     * alone, which keeps them on the session itself.
+     */
+    private final ai.mindconnect.agent.management.api.SessionManagement sessionManagement;
     private final ObjectProvider<WorkflowDataRepository> workflowsProvider;
     private final Path spoolBase;
     /** Where a call works — every store call names the namespace. */
@@ -74,6 +79,7 @@ public class SessionFileService {
                               ObjectProvider<VectorStores> storesProvider,
                               ObjectProvider<DynamicToolActivations> activationsProvider,
                               AgentSessionRepository sessions,
+                              ObjectProvider<ai.mindconnect.agent.management.api.SessionManagement> sessionManagement,
                               ObjectProvider<WorkflowDataRepository> workflowsProvider,
                               @Value("${mindconnect.tools.base-dir:#{systemProperties['user.home']}}") String toolsBaseDir,
                               ObjectProvider<ai.mindconnect.agent.runtime.service.UserHome> userHome,
@@ -83,6 +89,7 @@ public class SessionFileService {
         this.storesProvider = storesProvider;
         this.activationsProvider = activationsProvider;
         this.sessions = sessions;
+        this.sessionManagement = sessionManagement.getIfAvailable();
         this.workflowsProvider = workflowsProvider;
         this.spoolBase = Path.of(toolsBaseDir).toAbsolutePath().normalize();
         this.userHome = userHome.getIfAvailable(ai.mindconnect.agent.runtime.service.UserHome::none);
@@ -113,14 +120,25 @@ public class SessionFileService {
      * Records the file on the session and, when the copy landed in the
      * session's own directory, that directory as an additional one — the
      * system prompt names the copy's path, so the file tools must be allowed
-     * to open it. Both under one lock; false when the session is gone.
+     * to open it. False when the session is gone.
      */
     private boolean record(SessionId sessionId, AttachedFile attached, java.util.Optional<Path> copy) {
+        if (sessionManagement == null) {
+            if (sessions.update(sessionId, current -> current.withAttachedFiles(List.of(attached))).isEmpty()) {
+                return false;
+            }
+        } else {
+            try {
+                sessionManagement.attach(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()),
+                        new ai.mindconnect.agent.management.api.SessionAttachment(attached.id(), attached.name(),
+                                attached.mediaType(), attached.sizeBytes(), attached.path()));
+            } catch (IllegalArgumentException unknownSession) {
+                return false;
+            }
+        }
         java.util.Optional<String> ownDir = copy.map(c -> c.getParent().getParent().toString());
-        return sessions.update(sessionId, current -> {
-            AgentSession updated = current.withAttachedFiles(List.of(attached));
-            return ownDir.map(updated::withAdditionalDir).orElse(updated);
-        }).isPresent();
+        ownDir.ifPresent(dir -> sessions.update(sessionId, current -> current.withAdditionalDir(dir)));
+        return true;
     }
 
     /**
@@ -211,7 +229,12 @@ public class SessionFileService {
                 // The record and the entry are gone; a stale copy is harmless.
             }
         }));
-        sessions.update(sessionId, session -> session.withoutAttachedFile(fileName));
+        if (sessionManagement == null) {
+            sessions.update(sessionId, session -> session.withoutAttachedFile(fileName));
+        } else {
+            sessionManagement.detach(ai.mindconnect.agent.runtime.api.domain.SessionId.of(sessionId.value()),
+                    fileName);
+        }
     }
 
     /**

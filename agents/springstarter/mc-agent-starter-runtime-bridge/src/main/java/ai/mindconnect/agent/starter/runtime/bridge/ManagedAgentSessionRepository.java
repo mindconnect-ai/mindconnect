@@ -1,5 +1,6 @@
 package ai.mindconnect.agent.starter.runtime.bridge;
 
+import ai.mindconnect.agent.runtime.domain.AttachedFile;
 import ai.mindconnect.agent.runtime.capabilities.attachment.AttachmentPlugin;
 import java.util.function.Function;
 import ai.mindconnect.agent.runtime.api.domain.AgentDefinition;
@@ -220,7 +221,11 @@ final class ManagedAgentSessionRepository implements AgentSessionRepository {
                 written.startedAt(), written.completedAt(), written.parentSessionId(), written.parentTurnId(),
                 written.parentToolCallId(),
                 names(metadata.get(SessionToolActivation.ACTIVATED_TOOLS)),
-                written.attachedFiles(),
+                // Kept by the management since: what is attached now, not what was when this was written.
+                metadata.get(AttachmentPlugin.ATTACHMENTS) instanceof List<?> attached
+                        ? json.convertValue(attached, json.getTypeFactory()
+                                .constructCollectionType(List.class, AttachedFile.class))
+                        : written.attachedFiles(),
                 Set.copyOf(names(metadata.get(SessionApprovalMemory.APPROVED_TOOLS))),
                 written.sessionAgents(),
                 metadata.get(ManagedSession.WORKING_DIRECTORY) instanceof String directory ? directory : null,

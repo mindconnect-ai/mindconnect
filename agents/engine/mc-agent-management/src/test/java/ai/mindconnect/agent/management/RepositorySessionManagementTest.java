@@ -18,6 +18,7 @@ import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.adapter.InMemoryAgentRepository;
 import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.SessionAgent;
+import ai.mindconnect.agent.management.api.SessionAttachment;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.port.out.AgentRepository;
 import java.util.Optional;
@@ -140,6 +141,26 @@ class RepositorySessionManagementTest {
         agents.delete(owl.id());
         assertThat(management.agentOf(id)).contains(edited);
         assertThatThrownBy(() -> management.useAgent(id, owl.id())).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void a_session_holds_one_file_of_a_name_and_gives_it_up_again() {
+        SessionId id = open("s1", "ada", null, "2026-11-01T00:00:00Z", Map.of()).id();
+        SessionAttachment owl = new SessionAttachment("f-1", "owl.png", "image/png", 3, null);
+        SessionAttachment notes = new SessionAttachment("f-2", "notes.docx", null, 9, "/srv/ada/notes.docx");
+
+        management.attach(id, owl);
+        assertThat(management.attach(id, notes).attachments()).containsExactly(owl, notes);
+        SessionAttachment larger = new SessionAttachment("f-3", "owl.png", "image/png", 30, null);
+        assertThat(management.attach(id, larger).attachments()).containsExactly(notes, larger);
+        // The runtime finds them where it reads a session's attachments.
+        assertThat(runtime.find(id).orElseThrow().metadata().get(ManagedSession.ATTACHMENTS))
+                .isEqualTo(List.of(Map.of("id", "f-2", "name", "notes.docx", "sizeBytes", 9L,
+                                "path", "/srv/ada/notes.docx"),
+                        Map.of("id", "f-3", "name", "owl.png", "mediaType", "image/png", "sizeBytes", 30L)));
+
+        assertThat(management.detach(id, "notes.docx").attachments()).containsExactly(larger);
+        assertThat(management.detach(id, "unknown.txt").attachments()).containsExactly(larger);
     }
 
     @Test

@@ -1,8 +1,11 @@
 package ai.mindconnect.agent.management;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.UnaryOperator;
@@ -12,6 +15,7 @@ import ai.mindconnect.agent.management.api.ManagedAgent;
 import ai.mindconnect.agent.management.api.ManagedMessage;
 import ai.mindconnect.agent.management.api.ManagedSession;
 import ai.mindconnect.agent.management.api.SessionAgent;
+import ai.mindconnect.agent.management.api.SessionAttachment;
 import ai.mindconnect.agent.management.api.SessionDirectories;
 import ai.mindconnect.agent.management.api.SessionDirectoryPolicy;
 import ai.mindconnect.agent.management.api.SessionManagement;
@@ -107,6 +111,38 @@ public final class RepositorySessionManagement implements SessionManagement {
             return null;
         }
         return held.contains(directory) ? directory : directoryPolicy.admit(session.userId(), directory);
+    }
+
+    @Override
+    public ManagedSession attach(SessionId sessionId, SessionAttachment file) {
+        return changed(sessionId, session -> {
+            List<Object> attached = new ArrayList<>(without(session, file.name()));
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("id", file.id());
+            entry.put("name", file.name());
+            entry.put("mediaType", file.mediaType());
+            entry.put("sizeBytes", file.sizeBytes());
+            entry.put("path", file.path());
+            // An entry cannot hold nothing: a file without an id, a media type or a path has no such field.
+            entry.values().removeIf(java.util.Objects::isNull);
+            attached.add(entry);
+            return session.withMetadata(ManagedSession.ATTACHMENTS, attached);
+        });
+    }
+
+    @Override
+    public ManagedSession detach(SessionId sessionId, String fileName) {
+        return changed(sessionId, session ->
+                session.withMetadata(ManagedSession.ATTACHMENTS, without(session, fileName)));
+    }
+
+    /** The session's attached files as they are stored, leaving out the one of that name. */
+    private static List<?> without(Session session, String fileName) {
+        return session.metadata().get(ManagedSession.ATTACHMENTS) instanceof List<?> attached
+                ? attached.stream()
+                        .filter(entry -> !(entry instanceof Map<?, ?> file && fileName.equals(file.get("name"))))
+                        .toList()
+                : List.of();
     }
 
     @Override

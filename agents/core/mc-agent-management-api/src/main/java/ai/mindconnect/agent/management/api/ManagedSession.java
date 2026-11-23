@@ -1,6 +1,7 @@
 package ai.mindconnect.agent.management.api;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -71,6 +72,30 @@ public record ManagedSession(
     public static final String CHAT = "chat";
 
     /** The stored agent the session was opened with, where it was opened with one. */
+    /**
+     * Metadata key of the files attached to a session: a list of entries
+     * with the fields of a {@link SessionAttachment}. What tells a model
+     * about them reads the same entry.
+     */
+    public static final String ATTACHMENTS = "attachedFiles";
+
+    /** The files attached to the session, in the order they were attached. */
+    public List<SessionAttachment> attachments() {
+        if (!(metadata.get(ATTACHMENTS) instanceof List<?> stored)) {
+            return List.of();
+        }
+        return stored.stream()
+                .filter(Map.class::isInstance)
+                .map(entry -> (Map<?, ?>) entry)
+                .map(entry -> new SessionAttachment(
+                        entry.get("id") instanceof String id ? id : null,
+                        String.valueOf(entry.get("name")),
+                        entry.get("mediaType") instanceof String mediaType ? mediaType : null,
+                        entry.get("sizeBytes") instanceof Number size ? size.longValue() : 0,
+                        entry.get("path") instanceof String path ? path : null))
+                .toList();
+    }
+
     public Optional<AgentId> agentId() {
         return metadata.get(AGENT_ID) instanceof String id ? Optional.of(AgentId.of(id)) : Optional.empty();
     }

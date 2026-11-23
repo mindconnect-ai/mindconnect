@@ -48,6 +48,12 @@ public interface SessionManagement {
      */
     ManagedSession setMetadata(SessionId sessionId, String key, Object value);
 
+    /** Attaches a file to the session; a file of the same name it already holds is replaced. */
+    ManagedSession attach(SessionId sessionId, SessionAttachment file);
+
+    /** Takes the file of that name from the session; nothing changes if it holds none. */
+    ManagedSession detach(SessionId sessionId, String fileName);
+
     /**
      * A definition of the session's own to run on; what was said stays. A
      * session that referred to a managed agent stops following it and keeps

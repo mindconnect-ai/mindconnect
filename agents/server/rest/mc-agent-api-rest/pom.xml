@@ -17,6 +17,12 @@
     <description>Agent REST controllers and DTOs — library, no Spring Boot main class</description>
 
     <dependencies>
+        <!-- What is attached to a session is kept through the management API. -->
+        <dependency>
+            <groupId>ai.mindconnect</groupId>
+            <artifactId>mc-agent-management-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>ai.mindconnect</groupId>
             <artifactId>mc-agent-runtime</artifactId>
